@@ -233,8 +233,11 @@ private log retention before deletion. The HTTP contract is exercised with a
 real loopback server; it is not a recorded full guest/tenant acceptance run.
 A private runtime seed projection raises the selected instance to eight GiB
 without changing accepted asset bytes. The local profiles producer includes both
-predictable kernel naming and an exact generated-Netplan-link naming-policy
-drop-in. Shell contracts cover the new drop-in's idempotence
+predictable kernel naming and an exact generated-Netplan-link drop-in preserving
+the observed first-boot physical uplink (`eth0` or `enp1s0`). An empty NamePolicy
+and explicit Name avoid switching the persisted OVS uplink after reboot;
+subsequent boots disable only cloud-init network rendering. Shell contracts
+cover both names, ambiguous/missing/unsupported physical NIC refusal, idempotence
 and foreign-path refusal. Complete tenant acceptance with these corrections
 remains unexercised. None of these probes proves the full
 tenant/workload path. Local evidence reports

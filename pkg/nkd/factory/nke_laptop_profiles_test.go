@@ -48,7 +48,7 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 		t.Fatal("missing source-template append boundary")
 	}
 	stanza = "printf '%s\\n' '#cloud-config' 'bootcmd:'" + stanza
-	for _, scenario := range []string{"new-and-repeat", "different", "symlink", "directory", "link-different", "link-symlink", "link-directory", "link-parent-symlink"} {
+	for _, scenario := range []string{"new-and-repeat", "eth0-new-and-repeat", "missing-uplink", "ambiguous-uplink", "unsupported-uplink", "different", "symlink", "directory", "link-different", "link-symlink", "link-directory", "link-parent-symlink"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
 			destination := filepath.Join(root, "bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain")
@@ -81,7 +81,25 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 			if err := os.Mkdir(filepath.Join(root, "grub.d"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			linkDirectory := filepath.Join(root, "network/10-netplan-enp1s0.link.d")
+			uplink := "enp1s0"
+			if scenario == "eth0-new-and-repeat" {
+				uplink = "eth0"
+			}
+			if scenario != "missing-uplink" {
+				physical := uplink
+				if scenario == "unsupported-uplink" {
+					physical = "eth1"
+				}
+				if err := os.MkdirAll(filepath.Join(root, "sys/class/net", physical, "device"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if scenario == "ambiguous-uplink" {
+				if err := os.MkdirAll(filepath.Join(root, "sys/class/net/eth0/device"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			linkDirectory := filepath.Join(root, "network", "10-netplan-"+uplink+".link.d")
 			if err := os.MkdirAll(linkDirectory, 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -121,9 +139,10 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 			}
 			projected := strings.ReplaceAll(config.Bootcmd[0], "/etc/default/grub.d", filepath.Join(root, "grub.d"))
 			projected = strings.ReplaceAll(projected, "/etc/systemd/network", filepath.Join(root, "network"))
+			projected = strings.ReplaceAll(projected, "/sys/class/net", filepath.Join(root, "sys/class/net"))
 			for iteration := range 2 {
 				out, err := run(projected)
-				if scenario != "new-and-repeat" {
+				if scenario != "new-and-repeat" && scenario != "eth0-new-and-repeat" {
 					if err == nil {
 						t.Fatal("foreign drop-in accepted")
 					}
@@ -140,7 +159,7 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 					t.Fatalf("console/naming lost or duplicated: %q, %v", observed, err)
 				}
 				link, err := os.ReadFile(linkDropIn)
-				if err != nil || string(link) != "[Link]\nNamePolicy=path\n" {
+				if err != nil || string(link) != "[Link]\nNamePolicy=\nName="+uplink+"\n" {
 					t.Fatalf("generated Netplan link naming policy lost or changed: %q, %v", link, err)
 				}
 			}

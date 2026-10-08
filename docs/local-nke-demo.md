@@ -84,12 +84,15 @@ The local profiles image adds an idempotent guest boot command for
 after NICoSim's source-owned GRUB setup, to preserve the first boot's physical
 uplink name used by OVN's generated network configuration.
 This is laptop deployment configuration, not a change to the accepted QCOW2.
-The producer also configures the generated Netplan link through
-`/etc/systemd/network/10-netplan-enp1s0.link.d/10-nkd-local-name.conf`, with
-`NamePolicy=path`, so an earlier userspace rename cannot win through `keep`.
-This uses [systemd's supported link drop-in and naming policies](https://github.com/systemd/systemd/blob/v259/man/systemd.link.xml),
-preserving the generated MAC match and MTU. It is scoped to the measured local
-ARM64 VM interface, not a general host-network workaround. Different existing
+The producer admits exactly one physical NIC, named `eth0` or `enp1s0`, and
+configures its generated Netplan link through
+`/etc/systemd/network/10-netplan-<name>.link.d/10-nkd-local-name.conf`, with
+empty `NamePolicy=` and explicit `Name=<name>`. First-boot seed renaming may
+succeed or remain busy; either actual uplink must survive the OVS reboot.
+This uses [systemd's supported explicit Name precedence](https://github.com/systemd/systemd/blob/v259/man/systemd.link.xml),
+preserving the generated MAC match and MTU. Missing, multiple or unsupported
+physical NICs fail before writes. This single-NIC simulator configuration is
+not a general `eth0` policy for multi-interface hosts. Different existing
 content or symlinks fail the boot command. Rebuild `profiles` with a fresh attempt
 and pass that exact Run; an older completed Run does not acquire this correction.
 It also adds [`network-config=disabled`](https://docs.cloud-init.io/en/latest/reference/network-config.html#kernel-command-line)

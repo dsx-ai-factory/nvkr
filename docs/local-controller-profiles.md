@@ -32,7 +32,7 @@ the four-output `site` lane. This is not an approved release pin.
 | Input | Produced content |
 | --- | --- |
 | NKE fixture Dockerfile | Same copy/materialization layout; base changed from its `alpine:3.24.1` tag to the already maintained exact Alpine digest, observed as Alpine 3.24.2 |
-| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. Idempotent boot configuration adds `net.ifnames=1 network-config=disabled` after the console override plus the measured Netplan link's `NamePolicy`; different existing content or symlinks fail |
+| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. Idempotent boot configuration adds `net.ifnames=1 network-config=disabled` after the console override and preserves the observed single physical uplink through its generated Netplan link; different existing content or symlinks fail |
 | NKE VM config profiles | Source `nico-vms-cp` and `nico-vms-worker`, unchanged |
 | NKE fixture runbooks | All nine source runbooks, unchanged |
 | Local OS metadata | One `nke-local-26-04-arm64-plain` entry: ARM64, Ubuntu 26.04, injected Kubernetes version, diagnostic `local-plain-tpm` variant |
@@ -46,13 +46,17 @@ resolves the pinned image base; Dockerfile build steps use network mode `none`.
 The enclosing wrapped producer still has declared build networking and is not
 a qualified or completely hermetic closure.
 
-The local profile adds a `10-netplan-enp1s0.link.d` drop-in
-with `NamePolicy=path`; Netplan still owns the MAC match and MTU. Unlike `keep`,
-this selects the physical PCI-path name even if userspace has already renamed
-the interface. This configuration targets the local ARM64 simulator interface,
-not arbitrary physical nodes. Shell contracts cover idempotence and rejection of
-foreign content, symlinks and directories; a new full reboot/tenant run is still
-required. Old completed profiles images are unchanged.
+The local profile admits exactly one physical NIC, named `eth0` or `enp1s0`,
+and adds its `10-netplan-<name>.link.d` drop-in with an empty `NamePolicy=` and
+explicit `Name=<name>`. Netplan still owns the MAC match and MTU. The explicit
+name preserves the first boot's actual uplink used by NKE's OVS configuration,
+whether NICoSim's seed rename succeeded or the device remained PCI-path named.
+See [systemd's Name precedence](https://github.com/systemd/systemd/blob/v259/man/systemd.link.xml).
+Using a kernel-style name such as `eth0` is not a general multi-interface policy;
+the command rejects missing, multiple or unsupported physical NICs before writes.
+Shell contracts cover both names, repeated execution and foreign content,
+symlinks and directories; a full reboot/tenant run is still required.
+Old completed profiles images are unchanged.
 
 NICoSim's pinned seed requests `set-name: eth0`. First boot still consumes that
 seed before the profile's boot command runs. The command adds

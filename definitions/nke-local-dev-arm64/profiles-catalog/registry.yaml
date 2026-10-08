@@ -44,17 +44,17 @@ components:
         # Explicit exit propagation prevents cloud-init continuing after an
         # install failure. Installed bytes still need downstream runtime
         # verification; this is not full offline acceptance.
-        # The tested image first boots with predictable physical NIC names.
-        # OVN's source-owned reconciliation persists that uplink in netplan.
-        # Keep the same naming policy on reboot; switching to eth0 afterward
-        # strands that configuration and leaves the worker without IPv4. NICoSim
+        # The measured first boot can retain enp1s0 or become seed-named eth0.
+        # OVN's source-owned reconciliation persists that actual uplink in
+        # netplan. Freeze that one physical device's name across reboot. NICoSim
         # prepends its own GRUB bootcmd to this list; this item runs afterward.
         # The installer writes 99-console.cfg, which overrides /etc/default/grub.
         # Source this exact local snippet after it, preserving the console value.
-        # Ubuntu's generated MAC-matched Netplan .link lacks NamePolicy. On the
-        # measured reboot it renamed enp1s0 to eth0 despite net.ifnames=1.
-        # Select only the PCI-path name in that exact generated link's drop-in:
-        # "keep" would preserve an already userspace-renamed eth0 instead.
+        # Ubuntu's generated MAC-matched Netplan .link loses set-name when NKE
+        # moves L3 to OVS. Set an explicit Name in that generated link's drop-in,
+        # clearing NamePolicy so neither "keep" nor "path" overrides it.
+        # Only one physical NIC with one of the measured names is admitted;
+        # this is not a general eth0 naming policy for multi-interface hosts.
         # Preserve Netplan's MAC match and MTU rather than replacing its file.
         # First boot receives NICoSim's network seed before this bootcmd runs.
         # Subsequent boots must use NKE's persisted OVS Netplan, not reapply
@@ -62,13 +62,22 @@ components:
         # next GRUB command line; cloud-init and its other modules stay enabled.
         printf '%s\n' '#cloud-config' 'bootcmd:' '  - |' \
           '    set -eu' \
+          '    uplink=' \
+          '    for device in /sys/class/net/*; do' \
+          '      test -e "$device/device" || continue' \
+          '      candidate="${device##*/}"' \
+          '      case "$candidate" in eth0|enp1s0) ;; *) exit 1 ;; esac' \
+          '      test -z "$uplink"' \
+          '      uplink="$candidate"' \
+          '    done' \
+          '    test -n "$uplink"' \
           '    test ! -L /etc/systemd/network' \
           '    test -d /etc/systemd/network' \
-          '    directory=/etc/systemd/network/10-netplan-enp1s0.link.d' \
+          '    directory="/etc/systemd/network/10-netplan-$uplink.link.d"' \
           '    test ! -L "$directory"' \
           '    mkdir -p "$directory"' \
           '    link="$directory/10-nkd-local-name.conf"' \
-          '    link_expected="$(printf "[Link]\\nNamePolicy=path\\n")"' \
+          '    link_expected="$(printf "[Link]\\nNamePolicy=\\nName=%s\\n" "$uplink")"' \
           '    test ! -L "$link"' \
           '    if [ -e "$link" ]; then' \
           '      test -f "$link"' \
