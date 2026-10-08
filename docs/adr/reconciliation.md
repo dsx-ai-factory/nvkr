@@ -234,8 +234,7 @@ real loopback server; it is not a recorded full guest/tenant acceptance run.
 A private runtime seed projection raises the selected instance to eight GiB
 without changing accepted asset bytes. The local profiles producer includes both
 predictable kernel naming and an exact generated-Netplan-link naming-policy
-drop-in. Kernel naming alone failed during udev reapplication, leaving OVS
-pointed at a renamed uplink. Shell contracts cover the new drop-in's idempotence
+drop-in. Shell contracts cover the new drop-in's idempotence
 and foreign-path refusal. Complete tenant acceptance with these corrections
 remains unexercised. None of these probes proves the full
 tenant/workload path. Local evidence reports

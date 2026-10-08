@@ -15,6 +15,45 @@ import (
 	"time"
 )
 
+// The fixture models a Linux launcher; the host gate also admits macOS gtimeout.
+func linkLauncherTestTimeout(t *testing.T, tools string) {
+	t.Helper()
+	path, err := exec.LookPath("timeout")
+	if err != nil {
+		path, err = exec.LookPath("gtimeout")
+	}
+	if err != nil {
+		t.Fatalf("test prerequisite timeout or gtimeout: %v", err)
+	}
+	if err := os.Symlink(path, filepath.Join(tools, "timeout")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLauncherTimeoutHostNames(t *testing.T) {
+	for _, name := range []string{"timeout", "gtimeout"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			host, tools := filepath.Join(dir, "host"), filepath.Join(dir, "tools")
+			for _, path := range []string{host, tools} {
+				if err := os.Mkdir(path, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			binary := filepath.Join(host, name)
+			if err := os.WriteFile(binary, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", host)
+			linkLauncherTestTimeout(t, tools)
+			target, err := os.Readlink(filepath.Join(tools, "timeout"))
+			if err != nil || target != binary {
+				t.Fatalf("timeout target=%q error=%v; want %q", target, err, binary)
+			}
+		})
+	}
+}
+
 func TestLocalDeveloperPreflight(t *testing.T) {
 	for _, tc := range []struct {
 		name, system, arch, runtime, lane, state, disk, daemon, want string
@@ -106,7 +145,8 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(toolchainDir, "toolchain.lock.json"), lock, 0600); err != nil {
 				t.Fatal(err)
 			}
-			for _, name := range []string{"bash", "dirname", "git", "jq", "timeout", "awk"} {
+			linkLauncherTestTimeout(t, tools)
+			for _, name := range []string{"bash", "dirname", "git", "jq", "awk"} {
 				path, err := exec.LookPath(name)
 				if err != nil {
 					t.Fatalf("test prerequisite %s: %v", name, err)
@@ -346,6 +386,7 @@ esac
 `), 0700)
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
+			linkLauncherTestTimeout(t, filepath.Join(dir, "tools"))
 			cmd := exec.CommandContext(ctx, "bash", filepath.Join(dir, "scripts", "nke-full-arm64-local.sh"), "scope-probe", "1", "simulator")
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
@@ -432,6 +473,7 @@ esac
 `), 0700)
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
+			linkLauncherTestTimeout(t, filepath.Join(dir, "tools"))
 			cmd := exec.CommandContext(ctx, "bash", filepath.Join(dir, "scripts/nke-full-arm64-local.sh"), "id-probe", "1", "simulator")
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",

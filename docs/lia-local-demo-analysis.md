@@ -15,12 +15,10 @@ This is an analysis, not a completed executable tutorial. No local site or tenan
 was deployed during this analysis.
 
 Subsequent implementation added a separate source-built Linux ARM64 NICoSim
-server/CLI and pinned seed/UI archive bundle. The three-component Colima Docker
-Run completed 1/1, and NKD delivery
-verified/extracted its final members. An offline mock-runtime probe served exact
-packaged UI bytes without NKE source mounted. This closes the simulator's asset
-delivery/startup gap, not real VM provisioning, the missing combined artifact set
-or the Colima-to-tenant demo.
+server/CLI and pinned seed/UI archive bundle. Require a completed Run,
+verified/extracted final members and artifact-only startup checks. A mock-runtime
+probe does not prove real VM provisioning, the complete artifact set or the
+Colima-to-tenant demo. No private runtime acceptance outcome is recorded here.
 
 ## Sources and evidence limits
 
@@ -38,7 +36,7 @@ Checked on October 7, 2026:
   NICo provider, simulator, custom node builder, Tilt and backend E2E scripts.
 - NKD local-build branch at `91a8f7e348d82bc3ac6e1bdec61747d342d9328e`:
   [laptop Definition](../definitions/nke-local-dev-arm64/definition.json), catalog
-  pins and the retained complete 22-output component Run.
+  pins and declared 22-output component selection, not runtime acceptance.
 
 The user identifies Lia's environment as local Colima plus NICoSim. Neither the
 meeting transcript nor PR #1160's test summary specifies her exact simulator
@@ -198,11 +196,9 @@ test suite. Calling those scripts as-is cannot prove that NKD built everything.
 ## Concrete implementation order
 
 1. **Make the existing QCOW2 build run on the Mac.** Keep the authored ARM64 TCG
-   producer and admission requirements. October 8 failed-attempt cleanup recovered
-   sufficient workspace and the real Colima preflight passed. The shared-mount OS
-   build failed during SPIRE preparation; the native-ext4 retry reached autoinstall
-   but then lost QEMU to global OOM in the 16 GiB VM. No private execution or
-   storage report is shipped here. Use the current
+   producer and admission requirements. Check native workspace and physical host
+   capacity before execution, then require a complete Run and actual guest
+   checks. No private execution or storage outcome is recorded here. Use the current
    [integrated command and acceptance limits](local-nke-demo.md); do not treat
    preflight or material preparation as full tenant acceptance.
    Use the real NICoSim VM backend for tenant nodes,

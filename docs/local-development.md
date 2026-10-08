@@ -23,7 +23,7 @@ NKD is the project; `nkdctl` is its command-line tool. You provide three inputs:
 `run plan` describes the work. `run local` executes it as a new immutable attempt.
 Local builds are unqualified diagnostics, not signed releases or cluster deployment.
 For the next step, see [NKD artifacts for the NICo site installer](nkd-to-nke-demo.md).
-That guide distinguishes the tested artifact build from the still-unvalidated
+That guide distinguishes artifact construction from the still-unvalidated
 installation and tenant-provisioning handoff.
 
 ## Start from a clean machine
@@ -180,8 +180,8 @@ global caches or raise Mac limits to work around it. Its Mac-forwarded Colima
 route rejects `os` and `all` before downloads or attempt creation; enter the
 native source export and invoke the Linux launcher there instead.
 
-Colima's configured 150 GiB disk does not provide 150 GiB of physical host free
-space. Allow about 90 GiB free on both the host and the selected Run filesystem
+Colima's configured 150 GiB disk does not provide 150 GiB of free space on the
+physical host. Allow about 90 GiB free on both the host and the selected Run filesystem
 before a fresh OS attempt, with at least 64 GiB on the Run filesystem remaining
 at Packer admission. The launcher measures guest capacity; it does not reserve
 physical space for a sparse disk. A native guest filesystem addresses the shared
@@ -375,7 +375,7 @@ The launcher downloads the exact Go archive from the toolchain lock, verifies it
 SHA-256 inside the pinned utility container and uses it to compile a static Linux ARM64
 `nkdctl`, then runs it inside Linux, previews the selection and executes the 22-output
 Run. Producer and utility containers still use their pinned images. One job is the conservative
-starting point. The tested path uses the exact local Git clone shown above.
+starting point. The optional local-clone route supplies exact pinned Git objects.
 The bootstrap Go version/archive are maintained in
 `toolchains/nkd-packer/toolchain.lock.json`; that version must match `.go-version`,
 which `make build` checks. Bootstrap module/build caches are private per attempt,
@@ -383,7 +383,7 @@ so a fresh attempt downloads modules again; no shared-cache integrity is claimed
 Canonical remote fetch is available when `NKE_LOCAL_CLONE` is absent, but is not
 a validated first-time-developer quickstart here. Private-source Git authentication
 must work inside the VM, not just in the Mac's `gh` session. A remote-only setup
-recipe remains unvalidated; do not infer it from the local-clone result. Never put
+recipe remains unvalidated; a local-clone route would not prove remote access. Never put
 a PAT into catalogs, commands or logs. Charts, images and declared dependency
 preparation still need network access.
 
@@ -456,16 +456,11 @@ generic bundle's executable-mode/install hint. The data producer uses sorted arc
 source timestamps/ownership/modes and a timestamp-free gzip header. It does not
 add credentials, production fleet profiles or VM state. The archive retains
 source-owned paths (`internal/seed/default-seed.yaml` and `ui/`) for the deployment
-consumer. The three-component Colima Docker Run and artifact-only startup
-completed separately: delivery verified/extracted the final bundle, and the
-mock-runtime probe initialized SQLite and served exact packaged UI bytes without
-mounting NKE source. Deployment/tenant acceptance remains separate.
-Its build is not proof of real VM provisioning or tenant readiness;
-the earlier Podman smoke selected a mock
-VM backend. The later committed Colima Docker Run
-completed 1/1 with the earlier two-component selection and passed the same limited
-startup probe using seed/UI from the source snapshot. It does not prove the new
-archive producer, real VM provisioning or the complete demo.
+consumer. Require a complete simulator Run, verified extraction of every member
+and artifact-only startup checks before deployment. A mock-runtime probe does not
+prove real VM provisioning or tenant readiness. No private simulator-build or
+startup acceptance outcome is recorded here; deployment/tenant acceptance is
+separate.
 
 The later [artifact-only guest command](local-qcow2-guest-probe.md) consumes the
 completed simulator/OS Runs inside Linux, without rebuilding. It requires
@@ -530,8 +525,7 @@ NKTP's three repositories are registered in temporary Helm configuration, Helm
 validates its source-owned lock, and subsequent chart packaging is offline.
 These dependency archives remain acquisitions, not independent source builds.
 
-The completed Colima site Run
-observed all four outputs with no failure. Require your own Run status
+Require your own Run status
 `complete`, exactly four expected/observed outputs and no failure before using
 them. Helm 4.3.0 in this build wrapper does not match the installer's preferred
 4.2.4; the readiness check warns rather than failing solely on that mismatch.
@@ -546,8 +540,8 @@ not yet the promised deploy-only, QCOW2-backed site/tenant journey.
 
 The separate `profiles` lane builds the controller's profiles content image
 with a plain ARM64/Ubuntu 26.04 local profile, not the older fixture's 24.04/FDE
-selection. Its real Docker build and NKE-owned content/template tests passed.
-It still requires the deploy-only adapter's exact QCOW2 binding and runtime
+selection. Require completed Run and NKE-owned content/template checks.
+It also requires the deploy-only adapter's exact QCOW2 binding and runtime
 validation. Follow the [profiles guide](local-controller-profiles.md); this lane
 does not add profiles to `all` or install a site.
 
@@ -826,7 +820,7 @@ a hermetic or byte-reproducible OS claim.
 
 Contract tests cover local admission, exact output observation, input compilation
 and owned cleanup. They do not prove a clean-machine setup, remote-only source
-access, a full disk smoke, a complete source-built distribution or deployed NKE.
+access, a full-disk smoke, a complete source-built distribution or deployed NKE.
 Historical local trial reports are intentionally not shipped in this PR.
 Require complete Run records and actual consumer checks for your own outputs.
 The [integrated demo guide](local-nke-demo.md) tracks the distinct tenant/workload

@@ -82,9 +82,8 @@ host-local Go/GCC image ID. The launcher supports Podman and native ARM64 Docker
 building and natively probing pinned toolchain sources when required. It binds
 the measured image ID to exactly the selected simulator producers through an
 attempt overlay. `--check simulator` requires no cached toolchain and does no
-producer work; Docker bootstrap requires Buildx. The later committed
-Docker Run and startup probe
-passed separately; neither it nor the earlier Podman Run proves VM provisioning.
+producer work; Docker bootstrap requires Buildx. Require a completed Run and
+artifact-only startup checks; neither establishes VM provisioning.
 Module downloads and verification precede offline CGO compilation;
 the server invokes NKE's `build-static` target. These Linux tools do not run directly
 on macOS. The additional `nico-sim-runtime-assets` producer packages the pinned
@@ -92,11 +91,9 @@ diagnostic seed, UI and vendor notices in a tar+gzip archive, using deterministi
 metadata. The producer writes `nicosim-runtime-assets.tar.gz`; the final bundle
 member and verified extraction use `nico-sim-runtime-assets`, the component name.
 Treat that member as archive data, not an executable/install target.
-Its three-component Plan is contract-tested; the earlier recorded Runs built
-only the server/CLI. A new Docker Run and artifact-only startup probe
-completed and consumed verified extracted seed/UI without NKE source mounted.
-It still uses the mock backend. The QCOW2-to-tenant handoff, profiles and the
-deploy-only adapter need validation/integration. This separate build is not a
+Its three-component Plan is contract-tested. No private simulator-build or startup
+acceptance outcome is recorded here. A mock-runtime probe is not acceptance of
+the QCOW2-to-tenant handoff, profiles or deploy-only adapter. This build is not a
 complete Colima/NICoSim demo.
 
 The separate `site` lane pins four producers to NKE PR #1160's exact candidate
@@ -118,11 +115,9 @@ CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
   bash scripts/nke-full-arm64-local.sh arm64-site-01 1 site
 ```
 
-Docker/Podman compiler contracts and an isolated Helm preparation/package
-probe pass.
-A complete four-output Colima Run
-passed, including native controller help and unchanged chart handoff/rendering.
-It did not install NKE. The wrapper uses the existing
+Docker/Podman compiler contracts cover the selected inputs. Require a complete
+four-output Run, native controller help and unchanged chart handoff/rendering
+before attempting deployment. These checks do not install NKE. The wrapper uses the existing
 pinned Helm 4.3.0, not the installer's preferred 4.2.4. Its readiness script warns
 on this mismatch; a warning is not a matched pin. Read the
 [handoff gaps](../../docs/nkd-to-nke-demo.md) before treating these inputs as a
@@ -133,13 +128,13 @@ The separate `tools` selection compiles Helm 4.2.4, kubectl 1.36.0, clusterctl
 It reuses PR #113's preparation/offline-build approach and does not change the
 older acquired `operator-tools` output or the OS graph. See the
 [source-tool instructions and limits](../../docs/local-development.md#build-the-installer-tools-from-source).
-Compiler and preflight contracts, the complete five-component Colima Run,
-verified extraction and all five native version probes passed. Complete installer
-integration remains unexercised. These are Linux binaries, not Mac binaries.
+Compiler and preflight contracts do not prove a real tools build or installer
+integration. Require a completed Run, verified extraction and all five native
+version probes. These are Linux binaries, not Mac binaries.
 
 The separate `profiles` lane packages pinned NKE VM config profiles/runbooks
-and a diagnostic ARM64/Ubuntu 26.04 plain OS profile. Its Docker Run and offline
-content/NKE-owned template checks passed, not provisioning or tenant acceptance.
+and a diagnostic ARM64/Ubuntu 26.04 plain OS profile. Require a completed Run and
+offline content/NKE-owned template checks; those are not provisioning or tenant acceptance.
 See the [profiles guide](../../docs/local-controller-profiles.md) before using
 its local endpoint and TPM configuration; it does not authenticate a disk or
 replace production fleet profiles.

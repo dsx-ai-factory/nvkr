@@ -6,27 +6,17 @@ No application, chart or disk build runs during deployment. Kind is the
 management cluster only. Tenant nodes are real ARM64 libvirt VMs backed by the
 NKD-produced QCOW2, through CAPNICo and NICoSim, not CAPD/container nodes.
 
-The new integrated command is under real-runtime validation. Do not treat its
-contract tests, the earlier site-only replay or the successful standalone guest
-probe as a completed tenant/workload result. This is a disposable trusted-user
+The new integrated command is under real-runtime validation. Contract tests and
+separate site/guest probes do not establish a completed tenant/workload result.
+This is a disposable trusted-user
 diagnostic, not M2, a signed Release, qualified execution or a complete
 source-built distribution. The older retained disk's failed full OS smoke and
 missing DSX source material remain disclosed.
-An earlier completed integrated attempt booted both guests but failed
-`kubeadm init`: containerd could not pull the source-pinned kube-vip image from
-GHCR, and the tenant API virtual IP remained unreachable. A raw registry `401`
-is only an authentication challenge, not proof that a public image pull is
-denied. A later integrated attempt completed first-boot local package installation
-on both guests; the control-plane node became Ready
-and kube-vip was Running and Ready with its exact pinned GHCR image digest.
-The worker did not join. Although its reboot kernel selected `net.ifnames=1`,
-Netplan's generated MAC-matched `.link` omitted `NamePolicy`. Udev renamed
-`enp1s0` to `eth0`, while the persisted OVS bridge still referenced `enp1s0`.
-The worker then had no IPv4/default route and diagnostic SSH failed with
-`no route to host`. Kernel naming alone did not fix this.
-The candidate projects eight-GiB guests and now also supplies an exact Netplan
-link drop-in retaining the userspace name. Its contracts pass; a fresh integrated
-reboot, worker join, workload and final cleanup remain acceptance requirements.
+Private integrated attempts have not passed; no private runtime acceptance
+outcome is recorded here. The candidate projects eight-GiB guests and supplies
+an exact Netplan link naming-policy drop-in. Contracts cover the emitted
+configuration, not udev/reboot behavior. A complete integrated reboot, worker
+join, workload and final cleanup remain acceptance requirements.
 This guide is not yet a validated full-demo result.
 
 The selected controller hardcodes `ghcr.io/kube-vip/kube-vip` and renders a
@@ -92,12 +82,9 @@ request. No approximate YAML or iPXE parser is added in NKD.
 The local profiles image adds an idempotent guest boot command for
 [`net.ifnames=1`](https://github.com/systemd/systemd/blob/main/docs/PREDICTABLE_INTERFACE_NAMES.md),
 after NICoSim's source-owned GRUB setup, to preserve the first boot's physical
-uplink name used by OVN's generated network configuration. A previous profile
-set `net.ifnames=0` only for reboot: that renamed the physical NIC after OVN
-had persisted its first-boot name, leaving the worker without IPv4.
+uplink name used by OVN's generated network configuration.
 This is laptop deployment configuration, not a change to the accepted QCOW2.
-Kernel naming alone was insufficient: Netplan's MAC-matched link could still
-rename the uplink during reapplication. The producer also installs
+The producer also configures the generated Netplan link through
 `/etc/systemd/network/10-netplan-enp1s0.link.d/10-nkd-local-name.conf`, with
 `NamePolicy=keep kernel database onboard slot path`. This uses
 [systemd's supported link drop-in and naming policies](https://github.com/systemd/systemd/blob/v260/man/systemd.link.xml),
@@ -115,8 +102,7 @@ marker; it is not permission to fetch Ubuntu packages or silently skip
 installation. This profile change does not rebuild the disk or establish
 complete offline deployment:
 kube-vip and the workload still have separate runtime acquisition requirements.
-Real first-boot installation completed on both guests with the local APT policy;
-that attempt still failed worker reboot networking and did not pass E2E.
+Require actual guest installation and reboot checks; shell contracts are not E2E.
 
 Cache the pinned service images using the existing build/management setup.
 The integrated adapter uses the existing `kind` Docker bridge. On a clean
@@ -178,8 +164,8 @@ python3 -B scripts/nke-local-demo.py \
 
 Run that block inside `colima ssh --profile nkd-demo`, or on an equivalent
 dedicated native ARM64 Linux host. Linux executables cannot run directly on macOS.
-The tenant budget defaults to 60 minutes: native TCG provisioning on the tested
-laptop exceeded 30 minutes. This is a timeout bound, not a completion estimate.
+The tenant budget defaults to 60 minutes. This is a timeout bound, not a
+completion estimate.
 The consumer requires the disk-copy bytes plus 30 GiB free on its native output
 volume and the management admission's eight CPUs/20 GiB RAM. Its output must
 not already exist. This is two-VM diagnostic capacity, not fresh-bake admission.
@@ -221,8 +207,8 @@ a 60-GiB disk. The original seed is admitted by its exact source digest and kept
 unchanged. Only the selected instance's name/memory block is replaced in a
 separate runtime seed; NICoSim's source-owned decoder validates it through
 `NICO_SIM_SEED_PATH`. `demo-inputs.json` records both seed digests and the sizing.
-The six-GiB source default left insufficient allocatable memory for OVN on the
-tested control plane. This projection is deployment configuration, not a rebuild
+The projection selects eight GiB instead of the source's six-GiB default.
+This is deployment configuration, not a rebuild
 or change to the accepted simulator/disk artifact bytes. The QCOW2 bytes are the
 delivery subject; mutable guest overlays naturally diverge during provisioning.
 The consumer does not claim exact guest reproduction or inspect a final disk SBOM.

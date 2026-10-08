@@ -46,11 +46,9 @@ resolves the pinned image base; Dockerfile build steps use network mode `none`.
 The enclosing wrapped producer still has declared build networking and is not
 a qualified or completely hermetic closure.
 
-The kernel flag alone did not preserve the reboot network: the generated
-`10-netplan-enp1s0.link` lacked a naming policy, and udev renamed the uplink to
-`eth0` while OVS retained `enp1s0`. The local profile adds only a `.link.d` drop-in
+The local profile adds a `10-netplan-enp1s0.link.d` drop-in
 with `NamePolicy=keep kernel database onboard slot path`; Netplan still owns the
-MAC match and MTU. This correction targets the measured ARM64 simulator interface,
+MAC match and MTU. This configuration targets the local ARM64 simulator interface,
 not arbitrary physical nodes. Shell contracts cover idempotence and rejection of
 foreign content, symlinks and directories; a new full reboot/tenant run is still
 required. Old completed profiles images are unchanged.
