@@ -24,6 +24,22 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func TestFinalizeGeneratedRejectsEmptyWorkspaceBeforeInputsOrOutput(t *testing.T) {
+	for _, definitionPath := range []string{"", "missing-definition.yaml"} {
+		t.Run(definitionPath, func(t *testing.T) {
+			outputPath := filepath.Join(t.TempDir(), "run.json")
+			run, err := FinalizeGenerated(t.Context(), definitionPath, "missing-environment.yaml", "missing-plan.json", "test", "attempt", "", outputPath)
+			assertCode(t, err, nkderr.CodeUsage)
+			if run != nil {
+				t.Fatal("empty workspace must not create a Run")
+			}
+			if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+				t.Fatalf("unexpected output after failed admission: %v", err)
+			}
+		})
+	}
+}
+
 func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *testing.T) {
 	old, err := os.Getwd()
 	if err != nil {

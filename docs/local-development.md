@@ -37,17 +37,8 @@ Component tooling runs in catalog-pinned containers; Packer creates the node OS
 inside QEMU. Git, Bash, a working native container runtime, `jq` and GNU `timeout`
 are still required on the Linux execution host.
 
-The clone commands below target `main` after this example merges. While PR #118
-is still unmerged, select its implementation checkout before running the launcher:
-
-```sh
-# Pre-merge testing only; omit after the example is present on main.
-git switch --track origin/codex/full-nke-arm64-local
-```
-
-Run that command immediately after `cd nke-recipes` in either clone block below.
-It is not a permanent installation prerequisite; a deleted PR branch is not
-required after merge.
+The clone commands below target `main` after this example merges. Pre-merge
+testing instructions belong in the PR description, not the installed quickstart.
 
 | Starting point | Route |
 | --- | --- |
