@@ -43,7 +43,7 @@ VERSIONS_HASH = "0a4a74197a07a862faf2d536d8565bf8cce3cbc50b72d50bc7c0a67514af2f6
 SOURCE_FILES = ["deploy/stages/04-install-cluster-api.sh", "deploy/lib.sh", "make/tool-versions.mk"]
 
 
-class UnjoinedProcess(VM.SmokeError):
+class UnjoinedProcess(VM.SmokeError, CHART.UnjoinedCommand):
     """Cleanup cannot race a producer whose process group may still run."""
 
 
@@ -157,7 +157,7 @@ def stop_group(process, grace=40, kill_grace=5):
         raise UnjoinedProcess("owned process group remains after stop/join")
 
 
-def execute(argv, phase, work, env, timeout, diagnostic_optional=False):
+def execute(argv, phase, work, env, timeout, diagnostic_optional=False, output=None):
     """Own and join the entire subprocess group, including on interruption."""
     print("Management phase: " + phase, flush=True)
     try:
@@ -168,7 +168,8 @@ def execute(argv, phase, work, env, timeout, diagnostic_optional=False):
         print("Private cleanup log unavailable; exact owned-node cleanup still proceeds", file=sys.stderr)
         log = open(os.devnull, "wb")
     with log:
-        process = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT, env=env,
+        process = subprocess.Popen(argv, stdout=log if output is None else output,
+                                   stderr=subprocess.STDOUT if output is None else log, env=env,
                                    cwd=work, start_new_session=True)
         try:
             process.wait(timeout=timeout)
@@ -181,6 +182,17 @@ def execute(argv, phase, work, env, timeout, diagnostic_optional=False):
                 raise UnjoinedProcess(f"{phase}: stop/join failed; refusing concurrent cleanup") from err
     if process.returncode:
         raise VM.SmokeError(f"{phase}: failed (exit {process.returncode}); private phase log retained")
+
+
+def capture(argv, phase, work, env, timeout=30, text=True):
+    """Capture a bounded private result with the same stop/join ownership."""
+    result = work / (phase + ".stdout")
+    with result.open("xb") as output:
+        execute(argv, phase, work, env, timeout, output=output)
+    if result.stat().st_size > 8 * 1024**2:
+        raise VM.SmokeError(phase + ": result exceeds diagnostic bound")
+    raw = result.read_bytes()
+    return raw.decode() if text else raw
 
 
 def owned_nodes(name, env):
@@ -266,7 +278,7 @@ def verify_versions(tools, work, env):
         raise VM.SmokeError("built ORAS version/platform does not match the installer")
 
 
-def probe(args):
+def probe(args, consumer=None):
     env = native_environment()
     checkout, tool, root, layout, work, config, observed, source = admit(args, env)
     name = "nker-demo-" + uuid.uuid4().hex[:16]
@@ -314,6 +326,10 @@ def probe(args):
         execute(["bash", str(stage), "check"], "check-capi", work, env, 180)
         execute([str(tools / "kubectl"), "--kubeconfig", env["SITE_KUBECONFIG"], "get", "pods", "-A", "-o", "json"],
                 "management-pods", work, env, 30)
+        if consumer is not None:
+            # Trusted downstream adapter, not a caller-selected shell command.
+            # Keep node ownership/process failure handling around the consumer.
+            consumer(name, tools, work, env)
     except UnjoinedProcess:
         cleanup_allowed = False
         raise
@@ -325,8 +341,11 @@ def probe(args):
         finally:
             for number, handler in previous.items():
                 signal.signal(number, handler)
-    print("PASS: NKD-built tools, real management Kind/CAPI and owned-node cleanup.")
-    print("NOT full demo: NKE site, CAPNICo/QCOW2 tenant and workload remain separate acceptance.")
+    if consumer is None:
+        print("PASS: NKD-built tools, real management Kind/CAPI and owned-node cleanup.")
+        print("NOT full demo: NKE site, CAPNICo/QCOW2 tenant and workload remain separate acceptance.")
+    else:
+        print("PASS: downstream consumer returned and exact management cleanup completed; no full-demo claim.")
     print("Private diagnostic directory: " + str(work))
 
 

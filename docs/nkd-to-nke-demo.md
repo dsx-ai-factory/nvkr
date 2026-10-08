@@ -27,6 +27,12 @@ owned node/volume cleanup. It uses pinned NKE stage bytes without rebuilding
 artifacts. It does not deploy the NKE site or create a CAPD/container tenant;
 the full CAPNICo/QCOW2 path still needs integration.
 
+The later [deploy-only site consumer](local-site-integration.md) passed a
+[real Colima replay](evidence/2026-10-08-local-site-integration.md): six prepared
+charts, exact controller/profiles/CAPNICo image handoff and runtime image-ID
+checks, site health, registration and API access, then owned cleanup. This
+supersedes the earlier site-installation gap, not the tenant/workload gap.
+
 **The artifact-build part is tested; the complete NKD-to-demo E2E is not yet
 validated.** Do not use the completed 22-output local Run as proof that a site or
 tenant was installed. The [first-time build guide](local-development.md) is the
@@ -316,13 +322,15 @@ A full result requires all of the following recorded against one explicit input 
 5. A committed source change is repinned, rebuilt, deployed and observed with the
    new identity. Test resources are cleaned up through the authorized NKE workflow.
 
-Remaining implementation: combine the completed site/tools/profiles selections
-with the required membership; integrate the tested chart adapter
-with the staged manifest/override selection and registry transport. The requested
+Remaining implementation: combine the completed selections with the required
+membership, including PR #113's direct-source OS graph where applicable. The
+tested site adapter already joins six chart inputs with source-owned stage
+selection and reachable controller/profiles/provider registry transport. The requested
 scenario is already selected: local Colima plus
 CAPNICo/NICoSim with QCOW2-backed tenant VMs, not a production NICo site or CAPD
-substitute. The management-only Kind/CAPI consumer now passes separately; the
-full wrapper still needs to integrate it with the owned NICo endpoint,
-reachable artifact registry and bootstrap trust configuration, plus verify
-source access and OS capacity. Until that implementation and real acceptance run
+substitute. The full wrapper still needs owned NICoSim routing/DHCP/BGP and
+exact disk serving, guest/bootstrap trust compatibility, tenant creation and
+workload checks, plus verify source access and OS capacity. The current site
+CA and successful standalone guest do not prove that joint trust/bootstrap path.
+Until that implementation and real acceptance run
 are complete, this is not a working copy-paste full-E2E tutorial.

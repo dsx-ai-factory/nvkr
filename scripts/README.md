@@ -12,6 +12,15 @@ cleans up its exact node and anonymous volume. See the
 [management diagnostic](../docs/local-management-cluster.md). It rebuilds no
 artifacts and is not the complete NKE/CAPNICo/QCOW2 tenant demo.
 
+`python3 scripts/nke-local-site.py` extends that owned management lifetime with
+NKE's real site installer, consuming completed tools/site/components/profiles/
+provider Runs. It copies exact controller/profiles/CAPNICo manifests to a private
+node-reachable registry, installs six unchanged chart archives, checks health,
+registers the site and verifies actual runtime image IDs before owned cleanup.
+See the [site command and prerequisites](../docs/local-site-integration.md) and
+[real replay evidence](../docs/evidence/2026-10-08-local-site-integration.md).
+It requires an existing private NICoSim endpoint and is not tenant/workload E2E.
+
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
 OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
@@ -34,7 +43,8 @@ exact fixture preparation is diagnostic Local-only, not a supported held hosted
 fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
 `profiles` separately builds the diagnostic plain ARM64/Ubuntu 26.04 controller
 profiles image from pinned NKE fixtures. Its [Docker Run/content probe](../docs/evidence/2026-10-08-colima-local-profiles.md)
-passed; it is not deployed, included in `all`, or boot-compatibility proof.
+passed; the later site consumer deployed it and checked its exact init-container
+image ID. It is not included in `all` or tenant boot-compatibility proof.
 See the [profiles guide](../docs/local-controller-profiles.md).
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
 The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.

@@ -262,7 +262,7 @@ completed with no failure, and its exact controller image passed offline native
 help. A later [loopback registry transport probe](../evidence/2026-10-08-local-registry-handoff.md)
 copied that controller and bound chart with the built ORAS, matching both remote
 manifest digests. It establishes neither complete mirroring nor node/consumer
-reachability. Deployment remains unexercised; the
+reachability in that earlier probe. The later real site replay is recorded below; the
 site set is separate from `all`. Dependency charts remain acquisitions and the
 wrapper's Helm 4.3.0 does not match the installer's preferred 4.2.4; its readiness
 script warns rather than failing solely on that mismatch. Default source-tree
@@ -283,7 +283,7 @@ bundle of Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3, ORAS 1.3.3 and Kind 0.3
 matching the selected installer's source-owned tool pins. Native Docker/Podman
 compiler and no-work preflight contracts pass. The later Colima Docker Run completed
 all five source components into one observed bundle; verified extraction, independent
-hashing and all five native version commands passed. No NKE site installation is recorded.
+hashing and all five native version commands passed. The later site replay uses this bundle.
 The later [management consumer](../local-management-cluster.md) uses that
 completed bundle for a real private Kind management node and pinned NKE CAPI
 stage. It verifies client versions, executes a private tracked-Git projection,
@@ -295,6 +295,21 @@ CAPNICo/QCOW2 tenant acceptance, authenticated Release or full demo. Negative
 contracts cover foreign resource ownership, hidden working-tree stage changes,
 wrong tool versions/platforms, descendant teardown and failed diagnostic
 writes during cleanup.
+The later [site consumer](../local-site-integration.md) joins completed
+site/components/profiles/provider Runs with that management lifetime. NKE owns
+rendering, installation and stage checks; NKD owns chart/CLI material verification.
+Source-built ORAS copies three exact manifests to a private node-reachable
+registry and read-back matches their Run observations. The
+[real Colima replay](../evidence/2026-10-08-local-site-integration.md) passed
+six Helm releases, controller database/Temporal health, CAPNICo readiness,
+stage-06 registration/API access and exact runtime image IDs before removing
+the owned registry, node and anonymous volume. The supplied real NICoSim server
+and temporary bridge were owned by the private replay harness, not this adapter.
+No tenant was created. Acquired dependency charts/runtime images, a fresh local
+bootstrap CA, Kind-only telemetry TLS settings and disabled reference API
+authentication remain explicit diagnostic exceptions. This establishes local
+site installation, not a full source-built distribution, QCOW2 tenant/workload
+acceptance, qualified execution or authenticated Release.
 Four sources use bounded module preparation with unchanged manifest
 checks; Kubernetes uses its committed vendor/staging workspace. All five compile
 offline. Helm reuses PR #113's exact target-checked removal of four upstream

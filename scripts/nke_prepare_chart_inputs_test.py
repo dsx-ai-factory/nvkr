@@ -22,7 +22,7 @@ class ChartInputsTest(unittest.TestCase):
                 ADAPTER.assignments(values, "test")
 
     def test_preparation(self):
-        for case in ("exact", "wrong source", "dirty source", "missing chart", "extra chart", "missing pin",
+        for case in ("exact", "owned runner", "unjoined runner", "wrong source", "dirty source", "missing chart", "extra chart", "missing pin",
                      "duplicate items", "invalid interface", "symlink source", "extraction failure", "existing output", "output symlink",
                      "NKE output", "NKE parent symlink", "layout output"):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
@@ -59,6 +59,8 @@ class ChartInputsTest(unittest.TestCase):
                         if command == "show":
                             return sources[argv[4].split(":deploy/nico/", 1)[1]].encode()
                     if argv[0] == str(tool):
+                        if case == "unjoined runner":
+                            raise ADAPTER.UnjoinedCommand("process remains")
                         if case == "extraction failure":
                             raise ADAPTER.HandoffError("extraction failed")
                         Path(argv[-1]).write_bytes(b"exact fixture chart bytes")
@@ -92,9 +94,12 @@ class ChartInputsTest(unittest.TestCase):
                     out = alias / "prepared"
                 if case == "layout output":
                     out = layouts["controller"] / "prepared"
-                with patch.object(ADAPTER, "run", run):
-                    if case == "exact":
-                        deploy = ADAPTER.prepare(checkout, tool, charts, pins, out)
+                def forbidden(*_args, **_kwargs):
+                    self.fail("owned-runner preparation called ambient subprocess wrapper")
+                with patch.object(ADAPTER, "run", forbidden if case in ("owned runner", "unjoined runner") else run):
+                    if case in ("exact", "owned runner"):
+                        deploy = ADAPTER.prepare(checkout, tool, charts, pins, out,
+                                                 runner=run if case == "owned runner" else None)
                         self.assertEqual(deploy, out / "deploy")
                         self.assertEqual((deploy / "controller/values.yaml").read_text(), "preserve: exact\n")
                         self.assertIn("  path: charts/controller.tgz\n", (deploy / "controller/release.yaml").read_text())
@@ -103,11 +108,17 @@ class ChartInputsTest(unittest.TestCase):
                         self.assertEqual(out.stat().st_mode & 0o777, 0o700)
                     else:
                         with self.assertRaises(ADAPTER.HandoffError):
-                            ADAPTER.prepare(checkout, tool, charts, pins, out)
+                            ADAPTER.prepare(checkout, tool, charts, pins, out,
+                                            runner=run if case == "unjoined runner" else None)
                         if case not in ("existing output", "output symlink"):
                             self.assertFalse(out.exists())
                         self.assertFalse((root / "must-not-exist").exists())
-                self.assertFalse(list(root.glob(".nkd-chart-inputs-*")))
+                stages = list(root.glob(".nkd-chart-inputs-*"))
+                if case == "unjoined runner":
+                    self.assertEqual(len(stages), 1)
+                    self.assertTrue((stages[0] / "deploy/charts").is_dir())
+                else:
+                    self.assertFalse(stages)
                 self.assertFalse(list(checkout.iterdir()), "adapter wrote into NKE checkout")
                 for argv in calls:
                     self.assertNotIn("make", argv)

@@ -10,10 +10,12 @@ It does not create a Release, prove provenance or install a site.
 """
 
 import argparse
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import tempfile
 
@@ -24,6 +26,24 @@ INSTALLER_COMMIT = "8fb2d53368823bd386b4fbd55b4ab6d3c0931345"
 
 class HandoffError(Exception):
     pass
+
+
+class UnjoinedCommand(HandoffError):
+    """A runner must preserve staging while its process group may remain."""
+
+
+@contextmanager
+def private_stage(parent):
+    temporary = tempfile.mkdtemp(prefix=".nkd-chart-inputs-", dir=parent)
+    cleanup_allowed = True
+    try:
+        yield temporary
+    except UnjoinedCommand:
+        cleanup_allowed = False
+        raise
+    finally:
+        if cleanup_allowed:
+            shutil.rmtree(temporary)  # Only the private directory just created here.
 
 
 def run(argv, label, timeout=30, text=True):
@@ -49,15 +69,17 @@ def assignments(values, label):
     return result
 
 
-def release_fields(reader, path):
-    fields = run([sys.executable, str(reader), "release", str(path)],
+def release_fields(reader, path, runner=None):
+    runner = runner or run
+    fields = runner([sys.executable, str(reader), "release", str(path)],
                  "NKE deploy-item validation").rstrip("\n").split("\x1f")
     if len(fields) != 9 or fields[0] != "single":
         raise HandoffError("NKE deploy-item reader returned an unsupported interface")
     return fields
 
 
-def prepare(nke_checkout, nkdctl, charts, manifests, out):
+def prepare(nke_checkout, nkdctl, charts, manifests, out, runner=None):
+    runner = runner or run
     checkout = Path(nke_checkout).resolve(strict=True)
     tool = Path(nkdctl).resolve(strict=True)
     destination = Path(out).absolute()
@@ -67,16 +89,16 @@ def prepare(nke_checkout, nkdctl, charts, manifests, out):
     destination = parent / destination.name
     if parent.is_relative_to(checkout):
         raise HandoffError("prepared inputs must be outside the NKE checkout")
-    head = run(["git", "-C", str(checkout), "rev-parse", "HEAD"], "NKE source pin").strip()
+    head = runner(["git", "-C", str(checkout), "rev-parse", "HEAD"], "NKE source pin").strip()
     if head != INSTALLER_COMMIT:
         raise HandoffError("NKE checkout does not match the selected installer commit")
-    dirty = run(["git", "-C", str(checkout), "status", "--porcelain", "--untracked-files=all"],
+    dirty = runner(["git", "-C", str(checkout), "status", "--porcelain", "--untracked-files=all"],
                 "NKE clean-checkout check")
     if dirty:
         raise HandoffError("NKE installer checkout must be clean; use a separate pinned clone")
     reader = checkout / "deploy/lib/nke-deploy-items.py"
     source_path = checkout / "deploy/nico"
-    listed = run([sys.executable, str(reader), "items", str(source_path / "nke-deploy.yaml")],
+    listed = runner([sys.executable, str(reader), "items", str(source_path / "nke-deploy.yaml")],
                  "NKE deploy-item listing")
     items = []
     for line in listed.splitlines():
@@ -91,14 +113,14 @@ def prepare(nke_checkout, nkdctl, charts, manifests, out):
     if set(charts) != helm_items or set(manifests) != helm_items:
         raise HandoffError("supply exactly one chart layout and manifest pin for every NKE Helm item")
     # No output work begins until the complete source and requested set pass.
-    originals = {item: release_fields(reader, source_path / item / "release.yaml")
+    originals = {item: release_fields(reader, source_path / item / "release.yaml", runner)
                  for item in sorted(helm_items)}
     layouts = {item: str(Path(charts[item]).resolve(strict=True)) for item in helm_items}
     if any(parent.is_relative_to(Path(layout)) for layout in layouts.values()):
         raise HandoffError("prepared inputs must be outside every producer OCI layout")
-    tracked = run(["git", "-C", str(checkout), "ls-tree", "-rz", head, "--", "deploy/nico"],
+    tracked = runner(["git", "-C", str(checkout), "ls-tree", "-rz", head, "--", "deploy/nico"],
                   "NKE deploy-file membership").split("\0")
-    with tempfile.TemporaryDirectory(prefix=".nkd-chart-inputs-", dir=parent) as temporary:
+    with private_stage(parent) as temporary:
         stage = Path(temporary) / "deploy"
         stage.mkdir(mode=0o700)
         for entry in filter(None, tracked):
@@ -109,7 +131,7 @@ def prepare(nke_checkout, nkdctl, charts, manifests, out):
             relative = Path(path).relative_to("deploy/nico")
             if relative.is_absolute() or ".." in relative.parts:
                 raise HandoffError("NKE deploy file escapes its source directory")
-            raw = run(["git", "-C", str(checkout), "show", f"{head}:{path}"],
+            raw = runner(["git", "-C", str(checkout), "show", f"{head}:{path}"],
                       "NKE pinned deploy-file read", text=False)
             if len(raw) > 8 * 1024 * 1024:
                 raise HandoffError("NKE deploy file exceeds the adapter's 8 MiB bound")
@@ -123,7 +145,7 @@ def prepare(nke_checkout, nkdctl, charts, manifests, out):
             archive_path = f"charts/{item}.tgz"
             # Byte verification and no-replace extraction stay NKD-owned. Helm
             # remains the authoritative loader during inventory/installation.
-            observation = run([str(tool), "publish", "chart", "--layout", layouts[item],
+            observation = runner([str(tool), "publish", "chart", "--layout", layouts[item],
                                "--manifest", manifests[item], "--name", fields[1],
                                "--version", fields[2], "--out", str(stage / archive_path)],
                               "NKD chart extraction", timeout=120)
@@ -138,7 +160,7 @@ def prepare(nke_checkout, nkdctl, charts, manifests, out):
             release.write_text("\n".join(lines) + "\n")
             expected = fields[:]
             expected[3], expected[4] = "", archive_path
-            if release_fields(reader, release) != expected:
+            if release_fields(reader, release, runner) != expected:
                 raise HandoffError("prepared chart source changed other NKE deploy semantics")
         # Reserve, do not replace, the caller's destination. The only retained
         # child is complete input data; there is no success marker on a partial.

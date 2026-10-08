@@ -22,6 +22,64 @@ SPEC.loader.exec_module(ADAPTER)
 
 
 class ManagementTest(unittest.TestCase):
+    def test_private_capture_does_not_inherit_foreign_environment(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
+                "HOME": "/foreign", "GIT_CONFIG_COUNT": "1", "PYTHONPATH": "/foreign", "DOCKER_CONTEXT": "shared"}):
+            work = Path(temporary)
+            env = ADAPTER.native_environment()
+            env["HOME"] = str(work)
+            raw = ADAPTER.capture([os.sys.executable, "-c", "import os,json; print(json.dumps(dict(os.environ)))"],
+                                  "capture", work, env)
+            child = json.loads(raw)
+            self.assertEqual(child["HOME"], str(work))
+            for key in ("GIT_CONFIG_COUNT", "PYTHONPATH", "DOCKER_CONTEXT"):
+                self.assertNotIn(key, child)
+            self.assertTrue((work / "capture.log").is_file())
+
+    def test_capture_supports_binary_bounded_output_and_join_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            raw = ADAPTER.capture([os.sys.executable, "-c", "import sys; sys.stdout.buffer.write(bytes([255,0,1]))"],
+                                  "binary", work, os.environ.copy(), text=False)
+            self.assertEqual(raw, bytes([255, 0, 1]))
+            with patch.object(ADAPTER, "execute", side_effect=ADAPTER.UnjoinedProcess("not joined")):
+                with self.assertRaises(ADAPTER.UnjoinedProcess):
+                    ADAPTER.capture(["unused"], "unjoined", work, {})
+            with patch.object(ADAPTER, "execute"), patch.object(Path, "stat", return_value=SimpleNamespace(st_size=9 * 1024**2)):
+                with self.assertRaisesRegex(ADAPTER.VM.SmokeError, "bound"):
+                    ADAPTER.capture(["unused"], "oversized", work, {})
+
+    def test_consumer_outcome_preserves_cleanup_order(self):
+        for outcome in ("success", "failure", "unjoined"):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary) / "fresh"
+                admitted = (Path("checkout"), Path("nkdctl"), Path("run"), Path("layout"), work, "config", {}, {})
+                def execute(_argv, phase, *_args):
+                    if phase == "extract-tools":
+                        tools = work / "tools"
+                        tools.mkdir()
+                        for name in ADAPTER.MEMBERS:
+                            file = tools / name
+                            file.write_text("fixture")
+                            file.chmod(0o700)
+                consumer = Mock()
+                if outcome != "success":
+                    consumer.side_effect = ADAPTER.UnjoinedProcess("not joined") if outcome == "unjoined" else ADAPTER.VM.SmokeError("failed")
+                with patch.object(ADAPTER, "admit", return_value=admitted), \
+                     patch.object(ADAPTER, "owned_nodes", side_effect=[[], ["exact-id"]]), \
+                     patch.object(ADAPTER, "execute", side_effect=execute), patch.object(ADAPTER, "cleanup") as cleanup, \
+                     patch.object(ADAPTER, "verify_versions"), patch.object(ADAPTER, "inspect", return_value=""):
+                    if outcome == "success":
+                        ADAPTER.probe(Mock(), consumer)
+                    else:
+                        with self.assertRaises(ADAPTER.UnjoinedProcess if outcome == "unjoined" else ADAPTER.VM.SmokeError):
+                            ADAPTER.probe(Mock(), consumer)
+                    consumer.assert_called_once()
+                    if outcome == "unjoined":
+                        cleanup.assert_not_called()
+                    else:
+                        cleanup.assert_called_once()
+
     def test_native_environment_does_not_adopt_other_targets(self):
         foreign = {"PATH": "/usr/bin", "DOCKER_CONTEXT": "shared", "DOCKER_HOST": "tcp://remote",
                    "KUBECONFIG": "shared", "KIND_EXPERIMENTAL_PROVIDER": "podman", "CAPI_VERSION": "foreign",
