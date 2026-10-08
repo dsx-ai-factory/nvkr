@@ -11,6 +11,21 @@ def toolchain_overlay($arch; $from; $to; $digest; $components):
    name:("nke-os-local-toolchain-" + $arch), requiresCatalogDigest:$digest,
    toolchainSubstitutions:[{arch:$arch, from:$from, to:$to, components:$components}]};
 
+# This launcher projection follows an already admitted Plan. Catalog loading
+# authenticates the exact predecessor and substitution; this is not a validator
+# or permission to rewrite unrelated producer toolchains.
+def simulator_toolchain_scope:
+  [.builds[] | select(.name == "nicosim-tools-arm64")] |
+  if length != 1 then error("expected one simulator tools build") else .[0] end |
+  . as $build |
+  [.components[] as $name | .catalogSnapshot.Components[$name] |
+    if .fromSource != true or (.toolchainImages.arm64 | type) != "string" then
+      error("simulator component lacks a source toolchain")
+    else {name:$name, pin:.toolchainImages.arm64} end] as $selected |
+  [$selected[].pin] | unique |
+  if length != 1 then error("expected one simulator source toolchain") else .[0] end |
+  {pin:., catalogDigest:$build.catalogDigest, components:([$selected[].name] | sort)};
+
 # Conservatively recognize the NKE project path before enforcing the one exact
 # transport URL served by the private-source handoff. This lexical diagnostic
 # also rejects that project path on other hosts; it does not parse or authenticate

@@ -101,7 +101,13 @@ colima ssh --profile nkd-demo -- bash -c \
   'cd /mnt/lima-colima-nkd-demo/nkd-local/nke-recipes && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=/Users/ikislenko/Workspace/github/nke bash scripts/nke-full-arm64-local.sh laptop-colima-os-arm64-20261008-03 1 os'
 ```
 
-The retry has been launched, not yet accepted as a complete disk Run. Its files
+The retry passed SPIRE private snapshot preparation and the remaining material
+builds, verified/acquired and patched the installer ISO, then passed `packer validate`.
+The real QEMU ARM64 guest booted the ISO and reached Ubuntu autoinstall, APT
+configuration and Curtin system installation. Packer is waiting for guest SSH.
+These observations are live progress, not a completed disk or boot-smoke result.
+
+The retry has not yet been accepted as a complete disk Run. Its files
 reside inside the VM, not under the Mac checkout's `.nkd/runs`. Record its terminal
 status and exact exported QCOW2 digest/size separately after completion. Host free
 capacity was approximately 103 GiB before this retry; guest free capacity does

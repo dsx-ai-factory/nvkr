@@ -12,7 +12,7 @@ usage() {
     '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers|simulator]' \
     'all: 23 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
-    'simulator currently requires Podman and the recorded cached Go/GCC toolchain; no fresh bootstrap for that lane.' \
+    'simulator bootstraps the same pinned Go/GCC toolchain on Podman or Docker.' \
     'This subset is NOT a full source-built NKE distribution.' \
     'No host Go/Make or installed nkdctl needed: bootstrap uses the pinned utility image.' \
     'CONTAINER_RUNTIME=podman (default) or docker (native Linux ARM64 / explicitly selected Colima).' \
@@ -152,14 +152,8 @@ if [[ "${lane}" == all || "${lane}" == os ]]; then
   if [[ "${runtime}" == docker ]]; then docker buildx version >/dev/null || { echo 'Install the Docker Buildx plugin for OS toolchain bootstrap.' >&2; exit 1; }; fi
 fi
 if [[ "${lane}" == simulator ]]; then
-  if [[ "${runtime}" != podman ]]; then
-    echo 'The incremental simulator lane currently supports cached Podman only; fresh Docker toolchain binding is not implemented.' >&2
-    exit 1
-  fi
-  simulator_toolchain="$(jq -er '.localPodmanImages.arm64' toolchains/nkd-packer/toolchain.lock.json)"
-  if ! timeout --kill-after=5s 30s podman image inspect "${simulator_toolchain}" >/dev/null 2>&1; then
-    echo "Missing cached simulator Go/GCC toolchain ${simulator_toolchain}. No downloads or attempt creation; fresh simulator toolchain binding is not implemented." >&2
-    exit 1
+  if [[ "${runtime}" == docker ]] && ! docker buildx version >/dev/null; then
+    echo 'Install the Docker Buildx plugin for simulator toolchain bootstrap.' >&2; exit 1
   fi
 fi
 echo "Prerequisite diagnostics passed for ${lane}/${runtime}. Git authorization and cgroup/resource/toolchain admission remain execution gates."
@@ -193,7 +187,18 @@ runner="${bootstrap}/nkdctl"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }
 definition="definitions/nke-laptop-arm64/definition.json"
 if [[ "${lane}" != all ]]; then definition="definitions/nke-laptop-arm64/definition-${lane}.json"; fi
-if [[ "${lane}" == all || "${lane}" == os ]]; then
+if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator ]]; then
+  # Admit the compiled selection before building/loading/probing a replacement
+  # toolchain. The narrow utility bootstrap above supplies this Plan owner.
+  "${runner}" run plan --definition "${definition}" --environment "${environment}" --json >"${bootstrap}/baseline-plan.json"
+  if [[ "${lane}" == simulator ]]; then
+    baseline="$(jq -L scripts -er 'include "nke-os-plan"; simulator_toolchain_scope.pin' "${bootstrap}/baseline-plan.json")"
+  else
+    baseline="$(jq -er '[.builds[] | select(any(.executionGraph.nodes[]; .builderType == "vm-image"))] |
+    if length != 1 then error("expected one disk build") else .[0] end |
+    .catalogSnapshot.Components[([.executionGraph.nodes[] | select(.kind == "build" and .builderType == "vm-image") | .component] |
+      if length != 1 then error("expected one disk root") else .[0] end)].toolchainImages.arm64' "${bootstrap}/baseline-plan.json")"
+  fi
   image="$(jq -er '.localPodmanImages.arm64' toolchains/nkd-packer/toolchain.lock.json)"
   if [[ "${runtime}" != podman ]] || ! podman image inspect "${image}" >/dev/null 2>&1; then
     toolchain_tag="localhost/nkd-packer-toolchain:laptop-${attempt}"
@@ -203,21 +208,25 @@ if [[ "${lane}" == all || "${lane}" == os ]]; then
   fi
   # Freeze fresh local bytes through the existing overlay contract, not a tag
   # or a hand-edited maintained lock. Each output retains its own catalog scope.
-  "${runner}" run plan --definition "${definition}" --environment "${environment}" --json >"${bootstrap}/baseline-plan.json"
-  baseline="$(jq -er '[.builds[] | select(any(.executionGraph.nodes[]; .builderType == "vm-image"))] |
-    if length != 1 then error("expected one disk build") else .[0] end |
-    .catalogSnapshot.Components[([.executionGraph.nodes[] | select(.kind == "build" and .builderType == "vm-image") | .component] |
-      if length != 1 then error("expected one disk root") else .[0] end)].toolchainImages.arm64' "${bootstrap}/baseline-plan.json")"
   if [[ "${baseline}" != "${image}" ]]; then
-  jq -e --arg root "${repo_root}" --arg out "${repo_root}/${bootstrap}" '
+  jq -e --arg root "${repo_root}" --arg out "${repo_root}/${bootstrap}" --arg lane "${lane}" '
     def absolute: if startswith("/") then . else $root + "/definitions/nke-laptop-arm64/" + . end;
     def locate: .base |= absolute | if .overlays then .overlays |= map(absolute) else . end;
     .catalog |= locate |
     .outputs |= map(if .catalog then .catalog |= locate else . end) |
-    .outputs |= map(if .format == "disk-image" then
-      .catalog.overlays += [$out + "/toolchain-attempt.json"] else . end)
+    if $lane == "simulator" then
+      .catalog.overlays = ((.catalog.overlays // []) + [$out + "/toolchain-attempt.json"])
+    else .outputs |= map(if .format == "disk-image" then
+      .catalog.overlays += [$out + "/toolchain-attempt.json"] else . end) end
   ' "${definition}" >"${bootstrap}/definition.json"
-  jq -L scripts -n --arg to "${image}" --slurpfile plan "${bootstrap}/baseline-plan.json" '
+  if [[ "${lane}" == simulator ]]; then
+    jq -L scripts -e --arg to "${image}" '
+      include "nke-os-plan";
+      simulator_toolchain_scope |
+      toolchain_overlay("arm64"; .pin; $to; .catalogDigest; .components)
+    ' "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-attempt.json"
+  else
+    jq -L scripts -n --arg to "${image}" --slurpfile plan "${bootstrap}/baseline-plan.json" '
     include "nke-os-plan";
     [$plan[0].builds[] | select(any(.executionGraph.nodes[]; .builderType == "vm-image"))] |
     if length != 1 then error("expected one disk build") else .[0] end |
@@ -228,7 +237,8 @@ if [[ "${lane}" == all || "${lane}" == os ]]; then
       select(.key as $name | $disk.components | index($name)) |
       select(.value.fromSource == true and .value.toolchainImages.arm64 == $from) | .key] | sort |
     toolchain_overlay("arm64"; $from; $to; $disk.catalogDigest; .)
-  ' >"${bootstrap}/toolchain-attempt.json"
+    ' >"${bootstrap}/toolchain-attempt.json"
+  fi
   definition="${bootstrap}/definition.json"
   fi
 fi

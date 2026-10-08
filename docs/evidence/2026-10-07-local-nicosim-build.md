@@ -103,9 +103,12 @@ These attempt files are diagnostic local state, not committed release evidence.
 
 ## Remaining integration
 
-The launcher now fails before bootstrap downloads if the simulator lane lacks
-its exact cached Podman toolchain. Fresh-toolchain substitution and Docker
-execution remain unsupported for this incremental lane. The complete demo still
+At the time of this Run, the launcher required its exact cached Podman toolchain.
+The later October 8 implementation extends the incremental launcher to fresh
+native toolchain substitution on Podman/Docker; that change does not retroactively
+validate this Run on Docker. See the current
+[simulator instructions](../local-development.md#build-the-nico-simulator-separately).
+The complete demo still
 needs node-image/profiles/NKTP/deploy assets, exact-byte install handoffs, local
 runtime setup and tenant/workload acceptance. See the
 [whole-demo analysis](../lia-local-demo-analysis.md).

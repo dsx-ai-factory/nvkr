@@ -205,9 +205,12 @@ with source-built Linux ARM64 NICoSim server/CLI components. The exact-commit
 Podman Run completed 1/1 and an offline non-root mock-runtime probe initialized
 SQLite and served the prepared source's UI; see the
 [simulator evidence](../evidence/2026-10-07-local-nicosim-build.md). It uses an
-already-cached host-local Go/GCC image; launcher admission rejects a missing pin
-before downloads. Fresh simulator toolchain binding, its Docker launcher route,
-seed/UI artifact delivery, integration into the combined set and the complete
+already-cached host-local Go/GCC image. The launcher now permits Podman or Docker,
+bootstraps and natively probes pinned toolchain sources when required, and freezes
+an exact attempt-local substitution for the selected simulator producers. Contracts
+cover preflight without a cached image and reject ambiguous/mixed projection inputs;
+live Docker simulator execution remains unestablished. Seed/UI artifact delivery,
+integration into the combined set and the complete
 Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
 qualification authority.
 The laptop launcher additionally enters an explicitly selected Colima ARM64
@@ -219,7 +222,8 @@ before downloads. After [failed-attempt cleanup](../evidence/2026-10-08-local-st
 the OS preflight passed and real Docker execution validated the fresh Packer
 toolchain and built material producers, but failed at SPIRE private snapshot
 preparation with a shared-filesystem file-handle error. A native ext4 export of
-the same committed NKD source is the retry path; an external absolute Run root
+the same committed NKD source passed material preparation and Packer validation;
+the live QEMU guest reached Ubuntu autoinstall and system installation. An external absolute Run root
 was rejected before execution and is not a supported workaround. See the
 [execution evidence](../evidence/2026-10-08-colima-local-os-build.md).
 A completed Colima QCOW2 bake, guest boot and tenant provisioning remain

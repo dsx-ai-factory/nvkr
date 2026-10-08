@@ -52,10 +52,13 @@ not under an older maintained ID. Docker Desktop on macOS is not admitted here.
 Historical Runs do not prove the new bootstrap paths; preflight/dry-run do not
 prove full-set success.
 
-The simulator catalog pins NKE by exact commit and uses the existing host-local
-Go/GCC image ID. This incremental lane currently requires Podman with that exact
-cached image; `--check simulator` rejects a missing image before downloads. Fresh
-toolchain assembly/binding and the Docker simulator route are not implemented.
+The simulator catalog pins NKE by exact commit and starts from the recorded
+host-local Go/GCC image ID. The launcher supports Podman and native ARM64 Docker,
+building and natively probing pinned toolchain sources when required. It binds
+the measured image ID to exactly the selected simulator producers through an
+attempt overlay. `--check simulator` requires no cached toolchain and does no
+producer work; Docker bootstrap requires Buildx. Live Docker execution needs
+separate evidence; the earlier Podman Run does not prove it.
 Module downloads and verification precede offline CGO compilation;
 the server invokes NKE's `build-static` target. These Linux tools do not run directly
 on macOS. Seed/UI assets, the existing QCOW2-to-tenant handoff, profiles and the deploy-only adapter

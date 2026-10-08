@@ -395,6 +395,34 @@ its material closure. Give every build a fresh attempt name. Earlier attempts ar
 retained and cannot be resumed or overwritten. A failed Run is not success even
 if some payloads exist.
 
+## Build the NICo simulator separately
+
+The simulator is an additional one-output Definition, not part of `all` or
+`components`. It builds the Linux ARM64 server and CLI from one pinned NKE source
+snapshot. On the chosen Linux execution host, using a fresh attempt name:
+
+```sh
+CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh --check simulator
+CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=/absolute/path/to/nke \
+  bash scripts/nke-full-arm64-local.sh first-simulator 1 simulator
+```
+
+For Colima, run these commands inside the native source export described above;
+substitute your mounted source checkout or omit `NKE_LOCAL_CLONE` for authenticated
+remote Git. The Podman route uses the same commands with `CONTAINER_RUNTIME=podman`.
+No host Go/GCC is required. If the recorded Podman toolchain is absent, or Docker
+is selected, the launcher builds and natively probes the pinned toolchain sources.
+It freezes the measured image ID into an attempt-local overlay for exactly
+`nico-sim` and `nico-simctl`; it neither rewrites maintained pins nor changes the
+simulator's source revision. Docker bootstrap requires Buildx. `--check` does not
+require a previously cached toolchain and performs no pull/build.
+
+Require a complete 1/1 Run before consuming
+`packages/nicosim-tools-arm64`. This executable bundle does not yet deliver the
+seed/UI assets. Its build is not proof of real VM provisioning or tenant readiness;
+the earlier [Podman smoke](evidence/2026-10-07-local-nicosim-build.md) selected a mock
+VM backend. The new bootstrap route needs separate live Docker execution evidence.
+
 ## Find outputs and interpret the result
 
 For `first-components`:

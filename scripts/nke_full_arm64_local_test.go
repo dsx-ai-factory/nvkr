@@ -5,6 +5,7 @@ package scripts_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,8 +35,9 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		{"Docker daemon unavailable", "Linux", "aarch64", "docker", "providers", "running", "100000", "failed", "daemon is unreachable", true},
 		{"Docker providers without Go", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
 		{"simulator without OS capacity", "Linux", "aarch64", "podman", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/podman", false},
-		{"simulator missing toolchain before bootstrap", "Linux", "aarch64", "podman", "simulator", "running", "32000", "missing-toolchain", "No downloads or attempt creation", true},
-		{"simulator Docker is not exercised", "Linux", "aarch64", "docker", "simulator", "running", "32000", "ok", "cached Podman only", true},
+		{"simulator without cached toolchain", "Linux", "aarch64", "podman", "simulator", "running", "32000", "missing-toolchain", "Prerequisite diagnostics passed", false},
+		{"simulator Docker without OS capacity", "Linux", "aarch64", "docker", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/docker", false},
+		{"simulator Docker requires Buildx", "Linux", "aarch64", "docker", "simulator", "running", "32000", "missing-buildx", "Buildx plugin", true},
 		{"remote context overrides local host", "Linux", "aarch64", "docker", "providers", "running", "100000", "remote", "Remote Docker endpoints", true},
 		{"OS diagnostics without cached Packer", "Linux", "aarch64", "docker", "os", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
 		{"mutable bootstrap pin rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "admitted bootstrap image/platform/runtime", true},
@@ -117,7 +119,7 @@ case "$1 $2" in
   'version --format') [ "$TEST_DAEMON" != failed ] ;;
   'info --format') echo linux/arm64 ;;
   'context inspect') if [ "$TEST_DAEMON" = remote ]; then echo ssh://remote; else echo unix:///var/run/docker.sock; fi ;;
-  'buildx version') exit 0 ;;
+  'buildx version') [ "$TEST_DAEMON" != missing-buildx ] ;;
   *) exit 99 ;;
 esac`,
 				"colima": `printf '%s\n' "$*" >>"$TEST_CALLS"
@@ -178,8 +180,124 @@ esac`,
 					}
 				}
 			}
-			if tc.lane != "simulator" && strings.Contains(string(calls), "image inspect") {
-				t.Fatalf("unrelated preflight inspected a toolchain: %s", calls)
+			if strings.Contains(string(calls), "image inspect") {
+				t.Fatalf("diagnostic preflight inspected a cached toolchain: %s", calls)
+			}
+		})
+	}
+}
+
+func TestSimulatorToolchainScope(t *testing.T) {
+	for _, tc := range []struct {
+		name, components, entries, builds, want string
+		fail                                    bool
+	}{
+		{"sorted selected producers only", `["nico-simctl","nico-sim"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"unrelated":{"fromSource":true,"toolchainImages":{"arm64":"other"}}`, "", "old", false},
+		{"empty selection", `[]`, ``, "", "expected one simulator source toolchain", true},
+		{"missing producer", `["nico-sim"]`, ``, "", "lacks a source toolchain", true},
+		{"acquired producer", `["nico-sim"]`, `"nico-sim":{"fromSource":false,"toolchainImages":{"arm64":"old"}}`, "", "lacks a source toolchain", true},
+		{"missing native pin", `["nico-sim"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"amd64":"old"}}`, "", "lacks a source toolchain", true},
+		{"mixed toolchains", `["nico-sim","nico-simctl"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"other"}}`, "", "expected one simulator source toolchain", true},
+		{"no selected build", `[]`, ``, `[]`, "expected one simulator tools build", true},
+		{"ambiguous build", `[]`, ``, `[{"name":"nicosim-tools-arm64"},{"name":"nicosim-tools-arm64"}]`, "expected one simulator tools build", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			builds := tc.builds
+			if builds == "" {
+				builds = `[{"name":"nicosim-tools-arm64","catalogDigest":"catalog","components":` + tc.components + `,"catalogSnapshot":{"Components":{` + tc.entries + `}}}]`
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nke-os-plan"; simulator_toolchain_scope | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
+			cmd.Stdin = strings.NewReader(`{"builds":` + builds + `}`)
+			out, err := cmd.CombinedOutput()
+			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
+				t.Fatalf("error=%v output=%s, want fail=%t message=%s", err, out, tc.fail, tc.want)
+			}
+			if tc.fail {
+				return
+			}
+			var overlay struct {
+				Catalog string `json:"requiresCatalogDigest"`
+				Subs    []struct {
+					Arch, From, To string
+					Components     []string
+				} `json:"toolchainSubstitutions"`
+			}
+			if err := json.Unmarshal(out, &overlay); err != nil {
+				t.Fatal(err)
+			}
+			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || strings.Join(overlay.Subs[0].Components, ",") != "nico-sim,nico-simctl" {
+				t.Fatalf("unexpected substitution: %+v", overlay)
+			}
+		})
+	}
+}
+
+func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
+	for _, tc := range []struct{ name, plan, want string }{
+		{"unsupported build", `{"builds":[]}`, "expected one simulator tools build"},
+		{"mixed pins", `{"builds":[{"name":"nicosim-tools-arm64","components":["nico-sim","nico-simctl"],"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"different"}}}}}]}`, "expected one simulator source toolchain"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			write := func(name string, data []byte, mode os.FileMode) {
+				t.Helper()
+				path := filepath.Join(dir, name)
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, data, mode); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, path := range []string{
+				"scripts/nke-full-arm64-local.sh", "scripts/nke-os-plan.jq",
+				"definitions/nke-laptop-arm64/environment-local-docker.json",
+				"toolchains/nkd-packer/toolchain.lock.json",
+			} {
+				data, err := os.ReadFile(filepath.Join("..", path))
+				if err != nil {
+					t.Fatal(err)
+				}
+				write(path, data, 0600)
+			}
+			write("toolchains/nkd-packer/build.sh", []byte("#!/bin/sh\nprintf 'unexpected toolchain build\\n' >>\"$TEST_CALLS\"\nexit 99\n"), 0700)
+			write("tools/runner", []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >>\"$TEST_CALLS\"\n[ \"$1 $2\" = 'run plan' ] || exit 99\nprintf '%s\\n' \"$TEST_PLAN\"\n"), 0700)
+			write("tools/uname", []byte("#!/bin/sh\nif [ \"$1\" = -s ]; then echo Linux; else echo aarch64; fi\n"), 0700)
+			write("tools/id", []byte("#!/bin/sh\necho 1000\n"), 0700)
+			write("tools/docker", []byte(`#!/bin/sh
+printf '%s\n' "$*" >>"$TEST_CALLS"
+case "$1 $2" in
+  'version --format'|'buildx version') exit 0 ;;
+  'info --format') echo linux/arm64 ;;
+  'context inspect') echo unix:///var/run/docker.sock ;;
+  'pull --platform') exit 0 ;;
+  'run --rm') cp "$TEST_REPO/tools/runner" "$TEST_REPO/.nkd/laptop-bootstrap/scope-probe/nkdctl" ;;
+  *) exit 99 ;;
+esac
+`), 0700)
+			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", filepath.Join(dir, "scripts", "nke-full-arm64-local.sh"), "scope-probe", "1", "simulator")
+			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
+				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
+				"TEST_REPO="+dir, "TEST_PLAN="+tc.plan, "TEST_CALLS="+filepath.Join(dir, "calls"))
+			out, err := cmd.CombinedOutput()
+			if err == nil || !strings.Contains(string(out), tc.want) {
+				t.Fatalf("error=%v output=%s, want scope rejection %s", err, out, tc.want)
+			}
+			calls, err := os.ReadFile(filepath.Join(dir, "calls"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(calls), "run plan") {
+				t.Fatalf("never reached baseline admission: %s", calls)
+			}
+			for _, forbidden := range []string{"unexpected toolchain build", "image inspect", "run local"} {
+				if strings.Contains(string(calls), forbidden) {
+					t.Fatalf("scope rejection performed later work %q: %s", forbidden, calls)
+				}
 			}
 		})
 	}

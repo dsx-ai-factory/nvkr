@@ -153,7 +153,7 @@ inspection-derived disk SBOM or proof of all installed runtime dependencies.
 | Controller image | Source-built `cwe` | Align source/build contract with the selected demo revision; import/copy without rebuilding and verify deployed identity |
 | Controller chart | Image-bound `controller-chart` | Feed the packaged chart to the source-owned installer rather than silently using a different source-tree chart |
 | CAPNICo | Source-built ARM64 provider image | Chart/manifests and install override must consume that image; the current source install helper builds it again |
-| NICoSim and simulator CLI | Separate `definition-simulator.json` selects a source-built Linux ARM64 server/CLI bundle; its Podman Run completed | Deliver seed/UI/runtime assets and integrate into the demo selection. The separate bundle is not part of the 23-output `all` set; fresh toolchain binding and deployment remain incomplete |
+| NICoSim and simulator CLI | Separate `definition-simulator.json` selects a source-built Linux ARM64 server/CLI bundle; its Podman Run completed. The launcher supports fresh pinned-toolchain bootstrap on Podman/Docker | Deliver seed/UI/runtime assets and integrate into the demo selection. The separate bundle is not part of the 23-output `all` set; live Docker execution and deployment remain unvalidated |
 | Tenant node disk | Existing `nke-node-image-arm64` output with its OS material graph | Make the existing ARM64 TCG build complete on the Mac, then bind the exact QCOW2 to the NICoSim VM profile; do not add a substitute tenant-node container build |
 | Profiles/runbooks image | No selected output | Build the explicitly selected local demo fixture, label it diagnostic, bind the exact tenant QCOW2/OS choices; do not call it production fleet profiles |
 | NKTP chart and runtime closure | No NKTP chart output | Package its locked chart dependencies and enumerate its selected runtime images |
@@ -161,7 +161,7 @@ inspection-derived disk SBOM or proof of all installed runtime dependencies.
 | CLI and operator tools | Linux ARM64 `nkectl`, Helm/kubectl bundle | Linux binaries cannot run directly on macOS. Run them in the chosen Linux environment or add native-host producers; add matching installer tools |
 | BGP and any selected identity-exchange helpers | Not a complete selected set | Model required helper images/configuration from the chosen scenario. Do not silently enable or omit them |
 | Installer/templates/configuration contract | No complete delivered deploy bundle | Preserve NKE's exact source revision and installation format; map Run outputs to it, not arbitrary hand-entered refs |
-| QCOW2 boot evidence | Disk output declared; current laptop attempt did not reach Packer | Boot the newly produced disk through the real VM backend and observe the tenant. The component Run and a node container do not validate this disk |
+| QCOW2 boot evidence | Disk output declared; native Colima retry passed Packer validation and reached real QEMU autoinstall | Complete the bake, boot the newly produced disk through the real VM backend and observe the tenant. The component Run and a node container do not validate this disk |
 | E2E suite | No selected test executable | Produce the matching test binary before deployment, or explicitly separate an independently built test harness from the artifact Run |
 
 The current retained component Run is complete **22/22** in its declared

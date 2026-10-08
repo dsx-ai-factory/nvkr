@@ -12,8 +12,10 @@ OS disk; read its toolchain/capacity prerequisites before launching that larger 
 `providers` selects only the source-built CAPNICo and provisioned-provider images.
 `simulator` separately builds a Linux ARM64 NICoSim server/CLI bundle from pinned
 source; it is not part of `all` yet and does not start a simulator or deploy a site.
-This incremental lane requires the exact cached Podman Go/GCC toolchain;
-`--check simulator` rejects a missing image before bootstrap downloads.
+This incremental lane bootstraps pinned Go/GCC toolchain sources on Docker or
+when the recorded Podman image is missing, then binds the measured native ID
+through an exact attempt overlay. `--check simulator` performs no pull/build and
+does not require a previously cached toolchain; Docker bootstrap requires Buildx.
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
 The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.
 `CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, or explicitly
