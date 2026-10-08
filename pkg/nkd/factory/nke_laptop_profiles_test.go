@@ -136,11 +136,11 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 					t.Fatalf("bootcmd iteration %d: %v\n%s", iteration, err, out)
 				}
 				observed, err := os.ReadFile(filepath.Join(root, "observed"))
-				if err != nil || string(observed) != "console=tty0 console=ttyAMA0,115200 net.ifnames=1\n" {
+				if err != nil || string(observed) != "console=tty0 console=ttyAMA0,115200 net.ifnames=1 network-config=disabled\n" {
 					t.Fatalf("console/naming lost or duplicated: %q, %v", observed, err)
 				}
 				link, err := os.ReadFile(linkDropIn)
-				if err != nil || string(link) != "[Link]\nNamePolicy=keep kernel database onboard slot path\n" {
+				if err != nil || string(link) != "[Link]\nNamePolicy=path\n" {
 					t.Fatalf("generated Netplan link naming policy lost or changed: %q, %v", link, err)
 				}
 			}

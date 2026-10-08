@@ -32,7 +32,7 @@ the four-output `site` lane. This is not an approved release pin.
 | Input | Produced content |
 | --- | --- |
 | NKE fixture Dockerfile | Same copy/materialization layout; base changed from its `alpine:3.24.1` tag to the already maintained exact Alpine digest, observed as Alpine 3.24.2 |
-| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. Idempotent boot configuration adds `net.ifnames=1` after the console override plus the measured Netplan link's `NamePolicy`; different existing content or symlinks fail |
+| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. Idempotent boot configuration adds `net.ifnames=1 network-config=disabled` after the console override plus the measured Netplan link's `NamePolicy`; different existing content or symlinks fail |
 | NKE VM config profiles | Source `nico-vms-cp` and `nico-vms-worker`, unchanged |
 | NKE fixture runbooks | All nine source runbooks, unchanged |
 | Local OS metadata | One `nke-local-26-04-arm64-plain` entry: ARM64, Ubuntu 26.04, injected Kubernetes version, diagnostic `local-plain-tpm` variant |
@@ -47,11 +47,21 @@ The enclosing wrapped producer still has declared build networking and is not
 a qualified or completely hermetic closure.
 
 The local profile adds a `10-netplan-enp1s0.link.d` drop-in
-with `NamePolicy=keep kernel database onboard slot path`; Netplan still owns the
-MAC match and MTU. This configuration targets the local ARM64 simulator interface,
+with `NamePolicy=path`; Netplan still owns the MAC match and MTU. Unlike `keep`,
+this selects the physical PCI-path name even if userspace has already renamed
+the interface. This configuration targets the local ARM64 simulator interface,
 not arbitrary physical nodes. Shell contracts cover idempotence and rejection of
 foreign content, symlinks and directories; a new full reboot/tenant run is still
 required. Old completed profiles images are unchanged.
+
+NICoSim's pinned seed requests `set-name: eth0`. First boot still consumes that
+seed before the profile's boot command runs. The command adds
+[`network-config=disabled`](https://docs.cloud-init.io/en/latest/reference/network-config.html#kernel-command-line)
+to the next GRUB command line: subsequent boots use the persistent Netplan
+configuration, including NKE's OVS bridge, without cloud-init reapplying the old
+seed or renaming its uplink. Cloud-init itself and its other modules remain
+enabled. This is scoped laptop network ownership, not a generic cloud-image
+policy or proof of reboot acceptance.
 
 Cloud-init still installs source-declared NKE/Kubernetes/CNI packages using APT,
 including the unversioned `nke-agent` command. The laptop projection selects only

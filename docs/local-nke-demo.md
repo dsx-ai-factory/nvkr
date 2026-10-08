@@ -80,18 +80,23 @@ unchanged; the consumer projects its tracked bytes privately. Source-owned NKE
 scripts render/check chart values and the built `nkectl` validates the tenant
 request. No approximate YAML or iPXE parser is added in NKD.
 The local profiles image adds an idempotent guest boot command for
-[`net.ifnames=1`](https://github.com/systemd/systemd/blob/main/docs/PREDICTABLE_INTERFACE_NAMES.md),
+[`net.ifnames=1`](https://github.com/systemd/systemd/blob/v259/docs/PREDICTABLE_INTERFACE_NAMES.md),
 after NICoSim's source-owned GRUB setup, to preserve the first boot's physical
 uplink name used by OVN's generated network configuration.
 This is laptop deployment configuration, not a change to the accepted QCOW2.
 The producer also configures the generated Netplan link through
 `/etc/systemd/network/10-netplan-enp1s0.link.d/10-nkd-local-name.conf`, with
-`NamePolicy=keep kernel database onboard slot path`. This uses
-[systemd's supported link drop-in and naming policies](https://github.com/systemd/systemd/blob/v260/man/systemd.link.xml),
+`NamePolicy=path`, so an earlier userspace rename cannot win through `keep`.
+This uses [systemd's supported link drop-in and naming policies](https://github.com/systemd/systemd/blob/v259/man/systemd.link.xml),
 preserving the generated MAC match and MTU. It is scoped to the measured local
 ARM64 VM interface, not a general host-network workaround. Different existing
 content or symlinks fail the boot command. Rebuild `profiles` with a fresh attempt
 and pass that exact Run; an older completed Run does not acquire this correction.
+It also adds [`network-config=disabled`](https://docs.cloud-init.io/en/latest/reference/network-config.html#kernel-command-line)
+to the subsequent boot's GRUB command line. First boot still consumes NICoSim's
+network seed; afterward, the persistent NKE/Netplan configuration owns networking.
+This prevents the seed's `set-name: eth0` from being reapplied over the OVS uplink.
+Cloud-init is not disabled, and its other modules continue to run.
 
 The laptop profile also disables first-boot `package_update` and restricts APT
 installs to `/etc/apt/sources.list.d/nke-local.list`, disabling other source
