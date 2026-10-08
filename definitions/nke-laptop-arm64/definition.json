@@ -6,9 +6,23 @@
   "kind": "Definition",
   "metadata": {
     "name": "nke-laptop-arm64",
-    "description": "Local ARM64 counterpart of the current 34-output M2 candidate: 21 required outputs, no publication or signing; retains the mixed SPIRE-source exception."
+    "description": "Local ARM64 M2 counterpart plus source-built providers: 23 outputs, no publication or signing; not a full source-built NKE distribution; retains the mixed SPIRE-source exception."
   },
   "outputs": [
+    {
+      "catalog": {"base": "./capnico-catalog"},
+      "components": ["capnico-controller"],
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-controller/catalog"},
+      "components": ["cluster-api-provider-provisioned"],
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
+    },
     {
       "catalog": {
         "base": "../nke-controller/catalog"

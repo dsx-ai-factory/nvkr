@@ -2,14 +2,15 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Diagnostic launcher for the authored 21-output laptop inputs, not publication.
+# Diagnostic launcher for the authored laptop subset, not a full source-built distribution.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "${repo_root}"
 if [[ $# == 1 && "$1" == --help ]]; then
   printf '%s\n' \
-    'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os]' \
-    'all: one combined 21-output ARM64 Run; components: 20 non-disk outputs; os: one disk.' \
+    'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers]' \
+    'all: 23 selected outputs; components: 22 non-disk outputs; os: one disk; providers: two source-built images.' \
+    'Historical script name: this subset is NOT a full source-built NKE distribution.' \
     'Requires the repository-pinned host Go version and native rootless Podman.' \
     'On Apple Silicon, executes inside the existing podman-machine-default VM.' \
     'NKE_LOCAL_CLONE supplies pinned Git objects, not uncommitted source changes.' \
@@ -17,7 +18,7 @@ if [[ $# == 1 && "$1" == --help ]]; then
   exit 0
 fi
 if [[ $# -lt 1 || $# -gt 3 ]]; then
-  echo 'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os]' >&2
+  echo 'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers]' >&2
   exit 2
 fi
 attempt="$1"
@@ -28,8 +29,8 @@ if [[ ! "${attempt}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ || ! "${jobs}" =~ ^[1
   exit 2
 fi
 case "${lane}" in
-  all|components|os) ;;
-  *) echo 'Select all, components or os.' >&2; exit 2 ;;
+  all|components|os|providers) ;;
+  *) echo 'Select all, components, os or providers.' >&2; exit 2 ;;
 esac
 bootstrap=".nkd/laptop-bootstrap/${attempt}"
 build_runner() {
@@ -68,7 +69,7 @@ fi
 
 environment=definitions/nke-laptop-arm64/environment-local.json
 # Disk work retains the exact maintained Packer subject, never a mutable tag.
-if [[ "${lane}" != components ]]; then
+if [[ "${lane}" == all || "${lane}" == os ]]; then
   image="$(jq -er '.localPodmanImages.arm64' toolchains/nkd-packer/toolchain.lock.json)"
   actual="$(podman image inspect --format '{{.Id}}' "${image}")"
   actual="sha256:${actual#sha256:}"

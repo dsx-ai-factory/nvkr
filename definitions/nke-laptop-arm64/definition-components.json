@@ -6,9 +6,23 @@
   "kind": "Definition",
   "metadata": {
     "name": "nke-laptop-arm64-components",
-    "description": "Local ARM64 CLI, controller, tools, five charts and twelve dependency images; no publication or signing."
+    "description": "Local ARM64 CLI, controller, source-built providers, tools, five charts and twelve acquired dependency images; not a full source-built NKE distribution; no publication or signing."
   },
   "outputs": [
+    {
+      "catalog": {"base": "./capnico-catalog"},
+      "components": ["capnico-controller"],
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-controller/catalog"},
+      "components": ["cluster-api-provider-provisioned"],
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
+    },
     {
       "catalog": {
         "base": "../nke-controller/catalog"

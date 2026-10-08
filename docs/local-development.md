@@ -4,6 +4,14 @@ Inspect the ARM64 NKE artifact set, build it locally, and rebuild a committed so
 change. No previous NKD experience is required. Run commands from the `nke-recipes`
 repository root and keep the same terminal open.
 
+**This is not yet a full source-built NKE distribution.** The example selects
+23 outputs, including the two source-built infrastructure-provider images, but
+still acquires twelve dependency images, four charts and the operator tools.
+The OS is not yet wired to the direct-source catalog from PR #113. See the
+[full-source build gap map](full-nke-source-build.md) before using this example
+as acceptance of a full build. The script's historical `full` name is not a claim
+that all NKE components or their transitive dependencies are compiled.
+
 NKD is the project; `nkdctl` is its command-line tool. You provide three inputs:
 
 | Input | What you edit |
@@ -56,7 +64,7 @@ bin/nkdctl run local \
   --attempt first-preview --dry-run
 ```
 
-Validation prints the Definition name, digest and `outputs: 21`. Plan inspection
+Validation prints the Definition name, digest and `outputs: 23`. Plan inspection
 prints expected outputs, producer instructions, operations and publication routes.
 This Environment has no publication route. The preview ends with `pending`,
 `static-unqualified`, and `observed outputs: 0`: those are expected preview results,
@@ -67,24 +75,27 @@ needed by selected pin sets even though it does not build artifacts.
 ## Understand the selected artifact set
 
 The [example inputs](../definitions/nke-laptop-arm64/README.md) select the ARM64
-counterpart of the combined M2 candidate, not every module in the NKE repository.
+counterpart of the combined M2 candidate plus two source-built providers, not every
+module in the NKE repository.
 
 | Output set | Operation |
 | --- | --- |
 | `nkectl` | Compile the ARM64 CLI from pinned NKE Git |
 | `cwe` | Build the controller container image from pinned NKE Git |
 | `controller-chart` | Build its chart and bind it to the produced controller image digest |
+| `capnico-controller-arm64` | Compile CAPNICo from its pinned public Git release using its Dockerfile |
+| `cluster-api-provider-provisioned-arm64` | Compile the provisioned provider from pinned NKE Git using its Dockerfile |
 | Twelve dependency images | Acquire the exact locked ARM64 OCI payloads |
 | `postgresql`, `spire`, `spire-crds`, `temporal` | Acquire four pinned upstream charts |
 | `operator-tools` | Acquire digest-checked native ARM64 Helm and kubectl |
 | `nke-node-image-arm64` | Prepare OS materials; invoke Packer for a non-FDE QCOW2 |
 
-That is 13 container-image outputs, five charts, two executable bundles and one disk.
+That is 15 container-image outputs, five charts, two executable bundles and one disk.
 Producing the set does not mean compiling every third-party dependency from source.
 The Plan shows exactly which operations are builds and acquisitions.
 
-CAPNICo, the provisioned-provider image, fleet profiles and separately published
-OVN outputs are not selected. OVN image/chart bytes are OS materials here. AMD64,
+Fleet profiles and separately published OVN outputs are not selected. OVN
+image/chart bytes are OS materials here. AMD64,
 FDE, deployment, publication, signing, full-disk SBOM and qualification are not
 enabled. Ordinary SBOMs describe composition, not dependency scans. The OS retains
 the maintained older-SPIRE exception, omitting the DSX IMDS plugin.
@@ -119,6 +130,36 @@ A capacity rejection reports CPU, memory and workspace as `observed/required`,
 with units. Those measurements are not reservations. Free capacity or choose a
 host that meets the authored request; do not lower it just to suppress the error.
 
+### If the Plan says no execution class satisfies the VM build
+
+An Environment with only `runtime`, `utilityContainer` and publication settings
+does not describe an OS execution host. Use this example's complete
+`environment-local.json` together with its `os-tcg.json` catalog overlay. The
+Environment declares a Linux ARM64 class, CPU/memory/workspace capacity and timeout;
+the overlay selects the source producer's TCG route and exact local toolchain.
+The class describes requirements. Linux admission still measures the actual host.
+An AMD64 utility image is not an ARM64 execution-class declaration, and changing
+the utility image alone cannot fix a missing VM class.
+
+For ordinary images and charts, use the component or provider loop instead of
+copying an OS Definition and deleting its execution requirements.
+
+## Build just the two infrastructure providers
+
+This loop compiles both providers from pinned Git and needs no Packer image:
+
+```sh
+NKE_LOCAL_CLONE=/absolute/path/to/nke \
+  bash scripts/nke-full-arm64-local.sh first-providers 2 providers
+```
+
+CAPNICo uses its public `cluster-api-provider-nico` v0.0.45 source and source-owned
+Dockerfile. The provisioned provider uses the maintained NKE controller source
+pin. Both are wrapped BuildKit builds with declared network access, not acquired
+provider images or hermetic builds. Their compiler/base images and module downloads
+remain build inputs; this does not rebuild Linux or the compiler from source.
+Local layouts appear under `.nkd/runs/first-providers/packages/`.
+
 ## Build the images, charts and tools first
 
 This smaller loop omits only the disk and needs no Packer image:
@@ -129,7 +170,7 @@ NKE_LOCAL_CLONE=/absolute/path/to/nke \
 ```
 
 The launcher uses the required host Go version to compile a static Linux ARM64
-`nkdctl`, then runs it inside Linux, previews the selection and executes the 20-output
+`nkdctl`, then runs it inside Linux, previews the selection and executes the 22-output
 Run. Producer and utility containers still use their pinned images. One job is the conservative
 starting point. Omit `NKE_LOCAL_CLONE` to use canonical remote Git URLs:
 
@@ -166,7 +207,7 @@ NKE_LOCAL_CLONE=/absolute/path/to/nke \
   bash scripts/nke-full-arm64-local.sh first-full 1 all
 ```
 
-`all` selects one combined 21-output Definition. `os` selects only the disk and
+`all` selects one combined 23-output Definition. `os` selects only the disk and
 its material closure. Give every build a fresh attempt name. Earlier attempts are
 retained and cannot be resumed or overwritten. A failed Run is not success even
 if some payloads exist.
@@ -303,7 +344,7 @@ NKE_LOCAL_CLONE="$NKE_DEV_CLONE" \
 
 The templates derive CLI commit/date/version stamps from the selected pin. Do not
 hand-edit lock digests. Exact-commit pinning makes no release-tag claim. Review
-the new Plan before building. This command still produces the selected 20-output
+the new Plan before building. This command still produces the selected 22-output
 set, not an incremental reuse of earlier attempts. For tight code-edit loops use
 NKE's own Make/tests, then use NKD to exercise packaging and the artifact graph.
 Copy shared catalogs before changing controller/OS selections; do not repin the
@@ -332,6 +373,11 @@ a hermetic or byte-reproducible OS claim.
 
 ## Validation status
 
+The separate source-built provider Run `laptop-providers-arm64-20261007-01`
+completed with 2/2 observed outputs and both produced images passed offline help
+probes. See the [exact provider evidence](evidence/2026-10-07-laptop-provider-builds.md).
+This is not a complete 22-output component or 23-output combined Run.
+
 The laptop component Run `laptop-dev-arm64-20261007-05` completed with launcher
 exit 0, `status: complete`, 20 expected and 20 observed outputs, no failure, and
 lane `unqualified-local-execution`. It used rootless Podman, four jobs and the
@@ -348,6 +394,7 @@ not establish exact-byte reproducibility; neither Run is qualified.
 The earlier acquired-image final-observation failure is covered by regression
 tests, alongside mixed disk/non-disk utility admission and native Linux ARM64
 race checks. The OS trial built its materials and patched ISO, then failed
-capacity re-admission before Packer. No new completed combined 21-output Run is
-claimed. Raw attempts remain in `.nkd`; repository tests do not prove a disk bake,
+capacity re-admission before Packer. That historical Run predates the two provider
+additions. A complete 22-output component Run or combined 23-output Run is not
+established by it. Raw attempts remain in `.nkd`; repository tests do not prove a disk bake,
 remote-only Git access, registry publication or a fresh-machine Packer bootstrap.

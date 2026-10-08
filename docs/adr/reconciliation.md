@@ -187,8 +187,20 @@ and Helm OCI interoperability tests do not establish hosted or release acceptanc
 
 ## Output-local publication and metadata assembly
 
-Local ARM64 development inputs in `definitions/nke-laptop-arm64` select 21 outputs
-(or the 20 non-disk subset), without publication/signing. Mixed local offline utility
+Local ARM64 development inputs in `definitions/nke-laptop-arm64` select 23 outputs
+(or the 22 non-disk subset), without publication/signing. The two added provider
+images compile from Git through source-owned Dockerfiles: public CAPNICo v0.0.45
+and the existing provisioned-provider producer. Their separate rootless Podman
+Run `laptop-providers-arm64-20261007-01` completed with 2/2 observed outputs and
+both native images passed networkless help probes; see the
+[provider evidence](../evidence/2026-10-07-laptop-provider-builds.md).
+Contract tests admit the actual TCG OS Plan only with a sufficient execution-class
+declaration and reject missing classes, foreign hosts, insufficient workspace and
+short timeouts. They do not establish runtime capacity.
+The [full source-built distribution remains incomplete](../full-nke-source-build.md);
+fleet profiles and separately published OVN outputs are not selected, and the
+dependency-image/chart/tool acquisitions have not become source builds.
+Mixed local offline utility
 admission is restricted to non-disk observation/SBOM/ordinary packaging and retains
 complete-Plan validation plus the original helper Plan digest. Workspace image
 observation uses factory-owned relocation without weakening exact acquired producer
@@ -196,7 +208,8 @@ bindings; absolute binary observation remains supported. Contract tests cover th
 boundaries. The initial laptop component attempt failed final observation. The
 corrected rootless Podman component Run `laptop-dev-arm64-20261007-05` completed
 with launcher exit 0 and 20 expected/observed outputs in the unqualified local
-lane; it exercised local Git transport and four jobs, not the combined disk set.
+lane; it exercised local Git transport and four jobs, before the two provider
+additions, not the current combined disk set. No complete 22/23-output Run is claimed.
 The OS trial prepared materials and the patched ISO but failed capacity re-admission
 before Packer. Fresh native Podman toolchain reconstruction still mismatches the
 older local pin. Neither this example nor its previews establish M2 or release acceptance.

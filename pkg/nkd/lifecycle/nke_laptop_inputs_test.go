@@ -4,11 +4,14 @@
 package lifecycle
 
 import (
+	"errors"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
+	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 )
 
 func TestLaptopARM64DefinitionMembership(t *testing.T) {
@@ -23,8 +26,8 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 		count int
 		disk  bool
 	}{
-		{"definition.json", 21, true},
-		{"definition-components.json", 20, false},
+		{"definition.json", 23, true},
+		{"definition-components.json", 22, false},
 		{"definition-os.json", 1, true},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
@@ -60,11 +63,78 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	if !reflect.DeepEqual(all, parts) {
 		t.Fatal("component and OS selections do not exactly partition the combined set")
 	}
+	providers, err := authored.LoadDefinition(t.Context(), filepath.Join(root, "definition-providers.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(providers.Outputs) != 2 {
+		t.Fatal("provider loop must select both required source-built provider images")
+	}
+	for _, output := range providers.Outputs {
+		combined, ok := all[output.Name]
+		if !ok {
+			t.Fatalf("provider %s omitted from combined selection", output.Name)
+		}
+		// The provider-only Definition uses CAPNICo as its default catalog.
+		// Normalize that one explicit relationship before comparing outputs.
+		if output.Catalog == nil {
+			output.Catalog = &providers.Catalog
+		}
+		if !reflect.DeepEqual(output, combined) {
+			t.Fatalf("provider loop diverges from combined selection: %s", output.Name)
+		}
+	}
 	env, err := authored.LoadEnvironment(t.Context(), filepath.Join(root, "environment-local.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if env.Publication != nil || env.Signing != nil || env.GitHubARC != "" || env.UtilityPlatform != "linux/arm64" || env.RuntimeBinary() != "podman" {
 		t.Fatalf("local example grants an unintended route: %+v", env)
+	}
+}
+
+func TestLaptopARM64OSExecutionClassAdmission(t *testing.T) {
+	t.Chdir("../../..")
+	root := filepath.Join("definitions", "nke-laptop-arm64")
+	definitionPath := filepath.Join(root, "definition-os.json")
+	d, err := authored.LoadDefinition(t.Context(), definitionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentPath := filepath.Join(root, "environment-local.json")
+	env, err := authored.LoadEnvironment(t.Context(), environmentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*authored.Environment)
+	}{
+		{name: "complete TCG host declaration"},
+		{name: "runtime alone is not a VM class", change: func(env *authored.Environment) { env.ExecutionClasses = nil }},
+		{name: "foreign host is not implicit", change: func(env *authored.Environment) { env.ExecutionClasses[0].HostPlatform = "linux/amd64" }},
+		{name: "insufficient workspace declaration", change: func(env *authored.Environment) { env.ExecutionClasses[0].Resources.EphemeralStorageMiB = 1 }},
+		{name: "insufficient timeout declaration", change: func(env *authored.Environment) { env.ExecutionClasses[0].MaxTimeoutSeconds = 1 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			selected := env.Clone()
+			if tc.change != nil {
+				tc.change(&selected)
+			}
+			plan, err := factory.CompileDocuments(t.Context(), definitionPath, d, environmentPath, selected, "test")
+			if tc.change != nil {
+				var coded *e.Error
+				if plan != nil || !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+					t.Fatalf("expected no Plan and %s, got plan=%v err=%v", e.CodeEngineCapability, plan != nil, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "nke-node-image-arm64" {
+				t.Fatal("complete Environment did not admit the exact ARM64 disk Plan")
+			}
+		})
 	}
 }
