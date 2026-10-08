@@ -215,12 +215,19 @@ guest bridge to the exact owned management endpoint's SPIRE ports and withdraws
 those rules before address release. Unjoined children retain dependent controls.
 
 Full end-to-end acceptance remains unestablished. The latest private integrated
-attempt passed guest-to-management TCP, TPM attestation and cloud-init on both
-guests, then failed Kubernetes initialization at the unannounced tenant VIP.
-The BGP speaker started but installed no VIP route; no tenant/workload acceptance
-is claimed. Owned domains, management containers, bridge and routes were removed.
-The adapter uses NICoSim's guest diagnostics with per-attempt credentials and
-bounded private log retention before deletion. Local evidence reports
+attempt reached its tenant VIP/API and obtained a kubeconfig but exposed
+insufficient control-plane allocatable memory for OVN and missing worker IPv4
+after reboot. No tenant/workload/final-cleanup acceptance is claimed.
+The adapter uses NICoSim's guest diagnostics with per-attempt credentials,
+private-file Bearer headers, disabled ambient curl configuration and bounded
+private log retention before deletion. The HTTP contract is exercised with a
+real loopback server; a separate live probe retained the control-plane's three
+log sets while worker requests returned SSH connection-refused/no-route errors.
+A private runtime seed projection raises the selected instance to eight GiB
+without changing accepted asset bytes. The local profiles producer adds a guest
+boot command matching NICoSim's `eth0` seed across reboot. Complete tenant
+acceptance with both corrections remains unexercised. None of these probes proves the full
+tenant/workload path. Local evidence reports
 are intentionally not shipped in this PR. Private diagnostic logs and Run records
 are not authenticated external acceptance or qualified reproduction. The retained
 older disk's SPIRE/DSX exception, failed full boot smoke and direct-source OS

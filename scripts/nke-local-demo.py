@@ -46,6 +46,11 @@ VIP = "172.31.0.10"
 PROFILE = "nke-local-26-04-arm64-plain"
 TYPE = "a1b2c3d4-0005-4000-8000-000000000003"
 PREFIX = "a1b2c3d4-0004-4000-8000-000000000001"
+SEED_SHA256 = "e713b6e74e884bfba5a942b10eee142171565dcec2f24c6217cd9baecea03cac"
+LAPTOP_INSTANCE = ('  - id: "' + TYPE + '"\n'
+    '    name: "cpu4-mem6gb-disk60gb"\n'
+    '    site_id: "' + VM.SITE + '"\n'
+    '    gpu_count: 0\n    cpu_count: 4\n    memory_gib: 6\n    disk_gib: 60\n').encode()
 WORKLOAD_INDEX = "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
 # Exact linux/arm64/v8 manifest read from that OCI index using Docker's
 # descriptor interface; never compare a runtime image ID with its parent index.
@@ -77,6 +82,35 @@ def tenant_request(name):
             "autoProvisionDisabled": False, "autoModeDisabled": True, "provisioningMonitorDisabled": True,
             "recycleBudget": 0, "nico": {"configProfile": "nico-vms-worker", "osProfile": PROFILE,
                                        "instanceTypeID": TYPE, "vpcPrefixIDs": [PREFIX]}}]}
+
+
+def write_nico_header(work, token):
+    # curl's established @file interface keeps the per-attempt credential out
+    # of process arguments and phase logs. The caller owns this private workdir.
+    path = work / "nico-api-header"
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), "w") as held:
+        held.write("Authorization: Bearer " + token + "\n")
+
+
+def project_laptop_seed(simulator):
+    # Not a YAML parser: admit the entire exact source fixture, then project one
+    # known byte block into a separate runtime configuration. NICoSim's pinned
+    # YAML decoder/seed owner still validates it. Accepted assets stay unchanged.
+    source = simulator / "internal/seed/default-seed.yaml"
+    with os.fdopen(os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as held:
+        value = os.fstat(held.fileno())
+        if (not stat.S_ISREG(value.st_mode) or value.st_uid != os.getuid() or value.st_size > 65536):
+            raise VM.SmokeError("source seed is not a bounded regular owned file")
+        raw = held.read(65537)
+    if hashlib.sha256(raw).hexdigest() != SEED_SHA256 or raw.count(LAPTOP_INSTANCE) != 1:
+        raise VM.SmokeError("source simulator seed differs from the inspected laptop interface")
+    projected = raw.replace(LAPTOP_INSTANCE, LAPTOP_INSTANCE.replace(b"mem6gb", b"mem8gb").replace(
+        b"memory_gib: 6", b"memory_gib: 8"))
+    path = simulator / "laptop-seed.yaml"
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600), "wb") as held:
+        held.write(projected)
+    return {"sourceDigest": "sha256:" + SEED_SHA256, "runtimeDigest": "sha256:" + hashlib.sha256(projected).hexdigest(),
+            "instanceType": TYPE, "vcpus": 4, "memoryGiB": 8, "diskGiB": 60}
 
 
 def selected_tenant(rows, name, expected_id=None):
@@ -252,6 +286,12 @@ class Tenant:
             return
         simulator = self.work.parent / "simulator"
         try:
+            header = self.work.parent / "nico-api-header"
+            with os.fdopen(os.open(header, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as held:
+                value = os.fstat(held.fileno())
+                if (not stat.S_ISREG(value.st_mode) or value.st_uid != os.getuid() or value.st_nlink != 1 or
+                        stat.S_IMODE(value.st_mode) != 0o600 or not 0 < value.st_size <= 256):
+                    raise VM.SmokeError("diagnostic header is not a bounded private owned file")
             names = VM.domain_inventory(self.domain_runner)
             if len(names) > 2:
                 raise VM.SmokeError("diagnostic guest inventory exceeds the two-VM contract")
@@ -262,8 +302,11 @@ class Tenant:
                 for item in ("agent-logs", "kubelet-logs", "containerd-logs"):
                     try:
                         url = self.diagnostic_url + "/v1/orgs/novxwn552ssc/instances/" + instance + "/diagnostics/" + item
-                        data = self.capture(["curl", "--noproxy", "*", "--max-time", "10", "--max-filesize", "1048576",
-                            "--fail", "--silent", "--show-error", url], "diagnostic-" + instance + "-" + item, 12)
+                        # -q must be first: a user's curlrc can add URLs or
+                        # enable traces that would leak the private header.
+                        data = self.capture(["curl", "-q", "--noproxy", "*", "--max-time", "30", "--max-filesize", "1048576",
+                            "--fail", "--silent", "--show-error", "--header", "@" + str(header), url],
+                            "diagnostic-" + instance + "-" + item, 32)
                         if len(data.encode()) > 1024**2:
                             raise VM.SmokeError("guest diagnostic exceeds the private retention bound")
                         path = self.work / (instance + "." + item + ".log")
@@ -427,6 +470,7 @@ def simulator_environment(work, disk, guard_work, gateway, binding):
     temporary = work / "tmp"
     temporary.mkdir(mode=0o700)
     env.update({"TMPDIR": str(temporary), "NICO_SIM_LISTEN_ADDR": gateway + ":18089",
+        "NICO_SIM_SEED_PATH": str(work / "laptop-seed.yaml"),
         "NICO_VMS_BGP_ENABLED": "true", "NICO_VMS_BGP_VIP_CIDRS": NET.VIP_CIDR,
         "NICO_VMS_BGP_LISTEN_PORT": "10179", "NICO_VMS_READINESS_TIMEOUT": "30m",
         "NICO_VMS_DIAG_SSH_ENABLED": "true", "NICO_VMS_DIAG_SSH_USER": "nkd-demo",
@@ -478,6 +522,7 @@ def probe(args):
         if sorted(path.name for path in bundle.iterdir()) != ["nico-sim", "nico-sim-runtime-assets", "nico-simctl"]:
             raise VM.SmokeError("require exactly the three accepted simulator members")
         VM.extract_assets(bundle / "nico-sim-runtime-assets", simulator)
+        seed_projection = project_laptop_seed(simulator)
         # Grant only a private single-link copy, never mutate accepted inputs.
         binary = work / "nico-sim"
         shutil.copyfile(bundle / "nico-sim", binary)
@@ -521,6 +566,7 @@ def probe(args):
                     raise
                 time.sleep(.2)
         token = secrets.token_hex(24)
+        write_nico_header(work, token)
         # Guard's session admission may have activated the daemon. Re-admit its
         # effective paths before starting the capability-bearing simulator.
         if admit_libvirt_environment(env) != libvirt_binding:
@@ -544,6 +590,7 @@ def probe(args):
         (work / "demo-inputs.json").write_text(json.dumps({"scope": "unqualified-local-demo", "simulator": sim,
             "disk": image, "httpReadback": image["digest"], "workloadAcquisition": WORKLOAD_IMAGE,
             "workloadSourceIndex": WORKLOAD_INDEX,
+            "seedProjection": seed_projection,
             "outputs": {key: row[1] for key, row in outputs.items()}}, indent=2, sort_keys=True))
         args.out = str(work / "site")
         args.nico_org = "novxwn552ssc"
@@ -584,7 +631,7 @@ def main():
     for name in ("nke-checkout", "nkdctl", "tools-run", "site-run", "components-run", "profiles-run", "provider-run",
                  "simulator-run", "os-run", "out"):
         parser.add_argument("--" + name, required=True)
-    parser.add_argument("--timeout", type=int, default=1800)
+    parser.add_argument("--timeout", type=int, default=3600)
     args = parser.parse_args()
     def interrupted(_number, _frame):
         raise VM.SmokeError("demo interrupted; cleaning only joined owned resources")

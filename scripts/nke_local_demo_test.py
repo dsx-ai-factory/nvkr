@@ -5,10 +5,12 @@
 
 import importlib.util
 import io
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
@@ -19,6 +21,16 @@ SPEC.loader.exec_module(DEMO)
 
 
 class DemoTest(unittest.TestCase):
+    def test_cli_default_allows_measured_native_tcg_provisioning_budget(self):
+        arguments = ["demo"]
+        for name in ("nke-checkout", "nkdctl", "tools-run", "site-run", "components-run", "profiles-run",
+                     "provider-run", "simulator-run", "os-run", "out"):
+            arguments.extend(["--" + name, "/unused"])
+        with patch.object(DEMO.sys, "argv", arguments), patch.object(DEMO, "probe") as probe, \
+             patch.object(DEMO.signal, "signal"):
+            self.assertEqual(DEMO.main(), 0)
+        self.assertEqual(probe.call_args.args[0].timeout, 3600)
+
     def test_host_admission_precedes_output_network_and_process_work(self):
         with patch.object(DEMO.SITE, "admit_materials", side_effect=DEMO.VM.SmokeError("host")), \
              patch.object(DEMO.VM, "inputs") as inputs, patch.object(DEMO.NET, "OwnedNetwork") as guard, \
@@ -32,6 +44,56 @@ class DemoTest(unittest.TestCase):
     def test_all_owners_share_unjoined_failure_identity(self):
         self.assertIs(DEMO.NET.MGMT.UnjoinedProcess, DEMO.MGMT.UnjoinedProcess)
         self.assertIs(DEMO.NET.VM, DEMO.VM)
+
+    def test_seed_projection_preserves_source_and_changes_only_selected_memory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            simulator = Path(temporary)
+            source = simulator / "internal/seed/default-seed.yaml"
+            source.parent.mkdir(parents=True)
+            # Byte-projection contract only; NICoSim owns full YAML validation.
+            raw = b"# unchanged prefix\n" + DEMO.LAPTOP_INSTANCE + b"# unchanged suffix\n"
+            source.write_bytes(raw)
+            digest = DEMO.hashlib.sha256(raw).hexdigest()
+            with patch.object(DEMO, "SEED_SHA256", digest):
+                record = DEMO.project_laptop_seed(simulator)
+            self.assertEqual(source.read_bytes(), raw)
+            projected = (simulator / "laptop-seed.yaml").read_bytes()
+            self.assertEqual(projected, raw.replace(b"mem6gb", b"mem8gb").replace(b"memory_gib: 6", b"memory_gib: 8"))
+            self.assertEqual(record["sourceDigest"], "sha256:" + digest)
+            self.assertEqual(record["runtimeDigest"], "sha256:" + DEMO.hashlib.sha256(projected).hexdigest())
+            self.assertEqual(record["memoryGiB"], 8)
+            self.assertEqual((simulator / "laptop-seed.yaml").stat().st_mode & 0o777, 0o600)
+            with patch.object(DEMO, "SEED_SHA256", digest), self.assertRaises(FileExistsError):
+                DEMO.project_laptop_seed(simulator)
+
+    def test_seed_projection_rejects_changed_or_ambiguous_source_before_output(self):
+        for case in ("changed", "duplicate", "missing", "symlink", "fifo", "oversize", "foreign"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                simulator = Path(temporary)
+                source = simulator / "internal/seed/default-seed.yaml"
+                source.parent.mkdir(parents=True)
+                raw = DEMO.LAPTOP_INSTANCE
+                if case == "duplicate":
+                    raw *= 2
+                elif case == "missing":
+                    raw = b"# missing\n"
+                elif case == "oversize":
+                    raw += b"x" * 65536
+                if case == "symlink":
+                    source.symlink_to(simulator)
+                elif case == "fifo":
+                    os.mkfifo(source, 0o600)
+                else:
+                    source.write_bytes(raw)
+                real_stat = DEMO.os.fstat
+                def observed(fd):
+                    value = real_stat(fd)
+                    return Mock(st_mode=value.st_mode, st_uid=os.getuid()+1, st_size=value.st_size) if case == "foreign" else value
+                with patch.object(DEMO.os, "fstat", side_effect=observed), \
+                     patch.object(DEMO, "SEED_SHA256", "f" * 64 if case == "changed" else DEMO.hashlib.sha256(raw).hexdigest()):
+                    with self.assertRaises((DEMO.VM.SmokeError, OSError)):
+                        DEMO.project_laptop_seed(simulator)
+                self.assertFalse((simulator / "laptop-seed.yaml").exists())
 
     def test_guest_route_binds_owned_node_and_only_pinned_spire_ports(self):
         guard = Mock()
@@ -216,6 +278,7 @@ class DemoTest(unittest.TestCase):
             self.assertEqual(env["HOME"], "/admitted-account")
             self.assertEqual(env["XDG_RUNTIME_DIR"], "/run/user/" + str(os.getuid()))
             self.assertEqual(env["NICO_VMS_VM_BACKEND"], "libvirt")
+            self.assertEqual(env["NICO_SIM_SEED_PATH"], str(work / "laptop-seed.yaml"))
             self.assertEqual(env["NICO_VMS_DIAG_SSH_ENABLED"], "true")
             self.assertEqual(env["NICO_VMS_DIAG_SSH_USER"], "nkd-demo")
             self.assertEqual(len(env["NICO_VMS_DIAG_SSH_PASSWORD"]), 48)
@@ -227,6 +290,7 @@ class DemoTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary) / "site"
             work.mkdir()
+            DEMO.write_nico_header(work.parent, "private-test-token")
             tenant = DEMO.Tenant("owned", Path("tools"), work, {}, 300, Mock(), {},
                                  diagnostic_url="http://172.18.0.1:18089")
             tenant.intent = True
@@ -236,16 +300,21 @@ class DemoTest(unittest.TestCase):
                 tenant.preserve_guest_diagnostics()
             self.assertEqual(len(capture.call_args_list), 3)
             for call in capture.call_args_list:
-                self.assertEqual(call.args[2], 12)
-                self.assertEqual(call.args[0][:9], ["curl", "--noproxy", "*", "--max-time", "10", "--max-filesize", "1048576", "--fail", "--silent"])
+                self.assertEqual(call.args[2], 32)
+                self.assertEqual(call.args[0][:10], ["curl", "-q", "--noproxy", "*", "--max-time", "30", "--max-filesize", "1048576", "--fail", "--silent"])
                 self.assertTrue(call.args[0][-1].startswith(tenant.diagnostic_url + "/v1/orgs/novxwn552ssc/instances/" + identifier))
                 self.assertNotIn("follow", call.args[0][-1])
+                self.assertIn("@" + str(work.parent / "nico-api-header"), call.args[0])
+                self.assertNotIn("private-test-token", " ".join(call.args[0]))
             for path in work.iterdir():
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
     def test_failed_or_foreign_guest_diagnostics_do_not_block_cleanup(self):
         with tempfile.TemporaryDirectory() as temporary:
-            tenant = DEMO.Tenant("owned", Path("tools"), Path(temporary), {}, 300, Mock(), {},
+            work = Path(temporary) / "site"
+            work.mkdir()
+            DEMO.write_nico_header(work.parent, "private-test-token")
+            tenant = DEMO.Tenant("owned", Path("tools"), work, {}, 300, Mock(), {},
                                  diagnostic_url="http://172.18.0.1:18089")
             tenant.intent = True
             for case in ("foreign", "transport", "storage", "oversize", "unjoined"):
@@ -270,6 +339,98 @@ class DemoTest(unittest.TestCase):
                         restore.assert_called_once()
                     if case == "foreign":
                         capture.assert_not_called()
+
+    def test_guest_diagnostics_use_bearer_header_with_real_http_transport(self):
+        identifier = "00000000-0000-4000-8000-000000000001"
+        requests = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                accepted = self.headers.get("Authorization") == "Bearer private-test-token"
+                requests.append((self.path, accepted))
+                self.send_response(200 if accepted else 401)
+                self.end_headers()
+                self.wfile.write(b"private journal" if accepted else b"missing bearer token")
+
+            def log_message(self, *_args):
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary) / "site"
+                work.mkdir()
+                DEMO.write_nico_header(work.parent, "private-test-token")
+                url = "http://127.0.0.1:" + str(server.server_port)
+                config = work.parent / "curl-home"
+                config.mkdir()
+                (config / ".curlrc").write_text('url = "' + url + '/unexpected"\nverbose\n')
+                tenant = DEMO.Tenant("owned", Path("tools"), work, {"CURL_HOME": str(config)}, 300, Mock(), {},
+                    diagnostic_url=url)
+                tenant.intent = True
+                with self.assertRaises(DEMO.VM.SmokeError) as rejected:
+                    tenant.capture(["curl", "-q", "--noproxy", "*", "--max-time", "2", "--fail", "--silent",
+                                    tenant.diagnostic_url], "missing-auth", 4)
+                self.assertEqual(rejected.exception.returncode, 22)
+                with patch.object(DEMO.VM, "domain_inventory", return_value=["nico-vm-" + identifier]), \
+                     patch.object(DEMO.VM, "owned_domain", return_value=(identifier, "xml")), \
+                     patch.object(tenant, "capture", wraps=tenant.capture) as capture:
+                    tenant.preserve_guest_diagnostics()
+                self.assertEqual(len(capture.call_args_list), 3)
+                self.assertFalse(any("private-test-token" in " ".join(call.args[0]) for call in capture.call_args_list))
+                for item in ("agent-logs", "kubelet-logs", "containerd-logs"):
+                    path = work / (identifier + "." + item + ".log")
+                    self.assertEqual(path.read_text(), "private journal")
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                self.assertEqual([accepted for _, accepted in requests], [False, True, True, True])
+                self.assertFalse(any(path == "/unexpected" for path, _ in requests))
+                for path in work.glob("tenant-*.log"):
+                    self.assertNotIn("private-test-token", path.read_text())
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+            self.assertFalse(thread.is_alive())
+
+    def test_diagnostic_header_rejects_unsafe_files_without_blocking_cleanup(self):
+        for case in ("missing", "symlink", "fifo", "public", "oversize", "foreign", "hardlink"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary) / "site"
+                work.mkdir()
+                header = work.parent / "nico-api-header"
+                if case == "symlink":
+                    header.symlink_to(work)
+                elif case == "fifo":
+                    os.mkfifo(header, 0o600)
+                elif case != "missing":
+                    DEMO.write_nico_header(work.parent, "x" * 300 if case == "oversize" else "private-test-token")
+                    if case == "public":
+                        header.chmod(0o644)
+                    elif case == "hardlink":
+                        os.link(header, work / "alias")
+                tenant = DEMO.Tenant("owned", Path("tools"), work, {}, 300, Mock(), {},
+                                     diagnostic_url="http://127.0.0.1:18089")
+                tenant.intent = True
+                real_stat = DEMO.os.fstat
+                def observed(fd):
+                    value = real_stat(fd)
+                    return Mock(st_mode=value.st_mode, st_uid=os.getuid() + 1, st_nlink=value.st_nlink,
+                                st_size=value.st_size) if case == "foreign" else value
+                with patch.object(DEMO.os, "fstat", side_effect=observed), \
+                     patch.object(tenant, "preserve_consoles"), patch.object(tenant, "capture") as capture, \
+                     patch.object(tenant, "restore") as restore:
+                    tenant.close()
+                restore.assert_called_once()
+                capture.assert_not_called()
+
+    def test_diagnostic_header_writer_never_overwrites_existing_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            DEMO.write_nico_header(work, "private-test-token")
+            with self.assertRaises(FileExistsError):
+                DEMO.write_nico_header(work, "replacement")
+            self.assertEqual((work / "nico-api-header").read_text(), "Authorization: Bearer private-test-token\n")
 
     def test_console_fifo_is_rejected_without_blocking_cleanup(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -12,11 +12,13 @@ probe as a completed tenant/workload result. This is a disposable trusted-user
 diagnostic, not M2, a signed Release, qualified execution or a complete
 source-built distribution. The older retained disk's failed full OS smoke and
 missing DSX source material remain disclosed.
-The latest integrated attempt booted both guests and completed TPM attestation
-and cloud-init, but `kubeadm init` timed out reaching `172.31.0.10:6443`.
-The BGP speaker started without installing a VIP route. Tenant/workload
-acceptance has not passed. Its owned VMs, management containers, bridge and VIP
-routes were removed. This guide is not yet a validated full-demo result.
+The latest real attempt reached the tenant API and generated its kubeconfig,
+but OVN could not schedule on the six-GiB control plane, and the worker lost
+IPv4 after reboot with a failed `enp1s0` to `eth0` rename. The candidate now
+projects eight-GiB guests and builds a profile boot command that retains `eth0`
+across reboot. Both corrections still require a complete real rerun; tenant,
+workload and final cleanup acceptance have not passed together.
+This guide is not yet a validated full-demo result.
 
 ## Start on an Apple Silicon Mac
 
@@ -71,6 +73,12 @@ Prepare a separate clean NKE clone at that commit. Keep the source clone
 unchanged; the consumer projects its tracked bytes privately. Source-owned NKE
 scripts render/check chart values and the built `nkectl` validates the tenant
 request. No approximate YAML or iPXE parser is added in NKD.
+The local profiles image adds an idempotent guest boot command for
+[`net.ifnames=0`](https://github.com/systemd/systemd/blob/main/docs/PREDICTABLE_INTERFACE_NAMES.md),
+after NICoSim's source-owned GRUB setup, to match its single-NIC `eth0` seed.
+This is laptop deployment configuration, not a change to the accepted QCOW2.
+An older completed profiles Run does not contain this fix; rebuild the profiles
+lane with a fresh attempt and pass that exact Run to the consumer.
 
 Cache the pinned service images using the existing build/management setup.
 The integrated adapter uses the existing `kind` Docker bridge. On a clean
@@ -127,11 +135,13 @@ python3 -B scripts/nke-local-demo.py \
   --tools-run "$NKD_TOOLS_RUN" --site-run "$NKD_SITE_RUN" \
   --components-run "$NKD_COMPONENTS_RUN" --provider-run "$NKD_PROVIDER_RUN" \
   --profiles-run "$NKD_PROFILES_RUN" --simulator-run "$NKD_SIMULATOR_RUN" \
-  --os-run "$NKD_OS_RUN" --out "$NKD_DEMO_OUT" --timeout 1800
+  --os-run "$NKD_OS_RUN" --out "$NKD_DEMO_OUT" --timeout 3600
 ```
 
 Run that block inside `colima ssh --profile nkd-demo`, or on an equivalent
 dedicated native ARM64 Linux host. Linux executables cannot run directly on macOS.
+The tenant budget defaults to 60 minutes: native TCG provisioning on the tested
+laptop exceeded 30 minutes. This is a timeout bound, not a completion estimate.
 The consumer requires the disk-copy bytes plus 30 GiB free on its native output
 volume and the management admission's eight CPUs/20 GiB RAM. Its output must
 not already exist. This is two-VM diagnostic capacity, not fresh-bake admission.
@@ -147,8 +157,12 @@ dependent controls instead of recycling the management address. This scoped
 exception is specific to the disposable native demo, not production policy.
 NICoSim's source-owned guest diagnostics use a random per-attempt SSH credential,
 not its default password. That disposable account has passwordless sudo only in
-these owned guests. Before deletion, the adapter retains agent, kubelet and
-containerd logs privately, with a ten-second/1-MiB bound per request. Credentials
+these owned guests. Diagnostic API requests send the existing per-attempt Bearer
+header through a private, owner-checked `nico-api-header` file, not process
+arguments or phase logs. The pinned simulator only checks that a nonempty Bearer
+header exists; this is not production authentication or token verification.
+Before deletion, the adapter attempts to retain agent, kubelet and
+containerd logs privately, with a 30-second/1-MiB bound per request. Credentials
 and configuration files are not collected as diagnostic items. Diagnostic
 failures do not prevent cleanup; an unjoined child retains dependent controls.
 
@@ -164,7 +178,14 @@ failures do not prevent cleanup; an unjoined child retains dependent controls.
 
 The authored profiles select Ubuntu 26.04, Kubernetes 1.34.2 and OVN-Kubernetes
 1.4.0. This command creates one control-plane VM and one worker with the selected
-source seed's four-CPU/six-GiB/60-GiB instance type. The QCOW2 bytes are the
+source seed's four-CPU instance type, projected privately to eight GiB RAM and
+a 60-GiB disk. The original seed is admitted by its exact source digest and kept
+unchanged. Only the selected instance's name/memory block is replaced in a
+separate runtime seed; NICoSim's source-owned decoder validates it through
+`NICO_SIM_SEED_PATH`. `demo-inputs.json` records both seed digests and the sizing.
+The six-GiB source default left insufficient allocatable memory for OVN on the
+tested control plane. This projection is deployment configuration, not a rebuild
+or change to the accepted simulator/disk artifact bytes. The QCOW2 bytes are the
 delivery subject; mutable guest overlays naturally diverge during provisioning.
 The consumer does not claim exact guest reproduction or inspect a final disk SBOM.
 
