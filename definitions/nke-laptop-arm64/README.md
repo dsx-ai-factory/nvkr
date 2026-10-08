@@ -15,6 +15,7 @@ not a full source-built NKE distribution. See the
 | NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive, not included in the 23-output set |
 | Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart; not included in the 23-output set |
 | Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; separate from the acquired `operator-tools` in `all` |
+| Diagnostic controller profiles | `definition-profiles.json` | One plain ARM64/Ubuntu 26.04 profiles OCI image; separate from `all`, not fleet profiles or deployment proof |
 
 Use `environment-local.json` for rootless Podman, or `environment-local-docker.json`
 with `CONTAINER_RUNTIME=docker` on native Linux ARM64, including execution inside
@@ -95,7 +96,9 @@ CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
 
 Docker/Podman compiler contracts and an [isolated Helm preparation/package
 probe](../../docs/evidence/2026-10-08-local-site-chart-preparation.md) pass.
-A complete four-output NKD Run remains unexercised. The wrapper uses the existing
+A [complete four-output Colima Run](../../docs/evidence/2026-10-08-colima-site-and-tools-build.md)
+passed, including native controller help and unchanged chart handoff/rendering.
+It did not install NKE. The wrapper uses the existing
 pinned Helm 4.3.0, not the installer's preferred 4.2.4. Its readiness script warns
 on this mismatch; a warning is not a matched pin. Read the
 [handoff gaps](../../docs/nkd-to-nke-demo.md) before treating these inputs as a
@@ -106,5 +109,13 @@ The separate `tools` selection compiles Helm 4.2.4, kubectl 1.36.0, clusterctl
 It reuses PR #113's preparation/offline-build approach and does not change the
 older acquired `operator-tools` output or the OS graph. See the
 [source-tool instructions and limits](../../docs/local-development.md#build-the-installer-tools-from-source).
-Compiler and preflight contracts pass; a complete five-component Run and tool
-installation are still unexercised. These are Linux binaries, not Mac binaries.
+Compiler and preflight contracts, the complete five-component Colima Run,
+verified extraction and all five native version probes passed. Complete installer
+integration remains unexercised. These are Linux binaries, not Mac binaries.
+
+The separate `profiles` lane packages pinned NKE VM config profiles/runbooks
+and a diagnostic ARM64/Ubuntu 26.04 plain OS profile. Its Docker Run and offline
+content/NKE-owned template checks passed, not provisioning or tenant acceptance.
+See the [profiles guide](../../docs/local-controller-profiles.md) before using
+its local endpoint and TPM configuration; it does not authenticate a disk or
+replace production fleet profiles.

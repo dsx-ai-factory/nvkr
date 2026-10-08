@@ -26,6 +26,10 @@ contracts, complete build, verified extraction and native version probes passed;
 complete deployment remains unexercised. Helm's
 exact fixture preparation is diagnostic Local-only, not a supported held hosted
 fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
+`profiles` separately builds the diagnostic plain ARM64/Ubuntu 26.04 controller
+profiles image from pinned NKE fixtures. Its [Docker Run/content probe](../docs/evidence/2026-10-08-colima-local-profiles.md)
+passed; it is not deployed, included in `all`, or boot-compatibility proof.
+See the [profiles guide](../docs/local-controller-profiles.md).
 Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
 The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.
 `CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, or explicitly

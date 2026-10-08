@@ -237,6 +237,18 @@ remain absent; the full image smoke still fails on the missing DSX material. Int
 into the combined set and the complete
 Colima/NICoSim site/tenant demo remain absent. This adds no deployment or
 qualification authority.
+The separate local `definition-profiles.json` now produces one diagnostic
+ARM64/Ubuntu 26.04 plain profiles OCI image from the staged-installer's pinned
+NKE fixtures, with exact source-file guards, unchanged config/runbooks, a
+maintained digest-pinned Alpine base and no HTTP agent-download override.
+Docker/Podman compiler and preflight contracts cover the separate selection.
+The [real Docker Run and NKE-owned content probe](../evidence/2026-10-08-colima-local-profiles.md)
+passed 1/1, offline image checks, metadata selection and Calico/OVN template
+rendering. Podman execution, NICoSim boot-script execution, exact served-QCOW2
+binding, registry/node reachability, TPM attestation and site/tenant acceptance
+remain unexercised. The profile's APT operations and local endpoint are
+descriptions, not authenticated dependency/disk compatibility. It is not fleet
+configuration, an EFI artifact, part of `all`, or a new deployment authority.
 The additional local `definition-site.json` declares four producers aligned to
 the exact PR #1160 staged-installer candidate: CLI, controller image, image-bound
 controller chart and NKTP chart. Docker/Podman compiler contracts cover the

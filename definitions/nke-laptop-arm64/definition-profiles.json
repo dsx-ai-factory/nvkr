@@ -1,0 +1,17 @@
+{
+  "apiVersion": "nkd.dev/definition/v4",
+  "kind": "Definition",
+  "metadata": {
+    "name": "nke-local-profiles-arm64",
+    "description": "Diagnostic Ubuntu 26.04 plain ARM64 NICoSim profiles image. No fleet, image compatibility, deployment or qualification claim."
+  },
+  "catalog": {"base": "./profiles-catalog"},
+  "outputs": [
+    {
+      "name": "controller-profiles",
+      "components": ["nke-local-profiles"],
+      "format": "oci",
+      "platform": "linux/arm64"
+    }
+  ]
+}

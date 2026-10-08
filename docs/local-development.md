@@ -528,6 +528,15 @@ executor selection; actual staged installation and release-manifest overrides
 remain separate checks. See the [installer handoff analysis](nkd-to-nke-demo.md); this is
 not yet the promised deploy-only, QCOW2-backed site/tenant journey.
 
+## Build the diagnostic controller profiles
+
+The separate `profiles` lane builds the controller's profiles content image
+with a plain ARM64/Ubuntu 26.04 local profile, not the older fixture's 24.04/FDE
+selection. Its real Docker build and NKE-owned content/template tests passed.
+It still requires the deploy-only adapter's exact QCOW2 binding and runtime
+validation. Follow the [profiles guide](local-controller-profiles.md); this lane
+does not add profiles to `all` or install a site.
+
 ## Build the installer tools from source
 
 The `tools` lane supplies one `installer-tools-arm64` executable bundle containing
