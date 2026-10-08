@@ -264,7 +264,8 @@ func TestNKEOSPublicSourcesLive(t *testing.T) {
 	}
 }
 
-// probeHelmKubeVersion exercises both independently stamped upstream packages.
+// probeHelmKubeVersion exercises chartutil's stamped default and ordinary lint.
+// The separate lint/rules stamps are declaration-guarded, not exercised here.
 func probeHelmKubeVersion(t *testing.T, ctx context.Context, binary string) {
 	t.Helper()
 	chart := t.TempDir()

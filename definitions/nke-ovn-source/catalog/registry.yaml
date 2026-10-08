@@ -21,28 +21,19 @@ components:
     toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
     outputType: oci-image
     buildCommand:
-      - buildctl-daemonless.sh
-      - build
-      - --frontend
-      - dockerfile.v0
-      - --local
-      - context=/src
-      - --local
-      - dockerfile=/src/dist/images
-      - --opt
-      - filename=Dockerfile.ubuntu
-      - --opt
-      - platform=linux/{{.Arch}}
-      - --opt
-      - build-arg:OVN_KUBERNETES_DIR=.
-      - --opt
-      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:74560d1d7488711be460297046d5b8423dc21e81f2a0953b36ef6c8ec37a15cb
-      - --opt
-      - build-arg:KUBECTL_MINOR=1.36
-      - --opt
-      - build-arg:UBUNTU_BASE_IMAGE=docker.io/library/ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
-      - --output
-      - type=oci,dest=/src/nkd-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nke/ovn-kubernetes:git-26cc199de8e814a7fe6d899a770fc04df0bbc2f9
+      - sh
+      - -ec
+      - |
+        echo 'OVN IMAGE BUILD: source-owned Dockerfile acquires OVS/OVN and kubectl through APT; not hermetic or NV FIPS/STIG.' >&2
+        exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+          --local context=/src --local dockerfile=/src/dist/images \
+          --opt filename=Dockerfile.ubuntu --opt platform=linux/{{.Arch}} \
+          --opt build-arg:OVN_KUBERNETES_DIR=. \
+          --opt build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:74560d1d7488711be460297046d5b8423dc21e81f2a0953b36ef6c8ec37a15cb \
+          --opt build-arg:KUBECTL_MINOR=1.36 \
+          --opt build-arg:UBUNTU_BASE_IMAGE=docker.io/library/ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 \
+          --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+          --output type=oci,dest=/src/nkd-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nke/ovn-kubernetes:git-26cc199de8e814a7fe6d899a770fc04df0bbc2f9
     writeDir: nkd-output
     artifactPath: nkd-output/ovn-kube-ubuntu.oci.tar
   ovn-kubernetes-chart:
@@ -81,7 +72,6 @@ components:
       - bash
       - -ec
       - |
-        echo 'SOURCE ACCESS EXCEPTION: DSX OVN chart is internal; source credentials are host-side only.' >&2
         test -f /src/charts/ovn-kubernetes/Chart.yaml
         grep -qx 'version: 1.5.18' /src/charts/ovn-kubernetes/Chart.yaml
         tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
@@ -100,8 +90,6 @@ components:
       - bash
       - -ec
       - |
-        echo 'SOURCE ACCESS EXCEPTION: DSX OVN fork is internal; source credentials are host-side only.' >&2
-        echo 'WRAPPED IMAGE: source-owned Ubuntu Dockerfile acquires OVS/OVN and kubectl through APT; not hermetic or NV FIPS/STIG.' >&2
         readonly stream=1.5.18
         readonly revision=1+git.26cc199de8e8
         readonly out=/src/nkd-output
@@ -144,7 +132,7 @@ components:
         Package: nke-cni-ovn-$kind-$stream
         Version: $revision
         Architecture: {{.Arch}}
-        Maintainer: NVIDIA NKE
+        Maintainer: NKE <nke-dev@exchange.nvidia.com>
         Provides: nke-cni-ovn-$kind
         Conflicts: nke-cni-ovn-$kind
         Description: NKE OVN $kind from pinned DSX source

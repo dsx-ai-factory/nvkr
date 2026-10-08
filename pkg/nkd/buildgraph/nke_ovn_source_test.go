@@ -33,6 +33,9 @@ import (
 
 const ovnForkCommit = "26cc199de8e814a7fe6d899a770fc04df0bbc2f9"
 
+// ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
+const ovnForkStream = "1.5.18"
+
 func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
 	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nke-ovn-source/catalog"))
@@ -53,7 +56,7 @@ func TestNKEOVNForkGraphs(t *testing.T) {
 			}
 			for _, component := range cat.Components {
 				if !component.FromSource || component.Prebuilt != nil || component.Repo != "https://github.com/dsx-ai-factory/ovn-kubernetes" || component.Commit != ovnForkCommit {
-					t.Fatal("OVN producer must use the requested exact source, without binary fallback")
+					t.Fatal("OVN producer must use the locked fork source, without binary fallback")
 				}
 				if strings.Contains(strings.Join(component.BuildCommand, "\n"), "os-image/packages") {
 					t.Fatal("OVN producer delegates packaging to the NKE package folder")
@@ -106,6 +109,118 @@ func TestNKEOVNForkGraphs(t *testing.T) {
 				}
 			}
 			_ = compileOVNForkPlan(t, cat, arch, "podman")
+		})
+	}
+}
+
+// TestNKEOVNForkPinBindings guards the supplied catalog's repeated literals.
+// Re-pinning this candidate requires reviewing its stream and packaging together.
+func TestNKEOVNForkPinBindings(t *testing.T) {
+	lock, err := catalog.LoadLockContext(t.Context(), "../../../definitions/nke-ovn-source/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := lock.Pins["ovn-kubernetes"]
+	if pin.Commit != ovnForkCommit {
+		t.Fatal("fork lock changed without reviewing the catalog's stream and packaging bindings")
+	}
+	cat := loadOVNForkCatalog(t)
+	for _, tc := range []struct {
+		component string
+		fragments []string
+	}{
+		{component: "ovn-kube-ubuntu", fragments: []string{
+			"name=localhost/nke/ovn-kubernetes:git-" + pin.Commit,
+			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
+		}},
+		{component: "ovn-kubernetes-chart", fragments: []string{
+			"grep -qx 'version: " + ovnForkStream + "' /src/charts/ovn-kubernetes/Chart.yaml",
+		}},
+		{component: "nke-cni-ovn", fragments: []string{
+			"readonly stream=" + ovnForkStream,
+			"readonly revision=1+git." + pin.Commit[:12],
+			"tag: git-" + pin.Commit,
+			"readonly image_dir=/usr/lib/nke/cni-ovn/" + ovnForkStream,
+			"readonly image_name=ovn-images_" + ovnForkStream + "_linux_{{.Arch}}.tgz",
+			"Maintainer: NKE <nke-dev@exchange.nvidia.com>",
+		}},
+	} {
+		t.Run(tc.component, func(t *testing.T) {
+			component := cat.Components[tc.component]
+			if component.Commit != pin.Commit || component.SourceDate != pin.SourceDateEpoch {
+				t.Fatal("component source differs from its lock")
+			}
+			command := strings.Join(component.BuildCommand, "\n")
+			for _, fragment := range tc.fragments {
+				if !strings.Contains(command, fragment) {
+					t.Fatalf("catalog command lost pinned binding %q", fragment)
+				}
+			}
+		})
+	}
+}
+
+// TestNKEOVNForkImageInvocation runs only a local BuildKit argument fixture.
+// It proves the catalog passes the epoch; it does not prove image reproduction.
+func TestNKEOVNForkImageInvocation(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			cat := loadOVNForkCatalog(t)
+			resolved, err := buildgraph.Resolve(cat, buildgraph.Selection{
+				Components: []string{"ovn-kube-ubuntu"}, Platform: "linux/" + arch,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			graph, err := buildgraph.Compile(resolved)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, node := range graph.Nodes {
+				if node.Kind != ir.KindBuild || node.Component != "ovn-kube-ubuntu" {
+					continue
+				}
+				if len(node.Command) != 3 || node.Command[0] != "sh" || node.Command[1] != "-ec" {
+					t.Fatal("unexpected BuildKit invocation")
+				}
+				root := t.TempDir()
+				argsPath := filepath.Join(root, "arguments")
+				if err := os.WriteFile(filepath.Join(root, "buildctl-daemonless.sh"),
+					[]byte("#!/bin/sh\nprintf '%s\\n' \"$@\" >\"$TEST_ARGS\"\n"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, sh, node.Command[1:]...)
+				cmd.Env = []string{"PATH=" + root, "TEST_ARGS=" + argsPath}
+				for _, env := range node.Env {
+					cmd.Env = append(cmd.Env, env.Name+"="+env.Value)
+				}
+				cmd.WaitDelay = 5 * time.Second
+				output, err := cmd.CombinedOutput()
+				if err != nil || !strings.Contains(string(output), "OVN IMAGE BUILD:") {
+					t.Fatalf("image invocation: %v: %s", err, output)
+				}
+				args, err := os.ReadFile(argsPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, want := range []string{
+					"platform=linux/" + arch,
+					fmt.Sprintf("build-arg:SOURCE_DATE_EPOCH=%d", cat.Components["ovn-kube-ubuntu"].SourceDate),
+					"type=oci,dest=/src/nkd-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nke/ovn-kubernetes:git-" + ovnForkCommit,
+				} {
+					if !slices.Contains(strings.Split(string(args), "\n"), want) {
+						t.Fatalf("missing BuildKit argument %q in %s", want, args)
+					}
+				}
+				return
+			}
+			t.Fatal("missing OVN image producer")
 		})
 	}
 }
@@ -231,6 +346,8 @@ for kind in charts images; do
   package=/tmp/nke-cni-ovn-${kind}-1.5.18_1+git.26cc199de8e8_$GOARCH.deb
   test "$(dpkg-deb -f "$package" Architecture)" = "$GOARCH"
   test "$(dpkg-deb -f "$package" Package)" = "nke-cni-ovn-$kind-1.5.18"
+  test "$(dpkg-deb -f "$package" Version)" = "1+git.26cc199de8e8"
+  test "$(dpkg-deb -f "$package" Maintainer)" = 'NKE <nke-dev@exchange.nvidia.com>'
   dpkg-deb -x "$package" /tmp/root
   dpkg-deb -e "$package" "/tmp/control-$kind"
 done

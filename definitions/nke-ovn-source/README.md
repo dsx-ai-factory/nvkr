@@ -63,6 +63,17 @@ The image package installs a deterministic gzip archive and SHA-256 sidecar unde
 containerd readiness and import, then imports the archive into the `k8s.io`
 namespace. Import failures fail package configuration.
 
+These packages select stream `1.5.18` and Debian version `1+git.26cc199de8e8`,
+not the pinned NKE agent's default stream `1.4.0`. `InstallCNI.version=1.5.18`
+selects the existing stream-suffixed chart package; its logical `=1.5.18` suffix
+is informational, not an enforced Debian revision. InstallCNI strips that
+suffix before checking package presence and never runs APT. Install the exact
+package names with `=1+git.26cc199de8e8` separately, for example through
+InstallPackages, then validate chart deployment. These packages are not a
+drop-in for an empty-version request using the default stream. See the
+[pinned InstallCNI contract](https://github.com/dsx-ai-factory/nke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/agent/pkg/agent/proto/node_agent.proto#L525-L545)
+and its [package-presence implementation](https://github.com/dsx-ai-factory/nke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/agent/internal/agent/cni.go#L826-L875).
+
 ## Native image and Helm OCI outputs
 
 [definition.yaml](definition.yaml) declares four independent deliverables:
@@ -112,7 +123,7 @@ go run ./cmd/nkdctl run generate \
 ```
 
 Production execution requires installing that generated bundle in an admitted
-consumer checkout. The generator owns one `nkd-run.yml` per root; this PR does
+consumer checkout. The generator owns one `nkd-run.yml` per root; this candidate does
 not replace the maintained M2 bundle. Dispatch remains default-branch-only,
 with the existing protected `nkd-release` environment and main signer policy.
 `NKE_SOURCE_TOKEN` must separately have read access to the internal OVN fork;
@@ -184,7 +195,7 @@ proven. Publication/signing follows the selected Environment's existing OCI rout
 not this producer diagnostic.
 
 The current NKE composer still requires its `calico`, `kubeadm-distro`, `ovn` and
-`spire-agent` archive bindings plus the agent package. This PR adds a choice of
+`spire-agent` archive bindings plus the agent package. This catalog adds a choice of
 OVN producer, not an OVN-only maintained image or optional-material composer.
 
 ## Tests and limitations
@@ -207,6 +218,10 @@ closure, reject missing chart/image materials, and compile the diagnostic and
 four-output publication Plans. They verify all six native Helm bindings,
 cross-platform/missing-slot failures, publication-independent Build identity,
 ordinary native hosted routing and byte-exact bundle regeneration.
+Pin-binding tests cross-check the catalog's image tag, Debian revision, chart
+stream and import paths against the reviewed lock and stream. Re-pinning requires
+updating these declarations together. A local BuildKit argument fixture checks
+both architectures and the explicit source epoch without building an image.
 Ordinary public-source CI runs only these credential-free contracts.
 The opt-in `TestOVNForkHelmDigestRendering` accepts
 `NKD_OVN_CHART_DIRECTORY=/path/to/pinned-fork/charts/ovn-kubernetes`. It renders
@@ -216,7 +231,8 @@ loopback registry and verifies byte-identical real Helm pull. It does not prove
 production GHCR publication or correspondence with a source-built image.
 The opt-in live test executes the real factory fetch/build operations and its
 authenticated material handoff, then independently extracts the Debian packages
-with `dpkg-deb` and checks metadata, layout, hook syntax and gzip/sidecar integrity.
+with `dpkg-deb` and checks package name, architecture, version and maintainer,
+layout, hook syntax and gzip/sidecar integrity.
 It also builds Helm from the existing pinned public-source producer, renders the
 packaged chart, rejects old/default image references and compares decompressed
 image bytes with the exact source-built OCI export.
@@ -230,7 +246,14 @@ This is the standard Ubuntu Dockerfile, **not** the fork's private NVIDIA
 FIPS/STIG image flavor. OVS, OVN, kubectl and runtime dependencies inside that
 Dockerfile are acquired through APT; they are not compiled from pinned Git by this
 option. The image lane has network access, source-owned build stamps and mutable
-APT inputs. The catalog logs these limitations. No hermeticity, bit reproduction,
+APT inputs. The image producer logs these limitations; this is diagnostic text,
+not an authenticated exception or evidence waiver. The Debian route selects the
+locally imported image by `git-<commit>` tag (`global.useImageDigest=false`), not
+by manifest digest. A rebuild can assign different bytes to that tag and to the
+same Debian version. Do not treat either as exact content identity; the separate
+Helm OCI delivery route uses the authenticated digest binding described above.
+The source epoch is passed explicitly to BuildKit's timestamp rewrite, but does
+not freeze APT inputs or establish byte reproduction. No hermeticity, bit reproduction,
 toolchain review approval, complete OS bake, runtime CNI acceptance or Release
 acceptance is claimed. The pin/toolchain review and maintained integration gates
 remain required.

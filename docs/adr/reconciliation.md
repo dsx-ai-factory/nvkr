@@ -163,6 +163,12 @@ integration or a generated Run/Release. Helm's held `ExecNode` preparation remai
 blocked by pristine external fixture links; local diagnostic preparation does not
 admit that production route.
 
+[Hosted run 37829955849](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37829955849)
+passed all public-source producer builds on native AMD64 and ARM64 at
+`335ace1e75829c061eac92caf42d8da0bc2fbd80`. It exercises unqualified
+`pipeline.Local` execution, not OVN, full QCOW2 builds, production publication
+or the held `ExecNode` preparation route.
+
 The separate `definitions/nke-ovn-source` Definition selects native image and
 digest-bound Helm OCI outputs for both architectures. Contracts compile the
 four-output Plan, enforce six same-platform image bindings, reject missing

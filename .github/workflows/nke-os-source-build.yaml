@@ -8,9 +8,7 @@ on:
     paths:
       - .github/workflows/nke-os-source-build.yaml
       - definitions/nke-os-source/**
-      - definitions/nke-ovn-source/**
       - pkg/nkd/buildgraph/nke_os_source_test.go
-      - pkg/nkd/buildgraph/nke_ovn_source_test.go
   schedule:
     - cron: '19 3 * * 1'
   workflow_dispatch:
@@ -93,7 +91,9 @@ jobs:
             -test.run '^TestNKEOSPublicSourcesLive$' -test.v -test.timeout 75m \
             2>&1 | tee "$RUNNER_TEMP/direct-source-build.log"
       - name: Retain diagnostic build log
-        if: always()
+        if: >-
+          always() && (github.event_name != 'workflow_dispatch' ||
+          inputs.architecture == 'both' || inputs.architecture == matrix.arch)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: direct-source-build-${{ matrix.arch }}-${{ github.run_attempt }}
