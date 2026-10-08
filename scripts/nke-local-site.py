@@ -71,7 +71,7 @@ def endpoint(value):
     return value.rstrip("/")
 
 
-def admit(args):
+def admit_materials(args):
     env = MGMT.native_environment()
     MGMT.admit(args, env)  # Complete host/tools/source admission before mutation.
     if shutil.which("openssl") is None:
@@ -79,18 +79,6 @@ def admit(args):
     for name in ("bash", "curl"):
         if shutil.which(name) is None:
             raise VM.SmokeError("missing native site prerequisite: " + name)
-    if not Path(args.nico_token_file).is_file() or Path(args.nico_token_file).is_symlink():
-        raise VM.SmokeError("NICo token must be a private regular file")
-    token_path = Path(args.nico_token_file)
-    if token_path.stat().st_mode & 0o077 or token_path.stat().st_size > 4096:
-        raise VM.SmokeError("NICo token file must be private and no larger than 4 KiB")
-    token = token_path.read_text().strip()
-    if not token or "\n" in token:
-        raise VM.SmokeError("NICo token must be one nonempty scalar")
-    nico = endpoint(args.nico_endpoint)
-    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(nico + "/healthz", timeout=3) as response:
-        if json.loads(response.read(4097)) != {"status": "ok"}:
-            raise VM.SmokeError("NICoSim health interface differs")
     outputs = {}
     for item, name in CHART_OUTPUTS.items():
         outputs[item] = selection(args.site_run if item in ("controller", "nktp") else args.components_run,
@@ -115,7 +103,24 @@ def admit(args):
         raise VM.SmokeError("ambiguous private Kind IPv4 gateway")
     with socket.socket() as bound:
         bound.bind((gateways[0], REGISTRY_PORT))
-    return outputs, token, nico, gateways[0], image[0]["Id"]
+    return outputs, gateways[0], image[0]["Id"]
+
+
+def admit(args):
+    outputs, gateway, registry = admit_materials(args)
+    if not Path(args.nico_token_file).is_file() or Path(args.nico_token_file).is_symlink():
+        raise VM.SmokeError("NICo token must be a private regular file")
+    token_path = Path(args.nico_token_file)
+    if token_path.stat().st_mode & 0o077 or token_path.stat().st_size > 4096:
+        raise VM.SmokeError("NICo token file must be private and no larger than 4 KiB")
+    token = token_path.read_text().strip()
+    if not token or "\n" in token:
+        raise VM.SmokeError("NICo token must be one nonempty scalar")
+    nico = endpoint(args.nico_endpoint)
+    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(nico + "/healthz", timeout=3) as response:
+        if json.loads(response.read(4097)) != {"status": "ok"}:
+            raise VM.SmokeError("NICoSim health interface differs")
+    return outputs, token, nico, gateway, registry
 
 
 def registry_cleanup(name, owner, image_id, work, env):
@@ -194,7 +199,7 @@ def deployed_images(tools, work, env, refs):
     return observed
 
 
-def consume(args, outputs, token, nico, gateway, registry_id, name, tools, work, env):
+def consume(args, outputs, token, nico, gateway, registry_id, name, tools, work, env, continuation=None):
     node_ids = MGMT.owned_nodes(name, env)
     if len(node_ids) != 1:
         raise VM.SmokeError("site requires exactly the owned management node")
@@ -291,7 +296,12 @@ def consume(args, outputs, token, nico, gateway, registry_id, name, tools, work,
             "deployed": images,
             "outputs": {key: row[1] for key, row in outputs.items()}, "charts": {key: VM.digest(deploy / "charts" / (key + ".tgz"))
                                                                                   for key in CHART_OUTPUTS}}, sort_keys=True, indent=2))
-        print("PASS: local NKE site install/check and registration; tenant/workload is not yet exercised.")
+        if continuation is not None:
+            # Trusted deploy-only continuation, not a caller-selected command.
+            # Keep the registry and management node alive through tenant work.
+            continuation(name, tools, work, env)
+        else:
+            print("PASS: local NKE site install/check and registration; tenant/workload is not yet exercised.")
     except MGMT.UnjoinedProcess:
         cleanup_allowed = False
         raise

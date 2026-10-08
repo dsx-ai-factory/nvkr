@@ -33,7 +33,7 @@ func admitExecuteNodeRequirements(plan *Plan, nodeID string) error {
 	}
 	if node.IRNode != "" || node.Network != ir.NetworkNone || node.Requirements != nil ||
 		node.ExecutionBinding != nil || plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
-		return e.New(e.CodeEngineCapability, "%s requires the original Run owner for node %q", adapter, nodeID)
+		return e.New(e.CodeEngineCapability, "%s mixed local utility admission excludes producers, disks, network utility nodes and execution-bound nodes: %q", adapter, nodeID)
 	}
 	switch node.Kind {
 	case NodeVerify, NodeSBOM:

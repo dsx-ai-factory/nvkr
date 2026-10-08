@@ -175,13 +175,9 @@ source commit. A canonical authenticated Git clone into native storage is also
 an option; the archive approach does not require GitHub credentials in Colima
 for the NKD checkout itself.
 
-The October 8 shared-mount trial failed during the SPIRE source snapshot with
-`too many open files in system`, before Packer. An explicit clean-cache diagnostic
-reduced the Colima host VM process from 48,737 open file handles to 33; later
-trials used native ext4 rather than adding automatic cache flushes
-or raising Mac limits. See the Docker execution evidence.
-That investigation alone did not prove the retry; the later completed bake and
-separate failed full smoke are recorded in that evidence document.
+Use native ext4 for the source export and Run workspace. Shared-mount source
+snapshotting has failed with file-handle exhaustion. The launcher does not flush
+global caches or raise Mac limits to work around it.
 
 Colima's configured 150 GiB disk does not provide 150 GiB of physical host free
 space. Allow about 90 GiB free on both the host and the selected Run filesystem
@@ -191,19 +187,12 @@ physical space for a sparse disk. A native guest filesystem addresses the shared
 filesystem boundary, not insufficient physical storage. A successful preflight
 alone does not prove an OS bake or tenant lifecycle.
 
-The October 8 native-ext4 trial with a 16 GiB Colima VM reached Ubuntu kernel
-installation, but the guest host's global OOM killer terminated QEMU while a
-separate simulator build was active. Packer continued waiting for SSH; that was
-not evidence of a live guest. The attempt was canceled and recorded failed with
-zero accepted disks. Run component/simulator builds before the OS, not concurrently
-on this laptop. The dedicated profile was subsequently resized to 24 GiB and a
-fresh OS attempt completed and exported one exact, hash/size-checked non-FDE
-Ubuntu 26.04.1 QCOW2. This single-job result is not a capacity guarantee. A copied
-disk booted and reached SSH, but its complete source smoke failed in SPIRE checks;
-the retained older SPIRE package omits the required DSX IMDS plugin. Do not lower
-the authored execution requirement or remove smoke assertions to hide these
-failures. The OS execution evidence
-records the kernel failure and recovery separately from earlier progress.
+Run component/simulator builds before the OS, not concurrently on this laptop.
+Use the dedicated 24 GiB profile; this configuration is not a capacity guarantee.
+If Packer waits for SSH, inspect the actual QEMU process and host OOM diagnostics
+before treating the guest as alive. A terminal disk build and a complete boot
+smoke are separate gates. The retained older SPIRE package lacks DSX IMDS;
+do not remove that smoke assertion or relabel this exception as a full build.
 
 ### Check before the expensive build
 
@@ -320,6 +309,20 @@ The OS requires 8 CPUs, 10 GiB available memory, at least 64 GiB available works
 capacity and a six-hour execution ceiling. Runtime checks those requirements;
 configured VM size alone is not admission. TCG is selected, not KVM. Allow additional
 disk headroom for snapshots, OCI layouts and repeated attempts.
+If this is your dedicated development Podman VM, stop its workloads before
+resizing. Inspect its current settings first; do not resize a shared VM:
+
+```sh
+podman machine inspect podman-machine-default
+podman machine stop podman-machine-default
+podman machine set --cpus 8 --memory 24576 podman-machine-default
+podman machine start podman-machine-default
+podman machine ssh --username core podman-machine-default \
+  'nproc; awk "/MemAvailable:/ {print}" /proc/meminfo; df -h .'
+```
+
+Memory is configured in MiB; `MemAvailable` is reported in KiB. Inspect free
+space on the physical Mac separately. Resizing memory/CPU does not add storage.
 The failed laptop OS preparation alone used about 17 GiB before Packer. Roughly
 90 GiB free before a fresh combined attempt is a practical starting allowance,
 not a guarantee: the gate still requires 64 GiB remaining when Packer starts.
@@ -378,7 +381,8 @@ env -u NKE_LOCAL_CLONE \
   bash scripts/nke-full-arm64-local.sh remote-components 1 components
 ```
 
-Private-source Git authentication must work inside the VM, not just in the Mac's
+This remote-only command has not been validated end to end. Private-source Git
+authentication must work inside the VM, not just in the Mac's
 `gh` session. Never put a PAT into catalogs, commands or logs. Charts, images and
 declared dependency preparation still need network access.
 
@@ -585,12 +589,7 @@ external links before the preparation command, so this input is not a working
 hosted tools pipeline or a qualified build. Kubernetes uses its committed vendor
 tree rather than downloading a substitute workspace.
 
-**Current evidence: the complete five-component Colima Run passed, its one bundle
-was verified/extracted, and all five native version probes passed.** The
-completed Run evidence records
-exact subjects, executable hashes and limitations; the
-earlier contract evidence records
-source pins, independent review and preflight. Require your own terminal
+Require your own terminal
 Run status `complete`, exactly one required/observed output, no failure and verified
 bundle extraction before putting these executables on the installer's Linux PATH.
 Do not run Linux executables directly on macOS. The acquired `operator-tools`
@@ -637,7 +636,9 @@ For `first-components`:
   lifecycle.json       # required/observed outputs, lane, status, coded failure
   packages/<name>/     # ordinary artifact OCI layouts
   <name>/out/          # source-produced bytes
-  <name>/fetch/        # acquired bytes and source snapshots
+  <name>/fetch/        # acquired bytes
+  <name>/src/          # pinned source snapshots
+  <name>/source-receipts/ # source acquisition receipts
   <name>/results/      # exact producer results
   .runner/plan.json    # canonical execution Plan
 ```
@@ -774,7 +775,13 @@ NKE_LOCAL_CLONE="$NKE_DEV_CLONE" \
   bash scripts/nke-full-arm64-local.sh cli-change-01 1 components
 ```
 
-The templates derive CLI commit/date/version stamps from the selected pin. Do not
+This command changes the tracked example lock. Do not commit a development-only
+pin or publish a Definition referring to an unpushed commit. After the experiment,
+inspect `git diff -- definitions/nke-laptop-arm64/cli-catalog` and restore only
+your own pin change before creating a PR; preserve any pre-existing edits.
+
+The templates derive CLI commit/date/version stamps from the selected pin. A
+commit-only pin stamps the CLI version with the full 40-hex commit, not a release tag. Do not
 hand-edit lock digests. Exact-commit pinning makes no release-tag claim. Review
 the new Plan before building. This command still produces the selected 22-output
 set, not an incremental reuse of earlier attempts. For tight code-edit loops use
@@ -783,10 +790,10 @@ Copy shared catalogs before changing controller/OS selections; do not repin the
 maintained release simply to test local changes.
 
 A different baseline may need different producer instructions and toolchains.
-The checked local NKE `main` uses Go workspace 1.27.1 without the old committed
-vendor tree and changes the CLI linker target; this example's CLI release uses
-the older vendored build and its matching image. Repinning to that main commit
-alone is not a supported migration. Update the source-owned build interface,
+A baseline with a different Go workspace, vendor layout or CLI linker target
+needs matching producer instructions; this example's CLI release uses the
+older vendored build and its matching image. Repinning alone is not a supported
+migration. Update the source-owned build interface,
 dependency preparation and pinned compiler together before testing that baseline.
 
 To preview a pin change without writing, add `--check` before `nke`. A proposed
@@ -805,9 +812,10 @@ a hermetic or byte-reproducible OS claim.
 
 ## Validation status
 
-Repository contract tests cover the local runner, mixed utility admission,
-workspace observation and example inputs. Historical private component/provider
-trials are not shipped as evidence reports and are not public acceptance.
-The full local QCOW2 tenant/workload path, clean-machine setup, remote-only
-authentication and complete source-built selection require separate runtime
-validation. A partial completed Run does not establish any of those results.
+Contract tests cover local admission, exact output observation, input compilation
+and owned cleanup. They do not prove a clean-machine setup, remote-only source
+access, a full disk smoke, a complete source-built distribution or deployed NKE.
+Historical local trial reports are intentionally not shipped in this PR.
+Require complete Run records and actual consumer checks for your own outputs.
+The [integrated demo guide](local-nke-demo.md) tracks the distinct tenant/workload
+acceptance gate, which has not passed.

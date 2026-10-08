@@ -87,7 +87,7 @@ class ManagementTest(unittest.TestCase):
         with patch.dict(os.environ, foreign, clear=True):
             env = ADAPTER.native_environment()
         self.assertEqual(env, {"PATH": "/usr/bin", "DOCKER_HOST": "unix:///var/run/docker.sock",
-                               "KIND_EXPERIMENTAL_PROVIDER": "docker"})
+                               "KIND_EXPERIMENTAL_PROVIDER": "docker", "CLUSTERCTL_DISABLE_VERSIONCHECK": "true"})
 
     def test_platform_rejected_before_output_or_docker(self):
         with patch.object(ADAPTER.platform, "system", return_value="Darwin"), patch.object(ADAPTER, "inspect") as inspect:

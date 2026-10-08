@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/internal/testutil"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -90,6 +91,49 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	}
 	if env.Publication != nil || env.Signing != nil || env.GitHubARC != "" || env.UtilityPlatform != "linux/arm64" || env.RuntimeBinary() != "podman" {
 		t.Fatalf("local example grants an unintended route: %+v", env)
+	}
+}
+
+// Compile the actual maintained catalogs, not just the membership documents.
+// The full 22/23-output matrices are intentionally opt-in; the provider subset
+// stays cheap enough to catch catalog/pin drift in the default gate.
+func TestLaptopARM64CatalogCompilation(t *testing.T) {
+	t.Chdir("../../..")
+	root := filepath.Join("definitions", "nke-laptop-arm64")
+	for _, tc := range []struct {
+		file     string
+		outputs  int
+		extended bool
+	}{
+		{"definition-providers.json", 2, false},
+		{"definition-components.json", 22, true},
+		{"definition.json", 23, true},
+	} {
+		t.Run(tc.file, func(t *testing.T) {
+			if tc.extended {
+				testutil.RequireExtended(t)
+			}
+			path := filepath.Join(root, tc.file)
+			doc, err := authored.LoadDefinition(t.Context(), path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			envPath := filepath.Join(root, "environment-local.json")
+			env, err := authored.LoadEnvironment(t.Context(), envPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := factory.CompileDocuments(t.Context(), path, doc, envPath, env, "laptop-catalog-contract")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := plan.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.LifecycleOutputs) != tc.outputs || plan.Qualification != factory.TierStaticUnqualified {
+				t.Fatalf("unexpected compiled membership/tier: %d %s", len(plan.LifecycleOutputs), plan.Qualification)
+			}
+		})
 	}
 }
 

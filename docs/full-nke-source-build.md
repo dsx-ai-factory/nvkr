@@ -14,7 +14,8 @@ producer, packaging, source-access and runtime work.
 
 ## Evidence and remaining work
 
-This map was checked against main `105bb738521c9dbd7f1326ab15e78a699200f4f1`,
+Point-in-time inventory checked on October 7, 2026, against main
+`105bb738521c9dbd7f1326ab15e78a699200f4f1`,
 [PR #113](https://github.com/dsx-ai-factory/nke-recipes/pull/113) head
 `bb28f56614c71c04522c7be091f784f54b1c3794`, the local example and NKE's
 source-owned workflows. PR #113 is a separate draft, not merged support on main.
@@ -33,37 +34,22 @@ source-owned workflows. PR #113 is a separate draft, not merged support on main.
 | DSX IMDS | Release inventory retains payload digests but no established source revision | Accessible source with an approved pin, or a declared unavailable-source exception and accessible digest-matching payload. An older plugin-free SPIRE package is not completion |
 | OS material assembly | Existing OS graph produces image-inputs and stages them for source-owned Packer | Connect direct-source binary/image packages, remove package-folder calls including indirect agent packaging, and preserve the source-owned material contract |
 | Shared published/embedded image/chart bytes | [Issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116) records the missing generic handoff | An authenticated original-owner cross-output reuse contract. Independent rebuilds cannot be relabeled as identical published bytes |
-| Local OS runtime | Native Colima Docker/TCG Run 04 completed the bake and terminal observation, exporting one independently hash/size-checked non-FDE QCOW2; prior failed attempts remain recorded | Complete boot smoke and exact disk/profile integration. This uses the older material graph, not PR #113's complete direct-source graph, and is not a full combined Run or tenant. See the Docker evidence. Docker Desktop on macOS is not supported by this launcher |
+| Local OS runtime | Native Colima Docker/TCG can execute the declared disk graph; Docker Desktop on macOS is not supported by this launcher | Complete source smoke, direct-source material integration and tenant/workload acceptance. A disk build does not prove these gates |
 
 Do not use an upstream release SBOM hash as the expected hash of a new source
 build. New bytes receive new identities. The release inventory guides membership
 and versions; it does not prove the source-to-binary relationship or qualification.
-The two-provider Run evidence
-records exact inputs, image subjects, archive hashes and the limited help probes.
-The container-bootstrap evidence
-records a later complete 22-output component Run, not the disk or a deployed site.
 See the [Lia demo handoff](nkd-to-nke-demo.md) for installer alignment and E2E blockers.
 
 ## What needs external input
 
 Two source/access inputs cannot be invented: the fleet-profile repository/revision
-and the DSX IMDS source or accepted retained payload. The local OS also needs
-workspace headroom. User-authorized removal of eleven old failed attempts on
-October 8 increased free host storage to 141 GiB and the real Colima OS preflight
-passed; see the storage evidence.
-The first Colima bake attempt subsequently failed before Packer with a SPIRE
-snapshot file-handle error. The next approach runs the same committed launcher
-from a native ext4 source export, preserving `.nkd` containment; see the
-execution evidence.
-The later native Run 04 completed one disk bake and exported its observed bytes;
-its copied disk reached SSH/cloud-init and passed growth/agent checks, but the
-full source smoke failed in SPIRE checks. The retained package lacks DSX IMDS;
-its unauthenticated configured URL returned 403. A passing complete boot contract,
-corrected plain Ubuntu 26.04.1 profile selection and the complete source
-graph remain separate acceptance gates. The earlier failed laptop OS
-trial used about 17 GiB preparing materials; the Packer gate still requires
-64 GiB remaining. The developer launcher never deletes attempts, Podman images
-or user caches automatically to obtain that space.
+and the DSX IMDS source or accepted retained payload. The retained package lacks
+DSX IMDS and has not passed the complete source smoke. A successful TPM
+attestation does not satisfy that different contract. Fresh OS builds also need
+physical host and native workspace headroom; follow the resource checks in the
+[developer guide](local-development.md). The developer launcher never deletes
+attempts, container images or user caches automatically to obtain that space.
 
 ## Acceptance
 

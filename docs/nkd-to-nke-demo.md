@@ -35,9 +35,10 @@ supersedes the earlier site-installation gap, not the tenant/workload gap.
 
 The internal downstream network guard
 also passed native setup/restoration and a deliberate consumer-failure replay.
-It is not yet connected to the site entrypoint, simulator/guest lifetime or
-disk serving. Its running DHCP/DNS process does not establish guest delivery,
-BGP routes or tenant provisioning.
+The new [integrated consumer](local-nke-demo.md) connects the guard to exact
+disk serving and simulator/guest ownership. Its full runtime validation is in
+progress. The earlier isolated guard replay does not establish guest delivery,
+BGP routes or tenant/workload acceptance.
 
 **The artifact-build part is tested; the complete NKD-to-demo E2E is not yet
 validated.** Do not use the completed 22-output local Run as proof that a site or
@@ -143,22 +144,11 @@ private-source authorization works inside the execution host. Require `complete`
 22/22 and no failure before reusing any output. This selection still acquires
 third-party images/charts; it is not a full source-built distribution.
 
-The recorded container-bootstrap Run
-passed these artifact gates. The OS requires its separate capacity gate and real
-bake/boot. On October 8, user-authorized failed-attempt cleanup recovered enough
-workspace for the real Colima prerequisite check to pass; see the
-storage and preflight evidence.
-The first fresh Docker disk attempt failed before Packer during SPIRE snapshot
-preparation. The native-filesystem retry reached kernel installation but failed
-after Colima's global OOM killer terminated QEMU. It was canceled and recorded failed
-with zero accepted disks. Its run-owned build container was cleaned up; the failed
-Run was retained. The fresh non-overlapping attempt on the preserved 24 GiB
-profile completed one disk build and exported the independently hash-checked
-2,851,733,504-byte non-FDE QCOW2; boot smoke remains a separate check. See the
-execution evidence.
-The observed installer is Ubuntu 26.04.1, not the fixture profile's Ubuntu
-24.04 FDE choice. The exact disk/profile handoff still needs to honor that
-distinction. Passing preflight or building materials is not bake/boot evidence.
+The OS requires its separate capacity gate and real bake/boot. Use the
+[integrated demo guide](local-nke-demo.md) for the current plain ARM64/Ubuntu 26.04
+disk/profile handoff, not the historical fixture's Ubuntu 24.04 FDE choice.
+Passing preflight or building materials is not bake/boot evidence. Neither a
+disk build nor an isolated boot proves tenant readiness or workload acceptance.
 
 ## Prepare charts without rebuilding them
 

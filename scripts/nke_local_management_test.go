@@ -39,3 +39,13 @@ func TestNKELocalNetworkConsumer(t *testing.T) {
 		t.Fatalf("network consumer contracts: %v\n%s", err, out)
 	}
 }
+
+func TestNKELocalFullDemoConsumer(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "python3", "-B", "-m", "unittest", "nke_local_demo_test")
+	cmd.WaitDelay = time.Second
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("full-demo consumer contracts: %v\n%s", err, out)
+	}
+}

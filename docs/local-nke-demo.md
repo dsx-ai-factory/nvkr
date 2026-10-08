@@ -1,0 +1,208 @@
+# Local NKE demo from NKD-built artifacts
+
+The developer workflow has two separate commands: NKD builds the artifacts;
+the deploy-only consumer installs those exact outputs and exercises NKE.
+No application, chart or disk build runs during deployment. Kind is the
+management cluster only. Tenant nodes are real ARM64 libvirt VMs backed by the
+NKD-produced QCOW2, through CAPNICo and NICoSim, not CAPD/container nodes.
+
+The new integrated command is under real-runtime validation. Do not treat its
+contract tests, the earlier site-only replay or the successful standalone guest
+probe as a completed tenant/workload result. This is a disposable trusted-user
+diagnostic, not M2, a signed Release, qualified execution or a complete
+source-built distribution. The older retained disk's failed full OS smoke and
+missing DSX source material remain disclosed.
+The latest integrated attempt booted both guests and completed TPM attestation
+and cloud-init, but `kubeadm init` timed out reaching `172.31.0.10:6443`.
+The BGP speaker started without installing a VIP route. Tenant/workload
+acceptance has not passed. Its owned VMs, management containers, bridge and VIP
+routes were removed. This guide is not yet a validated full-demo result.
+
+## Start on an Apple Silicon Mac
+
+Follow the [clean-machine Docker/Colima setup](local-development.md#apple-silicon-mac-with-colima)
+first. Docker Desktop alone is not the native VM execution host for this path.
+The consumer disables clusterctl's optional remote update check through its
+source-owned `CLUSTERCTL_DISABLE_VERSIONCHECK` switch; exact executable version
+checks remain mandatory.
+Use a dedicated ARM64 Colima Docker profile with eight CPUs and 24 GiB RAM;
+do not reset or change your existing default Docker context. Inside it, native
+Python 3.12+, Git, Bash, curl, OpenSSL, Docker and passwordless `sudo -n` are
+required. The native VM tools are listed in the
+[guest prerequisite guide](local-qcow2-guest-probe.md#prepare-the-dedicated-linux-vm-once).
+The integrated network guard additionally needs `dnsmasq`, `iptables`,
+`iproute2` and `libcap2-bin`; the source-owned boot patch needs `debugfs`
+from `e2fsprogs` and `qemu-io` from `qemu-utils`. These are explicit host
+package acquisitions, not NKD-built or organizationally qualified toolchains.
+
+Builds should use a new committed-source export on the VM's native ext4 volume,
+as described in that setup guide. A fresh OS bake needs about 90 GiB free on
+both the physical Mac and selected build filesystem. Native VM free space
+does not create additional physical Mac capacity. Build the other lanes first,
+then the OS, not concurrently with it on this laptop.
+
+## Build once, then deploy without rebuilding
+
+Inside the native source export, use fresh names for these seven separate Runs:
+
+```sh
+set -euo pipefail
+export CONTAINER_RUNTIME=docker
+# Optional: exact pinned Git objects from a local clone visible inside Colima.
+# export NKE_LOCAL_CLONE=/absolute/path/to/nke
+for lane in components providers site tools profiles simulator os; do
+  bash scripts/nke-full-arm64-local.sh --check "$lane"
+  bash scripts/nke-full-arm64-local.sh "demo-$lane-01" 1 "$lane"
+done
+```
+
+For remote sources, omit `NKE_LOCAL_CLONE`; Git credentials must work inside
+the VM. A Mac `gh` login alone does not prove that access. Never embed tokens in
+commands, catalogs or logs. Separate successful Runs are not a combined Run or
+Release. The historical `all` selection does not include all seven lanes.
+PR #113's experimental direct-source OS catalog is not yet integrated into this
+maintained laptop selection; the OS still uses its declared NKE material graph.
+Acquired third-party charts/runtime images and unavailable-source exceptions are
+not relabeled as source builds. See the [full-source gap map](full-nke-source-build.md).
+
+The site, tools and profiles inputs target the exact staged-installer candidate
+`8fb2d53368823bd386b4fbd55b4ab6d3c0931345`, not a floating NKE branch.
+Prepare a separate clean NKE clone at that commit. Keep the source clone
+unchanged; the consumer projects its tracked bytes privately. Source-owned NKE
+scripts render/check chart values and the built `nkectl` validates the tenant
+request. No approximate YAML or iPXE parser is added in NKD.
+
+Cache the pinned service images using the existing build/management setup.
+The integrated adapter uses the existing `kind` Docker bridge. On a clean
+dedicated VM, inspect `docker network ls` and `ip route`, then create it once if
+absent and the proposed range is unused. Do not recreate an existing network:
+
+```sh
+# Once only, inside the dedicated VM; skip if kind already exists.
+docker network create --driver bridge --subnet 172.18.0.0/16 \
+  --gateway 172.18.0.1 kind
+```
+
+The private registry service additionally requires:
+
+```sh
+docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
+```
+
+Set absolute paths to the completed Runs. They may be in different exports;
+there is no reason to rebuild or relocate accepted artifacts merely to put them
+beside the consumer. Each Run must have complete, exact expected/observed output
+membership and no failure. The consumer rejects changed layout/disk bytes.
+For the fresh names used in the build block above, set these inside the same
+native export:
+
+```sh
+export NKD_NATIVE_BOOTSTRAP="$(pwd)/.nkd/laptop-bootstrap/demo-tools-01/nkdctl"
+export NKD_TOOLS_RUN="$(pwd)/.nkd/runs/demo-tools-01"
+export NKD_SITE_RUN="$(pwd)/.nkd/runs/demo-site-01"
+export NKD_COMPONENTS_RUN="$(pwd)/.nkd/runs/demo-components-01"
+export NKD_PROVIDER_RUN="$(pwd)/.nkd/runs/demo-providers-01"
+export NKD_PROFILES_RUN="$(pwd)/.nkd/runs/demo-profiles-01"
+export NKD_SIMULATOR_RUN="$(pwd)/.nkd/runs/demo-simulator-01"
+export NKD_OS_RUN="$(pwd)/.nkd/runs/demo-os-01"
+export NKD_DEMO_OUT="$(pwd)/.nkd/deploy-demo-01"
+# Set NKE_INSTALLER_CLONE to your separate clean clone at the pin above.
+```
+
+```sh
+set -euo pipefail
+: "${NKD_NATIVE_BOOTSTRAP:?Existing native Linux nkdctl from a successful launcher}"
+: "${NKE_INSTALLER_CLONE:?Clean exact pinned NKE installer clone}"
+: "${NKD_TOOLS_RUN:?Completed tools Run directory}"
+: "${NKD_SITE_RUN:?Completed site Run directory}"
+: "${NKD_COMPONENTS_RUN:?Completed components Run directory}"
+: "${NKD_PROVIDER_RUN:?Completed providers Run directory}"
+: "${NKD_PROFILES_RUN:?Completed profiles Run directory}"
+: "${NKD_SIMULATOR_RUN:?Completed simulator Run directory}"
+: "${NKD_OS_RUN:?Completed OS Run directory}"
+: "${NKD_DEMO_OUT:?NEW output directory outside source and all Runs}"
+
+python3 -B scripts/nke-local-demo.py \
+  --nke-checkout "$NKE_INSTALLER_CLONE" --nkdctl "$NKD_NATIVE_BOOTSTRAP" \
+  --tools-run "$NKD_TOOLS_RUN" --site-run "$NKD_SITE_RUN" \
+  --components-run "$NKD_COMPONENTS_RUN" --provider-run "$NKD_PROVIDER_RUN" \
+  --profiles-run "$NKD_PROFILES_RUN" --simulator-run "$NKD_SIMULATOR_RUN" \
+  --os-run "$NKD_OS_RUN" --out "$NKD_DEMO_OUT" --timeout 1800
+```
+
+Run that block inside `colima ssh --profile nkd-demo`, or on an equivalent
+dedicated native ARM64 Linux host. Linux executables cannot run directly on macOS.
+The consumer requires the disk-copy bytes plus 30 GiB free on its native output
+volume and the management admission's eight CPUs/20 GiB RAM. Its output must
+not already exist. This is two-VM diagnostic capacity, not fresh-bake admission.
+Check physical Mac capacity separately before launching it; a sparse Colima
+disk's apparent free space is not additional Mac capacity.
+
+The trusted diagnostic guard temporarily admits guest TCP to the exact owned
+management-node address on SPIRE ports 30440/30443 before Docker's raw-table
+direct-routing drop. It withdraws and reads back those exact rules before
+management-node deletion. No Docker daemon setting, existing Docker rule or
+network is replaced. An unjoined child or failed rule withdrawal retains the
+dependent controls instead of recycling the management address. This scoped
+exception is specific to the disposable native demo, not production policy.
+NICoSim's source-owned guest diagnostics use a random per-attempt SSH credential,
+not its default password. That disposable account has passwordless sudo only in
+these owned guests. Before deletion, the adapter retains agent, kubelet and
+containerd logs privately, with a ten-second/1-MiB bound per request. Credentials
+and configuration files are not collected as diagnostic items. Diagnostic
+failures do not prevent cleanup; an unjoined child retains dependent controls.
+
+## What gets deployed
+
+| Built output | Downstream use and identity check |
+| --- | --- |
+| Five-tool bundle | NKD verifies/extracts it; each tool's native version is checked |
+| Controller, profiles, CAPNICo images | Unchanged ORAS copy into a private registry; descriptor readback and actual Pod image IDs match the accepted manifests |
+| Six chart archives | NKD delivery owner validates/exports unchanged bytes; NKE installs/checks them |
+| NICoSim server/CLI/assets | Verified extraction; private server copy, seed and UI; libvirt backend, containers disabled |
+| Plain ARM64 QCOW2 | Independent digest/size check, read-only private copy, full HTTP byte readback; successful tenant evidence requires both VM overlays to reference byte-matching downloaded backing disks |
+
+The authored profiles select Ubuntu 26.04, Kubernetes 1.34.2 and OVN-Kubernetes
+1.4.0. This command creates one control-plane VM and one worker with the selected
+source seed's four-CPU/six-GiB/60-GiB instance type. The QCOW2 bytes are the
+delivery subject; mutable guest overlays naturally diverge during provisioning.
+The consumer does not claim exact guest reproduction or inspect a final disk SBOM.
+
+Success requires two ready ARM64 Kubernetes nodes, the expected VM VIP,
+real owned libvirt domains/TPMs and exact backing disks, then a pinned acquired
+Alpine workload that executes on ARM64 and resolves Kubernetes service DNS.
+This acquisition is a workload test, not an additional source-built NKE artifact.
+No success is emitted if tenant, workload, identity or cleanup checks fail.
+
+## Ownership, diagnostics and cleanup
+
+The command refuses existing demo bridges/QEMU policies, session VMs,
+simulators, overlapping routes and occupied ports. It owns the temporary
+`nkdvm0` bridge, exact commented firewall rules, DHCP/DNS, private disk HTTP
+server, simulator, management node/volume and registry. It temporarily grants
+only private executable copies and the byte/identity-bound QEMU bridge helper
+the permissions required by this trusted native diagnostic. It does not make
+the accepted Run artifacts privileged or change Docker's global daemon config.
+The simulator and libvirt observations use explicit native-account HOME/XDG
+paths, not ambient client settings. Admission compares a running session
+daemon's selected path bindings before privileged setup; the source's TPM
+seeding must target that same daemon namespace. Files/databases/cache belonging
+to this demo remain in its private directory; the session daemon's TPM state
+is removed through exact-domain `virsh undefine --tpm`. The source also creates
+or reuses native-account `~/.config/swtpm-localca` signing-key, certificate and
+serial state. That shared CA is outside the attempt directory and retained;
+domain cleanup does not remove it.
+
+The finalizer deletes only the exact NKE tenant, stops/joins producers, sweeps
+only libvirt domains bound to this private simulator directory, restores exact
+known BGP routes and the network guard's controls. Changed/foreign ownership or
+an unjoined process fails closed and retains setup for investigation. Do not
+prune Docker or delete unknown domains to force another attempt. After SIGKILL
+or a host crash, inspect retained privileged state before retrying.
+
+Private phase logs, kubeconfigs, credentials, simulator database and VM consoles
+stay under the new output directory; keep it out of Git and shared logs.
+`demo-inputs.json` identifies consumed outputs; `site/site-inputs.json` records
+deployed site images/charts. `site/tenant-result.json` is written only after the
+tenant and workload assertions. These are local diagnostics, not signed receipts.
+The final PASS additionally requires owned cleanup and unchanged accepted disks.

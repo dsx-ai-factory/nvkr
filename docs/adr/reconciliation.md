@@ -187,17 +187,44 @@ and Helm OCI interoperability tests do not establish hosted or release acceptanc
 
 ## Local ARM64 development inputs
 
-The authored `definitions/nke-laptop-arm64` examples select 23 combined outputs
-or the 22-output non-disk subset without publication/signing. Separate selections
-cover providers, simulator, site, tools and diagnostic profiles. They are not a
-complete source-built distribution or a full tenant/workload result. See the
-[development guide](../local-development.md) and [source-build gap map](../full-nke-source-build.md).
+The `definitions/nke-laptop-arm64` example selects 23 outputs or its 22-output
+non-disk subset without publication/signing. Separate selections cover providers,
+site, tools, profiles and simulator assets. The historical `all` selection is
+not a complete seven-lane demo or source-built distribution. See the
+[local development guide](../local-development.md) and
+[full-source gap map](../full-nke-source-build.md).
 
-Contract tests cover mixed offline utility admission, exact acquired-image
-subjects and typed OS execution-class admission. Local trial reports are not
-shipped in this PR; private attempts cannot establish public acceptance or
-qualification. No complete combined Run, full boot contract or real tenant/workload
-acceptance is claimed by these examples.
+Local static-unqualified mixed Plans admit only offline, non-disk utility
+observation/SBOM/ordinary packaging in the child helper. The local launcher
+passes the original Plan digest; complete Plan validation remains mandatory.
+VM producer/held-disk execution stays with the original Run owner. Mixed Plans
+with network utility acquisitions (including an acquired `sbomTool`) are
+unsupported, even from that owner. Publication/signing/ARC and qualified lanes
+do not gain this local utility exception.
+
+Local and restored pipeline-attested image observation relocate the validated
+Plan and descriptive paths together, retaining compiled identity and exact
+acquired-payload/result comparisons. Relocation grants no new authority.
+Contract tests are distinct from hosted signing or consumer acceptance.
+
+The deploy-only [integrated consumer](../local-nke-demo.md) consumes completed
+Runs, owns a real Kind management cluster, CAPNICo/NICoSim and QCOW2 tenant VMs,
+and requires two ready nodes plus a workload before PASS. It does not build
+artifacts or establish a Release. Its scoped networking permits only the owned
+guest bridge to the exact owned management endpoint's SPIRE ports and withdraws
+those rules before address release. Unjoined children retain dependent controls.
+
+Full end-to-end acceptance remains unestablished. The latest private integrated
+attempt passed guest-to-management TCP, TPM attestation and cloud-init on both
+guests, then failed Kubernetes initialization at the unannounced tenant VIP.
+The BGP speaker started but installed no VIP route; no tenant/workload acceptance
+is claimed. Owned domains, management containers, bridge and routes were removed.
+The adapter uses NICoSim's guest diagnostics with per-attempt credentials and
+bounded private log retention before deletion. Local evidence reports
+are intentionally not shipped in this PR. Private diagnostic logs and Run records
+are not authenticated external acceptance or qualified reproduction. The retained
+older disk's SPIRE/DSX exception, failed full boot smoke and direct-source OS
+integration remain open. No complete combined 23-output Run is claimed.
 
 ## Output-local publication and metadata assembly
 

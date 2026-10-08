@@ -17,7 +17,7 @@ func TestVMCapacityFailureDescribesObservedAndRequired(t *testing.T) {
 		change     func(*ObservedHostFacts)
 		diagnostic string
 	}{
-		{"CPU", func(f *ObservedHostFacts) { f.Resources.CPUMillis-- }, "CPU 7999/8000 millis"},
+		{"CPU", func(f *ObservedHostFacts) { f.Resources.CPUMillis-- }, "CPU 7999/8000 milliCPU"},
 		{"memory", func(f *ObservedHostFacts) { f.Resources.MemoryMiB-- }, "memory 16383/16384 MiB"},
 		{"workspace", func(f *ObservedHostFacts) { f.Resources.EphemeralStorageMiB-- }, "workspace 65535/65536 MiB"},
 	} {

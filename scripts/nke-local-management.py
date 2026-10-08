@@ -52,7 +52,8 @@ def native_environment():
     # clusterctl version override, release selection or user-site credentials.
     env = {key: os.environ[key] for key in ("PATH", "USER", "LANG", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY")
            if key in os.environ}
-    env.update({"DOCKER_HOST": "unix:///var/run/docker.sock", "KIND_EXPERIMENTAL_PROVIDER": "docker"})
+    env.update({"DOCKER_HOST": "unix:///var/run/docker.sock", "KIND_EXPERIMENTAL_PROVIDER": "docker",
+                "CLUSTERCTL_DISABLE_VERSIONCHECK": "true"})
     return env
 
 

@@ -528,10 +528,13 @@ The generated Plan is the single executable input document; separate per-build g
 
 An unqualified local Plan may select both direct-Packer disks and ordinary outputs.
 Its offline utility child admits only non-disk observation, SBOM and ordinary packaging;
-the complete Plan and original Plan digest remain checked. It cannot execute a producer,
+the complete Plan is checked and the local launcher binds its child invocation to the
+original Plan digest. This flag is not mandatory on a manually invoked helper.
+It cannot execute a producer,
 consume a held disk, publish or sign. Ordinary requirement-bearing producers and unsupported
 VM drivers remain rejected before work; the original Run owner retains VM admission.
-Local lifecycle image observation relocates the validated Plan and descriptive paths together,
+Local static-unqualified and restored pipeline-attested lifecycle image observation
+relocate the validated Plan and descriptive paths together,
 preserving compiled identity and exact acquired-payload/result comparisons. Other ordinary
 formats retain their existing descriptive workspace-path support. Relocation is not authority.
 

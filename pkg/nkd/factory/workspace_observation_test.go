@@ -33,9 +33,8 @@ func TestWorkspaceAcquiredImageObservationPreservesFrozenSubject(t *testing.T) {
 			}
 			_, visible := planIndex(relocated)
 			// The old mismatch remains rejected; no exact-artifact comparison is relaxed.
-			if _, err := ObserveLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], visible); err == nil {
-				t.Fatal("unrelocated Plan accepted foreign artifact paths")
-			}
+			_, err = ObserveLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], visible)
+			assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
 			observed, err := ObserveWorkspaceLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], workspace, visible)
 			if err != nil || observed.Digest != result.SHA256 {
 				t.Fatalf("observation=%+v err=%v", observed, err)
@@ -48,11 +47,26 @@ func TestWorkspaceAcquiredImageObservationPreservesFrozenSubject(t *testing.T) {
 				original := visible[id]
 				changed := original
 				changed.Path += ".substituted"
-				visible[id] = changed
-				_, err := ObserveWorkspaceLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], workspace, visible)
-				if err == nil {
-					t.Fatalf("substituted %s accepted", id)
+				info, err := os.Stat(original.Path)
+				if err != nil {
+					t.Fatal(err)
 				}
+				if info.IsDir() {
+					if err := os.CopyFS(changed.Path, os.DirFS(original.Path)); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					raw, err := os.ReadFile(original.Path)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(changed.Path, raw, 0o600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				visible[id] = changed
+				_, err = ObserveWorkspaceLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], workspace, visible)
+				assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
 				visible[id] = original
 			}
 			_, err = ObserveWorkspaceLifecyclePayload(t.Context(), plan, plan.LifecycleOutputs[0], "", visible)

@@ -16,6 +16,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
 // The existing image fixture supplies actual validated OCI bytes and a producer
@@ -38,7 +39,7 @@ func mixedLocalUtilityPlan(t *testing.T) *Plan {
 		t.Fatal(err)
 	}
 	d.Outputs = append(d.Outputs, imagePlan.Definition.Outputs...)
-	plan, err := Compile(t.Context(), d, env, stack, "test")
+	plan, err := Compile(t.Context(), d, env, stack, "v0.0.0 (test)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,6 +140,60 @@ func TestMixedLocalUtilityRejectsOrdinaryBuildRequirements(t *testing.T) {
 	assertFactoryErrorCode(t, ExecuteNode(t.Context(), plan, "worker/terminal-observe", nil, nil), e.CodeEngineCapability)
 }
 
+// Exercise each admission term independently. These descriptive mutations are
+// deliberately tested at the owning gate, before full-Plan validation can mask
+// a missing term with an unrelated digest or projection mismatch.
+func TestMixedLocalUtilityAdmissionRejectsEachUnsupportedRoute(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		edit  func(*Plan, *Node)
+		guard string
+	}{
+		{"production qualification", func(p *Plan, _ *Node) { p.Qualification = TierPipelineAttested }, "cannot enforce execution requirements"},
+		{"ARC", func(p *Plan, _ *Node) { p.Environment.GitHubARC = "native-kvm-v1" }, "requires the native-kvm-v1 ARC disk route"},
+		{"publication", func(p *Plan, _ *Node) { p.Environment.Publication = &authored.Publication{} }, "cannot enforce execution requirements"},
+		{"signing", func(p *Plan, _ *Node) { p.Environment.Signing = &authored.Signing{} }, "cannot enforce execution requirements"},
+		{"network utility", func(_ *Plan, n *Node) { n.Network = ir.NetworkDefault }, "mixed local utility admission excludes"},
+		{"utility requirements", func(_ *Plan, n *Node) { n.Requirements = testExecutionRequirements() }, "mixed local utility admission excludes"},
+		{"utility execution binding", func(_ *Plan, n *Node) { n.ExecutionBinding = &execution.Binding{} }, "mixed local utility admission excludes"},
+		{"OCI publication package", func(_ *Plan, n *Node) { n.Kind, n.PackageKind = NodePackage, PackageOCI }, "cannot package disk or release output"},
+		{"disk package", func(_ *Plan, n *Node) { n.Kind, n.PackageKind = NodePackage, PackageDiskImage }, "cannot package disk or release output"},
+		{"publish utility", func(_ *Plan, n *Node) { n.Kind = NodePublish }, "cannot execute mixed-Plan operation"},
+		{"source credentials", func(p *Plan, _ *Node) {
+			p.Environment.SourceAccess = map[string]authored.SourceAccess{"https://example.test/source": {CredentialRef: "secret"}}
+		}, "cannot admit hosted credentials or dispatch policy"},
+		{"dispatch policy", func(p *Plan, _ *Node) { p.Environment.GitHubDispatchBranches = []string{"candidate"} }, "cannot admit hosted credentials or dispatch policy"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			plan := mixedLocalUtilityPlan(t)
+			const id = "worker/terminal-observe"
+			if err := admitExecuteNodeRequirements(plan, id); err != nil {
+				t.Fatal(err)
+			}
+			var node *Node
+			for i := range plan.Graph.Nodes {
+				if plan.Graph.Nodes[i].ID == id {
+					node = &plan.Graph.Nodes[i]
+					break
+				}
+			}
+			if node == nil || node.IRNode != "" {
+				t.Fatal("fixture must select a non-IR offline utility")
+			}
+			tc.edit(plan, node)
+			err := admitExecuteNodeRequirements(plan, id)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if !strings.Contains(err.Error(), tc.guard) {
+				t.Fatalf("wrong admission branch: %v; want %q", err, tc.guard)
+			}
+			if _, err := os.Stat(".nkd/factory/node-image"); !os.IsNotExist(err) {
+				t.Fatalf("admission touched disk workspace: %v", err)
+			}
+		})
+	}
+}
+
 func TestMixedLocalUtilityLaunchBindsExactPlan(t *testing.T) {
 	t.Chdir(t.TempDir())
 	plan := mixedLocalUtilityPlan(t)
@@ -158,7 +213,16 @@ func TestMixedLocalUtilityLaunchBindsExactPlan(t *testing.T) {
 	}
 	node := planNode(plan, "worker/terminal-observe")
 	options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/test", Runtime: runtime})
-	if err := executeLocalFactoryNode(t.Context(), plan, node, options, map[string]string{"linux/amd64": "runner"}); err != nil {
+	compiler := filepath.Join(root, "compiler")
+	if err := os.WriteFile(compiler, []byte("#!/bin/sh\n[ \"$5\" = -o ] || exit 91\nprintf 'fixture runner' > \"$6\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	options.Go, options.RunnerSource = compiler, root
+	runners, err := prepareLocalRunners(t.Context(), plan, options, []string{"linux/amd64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := executeLocalFactoryNode(t.Context(), plan, node, options, runners); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(log)
@@ -168,4 +232,12 @@ func TestMixedLocalUtilityLaunchBindsExactPlan(t *testing.T) {
 	if !strings.Contains(string(raw), "--plan-digest\n"+digest+"\n") {
 		t.Fatalf("helper lacks exact Plan binding: %s", raw)
 	}
+	written, err := LoadPlanContext(t.Context(), filepath.Join(options.Workspace, localPlanPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyPlanDigest(written, digest); err != nil {
+		t.Fatalf("child argv does not bind written Plan: %v", err)
+	}
+	assertFactoryErrorCode(t, VerifyPlanDigest(written, "sha256:"+strings.Repeat("f", 64)), e.CodePipelineDrift)
 }

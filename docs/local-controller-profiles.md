@@ -71,9 +71,10 @@ http://172.30.0.1:18080/nke-node-image-arm64.qcow2
 ```
 
 This is a diagnostic endpoint description, not a content digest or an
-authenticated disk receipt. The still-unimplemented deploy-only adapter must
+authenticated disk receipt. The new [deploy-only adapter](local-nke-demo.md) must
 serve the exact held Run output there, read back/recheck its SHA-256 and size,
-and establish actual NICoSim/controller/node reachability. It must reject an
+and establish actual NICoSim/controller/node reachability; complete runtime
+validation remains in progress. It must reject an
 occupied/foreign endpoint and incompatible disk selection. The EFI URL is a
 NICoSim parser placeholder, not a supplied bare-metal EFI artifact; this image
 does not enable physical-node provisioning.

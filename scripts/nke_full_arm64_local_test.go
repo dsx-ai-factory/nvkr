@@ -35,6 +35,8 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		{"capacity fails before pull", "Linux", "aarch64", "podman", "os", "running", "38000", "ok", "No downloads started", true},
 		{"Docker daemon unavailable", "Linux", "aarch64", "docker", "providers", "running", "100000", "failed", "daemon is unreachable", true},
 		{"Docker providers without Go", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
+		{"default check uses components", "Linux", "aarch64", "docker", "", "running", "100000", "ok", "Prerequisite diagnostics passed for components/docker", false},
+		{"relative clone rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "NKE_LOCAL_CLONE must be an absolute path", true},
 		{"Docker site without OS capacity", "Linux", "aarch64", "docker", "site", "running", "32000", "ok", "Prerequisite diagnostics passed for site/docker", false},
 		{"Podman site without OS capacity", "Linux", "aarch64", "podman", "site", "running", "32000", "ok", "Prerequisite diagnostics passed for site/podman", false},
 		{"Docker tools without OS capacity", "Linux", "aarch64", "docker", "tools", "running", "32000", "ok", "Prerequisite diagnostics passed for tools/docker", false},
@@ -160,6 +162,9 @@ esac`,
 			cmd.Env = append(os.Environ(), "PATH="+tools, "CONTAINER_RUNTIME="+tc.runtime, "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_SYSTEM="+tc.system, "TEST_ARCH="+tc.arch, "TEST_STATE="+tc.state, "TEST_DISK="+tc.disk, "TEST_DAEMON="+tc.daemon,
 				"TEST_CALLS="+filepath.Join(dir, "calls"))
+			if tc.name == "relative clone rejected" {
+				cmd.Env = append(cmd.Env, "NKE_LOCAL_CLONE=../nke")
+			}
 			if strings.HasPrefix(tc.name, "Colima ") {
 				profile := "nkd-demo"
 				if tc.name == "Colima invalid profile" {

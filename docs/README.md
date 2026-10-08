@@ -9,12 +9,13 @@ each concept to a worked example.
 | I want to… | Read |
 |---|---|
 | Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-laptop-arm64/README.md) |
+| Build once, then exercise a real QCOW2 tenant without rebuilding | [Integrated local demo command and current validation limits](local-nke-demo.md) |
 | Boot an existing NKD disk through the real local NICoSim VM backend | [Artifact-only QCOW2 guest probe](local-qcow2-guest-probe.md) |
 | Test the real NKE management Kind/CAPI path with existing NKD-built tools | [Deploy-only management diagnostic](local-management-cluster.md) |
 | Install a disposable NKE site from completed NKD images/charts, without rebuilding | [Deploy-only site integration](local-site-integration.md) |
-| Inspect owned native host-network setup and restoration | [Network guard](../scripts/nke-local-network.py) |
+| Inspect native host-network setup, restoration and current runtime limits | [Integrated consumer](local-nke-demo.md) |
 | Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
-| Understand Lia's local Colima/NICoSim demo and the missing NKD-to-deployment handoff | [Whole-demo analysis](lia-local-demo-analysis.md), [staged-installer handoff](nkd-to-nke-demo.md) |
+| Understand Lia's local Colima/NICoSim demo and the NKD-to-deployment handoff | [Whole-demo analysis](lia-local-demo-analysis.md), [staged-installer handoff](nkd-to-nke-demo.md) |
 | Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |

@@ -32,12 +32,12 @@ if [[ "${1:-}" == --check ]]; then
   check_only=1
   attempt=prerequisites-only
   jobs=1
-  lane="${2:-all}"
+  lane="${2:-components}"
 else
   [[ $# -ge 1 && $# -le 3 ]] || { usage >&2; exit 2; }
   attempt="$1"
   jobs="${2:-1}"
-  lane="${3:-all}"
+  lane="${3:-components}"
 fi
 if [[ ! "${attempt}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ || ! "${jobs}" =~ ^[1-9][0-9]*$ ]]; then
   echo 'Supply a fresh attempt name and positive job count.' >&2; exit 2
@@ -125,10 +125,14 @@ if [[ "${runtime}" == docker ]]; then
   case "${endpoint}" in unix://*) ;; *) echo 'Remote Docker endpoints are not supported by this local launcher; run on the Docker host.' >&2; exit 1 ;; esac
 fi
 if [[ -n "${NKE_LOCAL_CLONE:-}" ]]; then
+  [[ "${NKE_LOCAL_CLONE}" == /* ]] || { echo 'NKE_LOCAL_CLONE must be an absolute path.' >&2; exit 2; }
   git -C "${NKE_LOCAL_CLONE}" rev-parse --git-dir >/dev/null || { echo 'NKE_LOCAL_CLONE must be an accessible Git checkout.' >&2; exit 1; }
   nke_clone="$(cd "${NKE_LOCAL_CLONE}" && pwd -P)"
   export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0="url.${nke_clone}.insteadOf" GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nke.git
   export GIT_CONFIG_KEY_1="url.${nke_clone}.insteadOf" GIT_CONFIG_VALUE_1=https://github.com/dsx-ai-factory/nke
+  # Git insteadOf is prefix-based; pinned commit/tree verification still owns
+  # source identity. The bare NKE form also prefix-matches sibling repository
+  # names, so use this override only for this maintained NKE selection.
 fi
 environment="definitions/nke-laptop-arm64/environment-local.json"
 if [[ "${runtime}" == docker ]]; then environment="definitions/nke-laptop-arm64/environment-local-docker.json"; fi

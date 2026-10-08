@@ -366,7 +366,7 @@ func observedHostSatisfiesVM(request LocalVMRequest, observed ObservedHostFacts)
 		observed.Resources.MemoryMiB < want.MemoryMiB ||
 		observed.Resources.EphemeralStorageMiB < want.EphemeralStorageMiB {
 		return e.New(e.CodeEngineCapability,
-			"local VM host does not realize selected execution class capacity: CPU %d/%d millis, memory %d/%d MiB, workspace %d/%d MiB (observed/required; not reserved)",
+			"local VM host capacity admission: CPU %d/%d milliCPU, memory %d/%d MiB, workspace %d/%d MiB (observed/required; not reserved)",
 			observed.Resources.CPUMillis, want.CPUMillis,
 			observed.Resources.MemoryMiB, want.MemoryMiB,
 			observed.Resources.EphemeralStorageMiB, want.EphemeralStorageMiB)

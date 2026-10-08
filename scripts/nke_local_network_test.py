@@ -67,6 +67,68 @@ class NetworkTest(unittest.TestCase):
                         guard.close()
                     self.assertTrue(all(argv.args[0][0] in ("ps", "virsh") for argv in command.call_args_list))
 
+    def test_guest_tcp_exception_is_exact_and_insertion_is_observed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            guard = NET.OwnedNetwork(temporary, {}, "172.18.0.0/16")
+            guard.bridge_intent = True
+            with patch.object(guard, "bridge_binding", return_value="42"), \
+                 patch.object(guard, "rule_exists", side_effect=[False, True, False, True]), \
+                 patch.object(guard, "command") as command:
+                guard.allow_guest_tcp("172.18.0.2", (30443, 30440))
+            self.assertEqual(len(guard.rule_intents), 2)
+            for index, port in enumerate((30440, 30443)):
+                row = guard.rule_intents[index]
+                self.assertEqual(row, ("raw", "PREROUTING", ["-m", "comment", "--comment", guard.owner,
+                    "-i", NET.BRIDGE, "-s", NET.CIDR, "-d", "172.18.0.2", "-p", "tcp", "--dport", str(port), "-j", "ACCEPT"]))
+                self.assertEqual(command.call_args_list[index].args[0], ["iptables", "-w", "5", "-t", "raw", "-I", "PREROUTING", *row[2]])
+
+    def test_guest_tcp_exception_rejects_foreign_hosts_and_invalid_ports_before_work(self):
+        for address, ports in (("8.8.8.8", (30440,)), ("172.18.0.0", (30440,)),
+                ("172.18.255.255", (30440,)), ("172.18.0.2", ()), ("172.18.0.2", (True,)),
+                ("172.18.0.2", (0,)), ("172.18.0.2", (65536,)), ("172.18.0.2", (30440, 30440))):
+            with self.subTest(address=address, ports=ports), tempfile.TemporaryDirectory() as temporary:
+                guard = NET.OwnedNetwork(temporary, {}, "172.18.0.0/16")
+                with patch.object(guard, "command") as command, patch.object(guard, "bridge_binding") as bridge:
+                    with self.assertRaises(NET.VM.SmokeError):
+                        guard.allow_guest_tcp(address, ports)
+                    command.assert_not_called()
+                    bridge.assert_not_called()
+                    self.assertEqual(guard.rule_intents, [])
+
+    def test_guest_tcp_exception_retains_ambiguous_insert_for_rollback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            guard = NET.OwnedNetwork(temporary, {}, "172.18.0.0/16")
+            guard.bridge_intent = True
+            with patch.object(guard, "bridge_binding", return_value="42"), \
+                 patch.object(guard, "rule_exists", return_value=False), \
+                 patch.object(guard, "command", side_effect=NET.VM.SmokeError("insert failed")):
+                with self.assertRaises(NET.VM.SmokeError):
+                    guard.allow_guest_tcp("172.18.0.2", (30440,))
+            self.assertEqual(len(guard.rule_intents), 1)
+            with patch.object(guard, "bridge_binding", return_value=None), \
+                 patch.object(guard, "rule_exists", side_effect=[True, False]), \
+                 patch.object(guard, "command", return_value="") as command:
+                guard.close()
+            self.assertIn(["iptables", "-w", "5", "-t", "raw", "-D", "PREROUTING", *guard.rule_intents[0][2]],
+                          [call.args[0] for call in command.call_args_list])
+
+    def test_guest_tcp_revocation_only_withdraws_raw_rows_and_retains_intents(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            guard = NET.OwnedNetwork(temporary, {}, "172.18.0.0/16")
+            row = ("raw", "PREROUTING", ["-m", "comment", "--comment", guard.owner,
+                "-i", NET.BRIDGE, "-s", NET.CIDR, "-d", "172.18.0.2", "-p", "tcp", "--dport", "30440", "-j", "ACCEPT"])
+            guard.rule_intents = [*NET.rules(guard.owner, guard.kind_cidr), row]
+            intents = list(guard.rule_intents)
+            with patch.object(guard, "rule_exists", side_effect=[True, False]), patch.object(guard, "command") as command:
+                guard.revoke_guest_tcp()
+            command.assert_called_once_with(["iptables", "-w", "5", "-t", "raw", "-D", "PREROUTING", *row[2]], True)
+            self.assertEqual(guard.rule_intents, intents)
+            self.assertFalse(guard.cleaning)
+            with patch.object(guard, "rule_exists", return_value=True), patch.object(guard, "command"):
+                with self.assertRaises(NET.VM.SmokeError):
+                    guard.revoke_guest_tcp()
+            self.assertFalse(guard.cleaning)
+
     def test_created_bridge_is_recovered_after_missing_initial_readback(self):
         for changed in (False, True):
             with self.subTest(changed=changed), tempfile.TemporaryDirectory() as temporary:

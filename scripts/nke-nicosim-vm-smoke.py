@@ -190,11 +190,13 @@ def stop(process):
             raise SmokeError("server did not join after SIGKILL; cleanup remains incomplete") from err
 
 
-def domain_inventory():
+def domain_inventory(runner=None):
+    run = runner or globals()["run"]
     return run(["virsh", "-c", "qemu:///session", "list", "--all", "--name"], "cleanup inventory").split()
 
 
-def owned_domain(name, work):
+def owned_domain(name, work, runner=None):
+    run = runner or globals()["run"]
     instance_id = name.removeprefix("nico-vm-")
     try:
         if name != "nico-vm-" + str(uuid.UUID(instance_id)):
@@ -211,8 +213,9 @@ def owned_domain(name, work):
     return domain_uuid, xml
 
 
-def remove_owned_domain(name, work):
-    binding = owned_domain(name, work)
+def remove_owned_domain(name, work, runner=None):
+    run = runner or globals()["run"]
+    binding = owned_domain(name, work, runner)
     if binding is None:
         raise SmokeError("refusing to delete a domain not bound to this private probe directory")
     domain_uuid, _ = binding
@@ -222,13 +225,13 @@ def remove_owned_domain(name, work):
     run(["virsh", "-c", "qemu:///session", "undefine", domain_uuid, "--nvram", "--tpm"], "owned domain removal")
 
 
-def sweep_owned_domains(work):
+def sweep_owned_domains(work, runner=None):
     # Run only AFTER the producer has stopped/joined. This covers an accepted
     # Create whose CLI response timed out/interrupted before an ID was returned.
     # No private-DB parser: libvirt owns XML, interpreted with the stdlib.
-    for name in domain_inventory():
-        if name.startswith("nico-vm-") and owned_domain(name, work) is not None:
-            remove_owned_domain(name, work)
+    for name in domain_inventory(runner):
+        if name.startswith("nico-vm-") and owned_domain(name, work, runner) is not None:
+            remove_owned_domain(name, work, runner)
 
 
 def cleanup_vm(cli, instance_id, work):

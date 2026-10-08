@@ -23,6 +23,18 @@ an explicitly selected `COLIMA_PROFILE` on Apple Silicon. Neither publishes or s
 The OS selects TCG and the recorded local Packer subject through
 `os-tcg.json`. The CLI catalog adds an explicit ARM64 producer; its pin starts
 at the maintained CLI release and its stamps follow machine-managed pins.
+Its compiler subject `golang@sha256:6c2a5538f964f1c82f97ad14988bf05de100d922d159d0e398b54c7b0ca0c6c9`
+deliberately differs from the `nke-v1` compiler subject
+`golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6`.
+The common build command does not imply identical release compiler or bytes.
+
+The combined, components and OS selections reuse catalogs under `definitions/nke-m2`.
+In particular, `os-tcg.json` binds its override to that OS catalog's exact
+`requiresCatalogDigest`. An M2 catalog repin can therefore invalidate this local
+example. Review the changed source/material/toolchain contract before updating
+that binding; do not bypass it. Default tests compile the provider subset and
+OS selection. `NKD_TEST_EXTENDED=1 go test ./pkg/nkd/lifecycle -run '^TestLaptopARM64CatalogCompilation$' -count=1` also compiles the actual 22/23-output
+selections offline. Compilation is not a full runtime build or acceptance run.
 The operator catalog pins native ARM64 Helm and kubectl assets.
 The CAPNICo catalog builds the public v0.0.45 Git source using its source-owned
 Dockerfile; the provisioned provider reuses the maintained controller catalog's

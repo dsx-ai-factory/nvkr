@@ -6,6 +6,13 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
+`python3 scripts/nke-local-demo.py` is the new deploy-only integration command:
+completed seven-lane artifacts, owned native networking, exact QCOW2 serving,
+VM-backed NICoSim, NKE site, a real control-plane/worker tenant and a workload
+gate. It rebuilds nothing. Read the [setup, command and validation limits](../docs/local-nke-demo.md)
+before running. Full tenant/workload runtime validation is still in progress;
+site-only and standalone guest successes are not an integrated PASS.
+
 `python3 scripts/nke-local-management.py` uses a completed source-built tools Run
 for a real private Kind management cluster and NKE's pinned CAPI stage, then
 cleans up its exact node and anonymous volume. See the
@@ -18,13 +25,14 @@ provider Runs. It copies exact controller/profiles/CAPNICo manifests to a privat
 node-reachable registry, installs six unchanged chart archives, checks health,
 registers the site and verifies actual runtime image IDs before owned cleanup.
 See the [site command and prerequisites](../docs/local-site-integration.md) and
-real replay evidence.
+current validation limits in that guide.
 It requires an existing private NICoSim endpoint and is not tenant/workload E2E.
 
 The internal `nke-local-network.py` guard has real native setup/restoration
-evidence, including a deliberate consumer failure. It is not yet wired into
-the site entrypoint or a complete tenant command; see the
-scope and restoration readback.
+evidence, including a deliberate consumer failure. The new integrated command
+wires it into simulator/guest ownership, but complete tenant/workload acceptance
+is still required. See the [integrated consumer guide](../docs/local-nke-demo.md)
+for its network scope, cleanup and current runtime limits.
 
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the

@@ -118,6 +118,49 @@ class OwnedNetwork:
                 raise
             return False
 
+    def allow_guest_tcp(self, address, ports):
+        """Explicit diagnostic exception for Docker's raw direct-routing gate.
+
+        Bind one admitted Kind address and exact TCP ports, not the subnet or
+        all container traffic. No Docker rule or daemon setting is modified.
+        The existing intent ledger owns rollback even after an ambiguous insert.
+        """
+        target = ipaddress.IPv4Address(address)
+        network = ipaddress.ip_network(self.kind_cidr)
+        if (target not in network or target in (network.network_address, network.broadcast_address) or
+                not isinstance(ports, tuple) or not ports or
+                any(type(port) is not int or not 1 <= port <= 65535 for port in ports) or
+                len(set(ports)) != len(ports)):
+            raise VM.SmokeError("guest TCP exception requires one Kind host and unique exact ports")
+        if self.cleaning or not self.bridge_intent or self.bridge_binding() is None:
+            raise VM.SmokeError("guest TCP exception requires this active owned bridge")
+        for port in sorted(ports):
+            row = ("raw", "PREROUTING", ["-m", "comment", "--comment", self.owner,
+                "-i", BRIDGE, "-s", CIDR, "-d", str(target), "-p", "tcp", "--dport", str(port), "-j", "ACCEPT"])
+            if row in self.rule_intents or self.rule_exists(row):
+                raise VM.SmokeError("fresh guest TCP exception unexpectedly exists")
+            self.rule_intents.append(row)
+            table, chain, arguments = row
+            self.command(["iptables", "-w", "5", "-t", table, "-I", chain, *arguments], True)
+            if not self.rule_exists(row):
+                raise VM.SmokeError("guest TCP exception insert did not survive readback")
+
+    def revoke_guest_tcp(self):
+        # The node address must not be released while a guest exception remains.
+        # Keep the ledger for outer rollback/readback, including partial inserts.
+        previous, self.cleaning = self.cleaning, True
+        try:
+            for row in reversed(self.rule_intents):
+                table, chain, arguments = row
+                if (table, chain) != ("raw", "PREROUTING"):
+                    continue
+                if self.rule_exists(row):
+                    self.command(["iptables", "-w", "5", "-t", table, "-D", chain, *arguments], True)
+                if self.rule_exists(row):
+                    raise VM.SmokeError("guest TCP exception remains before node release")
+        finally:
+            self.cleaning = previous
+
     def admit(self):
         if platform.system() != "Linux" or platform.machine() != "aarch64" or sys.version_info < (3, 12):
             raise VM.SmokeError("network guard requires dedicated ARM64 Linux/Colima and Python 3.12+")
