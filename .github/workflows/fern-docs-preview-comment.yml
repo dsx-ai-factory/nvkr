@@ -16,7 +16,7 @@
 # Workflow 2 of 2 for Fern doc previews.
 #
 # Triggered by workflow_run after "Preview Fern Docs: Build" completes.
-# Downloads the fern/ artifact, builds a preview with DOCS_FERN_TOKEN, and
+# Downloads the fern/ artifact, builds a preview with FERN_TOKEN, and
 # posts a stable :herb: comment on the PR. This workflow never checks out the
 # PR branch directly, keeping secrets isolated from untrusted code.
 #
@@ -30,7 +30,7 @@
 # until it is merged to main.
 #
 # Required configuration:
-# - Organization or repository secret: DOCS_FERN_TOKEN (from `fern token` for the nvidia Fern org)
+# - Organization or repository secret: FERN_TOKEN (a Fern token for the nvidia Fern org)
 
 name: "Preview Fern Docs: Comment"
 
@@ -91,7 +91,7 @@ jobs:
       - name: Generate preview URL
         id: generate-docs
         env:
-          FERN_TOKEN: ${{ secrets.DOCS_FERN_TOKEN }}
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
           PREVIEW_ID: pr-${{ steps.metadata.outputs.pr_number }}
         working-directory: ./fern
         run: |
@@ -107,7 +107,7 @@ jobs:
       - name: Build page links for changed files
         id: page-links
         env:
-          FERN_TOKEN: ${{ secrets.DOCS_FERN_TOKEN }}
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
           PREVIEW_URL: ${{ steps.generate-docs.outputs.preview_url }}
         run: |
           CHANGED_FILES=""

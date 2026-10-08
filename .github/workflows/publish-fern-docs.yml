@@ -32,7 +32,7 @@
 # Pre-releases trigger publish but skip version registration.
 #
 # Required configuration:
-# - Organization or repository secret: DOCS_FERN_TOKEN (from `fern token` for the nvidia Fern org)
+# - Organization or repository secret: FERN_TOKEN (a Fern token for the nvidia Fern org)
 # - Repository setting "Allow GitHub Actions to create and approve pull requests",
 #   so the registry PR can be opened.
 #
@@ -246,7 +246,7 @@ jobs:
 
       - name: Publish docs
         env:
-          FERN_TOKEN: ${{ secrets.DOCS_FERN_TOKEN }}
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
         working-directory: ./fern
         run: |
           set -eo pipefail
