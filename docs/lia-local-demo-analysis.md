@@ -15,9 +15,12 @@ This is an analysis, not a completed executable tutorial. No local site or tenan
 was deployed during this analysis.
 
 Subsequent implementation added a separate source-built Linux ARM64 NICoSim
-server/CLI bundle. Its real Podman Run and offline SQLite/UI startup smoke passed;
-see the [simulator evidence](evidence/2026-10-07-local-nicosim-build.md). This does
-not complete the missing artifact set or the Colima-to-tenant demo.
+server/CLI and pinned seed/UI archive bundle. The [three-component Colima Docker
+Run](evidence/2026-10-08-colima-nicosim-assets.md) completed 1/1, and NKD delivery
+verified/extracted its final members. An offline mock-runtime probe served exact
+packaged UI bytes without NKE source mounted. This closes the simulator's asset
+delivery/startup gap, not real VM provisioning, the missing combined artifact set
+or the Colima-to-tenant demo.
 
 ## Sources and evidence limits
 
@@ -153,7 +156,7 @@ inspection-derived disk SBOM or proof of all installed runtime dependencies.
 | Controller image | Source-built `cwe` | Align source/build contract with the selected demo revision; import/copy without rebuilding and verify deployed identity |
 | Controller chart | Image-bound `controller-chart` | Feed the packaged chart to the source-owned installer rather than silently using a different source-tree chart |
 | CAPNICo | Source-built ARM64 provider image | Chart/manifests and install override must consume that image; the current source install helper builds it again |
-| NICoSim and simulator CLI | Separate `definition-simulator.json` selects a source-built Linux ARM64 server/CLI bundle; both Podman and committed Colima Docker Runs completed and passed limited offline startup probes. The launcher supports fresh pinned-toolchain bootstrap | Deliver seed/UI/runtime assets and integrate into the demo selection. The separate bundle is not part of the 23-output `all` set; real VM/site/tenant deployment remains unvalidated |
+| NICoSim and simulator CLI | Separate `definition-simulator.json` selects source-built Linux ARM64 server/CLI and pinned seed/UI archive; a three-component Docker Run and verified artifact-only mock startup passed. The launcher supports fresh pinned-toolchain bootstrap | Integrate into the demo selection and real VM process/runtime handoff. The separate bundle is not part of the 23-output `all` set; real VM/site/tenant deployment remains unvalidated |
 | Tenant node disk | Existing `nke-node-image-arm64` output with its OS material graph | Make the existing ARM64 TCG build complete on the Mac, then bind the exact QCOW2 to the NICoSim VM profile; do not add a substitute tenant-node container build |
 | Profiles/runbooks image | No selected output | Build the explicitly selected local demo fixture, label it diagnostic, bind the exact tenant QCOW2/OS choices; do not call it production fleet profiles |
 | NKTP chart and runtime closure | No NKTP chart output | Package its locked chart dependencies and enumerate its selected runtime images |
@@ -161,7 +164,7 @@ inspection-derived disk SBOM or proof of all installed runtime dependencies.
 | CLI and operator tools | Linux ARM64 `nkectl`, Helm/kubectl bundle | Linux binaries cannot run directly on macOS. Run them in the chosen Linux environment or add native-host producers; add matching installer tools |
 | BGP and any selected identity-exchange helpers | Not a complete selected set | Model required helper images/configuration from the chosen scenario. Do not silently enable or omit them |
 | Installer/templates/configuration contract | No complete delivered deploy bundle | Preserve NKE's exact source revision and installation format; map Run outputs to it, not arbitrary hand-entered refs |
-| QCOW2 boot evidence | Disk output declared; native Colima retry passed Packer validation and reached real QEMU autoinstall | Complete the bake, boot the newly produced disk through the real VM backend and observe the tenant. The component Run and a node container do not validate this disk |
+| QCOW2 boot evidence | Disk output declared; the 16 GiB native trial reached QEMU kernel installation but failed after global host OOM killed QEMU. A fresh 24 GiB, non-overlapping attempt began | Complete the bake, boot the newly produced disk through the real VM backend and observe the tenant. The failed trial, component Run and a node container do not validate this disk |
 | E2E suite | No selected test executable | Produce the matching test binary before deployment, or explicitly separate an independently built test harness from the artifact Run |
 
 The current retained component Run is complete **22/22** in its declared
@@ -195,15 +198,17 @@ test suite. Calling those scripts as-is cannot prove that NKD built everything.
 
 1. **Make the existing QCOW2 build run on the Mac.** Keep the authored ARM64 TCG
    producer and admission requirements. October 8 failed-attempt cleanup recovered
-   sufficient workspace and the real Colima preflight passed; the fresh OS build
-   failed before Packer during SPIRE snapshot preparation. A native ext4 source
-   export is the retry path; see the [execution evidence](evidence/2026-10-08-colima-local-os-build.md)
+   sufficient workspace and the real Colima preflight passed. The shared-mount OS
+   build failed during SPIRE preparation; the native-ext4 retry reached autoinstall
+   but then lost QEMU to global OOM in the 16 GiB VM. A fresh attempt on the
+   preserved 24 GiB profile is running without concurrent builds; see the
+   [execution evidence](evidence/2026-10-08-colima-local-os-build.md)
    and [storage evidence](evidence/2026-10-08-local-storage-cleanup.md).
    Complete the bake rather than treating preflight or materials as acceptance.
    Use the real NICoSim VM backend for tenant nodes,
    not CAPD or the default container backend. Record matching architecture,
    attestation/CNI choices and exact install source.
-2. **Complete the NKD Definition/catalog membership.** Add missing simulator,
+2. **Complete the NKD Definition/catalog membership.** Integrate the separate simulator bundle; add
    local profiles, NKTP, deploy assets and selected helpers. Reuse the existing
    OS output, NKE-owned producers and the existing graph/executors. Public application
    components requested from source remain source builds; retained binary

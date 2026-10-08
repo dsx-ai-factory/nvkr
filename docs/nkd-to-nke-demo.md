@@ -91,7 +91,11 @@ bake/boot. On October 8, user-authorized failed-attempt cleanup recovered enough
 workspace for the real Colima prerequisite check to pass; see the
 [storage and preflight evidence](evidence/2026-10-08-local-storage-cleanup.md).
 The first fresh Docker disk attempt failed before Packer during SPIRE snapshot
-preparation. A native-filesystem retry is in progress; see the
+preparation. The native-filesystem retry reached kernel installation but failed
+after Colima's global OOM killer terminated QEMU. It was canceled and recorded failed
+with zero accepted disks. Its run-owned build container was cleaned up; the failed
+Run was retained. A fresh non-overlapping attempt on the
+preserved 24 GiB profile is preparing materials; see the
 [execution evidence](evidence/2026-10-08-colima-local-os-build.md).
 Passing preflight or building materials is not bake/boot evidence.
 
@@ -182,7 +186,9 @@ A full result requires all of the following recorded against one explicit input 
 
 Remaining implementation: align the demo's NKE producers/pins; add the missing
 NKTP/profiles membership; implement/test the artifact-to-installer handoff and
-registry transport. Remaining external inputs: choose exact NICo test-site versus
-an explicitly different laptop variant, provide authorized site/registry/source
-access and sufficient OS capacity. Until those are resolved this is not a working
-copy-paste full-E2E tutorial.
+registry transport. The requested scenario is already selected: local Colima plus
+CAPNICo/NICoSim with QCOW2-backed tenant VMs, not a production NICo site or CAPD
+substitute. The wrapper still needs to create/admit its owned local management
+cluster, NICo endpoint, registry and bootstrap trust configuration, plus verify
+source access and OS capacity. Until that implementation and real acceptance run
+are complete, this is not a working copy-paste full-E2E tutorial.
