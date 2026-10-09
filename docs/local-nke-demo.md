@@ -35,13 +35,14 @@ not a requirement for nested KVM:
 ```sh
 # Keep newly created checkout files private to this user; not a Git requirement.
 umask 077
-git clone https://github.com/dsx-ai-factory/nke-recipes.git
+git clone --branch main https://github.com/dsx-ai-factory/nke-recipes.git
 cd nke-recipes
-# Until PR #118 merges, use its branch:
-git switch --track origin/codex/full-nke-arm64-local
 test "$(uname -m)" = aarch64
 test "$(findmnt -n -o FSTYPE -T .)" = ext4
 ```
+
+When testing an unmerged PR, check out that PR's branch before continuing.
+The normal installation above uses `main`.
 
 ### Additional macOS setup
 
