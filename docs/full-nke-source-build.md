@@ -14,20 +14,18 @@ producer, packaging, source-access and runtime work.
 
 ## Evidence and remaining work
 
-The source-catalog status was refreshed on October 8, 2026, against main
-`d5b02b8a23d8d40456353facc1cd9beb9bbfd8ae`, which merged
-[PR #113](https://github.com/dsx-ai-factory/nke-recipes/pull/113) head
-`6d5c36a96baf81911b5a1c9af62b7e63cfebfe46`. Its
+The catalogs introduced by
+[PR #113](https://github.com/dsx-ai-factory/nke-recipes/pull/113) provide
 [public-source producers](../definitions/nke-os-source/README.md) and
-[OVN outputs](../definitions/nke-ovn-source/README.md) now exist on main,
-but are not selected by the maintained OS graph or this laptop OS selection.
+[OVN outputs](../definitions/nke-ovn-source/README.md). These are not selected
+by the maintained OS graph or this laptop OS selection.
 The remaining migration is not completed by merging those candidate catalogs.
 
 | Required area | Existing implementation | Missing for the requested build |
 | --- | --- | --- |
 | CLI/controller/chart | Local source producers and controller image binding | Exercise the complete final source-built selection; migrating to a different NKE baseline also requires its matching build interface/toolchain |
-| CAPNICo | This example adds a source-owned BuildKit producer at public v0.0.45, commit `30882520888ab7bb75d125cb7bb9aa89e48acd6a`; local source build and offline help passed | Include it in the complete Run; provider reconciliation is not exercised |
-| Provisioned provider | Existing `nke-controller/catalog` source producer, now selected locally; local source build and offline help passed | Include it in the complete Run; provider reconciliation is not exercised |
+| CAPNICo | This example selects a source-owned BuildKit producer at public v0.0.45, commit `30882520888ab7bb75d125cb7bb9aa89e48acd6a` | Include it in the complete Run and validate provider reconciliation; a producer declaration is not runtime acceptance |
+| Provisioned provider | Existing `nke-controller/catalog` source producer, selected locally | Include it in the complete Run and validate provider reconciliation; the NICo demo does not use this provider |
 | Fleet profiles | NKE `image.yml` identifies `nke-site-deploy` as the production source; checked-in profiles are an example fixture | Accessible Git URL and approved revision, producer and image output. Do not publish the fixture as production profiles |
 | Kubernetes/containerd/crictl/CNI/Helm/TPM | PR #113 has fourteen direct-source producers across supported versions | Integrate the candidate catalog and package the authenticated outputs for actual consumers. Its static containerd subset is not feature-equivalent to NKE's upstream release archive; held Helm preparation remains a separate hosted-route limitation, not a blocker to the local developer-fetch route |
 | Remaining OS application dependencies | PR #113's inventory maps released inputs and missing source producers | SPIRE, runc with seccomp, CoreDNS, etcd, pause, Calico/Tigera and embedded OCI images; preserve package dependencies, paths, units, hooks and import behavior |
@@ -47,9 +45,10 @@ See the [staged-installer handoff](nkd-to-nke-demo.md) for installer alignment a
 ## What needs external input
 
 Two source/access inputs cannot be invented: the fleet-profile repository/revision
-and the DSX IMDS source or accepted retained payload. The retained package lacks
-DSX IMDS and has not passed the complete source smoke. A successful TPM
-attestation does not satisfy that different contract. Fresh OS builds also need
+and the DSX IMDS source or accepted retained payload. A plugin-free SPIRE package
+does not satisfy that membership; complete source smoke is not established here.
+A successful TPM attestation does not satisfy that different contract.
+Fresh OS builds also need
 physical host and native workspace headroom; follow the resource checks in the
 [developer guide](local-development.md). The developer launcher never deletes
 attempts, container images or user caches automatically to obtain that space.

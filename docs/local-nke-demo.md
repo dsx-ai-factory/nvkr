@@ -160,8 +160,10 @@ tools are reused by sibling lanes; artifact Runs and their observations remain
 separate. A failed lane stops deployment.
 
 Progress streams to the terminal with observed START/DONE/FAIL boundaries;
-private installer output stays in private logs. Ctrl+C cancels work and waits
-for owned cleanup. There is no terminal dashboard or presentation-mode flag.
+private installer output stays in private logs. Ctrl+C requests cancellation;
+the adapter attempts bounded process joins and owned cleanup. If cleanup refuses,
+inspect the retained resources and recovery instructions before rerunning.
+Ordinary tests do not prove interruption at every live NKE stage.
 
 The OS uses QEMU software acceleration. The eight-hour E2E budget and 60-minute
 tenant budget are ceilings, not completion estimates. Deployment requires the

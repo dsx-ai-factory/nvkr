@@ -156,144 +156,61 @@ hosted finalization or independent consumer acceptance.
 ## Local ARM64 development inputs
 
 The `definitions/nke-local-dev-arm64` example selects 23 outputs or its 22-output
-non-disk subset without publication/signing. Separate selections cover providers,
-site, tools, profiles and simulator assets. The historical `all` selection is
-not a complete seven-lane demo or source-built distribution. See the
-[local development guide](../local-development.md) and
-[full-source gap map](../full-nke-source-build.md).
+non-disk subset without publication/signing. The demo joins six separate
+OS, components, site, tools, profiles and simulator selections; `all` is not
+that joined flow or a complete source-built distribution. See the
+[quickstart](../local-nke-demo.md) and [source gaps](../full-nke-source-build.md).
 
-Local static-unqualified mixed Plans admit only offline, non-disk utility
-observation/SBOM/ordinary packaging in the child helper. The local launcher
-passes the original Plan digest; complete Plan validation remains mandatory.
-VM producer/held-disk execution stays with the original Run owner. Mixed Plans
-with network utility acquisitions (including an acquired `sbomTool`) are
-unsupported, even from that owner. Publication/signing/ARC and qualified lanes
-do not gain this local utility exception.
+Local static-unqualified mixed Plans admit offline, non-disk utility
+observation/SBOM/packaging in the child helper while VM/held-disk execution
+stays with the original Run owner. Network utility acquisitions remain
+unsupported. Relocated image observation retains compiled Plan identity.
+[Mixed-utility tests](../../pkg/nkd/factory/local_mixed_utility_test.go)
+use controlled OCI bytes and a descriptive, unexecuted VM; they do not prove
+a real joined bake or extend hosted, signing or qualification admission.
 
-Local and restored pipeline-attested image observation relocate the validated
-Plan and descriptive paths together, retaining compiled identity and exact
-acquired-payload/result comparisons. Relocation grants no new authority.
-Contract tests are distinct from hosted signing or consumer acceptance.
+The Go downstream consumer invokes `nkdctl` for build, verification and
+extraction, and NKE's pinned staged installer for deployment. Kind hosts
+management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Final success
+requires two Ready nodes, workload/DNS checks, exact disk/artifact bindings and
+owned cleanup. Cobra/Viper configuration supplies descriptions, not receipts.
+The six-lane build reuses bootstrap executables and the measured toolchain,
+but retains separate Runs and per-lane admission. The upstream NKE readers
+still require Python; the demo does not reimplement them.
 
-The deploy-only [integrated consumer](../local-nke-demo.md) consumes completed
-Runs, owns a real Kind management cluster, CAPNICo/NICoSim and QCOW2 tenant VMs,
-and requires two ready nodes plus a workload before PASS. It does not build
-artifacts or establish a Release. Its scoped networking permits only the owned
-guest bridge to the exact owned management endpoint's SPIRE ports and withdraws
-those rules before address release. Unjoined children retain dependent controls.
-Joined restoration refusals retain exact resources without retaining live
-simulator, disk-server or DNS daemons; their independent process groups are
-stopped/joined before host restoration checks. Contract negatives cover foreign
-domains, refused BGP restoration and individual daemon join failures.
-VIP-route restoration admits only the kernel's `linkdown` next-hop flag after
-producers are idle, retaining exact bridge, destination, gateway and route
-read-back checks; unknown flags and changed bindings remain refusals.
-Downstream consumers emit success only after their outermost cleanup completes.
-The consumer is now a typed Go library with a thin local-demo CLI. NKD build,
-verification and extraction operations invoke `nkdctl` subprocesses, not an
-in-process SDK. Ordinary Go tests cover the adapter contracts; a separately
-opted-in test builds all six demo lanes before deployment. The earlier Colima
-results below exercised the previous Python consumer and do not establish fresh
-Go-consumer acceptance. The pinned upstream NKE installer still requires Python
-for its source-owned readers. Go network journals use version 2 and reject legacy
-version-1 Python journals; restore any old live controls before upgrading.
-The local diagnostic command also accepts an explicitly selected versioned YAML
-configuration through Cobra/Viper. Typed, bounded parsing rejects unknown keys,
-ambiguous documents and implicit type coercion before action callbacks. A local
-`e2e` command derives deployment Run paths from its own fresh six-lane build;
-this descriptive file grants no NKD execution or Release authority. The cold
-Go replay of commit `b3d97b3` stopped during Packer toolchain construction because
-Canonical's exact pinned APT snapshot endpoint returned HTTP 503 on both the Mac
-and Colima host. It produced no new QCOW2 and supplies no E2E acceptance.
-The separate `clean-go-02` retry completed all six lanes and retained a new
-plain ARM64 QCOW2, but its initial deployment failed at a journal-staging
-pointer alias. The corrected consumer preserves independent mode-0600 staging
-and mode-0644 policy identities and validates new snapshots before writing.
-It also projects the exact admitted NKE Kind configuration into a private
-IPv4-only runtime copy, matching this demo's IPv4 tenant/network contract;
-NKE source bytes, selected node image and feature gates remain unchanged.
-The subsequent private Go replay completed on October 9, 2026: two Ready ARM64
-Kubernetes 1.34.2 QCOW2 nodes, workload/DNS success, exact backing-disk bindings
-and owned cleanup, followed by process exit zero. Independent read-back matched
-the 2,835,153,408-byte disk to
-`sha256:361c1bc513509e748079e25b7b9ec596ac0085ec6d5c0305ded9b9b2e3946373`,
-found no remaining owned domains, management containers, registry or anonymous
-volume, and confirmed the finished restoration journal and absent demo bridge.
-This replay consumed the six newly completed `clean-go-02` Runs from `b3d97b3`
-using the `1856b5b` Go consumer with local journal/IPv4 fixes. It does not turn
-the failed original Go E2E test into a passing one-shot build/deploy run or grant
-Release/qualification authority; the corrective changes still need publication
-to the PR branch.
-The downstream CLI presents observed lane/phase events and streams public build
-output as plain text; private deployment diagnostics are not forwarded. The
-custom TUI/PTY framework and its four direct Charmbracelet dependencies have
-been removed. Output failure still cancels work without bypassing owned-process
-joins or cleanup. Presentation events grant no artifact, Release or qualification
-authority; CLI contract tests do not establish fresh E2E.
-The six-lane flow reuses its first lane's bootstrap executables and measured
-toolchain image, while keeping separate immutable Runs and per-lane Plan admission.
-The shared toolchain now pins Go 1.27.2, Helm 4.2.4 and ORAS 1.3.3. Its October 9
-native ARM64 Docker assembly and executable probes passed in Colima, yielding
-diagnostic image `sha256:eee81eb826bbc62e3dc3c1b72bfee6720d165d8f03dcd2b06b24976c463dfde2`.
-This is not a published pin, repeat-build proof or fresh OS/E2E acceptance.
-Profiles now use the existing executable-format OCI bundle to carry a deterministic
-data archive; ORAS transports it and `nkdctl` authenticates its extraction. The
-controller reads a validated directory inside the owned Kind node through a
-read-only volume, without a profiles-image materializer. The source overlay only
-adds local profile data; its offline first-boot and uplink naming behavior remains
-explicitly local. The pinned NKE installer still requires the unused legacy
-`images.profiles` field. Actual source-rendered values and Helm precedence passed,
-but earlier image-based Runs do not establish this changed consumer's E2E acceptance.
-The pinned NKE `bootstrap site` command uses nerdctl and pre-provisioned hosts,
-not the demo's persistent Docker/Kind and NICoSim substrate. The demo still calls
-NKE's source-owned deployment stages. Replacing that adapter with bootstrap needs
-an NKE-owned interface for Docker/NICo and exact locally built input selection;
-the existing command is not a demonstrated drop-in replacement.
-Network-only crash recovery now uses a private synced intent journal and the
-same kernel-released lock. Exact executable/file/bridge bindings gate restoration;
-recovery never kills journal PIDs. Contract negatives cover changed journals,
-live owners, protected executable metadata, substituted root staging and full
-diagnostic volumes. This does not establish a full tenant crash/restart matrix.
+Profiles use an OCI-carried data bundle, ORAS transport and NKD-authenticated
+extraction, followed by a read-only controller volume. The additive source
+overlay changes no upstream NKE files. Local-only APT installation and uplink
+naming are explicit profile choices, not a general NKE offline boot contract.
+The pinned installer still requires the unused legacy `images.profiles` field.
+[Profile factory tests](../../pkg/nkd/factory/nke_laptop_profiles_test.go)
+cover additive patch authentication, compilation and modeled APT/uplink cases.
+[Consumer tests](../../internal/nkedemo/site_test.go) cover bundle-index
+preservation, owner rejection of corrupt bytes and volume-description checks;
+the source-chart rendering test is opt-in and skipped without its chart input.
+Neither suite alone proves actual registry transport, boot or deployment.
 
-A real private Colima run completed on October 8, 2026, using seven retained
-completed Runs: two Ready ARM64 Kubernetes 1.34.2 QCOW2 nodes, exact backing-disk
-bindings, workload/DNS success, NKE tenant deletion and owned cleanup. Independent
-readback found no remaining owned containers, domains, bridge, guest/VIP routes
-or QEMU policy; the helper returned to root-owned mode 0755 and the restoration
-journal finished. This is unqualified local execution, not an authenticated
-external acceptance record or a clean-machine/full-source build.
-The adapter uses NICoSim's guest diagnostics with per-attempt credentials,
-private-file Bearer headers, disabled ambient curl configuration and bounded
-private log retention before deletion. The HTTP contract is exercised with a
-real loopback server; it is not a recorded full guest/tenant acceptance run.
-A private runtime seed projection raises the selected instance to eight GiB
-without changing accepted asset bytes. The local profiles producer includes both
-predictable kernel naming and an exact generated-Netplan-link drop-in preserving
-the observed first-boot physical uplink (`eth0` or `enp1s0`). An empty NamePolicy
-and explicit Name avoid switching the persisted OVS uplink after reboot;
-subsequent boots disable only cloud-init network rendering. Shell contracts
-cover both names, ambiguous/missing/unsupported physical NIC refusal, idempotence
-and foreign-path refusal. The completed integrated run exercised the corrected
-worker uplink across its pre-join reboot and passed tenant/workload checks;
-isolated shell probes alone do not prove that path. Local evidence reports
-are intentionally not shipped in this PR. Private diagnostic logs and Run records
-are not authenticated external acceptance or qualified reproduction. The retained
-older disk's SPIRE/DSX exception, failed full boot smoke and direct-source OS
-integration remain open. No complete combined 23-output Run is claimed.
-The diagnostic laptop profile disables first-boot package refresh and selects
-only the baked file-based APT repository. Install errors terminate the commands
-before service restarts or the completion marker. This removes the authored
-public APT fallback, not runtime container acquisitions. The completed integrated
-run exercised that first-boot package installation and tenant/workload path;
-it did not prove a complete offline deployment or full OS smoke.
+[Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
+journal, cleanup, artifact and tenant-description cases. Runner tests exercise
+bounded subprocess cancellation and joining; CLI tests exercise output-failure
+cancellation with controlled callbacks. These do not prove real SIGINT during
+NKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
+at every build/deployment phase. Network-only recovery uses version-2 journals
+and never kills serialized PIDs; restore legacy live controls before upgrading.
+A full tenant crash/restart and recovery matrix remains unverified.
 
-The diagnostic local launcher can compile an attempt-scoped substitution from a
-freshly measured, native-validated Packer toolchain image ID; this does not update
-maintained pins. The native Docker TCG route is contract-tested; no successful
-full OS-smoke/tenant acceptance record is shipped here. Neither route grants
-publication, signing or qualification authority (ADR-18).
-`publish chart` is local verification/extraction of a pinned Helm archive, not
-remote publication, Release authorization or a signing gate (ADR-20).
+[TestEndToEnd](../../internal/nkedemo/e2e_test.go) is explicitly opt-in; ordinary
+tests do not build images, deploy tenants or mutate host networking. No durable
+fresh-build/deploy acceptance record is supplied by this PR. Private logs,
+retained Runs, chart renders and tool probes are not public operational evidence,
+complete OS smoke, full-source completion, signing or qualification. Validate
+the terminal result and cleanup of the exact invocation being accepted.
+
+Attempt-scoped native toolchain substitution does not update maintained pins.
+`publish chart` locally verifies/extracts a pinned Helm archive; diagnostic
+registry copies do not constitute NKD publication or Release authorization
+(ADR-18/20). The current NKE `bootstrap site` route is not a demonstrated
+drop-in replacement for the Docker/Kind and NICoSim adapter.
 
 ## Experimental OS source producers and OVN outputs
 

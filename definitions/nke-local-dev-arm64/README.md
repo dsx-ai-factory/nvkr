@@ -62,6 +62,6 @@ profiles Dockerfile, BuildKit producer or runtime init image is needed. The
 diagnostic OS profile remains separate from production fleet profiles and does
 not authenticate the selected disk or establish tenant compatibility.
 
-See [reconciliation](../../docs/adr/reconciliation.md) for the exact recorded
-results. The reduced shared-toolchain/profile-data flow still needs a fresh
-end-to-end run; older retained-artifact success does not validate these changes.
+See [reconciliation](../../docs/adr/reconciliation.md) for implementation and
+test boundaries. Ordinary tests do not execute the full demo; this PR supplies
+no durable fresh-build/deploy acceptance record.

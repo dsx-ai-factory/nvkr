@@ -46,9 +46,9 @@ naming across reboot; these are declared local profile behavior, not fixes to
 upstream NKE. A first-class data-profile installer input and general offline
 first-boot/network behavior remain NKE-owned integration gaps.
 
-Factory tests authenticate the additive overlay, compile the tarball output
-and exercise its local APT/uplink behavior. The source-owned pinned controller
-chart was rendered with its NICo overlay and the data-volume override:
-no profiles image is rendered. This proves chart compatibility, **not a fresh
-end-to-end deployment**. Earlier image-based demo results do not validate
-this changed data-artifact delivery path.
+[Factory tests](../pkg/nkd/factory/nke_laptop_profiles_test.go) authenticate the
+additive overlay, compile the tarball output and exercise modeled APT/uplink
+cases. [Consumer tests](../internal/nkedemo/site_test.go) check transport-index
+preservation and volume descriptions. The source-chart rendering test is
+opt-in and skipped without its chart input. These contracts do not establish
+live ORAS delivery, first boot or end-to-end deployment.
