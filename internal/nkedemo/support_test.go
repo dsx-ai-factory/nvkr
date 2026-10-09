@@ -188,6 +188,7 @@ func TestSupportHelperProcess(t *testing.T) {
 	switch mode {
 	case "oversized":
 		_, _ = os.Stdout.Write(bytes.Repeat([]byte("x"), diagnosticLimit+1024))
+		_, _ = fmt.Fprint(os.Stdout, "\n[done] after diagnostic limit\n")
 	case "linger":
 		time.Sleep(time.Minute)
 	case "orphan":

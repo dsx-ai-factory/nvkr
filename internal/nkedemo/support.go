@@ -67,24 +67,27 @@ type Runner struct {
 }
 
 type boundedDiagnostic struct {
-	mu        sync.Mutex
-	writer    io.Writer
-	buffer    bytes.Buffer
-	remaining int
-	overflow  bool
-	err       error
-	capture   bool
+	mu           sync.Mutex
+	writer       io.Writer
+	buffer       bytes.Buffer
+	remaining    int
+	overflow     bool
+	err          error
+	capture      bool
+	publicStream bool
 }
 
 func (w *boundedDiagnostic) Write(raw []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	n := len(raw)
-	if len(raw) > w.remaining {
-		raw = raw[:w.remaining]
-		w.overflow = true
+	if !w.publicStream {
+		if len(raw) > w.remaining {
+			raw = raw[:w.remaining]
+			w.overflow = true
+		}
+		w.remaining -= len(raw)
 	}
-	w.remaining -= len(raw)
 	if w.capture {
 		_, _ = w.buffer.Write(raw)
 	}
@@ -359,7 +362,10 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 			sink = io.MultiWriter(sink, r.output)
 		}
 	}
-	p.stdout = &boundedDiagnostic{writer: sink, remaining: diagnosticLimit, capture: capture}
+	// The uncaptured public build stream owns its retention at the presenter.
+	// Private command logs and captured diagnostics retain their failure bound.
+	p.stdout = &boundedDiagnostic{writer: sink, remaining: diagnosticLimit, capture: capture,
+		publicStream: r.output != nil && r.Work == "" && !capture}
 	p.stderr = p.stdout
 	if capture {
 		p.stderr = &boundedDiagnostic{writer: sink, remaining: diagnosticLimit}

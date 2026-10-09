@@ -5,6 +5,9 @@ package nkedemo
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -78,6 +81,62 @@ func TestBuildInvokesOneCombinedRun(t *testing.T) {
 			}
 			if string(calls) != "fresh:4:all:\n" {
 				t.Fatalf("calls=%q, want one combined Run with no previous bootstrap", calls)
+			}
+		})
+	}
+}
+
+func TestBuildPublicStreamBeyondDiagnosticBound(t *testing.T) {
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"public stream", "capture", "private log", "output error"} {
+		t.Run(mode, func(t *testing.T) {
+			var output bytes.Buffer
+			runner := Runner{Env: []string{"NKD_SUPPORT_HELPER=oversized"}, output: &output}
+			failure := errors.New("stream write failed")
+			if mode == "private log" {
+				runner.Work = privateTestDir(t)
+			}
+			if mode == "output error" {
+				reader, writer := io.Pipe()
+				if err := reader.CloseWithError(failure); err != nil {
+					t.Fatal(err)
+				}
+				defer writer.Close()
+				runner.output = writer
+			}
+			args := []string{program, "-test.run=TestSupportHelperProcess"}
+			var captured []byte
+			var err error
+			if mode == "capture" {
+				captured, err = runner.Capture(t.Context(), args, "large", 10*time.Second)
+			} else {
+				err = runner.Run(t.Context(), args, "large", 10*time.Second)
+			}
+			if errors.Is(err, ErrUnjoined) || errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("output did not drain and join: %v", err)
+			}
+			if mode == "public stream" {
+				const marker = "\n[done] after diagnostic limit\n"
+				if err != nil || output.Len() != diagnosticLimit+1024+len(marker) || !bytes.HasSuffix(output.Bytes(), []byte(marker)) {
+					t.Fatalf("full public stream lost: bytes=%d error=%v", output.Len(), err)
+				}
+			} else if err == nil {
+				t.Fatal("diagnostic bound or output failure was ignored")
+			}
+			if mode == "capture" && (len(captured) != diagnosticLimit || output.Len() != diagnosticLimit) {
+				t.Fatal("public output opt-in bypassed capture bounds")
+			}
+			if mode == "private log" {
+				info, err := os.Stat(filepath.Join(runner.Work, "large.log"))
+				if err != nil || info.Size() != diagnosticLimit || output.Len() != diagnosticLimit {
+					t.Fatalf("private log bounds changed: %v", err)
+				}
+			}
+			if mode == "output error" && !errors.Is(err, failure) {
+				t.Fatalf("output failure was lost: %v", err)
 			}
 		})
 	}
