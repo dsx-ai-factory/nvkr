@@ -119,6 +119,7 @@ type NetworkGuard struct {
 	persistenceFailures                        []error
 	// Test seams are private. Production always uses the source-owned boundary.
 	capture                func(context.Context, []string, bool) ([]byte, error)
+	stageObservationHook   func(context.Context) (networkFileID, error)
 	checkpointHook         func() error
 	stopDNSHook            func(context.Context) error
 	helperPath, policyPath string
@@ -451,7 +452,11 @@ func (g *NetworkGuard) checkpoint(ctx context.Context) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	raw, err := canonical.Marshal(g.snapshot())
+	state := g.snapshot()
+	if err := validateNetworkState(state, g.Work); err != nil {
+		return err
+	}
+	raw, err := canonical.Marshal(state)
 	if err != nil {
 		return err
 	}
@@ -619,11 +624,11 @@ func (g *NetworkGuard) Start(ctx context.Context) error {
 	if _, err = g.Command(ctx, []string{"chmod", "0644", stage}, true); err != nil {
 		return err
 	}
-	binding, err = g.stageBinding(ctx)
+	policyBinding, err := g.stageBinding(ctx)
 	if err != nil {
 		return err
 	}
-	g.policyID = &binding
+	g.policyID = &policyBinding
 	if err = g.checkpoint(ctx); err != nil {
 		return err
 	}
@@ -869,6 +874,9 @@ func (g *NetworkGuard) withdrawRule(ctx context.Context, row networkRule) error 
 }
 
 func (g *NetworkGuard) stageBinding(ctx context.Context) (networkFileID, error) {
+	if g.stageObservationHook != nil {
+		return g.stageObservationHook(ctx)
+	}
 	path := g.staging.Path
 	var st unix.Stat_t
 	err := unix.Lstat(path, &st)

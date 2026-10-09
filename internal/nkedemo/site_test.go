@@ -4,16 +4,104 @@
 package nkedemo
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
+
+func TestProfilesTransportPreservesOriginalBundleIndex(t *testing.T) {
+	for _, scenario := range []string{"exact", "foreign-manifest", "corrupt-blob"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			payload := filepath.Join(root, "profiles")
+			if err := os.WriteFile(payload, []byte("profiles data"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			original, imported := filepath.Join(root, "original"), filepath.Join(root, "imported")
+			result, err := delivery.BuildBinaryBundle(t.Context(), original, delivery.BinaryBundleRequest{
+				OS: "linux", Arch: "arm64", Purpose: "controller-profiles",
+				Files: []delivery.BinaryFileInput{{Name: "profiles", Path: payload, InstallPath: "/profiles", Mode: 0o644}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.CopyFS(imported, os.DirFS(original)); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(filepath.Join(original, "index.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// ORAS creates a transport-only index without NKD bootstrap metadata.
+			var index struct {
+				SchemaVersion int    `json:"schemaVersion"`
+				MediaType     string `json:"mediaType"`
+				Manifests     []struct {
+					MediaType string `json:"mediaType"`
+					Digest    string `json:"digest"`
+					Size      int64  `json:"size"`
+				} `json:"manifests"`
+			}
+			if err := json.Unmarshal(raw, &index); err != nil {
+				t.Fatal(err)
+			}
+			digest := index.Manifests[0].Digest
+			if scenario == "foreign-manifest" {
+				index.Manifests[0].Digest = "sha256:" + strings.Repeat("a", 64)
+			}
+			generic, err := json.Marshal(index)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(imported, "index.json"), generic, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := delivery.InspectBinaryBundle(t.Context(), imported); err == nil {
+				t.Fatal("generic transport index unexpectedly passed the strict owner")
+			}
+			if scenario == "corrupt-blob" {
+				entries, err := os.ReadDir(filepath.Join(imported, "blobs/sha256"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(imported, "blobs/sha256", entries[0].Name()), []byte("corrupt"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = restoreBundleTransportIndex(t.Context(), original, imported, digest)
+			if scenario == "foreign-manifest" {
+				if err == nil {
+					t.Fatal("foreign manifest reached index restoration")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			restored, err := os.ReadFile(filepath.Join(imported, "index.json"))
+			if err != nil || !bytes.Equal(restored, raw) {
+				t.Fatal("original bootstrap bytes were not preserved exactly")
+			}
+			_, checked, err := delivery.InspectBinaryBundle(t.Context(), imported)
+			if scenario == "corrupt-blob" {
+				if err == nil {
+					t.Fatal("restored description concealed corrupt payload bytes")
+				}
+			} else if err != nil || checked.RootDigest != result.RootDigest || checked.SemanticDigest != result.SemanticDigest {
+				t.Fatalf("original bundle identity was not independently verified: %v", err)
+			}
+		})
+	}
+}
 
 func TestSiteEndpointAdmission(t *testing.T) {
 	for _, value := range []string{"http://172.18.0.1:18089", "http://127.0.0.1:18089", "http://0.0.0.0:18089", "https://172.18.0.1:18089", "http://172.18.0.1:18080", "http://user:password@172.18.0.1:18089", "http://172.18.0.1:18089/private", "http://example.com:18089", "http://8.8.8.8:18089", "http://172.18.0.1:18089?x=1", "http://[::1]:18089"} {
@@ -21,6 +109,100 @@ func TestSiteEndpointAdmission(t *testing.T) {
 			_, err := validateEndpoint(value)
 			if (err == nil) != (value == "http://172.18.0.1:18089") {
 				t.Fatalf("endpoint:%v", err)
+			}
+		})
+	}
+}
+
+func TestProfilesVolumeDisablesImageAndLimitsMount(t *testing.T) {
+	values := profilesVolumeValues()
+	profiles := values["profiles"].(map[string]any)
+	if profiles["path"] != "/profiles" || profiles["image"].(map[string]any)["enabled"] != false {
+		t.Fatal("data profiles must not enable the image materializer")
+	}
+	volumes := values["volumes"].([]any)
+	mounts := values["volumeMounts"].([]any)
+	if len(volumes) != 1 || len(mounts) != 1 {
+		t.Fatal("profiles require exactly one volume and mount")
+	}
+	host := volumes[0].(map[string]any)["hostPath"].(map[string]string)
+	mount := mounts[0].(map[string]any)
+	if host["path"] != "/var/nkd-local-profiles/profiles" || host["type"] != "Directory" ||
+		mount["mountPath"] != "/profiles" || mount["readOnly"] != true ||
+		mount["name"] != volumes[0].(map[string]any)["name"] {
+		t.Fatal("profiles must use the exact prepared read-only directory in the owned Kind node")
+	}
+}
+
+// Optional source-owned consumer check. Supply a chart exported from the exact
+// InstallerCommit; this check renders it but creates no Kubernetes resources.
+func TestProfilesVolumeSourceChart(t *testing.T) {
+	chart := os.Getenv("NKD_DEMO_PROFILE_CHART")
+	if chart == "" {
+		t.Skip("set NKD_DEMO_PROFILE_CHART to the pinned NKE controller chart")
+	}
+	raw, err := json.Marshal(profilesVolumeValues())
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "profiles.json")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	args := []string{"template", "controller", chart, "--namespace", "nke-controller"}
+	if overlay := os.Getenv("NKD_DEMO_PROFILE_OVERLAY"); overlay != "" {
+		args = append(args, "-f", overlay)
+	}
+	args = append(args, "-f", path)
+	// Stage 05 applies describe-site's generated values after release values.
+	// A real source-reader export can exercise that same precedence without
+	// deploying; the default probes the legacy field's repository/digest shape.
+	if generated := os.Getenv("NKD_DEMO_PROFILE_SITE_VALUES"); generated != "" {
+		args = append(args, "-f", generated)
+	} else {
+		args = append(args, "--set-string", "profiles.image.repository=example.invalid/profiles",
+			"--set-string", "profiles.image.digest=sha256:"+strings.Repeat("a", 64))
+	}
+	args = append(args, "--show-only", "templates/deployment.yaml")
+	command := exec.CommandContext(ctx, "helm", args...)
+	command.WaitDelay = time.Second
+	rendered, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("source-owned chart rejected profiles volume: %v\n%s", err, rendered)
+	}
+	value := string(rendered)
+	for _, required := range []string{"mountPath: /profiles", "readOnly: true", "path: /var/nkd-local-profiles/profiles", "type: Directory", "name: PROFILES_DIR"} {
+		if !strings.Contains(value, required) {
+			t.Fatalf("missing source-owned profile volume field %q", required)
+		}
+	}
+	if strings.Contains(value, "materialize-profiles") || strings.Contains(value, "cwe-profiles") {
+		t.Fatal("profiles data must not invoke a runnable profiles image")
+	}
+}
+
+func TestDeployedProfilesVolumeRejectsSubstitution(t *testing.T) {
+	for _, scenario := range []string{"exact", "image", "path", "writable", "missing-volume", "duplicate-mount"} {
+		t.Run(scenario, func(t *testing.T) {
+			var pod sitePod
+			pod.Spec.Volumes = []profileVolume{{Name: "local-profiles", HostPath: &struct{ Path, Type string }{"/var/nkd-local-profiles/profiles", "Directory"}}}
+			pod.Spec.Containers = []podContainer{{Name: "controller", VolumeMounts: []profileMount{{"local-profiles", "/profiles", true}}}}
+			switch scenario {
+			case "image":
+				pod.Spec.InitContainers = []podContainer{{Name: "materialize-profiles"}}
+			case "path":
+				pod.Spec.Volumes[0].HostPath.Path = "/var"
+			case "writable":
+				pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = false
+			case "missing-volume":
+				pod.Spec.Volumes = nil
+			case "duplicate-mount":
+				pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, pod.Spec.Containers[0].VolumeMounts[0])
+			}
+			if err := validateProfilesVolume(pod, "controller"); (err == nil) != (scenario == "exact") {
+				t.Fatalf("profiles volume acceptance: %v", err)
 			}
 		})
 	}
@@ -97,7 +279,7 @@ func TestRegistryCapacityIsMeasuredAndBounded(t *testing.T) {
 			case "oversized":
 				truncate(blob, registryBytes+1)
 			case "combined":
-				for _, key := range []string{"cwe", "profiles"} {
+				for _, key := range []string{"cwe", "provider"} {
 					truncate(filepath.Join(outputs[key].Layout, "blobs/sha256/large"), registryBytes/2)
 				}
 			case "symlink":

@@ -246,6 +246,115 @@ func TestNetworkCheckpointConcurrentSerialization(t *testing.T) {
 	}
 }
 
+func TestNetworkCheckpointRejectsInvalidSnapshotWithoutReplacingJournal(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		t.Run(fmt.Sprint(existing), func(t *testing.T) {
+			g := networkFixture(t)
+			path := filepath.Join(g.Work, networkJournal)
+			var before []byte
+			if existing {
+				if err := g.Checkpoint(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				var err error
+				before, err = os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			g.staging = &networkStaging{
+				Path:    filepath.Join(filepath.Dir(qemuPolicy), ".nkd-policy-"+strings.TrimPrefix(g.Owner, "nkd-demo-")),
+				Binding: &networkFileID{Device: 1, Inode: 3, Mode: 0o644},
+			}
+			if err := g.Checkpoint(t.Context()); err == nil || !strings.Contains(err.Error(), "unsupported root staging binding") {
+				t.Fatalf("invalid snapshot result=%v", err)
+			}
+			after, err := os.ReadFile(path)
+			if existing {
+				if err != nil || string(after) != string(before) {
+					t.Fatal("invalid snapshot replaced valid journal", err)
+				}
+			} else if !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("invalid snapshot created journal", err)
+			}
+			entries, err := os.ReadDir(g.Work)
+			want := 0
+			if existing {
+				want = 1
+			}
+			if err != nil || len(entries) != want {
+				t.Fatal("invalid snapshot left temporary files", entries, err)
+			}
+		})
+	}
+}
+
+func TestNetworkStartPreservesStagingIdentityThroughPolicyModeTransition(t *testing.T) {
+	for _, boundary := range []string{"after-chmod", "before-rename"} {
+		t.Run(boundary, func(t *testing.T) {
+			g := networkFixture(t)
+			stage := filepath.Join(filepath.Dir(qemuPolicy), ".nkd-policy-"+strings.TrimPrefix(g.Owner, "nkd-demo-"))
+			for _, path := range []string{qemuPolicy, stage} {
+				if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+					t.Skipf("fixture refuses existing or uninspectable host control %s: %v", path, err)
+				}
+			}
+			stop := errors.New("intentional stop before host publication")
+			modeChanged, renamed := false, false
+			observations := 0
+			g.stageObservationHook = func(context.Context) (networkFileID, error) {
+				observations++
+				id := networkFileID{Device: 1, Inode: 3, Mode: 0o600}
+				if modeChanged {
+					if boundary == "after-chmod" {
+						return networkFileID{}, stop
+					}
+					id.Mode = 0o644
+				}
+				return id, nil
+			}
+			g.capture = func(_ context.Context, args []string, _ bool) ([]byte, error) {
+				switch args[0] {
+				case "ip":
+					if slices.Equal(args, []string{"ip", "-d", "-j", "link", "show"}) {
+						return []byte(fmt.Sprintf(`[{"ifname":%q,"ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, BridgeName, g.BridgeMAC)), nil
+					}
+				case "chmod":
+					if !slices.Equal(args, []string{"chmod", "0644", stage}) {
+						t.Fatalf("unexpected protected mode change: %v", args)
+					}
+					state, err := readNetworkState(g.Work)
+					if err != nil || state.Staging == nil || state.Staging.Binding == nil || state.Staging.Binding.Mode != 0o600 {
+						t.Fatal("mode transition lacks valid staging checkpoint", err)
+					}
+					modeChanged = true
+				case "mv":
+					renamed = true
+					return nil, stop
+				}
+				return nil, nil
+			}
+			if err := g.Start(t.Context()); !errors.Is(err, stop) {
+				t.Fatalf("Start did not reach selected publication boundary: %v", err)
+			}
+			state, err := readNetworkState(g.Work)
+			if err != nil || state.Staging == nil || state.Staging.Binding == nil || state.Staging.Binding.Mode != 0o600 {
+				t.Fatal("staging identity was corrupted by policy mode transition", err)
+			}
+			if !modeChanged || observations != 2 || renamed != (boundary == "before-rename") {
+				t.Fatalf("transition modeChanged=%v observations=%d renamed=%v", modeChanged, observations, renamed)
+			}
+			if boundary == "before-rename" {
+				if state.PolicyID == nil || state.PolicyID.Mode != 0o644 || state.PolicyID.Device != state.Staging.Binding.Device || state.PolicyID.Inode != state.Staging.Binding.Inode || g.policyID == g.staging.Binding {
+					t.Fatal("published-policy binding does not independently retain the same inode")
+				}
+			} else if state.PolicyID != nil {
+				t.Fatal("failed policy observation committed a publication binding")
+			}
+		})
+	}
+}
+
 func TestNetworkBridgeBindingContracts(t *testing.T) {
 	for _, name := range []string{"valid", "ambiguous-created", "absent", "foreign-mac", "foreign-kind", "foreign-index", "duplicate", "inventory-failed"} {
 		t.Run(name, func(t *testing.T) {

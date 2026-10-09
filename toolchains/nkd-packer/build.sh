@@ -98,8 +98,10 @@ jq -e '
   .qemuPlugin.source == "github.com/hashicorp/qemu" and
   .qemuPlugin.version == "1.1.6" and
   .qemuPlugin.license == "MPL-2.0" and
-  .go.version == "1.27.1" and
+  .go.version == "1.27.2" and
   .go.license == "BSD-3-Clause" and
+  .helm.version == "4.2.4" and .helm.license == "Apache-2.0" and
+  .oras.version == "1.3.3" and .oras.license == "Apache-2.0" and
   .crane.version == "0.21.9" and
   .crane.license == "Apache-2.0" and
   .nfpm.version == "2.47.0" and
@@ -107,7 +109,8 @@ jq -e '
   .publicationGates.packerBUSLRedistributionApproval == "not-recorded" and
   .publicationGates.vulnerabilityReviewApproval == "not-recorded" and
   ([.packer.archives, .packer.binaries, .qemuPlugin.archives, .qemuPlugin.binaries,
-    .go.archives, .crane.archives, .crane.binaries, .nfpm.archives, .nfpm.binaries] | all(
+    .go.archives, .crane.archives, .crane.binaries, .nfpm.archives, .nfpm.binaries,
+    .helm.archives, .helm.binaries, .oras.archives, .oras.binaries] | all(
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
   )) and
@@ -288,8 +291,17 @@ build_command+=(
   --build-arg "NFPM_ARCHIVE_SHA256=${nfpm_digest#sha256:}" \
   --build-arg "NFPM_BINARY_SHA256=${nfpm_binary_digest#sha256:}" \
   --file "${here}/Dockerfile" \
-  --tag "${tag}" \
-  "${here}")
+  --tag "${tag}")
+
+# Helm and ORAS are shared preparation/transport tools, not separate images.
+for tool in helm oras; do
+  prefix="$(printf '%s' "${tool}" | tr '[:lower:]' '[:upper:]')"
+  build_command+=(
+    --build-arg "${prefix}_VERSION=$(jq -r --arg tool "${tool}" '.[$tool].version' "${lock}")"
+    --build-arg "${prefix}_ARCHIVE_SHA256=$(jq -r --arg tool "${tool}" --arg arch "${arch}" '.[$tool].archives[$arch] | ltrimstr("sha256:")' "${lock}")"
+    --build-arg "${prefix}_BINARY_SHA256=$(jq -r --arg tool "${tool}" --arg arch "${arch}" '.[$tool].binaries[$arch] | ltrimstr("sha256:")' "${lock}")")
+done
+build_command+=("${here}")
 
 if [[ "${runtime##*/}" == docker ]]; then
   if "${build_command[@]}" >"${image_archive}"; then
@@ -403,6 +415,8 @@ fi
   command -v xorriso >/dev/null
   test "$(GOTOOLCHAIN=local go version)" = "go version go${EXPECTED_GO_VERSION} linux/'"${arch}"'"
   test "$(crane version)" = "0.21.9"
+  test "$(helm version --template "{{.Version}}")" = "v4.2.4"
+  oras version | grep -Eq "^Version:[[:space:]]+1.3.3$"
   nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.47.0$"
   dpkg-scanpackages --version >/dev/null
   7z i >/dev/null

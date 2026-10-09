@@ -32,6 +32,7 @@ const toolVersionsHash = "0a4a74197a07a862faf2d536d8565bf8cce3cbc50b72d50bc7c0a6
 const kindNodeImage = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const kindNodeID = "sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const socketMount = "  extraMounts:\n    - hostPath: /var/run/docker.sock\n      containerPath: /var/run/docker.sock\n"
+const sourceKindIPFamily = "  ipFamily: dual\n"
 
 var managementMembers = []string{"clusterctl", "helm", "kind", "kubectl", "oras"}
 
@@ -242,6 +243,18 @@ type managementAdmission struct {
 	toolsOutput                 SelectedOutput
 }
 
+// projectManagementConfig changes only this demo's private runtime copy after
+// exact source-byte admission. The tenant network is IPv4-only; requiring IPv6
+// from the shared Docker network would add an unrelated host prerequisite.
+func projectManagementConfig(source []byte) ([]byte, error) {
+	text := string(source)
+	if plainSHA(source) != kindConfigHash || strings.Count(text, socketMount) != 1 || strings.Count(text, sourceKindIPFamily) != 1 {
+		return nil, errors.New("source-owned Kind configuration differs from inspected interface")
+	}
+	text = strings.Replace(text, socketMount, "", 1)
+	return []byte(strings.Replace(text, sourceKindIPFamily, "  ipFamily: ipv4\n", 1)), nil
+}
+
 func admitManagement(ctx context.Context, cfg Config) (managementAdmission, error) {
 	var admitted managementAdmission
 	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
@@ -283,8 +296,9 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 	if err != nil {
 		return admitted, err
 	}
-	if plainSHA(config) != kindConfigHash || strings.Count(string(config), socketMount) != 1 {
-		return admitted, errors.New("source-owned Kind configuration differs from inspected interface")
+	config, err = projectManagementConfig(config)
+	if err != nil {
+		return admitted, err
 	}
 	observation, err := CompleteOutput(ctx, root, managementBundle, "executable")
 	if err != nil {
@@ -336,7 +350,7 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 	if plainSHA(source["make/tool-versions.mk"]) != toolVersionsHash {
 		return admitted, errors.New("NKE installer tool pins differ from inspected interface")
 	}
-	return managementAdmission{checkout: checkout, tool: tool, layout: layout, out: out, config: []byte(strings.Replace(string(config), socketMount, "", 1)), source: source, toolsOutput: SelectedOutput{Layout: layout, Observation: observation}}, nil
+	return managementAdmission{checkout: checkout, tool: tool, layout: layout, out: out, config: config, source: source, toolsOutput: SelectedOutput{Layout: layout, Observation: observation}}, nil
 }
 
 type dockerImage struct {

@@ -147,6 +147,10 @@ func DigestFile(ctx context.Context, filename string) (string, error) {
 // no links, devices, duplicate names, traversal or overwrites are accepted.
 // out is an existing private directory (usually a fresh attempt workspace).
 func SafeExtractAssets(ctx context.Context, archive, out string) error {
+	return safeExtractAssets(ctx, archive, out, []string{"internal/seed/default-seed.yaml", "ui/index.html"})
+}
+
+func safeExtractAssets(ctx context.Context, archive, out string, requiredMembers []string) error {
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
@@ -257,10 +261,10 @@ func SafeExtractAssets(ctx context.Context, archive, out string) error {
 	if err != nil || !securepath.SameMetadata(info, after) {
 		return errors.New("asset archive changed")
 	}
-	for _, required := range []string{"internal/seed/default-seed.yaml", "ui/index.html"} {
+	for _, required := range requiredMembers {
 		file, _, err := openRunFile(stage, filepath.FromSlash(required))
 		if err != nil {
-			return errors.New("assets missing source seed/UI interface")
+			return errors.New("assets missing required member: " + required)
 		}
 		_ = file.Close()
 	}

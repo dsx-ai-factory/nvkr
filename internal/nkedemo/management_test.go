@@ -38,6 +38,47 @@ func TestNativeEnvironmentExcludesForeignTargets(t *testing.T) {
 	}
 }
 
+func TestManagementConfigProjectionAdmitsExactSourceAndUsesIPv4(t *testing.T) {
+	source, err := os.ReadFile("testdata/pinned-kind.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plainSHA(source) != kindConfigHash {
+		t.Fatal("fixture differs from pinned NKE source")
+	}
+	before := string(source)
+	for _, name := range []string{"exact", "already-projected", "missing-family", "duplicate-family", "missing-socket", "changed-image", "trailing-content"} {
+		t.Run(name, func(t *testing.T) {
+			input := before
+			switch name {
+			case "already-projected":
+				input = strings.Replace(input, sourceKindIPFamily, "  ipFamily: ipv4\n", 1)
+			case "missing-family":
+				input = strings.Replace(input, sourceKindIPFamily, "", 1)
+			case "duplicate-family":
+				input = strings.Replace(input, sourceKindIPFamily, sourceKindIPFamily+sourceKindIPFamily, 1)
+			case "missing-socket":
+				input = strings.Replace(input, socketMount, "", 1)
+			case "changed-image":
+				input = strings.Replace(input, kindNodeImage, "kindest/node:latest", 1)
+			case "trailing-content":
+				input += "---\n"
+			}
+			projected, projectErr := projectManagementConfig([]byte(input))
+			if name != "exact" {
+				if projectErr == nil || projected != nil {
+					t.Fatal("changed source accepted or partial projection returned", projectErr)
+				}
+				return
+			}
+			want := strings.Replace(strings.Replace(before, socketMount, "", 1), sourceKindIPFamily, "  ipFamily: ipv4\n", 1)
+			if projectErr != nil || string(projected) != want || string(source) != before || !strings.Contains(string(projected), kindNodeImage) {
+				t.Fatal("projection changed anything except the two admitted runtime settings", projectErr)
+			}
+		})
+	}
+}
+
 func TestManagementRejectsUnsupportedHostBeforeOutput(t *testing.T) {
 	if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
 		t.Skip("unsupported-platform case does not apply")

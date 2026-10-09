@@ -1,14 +1,9 @@
 # Local NKE development on ARM64
 
-Start with the [first-time developer guide](../../docs/local-development.md).
-`nke-local-dev-arm64` names the development workflow and artifact architecture,
-not the host operating system. On Apple Silicon macOS, execution runs inside an
-explicitly selected Colima Linux VM; native Linux ARM64 is also supported. Every
-selected artifact targets `linux/arm64`, not Darwin.
-This example selects the ARM64 counterpart of the combined M2 artifact selection
-plus CAPNICo and the provisioned provider, without publication or signing. It is
-not a full source-built NKE distribution. See the
-[full-source gap map](../../docs/full-nke-source-build.md).
+For setup and the complete journey, use the
+[Ubuntu ARM64 build-and-demo guide](../../docs/local-nke-demo.md). These inputs
+target Linux ARM64; macOS supplies a Colima Linux VM, not Darwin artifacts.
+They do not publish, sign or build a complete source-only NKE distribution.
 
 | Selection | Definition | Outputs |
 | --- | --- | --- |
@@ -19,45 +14,16 @@ not a full source-built NKE distribution. See the
 | NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive, not included in the 23-output set |
 | Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart; not included in the 23-output set |
 | Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; separate from the acquired `operator-tools` in `all` |
-| Diagnostic controller profiles | `definition-profiles.json` | One plain ARM64/Ubuntu 26.04 profiles OCI image; separate from `all`, not fleet profiles or deployment proof |
+| Diagnostic controller profiles | `definition-profiles.json` | One OCI-carried tarball containing plain ARM64/Ubuntu 26.04 profile data; separate from `all`, not a runnable image or fleet profiles |
 
-Use `environment-local.json` for rootless Podman, or `environment-local-docker.json`
-with `CONTAINER_RUNTIME=docker` on native Linux ARM64, including execution inside
-an explicitly selected `COLIMA_PROFILE` on Apple Silicon. Neither publishes or signs.
-The OS selects TCG and the recorded local Packer subject through
-`os-tcg.json`. The CLI catalog adds an explicit ARM64 producer; its pin starts
-at the maintained CLI release and its stamps follow machine-managed pins.
-Its Go 1.27.2 compiler subject `golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c`
-deliberately differs from the `nke-v1` compiler subject
-`golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6`.
-The common build command does not imply identical release compiler or bytes.
-
-The launcher builds NKD with Go 1.27.2 from the Environment's digest-pinned
-utility image. `make build` checks that SDK against `.go-version`; the launcher
-does not download a second Go SDK. The local CLI and site CLI/controller also
-select Go 1.27.2 on Trixie; the five source-built installer tools select its
-native ARM64 Bookworm manifest. The site controller uses its source-owned
-`GOLANG_IMAGE` argument, without modifying NKE's Dockerfile. These producer
-changes require fresh Runs and do not relabel retained outputs or claim that
-existing Packer/inspection images were rebuilt with Go 1.27.2.
-
-The combined, components and OS selections reuse catalogs under `definitions/nke-m2`.
-In particular, `os-tcg.json` binds its override to that OS catalog's exact
-`requiresCatalogDigest`. An M2 catalog repin can therefore invalidate this local
-example. Review the changed source/material/toolchain contract before updating
-that binding; do not bypass it. Default tests check exact provider membership
-and compile the actual CAPNICo catalog and OS selection without remote Git.
-`NKD_TEST_EXTENDED=1 go test ./pkg/nkd/lifecycle -run '^TestLaptopARM64CatalogCompilation$' -count=1`
-compiles the complete, unmodified two-provider and 22/23-output catalogs. Those
-integration tests require authenticated NKE Git access or an exact local Git
-mirror: the shared controller catalog validates its derived chart pin set against
-the locked NKE tree even when only its provider is selected. No source build or
-chart download runs during compilation, but compilation is not network-free
-without that mirror. It is not a runtime build or acceptance run.
-The operator catalog pins native ARM64 Helm and kubectl assets.
-The CAPNICo catalog builds the public v0.0.45 Git source using its source-owned
-Dockerfile; the provisioned provider reuses the maintained controller catalog's
-existing source producer. Neither provider is replaced with an acquired image.
+Use `environment-local.json` with rootless Podman, or
+`environment-local-docker.json` with native Linux Docker. The OS uses TCG.
+The full demo shares its first OS lane's NKD/demo executables and measured
+Packer/Go/GCC toolchain across subsequent lanes; that image also includes
+digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
+Each lane still creates its own immutable Run and authenticates its catalog
+overlay against the exact predecessor digest. `os-tcg.json` depends on the M2
+OS catalog's digest: repinning that catalog requires reviewing this binding.
 
 ```sh
 bin/nkdctl definition validate --definition definitions/nke-local-dev-arm64/definition.json
@@ -73,77 +39,29 @@ NKE_LOCAL_CLONE=/absolute/path/to/nke \
 bash scripts/nke-full-arm64-local.sh --check providers
 CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh docker-providers-01 1 providers
 
-# Build the missing simulator tools separately; this does not deploy a demo.
+# Build simulator tools separately; this does not deploy a demo.
 NKE_LOCAL_CLONE=/absolute/path/to/nke \
   bash scripts/nke-full-arm64-local.sh arm64-simulator-01 1 simulator
 ```
 
-Use a fresh attempt for execution. `NKE_LOCAL_CLONE` supplies pinned Git objects,
-not dirty checkout bytes; omit it for canonical remote fetch. See the guide for
-commit-based development, clean-machine installation, exact outputs and resource
-checks. Fresh toolchains freeze native-validated IDs in attempt-scoped overlays,
-not under an older maintained ID. Docker Desktop on macOS is not admitted here.
-Historical Runs do not prove the new bootstrap paths; preflight/dry-run do not
-prove full-set success.
+Use a fresh attempt name. `NKE_LOCAL_CLONE` supplies pinned Git objects, not
+uncommitted checkout bytes; omit it for canonical remote fetch. Compilation can
+require authenticated Git access because NKE chart pin sets are checked against
+the pinned tree. Dry-run/preflight are not runtime acceptance.
 
-The simulator catalog pins NKE by exact commit and starts from the recorded
-host-local Go/GCC image ID. The launcher supports Podman and native ARM64 Docker,
-building and natively probing pinned toolchain sources when required. It binds
-the measured image ID to exactly the selected simulator producers through an
-attempt overlay. `--check simulator` requires no cached toolchain and does no
-producer work; Docker bootstrap requires Buildx. Require a completed Run and
-artifact-only startup checks; neither establishes VM provisioning.
-Module downloads and verification precede offline CGO compilation;
-the server invokes NKE's `build-static` target. These Linux tools do not run directly
-on macOS. The additional `nico-sim-runtime-assets` producer packages the pinned
-diagnostic seed, UI and vendor notices in a tar+gzip archive, using deterministic
-metadata. The producer writes `nicosim-runtime-assets.tar.gz`; the final bundle
-member and verified extraction use `nico-sim-runtime-assets`, the component name.
-Treat that member as archive data, not an executable/install target.
-Its three-component Plan is contract-tested. No private simulator-build or startup
-acceptance outcome is recorded here. A mock-runtime probe is not acceptance of
-the QCOW2-to-tenant handoff, profiles or deploy-only adapter. This build is not a
-complete Colima/NICoSim demo.
+The site catalog pins CLI, controller and charts to one exact NKE candidate;
+chart dependencies are acquired at exact archive digests before offline packaging,
+not independently source-built or upstream-signature-verified. The tools catalog
+compiles the installer's five Linux binaries from pinned Git. The separate older
+acquired `operator-tools` selection is unchanged.
 
-The separate `site` lane pins four producers to NKE PR #1160's exact candidate
-commit `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`, rather than combining older
-controller and CLI release pins. It uses the source-owned CLI Make build and
-controller Dockerfile, preserves chart versions `0.0.0` and `0.1.0-rc.2`, and binds
-the controller chart to the produced image. Its local Helm wrapper registers
-NKTP's three repositories before fetching locked chart dependencies and verifies
-the three exact archive SHA-256 pins before offline packaging. A missing,
-additional or republished same-version archive fails preparation. Those
-dependency archives are not independent source builds
-or upstream-signature-verified inputs.
+Profiles contain configuration and runbooks, packaged deterministically as data.
+NKD retains their OCI-carried bundle with the completed Run; the consumer uses
+ORAS and verified extraction to supply files to NKE's profiles volume. No
+profiles Dockerfile, BuildKit producer or runtime init image is needed. The
+diagnostic OS profile remains separate from production fleet profiles and does
+not authenticate the selected disk or establish tenant compatibility.
 
-```sh
-CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
-  bash scripts/nke-full-arm64-local.sh --check site
-CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
-  NKE_LOCAL_CLONE=/absolute/path/to/nke \
-  bash scripts/nke-full-arm64-local.sh arm64-site-01 1 site
-```
-
-Docker/Podman compiler contracts cover the selected inputs. Require a complete
-four-output Run, native controller help and unchanged chart handoff/rendering
-before attempting deployment. These checks do not install NKE. The wrapper uses the existing
-pinned Helm 4.3.0, not the installer's preferred 4.2.4. Its readiness script warns
-on this mismatch; a warning is not a matched pin. Read the
-[handoff gaps](../../docs/nkd-to-nke-demo.md) before treating these inputs as a
-working deployment. Do not run another large build alongside the OS bake.
-
-The separate `tools` selection compiles Helm 4.2.4, kubectl 1.36.0, clusterctl
-1.12.3, ORAS 1.3.3 and Kind 0.32.0 from their machine-pinned upstream Git trees.
-It reuses PR #113's preparation/offline-build approach and does not change the
-older acquired `operator-tools` output or the OS graph. See the
-[source-tool instructions and limits](../../docs/local-development.md#build-the-installer-tools-from-source).
-Compiler and preflight contracts do not prove a real tools build or installer
-integration. Require a completed Run, verified extraction and all five native
-version probes. These are Linux binaries, not Mac binaries.
-
-The separate `profiles` lane packages pinned NKE VM config profiles/runbooks
-and a diagnostic ARM64/Ubuntu 26.04 plain OS profile. Require a completed Run and
-offline content/NKE-owned template checks; those are not provisioning or tenant acceptance.
-See the [profiles guide](../../docs/local-controller-profiles.md) before using
-its local endpoint and TPM configuration; it does not authenticate a disk or
-replace production fleet profiles.
+See [reconciliation](../../docs/adr/reconciliation.md) for the exact recorded
+results. The reduced shared-toolchain/profile-data flow still needs a fresh
+end-to-end run; older retained-artifact success does not validate these changes.

@@ -55,11 +55,9 @@ func executeRoot(ctx context.Context, root *cobra.Command, args []string) error 
 }
 func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command {
 	var config string
-	var progress string
 	root := &cobra.Command{
 		Use: "nke-demo", Short: "Build and deploy a trusted local ARM64 NKE diagnostic",
 		SilenceUsage: true, SilenceErrors: true, Args: cobra.NoArgs,
-		PersistentPreRunE: func(*cobra.Command, []string) error { return validateProgress(progress) },
 		RunE: func(*cobra.Command, []string) error {
 			return nkderr.New(nkderr.CodeUsage, "select e2e, run, build, restore or completion; use --help")
 		},
@@ -67,7 +65,6 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 	root.SetOut(out)
 	root.SetErr(diagnostics)
 	root.PersistentFlags().StringVar(&config, "config", "", "explicit version-1 local-demo YAML file (changed flags override it)")
-	root.PersistentFlags().StringVar(&progress, "progress", "auto", "progress presentation: auto, plain or tui (interactive terminals only)")
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
 	root.InitDefaultCompletionCmd()
 	for _, command := range root.Commands() {
@@ -96,8 +93,8 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			return runProgress(cmd.Context(), progressMode(cmd), out, "run", func(ctx context.Context, writer io.Writer) error {
-				cfg.Progress = writer
+			return runProgress(cmd.Context(), out, func(ctx context.Context, progress io.Writer) error {
+				cfg.Progress = progress
 				return actions.run(ctx, cfg)
 			})
 		},
@@ -118,13 +115,13 @@ func newBuildCommand(out io.Writer, actions demoActions, config *string) *cobra.
 			if err != nil {
 				return err
 			}
-			return runProgress(cmd.Context(), progressMode(cmd), out, "build", func(ctx context.Context, writer io.Writer) error {
-				cfg.Progress = writer
+			return runProgress(cmd.Context(), out, func(ctx context.Context, progress io.Writer) error {
+				cfg.Progress = progress
 				built, err := actions.build(ctx, cfg)
 				if err != nil {
 					return err
 				}
-				_, err = fmt.Fprintf(writer, "Artifact builds complete; nkdctl: %s\nDeployment is separate: nke-demo run --help\n", built.NKDCTL)
+				_, err = fmt.Fprintf(progress, "Artifact builds complete; nkdctl: %s\nDeployment is separate: nke-demo run --help\n", built.NKDCTL)
 				return err
 			})
 		},
@@ -147,11 +144,11 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 			}
 			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Minute)
 			defer cancel()
-			return runProgress(budget, progressMode(cmd), out, "restore", func(ctx context.Context, writer io.Writer) error {
-				if err := actions.restore(ctx, work, writer); err != nil {
+			return runProgress(budget, out, func(ctx context.Context, progress io.Writer) error {
+				if err := actions.restore(ctx, work, progress); err != nil {
 					return err
 				}
-				_, err := fmt.Fprintln(writer, "PASS: recorded local network controls restored; no tenant, VM or management deletion was attempted.")
+				_, err := fmt.Fprintln(progress, "PASS: recorded local network controls restored; no tenant, VM or management deletion was attempted.")
 				return err
 			})
 		},
@@ -177,13 +174,14 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			}
 			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Hour)
 			defer cancel()
-			return runProgress(budget, progressMode(cmd), out, "e2e", func(ctx context.Context, writer io.Writer) error {
-				build.Progress, run.Progress = writer, writer
+			return runProgress(budget, out, func(ctx context.Context, progress io.Writer) error {
+				build.Progress, run.Progress = progress, progress
 				built, err := actions.build(ctx, build)
 				if err != nil {
 					return err
 				}
-				run.NKDCTL, run.Runs = built.NKDCTL, built.Runs
+				run.NKDCTL = built.NKDCTL
+				run.Runs = built.Runs
 				return actions.run(ctx, run)
 			})
 		},
@@ -191,9 +189,6 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 	addBuildFlags(command, &flags.Build)
 	addRunFlags(command, &flags.Run, false)
 	return command
-}
-func progressMode(command *cobra.Command) string {
-	return command.Flag("progress").Value.String()
 }
 func addBuildFlags(command *cobra.Command, cfg *nkedemo.BuildFile) {
 	flags := command.Flags()

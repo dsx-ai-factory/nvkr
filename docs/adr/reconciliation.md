@@ -205,12 +205,50 @@ this descriptive file grants no NKD execution or Release authority. The cold
 Go replay of commit `b3d97b3` stopped during Packer toolchain construction because
 Canonical's exact pinned APT snapshot endpoint returned HTTP 503 on both the Mac
 and Colima host. It produced no new QCOW2 and supplies no E2E acceptance.
-The downstream CLI optionally presents real lane/phase events and a bounded,
-terminal-control-sanitized public build console; private deployment diagnostics
-are not forwarded. Pipes and unsupported terminals retain plain output. The
-TUI admits an independently opened nonblocking terminal and retains work/cleanup
-ownership through cancellation. Presentation events grant no artifact, Release
-or qualification authority; terminal contract tests do not establish fresh E2E.
+The separate `clean-go-02` retry completed all six lanes and retained a new
+plain ARM64 QCOW2, but its initial deployment failed at a journal-staging
+pointer alias. The corrected consumer preserves independent mode-0600 staging
+and mode-0644 policy identities and validates new snapshots before writing.
+It also projects the exact admitted NKE Kind configuration into a private
+IPv4-only runtime copy, matching this demo's IPv4 tenant/network contract;
+NKE source bytes, selected node image and feature gates remain unchanged.
+The subsequent private Go replay completed on October 9, 2026: two Ready ARM64
+Kubernetes 1.34.2 QCOW2 nodes, workload/DNS success, exact backing-disk bindings
+and owned cleanup, followed by process exit zero. Independent read-back matched
+the 2,835,153,408-byte disk to
+`sha256:361c1bc513509e748079e25b7b9ec596ac0085ec6d5c0305ded9b9b2e3946373`,
+found no remaining owned domains, management containers, registry or anonymous
+volume, and confirmed the finished restoration journal and absent demo bridge.
+This replay consumed the six newly completed `clean-go-02` Runs from `b3d97b3`
+using the `1856b5b` Go consumer with local journal/IPv4 fixes. It does not turn
+the failed original Go E2E test into a passing one-shot build/deploy run or grant
+Release/qualification authority; the corrective changes still need publication
+to the PR branch.
+The downstream CLI presents observed lane/phase events and streams public build
+output as plain text; private deployment diagnostics are not forwarded. The
+custom TUI/PTY framework and its four direct Charmbracelet dependencies have
+been removed. Output failure still cancels work without bypassing owned-process
+joins or cleanup. Presentation events grant no artifact, Release or qualification
+authority; CLI contract tests do not establish fresh E2E.
+The six-lane flow reuses its first lane's bootstrap executables and measured
+toolchain image, while keeping separate immutable Runs and per-lane Plan admission.
+The shared toolchain now pins Go 1.27.2, Helm 4.2.4 and ORAS 1.3.3. Its October 9
+native ARM64 Docker assembly and executable probes passed in Colima, yielding
+diagnostic image `sha256:eee81eb826bbc62e3dc3c1b72bfee6720d165d8f03dcd2b06b24976c463dfde2`.
+This is not a published pin, repeat-build proof or fresh OS/E2E acceptance.
+Profiles now use the existing executable-format OCI bundle to carry a deterministic
+data archive; ORAS transports it and `nkdctl` authenticates its extraction. The
+controller reads a validated directory inside the owned Kind node through a
+read-only volume, without a profiles-image materializer. The source overlay only
+adds local profile data; its offline first-boot and uplink naming behavior remains
+explicitly local. The pinned NKE installer still requires the unused legacy
+`images.profiles` field. Actual source-rendered values and Helm precedence passed,
+but earlier image-based Runs do not establish this changed consumer's E2E acceptance.
+The pinned NKE `bootstrap site` command uses nerdctl and pre-provisioned hosts,
+not the demo's persistent Docker/Kind and NICoSim substrate. The demo still calls
+NKE's source-owned deployment stages. Replacing that adapter with bootstrap needs
+an NKE-owned interface for Docker/NICo and exact locally built input selection;
+the existing command is not a demonstrated drop-in replacement.
 Network-only crash recovery now uses a private synced intent journal and the
 same kernel-released lock. Exact executable/file/bridge bindings gate restoration;
 recovery never kills journal PIDs. Contract negatives cover changed journals,

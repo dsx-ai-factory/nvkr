@@ -3,14 +3,14 @@
   "kind": "Definition",
   "metadata": {
     "name": "nke-local-profiles-arm64",
-    "description": "Diagnostic Ubuntu 26.04 plain ARM64 NICoSim profiles image. No fleet, image compatibility, deployment or qualification claim."
+    "description": "Diagnostic Ubuntu 26.04 plain ARM64 NICoSim profile data in an OCI-carried tarball bundle. No runnable profiles image, fleet or qualification claim."
   },
   "catalog": {"base": "./profiles-catalog"},
   "outputs": [
     {
       "name": "controller-profiles",
       "components": ["nke-local-profiles"],
-      "format": "oci",
+      "format": "executable",
       "platform": "linux/arm64"
     }
   ]

@@ -1,85 +1,54 @@
-# Build the local controller profiles image
+# Local controller profile data
 
-The `profiles` lane builds the small ARM64 OCI image that NKE's controller
-uses for node configuration. It does not build the QCOW2 or start a cluster.
+Profiles are configuration, not a runnable container image. The `profiles`
+lane selects `controller-profiles`: an ordinary NKD OCI bundle containing
+the deterministic `nke-local-profiles` tarball. It needs neither a profiles
+Dockerfile nor BuildKit. ORAS is supplied by the shared toolchain.
+
 For the complete build-and-deploy sequence, follow the
-[local demo guide](local-nke-demo.md).
-
-## Build just this artifact
-
-Inside Colima, from the native source export prepared in
-[execution-host setup in the local demo guide](local-nke-demo.md#1-choose-your-linux-execution-host):
+[local demo guide](local-nke-demo.md). To build this output alone on Linux ARM64:
 
 ```sh
-CONTAINER_RUNTIME=docker \
-  bash scripts/nke-full-arm64-local.sh --check profiles
-CONTAINER_RUNTIME=docker \
-  bash scripts/nke-full-arm64-local.sh my-profiles-01 1 profiles
+CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh --check profiles
+CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh my-profiles-01 1 profiles
 ```
 
-Use a fresh attempt name. Native Linux ARM64 uses the same commands.
-The Mac shared mount failed source-snapshot copying during the fresh profile
-build; use native ext4 storage as the full demo guide specifies.
-If remote Git access is unavailable inside Colima, supply
-`NKE_LOCAL_CLONE=/absolute/path/to/nke`; only the pinned committed objects are used.
+Use a fresh attempt name. As with the other lanes, NKD owns source admission,
+artifact observation and OCI bundle packaging; direct `oras push` does not
+replace those checks.
 
-## What is built
+## Content and delivery
 
-The [Definition](../definitions/nke-local-dev-arm64/definition-profiles.json)
-selects one output, `controller-profiles`.
-Its [catalog](../definitions/nke-local-dev-arm64/profiles-catalog/registry.yaml)
-now has a short source-owned build command, not an embedded template generator:
+The [catalog](../definitions/nke-local-dev-arm64/profiles-catalog/registry.yaml)
+selects pinned NKE config profiles and runbooks. Its authenticated
+[local data overlay](../definitions/nke-local-dev-arm64/profiles-catalog/patches/local-profile.patch)
+**only adds** a plain Ubuntu 26.04 ARM64 profile: cloud-init, metadata and iPXE
+configuration. It changes no upstream NKE file and adds no build script.
 
-```yaml
-patches:
-  - name: patches/local-profile.patch
-    sha256: sha256:4a36de3fe026f3e8b1841c49ef4590dcc5fa65c1f4d463769c32d84b05455171
-buildCommand: [sh, controller/test/fixtures/nkd-local/build.sh, '{{.Arch}}']
-```
+The demo transfers the exact OCI bundle through ORAS, reads back its digest,
+and uses `nkdctl publish root` / `publish extract` to verify and extract it.
+ORAS rewrites the local index wrapper, so the importer retains the original
+bounded bootstrap index bytes after matching the observed manifest. NKD then
+independently verifies the imported blob closure and semantic binding.
+The existing bounded archive reader validates the profile data before copying
+it into the owned Kind node. The node archive is rehashed before extraction.
 
-NKD verifies the [patch](../definitions/nke-local-dev-arm64/profiles-catalog/patches/local-profile.patch)
-before applying it to a private source snapshot. The patch and prepared source
-enter build identity. The developer's NKE checkout is not modified.
-The [source lock](../definitions/nke-local-dev-arm64/profiles-catalog/pins.lock.yaml)
-still selects `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`, the site/installer
-candidate, not an approved release.
+NKE's controller chart reads the prepared directory through `profiles.path`
+and a read-only volume. `profiles.image.enabled=false`, so there is no
+profiles-image initContainer. The pinned installer still requires an
+`images.profiles` reference: the actual data bundle reference satisfies that
+legacy configuration field, but is **not** run as an image.
 
-The reviewed patch makes the local differences explicit:
+## Explicit NKE gaps and validation
 
-- Freeze the Alpine base image by digest.
-- Retain the source's two VM config profiles and nine runbooks unchanged.
-- Supply one plain Ubuntu 26.04 ARM64 profile and its local QCOW2 URL.
-- Remove the fixture's HTTP agent override and disable first-boot package refresh.
-- Install from the baked file-based APT repository only; missing packages stop boot setup.
-- Preserve the single observed physical uplink across the worker's reboot.
+The local cloud-init profile retains local-only APT installation and uplink
+naming across reboot; these are declared local profile behavior, not fixes to
+upstream NKE. A first-class data-profile installer input and general offline
+first-boot/network behavior remain NKE-owned integration gaps.
 
-The private build context is written only under `bin`. BuildKit exports
-`bin/nke-local-profiles-arm64.oci.tar`; Dockerfile steps use network mode
-`none`. This is diagnostic execution, not qualified or completely hermetic
-production.
-
-## How NKE consumes it
-
-The controller chart copies `/profiles` from this image into its profiles volume.
-The deploy-only consumer imports the exact completed Run output and supplies
-its image reference as `images.profiles`. It does not edit or rebuild the image.
-
-The local profile points to
-`http://172.30.0.1:18080/nke-node-image-arm64.qcow2`.
-The consumer serves the held QCOW2 there, verifies its bytes and binds each real
-guest to that backing disk. The EFI URL is only NICoSim's parser placeholder;
-no bare-metal EFI artifact or FDE support is supplied.
-
-## Validation limits
-
-Tests apply the actual authenticated patch using Git. They cover local-only APT,
-install-error propagation, both admitted uplink names, idempotence, foreign paths
-and tampered patch rejection. NKE's own metadata/template helpers validate the
-produced content through
-[the downstream contract test](../scripts/testdata/nke-local-profile/contract_test.go).
-
-The retained Colima demo passed the real tenant/workload and worker-reboot checks.
-The simplified producer retains identical Dockerfile, cloud-init, iPXE and
-metadata bytes. That content comparison is not a fresh end-to-end acceptance run.
-Full-source OS integration, the missing DSX material and full OS smoke remain
-[separate gaps](full-nke-source-build.md).
+Factory tests authenticate the additive overlay, compile the tarball output
+and exercise its local APT/uplink behavior. The source-owned pinned controller
+chart was rendered with its NICo overlay and the data-volume override:
+no profiles image is rendered. This proves chart compatibility, **not a fresh
+end-to-end deployment**. Earlier image-based demo results do not validate
+this changed data-artifact delivery path.

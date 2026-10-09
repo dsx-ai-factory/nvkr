@@ -46,6 +46,16 @@ type SiteMaterials struct {
 }
 type SiteConnection struct{ Token, Endpoint, Org string }
 
+// Profiles use the source-owned chart's existing directory interface. The path
+// is inside the owned Kind container, not a mount of the workstation filesystem.
+func profilesVolumeValues() map[string]any {
+	return map[string]any{
+		"profiles":     map[string]any{"path": "/profiles", "image": map[string]any{"enabled": false}},
+		"volumes":      []any{map[string]any{"name": "local-profiles", "hostPath": map[string]string{"path": "/var/nkd-local-profiles/profiles", "type": "Directory"}}},
+		"volumeMounts": []any{map[string]any{"name": "local-profiles", "mountPath": "/profiles", "readOnly": true}},
+	}
+}
+
 func imageKeys() []string {
 	keys := []string{"cwe", "profiles", "provider"}
 	for _, name := range runtimeImages {
@@ -144,7 +154,7 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 		}
 		outputs[item] = selected
 	}
-	for _, item := range []struct{ key, root, name, kind string }{{"cwe", cfg.Runs.Site, "cwe", "oci"}, {"profiles", cfg.Runs.Profiles, "controller-profiles", "oci"}, {"provider", cfg.Runs.Providers, "capnico-controller-arm64", "oci"}, {"nkectl", cfg.Runs.Site, "nkectl", "executable"}} {
+	for _, item := range []struct{ key, root, name, kind string }{{"cwe", cfg.Runs.Site, "cwe", "oci"}, {"profiles", cfg.Runs.Profiles, "controller-profiles", "executable"}, {"provider", cfg.Runs.Providers, "capnico-controller-arm64", "oci"}, {"nkectl", cfg.Runs.Site, "nkectl", "executable"}} {
 		selected, readErr := selectSiteOutput(ctx, item.root, item.name, item.kind)
 		if readErr != nil {
 			return nil, readErr
@@ -418,6 +428,10 @@ func runtimeValues(host string, outputs map[string]SelectedOutput) map[string]an
 }
 
 func appendRuntimeValues(raw []byte) ([]byte, error) {
+	return appendValuesFile(raw, "nkd-image-inputs.json")
+}
+
+func appendValuesFile(raw []byte, filename string) ([]byte, error) {
 	lines := strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n")
 	start := -1
 	for i, line := range lines {
@@ -440,45 +454,52 @@ func appendRuntimeValues(raw []byte) ([]byte, error) {
 		}
 	}
 	result := slices.Clone(lines[:end])
-	result = append(result, "  - nkd-image-inputs.json")
+	result = append(result, "  - "+filename)
 	result = append(result, lines[end:]...)
 	return []byte(strings.Join(result, "\n") + "\n"), nil
+}
+
+func appendChartValues(ctx context.Context, capture chartCapture, reader, deploy, item, filename string, values any) error {
+	release := filepath.Join(deploy, item, "release.yaml")
+	before, err := releaseFields(ctx, capture, reader, release)
+	if err != nil {
+		return err
+	}
+	if before[7] == "" {
+		return errors.New("chart overrides require existing values")
+	}
+	raw, err := boundedRegularRead(release, diagnosticLimit)
+	if err != nil {
+		return err
+	}
+	projected, err := appendValuesFile(raw, filename)
+	if err != nil {
+		return err
+	}
+	if err = privateJSON(filepath.Join(filepath.Dir(release), filename), values); err != nil {
+		return err
+	}
+	if err = privateReplace(release, projected); err != nil {
+		return err
+	}
+	expected := slices.Clone(before)
+	expected[7] += "," + filename
+	after, err := releaseFields(ctx, capture, reader, release)
+	if err != nil {
+		return err
+	}
+	if !slices.Equal(after, expected) {
+		return errors.New("chart override changed other deploy semantics")
+	}
+	return nil
 }
 
 func prepareRuntimeValues(ctx context.Context, checkout, deploy, host string, outputs map[string]SelectedOutput, capture chartCapture) error {
 	values := runtimeValues(host, outputs)
 	reader := filepath.Join(checkout, "deploy/lib/nke-deploy-items.py")
 	for _, item := range []string{"postgresql", "spire", "temporal"} {
-		release := filepath.Join(deploy, item, "release.yaml")
-		before, err := releaseFields(ctx, capture, reader, release)
-		if err != nil {
+		if err := appendChartValues(ctx, capture, reader, deploy, item, "nkd-image-inputs.json", values[item]); err != nil {
 			return err
-		}
-		if before[7] == "" {
-			return errors.New("runtime overrides require existing values")
-		}
-		raw, err := boundedRegularRead(release, diagnosticLimit)
-		if err != nil {
-			return err
-		}
-		projected, err := appendRuntimeValues(raw)
-		if err != nil {
-			return err
-		}
-		if err = privateJSON(filepath.Join(filepath.Dir(release), "nkd-image-inputs.json"), values[item]); err != nil {
-			return err
-		}
-		if err = privateReplace(release, projected); err != nil {
-			return err
-		}
-		expected := slices.Clone(before)
-		expected[7] += ",nkd-image-inputs.json"
-		after, err := releaseFields(ctx, capture, reader, release)
-		if err != nil {
-			return err
-		}
-		if !slices.Equal(after, expected) {
-			return errors.New("runtime override changed other deploy semantics")
 		}
 	}
 	return nil
@@ -508,11 +529,105 @@ func copySiteImages(ctx context.Context, session ManagementSession, host string,
 	return refs, nil
 }
 
+// ORAS transports the existing NKD bundle; nkdctl verifies and extracts it.
+// Only an already-owned Kind node receives the validated data. Its lifetime
+// and cleanup stay with the existing management session.
+func prepareSiteProfiles(ctx context.Context, session ManagementSession, tool, node, reference string, selected SelectedOutput) error {
+	layout := filepath.Join(session.Work, "profiles-layout")
+	if err := session.Runner.Run(ctx, []string{filepath.Join(session.Tools, "oras"), "cp", "--from-plain-http", reference, "--to-oci-layout", layout + ":profiles"}, "pull-profiles", 120*time.Second); err != nil {
+		return err
+	}
+	if err := restoreBundleTransportIndex(ctx, selected.Layout, layout, selected.Observation.Digest); err != nil {
+		return err
+	}
+	publication, bundle := filepath.Join(session.Work, "profiles-publication"), filepath.Join(session.Work, "profiles-bundle")
+	for _, step := range []struct {
+		args  []string
+		phase string
+	}{
+		{[]string{tool, "publish", "root", "--bundle", "controller-profiles=" + layout, "--out", publication}, "verify-profiles"},
+		{[]string{tool, "publish", "extract", "--layout", publication, "--bundle", "controller-profiles", "--out", bundle}, "extract-profiles"},
+	} {
+		if err := session.Runner.Run(ctx, step.args, step.phase, 120*time.Second); err != nil {
+			return err
+		}
+	}
+	archive := filepath.Join(bundle, "nke-local-profiles")
+	expected, err := DigestFile(ctx, archive)
+	if err != nil {
+		return err
+	}
+	validated := filepath.Join(session.Work, "validated-profiles")
+	if err = os.Mkdir(validated, 0o700); err != nil {
+		return err
+	}
+	if err = safeExtractAssets(ctx, archive, validated, []string{
+		"profiles/osProfiles/metadata.yaml",
+		"profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl",
+		"profiles/osProfiles/nke-local-26-04-arm64-plain/ipxeScript",
+		"profiles/configProfiles/nico-vms-cp.yaml",
+		"profiles/configProfiles/nico-vms-worker.yaml",
+	}); err != nil {
+		return err
+	}
+	after, err := DigestFile(ctx, archive)
+	if err != nil || after != expected {
+		return errors.Join(err, errors.New("profiles archive changed during validation"))
+	}
+	const nodeArchive = "/var/nkd-local-profiles.tar.gz"
+	if err = session.Runner.Run(ctx, []string{"docker", "exec", node, "sh", "-euc", "test ! -e /var/nkd-local-profiles.tar.gz; test ! -e /var/nkd-local-profiles; mkdir /var/nkd-local-profiles"}, "admit-node-profiles", 30*time.Second); err != nil {
+		return err
+	}
+	if err = session.Runner.Run(ctx, []string{"docker", "cp", archive, node + ":" + nodeArchive}, "copy-profiles-data", 30*time.Second); err != nil {
+		return err
+	}
+	readback, err := session.Runner.Capture(ctx, []string{"docker", "exec", node, "sha256sum", nodeArchive}, "verify-node-profiles", 30*time.Second)
+	if err != nil {
+		return err
+	}
+	if string(readback) != strings.TrimPrefix(expected, "sha256:")+"  "+nodeArchive+"\n" {
+		return errors.New("node profiles archive changed during transfer")
+	}
+	return session.Runner.Run(ctx, []string{"docker", "exec", node, "tar", "--no-same-owner", "-xzf", nodeArchive, "-C", "/var/nkd-local-profiles"}, "materialize-profiles-data", 30*time.Second)
+}
+
+// ORAS preserves the selected manifest but writes a generic local index wrapper.
+// Preserve the exact original NKD bootstrap description, never reconstruct it.
+// This grants no authority: nkdctl must still verify every imported blob and
+// recompute the binary bundle's semantic binding before extraction.
+func restoreBundleTransportIndex(ctx context.Context, original, imported, digest string) error {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	if err := diagnosticIndexMatches(imported, digest); err != nil {
+		return err
+	}
+	raw, err := readRunFile(ctx, original, "index.json", diagnosticLimit)
+	if err != nil {
+		return err
+	}
+	if err := privateReplace(filepath.Join(imported, "index.json"), raw); err != nil {
+		return err
+	}
+	return diagnosticIndexMatches(imported, digest)
+}
+
 type podMetadata struct {
 	UID, Namespace string
 	Labels         map[string]string
 }
-type podContainer struct{ Name, Image string }
+type profileMount struct {
+	Name, MountPath string
+	ReadOnly        bool
+}
+type profileVolume struct {
+	Name     string
+	HostPath *struct{ Path, Type string }
+}
+type podContainer struct {
+	Name, Image  string
+	VolumeMounts []profileMount
+}
 type podContainerState struct {
 	Name, ImageID string
 	Ready         bool
@@ -523,8 +638,11 @@ type podContainerState struct {
 }
 type sitePod struct {
 	Metadata podMetadata
-	Spec     struct{ Containers, InitContainers []podContainer }
-	Status   struct {
+	Spec     struct {
+		Containers, InitContainers []podContainer
+		Volumes                    []profileVolume
+	}
+	Status struct {
 		ContainerStatuses, InitContainerStatuses []podContainerState
 		Phase                                    string
 	}
@@ -656,8 +774,7 @@ func deployedSiteImages(ctx context.Context, session ManagementSession, refs map
 	kube := environmentValue(session.Runner.Env, "SITE_KUBECONFIG")
 	for _, item := range []struct {
 		key, namespace, selector, container string
-		init                                bool
-	}{{"cwe", "nke-controller", "app.kubernetes.io/name=nke-controller", "nke-controller", false}, {"profiles", "nke-controller", "app.kubernetes.io/name=nke-controller", "materialize-profiles", true}, {"provider", "capnico-system", "control-plane=controller-manager", "manager", false}} {
+	}{{"cwe", "nke-controller", "app.kubernetes.io/name=nke-controller", "nke-controller"}, {"provider", "capnico-system", "control-plane=controller-manager", "manager"}} {
 		rows, err := captureJSON[podList](ctx, session.Runner, []string{kubectl, "--kubeconfig", kube, "-n", item.namespace, "get", "pods", "-l", item.selector, "-o", "json"}, "deployed-"+item.key)
 		if err != nil {
 			return nil, err
@@ -665,17 +782,20 @@ func deployedSiteImages(ctx context.Context, session ManagementSession, refs map
 		if len(rows.Items) != 1 {
 			return nil, errors.New("expected one exact deployed image pod")
 		}
-		states := rows.Items[0].Status.ContainerStatuses
-		if item.init {
-			states = rows.Items[0].Status.InitContainerStatuses
+		if item.key == "cwe" {
+			if err := validateProfilesVolume(rows.Items[0], item.container); err != nil {
+				return nil, err
+			}
+			observed["profiles"] = map[string]string{"podUID": rows.Items[0].Metadata.UID, "bundle": refs["profiles"], "path": "/profiles"}
 		}
+		states := rows.Items[0].Status.ContainerStatuses
 		var selected []podContainerState
 		for _, state := range states {
 			if state.Name == item.container {
 				selected = append(selected, state)
 			}
 		}
-		if len(selected) != 1 || selected[0].ImageID != refs[item.key] || (!item.init && !selected[0].Ready) || (item.init && (selected[0].State.Terminated == nil || selected[0].State.Terminated.ExitCode == nil || *selected[0].State.Terminated.ExitCode != 0)) || rows.Items[0].Metadata.UID == "" {
+		if len(selected) != 1 || selected[0].ImageID != refs[item.key] || !selected[0].Ready || rows.Items[0].Metadata.UID == "" {
 			return nil, errors.New("deployed image does not match accepted manifest/readiness: " + item.key)
 		}
 		observed[item.key] = struct {
@@ -695,6 +815,40 @@ func deployedSiteImages(ctx context.Context, session ManagementSession, refs map
 		observed[key] = value
 	}
 	return observed, nil
+}
+
+func validateProfilesVolume(pod sitePod, controller string) error {
+	for _, init := range pod.Spec.InitContainers {
+		if init.Name == "materialize-profiles" {
+			return errors.New("profiles image materializer must be disabled")
+		}
+	}
+	volumes, mounts := 0, 0
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Name == "local-profiles" {
+			volumes++
+			if volume.HostPath == nil || volume.HostPath.Path != "/var/nkd-local-profiles/profiles" || volume.HostPath.Type != "Directory" {
+				return errors.New("deployed profiles volume differs from the prepared Kind directory")
+			}
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		if container.Name != controller {
+			continue
+		}
+		for _, mount := range container.VolumeMounts {
+			if mount.Name == "local-profiles" || mount.MountPath == "/profiles" {
+				mounts++
+				if mount.Name != "local-profiles" || mount.MountPath != "/profiles" || !mount.ReadOnly {
+					return errors.New("deployed profiles mount must be the exact read-only data volume")
+				}
+			}
+		}
+	}
+	if volumes != 1 || mounts != 1 {
+		return errors.New("deployed controller requires exactly one prepared profiles volume and mount")
+	}
+	return nil
 }
 
 func bootstrapCA(ctx context.Context, session ManagementSession) error {
@@ -868,6 +1022,9 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	if err != nil {
 		return err
 	}
+	if err = prepareSiteProfiles(ctx, session, tool, node, refs["profiles"], materials.Outputs["profiles"]); err != nil {
+		return err
+	}
 	hostConfig := filepath.Join(session.Work, "registry-hosts.toml")
 	if err = privateWrite(hostConfig, []byte("server = \"http://"+host+"\"\n[host.\"http://"+host+"\"]\n  capabilities = [\"pull\", \"resolve\"]\n")); err != nil {
 		return err
@@ -890,6 +1047,8 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	config.Spire.CACertFile = filepath.Join(session.Work, "ca.crt")
 	config.Spire.CAKeyFile = filepath.Join(session.Work, "ca.key")
 	config.Images.Controller = refs["cwe"]
+	// The legacy installer requires this reference. The final chart disables its
+	// image materializer and reads the digest-bound bundle through its volume.
 	config.Images.Profiles = refs["profiles"]
 	config.Nico.Endpoint = endpoint
 	config.Nico.OrgID = connection.Org
@@ -938,6 +1097,11 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 		}
 		if err = session.Runner.Run(ctx, []string{"bash", stage, "check"}, "check-"+phase, 180*time.Second); err != nil {
 			return err
+		}
+		if phase == "03-describe-site" {
+			if err = appendChartValues(ctx, capture, filepath.Join(checkout, "deploy/lib/nke-deploy-items.py"), deploy, "controller", "nkd-profiles-volume.json", profilesVolumeValues()); err != nil {
+				return err
+			}
 		}
 	}
 	images, err := deployedSiteImages(ctx, session, refs)

@@ -5,23 +5,33 @@ apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: nke-local-profiles-arm64
-  description: Diagnostic NICoSim profiles from the staged-installer source, with an explicit plain ARM64 profile. Not fleet configuration or compatibility proof.
+  description: Diagnostic profile data bundle from pinned NKE config/runbooks and an authenticated additive local profile overlay. Not fleet configuration or compatibility proof.
 sources:
   nke-profiles:
     repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.21.x
-    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    toolchainImage: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
 components:
   nke-local-profiles:
     fromSource: true
     source: nke-profiles
-    builderType: buildkit-rootless
-    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
     patches:
       - name: patches/local-profile.patch
-        sha256: sha256:4a36de3fe026f3e8b1841c49ef4590dcc5fa65c1f4d463769c32d84b05455171
-    artifactPath: bin/nke-local-profiles-{{.Arch}}.oci.tar
+        sha256: sha256:1ecaaa68a35103f8b11c56ee036405df24e4816082e46a4644b0ce05347320f4
+    artifactPath: bin/nke-local-profiles.tar.gz
     writeDir: bin
-    outputType: oci-image
+    outputType: tarball
     platforms: [linux/arm64]
-    buildCommand: [sh, controller/test/fixtures/nkd-local/build.sh, '{{.Arch}}']
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        set -o pipefail
+        mkdir -p bin/profiles/configProfiles
+        cp -R nkd-local-profiles/osProfiles bin/profiles/
+        cp -R controller/test/fixtures/runbooks bin/profiles/
+        cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml \
+          controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles/configProfiles/
+        tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
+          --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
+          -C bin -cf - profiles | gzip -n > bin/nke-local-profiles.tar.gz

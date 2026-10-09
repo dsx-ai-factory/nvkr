@@ -5,12 +5,10 @@ package factory
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,29 +22,10 @@ import (
 )
 
 // Apply the authenticated patch with Git, not a second patch interpreter.
-// These exact fixture bytes come from the catalog's pinned NKE source.
+// The overlay adds local profile data without modifying upstream NKE files.
 func laptopProfilesPatchedFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	for _, file := range []struct{ name, target, digest string }{
-		{"Dockerfile", "controller/test/fixtures/Dockerfile", "231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a"},
-		{"userData.tmpl", "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl", "861964b7d4bbc6d4c82c8e77891cf1cd3ceb344666d344708b54e4492f910d09"},
-	} {
-		data, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "testdata", "nke-local-profile", "upstream", file.name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if fmt.Sprintf("%x", sha256.Sum256(data)) != file.digest {
-			t.Fatal("upstream fixture bytes changed")
-		}
-		target := filepath.Join(root, file.target)
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(target, data, 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
 	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog")))
 	if err != nil {
 		t.Fatal(err)
@@ -74,30 +53,11 @@ func laptopProfilesPatchedFixture(t *testing.T) string {
 	return root
 }
 
-func TestLaptopProfilesBuildArguments(t *testing.T) {
-	for _, args := range [][]string{nil, {"arm64", "extra"}, {"amd64"}} {
-		t.Run(fmt.Sprint(args), func(t *testing.T) {
-			root := laptopProfilesPatchedFixture(t)
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-			command := append([]string{"controller/test/fixtures/nkd-local/build.sh"}, args...)
-			cmd := exec.CommandContext(ctx, "sh", command...)
-			cmd.Dir, cmd.WaitDelay = root, time.Second
-			if out, err := cmd.CombinedOutput(); err == nil {
-				t.Fatalf("invalid arguments accepted: %s", out)
-			}
-			if _, err := os.Lstat(filepath.Join(root, "bin")); !os.IsNotExist(err) {
-				t.Fatal("invalid arguments reached output work")
-			}
-		})
-	}
-}
-
 // Exercise the patched shell, not a duplicate of its configuration mutation.
 // The GRUB loader is modeled; udev naming and a real reboot remain acceptance.
 func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 	patched := laptopProfilesPatchedFixture(t)
-	raw, err := os.ReadFile(filepath.Join(patched, "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl"))
+	raw, err := os.ReadFile(filepath.Join(patched, "nkd-local-profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,10 +174,10 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 }
 
 // Inspect and execute the actual patched APT commands. Full cloud-init template
-// rendering remains covered with NKE's owning helpers in the downstream test.
+// rendering and real boot remain separate acceptance checks.
 func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 	root := laptopProfilesPatchedFixture(t)
-	raw, err := os.ReadFile(filepath.Join(root, "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl"))
+	raw, err := os.ReadFile(filepath.Join(root, "nkd-local-profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +306,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "controller-profiles" || plan.LifecycleOutputs[0].Kind != "oci" {
+			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "controller-profiles" || plan.LifecycleOutputs[0].Kind != "executable" {
 				t.Fatal("profiles must remain a separate single-output selection")
 			}
 			fetches, producers := 0, 0
@@ -361,14 +321,16 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					}
 				case ir.KindBuild:
 					producers++
-					if node.BuilderType != ir.BuilderBuildKit || node.OutputType != "oci-image" || node.WriteDir != "bin" {
+					if node.BuilderType != ir.BuilderOCIHermetic || node.OutputType != "tarball" || node.WriteDir != "bin" {
 						t.Fatalf("unexpected producer: %+v", node)
 					}
-					if !slices.Equal(node.Command, []string{"sh", "controller/test/fixtures/nkd-local/build.sh", "arm64"}) {
-						t.Fatalf("unexpected producer command: %v", node.Command)
+					if len(node.Command) != 3 || node.Command[0] != "bash" || node.Command[1] != "-euc" ||
+						!strings.Contains(node.Command[2], "tar --sort=name") || !strings.Contains(node.Command[2], "gzip -n") ||
+						strings.Contains(node.Command[2], "buildctl") {
+						t.Fatalf("expected deterministic data packaging, got %v", node.Command)
 					}
 					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
-						node.Patches[0].SHA256 != "sha256:4a36de3fe026f3e8b1841c49ef4590dcc5fa65c1f4d463769c32d84b05455171" {
+						node.Patches[0].SHA256 != "sha256:1ecaaa68a35103f8b11c56ee036405df24e4816082e46a4644b0ce05347320f4" {
 						t.Fatal("Plan must retain the exact authenticated source patch")
 					}
 					command := node.Patches[0].Content
@@ -376,17 +338,14 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 						"package_update: false", "Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list", "Dir::Etc::sourceparts=-", " || exit 1", "net.ifnames=1", "update-grub", "bootcmd:",
 						"/etc/default/grub.d/zz-nkd-local-network.cfg", "${GRUB_CMDLINE_LINUX} net.ifnames=1",
 						"set -eu", "test ! -L", "test -f", "= \"$expected\"",
-						"FROM alpine@sha256:", "nico-vms-cp.yaml", "nico-vms-worker.yaml",
 						"nke-local-26-04-arm64-plain", "ubuntu_version: \"26.04\"", "variant: local-plain-tpm",
 						"http://172.30.0.1:18080/nke-node-image-arm64.qcow2", "console=ttyAMA0,115200",
-						"--opt platform=linux/arm64", "--opt force-network-mode=none", "nke-local-profiles-arm64.oci.tar",
-						"test \"$#\" = 1", "test \"$1\" = arm64",
 					} {
 						if !strings.Contains(command, required) {
 							t.Fatalf("missing bound producer instruction %q", required)
 						}
 					}
-					for _, forbidden := range []string{"luks.key=", "set luks-key", "\nmake ", "\ndocker push", "sed '1d;98d;", "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/."} {
+					for _, forbidden := range []string{"--- a/controller/", "Dockerfile", "build.sh", "luks.key=", "set luks-key", "\nmake ", "\ndocker push", "sed '1d;98d;", "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/."} {
 						if strings.Contains(command, forbidden) {
 							t.Fatalf("unexpected build scope %q", forbidden)
 						}

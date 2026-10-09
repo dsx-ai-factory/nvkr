@@ -7,8 +7,9 @@
 version: 1
 build:
   repo: /workspace/nke-recipes
-  # Optional local Git object source. Omit for network Git acquisition.
-  nkeClone: /workspace/nke-source
+  # Default: fetch pinned remote Git sources. Authentication must work on Linux.
+  # Optional: uncomment only for an accessible local Git object source.
+  # nkeClone: /workspace/nke-source
   attempt: demo-e2e-01
   jobs: 1
 run:

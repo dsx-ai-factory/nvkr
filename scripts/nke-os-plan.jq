@@ -11,6 +11,17 @@ def toolchain_overlay($arch; $from; $to; $digest; $components):
    name:("nke-os-local-toolchain-" + $arch), requiresCatalogDigest:$digest,
    toolchainSubstitutions:[{arch:$arch, from:$from, to:$to, components:$components}]};
 
+def disk_toolchain_scope:
+  [.builds[] | select(any(.executionGraph.nodes[]; .builderType == "vm-image"))] |
+  if length != 1 then error("expected one disk build") else .[0] end |
+  . as $disk |
+  [.executionGraph.nodes[] | select(.kind == "build" and .builderType == "vm-image") | .component] |
+  if length != 1 then error("expected one disk root") else .[0] end |
+  $disk.catalogSnapshot.Components[.].toolchainImages.arm64 as $pin |
+  {pin:$pin, catalogDigest:$disk.catalogDigest, components:
+    ([$disk.components[] as $name | $disk.catalogSnapshot.Components[$name] |
+      select(.fromSource == true and .toolchainImages.arm64 == $pin) | $name] | sort)};
+
 # This launcher projection follows an already admitted Plan. Catalog loading
 # authenticates the exact predecessor and substitution; this is not a validator
 # or permission to rewrite unrelated producer toolchains.
@@ -26,7 +37,7 @@ def simulator_toolchain_scope:
   if length != 1 then error("expected one simulator source toolchain") else .[0] end |
   {pin:., catalogDigest:$build.catalogDigest, components:([$selected[].name] | sort)};
 
-# Only the two source-built site charts share the local Helm wrapper. The
+# Only the two source-built site charts select the shared local toolchain. The
 # ordinary catalog overlay authenticates every selected predecessor digest.
 def site_helm_toolchain_scope:
   [.builds[] | select(.name == "controller-chart" or .name == "nktp")] as $builds |

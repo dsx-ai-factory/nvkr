@@ -78,13 +78,24 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 			return BuiltInputs{}, err
 		}
 	}
-	for _, lane := range lanes {
-		if err = buildLane(ctx, runner, script, cfg.AttemptPrefix, cfg.Jobs, lane); err != nil {
-			return BuiltInputs{}, err
-		}
+	if err = buildLocalLanes(ctx, runner, script, cfg, lanes); err != nil {
+		return BuiltInputs{}, err
 	}
 	path := func(lane string) string { return filepath.Join(repo, ".nkd/runs", cfg.AttemptPrefix+"-"+lane) }
-	return BuiltInputs{RunInputs{OS: path("os"), Components: path("components"), Providers: path("components"), Site: path("site"), Tools: path("tools"), Profiles: path("profiles"), Simulator: path("simulator")}, filepath.Join(repo, ".nkd/laptop-bootstrap", cfg.AttemptPrefix+"-tools", "nkdctl")}, nil
+	return BuiltInputs{RunInputs{OS: path("os"), Components: path("components"), Providers: path("components"), Site: path("site"), Tools: path("tools"), Profiles: path("profiles"), Simulator: path("simulator")}, filepath.Join(repo, ".nkd/laptop-bootstrap", cfg.AttemptPrefix+"-os", "nkdctl")}, nil
+}
+
+func buildLocalLanes(ctx context.Context, runner Runner, script string, cfg BuildConfig, lanes []string) error {
+	for _, lane := range lanes {
+		if err := buildLane(ctx, runner, script, cfg.AttemptPrefix, cfg.Jobs, lane); err != nil {
+			return err
+		}
+		if lane == "os" {
+			// Reuse tools, never observations, from this invocation's first Run.
+			runner.Env = SetEnv(runner.Env, map[string]string{"NKD_LOCAL_BOOTSTRAP": cfg.AttemptPrefix + "-os"})
+		}
+	}
+	return nil
 }
 
 func buildLane(ctx context.Context, runner Runner, script, prefix string, jobs int, lane string) (result error) {

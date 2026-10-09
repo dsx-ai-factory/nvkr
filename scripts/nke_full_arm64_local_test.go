@@ -30,30 +30,6 @@ func linkLauncherTestTimeout(t *testing.T, tools string) {
 	}
 }
 
-func TestLauncherTimeoutHostNames(t *testing.T) {
-	for _, name := range []string{"timeout", "gtimeout"} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			host, tools := filepath.Join(dir, "host"), filepath.Join(dir, "tools")
-			for _, path := range []string{host, tools} {
-				if err := os.Mkdir(path, 0700); err != nil {
-					t.Fatal(err)
-				}
-			}
-			binary := filepath.Join(host, name)
-			if err := os.WriteFile(binary, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
-				t.Fatal(err)
-			}
-			t.Setenv("PATH", host)
-			linkLauncherTestTimeout(t, tools)
-			target, err := os.Readlink(filepath.Join(tools, "timeout"))
-			if err != nil || target != binary {
-				t.Fatalf("timeout target=%q error=%v; want %q", target, err, binary)
-			}
-		})
-	}
-}
-
 func TestLocalDeveloperPreflight(t *testing.T) {
 	for _, tc := range []struct {
 		name, system, arch, runtime, lane, state, disk, daemon, want string
@@ -133,17 +109,6 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(inputs, name), env, 0600); err != nil {
 					t.Fatal(err)
 				}
-			}
-			toolchainDir := filepath.Join(dir, "toolchains", "nkd-packer")
-			if err := os.MkdirAll(toolchainDir, 0700); err != nil {
-				t.Fatal(err)
-			}
-			lock, err := os.ReadFile(filepath.Join("..", "toolchains", "nkd-packer", "toolchain.lock.json"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(toolchainDir, "toolchain.lock.json"), lock, 0600); err != nil {
-				t.Fatal(err)
 			}
 			linkLauncherTestTimeout(t, tools)
 			for _, name := range []string{"bash", "dirname", "git", "jq", "awk"} {
@@ -361,7 +326,6 @@ func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 			for _, path := range []string{
 				"scripts/nke-full-arm64-local.sh", "scripts/nke-os-plan.jq",
 				"definitions/nke-local-dev-arm64/environment-local-docker.json",
-				"toolchains/nkd-packer/toolchain.lock.json",
 			} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
@@ -427,11 +391,16 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 	for _, tc := range []struct {
 		name, returned, buildExit string
 		wantError                 bool
+		shared                    bool
+		inspected                 string
 	}{
-		{"freeze validated ID without resolving tag", validated, "0", false},
-		{"reject empty result", "", "0", true},
-		{"reject result mixed with diagnostics", "diagnostic\n" + validated, "0", true},
-		{"failed validation cannot proceed", validated, "42", true},
+		{"freeze validated ID without resolving tag", validated, "0", false, false, ""},
+		{"reject empty result", "", "0", true, false, ""},
+		{"reject result mixed with diagnostics", "diagnostic\n" + validated, "0", true, false, ""},
+		{"failed validation cannot proceed", validated, "42", true, false, ""},
+		{"reuse first lane without compiling or building", validated, "99", false, true, validated},
+		{"shared image cannot be a tag", "local:latest", "99", true, true, validated},
+		{"shared image unavailable in runtime", validated, "99", true, true, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -446,7 +415,7 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 				}
 			}
 			for _, path := range []string{"scripts/nke-full-arm64-local.sh", "scripts/nke-os-plan.jq",
-				"definitions/nke-local-dev-arm64/environment-local-docker.json", "toolchains/nkd-packer/toolchain.lock.json"} {
+				"definitions/nke-local-dev-arm64/environment-local-docker.json"} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
 					t.Fatal(err)
@@ -477,10 +446,20 @@ case "$1 $2" in
   'info --format') echo linux/arm64;;
   'context inspect') echo unix:///var/run/docker.sock;;
   'run --rm') cp "$TEST_REPO/tools/runner" "$TEST_REPO/.nkd/laptop-bootstrap/id-probe/nkdctl";;
-  'image inspect') echo 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';;
+  'image inspect') echo "$TEST_INSPECTED";;
   *) exit 99;;
 esac
 `), 0700)
+			shared := ""
+			if tc.shared {
+				shared = "first-os"
+				runner, err := os.ReadFile(filepath.Join(dir, "tools/runner"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				write(".nkd/laptop-bootstrap/first-os/nkdctl", runner, 0700)
+				write(".nkd/laptop-bootstrap/first-os/toolchain-image", []byte(tc.returned+"\n"), 0600)
+			}
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
 			linkLauncherTestTimeout(t, filepath.Join(dir, "tools"))
@@ -488,7 +467,7 @@ esac
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
-				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"))
+				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NKD_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected)
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.wantError {
 				t.Fatalf("error=%v output=%s, want failure=%t", err, out, tc.wantError)
@@ -497,8 +476,11 @@ esac
 			if err != nil {
 				t.Fatal(err)
 			}
-			if strings.Contains(string(calls), "image inspect") {
+			if !tc.shared && strings.Contains(string(calls), "image inspect") {
 				t.Fatalf("launcher resolved validated bytes through a mutable tag: %s", calls)
+			}
+			if tc.shared && (strings.Contains(string(calls), "toolchain-build") || strings.Contains(string(calls), "pull --platform") || strings.Contains(string(calls), "make -C /src")) {
+				t.Fatalf("shared bootstrap repeated build work: %s", calls)
 			}
 			if reached := strings.Contains(string(calls), "run local"); reached == tc.wantError {
 				t.Fatalf("local execution reached=%t; want %t: %s", reached, !tc.wantError, calls)

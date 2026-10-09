@@ -15,7 +15,7 @@ usage() {
     'simulator bootstraps the same pinned Go/GCC toolchain on Podman or Docker.' \
     'site: four source-aligned installer outputs (controller, CLI, controller chart and NKTP chart).' \
     'tools: one source-built Linux ARM64 bundle (Helm, kubectl, clusterctl, ORAS and Kind).' \
-    'profiles: one diagnostic ARM64 plain Ubuntu 26.04 NICoSim profiles image, not fleet profiles.' \
+    'profiles: one diagnostic ARM64 plain Ubuntu 26.04 NICoSim profiles data bundle, not fleet profiles.' \
     'This subset is NOT a full source-built NKE distribution.' \
     'No host Go/Make or installed nkdctl needed: bootstrap uses the pinned utility image.' \
     'CONTAINER_RUNTIME=podman (default) or docker (native Linux ARM64 / explicitly selected Colima).' \
@@ -24,6 +24,7 @@ usage() {
     'No VM is created, started, reset or resized automatically; Docker Desktop is not admitted.' \
     '--check performs prerequisite diagnostics only: no pull, build or attempt creation.' \
     'NKE_LOCAL_CLONE supplies pinned Git objects, not uncommitted changes.' \
+    'The Go demo reuses the first lane bootstrap via NKD_LOCAL_BOOTSTRAP; Runs remain separate.' \
     'See docs/local-development.md for clean setup and acceptance limits.'
 }
 if [[ $# == 1 && ( "$1" == --help || "$1" == -h ) ]]; then usage; exit 0; fi
@@ -171,14 +172,24 @@ fi
 echo "Prerequisite diagnostics passed for ${lane}/${runtime}. Git authorization and cgroup/resource/toolchain admission remain execution gates."
 if [[ "${check_only}" == 1 ]]; then exit 0; fi
 bootstrap=".nkd/laptop-bootstrap/${attempt}"
+shared_bootstrap="${NKD_LOCAL_BOOTSTRAP:-}"
+if [[ -n "${shared_bootstrap}" ]]; then
+  [[ "${shared_bootstrap}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || { echo 'Invalid shared bootstrap name.' >&2; exit 2; }
+  tools=".nkd/laptop-bootstrap/${shared_bootstrap}"
+  [[ -d "${tools}" && ! -L "${tools}" ]] || { echo 'Shared bootstrap is missing or not a real directory.' >&2; exit 1; }
+else
+  tools="${bootstrap}"
+fi
 mkdir -p .nkd/laptop-bootstrap
 mkdir "${bootstrap}" || { echo 'Bootstrap already exists; use a fresh attempt name.' >&2; exit 1; }
-mkdir "${bootstrap}/go-build" "${bootstrap}/go-mod" "${bootstrap}/home" "${bootstrap}/tmp"
+mkdir "${bootstrap}/tmp"
 export TMPDIR="${repo_root}/${bootstrap}/tmp"
-network=default
-if [[ "${runtime}" == docker ]]; then network=bridge; fi
-"${runtime}" pull --platform linux/arm64 "${utility}"
-"${runtime}" run --rm --pull=never --platform linux/arm64 --network="${network}" \
+if [[ -z "${shared_bootstrap}" ]]; then
+  mkdir "${bootstrap}/go-build" "${bootstrap}/go-mod" "${bootstrap}/home"
+  network=default
+  if [[ "${runtime}" == docker ]]; then network=bridge; fi
+  "${runtime}" pull --platform linux/arm64 "${utility}"
+  "${runtime}" run --rm --pull=never --platform linux/arm64 --network="${network}" \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges --security-opt=label=disable \
   --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
   --volume "${repo_root}:/src:ro" --volume "${repo_root}/${bootstrap}:/out:rw" \
@@ -188,7 +199,8 @@ if [[ "${runtime}" == docker ]]; then network=bridge; fi
     make -C /src build BIN=/out/nkdctl
     make -C /src demo DEMO_BIN=/out/nke-demo
   '
-runner="${bootstrap}/nkdctl"
+fi
+runner="${tools}/nkdctl"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }
 definition="definitions/nke-local-dev-arm64/definition.json"
 if [[ "${lane}" != all ]]; then definition="definitions/nke-local-dev-arm64/definition-${lane}.json"; fi
@@ -196,41 +208,26 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.
   "${runner}" run plan --definition "${definition}" --environment "${environment}" --json >"${bootstrap}/baseline-plan.json"
-  if [[ "${lane}" == site ]]; then
-    baseline="$(jq -L scripts -er 'include "nke-os-plan"; site_helm_toolchain_scope.pin' "${bootstrap}/baseline-plan.json")"
-  elif [[ "${lane}" == simulator ]]; then
-    baseline="$(jq -L scripts -er 'include "nke-os-plan"; simulator_toolchain_scope.pin' "${bootstrap}/baseline-plan.json")"
+  case "${lane}" in
+    site) scope=site_helm_toolchain_scope ;;
+    simulator) scope=simulator_toolchain_scope ;;
+    *) scope=disk_toolchain_scope ;;
+  esac
+  baseline="$(jq -L scripts -er "include \"nke-os-plan\"; ${scope}.pin" "${bootstrap}/baseline-plan.json")"
+  if [[ -n "${shared_bootstrap}" ]]; then
+    # This is an explicit invocation-local tool selection, not a serialized
+    # receipt. The next Plan still admits the exact image and substitution.
+    [[ -f "${tools}/toolchain-image" && ! -L "${tools}/toolchain-image" ]] || { echo 'Shared bootstrap lacks its measured toolchain image.' >&2; exit 1; }
+    image="$(<"${tools}/toolchain-image")"
+    [[ "${image}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Shared bootstrap image must be an immutable native image ID.' >&2; exit 1; }
+    actual="$(timeout --kill-after=5s 30s "${runtime}" image inspect --format '{{.Id}}' "${image}")"
+    [[ "sha256:${actual#sha256:}" == "${image}" ]] || { echo 'Shared toolchain bytes are unavailable in this runtime.' >&2; exit 1; }
   else
-    baseline="$(jq -er '[.builds[] | select(any(.executionGraph.nodes[]; .builderType == "vm-image"))] |
-    if length != 1 then error("expected one disk build") else .[0] end |
-    .catalogSnapshot.Components[([.executionGraph.nodes[] | select(.kind == "build" and .builderType == "vm-image") | .component] |
-      if length != 1 then error("expected one disk root") else .[0] end)].toolchainImages.arm64' "${bootstrap}/baseline-plan.json")"
-  fi
-  if [[ "${lane}" == site ]]; then
-    toolchain_tag="localhost/nkd-local-helm:laptop-${attempt}"
-    if [[ "${runtime}" == docker ]]; then
-      docker buildx build --load --platform linux/arm64 --network=none --provenance=false --sbom=false --build-arg SOURCE_DATE_EPOCH=0 \
-        --tag "${toolchain_tag}" toolchains/nkd-local-helm
-    else
-      podman build --platform linux/arm64 --network=none --timestamp=0 \
-        --tag "${toolchain_tag}" toolchains/nkd-local-helm
-    fi
-    image="$("${runtime}" image inspect --format '{{.Id}}' "${toolchain_tag}")"
-    image="sha256:${image#sha256:}"
-    "${runtime}" run --rm --pull=never --platform linux/arm64 --network=none --read-only \
-      --cap-drop=ALL --security-opt=no-new-privileges "${image}" sh -euc \
-      'test "$(helm version --template "{{.Version}}")" = v4.3.0; command -v sha256sum; command -v sh'
-  else
-    image="$(jq -er '.localPodmanImages.arm64' toolchains/nkd-packer/toolchain.lock.json)"
-    if [[ "${runtime}" != podman ]] || ! podman image inspect "${image}" >/dev/null 2>&1; then
-      toolchain_tag="localhost/nkd-packer-toolchain:laptop-${attempt}"
-      image="$(CONTAINER_RUNTIME="${runtime}" bash toolchains/nkd-packer/build.sh \
-        --arch arm64 --diagnostic-local --print-validated-image-id --tag "${toolchain_tag}")"
-      if [[ ! "${image}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-        echo 'Toolchain build did not return one native-validated immutable image ID.' >&2
-        exit 1
-      fi
-    fi
+    toolchain_tag="localhost/nkd-packer-toolchain:laptop-${attempt}"
+    image="$(CONTAINER_RUNTIME="${runtime}" bash toolchains/nkd-packer/build.sh \
+      --arch arm64 --diagnostic-local --print-validated-image-id --tag "${toolchain_tag}")"
+    [[ "${image}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Toolchain build did not return one native-validated immutable image ID.' >&2; exit 1; }
+    printf '%s\n' "${image}" >"${tools}/toolchain-image"
   fi
   # Freeze fresh local bytes through the existing overlay contract, not a tag
   # or a hand-edited maintained lock. Each output retains its own catalog scope.
@@ -245,26 +242,9 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
     else .outputs |= map(if .format == "disk-image" then
       .catalog.overlays += [$out + "/toolchain-attempt.json"] else . end) end
   ' "${definition}" >"${bootstrap}/definition.json"
-  if [[ "${lane}" == simulator || "${lane}" == site ]]; then
-    jq -L scripts -e --arg to "${image}" --arg lane "${lane}" '
-      include "nke-os-plan";
-      (if $lane == "site" then site_helm_toolchain_scope else simulator_toolchain_scope end) |
-      toolchain_overlay("arm64"; .pin; $to; .catalogDigest; .components)
-    ' "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-attempt.json"
-  else
-    jq -L scripts -n --arg to "${image}" --slurpfile plan "${bootstrap}/baseline-plan.json" '
-    include "nke-os-plan";
-    [$plan[0].builds[] | select(any(.executionGraph.nodes[]; .builderType == "vm-image"))] |
-    if length != 1 then error("expected one disk build") else .[0] end |
-    . as $disk | [.executionGraph.nodes[] | select(.kind == "build" and .builderType == "vm-image") | .component] |
-    if length != 1 then error("expected one disk root") else .[0] end |
-    $disk.catalogSnapshot.Components[.].toolchainImages.arm64 as $from |
-    [$disk.catalogSnapshot.Components | to_entries[] |
-      select(.key as $name | $disk.components | index($name)) |
-      select(.value.fromSource == true and .value.toolchainImages.arm64 == $from) | .key] | sort |
-    toolchain_overlay("arm64"; $from; $to; $disk.catalogDigest; .)
-    ' >"${bootstrap}/toolchain-attempt.json"
-  fi
+  jq -L scripts -e --arg to "${image}" "include \"nke-os-plan\"; ${scope} |
+    toolchain_overlay(\"arm64\"; .pin; \$to; .catalogDigest; .components)" \
+    "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-attempt.json"
   definition="${bootstrap}/definition.json"
   fi
 fi

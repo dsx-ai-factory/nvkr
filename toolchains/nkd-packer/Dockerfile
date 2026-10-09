@@ -25,6 +25,24 @@ ARG NFPM_VERSION
 ARG NFPM_ARCHIVE_SHA256
 ARG NFPM_BINARY_SHA256
 ARG NKD_ARCHIVE_MODE=download
+ARG HELM_VERSION
+ARG HELM_ARCHIVE_SHA256
+ARG ORAS_VERSION
+ARG ORAS_ARCHIVE_SHA256
+
+RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 --mount=type=bind,from=nkd_archives,target=/nkd/archives set -eux; \
+    if [ -r /run/secrets/nkd_ca_bundle ]; then export CURL_CA_BUNDLE=/run/secrets/nkd_ca_bundle; fi; \
+    helm_archive="helm-v${HELM_VERSION}-linux-${TARGETARCH}.tar.gz"; \
+    oras_archive="oras_${ORAS_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    case "${NKD_ARCHIVE_MODE}" in \
+    local) cp "/nkd/archives/${helm_archive}" "/tmp/${helm_archive}"; cp "/nkd/archives/${oras_archive}" "/tmp/${oras_archive}" ;; \
+    download) curl --fail --location --max-time 300 --retry 2 \
+      "https://get.helm.sh/${helm_archive}" --output "/tmp/${helm_archive}"; \
+      curl --fail --location --max-time 300 --retry 2 \
+      "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/${oras_archive}" --output "/tmp/${oras_archive}" ;; \
+    *) echo 'unsupported archive mode' >&2; exit 1 ;; esac; \
+    printf '%s  %s\n' "${HELM_ARCHIVE_SHA256}" "/tmp/${helm_archive}" | sha256sum -c; \
+    printf '%s  %s\n' "${ORAS_ARCHIVE_SHA256}" "/tmp/${oras_archive}" | sha256sum -c
 
 RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 --mount=type=bind,from=nkd_archives,target=/nkd/archives set -eux; \
     if [ -r /run/secrets/nkd_ca_bundle ]; then export CURL_CA_BUNDLE=/run/secrets/nkd_ca_bundle; fi; \
@@ -92,6 +110,15 @@ COPY --from=download /tmp/packer-plugin-qemu_*.zip /tmp/
 COPY --from=download /tmp/go*.linux-*.tar.gz /tmp/
 COPY --from=download /tmp/go-containerregistry_Linux_*.tar.gz /tmp/
 COPY --from=download /tmp/nfpm_*_Linux_*.tar.gz /tmp/
+COPY --from=download /tmp/helm-*.tar.gz /tmp/
+COPY --from=download /tmp/oras_*.tar.gz /tmp/
+
+ARG HELM_VERSION
+ARG HELM_ARCHIVE_SHA256
+ARG HELM_BINARY_SHA256
+ARG ORAS_VERSION
+ARG ORAS_ARCHIVE_SHA256
+ARG ORAS_BINARY_SHA256
 
 RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 printf '%s\n' 'Acquire::https::CaInfo "/etc/ssl/certs/ca-certificates.crt";' \
       >/etc/apt/apt.conf.d/99bootstrap-ca \
@@ -154,6 +181,21 @@ RUN set -eux; \
     install -m 0644 /out/tools/LICENSE.md /out/licenses/nfpm/LICENSE.md; \
     rm /out/tools/LICENSE.md
 
+RUN set -eux; \
+    helm_archive="helm-v${HELM_VERSION}-linux-${TARGETARCH}.tar.gz"; \
+    oras_archive="oras_${ORAS_VERSION}_linux_${TARGETARCH}.tar.gz"; \
+    printf '%s  %s\n' "${HELM_ARCHIVE_SHA256}" "/tmp/${helm_archive}" | sha256sum -c; \
+    printf '%s  %s\n' "${ORAS_ARCHIVE_SHA256}" "/tmp/${oras_archive}" | sha256sum -c; \
+    mkdir -p /out/helm /out/oras /out/licenses/helm /out/licenses/oras; \
+    tar -xzf "/tmp/${helm_archive}" -C /out/helm "linux-${TARGETARCH}/helm" "linux-${TARGETARCH}/LICENSE"; \
+    tar -xzf "/tmp/${oras_archive}" -C /out/oras oras LICENSE; \
+    printf '%s  %s\n' "${HELM_BINARY_SHA256}" "/out/helm/linux-${TARGETARCH}/helm" | sha256sum -c; \
+    printf '%s  %s\n' "${ORAS_BINARY_SHA256}" /out/oras/oras | sha256sum -c; \
+    install -m 0755 "/out/helm/linux-${TARGETARCH}/helm" /out/tools/helm; \
+    install -m 0755 /out/oras/oras /out/tools/oras; \
+    install -m 0644 "/out/helm/linux-${TARGETARCH}/LICENSE" /out/licenses/helm/LICENSE; \
+    install -m 0644 /out/oras/LICENSE /out/licenses/oras/LICENSE
+
 FROM ${BASE_IMAGE}
 
 ARG TARGETARCH
@@ -210,6 +252,8 @@ COPY --from=fetch /out/plugins/ /nkd/toolchain/packer/plugins/
 COPY --from=fetch /out/go/ /usr/local/go/
 COPY --from=fetch /out/tools/crane /usr/local/bin/crane
 COPY --from=fetch /out/tools/nfpm /usr/local/bin/nfpm
+COPY --from=fetch /out/tools/helm /usr/local/bin/helm
+COPY --from=fetch /out/tools/oras /usr/local/bin/oras
 COPY --from=fetch /out/licenses/ /usr/share/doc/nkd-packer-toolchain/licenses/
 
 RUN set -eux; \
@@ -244,6 +288,8 @@ RUN set -eux; \
 	command -v make; \
 	command -v crane; \
 	command -v nfpm; \
+	command -v helm; \
+	command -v oras; \
 	command -v 7z; \
 	command -v unzip; \
 	command -v xorriso; \

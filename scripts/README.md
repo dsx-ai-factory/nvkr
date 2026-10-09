@@ -6,77 +6,21 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
-The maintained local deployment command is the Go `nke-demo run` CLI built by
-`scripts/nke-full-arm64-local.sh` beside `nkdctl`. Follow the single
-[Ubuntu ARM64 build-and-demo guide](../docs/local-nke-demo.md) for host setup,
-six build lanes, completed Run paths and deployment.
+Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nke-demo.md) for
+`nke-demo e2e`: build selected artifacts through `nkdctl`, then deploy those
+completed Runs to a local site and QCOW2-backed tenant. macOS supplies the Linux
+host through Colima; this is not a native Darwin build.
 
-Deployment rebuilds nothing: it consumes the exact completed artifacts, owns
-native networking and NICoSim, serves the selected QCOW2, installs NKE's site,
-and tests a real control-plane/worker tenant plus workload and DNS. The former
-standalone management, site and guest experiments have been consolidated into
-this typed Go library and thin CLI, not maintained as parallel Python commands.
-NKD operations invoke `nkdctl`; the pinned NKE installer still requires Python
-for its existing source-owned readers and stages.
+`nke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
+[focused selections](../definitions/nke-local-dev-arm64/README.md);
+`--check LANE` performs diagnostics only. The full demo compiles binaries once and shares
+one measured Packer toolchain, including Helm 4.2.4 and ORAS 1.3.3. Profiles are
+data bundles, not a separate container image. No publication/signing is enabled.
 
-The flow runs on Linux ARM64. macOS supplies that Linux host through Colima;
-it does not build or run Darwin artifacts. Earlier retained-artifact Colima
-replays passed, but that is not fresh Go-consumer, clean-machine or full-source
-acceptance. Site-only success is not an integrated PASS.
-
-Contract tests execute without building or deploying NKE:
-
-```sh
-go test ./internal/nkedemo ./cmd/nke-demo -count=1
-```
-
-The opt-in real six-lane build/deployment test is documented in the
-[guide](../docs/local-nke-demo.md#repeat-the-real-build-and-demo-as-a-go-test).
-
-For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
-and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
-OS disk; read its toolchain/capacity prerequisites before launching that larger Run.
-On macOS the forwarded Colima route rejects `os`/`all`: export committed source
-to native ext4 and invoke the launcher inside Linux, as the build guide shows.
-`providers` selects only the source-built CAPNICo and provisioned-provider images.
-`simulator` separately builds a Linux ARM64 NICoSim server/CLI and seed/UI archive bundle from pinned
-source; it is not part of `all` yet and does not start a simulator or deploy a site.
-This incremental lane bootstraps pinned Go/GCC toolchain sources on Docker or
-when the recorded Podman image is missing, then binds the measured native ID
-through an exact attempt overlay. `--check simulator` performs no pull/build and
-does not require a previously cached toolchain; Docker bootstrap requires Buildx.
-`site` separately selects the installer-aligned CLI/controller and two chart
-outputs. Its local pinned Helm wrapper prepares NKTP's locked dependencies before
-offline packaging. Its separate four-output selection is not a deployment;
-see the [site handoff](../docs/nkd-to-nke-demo.md).
-`tools` separately selects source-built Linux ARM64 Helm, kubectl, clusterctl,
-ORAS and Kind at the staged installer's pinned versions. Compiler/preflight
-contracts cover this selection; consumers verify extraction and native versions.
-The integrated tenant/workload gate passed with retained artifacts; a fresh
-build of its entire input set remains unverified. Helm's
-exact fixture preparation is diagnostic Local-only, not a supported held hosted
-fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
-`profiles` separately builds the diagnostic plain ARM64/Ubuntu 26.04 controller
-profiles image from pinned NKE fixtures. Its content tests use NKE's metadata
-loader/template helpers; the site consumer requires its exact init-container
-image ID. It is not included in `all` or tenant boot-compatibility proof.
-See the [profiles guide](../docs/local-controller-profiles.md).
-Start with `bash scripts/nke-full-arm64-local.sh --check providers` (or `--check os`).
-The launcher bootstraps NKD inside the pinned utility container: no host Go/Make.
-`CONTAINER_RUNTIME=docker` selects native Linux ARM64 Docker, or explicitly
-selected `COLIMA_PROFILE=NAME` on Apple Silicon; not Docker Desktop on macOS.
-The guide covers clean Podman/Colima VM setup and attempt-pinned fresh Packer
-bootstrap. Check-only diagnostics never pull/build or create attempts.
-The Colima guide exports the committed checkout to native ext4 to avoid large
-source trees on the Mac shared mount. Run storage remains below that checkout's
-`.nkd/`; an external absolute attempts root is not supported by the factory runner.
-Native guest capacity does not provide extra physical Mac space.
-Despite its historical filename, this launcher does not yet build a full
-source-built NKE distribution; see the [remaining work](../docs/full-nke-source-build.md).
-
-The complete flow verifies actual QCOW2-backed tenant nodes; no separate guest
-probe is needed for this journey. See the [integrated guide](../docs/local-nke-demo.md)
-for native prerequisites and current validation boundaries.
+Contract tests: `go test ./internal/nkedemo ./cmd/nke-demo -count=1`.
+See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;
+the reduced flow has not passed a new clean-machine end-to-end run. This is not
+a [full source-built distribution](../docs/full-nke-source-build.md).
 
 ```sh
 # Plan only: validates and creates no attempt storage.

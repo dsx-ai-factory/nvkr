@@ -1,64 +1,41 @@
 # Build and run NKE on Ubuntu ARM64
 
-NKD builds the artifacts. A separate command deploys those exact outputs, creates
-a real ARM64 control-plane and worker from the QCOW2 through CAPNICo/NICoSim,
-tests a workload and Kubernetes DNS, then removes its owned resources.
+This guide builds the selected artifacts with NKD, deploys their exact outputs
+using NKE's installer, and provisions a real QCOW2 control-plane and worker
+through CAPNICo/NICoSim. Kind hosts management services, not tenant nodes.
 
-All build and deployment commands run on a **Linux ARM64 execution host**.
-Use a dedicated Ubuntu ARM64 machine, or follow the additional macOS/Colima
-setup below to provide that host. This is not a native macOS build: the outputs
-are Linux ARM64 binaries, images and charts, plus an ARM64 QCOW2. Docker Desktop
-alone cannot run this demo's libvirt tenant VMs. Other architectures are not
-selected automatically by this example.
+Run everything on a dedicated Ubuntu ARM64 host with Docker. On an Apple Silicon
+Mac, first create that Linux host with Colima below. This is **not a native macOS
+build**. Docker Desktop alone does not provide the libvirt tenant runtime.
 
-A real Colima run passed on October 8, 2026, using retained completed artifacts,
-including workload/DNS testing and final cleanup. A fresh clean-machine build
-of all lanes is not yet verified. This is a trusted-user local demo, not a
-signed Release or complete source-built distribution. Acquired images/charts,
-the missing DSX input and PR #113 integration remain explicit
-[full-source gaps](full-nke-source-build.md).
-The expanded handoff also passed an integrated tenant/workload/cleanup replay
-with five freshly built non-OS lanes and a retained QCOW2. All fifteen selected
-site image identities were checked. Those runs preceded the Go consumer port;
-they do not prove its fresh runtime acceptance or a fresh OS rebuild. See
-[PR #118's validation status](https://github.com/dsx-ai-factory/nke-recipes/pull/118).
+This is a trusted-user, unqualified diagnostic, not a signed Release, complete
+source-built distribution or qualified OS. See the
+[full-source gaps](full-nke-source-build.md) and
+[current validation status](adr/reconciliation.md). A successful separate
+deployment replay does not establish a clean one-shot E2E build.
 
 ## 1. Choose your Linux execution host
 
-### Ubuntu ARM64
+Use eight CPUs, 24 GiB RAM and about 90 GiB free on native ext4 storage before
+building. These are setup allowances; execution rechecks authored requirements.
+Install Docker Engine and Buildx using the
+[Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/).
 
-Use a dedicated host with Docker Engine and Buildx, eight CPUs, 24 GiB RAM,
-Python 3.12+ and about 90 GiB free on the build filesystem. Install Docker using
-the [official Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/).
-No host Go, Packer or Helm is required. The recorded E2E validation below used
-Colima; it is not evidence of a separate bare-metal Ubuntu acceptance run.
-
-Clone into native ext4 storage, not a network or macOS shared filesystem. Keep
-this checkout private because its `.nkd` directory will hold build and demo data:
+On native Ubuntu ARM64, clone privately and continue with step 2:
 
 ```sh
-set -euo pipefail
-sudo apt-get update
-sudo apt-get install -y git
 umask 077
 git clone https://github.com/dsx-ai-factory/nke-recipes.git
 cd nke-recipes
 test "$(uname -m)" = aarch64
 test "$(findmnt -n -o FSTYPE -T .)" = ext4
-df -h .
 ```
 
-Continue with step 2 in this same Linux terminal; skip the macOS section. The
-clone commands target `main` after merge; pre-merge instructions are in PR #118.
+### Additional macOS setup
 
-### macOS: provide Ubuntu ARM64 through Colima
-
-You need Git, Homebrew, access to the pinned NKE sources, and about 90 GiB free
-on the Mac and build filesystem for a fresh OS build. Docker Desktop alone does
-not supply this demo's native VM runtime. No host Go, Packer or Helm is required.
-
-From your NKE Recipes checkout, create the dedicated profile **only if it does
-not already exist**. Do not reset another profile or change your Docker context.
+From your NKE Recipes checkout, install Colima if needed. Create the dedicated
+profile only if it does not exist; inspect an existing profile rather than
+resetting it. Keep enough physical Mac space as well as guest space.
 
 ```sh
 brew install colima
@@ -69,13 +46,8 @@ colima start --profile nkd-demo --arch aarch64 --runtime docker --vm-type vz \
 df -h .
 ```
 
-For an existing profile, inspect its architecture, resources and mounts first.
-See the [Colima reference](local-development.md#apple-silicon-mac-with-colima)
-for reuse and storage troubleshooting.
-
-Still on the Mac, copy committed NKD source into native VM storage. Run this
-block from the checkout in Bash. The destination must be new; uncommitted files
-are not included.
+Copy committed source into native VM storage. Run this block from the Mac
+checkout in Bash. The destination must be new; dirty files are not exported.
 
 ```sh
 set -euo pipefail
@@ -85,17 +57,14 @@ colima ssh --profile nkd-demo -- bash -c \
   'test "$(findmnt -n -o FSTYPE --mountpoint /mnt/lima-colima-nkd-demo)" = ext4 && sudo install -d -o "$(id -u)" -g "$(id -g)" -m 700 /mnt/lima-colima-nkd-demo/nkd-local'
 colima ssh --profile nkd-demo -- mkdir -m 700 "$NKD_NATIVE_REPO"
 git archive "$NKD_SOURCE" | colima ssh --profile nkd-demo -- tar -xf - -C "$NKD_NATIVE_REPO"
-printf 'Inside Colima, cd to: %s\n' "$NKD_NATIVE_REPO"
 colima ssh --profile nkd-demo -- bash -c 'cd "$1" && exec bash' bash "$NKD_NATIVE_REPO"
 ```
 
-You are now inside the Ubuntu ARM64 VM, in the directory just printed. Native
-ext4 avoids the shared-mount file-handle problem encountered during source export.
-**Run every remaining command in this Linux terminal, not on the Mac.**
+**Run the remaining commands inside Linux**, with Linux paths. Inspect this
+profile from the Mac using `colima ssh --profile nkd-demo -- docker ps`;
+tenant VMs are not Docker containers.
 
 ## 2. Install prerequisites on the Ubuntu execution host
-
-On either your native Ubuntu ARM64 host or the Colima Ubuntu ARM64 VM:
 
 ```sh
 set -euo pipefail
@@ -109,59 +78,36 @@ sudo -n true
 docker info >/dev/null
 docker buildx version
 df -h .
-ip route
 virsh -c qemu:///session list --all
 ```
 
-Python 3.12+ is required by the pinned NKE installer's existing readers and
-stages, not by the Go demo command. The libvirt session must be empty. The demo
-refuses overlapping
-networks and existing owned resources rather than deleting them. Host package
-installation is explicit setup, not a hermetic NKD toolchain.
+The libvirt session must be empty. The demo refuses occupied resources and
+overlapping networks. Python 3.12+ is an upstream NKE installer prerequisite;
+the demo itself is Go. No host Go, Packer or Helm is required.
 
-Git authentication must work **on the Linux execution host**; a Mac's `gh` login
-is not proof of access inside Colima. Alternatively, use an exact local NKE Git
-repository accessible from Linux and set `NKE_LOCAL_CLONE` to its absolute Linux
-path. Only committed, pinned Git objects are used.
+Git authorization must work **inside Linux**. The example fetches pinned remote
+sources. For a local NKE Git clone, use its absolute Linux path in
+`NKE_LOCAL_CLONE` and `build.nkeClone`; only committed pinned objects are used.
 
-## 3. Build the Linux ARM64 artifacts
-
-From the Linux NKD checkout or committed export, run sequentially. Use new attempt
-names for a rerun.
+## 3. Bootstrap the demo command
 
 ```sh
-set -euo pipefail
 export CONTAINER_RUNTIME=docker
 umask 022
-# Optional: export NKE_LOCAL_CLONE=/absolute/path/to/mounted/nke
-for lane in os components site tools profiles simulator; do
-  bash scripts/nke-full-arm64-local.sh --check "$lane"
-  bash scripts/nke-full-arm64-local.sh "demo-$lane-01" 1 "$lane"
-done
+# Optional: export NKE_LOCAL_CLONE=/absolute/Linux/path/to/nke
+bash scripts/nke-full-arm64-local.sh --check tools
+bash scripts/nke-full-arm64-local.sh demo-bootstrap-tools-01 1 tools
+export NKE_DEMO="$(pwd)/.nkd/laptop-bootstrap/demo-bootstrap-tools-01/nke-demo"
+"$NKE_DEMO" e2e --help
 ```
 
-A failed lane stops the sequence. `--check` is preflight, not a build.
-OS execution uses QEMU software acceleration; its duration is not guaranteed.
-Build the OS first to preserve its disk-space headroom. The components Run
-already contains both providers; a separate `providers` build is unnecessary
-for this demo. The historical `all` selection does not contain this whole set.
-The build umask allows the rootless builder to read source files; the private
-checkout or export parent still prevents access by other host users. The `tools`
-lane builds the demo's Linux Helm, kubectl, clusterctl, ORAS and Kind bundle;
-the consumer extracts it privately rather than requiring those tools on the Mac
-or preinstalled on Ubuntu.
-The launcher also builds native `nkdctl` and `nke-demo` beside each other under
-`.nkd/laptop-bootstrap/<attempt>/`; no host Go installation is needed.
-To reuse completed Runs instead, skip this step and supply their absolute paths
-below. Never overwrite or rebuild accepted artifacts just to relocate them.
+Preflight does not build. Each attempt name must be new. This bootstrap supplies
+the CLI; E2E subsequently builds its own fresh artifact Runs, including tools.
+Developers with the pinned Go toolchain can instead use `make demo`.
 
 ## 4. Prepare the matching installer
 
-The installer must match the site/tools/profiles source pin. This creates a new
-clean clone; use an exact local Git repository instead of the URL if appropriate.
-
 ```sh
-set -euo pipefail
 export NKE_INSTALLER_CLONE="$(pwd)/.nkd/installers/nke-8fb2d533"
 mkdir -p "$(pwd)/.nkd/installers"
 git clone --no-checkout https://github.com/dsx-ai-factory/nke.git "$NKE_INSTALLER_CLONE"
@@ -170,144 +116,81 @@ git -C "$NKE_INSTALLER_CLONE" checkout --detach 8fb2d53368823bd386b4fbd55b4ab6d3
 test "$(git -C "$NKE_INSTALLER_CLONE" rev-parse HEAD)" = 8fb2d53368823bd386b4fbd55b4ab6d3c0931345
 ```
 
-## 5. Run the demo without rebuilding
+Use a new clean clone. A different installer revision is not automatically
+compatible with these selected artifacts.
 
-Inspect `docker network ls` and `ip route`. If `kind` does not exist and
-`172.18.0.0/16` is unused, create it once:
+## 5. Build and run the demo
+
+Inspect `docker network ls` and `ip route`. Only if `kind` does not exist
+and its subnet is unused:
 
 ```sh
 docker network create --driver bridge --subnet 172.18.0.0/16 --gateway 172.18.0.1 kind
 ```
 
-Do not recreate an existing network. Cache the pinned management-node and
-registry images (runtime acquisitions, not NKD source-built outputs):
+The adapter checks the pinned Kind configuration and projects IPv4 networking
+without a Docker-socket mount into a private copy; it does not edit NKE.
+
+Cache the explicit runtime acquisitions, then copy the example config:
 
 ```sh
 docker pull kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
 docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
+test ! -e .nkd/demo.local.yaml
+cp demos/local-nke.yaml .nkd/demo.local.yaml
+chmod 600 .nkd/demo.local.yaml
+printf 'build.repo: %s\nrun.nkeCheckout: %s\nrun.out: %s\n' \
+  "$(pwd)" "$NKE_INSTALLER_CLONE" "$(pwd)/.nkd/e2e-demo-01"
 ```
 
-Set the paths below to your completed Runs. The output directory must be new.
-Deployment requires the disk-copy bytes plus 30 GiB free on the Linux execution
-filesystem. If using Colima, check physical Mac capacity separately too.
+Edit those three YAML paths using the printed values. They are literal Linux
+paths: `~` and shell variables are not expanded. For each rerun, use a fresh
+`build.attempt` **and** `run.out`. Do not add retained `run.runs` or
+`run.nkdctl` references to E2E configuration.
 
 ```sh
-set -euo pipefail
-export NKD_NATIVE_BOOTSTRAP="$(pwd)/.nkd/laptop-bootstrap/demo-tools-01/nkdctl"
-export NKD_TOOLS_RUN="$(pwd)/.nkd/runs/demo-tools-01"
-export NKD_SITE_RUN="$(pwd)/.nkd/runs/demo-site-01"
-export NKD_COMPONENTS_RUN="$(pwd)/.nkd/runs/demo-components-01"
-export NKD_PROVIDER_RUN="$NKD_COMPONENTS_RUN"
-export NKD_PROFILES_RUN="$(pwd)/.nkd/runs/demo-profiles-01"
-export NKD_SIMULATOR_RUN="$(pwd)/.nkd/runs/demo-simulator-01"
-export NKD_OS_RUN="$(pwd)/.nkd/runs/demo-os-01"
-export NKD_DEMO_OUT="$(pwd)/.nkd/deploy-demo-01"
-
-"$(pwd)/.nkd/laptop-bootstrap/demo-tools-01/nke-demo" run \
-  --nke-checkout "$NKE_INSTALLER_CLONE" --nkdctl "$NKD_NATIVE_BOOTSTRAP" \
-  --tools-run "$NKD_TOOLS_RUN" --site-run "$NKD_SITE_RUN" \
-  --components-run "$NKD_COMPONENTS_RUN" --provider-run "$NKD_PROVIDER_RUN" \
-  --profiles-run "$NKD_PROFILES_RUN" --simulator-run "$NKD_SIMULATOR_RUN" \
-  --os-run "$NKD_OS_RUN" --out "$NKD_DEMO_OUT" --timeout 3600
+"$NKE_DEMO" e2e --config .nkd/demo.local.yaml
 ```
 
-The 60-minute tenant budget is a bound, not a completion estimate. Kind hosts
-management services only. Tenant nodes are real libvirt guests using Ubuntu
-26.04, Kubernetes 1.34.2 and OVN-Kubernetes 1.4.0. Each has four CPUs, eight GiB
-RAM and a 60-GiB overlay. Packer is not called during deployment.
-The thin Go command delegates to the typed local-demo library. Its NKD operations
-are `nkdctl` subprocesses; the consumer does not execute builds through an SDK.
+E2E preflights all lanes, then builds OS, components, site, tools, profiles and
+simulator. The components Run supplies both providers. The first lane's bootstrap
+tools are reused by sibling lanes; artifact Runs and their observations remain
+separate. A failed lane stops deployment.
 
-### Use one YAML file for the complete build and demo
+Progress streams to the terminal with observed START/DONE/FAIL boundaries;
+private installer output stays in private logs. Ctrl+C cancels work and waits
+for owned cleanup. There is no terminal dashboard or presentation-mode flag.
 
-After the prerequisites and runtime-image setup above, copy
-[`demos/local-nke.yaml`](../demos/local-nke.yaml) to a private local file and edit
-the absolute paths for your Ubuntu host. On a Mac, these are **Linux VM paths**,
-not Mac paths. Use a new `build.attempt` and `run.out` for each fresh build.
-
-```sh
-cp demos/local-nke.yaml demo.local.yaml
-chmod 600 demo.local.yaml
-# Edit demo.local.yaml: build.repo, optional build.nkeClone,
-# run.nkeCheckout and run.out. Omit nkeClone for remote source acquisition.
-.nkd/laptop-bootstrap/demo-tools-01/nke-demo e2e --config demo.local.yaml
-```
-
-This command builds all six lanes, then deploys their exact new outputs and runs
-the tenant/workload/cleanup checks. It does not reuse Runs from the YAML file:
-`run.nkdctl` and `run.runs` are refused for `e2e`. Bootstrap the command through
-the tools lane above; developers with the pinned Go installed can use
-`make demo` and `bin/nke-demo` instead.
-
-Cobra owns commands and completion; Viper loads only the explicitly named YAML
-file into typed inputs. Unknown keys, duplicate keys, wrong types and unsupported
-versions fail before building or deploying. Explicit CLI flags override config
-values. No automatic environment substitution or hidden config search occurs.
-The file describes this downstream demo, not an additional NKD lifecycle object.
-Keep it out of commits if it contains your local paths.
-
-### Watch progress
-
-An interactive terminal gets a live dashboard automatically: six artifact
-lanes, the current phase, elapsed time and a bounded tail of public build
-output. Completed markers follow actual operation results, not estimated
-percentages. Private installer output stays in the demo's private logs.
-
-Use plain output when recording commands or piping logs:
-
-```sh
-.nkd/laptop-bootstrap/demo-tools-01/nke-demo e2e \
-  --config demo.local.yaml --progress plain
-```
-
-`--progress auto` is the default. Pipes, `NO_COLOR`, and an unset or `dumb`
-`TERM` also select plain output. `--progress tui` requires a supported terminal;
-it fails before runtime work if that presentation is unavailable. Ctrl+C cancels
-work; the command waits for its owned cleanup rather than exiting mid-cleanup.
-The dashboard is presentation, not signed evidence or a qualification result.
+The OS uses QEMU software acceleration. The eight-hour E2E budget and 60-minute
+tenant budget are ceilings, not completion estimates. Deployment requires the
+disk-copy bytes plus 30 GiB free. Tenant guests use the selected plain ARM64 disk,
+four CPUs, eight GiB RAM and a 60-GiB overlay each.
 
 ## 6. Recognize success
 
-The command must exit zero and print:
+Require exit zero and this exact final message:
 
 ```text
 PASS: real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.
 ```
 
-This means both nodes were Ready, the pinned ARM64 workload and DNS test passed,
-backing-disk and deployed image identities matched, and owned cleanup finished.
-No PASS is printed for an installation-only result or cleanup failure.
+The adapter requires both nodes Ready, workload/DNS success, artifact/disk
+correspondence and owned cleanup. The private output directory retains
+`demo-inputs.json`, `site/site-inputs.json`, `site/tenant-result.json` and
+logs. They are diagnostics, not signed receipts.
 
-Private `demo-inputs.json` records consumed artifacts; `site/site-inputs.json`
-records deployed image/chart references; `site/tenant-result.json` records node,
-VM/backing-disk and workload observations. These are diagnostics, not signed
-receipts. Keep the entire output directory out of Git and shared logs.
+The command removes owned tenant/VMs, management node/volume, registry, bridge,
+temporary firewall rules and grants. It retains accepted Runs, logs, shared
+image caches and the native TPM CA. It does not prune Docker or reset Colima.
 
-The command removes its tenant, VMs, management node/volume, registry, bridge,
-firewall rules and temporary grants. Accepted Runs, private logs, shared image
-caches and the native TPM CA remain. It does not prune Docker or reset Colima.
-
-## If something fails
-
-Read the last printed phase and private logs in the output directory. Do not
-delete unknown VMs, change NKE or prune the runtime to force a rerun.
-
-- Inspect containers from the Mac: `colima ssh --profile nkd-demo -- docker ps`.
-  Tenant VMs are not Docker containers.
-- A new source change needs a new committed source export and fresh Run names.
-  See [local rebuilds](local-development.md#rebuild-a-committed-local-source-change).
-- For cleanup refusal or interruption, use the
-  [network recovery procedure](nkd-to-nke-demo.md#recover-network-controls-after-a-crash).
-- See the [installer and safety reference](nkd-to-nke-demo.md) for transport,
-  privilege, offline-package and diagnostic security boundaries.
+For failures, inspect the last phase and private logs. Do not delete unknown
+resources to force a rerun. See [network recovery](nkd-to-nke-demo.md#recover-network-controls-after-a-crash).
+For focused rebuilds see [local development](local-development.md).
 
 ## Repeat the real build and demo as a Go test
 
-For developers of the Go adapter, `TestEndToEnd` builds all six lanes and deploys
-their newly completed outputs. It is opt-in because it performs real builds,
-temporary host grants and tenant creation. Use the same dedicated Ubuntu ARM64
-host and prerequisites above, a fresh attempt prefix and a new output directory.
-This developer test also requires the repository's pinned Go toolchain.
+This opt-in test performs real builds and host mutations on the same dedicated
+Ubuntu ARM64 host. Ordinary tests skip it.
 
 ```sh
 export NKD_NKE_E2E=1
@@ -315,12 +198,8 @@ export NKD_NKE_E2E_REPO="$(pwd)"
 export NKD_NKE_E2E_INSTALLER="$NKE_INSTALLER_CLONE"
 export NKD_NKE_E2E_OUT="$(pwd)/.nkd/e2e-demo-02"
 export NKD_NKE_E2E_ATTEMPT=demo-e2e-02
-# Optional: export NKE_LOCAL_CLONE=/absolute/path/to/nke
 go test ./internal/nkedemo -run '^TestEndToEnd$' -count=1 -timeout 9h
 ```
 
-Ordinary `go test` skips this test. The test calls the same build launcher and
-typed deployment library; it does not select an SDK execution path or replace
-the real tenant/workload and cleanup gates with mocks.
-The outer test deadline exceeds the eight-hour work context so bounded cleanup
-can run after its cancellation; neither duration is a completion estimate.
+The test requires the pinned Go toolchain. Its deadline allows bounded cleanup
+after the eight-hour work context expires.
