@@ -2,7 +2,9 @@
 
 Use the [14-slide deck](nkd-team-tour.html) for the story, the [concept gallery](demo-team-concepts.html)
 for questions, and the [HTML walkthrough](demo-team-walkthrough.html) for copyable commands.
-The [graph explorer](demo-team-explorer.html) displays saved Plans and release metadata offline.
+The [graph explorer](demo-team-explorer.html) displays a generated one-output `hello` Plan and recorded
+release metadata offline. The embedded Plan is a planning example, not the Plan of the featured NKE release;
+use **Open JSON** for a full NKE or OS Plan exported from your checkout.
 Keep all four HTML files together; they need no server or runtime downloads.
 
 NVKE Recipes turns declared build inputs into generated pipelines and traceable releases. The deck

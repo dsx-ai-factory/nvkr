@@ -70,10 +70,25 @@ Complete removal of NKE package-folder use is not implemented by this catalog al
 4. Resolve Helm held-source preparation admission: both pinned Helm trees are rejected by the production `ExecNode` vendor owner before fixture removal. Local-route green diagnostics do not establish that production path.
 5. Connect the producers to image-inputs and the maintained OS/M2 Definition, regenerate matching overlays and Plans through their owning commands, and execute fresh AMD64 and ARM64 image builds plus package/boot/runtime selection tests.
 
-The [release inventory](../../docs/nke-v0.21.0-os-dependency-inventory.md) contains the exact released inputs and remaining source mappings. Ubuntu packages remain the separately captured APT lane; this change does not rebuild Ubuntu itself or claim byte-reproducible QCOW2 images.
+The release SBOM below is a reference for acquired inputs, not expected hashes for rebuilt outputs or a complete OS inventory. Ubuntu packages remain the separately captured APT lane; this change does not rebuild Ubuntu itself or claim byte-reproducible QCOW2 images.
+
+## Release reference
+
+The original [NKE v0.21.0 SBOM](https://github.com/dsx-ai-factory/nke/releases/download/v0.21.0/SBOM.cdx.json)
+has SHA-256 `546477fbb07f5915aa425a0b633a279de7c62dd884da7aeb9d7f6270551ac626`.
+To retrieve and inspect that exact reference:
+
+```sh
+gh release download v0.21.0 --repo dsx-ai-factory/nke --pattern SBOM.cdx.json
+printf '%s  SBOM.cdx.json\n' 546477fbb07f5915aa425a0b633a279de7c62dd884da7aeb9d7f6270551ac626 | shasum -a 256 -c -
+jq '{metadata, components, dependencies, compositions, externalReferences}' SBOM.cdx.json
+```
+
+The hash checks blob integrity, not upstream authenticity. This release SBOM does not establish complete
+installed-disk inventory or approved source mappings for every acquired component.
 
 ### Unavailable-public-source exception
 
-DSX IMDS has no established public Git URL/approved source revision in the release inventory. The proposed [ADR-13 acquisition policy](../../docs/adr/0013-supply-chain-evidence.md#2-external-evidence-for-acquired-artifacts) retains existing per-architecture digest-pinned payloads with an explicit source-availability exception; it does not waive acquisition integrity. The release-declared URLs returned anonymous HTTP 403 on 2026-10-07. An accessible existing mirror or held payload with the same digests is still required for a complete package/image build.
+DSX IMDS has no established public Git URL/approved source revision in the release SBOM. The proposed [ADR-13 acquisition policy](../../docs/adr/0013-supply-chain-evidence.md#2-external-evidence-for-acquired-artifacts) retains existing per-architecture digest-pinned payloads with an explicit source-availability exception; it does not waive acquisition integrity. The release-declared URLs returned anonymous HTTP 403 on 2026-10-07. An accessible existing mirror or held payload with the same digests is still required for a complete package/image build.
 
 This experimental public-source-only catalog does not claim complete release membership and does not acquire DSX. The live test prints the unresolved prebuilt exception explicitly. It never reclassifies a publicly available component as unavailable merely because its source build fails.

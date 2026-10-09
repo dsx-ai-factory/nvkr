@@ -22,8 +22,8 @@ and [OS-image routes](../definitions/nke-os/README.md). The [demo index](../demo
 
 Experimental [public OS source producers](../definitions/nke-os-source/README.md) and the
 [OVN source-build option](../definitions/nke-ovn-source/README.md) are separate candidates, not full OS
-migration or maintained M2 membership. The [v0.21.0 dependency inventory](nke-v0.21.0-os-dependency-inventory.md)
-records source availability and remaining gaps.
+migration or maintained M2 membership. The [source-producer guide](../definitions/nke-os-source/README.md)
+owns remaining migration gaps and the [original release SBOM reference](../definitions/nke-os-source/README.md#release-reference).
 
 ## Detailed references
 

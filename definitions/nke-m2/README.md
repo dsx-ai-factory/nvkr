@@ -20,106 +20,25 @@ native image digests. Do not maintain a second digest table in documentation. Po
 retain their source-owned index digests as well as the selected native child pins; acquisition checks
 actual parent-to-child membership before using the native image.
 
-The OS, Calico and kubeadm sources remain machine-pinned to that capture-capable commit.
-For the temporary branch build test, only `nke-spire-agent-source` is pinned to
-`726f76944404e1106626b8333d3576bdf67b575b` using `catalog pin --commit`. That older package
-omits the DSX IMDS plugin whose S3 download returned HTTP 403 on both hosted architectures.
-This mixed-source candidate tests the build path; it is not the intended complete M2 image.
-The exception's acceptance owner, expiry and production-content approval are not recorded. Exiting the exception
-requires restoring the intended DSX IMDS payload with verified native materials and both-architecture content
-checks, or a named, explicitly approved content-scope decision; a successful build cannot silently approve omission.
-The [merged-source handoff](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
-records NKE #1211 as approved and merged, and the exact selected commit as protected `main`
-at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
-`agent/v*` tag pattern. Exact commit acquisition itself is not protected-ref or source-review
-proof; that acceptance is separately recorded. The hosted candidate publication result is recorded below;
-independent consumer acceptance remains unresolved.
-The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
-`non-fde/apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
-The source's composition command receives the required explicit native `--architecture` argument.
-The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
-under `nke.dev/os-image-materials/v1`; every selected material and disk target retains its own architecture.
+Each disk selects its root and complete material closure: agent, Kubernetes distribution, Calico, OVN,
+SPIRE, installer ISO and aggregate inputs. The OS, Calico and kubeadm sources use the capture-capable NKE
+pin. The source composer receives an explicit native architecture. The direct-Packer contract receives
+`capture_apt_acquisitions=true` and exports `non-fde/apt-acquisitions.tar`, declared through
+`packer.acquisitionArchive`. The material projection binds `image-inputs` as `archive` and `installer-iso`
+as `disk-image` under `nke.dev/os-image-materials/v1`; every material retains its target architecture.
+Capture byte correspondence alone does not authenticate repository origin or establish a complete
+installed-software inventory.
 
-This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
-the existing registry credential, source access and workflow signing policy, but publishes only under
-the separately authored `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix. The maintained signer identity
-admits only `main`; the temporary PR #97 branch-test exception has been removed after the
-cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
-execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
-capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
-Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
-The two inspector profiles use measured executable hashes and published native image manifests.
-Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
-224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
-include the held subject snapshot. These are admission budgets, not measured full-M2 usage.
-The inspector and Packer source locks retain their outstanding organizational approval gates;
-the [candidate exception and publication evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md)
-records the narrower authorization and exact registry read-back.
-The retained measurements came from developer-host preparation and publication. A hosted toolchain build,
-its matching measurements and provenance, and completed organizational clearance are not recorded here;
-native preparation commands alone do not supply that evidence.
-The candidate exception's organizational acceptance owner and expiry are not recorded. Leaving that exception
-requires recorded license/security clearance and the hosted closure/measurement/provenance evidence; a
-developer-host image push does not supply those approvals.
-The candidate Environment selects Docker through the existing typed runtime controls;
-it declares no storage-driver field or ambient runtime-variable workaround. Storage behavior
-is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
-is diagnostic evidence, not this Environment's configuration or production approval.
-Runner labels do not supply runtime-capacity or full-inspector profile authority.
-The current candidate selects `diskEvidence: build-provenance-v1`, authenticating both held disks and their
-material producers without deep inspection. Profiles remain available for strict mode but are not pulled or
-executed in this mode; its signed evidence reports inspection as `not-performed`. Ilya Kislenko's October 7
-task-chat instruction preserves main/#106's producer-provenance M2 floor and full scan plus material
-reconciliation for M3 ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
-The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
-extension, and both disk outputs remain mandatory for completion of this Definition.
-Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
-M2 candidate requires publication, signatures and consumer verification for every selected output.
-The [failed delivery attempt](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md)
-records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
-Per-output storage peaks still require measured admission.
-The signed disk mode is descriptive. `VerificationPolicy.minimumDiskEvidence` defaults to `build-provenance-v1`
-for pipeline-attested verification. Explicit `strict` rejects producer-only evidence; qualified policy defaults
-to strict and rejects the producer-only minimum. The selected minimum is
-policy-digest-bound. The historical validation run below predates these consumer-policy and timeout changes
-and does not validate this updated head, current main execution, strict inspection or independent full-payload
-consumer acceptance.
+The temporary `nke-spire-agent-source` pin selects an older package that omits the DSX IMDS plugin whose
+S3 download failed on both hosted architectures. This mixed-source candidate tests the build path;
+it is not the intended complete M2 image. The exception's acceptance owner, expiry and production-content
+approval are not recorded. Exiting it requires restoring the intended DSX IMDS payload with verified native
+materials and both-architecture content checks, or a named, explicitly approved content-scope decision.
+A successful build cannot silently approve omission. [Reconciliation](../../docs/adr/reconciliation.md#maintained-input-and-schema-boundaries)
+retains the source handoff and acquisition history.
 
 The [customer choices guide](../../docs/nke-m2-customer-choices.md) explains supplier replacement through
-the existing catalog interfaces and the precise scope of its graph tests. The
-[release transport evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
-failed candidate's storage exhaustion and why correcting carrier selection alone does not complete delivery.
-
-The [toolchain preparation guide](../../toolchains/nkd-packer/README.md)
-lists repository-owned native preparation and measurement commands, their current
-toolchain license/security gates, and the missing production inputs. The inspector's source
-README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
-read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. Maintained manual dispatch and
-signing admit only `main`. The October 7 branch attempt at `562a609` used a temporary exact
-`codex/m2-native-arc-foundation` authored exception; it was cancelled after GitHub environment
-protection rejected that branch before attestation, disk execution and finalization steps ran
-([run 37661490433](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37661490433)).
-That exception is removed from the authored inputs and regenerated bundle. No deployment-policy
-entry was added, and existing unrelated entries are not changed here. Any further branch test
-needs a separate non-merge candidate and actual environment admission; this maintained bundle
-does not authorize it.
-The equivalent validation-branch bundle completed all jobs in
-[run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963);
-that run used a different exact branch exception and is not evidence for this PR's head.
-
-Each disk selects its root and complete material closure: agent, Kubernetes distribution, Calico, OVN,
-SPIRE, installer ISO and aggregate inputs. The source composer receives an explicit native architecture.
-The direct-Packer contract opts into APT capture and declares `non-fde/apt-acquisitions.tar` under the
-source-owned material projection. Capture byte correspondence alone does not authenticate repository
-origin or establish a complete installed-software inventory.
-
-The Environment explicitly selects `diskEvidence: build-provenance-v1`. M2 authenticates the held disk
-and its live producer/material subjects and signs evidence describing the deferred inspection scope.
-Deep content inspection and reconciliation move to M3. The existing strict inspection profiles remain
-available, but this M2 mode neither prepares nor invokes the inspector. A successful M2 pipeline still
-requires every named output, exact-subject evidence, publication, signing and verification; deferral
-cannot substitute for those gates or establish qualified reproduction.
+the existing catalog interfaces and the precise scope of its graph tests.
 
 ## Native execution and publication
 
@@ -132,26 +51,39 @@ and producer-declared build-network controls; no ambient storage-driver workarou
 `native-toolchains.yaml` substitutes measured published Packer pins for each architecture's nine selected
 source-map consumers, preserving OVN's separate BuildKit pin. Internal Packer/inspector images were
 published under the user's scoped candidate exception. Their source locks retain unresolved general
-license/security approval gates; the exception does not mark those reviews complete. See
-[Packer preparation and selection](../../toolchains/nkd-packer/README.md#native-preparation-and-catalog-selection)
+license/security approval gates; the exception does not mark those reviews complete. Its organizational
+acceptance owner and expiry are not recorded. Leaving it requires recorded license/security clearance
+and hosted closure, measurement and provenance evidence; developer-host preparation or publication alone
+does not supply those approvals. See [Packer preparation and selection](../../toolchains/nkd-packer/README.md#native-preparation-and-catalog-selection)
 and [inspector measurement](../../toolchains/nkd-disk-inspect/README.md#local-measurement-not-publication-admission).
 
-Strict profiles contain actual native image/executable pins and conservative bounds: up to an 8 GiB
-subject, 16 GiB filesystem, 28 GiB inspection memory, 224 GiB private scratch and a ten-minute deadline.
-These retained profiles do not demonstrate a successful full M2 inspection or measured peak usage.
+The Environment explicitly selects `diskEvidence: build-provenance-v1`. M2 authenticates the held disk
+and its live producer/material subjects and signs evidence describing inspection as `not-performed`.
+Deep content inspection and reconciliation move to M3 under [ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope).
+The retained strict profiles are neither prepared nor invoked in this mode. They contain native
+image/executable pins and conservative bounds: an 8 GiB subject, 16 GiB filesystem, 28 GiB inspection
+memory, 224 GiB private scratch and a ten-minute deadline. They do not demonstrate successful full M2
+inspection or measured peak usage. Runner labels do not supply runtime-capacity or profile authority.
+
+Omitting producer `diskEvidence` selects strict inspection. Consumer `VerificationPolicy.minimumDiskEvidence`
+defaults to `build-provenance-v1` for pipeline-attested verification; explicit `strict` rejects producer-only
+evidence. Qualified policy defaults to strict and rejects the producer-only minimum. The selected minimum
+is policy-digest-bound. Deferral cannot replace exact-subject evidence or establish qualified reproduction.
 
 Publication uses the separate `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate` prefix and
 `publication.mode: per-output-v1`. Each output is packaged, published, signed and verified independently.
 Assembly authenticates same-Plan, same-workflow metadata and evidence; it does not download payload layers.
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities, but
-hosted mixed-attempt reuse remains unexercised.
+hosted mixed-attempt reuse remains unexercised. Per-output storage peaks require measured admission.
 
-Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN`; native build jobs receive source bytes without that
-credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
-before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
-package. Restrict `nkd-arc`, `nkd-release` and the signing identity to the selected refs. Maintained inputs
-admit `main` only and contain no validation-branch dispatch exception. Ephemeral runner isolation and
-provider access restrictions remain operator obligations.
+Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN`;
+native build jobs receive source bytes without that credential. Internal toolchain preparation uses
+separate ephemeral read-only package access, removed before producer execution. Grant the workflow
+repository Actions Read access on each internal toolchain package. Restrict `nkd-arc`, `nkd-release` and
+the signing identity to the selected refs. Maintained inputs admit `main` only. Any branch test needs a
+separate non-merge candidate with authored dispatch/signing refs and actual environment admission;
+these inputs do not change provider deployment policies. Ephemeral runner isolation and provider access
+restrictions remain operator obligations.
 
 ## Generate and check the maintained workflow
 
@@ -177,13 +109,13 @@ temporary SPIRE selection. The opt-in full graph integration runs with
 `NKD_TEST_M2_ALL_OUTPUT_GRAPHS=1` and authorized pinned-source access; ordinary tests receive no
 private-source credentials. Pinning and graph tests establish their own contracts, not production launch.
 
-## Recorded delivery and remaining acceptance
+## Acceptance status
 
-[Run 37533806963](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed all 34 outputs and aggregate
-publication, signing, verification and finalization. It used an exact validation-branch dispatch/signing
-exception absent from the maintained main-only inputs. Independent full-payload signed disk consumption,
-main-only execution and hosted mixed-attempt retry acceptance remain unexercised. Earlier deep inspections
-timed out; the successful candidate used the explicit build-provenance mode.
+[Reconciliation](../../docs/adr/reconciliation.md#native-arc-disk-route) owns current implementation,
+recorded runs and their limits; [the epic specification](../../docs/epics-v1-spec.md) owns product acceptance.
+A historical candidate run does not validate an updated head or independent full-payload signed consumption.
+The product acceptance floor is AMD64; this candidate also selects ARM64. Both disk outputs and every other
+named output remain mandatory for its complete Run and Release, including publication, signing and verification.
 
 The required checkpoint for NKE images outside the disk remains separately owned. The pinned deploy tree
 mentions CAPNICo, while the catalog's provisioned-provider build is a different project. Its fleet-profile
@@ -192,6 +124,4 @@ or silently treated as deferred. Embedded SPIRE and chart-side SPIRE containers 
 one cannot satisfy the other's evidence row. These unresolved ownership/payload questions remain product
 acceptance gaps, alongside full M3 disk evidence and organizational toolchain reviews.
 
-[Reconciliation](../../docs/adr/reconciliation.md) owns current implementation/evidence status;
-[the epic specification](../../docs/epics-v1-spec.md) owns product acceptance. This README owns the
-candidate input selections and the maintained workflow instructions.
+This README owns candidate input selections and maintained workflow instructions, not a second run-history ledger.

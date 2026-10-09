@@ -90,29 +90,11 @@ expected stage and bootstrap jobs, rejects duplicate or unknown fields and statu
 job outputs without logging them. It records ordinary carrier failures and continues; cancellation or a
 failure to persist outcomes stops recovery. The finalizer still authenticates completeness and evidence.
 
-## Historical six-output workflow comparison
+## Contract checks
 
-The October 4 compact-helper review used the six-output `nke-deploy` Definition and identical canonical Plan bytes.
-These measurements describe that review, rather than the current M2 workflow:
-
-| Item | Initial PR #90 (`582ab01`) | Compact helper |
-|---|---:|---:|
-| Workflow lines | 5,079 | 1,145 |
-| Workflow bytes | 345,920 | 59,933 |
-| Jobs | 23 | 23 |
-| Logical execution operations | 33 | 33 |
-| Visible steps | 212 | 209 |
-| Download actions | 36 | 36 |
-| Upload actions, including helper and final Run record | 44 | 44 |
-| Finalizer steps | 10 | 7 |
-| Largest decoded run script, bytes | 20,408 | 412 |
-
-Repeated shell traps, status loops and inline utility launch commands now live in the Go helper. The
-conservative 21,000-byte limit still applies to every generated run script, including explicit operator setup.
-Workflow and manifest bytes change; the Plan digest and bytes remain unchanged. Transport count and payload
-size are unchanged by this refactor, including the remaining work to minimize OS-image transfer.
+The conservative 21,000-byte limit applies to every generated run script, including explicit operator setup.
 
 Current contracts live in [compact-helper tests](../pkg/nkd/factory/github_compact_test.go),
 [reporter tests](../pkg/nkd/factory/github_reporter_test.go), and
 [finalization tests](../pkg/nkd/factory/github_finalize_test.go). They cover generated commands and failure
-handling; neither these tests nor the historical static counts establish hosted duration or Release acceptance.
+handling; these tests do not establish hosted duration or Release acceptance.

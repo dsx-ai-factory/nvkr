@@ -15,11 +15,15 @@ extra time for optional demos. The featured hosted release comes from Run 377365
 | [14-slide deck](nkd-team-tour.html) | Present the core story |
 | [Concept gallery](demo-team-concepts.html) | Explore worked examples from the slides |
 | [HTML walkthrough](demo-team-walkthrough.html) | Follow the guided discovery steps |
-| [Offline graph explorer](demo-team-explorer.html) | Navigate saved Plans and the featured release |
+| [Offline graph explorer](demo-team-explorer.html) | Navigate the tiny demo Plan, imported full Plans and the featured release |
 | [Facilitator guide](team-guide.md) | Present the concepts and optional live stops |
 
 Open the HTML files directly in a browser. They include their assets and need no web server.
 The deck’s CLI snippets illustrate the operations using your input paths; the walkthrough supplies full setup and runnable examples.
+
+The explorer embeds a small generated Plan from `demos/quickstart`, not a duplicate of the committed
+M2 Plan. It is a planning example, separate from the recorded NKE release. Use **Open JSON** to load a
+full NKE or OS Plan exported by the scripts below.
 
 ## Self-guided scripts
 
