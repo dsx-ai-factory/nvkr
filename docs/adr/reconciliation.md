@@ -197,6 +197,20 @@ results below exercised the previous Python consumer and do not establish fresh
 Go-consumer acceptance. The pinned upstream NKE installer still requires Python
 for its source-owned readers. Go network journals use version 2 and reject legacy
 version-1 Python journals; restore any old live controls before upgrading.
+The local diagnostic command also accepts an explicitly selected versioned YAML
+configuration through Cobra/Viper. Typed, bounded parsing rejects unknown keys,
+ambiguous documents and implicit type coercion before action callbacks. A local
+`e2e` command derives deployment Run paths from its own fresh six-lane build;
+this descriptive file grants no NKD execution or Release authority. The cold
+Go replay of commit `b3d97b3` stopped during Packer toolchain construction because
+Canonical's exact pinned APT snapshot endpoint returned HTTP 503 on both the Mac
+and Colima host. It produced no new QCOW2 and supplies no E2E acceptance.
+The downstream CLI optionally presents real lane/phase events and a bounded,
+terminal-control-sanitized public build console; private deployment diagnostics
+are not forwarded. Pipes and unsupported terminals retain plain output. The
+TUI admits an independently opened nonblocking terminal and retains work/cleanup
+ownership through cancellation. Presentation events grant no artifact, Release
+or qualification authority; terminal contract tests do not establish fresh E2E.
 Network-only crash recovery now uses a private synced intent journal and the
 same kernel-released lock. Exact executable/file/bridge bindings gate restoration;
 recovery never kills journal PIDs. Contract negatives cover changed journals,

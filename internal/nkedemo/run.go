@@ -298,7 +298,9 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 // Run deploys completed attempts through nkdctl extraction and source-owned NKE
 // interfaces. Success is a local diagnostic, not Release authorization. Every
 // daemon is joined before removing its shared networking controls.
-func Run(ctx context.Context, cfg Config) error {
+func Run(ctx context.Context, cfg Config) (result error) {
+	boundary := beginProgress(cfg.Progress, "local-demo", DeploymentStarted, DeploymentFinished, DeploymentFailed)
+	defer func() { boundary.finish(result) }()
 	err := run(ctx, cfg)
 	if err == nil {
 		if cfg.Progress != nil {

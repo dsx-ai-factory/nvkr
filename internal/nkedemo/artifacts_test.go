@@ -210,7 +210,7 @@ func writeAssetArchive(t *testing.T, entries []assetEntry) string {
 
 func TestSafeExtractAssets(t *testing.T) {
 	base := []assetEntry{{"internal/seed/default-seed.yaml", tar.TypeReg, "seed", 0}, {"ui/", tar.TypeDir, "", 0}, {"ui/index.html", tar.TypeReg, "index", 0}}
-	for _, name := range []string{"valid", "traversal", "absolute", "symlink", "hardlink", "device", "duplicate", "missing seed", "oversized", "too many", "privileged mode", "bad CRC", "destination collision", "destination symlink", "canceled"} {
+	for _, name := range []string{"valid", "traversal", "nested traversal", "backslash traversal", "absolute", "symlink", "hardlink", "device", "duplicate", "missing seed", "oversized", "too many", "privileged mode", "bad CRC", "destination collision", "destination symlink", "canceled"} {
 		t.Run(name, func(t *testing.T) {
 			entries := append([]assetEntry(nil), base...)
 			out := privateTestDir(t)
@@ -218,6 +218,10 @@ func TestSafeExtractAssets(t *testing.T) {
 			switch name {
 			case "traversal":
 				entries = append(entries, assetEntry{"../outside", tar.TypeReg, "escape", 0})
+			case "nested traversal":
+				entries = append(entries, assetEntry{"ui/../../outside", tar.TypeReg, "escape", 0})
+			case "backslash traversal":
+				entries = append(entries, assetEntry{"..\\outside", tar.TypeReg, "escape", 0})
 			case "absolute":
 				entries = append(entries, assetEntry{"/outside", tar.TypeReg, "escape", 0})
 			case "symlink":

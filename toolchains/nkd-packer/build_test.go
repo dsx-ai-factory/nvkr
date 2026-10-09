@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,12 +28,20 @@ func TestToolchainValidatedImageID(t *testing.T) {
 	const measured = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	for _, tc := range []struct {
 		name, inspected, smokeExit string
+		buildExit                  string
+		cleanupCommand             string
+		wantExit                   int
 		flags                      []string
 		wantError, wantID          bool
 	}{
 		{name: "exact validated ID", inspected: measured, smokeExit: "0", wantID: true},
 		{name: "normalize Podman-style ID", inspected: strings.TrimPrefix(measured, "sha256:"), smokeExit: "0", wantID: true},
 		{name: "native smoke failure emits no ID", inspected: measured, smokeExit: "42", wantError: true},
+		{name: "failed export emits no ID", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true},
+		{name: "unlink failure emits no ID", inspected: measured, smokeExit: "0", cleanupCommand: "rm", wantError: true, wantExit: 1},
+		{name: "directory cleanup failure emits no ID", inspected: measured, smokeExit: "0", cleanupCommand: "rmdir", wantError: true, wantExit: 1},
+		{name: "export exit survives unlink failure", inspected: measured, smokeExit: "0", buildExit: "42", cleanupCommand: "rm", wantError: true, wantExit: 42},
+		{name: "export exit survives directory cleanup failure", inspected: measured, smokeExit: "0", buildExit: "42", cleanupCommand: "rmdir", wantError: true, wantExit: 42},
 		{name: "invalid inspected ID emits no ID", inspected: "mutable:tag", smokeExit: "0", wantError: true},
 		{name: "lock check is not validation", inspected: measured, smokeExit: "0", flags: []string{"--check"}, wantError: true},
 		{name: "cross mode is not native proof", inspected: measured, smokeExit: "0", flags: []string{"--cross-build-only"}, wantError: true},
@@ -53,8 +63,9 @@ func TestToolchainValidatedImageID(t *testing.T) {
 printf '%s\n' "$1 $2 $3" >>"$TEST_CALLS"
 case "$1 $2" in
   'buildx version'|'version --format') echo 'runtime diagnostic';;
-  'buildx build') printf 'archive\n';;
-  'image load') cat >/dev/null; echo 'load diagnostic';;
+  'buildx build') printf 'archive\n'; exit "${TEST_BUILD_EXIT:-0}";;
+  'image load') [ "$3" = --input ] && [ -f "$4" ] && [ -s "$4" ] || exit 96
+    cat "$4" >/dev/null; echo 'load diagnostic';;
   'image inspect')
     [ "$3" != --format ] || exit 97
     printf '[{"Id":"%s","Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' "$TEST_IMAGE_ID" "$TEST_ARCH";;
@@ -68,6 +79,13 @@ esac
 			if err := os.WriteFile(fake, []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}
+			if tc.cleanupCommand != "" {
+				// Inject only the owning cleanup command. This contract fixture
+				// does not mutate a real runtime or claim image-build evidence.
+				if err := os.WriteFile(filepath.Join(dir, tc.cleanupCommand), []byte("#!/bin/sh\nprintf 'injected cleanup failure\\n' >&2\nexit 59\n"), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
 			args := append([]string{filepath.Join(dir, "build.sh"), "--arch", runtime.GOARCH,
 				"--diagnostic-local", "--print-validated-image-id"}, tc.flags...)
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
@@ -75,12 +93,25 @@ esac
 			cmd := exec.CommandContext(ctx, "bash", args...)
 			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_CALLS="+log,
 				"TEST_ARCH="+runtime.GOARCH, "TEST_IMAGE_ID="+tc.inspected, "TEST_EXPECTED_ID="+measured,
-				"TEST_SMOKE_EXIT="+tc.smokeExit, "NKD_BUILD_ARCHIVES=", "NKD_BUILD_CA_BUNDLE=")
+				"TEST_SMOKE_EXIT="+tc.smokeExit, "TEST_BUILD_EXIT="+tc.buildExit, "NKD_BUILD_ARCHIVES=", "NKD_BUILD_CA_BUNDLE=",
+				"TMPDIR="+dir, "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 			var diagnostics bytes.Buffer
 			cmd.Stderr = &diagnostics
 			out, err := cmd.Output()
 			if (err != nil) != tc.wantError {
 				t.Fatalf("error=%v stdout=%s stderr=%s; want error=%t", err, out, diagnostics.String(), tc.wantError)
+			}
+			if tc.wantExit != 0 {
+				var failure *exec.ExitError
+				if !errors.As(err, &failure) || failure.ExitCode() != tc.wantExit {
+					t.Fatalf("exit=%v; want %d; diagnostics=%s", err, tc.wantExit, diagnostics.String())
+				}
+			}
+			if tc.cleanupCommand != "" && (!strings.Contains(diagnostics.String(), "injected cleanup failure") || strings.Contains(diagnostics.String(), "validated local toolchain")) {
+				t.Fatalf("cleanup failure lost or successful validation reported: %s", diagnostics.String())
+			}
+			if tc.cleanupCommand != "" && tc.buildExit != "42" && !strings.Contains(diagnostics.String(), "native smoke diagnostic") {
+				t.Fatalf("cleanup regression did not reach successful native smoke: %s", diagnostics.String())
 			}
 			want := ""
 			if tc.wantID {
@@ -99,6 +130,9 @@ esac
 			if len(tc.flags) > 0 && len(calls) > 0 {
 				t.Fatalf("unsupported output mode performed runtime work: %s", calls)
 			}
+			if tc.buildExit == "42" && strings.Contains(string(calls), "image load") {
+				t.Fatalf("failed export loaded an archive: %s", calls)
+			}
 		})
 	}
 }
@@ -111,16 +145,20 @@ func TestToolchainDockerExportAndLoad(t *testing.T) {
 		t.Skip("toolchain supports amd64 and arm64 hosts")
 	}
 	for _, tc := range []struct {
-		name        string
-		buildExit   string
-		loadExit    string
-		wantError   bool
-		localInputs bool
+		name         string
+		buildExit    string
+		loadExit     string
+		wantError    bool
+		localInputs  bool
+		emptyArchive bool
+		wantExit     int
 	}{
 		{name: "archive loaded before validation", buildExit: "0", loadExit: "0"},
 		{name: "local archives and build CA", buildExit: "0", loadExit: "0", localInputs: true},
-		{name: "export failure stops validation", buildExit: "42", loadExit: "0", wantError: true},
-		{name: "load failure stops validation", buildExit: "0", loadExit: "43", wantError: true},
+		{name: "partial export failure does not load or validate", buildExit: "42", loadExit: "0", wantError: true, wantExit: 42},
+		{name: "empty export failure preserves primary error", buildExit: "42", loadExit: "0", emptyArchive: true, wantError: true, wantExit: 42},
+		{name: "empty successful export refuses load", buildExit: "0", loadExit: "0", emptyArchive: true, wantError: true, wantExit: 1},
+		{name: "load failure stops validation", buildExit: "0", loadExit: "43", wantError: true, wantExit: 43},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -134,11 +172,13 @@ case "$1 $2" in
   "buildx build")
     [[ " $* " == *" --output type=docker,dest=-,rewrite-timestamp=true "* ]]
     [[ " $* " == *" --build-arg SOURCE_DATE_EPOCH=0 "* ]]
-    printf 'test-image-archive\n'
+    if [[ "${TEST_EMPTY_ARCHIVE}" != true ]]; then printf 'test-image-archive\n'; fi
+    if [[ "${TEST_BUILD_EXIT}" != 0 ]]; then printf 'injected upstream build failure\n' >&2; fi
     exit "${TEST_BUILD_EXIT}"
     ;;
   "image load")
-    test "$(cat)" = test-image-archive
+    [[ "$3" == --input && -f "$4" && ! -L "$4" && -s "$4" ]]
+    test "$(cat "$4")" = test-image-archive
     exit "${TEST_LOAD_EXIT}"
     ;;
 		"image inspect")
@@ -157,13 +197,20 @@ esac
 			cmd := exec.CommandContext(ctx, "bash", "build.sh", "--arch", runtime.GOARCH)
 			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_CALLS="+log,
 				"TEST_BUILD_EXIT="+tc.buildExit, "TEST_LOAD_EXIT="+tc.loadExit, "TEST_ARCH="+runtime.GOARCH,
-				"NKD_BUILD_ARCHIVES=", "NKD_BUILD_CA_BUNDLE=")
+				"NKD_BUILD_ARCHIVES=", "NKD_BUILD_CA_BUNDLE=", "TMPDIR="+dir,
+				fmt.Sprintf("TEST_EMPTY_ARCHIVE=%t", tc.emptyArchive))
 			if tc.localInputs {
 				cmd.Env = append(cmd.Env, "NKD_BUILD_ARCHIVES="+dir, "NKD_BUILD_CA_BUNDLE="+fake)
 			}
 			output, err := cmd.CombinedOutput()
 			if (err != nil) != tc.wantError {
 				t.Fatalf("build error = %v, want error %v:\n%s", err, tc.wantError, output)
+			}
+			if tc.wantError {
+				var failure *exec.ExitError
+				if !errors.As(err, &failure) || failure.ExitCode() != tc.wantExit {
+					t.Fatalf("primary exit status changed: %v, want %d:\n%s", err, tc.wantExit, output)
+				}
 			}
 			calls, err := os.ReadFile(log)
 			if err != nil {
@@ -176,14 +223,47 @@ esac
 					}
 				}
 			}
-			if !strings.Contains(string(calls), "image load\n") {
-				t.Fatalf("archive was not explicitly loaded:\n%s", calls)
+			loaded := strings.Contains(string(calls), "image load --input ")
+			wantLoad := tc.buildExit == "0" && !tc.emptyArchive
+			if loaded != wantLoad {
+				t.Fatalf("archive load reached=%t want=%t:\n%s", loaded, wantLoad, calls)
 			}
 			validated := strings.Contains(string(calls), "image inspect ")
 			if validated == tc.wantError {
 				t.Fatalf("validation reached = %v, want %v:\n%s", validated, !tc.wantError, calls)
 			}
+			if tc.buildExit != "0" && (!strings.Contains(string(output), "injected upstream build failure") || !strings.Contains(string(output), "export failed (exit "+tc.buildExit+")")) {
+				t.Fatalf("primary build diagnostics lost:\n%s", output)
+			}
+			if tc.wantError && strings.Contains(string(output), "validated local toolchain") {
+				t.Fatalf("failed export/load reported successful native validation:\n%s", output)
+			}
+			remaining, err := filepath.Glob(filepath.Join(dir, "nkd-packer-identity.*"))
+			if err != nil || len(remaining) != 0 {
+				t.Fatalf("private export temporary files retained: %v %v", remaining, err)
+			}
 		})
+	}
+}
+
+// This source contract proves both image stages author strict APT updates; it
+// does not claim successful upstream snapshot acquisition or a real image build.
+func TestToolchainAPTUpdateFailsOnAnyFetchError(t *testing.T) {
+	raw, err := os.ReadFile("Dockerfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updates := 0
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.Contains(line, "apt-get update") {
+			updates++
+			if !strings.Contains(line, "apt-get update --error-on=any") {
+				t.Fatalf("APT stage permits degraded update: %s", line)
+			}
+		}
+	}
+	if updates != 2 {
+		t.Fatalf("strict APT update boundaries=%d want=2", updates)
 	}
 }
 

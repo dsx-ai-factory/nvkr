@@ -201,6 +201,12 @@ func SafeExtractAssets(ctx context.Context, archive, out string) error {
 			return err
 		}
 		name := strings.TrimSuffix(header.Name, "/")
+		// Standard-library locality admission precedes every archive-derived
+		// filesystem operation. Held descriptor-relative writes additionally
+		// reject substituted symlink parents; lexical checks alone cannot do so.
+		if !filepath.IsLocal(name) {
+			return errors.New("asset archive member is not a local relative path")
+		}
 		if count >= 256 || name == "" || name == "." || path.IsAbs(name) || path.Clean(name) != name || strings.HasPrefix(name, "../") || strings.ContainsAny(name, "\\\x00") || seen[name] || (header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir) || header.Size < 0 || header.Size > (16<<20)-total || header.Mode&0o7000 != 0 {
 			return errors.New("unsafe or oversized asset archive member")
 		}

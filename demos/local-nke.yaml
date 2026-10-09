@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Edit the absolute paths for your dedicated Ubuntu ARM64 execution host.
+# On macOS, these paths refer to files INSIDE the Colima Linux VM.
+# This is a local diagnostic description, not an NKD Definition or Release.
+version: 1
+build:
+  repo: /workspace/nke-recipes
+  # Optional local Git object source. Omit for network Git acquisition.
+  nkeClone: /workspace/nke-source
+  attempt: demo-e2e-01
+  jobs: 1
+run:
+  nkeCheckout: /workspace/nke-installer
+  out: /workspace/nke-recipes/.nkd/e2e-demo-01
+  timeoutSeconds: 3600
+# e2e obtains nkdctl and all Run paths from this invocation's fresh builds.
+# Do not add run.nkdctl or run.runs to an e2e configuration.

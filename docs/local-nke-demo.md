@@ -218,6 +218,54 @@ RAM and a 60-GiB overlay. Packer is not called during deployment.
 The thin Go command delegates to the typed local-demo library. Its NKD operations
 are `nkdctl` subprocesses; the consumer does not execute builds through an SDK.
 
+### Use one YAML file for the complete build and demo
+
+After the prerequisites and runtime-image setup above, copy
+[`demos/local-nke.yaml`](../demos/local-nke.yaml) to a private local file and edit
+the absolute paths for your Ubuntu host. On a Mac, these are **Linux VM paths**,
+not Mac paths. Use a new `build.attempt` and `run.out` for each fresh build.
+
+```sh
+cp demos/local-nke.yaml demo.local.yaml
+chmod 600 demo.local.yaml
+# Edit demo.local.yaml: build.repo, optional build.nkeClone,
+# run.nkeCheckout and run.out. Omit nkeClone for remote source acquisition.
+.nkd/laptop-bootstrap/demo-tools-01/nke-demo e2e --config demo.local.yaml
+```
+
+This command builds all six lanes, then deploys their exact new outputs and runs
+the tenant/workload/cleanup checks. It does not reuse Runs from the YAML file:
+`run.nkdctl` and `run.runs` are refused for `e2e`. Bootstrap the command through
+the tools lane above; developers with the pinned Go installed can use
+`make demo` and `bin/nke-demo` instead.
+
+Cobra owns commands and completion; Viper loads only the explicitly named YAML
+file into typed inputs. Unknown keys, duplicate keys, wrong types and unsupported
+versions fail before building or deploying. Explicit CLI flags override config
+values. No automatic environment substitution or hidden config search occurs.
+The file describes this downstream demo, not an additional NKD lifecycle object.
+Keep it out of commits if it contains your local paths.
+
+### Watch progress
+
+An interactive terminal gets a live dashboard automatically: six artifact
+lanes, the current phase, elapsed time and a bounded tail of public build
+output. Completed markers follow actual operation results, not estimated
+percentages. Private installer output stays in the demo's private logs.
+
+Use plain output when recording commands or piping logs:
+
+```sh
+.nkd/laptop-bootstrap/demo-tools-01/nke-demo e2e \
+  --config demo.local.yaml --progress plain
+```
+
+`--progress auto` is the default. Pipes, `NO_COLOR`, and an unset or `dumb`
+`TERM` also select plain output. `--progress tui` requires a supported terminal;
+it fails before runtime work if that presentation is unavailable. Ctrl+C cancels
+work; the command waits for its owned cleanup rather than exiting mid-cleanup.
+The dashboard is presentation, not signed evidence or a qualification result.
+
 ## 6. Recognize success
 
 The command must exit zero and print:

@@ -103,7 +103,7 @@ RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 printf '%s\n' 'Acquire::https
       'Components: main universe' \
       'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
       >/etc/apt/sources.list.d/ubuntu.sources \
-    && apt-get update \
+    && apt-get update --error-on=any \
     && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
         ca-certificates gzip tar unzip \
     && rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/99bootstrap-ca
@@ -175,7 +175,7 @@ RUN --mount=type=secret,id=nkd_ca_bundle,mode=0444 set -eux; \
       'Components: main universe' \
       'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
       >/etc/apt/sources.list.d/ubuntu.sources \
-    && apt-get update \
+    && apt-get update --error-on=any \
     && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
         bash \
         ca-certificates \

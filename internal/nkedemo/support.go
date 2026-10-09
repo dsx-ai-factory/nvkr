@@ -126,6 +126,7 @@ type OwnedProcess struct {
 	logDir      *os.File
 	groupProbe  func(int) (bool, error)
 	groupSignal func(int, unix.Signal) error
+	progress    *progressBoundary
 }
 
 func (p *OwnedProcess) PID() int { return p.cmd.Process.Pid }
@@ -135,8 +136,12 @@ func (p *OwnedProcess) Exited() (bool, error) {
 	select {
 	case <-p.done:
 		p.mu.Lock()
-		defer p.mu.Unlock()
-		return true, errors.Join(p.waitErr, p.joinErr)
+		err := errors.Join(p.waitErr, p.joinErr)
+		p.mu.Unlock()
+		if p.progress != nil {
+			p.progress.finish(err)
+		}
+		return true, err
 	default:
 		return false, nil
 	}
@@ -207,7 +212,13 @@ func (p *OwnedProcess) finish() {
 
 // Stop sends TERM to the exact live group, then escalates to KILL and joins.
 // A canceled caller is not permission to release dependent controls.
-func (p *OwnedProcess) Stop(ctx context.Context) error {
+func (p *OwnedProcess) Stop(ctx context.Context) (result error) {
+	var observedExit error
+	defer func() {
+		if p.progress != nil {
+			p.progress.finish(errors.Join(result, observedExit))
+		}
+	}()
 	if ctx == nil {
 		return fmt.Errorf("%w: stop requires a context", ErrUnjoined)
 	}
@@ -215,6 +226,9 @@ func (p *OwnedProcess) Stop(ctx context.Context) error {
 	case <-p.done:
 		p.mu.Lock()
 		defer p.mu.Unlock()
+		// Cleanup succeeds when the group joined, but a child that failed
+		// before this stop request must not become successful presentation.
+		observedExit = p.waitErr
 		return p.joinErr
 	default:
 	}
@@ -363,7 +377,14 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture 
 
 // Start transfers an explicit Stop obligation to the caller.
 func (r Runner) Start(ctx context.Context, args []string, phase string) (*OwnedProcess, error) {
-	return r.start(ctx, args, phase, false)
+	boundary := beginProgress(r.Progress, phase, PhaseStarted, PhaseFinished, PhaseFailed)
+	process, err := r.start(ctx, args, phase, false)
+	if err != nil {
+		boundary.finish(err)
+		return nil, err
+	}
+	process.progress = boundary
+	return process, nil
 }
 
 func (r Runner) Capture(ctx context.Context, args []string, phase string, timeout time.Duration) ([]byte, error) {
@@ -374,7 +395,9 @@ func (r Runner) Run(ctx context.Context, args []string, phase string, timeout ti
 	return err
 }
 
-func (r Runner) execute(ctx context.Context, args []string, phase string, timeout time.Duration, capture bool) ([]byte, error) {
+func (r Runner) execute(ctx context.Context, args []string, phase string, timeout time.Duration, capture bool) (result []byte, resultErr error) {
+	boundary := beginProgress(r.Progress, phase, PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { boundary.finish(resultErr) }()
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}

@@ -171,13 +171,36 @@ fi
 uid="$(id -u)"
 gid="$(id -g)"
 identity_dir=""
+image_archive=""
 cleanup_identity() {
+  local cleanup_status=0
   if [[ -n "${identity_dir}" ]]; then
-    rm -f -- "${identity_dir}/passwd" "${identity_dir}/group"
-    rmdir -- "${identity_dir}"
+    if [[ -n "${image_archive}" ]] && ! rm -f -- "${image_archive}"; then
+      cleanup_status=1
+    fi
+    if ! rm -f -- "${identity_dir}/passwd" "${identity_dir}/group"; then
+      cleanup_status=1
+    fi
+    if ! rmdir -- "${identity_dir}"; then
+      cleanup_status=1
+    fi
   fi
+  if [[ "${cleanup_status}" -ne 0 ]]; then
+    echo 'could not remove private toolchain build temporary files' >&2
+    return "${cleanup_status}"
+  fi
+  identity_dir=""
+  image_archive=""
 }
-trap cleanup_identity EXIT
+cleanup_on_exit() {
+  local exit_status=$?
+  trap - EXIT
+  if ! cleanup_identity && [[ "${exit_status}" -eq 0 ]]; then
+    exit_status=1
+  fi
+  exit "${exit_status}"
+}
+trap cleanup_on_exit EXIT
 case "${runtime##*/}" in
   podman)
     identity_args=(
@@ -187,6 +210,7 @@ case "${runtime##*/}" in
     ;;
   docker)
     identity_dir="$(mktemp -d "${TMPDIR:-/tmp}/nkd-packer-identity.XXXXXX")"
+    image_archive="$(mktemp "${identity_dir}/image.XXXXXX")"
     printf 'nkd:x:%s:%s:NKD Builder:/nkd/work/home:/bin/sh\n' "${uid}" "${gid}" \
       >"${identity_dir}/passwd"
     printf 'nkd:x:%s:\n' "${gid}" >"${identity_dir}/group"
@@ -226,8 +250,9 @@ if [[ "${runtime##*/}" == docker ]]; then
   # Buildx passes the fixed epoch into BuildKit's image config and history,
   # then rewrites image-layer file timestamps to the same epoch on export.
   # Explicit stdout export avoids the Docker driver's automatic image-store
-  # unpack, which cannot be combined with timestamp rewriting. Load the
-  # archive separately below; pipefail preserves failures from either stage.
+  # unpack, which cannot be combined with timestamp rewriting. Hold the archive
+  # in private temporary storage and load only after successful export; failed
+  # builds must not become misleading secondary image-format errors.
   # Runtime-specific recorded IDs remain independent and are checked below;
   # changes to the image sources require fresh measurements.
   "${runtime}" buildx version
@@ -267,7 +292,17 @@ build_command+=(
   "${here}")
 
 if [[ "${runtime##*/}" == docker ]]; then
-  "${build_command[@]}" | "${runtime}" image load
+  if "${build_command[@]}" >"${image_archive}"; then
+    if [[ ! -f "${image_archive}" || -L "${image_archive}" || ! -s "${image_archive}" ]]; then
+      echo 'Docker Buildx returned no nonempty regular image archive; refusing image load' >&2
+      exit 1
+    fi
+  else
+    build_status=$?
+    printf 'Docker Buildx export failed (exit %s); image load and validation were not attempted\n' "${build_status}" >&2
+    exit "${build_status}"
+  fi
+  "${runtime}" image load --input "${image_archive}"
 else
   "${build_command[@]}"
 fi
@@ -304,6 +339,8 @@ if [[ "${diagnostic_local}" -eq 1 ]]; then
   echo 'Diagnostic local toolchain: bind the measured ID in attempt inputs; no maintained-pin, publication or qualification claim.' >&2
 fi
 if [[ "${arch}" != "${native_arch}" ]]; then
+  cleanup_identity
+  trap - EXIT
   printf 'built structurally checked cross-architecture toolchain %s (%s)\n' "${tag}" "${image_id}"
   echo "run this build on a native ${arch} host before publication"
   exit 0
@@ -412,6 +449,8 @@ EOF
   grep -Fx "The configuration is valid." "${TMPDIR}/packer-validate.out" >/dev/null
 '
 
+cleanup_identity
+trap - EXIT
 printf 'validated local toolchain %s (%s)\n' "${tag}" "${image_id}"
 echo "publish through an approved registry workflow, then record the immutable repository digest before catalog use"
 if [[ "${print_validated_image_id}" -eq 1 ]]; then

@@ -79,13 +79,19 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		}
 	}
 	for _, lane := range lanes {
-		if cfg.Progress != nil {
-			fmt.Fprintf(cfg.Progress, "Build lane: %s (existing launcher → nkdctl run local)\n", lane)
-		}
-		if err = runner.Run(ctx, []string{"bash", script, cfg.AttemptPrefix + "-" + lane, strconv.Itoa(cfg.Jobs), lane}, "build-"+lane, 6*time.Hour); err != nil {
+		if err = buildLane(ctx, runner, script, cfg.AttemptPrefix, cfg.Jobs, lane); err != nil {
 			return BuiltInputs{}, err
 		}
 	}
 	path := func(lane string) string { return filepath.Join(repo, ".nkd/runs", cfg.AttemptPrefix+"-"+lane) }
 	return BuiltInputs{RunInputs{OS: path("os"), Components: path("components"), Providers: path("components"), Site: path("site"), Tools: path("tools"), Profiles: path("profiles"), Simulator: path("simulator")}, filepath.Join(repo, ".nkd/laptop-bootstrap", cfg.AttemptPrefix+"-tools", "nkdctl")}, nil
+}
+
+func buildLane(ctx context.Context, runner Runner, script, prefix string, jobs int, lane string) (result error) {
+	boundary := beginProgress(runner.Progress, lane, LaneStarted, LaneFinished, LaneFailed)
+	defer func() { boundary.finish(result) }()
+	if runner.Progress != nil {
+		fmt.Fprintf(runner.Progress, "Build lane: %s (existing launcher → nkdctl run local)\n", lane)
+	}
+	return runner.Run(ctx, []string{"bash", script, prefix + "-" + lane, strconv.Itoa(jobs), lane}, "build-"+lane, 6*time.Hour)
 }
