@@ -6,6 +6,7 @@ package delivery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -184,20 +185,88 @@ func twoAliasPublication(t *testing.T) (string, Result, map[string]string) {
 
 func TestImageTagsFollowCompleteReadbackInSortedOrderAndRerunWithoutPUT(t *testing.T) {
 	publication, result, expected := twoAliasPublication(t)
+	inspection, err := Inspect(t.Context(), publication)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := name.NewDigest("registry.test/product/release@" + result.RootDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs, err := publicationReferences(root, inspection.Root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	required := map[string]bool{}
+	for _, object := range inspection.Root.Objects {
+		ref, ok := refs[object.Name]
+		if !ok {
+			continue
+		}
+		prefix := "/v2/" + ref.Context().RepositoryStr()
+		required[prefix+"/manifests/"+object.DescriptorDigest] = false
+		manifests := []PublishedObject{object}
+		if object.Output != nil && object.Output.ImageIndex != nil {
+			manifests = nil
+			for _, child := range object.Output.ImageIndex.Children {
+				manifests = append(manifests, PublishedObject{DescriptorDigest: child.ManifestDigest, Size: child.Size})
+			}
+		}
+		for _, member := range manifests {
+			required[prefix+"/manifests/"+member.DescriptorDigest] = false
+			manifest, err := flatManifest(t.Context(), publication, member)
+			if err != nil {
+				t.Fatal(err)
+			}
+			required[prefix+"/blobs/"+manifest.Config.Digest] = false
+			for _, layer := range manifest.Layers {
+				required[prefix+"/blobs/"+layer.Digest] = false
+			}
+		}
+	}
 	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	var mu sync.Mutex
 	var events []string
 	var immutable atomic.Bool
+	var rootPublished bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		events = append(events, r.Method+" "+r.URL.Path)
+		if r.Method == http.MethodPut && (r.URL.Path == "/v2/product/alpha/manifests/v1" || r.URL.Path == "/v2/product/zeta/manifests/candidate") {
+			for path, complete := range required {
+				if !complete {
+					t.Errorf("alias advanced before complete post-root response for %s", path)
+				}
+			}
+		}
 		mu.Unlock()
 		if immutable.Load() && r.Method == http.MethodPut &&
 			(r.URL.Path == "/v2/product/alpha/manifests/v1" || r.URL.Path == "/v2/product/zeta/manifests/candidate") {
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
-		handler.ServeHTTP(w, r)
+		// Buffer the complete response before recording it and forwarding bytes.
+		// Arrival alone must not satisfy the post-root readback prerequisite.
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, r)
+		mu.Lock()
+		if r.Method == http.MethodPut && r.URL.Path == "/v2/product/release/manifests/"+result.RootDigest && response.Code < 300 {
+			rootPublished = true
+			for path := range required {
+				required[path] = false
+			}
+		}
+		if rootPublished && r.Method == http.MethodGet && response.Code == http.StatusOK {
+			if _, ok := required[r.URL.Path]; ok {
+				required[r.URL.Path] = true
+			}
+		}
+		mu.Unlock()
+		for key, values := range response.Header() {
+			w.Header()[key] = values
+		}
+		w.WriteHeader(response.Code)
+		_, _ = w.Write(response.Body.Bytes())
 	}))
 	defer server.Close()
 	repository := strings.TrimPrefix(server.URL, "http://") + "/product/release"
@@ -314,7 +383,7 @@ func TestImageTagsDoNotAdvanceAfterAnyClosureReadbackFailure(t *testing.T) {
 func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 	for _, mode := range []string{"head transient", "immutable", "put uncertain", "put canceled", "readback missing", "readback corrupt"} {
 		t.Run(mode, func(t *testing.T) {
-			publication, _, index := registryImageIndexFixture(t)
+			publication, result, index := registryImageIndexFixture(t)
 			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
@@ -387,6 +456,9 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 			if ref != "" {
 				t.Fatal("failed alias write returned successful reference")
 			}
+			if !strings.Contains(err.Error(), repository+"@"+result.RootDigest) {
+				t.Fatalf("alias failure lost immutable root locator: %v", err)
+			}
 			if mode == "head transient" && writes.Load() != 0 {
 				t.Fatal("inconclusive HEAD caused tag PUT")
 			}
@@ -448,5 +520,57 @@ func TestImageTagRequiresUnselectedSiblingReadback(t *testing.T) {
 	assertRegistryCode(t, err, e.CodeUnavailable)
 	if ref != "" || !rootWritten.Load() || aliasWrites.Load() != 0 {
 		t.Fatal("selected alias did not wait for the unselected sibling's exact readback")
+	}
+}
+
+func TestRegistryImageImportResultPreservesBothCauses(t *testing.T) {
+	importCause := errors.New("import failed")
+	closeCause := errors.New("close failed")
+	for _, test := range []struct {
+		name                string
+		importErr, closeErr error
+		code                e.Code
+	}{
+		{"success", nil, nil, ""},
+		{"import", e.Wrap(e.CodeUnavailable, importCause, "import"), nil, e.CodeUnavailable},
+		{"close", nil, closeCause, e.CodeVerifyFailed},
+		{"both", e.Wrap(e.CodeUnavailable, importCause, "import"), closeCause, e.CodeUnavailable},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := registryImageImportResult(t.Context(), test.importErr, test.closeErr)
+			if test.code == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			assertRegistryCode(t, err, test.code)
+			if errors.Is(err, importCause) != (test.importErr != nil) || errors.Is(err, closeCause) != (test.closeErr != nil) {
+				t.Fatalf("lost failure cause: %v", err)
+			}
+		})
+	}
+}
+
+func TestPushOptionsCredentialsRejectedBeforeIO(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		options RegistryOptions
+	}{
+		{"anonymous credentials", RegistryOptions{Anonymous: true, Username: "user", Password: "secret"}},
+		{"username only", RegistryOptions{Username: "user"}},
+		{"password only", RegistryOptions{Password: "secret"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request := PushOptions{Registry: test.options}
+			assertRegistryCode(t, request.Validate(), e.CodeUsage)
+			// A missing layout and invalid repository would fail differently if
+			// filesystem or registry admission preceded credential validation.
+			ref, err := PushWithOptions(t.Context(), filepath.Join(t.TempDir(), "missing"), "invalid", request)
+			assertRegistryCode(t, err, e.CodeUsage)
+			if ref != "" {
+				t.Fatal("invalid credentials returned a reference")
+			}
+		})
 	}
 }

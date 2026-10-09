@@ -6,6 +6,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"sort"
@@ -44,9 +45,8 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if err := options.Validate(); err != nil {
-		return "", err
-	}
+	// PushOptions.Validate includes the identical registry credential validation,
+	// followed by tag admission, before Inspect or any registry operation.
 	if err := request.Validate(); err != nil {
 		return "", err
 	}
@@ -154,7 +154,7 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	}
 	pinned := ref.Context().Name() + "@" + digest.String()
 	if err := publishImageAliases(ctx, pinned, aliases, options); err != nil {
-		return "", err
+		return "", fmt.Errorf("image alias publication failed after root upload at %s (readback acceptance is not implied): %w", pinned, err)
 	}
 	return pinned, nil
 }
@@ -222,11 +222,8 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 				}
 				importErr := materializeRegistryImageIndex(ctx, stage, object, index)
 				closeErr := index.Close()
-				if importErr != nil {
-					return importErr
-				}
-				if closeErr != nil {
-					return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, closeErr, "closing registry image index"))
+				if err := registryImageImportResult(ctx, importErr, closeErr); err != nil {
+					return err
 				}
 				continue
 			}
@@ -498,4 +495,12 @@ func OutputReferences(reference string, inspection Inspection) (map[string]strin
 		result[output] = ref.Name()
 	}
 	return result, nil
+}
+
+// Keep import classification primary while retaining a simultaneous cleanup failure.
+func registryImageImportResult(ctx context.Context, importErr, closeErr error) error {
+	if closeErr != nil {
+		closeErr = classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, closeErr, "closing registry image index"))
+	}
+	return errors.Join(importErr, closeErr)
 }
