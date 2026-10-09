@@ -46,10 +46,7 @@ records source availability and remaining gaps.
 
 | Task | Guide |
 |---|---|
-| Boot an existing NKD disk through the real local NICoSim VM backend | [Artifact-only QCOW2 guest probe](local-qcow2-guest-probe.md) |
-| Test the real NKE management Kind/CAPI path with existing NKD-built tools | [Deploy-only management diagnostic](local-management-cluster.md) |
-| Install a disposable NKE site from completed NKD images/charts, without rebuilding | [Deploy-only site integration](local-site-integration.md) |
-| Inspect native host-network setup, restoration and current runtime limits | [Integrated consumer](local-nke-demo.md) |
+| Build artifacts, install a local site, and validate a real QCOW2-backed tenant plus workload | [Integrated Ubuntu ARM64 guide](local-nke-demo.md) |
 | Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
 | Understand the NKD-to-installer artifact handoff | [Staged-installer handoff](nkd-to-nke-demo.md) |
 | Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md) |

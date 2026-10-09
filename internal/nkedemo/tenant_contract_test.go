@@ -1,0 +1,295 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package nkedemo
+
+import (
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
+	"golang.org/x/sys/unix"
+)
+
+func TestTenantSelectionNeverAdoptsSubstitution(t *testing.T) {
+	for _, name := range []string{"exact", "absent", "unrelated", "duplicate", "changed ID", "foreign org", "foreign site", "foreign VPC", "empty ID", "path ID", "traversal ID", "whitespace ID", "NUL ID"} {
+		t.Run(name, func(t *testing.T) {
+			row := tenantRow{Name: "owned", ID: "opaque-owned-id", NICo: TenantProvider{OrgID, SiteID, VPCID}}
+			rows := []tenantRow{row}
+			id := row.ID
+			switch name {
+			case "absent":
+				rows = nil
+			case "unrelated":
+				rows[0].Name = "other"
+			case "duplicate":
+				rows = append(rows, row)
+			case "changed ID":
+				rows[0].ID = "replacement"
+			case "foreign org":
+				rows[0].NICo.Org = "other"
+			case "foreign site":
+				rows[0].NICo.Site = "other"
+			case "foreign VPC":
+				rows[0].NICo.VPC = "other"
+			case "empty ID":
+				rows[0].ID, id = "", ""
+			case "path ID":
+				rows[0].ID, id = "../foreign", ""
+			case "traversal ID":
+				rows[0].ID, id = "..", ""
+			case "whitespace ID":
+				rows[0].ID, id = "foreign\n", ""
+			case "NUL ID":
+				rows[0].ID, id = "foreign\x00", ""
+			}
+			selected, err := selectedTenant(rows, "owned", id)
+			switch name {
+			case "exact":
+				if err != nil || selected == nil || *selected != row {
+					t.Fatalf("exact tenant rejected: %v %v", selected, err)
+				}
+			case "absent", "unrelated":
+				if err != nil || selected != nil {
+					t.Fatalf("unrelated tenant adopted: %v %v", selected, err)
+				}
+			default:
+				if err == nil || selected != nil {
+					t.Fatalf("substituted tenant adopted: %v %v", selected, err)
+				}
+			}
+		})
+	}
+}
+
+func readyTenantFixture() []tenantNode {
+	nodes := make([]tenantNode, 2)
+	for i := range nodes {
+		nodes[i].Metadata.Name = fmt.Sprintf("owned-%d", i)
+		nodes[i].Metadata.Labels = map[string]string{}
+		nodes[i].Status.NodeInfo.Architecture = "arm64"
+		nodes[i].Status.NodeInfo.KubeletVersion = "v1.34.2"
+		nodes[i].Status.Conditions = append(nodes[i].Status.Conditions, struct{ Type, Status string }{"Ready", "True"})
+	}
+	nodes[0].Metadata.Labels["node-role.kubernetes.io/control-plane"] = ""
+	return nodes
+}
+
+func TestTenantRequiresTwoDistinctReadyNativeNodes(t *testing.T) {
+	for _, name := range []string{"exact", "none", "one", "extra", "empty name", "duplicate name", "not ready", "unknown ready", "wrong condition", "foreign arch", "foreign kubelet", "no control plane", "two control planes"} {
+		t.Run(name, func(t *testing.T) {
+			nodes := readyTenantFixture()
+			expectError := true
+			switch name {
+			case "exact":
+				expectError = false
+			case "none":
+				nodes, expectError = nil, false
+			case "one":
+				nodes, expectError = nodes[:1], false
+			case "extra":
+				nodes = append(nodes, nodes[0])
+			case "empty name":
+				nodes[1].Metadata.Name = ""
+			case "duplicate name":
+				nodes[1].Metadata.Name = nodes[0].Metadata.Name
+			case "not ready":
+				nodes[1].Status.Conditions[0].Status, expectError = "False", false
+			case "unknown ready":
+				nodes[1].Status.Conditions[0].Status, expectError = "Unknown", false
+			case "wrong condition":
+				nodes[1].Status.Conditions[0].Type, expectError = "Other", false
+			case "foreign arch":
+				nodes[1].Status.NodeInfo.Architecture = "amd64"
+			case "foreign kubelet":
+				nodes[1].Status.NodeInfo.KubeletVersion = "v1.34.3"
+			case "no control plane":
+				delete(nodes[0].Metadata.Labels, "node-role.kubernetes.io/control-plane")
+			case "two control planes":
+				nodes[1].Metadata.Labels["node-role.kubernetes.io/control-plane"] = ""
+			}
+			ready, err := readyNodes(nodes)
+			if ready != (name == "exact") || (err != nil) != expectError {
+				t.Fatalf("ready=%v err=%v, want ready=%v error=%v", ready, err, name == "exact", expectError)
+			}
+		})
+	}
+}
+
+func tenantVMFixture(t *testing.T) (Runner, string, lifecycle.Artifact, string, []string) {
+	t.Helper()
+	runner, root, work, first := domainFixture(t)
+	second := strings.Replace(first, "000000000001", "000000000002", 1)
+	names := []string{first, second}
+	for _, name := range names {
+		id := strings.TrimPrefix(name, "nico-vm-")
+		raw := fmt.Sprintf(`<domain><name>%s</name><uuid>%s</uuid><os><type>hvm</type></os><devices><tpm/><disk><source file="%s"/></disk></devices></domain>`, name, id, filepath.Join(work, "var/instances", id, "disk.qcow2"))
+		writeTenantFixture(t, filepath.Join(root, name+".xml"), []byte(raw), 0o600)
+		writeTenantFixture(t, filepath.Join(root, name+".uuid"), []byte(id), 0o600)
+	}
+	writeTenantFixture(t, filepath.Join(root, "inventory"), []byte(strings.Join(names, "\n")+"\n"), 0o600)
+	if err := os.Mkdir(filepath.Join(work, "cache"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	base := filepath.Join(work, "cache", "accepted.qcow2")
+	contents := []byte("fixture QCOW2 bytes; this test never starts QEMU")
+	writeTenantFixture(t, base, contents, 0o600)
+	writeTenantBacking(t, root, base)
+	writeTenantFixture(t, filepath.Join(root, "qemu-img"), []byte("#!/bin/sh\nset -eu\ntest \"$1\" = info\ncat \"$FIXTURE/backing.json\"\n"), 0o700)
+	image := lifecycle.Artifact{Digest: fmt.Sprintf("sha256:%x", sha256.Sum256(contents)), Disk: &delivery.DiskOutput{Size: int64(len(contents))}}
+	// A nonempty Runner.Work must not turn the second VM's repeated inspection
+	// phase into an exclusive-log collision. vmEvidence uses volatile capture.
+	runner.Work = privateTestDir(t)
+	return runner, root, image, work, names
+}
+
+func writeTenantFixture(t *testing.T, path string, raw []byte, mode os.FileMode) {
+	t.Helper()
+	if err := os.WriteFile(path, raw, mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeTenantBacking(t *testing.T, root, backing string) {
+	t.Helper()
+	raw, err := json.Marshal(map[string]string{"full-backing-filename": backing})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTenantFixture(t, filepath.Join(root, "backing.json"), raw, 0o600)
+}
+
+func TestTenantVMEvidenceRejectsSubstitution(t *testing.T) {
+	for _, tc := range []struct{ name, message string }{
+		{"exact", ""}, {"one domain", "exactly two"}, {"extra domain", "exactly two"},
+		{"foreign disk", "not owned"}, {"missing TPM", "lacks real"}, {"missing OS", "lacks real"},
+		{"relative backing", "absolute"}, {"outside cache", "exact downloaded"}, {"backing symlink", "exact downloaded"},
+		{"wrong size", "exact downloaded"}, {"wrong digest", "digest differs"}, {"missing disk description", "exact downloaded"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			runner, root, image, work, names := tenantVMFixture(t)
+			xmlFile := filepath.Join(root, names[1]+".xml")
+			raw, err := os.ReadFile(xmlFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch tc.name {
+			case "one domain":
+				writeTenantFixture(t, filepath.Join(root, "inventory"), []byte(names[0]+"\n"), 0o600)
+			case "extra domain":
+				writeTenantFixture(t, filepath.Join(root, "inventory"), []byte(strings.Join(names, "\n")+"\nforeign\n"), 0o600)
+			case "foreign disk":
+				raw = stringsToBytesReplace(raw, work, "/foreign")
+			case "missing TPM":
+				raw = stringsToBytesReplace(raw, "<tpm/>", "")
+			case "missing OS":
+				raw = stringsToBytesReplace(raw, "<type>hvm</type>", "")
+			case "relative backing":
+				writeTenantBacking(t, root, "cache/accepted.qcow2")
+			case "outside cache":
+				base := filepath.Join(privateTestDir(t), "foreign.qcow2")
+				accepted, readErr := os.ReadFile(filepath.Join(work, "cache", "accepted.qcow2"))
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				// Byte-identical outside data isolates the containment check;
+				// a wrong size/digest must not mask its removal.
+				writeTenantFixture(t, base, accepted, 0o600)
+				writeTenantBacking(t, root, base)
+			case "backing symlink":
+				link := filepath.Join(work, "cache", "link")
+				if err := os.Symlink(filepath.Join(work, "cache", "accepted.qcow2"), link); err != nil {
+					t.Fatal(err)
+				}
+				linkInfo, statErr := os.Lstat(link)
+				if statErr != nil {
+					t.Fatal(statErr)
+				}
+				// Match lstat size so the independent no-symlink guard is
+				// decisive even if its neighboring size check remains intact.
+				image.Disk.Size = linkInfo.Size()
+				writeTenantBacking(t, root, link)
+			case "wrong size":
+				image.Disk.Size++
+			case "wrong digest":
+				image.Digest = "sha256:" + strings.Repeat("0", 64)
+			case "missing disk description":
+				image.Disk = nil
+			}
+			writeTenantFixture(t, xmlFile, raw, 0o600)
+			observed, err := vmEvidence(t.Context(), work, image, runner)
+			if tc.name == "exact" {
+				if err != nil || len(observed) != 2 || observed[0].BackingDigest != image.Digest || observed[1].BackingDigest != image.Digest {
+					t.Fatalf("exact two-domain observation rejected: %v %v", observed, err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.message) || observed != nil {
+				t.Fatalf("wrong refusal for %s: observed=%v err=%v", tc.name, observed, err)
+			}
+			if _, err := os.Stat(filepath.Join(root, "events")); !os.IsNotExist(err) {
+				t.Fatal("observation mutated a libvirt domain")
+			}
+		})
+	}
+}
+
+func stringsToBytesReplace(raw []byte, old, replacement string) []byte {
+	return []byte(strings.ReplaceAll(string(raw), old, replacement))
+}
+
+func TestTenantDiagnosticHeaderAdmission(t *testing.T) {
+	for _, name := range []string{"exact", "empty", "too large", "public mode", "hardlink", "symlink", "directory", "FIFO", "foreign owner"} {
+		t.Run(name, func(t *testing.T) {
+			root := privateTestDir(t)
+			path := filepath.Join(root, "header")
+			writeTenantFixture(t, path, []byte("Authorization: Bearer fixture-only-token\n"), 0o600)
+			switch name {
+			case "empty":
+				writeTenantFixture(t, path, nil, 0o600)
+			case "too large":
+				writeTenantFixture(t, path, make([]byte, 257), 0o600)
+			case "public mode":
+				if err := os.Chmod(path, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			case "hardlink":
+				if err := os.Link(path, filepath.Join(root, "alias")); err != nil {
+					t.Fatal(err)
+				}
+			case "symlink", "directory", "FIFO":
+				if err := os.Rename(path, filepath.Join(root, "held")); err != nil {
+					t.Fatal(err)
+				}
+				var err error
+				switch name {
+				case "symlink":
+					err = os.Symlink(filepath.Join(root, "held"), path)
+				case "directory":
+					err = os.Mkdir(path, 0o700)
+				case "FIFO":
+					err = unix.Mkfifo(path, 0o600)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "foreign owner":
+				if err := os.Chown(path, os.Getuid()+1, -1); err != nil {
+					if errors.Is(err, unix.EPERM) {
+						t.Skip("foreign-UID fixture requires chown capability")
+					}
+					t.Fatal(err)
+				}
+			}
+			err := privateHeader(path)
+			if (err == nil) != (name == "exact") {
+				t.Fatalf("header %s admission: %v", name, err)
+			}
+		})
+	}
+}

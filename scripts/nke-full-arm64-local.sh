@@ -186,6 +186,7 @@ if [[ "${runtime}" == docker ]]; then network=bridge; fi
   "${utility}" bash -euc '
     # make checks the container SDK against .go-version before compiling.
     make -C /src build BIN=/out/nkdctl
+    make -C /src demo DEMO_BIN=/out/nke-demo
   '
 runner="${bootstrap}/nkdctl"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }

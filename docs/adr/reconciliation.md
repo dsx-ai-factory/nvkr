@@ -189,6 +189,14 @@ VIP-route restoration admits only the kernel's `linkdown` next-hop flag after
 producers are idle, retaining exact bridge, destination, gateway and route
 read-back checks; unknown flags and changed bindings remain refusals.
 Downstream consumers emit success only after their outermost cleanup completes.
+The consumer is now a typed Go library with a thin local-demo CLI. NKD build,
+verification and extraction operations invoke `nkdctl` subprocesses, not an
+in-process SDK. Ordinary Go tests cover the adapter contracts; a separately
+opted-in test builds all six demo lanes before deployment. The earlier Colima
+results below exercised the previous Python consumer and do not establish fresh
+Go-consumer acceptance. The pinned upstream NKE installer still requires Python
+for its source-owned readers. Go network journals use version 2 and reject legacy
+version-1 Python journals; restore any old live controls before upgrading.
 Network-only crash recovery now uses a private synced intent journal and the
 same kernel-released lock. Exact executable/file/bridge bindings gate restoration;
 recovery never kills journal PIDs. Contract negatives cover changed journals,

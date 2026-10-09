@@ -6,38 +6,32 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
-`python3 scripts/nke-local-demo.py` is the new deploy-only integration command:
-completed artifacts, owned native networking, exact QCOW2 serving,
-VM-backed NICoSim, NKE site, a real control-plane/worker tenant and a workload
-gate. It rebuilds nothing. Read the [Ubuntu ARM64 setup, command and validation limits](../docs/local-nke-demo.md)
-before running. A real Colima run completed tenant/workload and owned cleanup
-with retained artifacts; fresh clean-machine and full-source builds remain
-separate requirements. Site-only and standalone guest successes are not an
-integrated PASS.
+The maintained local deployment command is the Go `nke-demo run` CLI built by
+`scripts/nke-full-arm64-local.sh` beside `nkdctl`. Follow the single
+[Ubuntu ARM64 build-and-demo guide](../docs/local-nke-demo.md) for host setup,
+six build lanes, completed Run paths and deployment.
 
-The integrated build/demo runs on Linux ARM64. macOS support means supplying
-that Linux host through Colima, not building or running Darwin artifacts.
+Deployment rebuilds nothing: it consumes the exact completed artifacts, owns
+native networking and NICoSim, serves the selected QCOW2, installs NKE's site,
+and tests a real control-plane/worker tenant plus workload and DNS. The former
+standalone management, site and guest experiments have been consolidated into
+this typed Go library and thin CLI, not maintained as parallel Python commands.
+NKD operations invoke `nkdctl`; the pinned NKE installer still requires Python
+for its existing source-owned readers and stages.
 
-`python3 scripts/nke-local-management.py` uses a completed source-built tools Run
-for a real private Kind management cluster and NKE's pinned CAPI stage, then
-cleans up its exact node and anonymous volume. See the
-[management diagnostic](../docs/local-management-cluster.md). It rebuilds no
-artifacts and is not the complete NKE/CAPNICo/QCOW2 tenant demo.
+The flow runs on Linux ARM64. macOS supplies that Linux host through Colima;
+it does not build or run Darwin artifacts. Earlier retained-artifact Colima
+replays passed, but that is not fresh Go-consumer, clean-machine or full-source
+acceptance. Site-only success is not an integrated PASS.
 
-`python3 scripts/nke-local-site.py` extends that owned management lifetime with
-NKE's real site installer, consuming completed tools/site/components/profiles/
-provider Runs. It copies exact controller/profiles/CAPNICo manifests to a private
-node-reachable registry, installs six unchanged chart archives, checks health,
-registers the site and verifies actual runtime image IDs before owned cleanup.
-See the [site command and prerequisites](../docs/local-site-integration.md) and
-current validation limits in that guide.
-It requires an existing private NICoSim endpoint and is not tenant/workload E2E.
+Contract tests execute without building or deploying NKE:
 
-The internal `nke-local-network.py` guard has setup/restoration and deliberate
-consumer-failure contract tests. No private acceptance record is shipped here. The integrated command
-wires it into simulator/guest ownership and requires tenant/workload acceptance
-before success. See the [integrated consumer guide](../docs/local-nke-demo.md)
-for its network scope, cleanup and current runtime limits.
+```sh
+go test ./internal/nkedemo ./cmd/nke-demo -count=1
+```
+
+The opt-in real six-lane build/deployment test is documented in the
+[guide](../docs/local-nke-demo.md#repeat-the-real-build-and-demo-as-a-go-test).
 
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)
 and `bash scripts/nke-full-arm64-local.sh ATTEMPT 1 components`. `all` also selects the
@@ -80,11 +74,9 @@ Native guest capacity does not provide extra physical Mac space.
 Despite its historical filename, this launcher does not yet build a full
 source-built NKE distribution; see the [remaining work](../docs/full-nke-source-build.md).
 
-`python3 scripts/nke-nicosim-vm-smoke.py` consumes completed simulator and OS
-Runs without rebuilding. It uses a real libvirt session/QCOW2 guest, not the
-mock or container backend. Read the [guest-probe setup](../docs/local-qcow2-guest-probe.md)
-first: native VM packages, an explicitly admitted bridge/helper and Python 3.12+
-are required inside Linux/Colima. It is not the full OS contract or NKE tenant demo.
+The complete flow verifies actual QCOW2-backed tenant nodes; no separate guest
+probe is needed for this journey. See the [integrated guide](../docs/local-nke-demo.md)
+for native prerequisites and current validation boundaries.
 
 ```sh
 # Plan only: validates and creates no attempt storage.

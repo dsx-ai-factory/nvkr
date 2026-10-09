@@ -19,7 +19,8 @@ the missing DSX input and PR #113 integration remain explicit
 [full-source gaps](full-nke-source-build.md).
 The expanded handoff also passed an integrated tenant/workload/cleanup replay
 with five freshly built non-OS lanes and a retained QCOW2. All fifteen selected
-site image identities were checked. This is not a fresh OS rebuild; see
+site image identities were checked. Those runs preceded the Go consumer port;
+they do not prove its fresh runtime acceptance or a fresh OS rebuild. See
 [PR #118's validation status](https://github.com/dsx-ai-factory/nke-recipes/pull/118).
 
 ## 1. Choose your Linux execution host
@@ -112,7 +113,9 @@ ip route
 virsh -c qemu:///session list --all
 ```
 
-Use Python 3.12+. The libvirt session must be empty. The demo refuses overlapping
+Python 3.12+ is required by the pinned NKE installer's existing readers and
+stages, not by the Go demo command. The libvirt session must be empty. The demo
+refuses overlapping
 networks and existing owned resources rather than deleting them. Host package
 installation is explicit setup, not a hermetic NKD toolchain.
 
@@ -147,6 +150,8 @@ checkout or export parent still prevents access by other host users. The `tools`
 lane builds the demo's Linux Helm, kubectl, clusterctl, ORAS and Kind bundle;
 the consumer extracts it privately rather than requiring those tools on the Mac
 or preinstalled on Ubuntu.
+The launcher also builds native `nkdctl` and `nke-demo` beside each other under
+`.nkd/laptop-bootstrap/<attempt>/`; no host Go installation is needed.
 To reuse completed Runs instead, skip this step and supply their absolute paths
 below. Never overwrite or rebuild accepted artifacts just to relocate them.
 
@@ -198,7 +203,7 @@ export NKD_SIMULATOR_RUN="$(pwd)/.nkd/runs/demo-simulator-01"
 export NKD_OS_RUN="$(pwd)/.nkd/runs/demo-os-01"
 export NKD_DEMO_OUT="$(pwd)/.nkd/deploy-demo-01"
 
-python3 -B scripts/nke-local-demo.py \
+"$(pwd)/.nkd/laptop-bootstrap/demo-tools-01/nke-demo" run \
   --nke-checkout "$NKE_INSTALLER_CLONE" --nkdctl "$NKD_NATIVE_BOOTSTRAP" \
   --tools-run "$NKD_TOOLS_RUN" --site-run "$NKD_SITE_RUN" \
   --components-run "$NKD_COMPONENTS_RUN" --provider-run "$NKD_PROVIDER_RUN" \
@@ -210,6 +215,8 @@ The 60-minute tenant budget is a bound, not a completion estimate. Kind hosts
 management services only. Tenant nodes are real libvirt guests using Ubuntu
 26.04, Kubernetes 1.34.2 and OVN-Kubernetes 1.4.0. Each has four CPUs, eight GiB
 RAM and a 60-GiB overlay. Packer is not called during deployment.
+The thin Go command delegates to the typed local-demo library. Its NKD operations
+are `nkdctl` subprocesses; the consumer does not execute builds through an SDK.
 
 ## 6. Recognize success
 
@@ -245,3 +252,27 @@ delete unknown VMs, change NKE or prune the runtime to force a rerun.
   [network recovery procedure](nkd-to-nke-demo.md#recover-network-controls-after-a-crash).
 - See the [installer and safety reference](nkd-to-nke-demo.md) for transport,
   privilege, offline-package and diagnostic security boundaries.
+
+## Repeat the real build and demo as a Go test
+
+For developers of the Go adapter, `TestEndToEnd` builds all six lanes and deploys
+their newly completed outputs. It is opt-in because it performs real builds,
+temporary host grants and tenant creation. Use the same dedicated Ubuntu ARM64
+host and prerequisites above, a fresh attempt prefix and a new output directory.
+This developer test also requires the repository's pinned Go toolchain.
+
+```sh
+export NKD_NKE_E2E=1
+export NKD_NKE_E2E_REPO="$(pwd)"
+export NKD_NKE_E2E_INSTALLER="$NKE_INSTALLER_CLONE"
+export NKD_NKE_E2E_OUT="$(pwd)/.nkd/e2e-demo-02"
+export NKD_NKE_E2E_ATTEMPT=demo-e2e-02
+# Optional: export NKE_LOCAL_CLONE=/absolute/path/to/nke
+go test ./internal/nkedemo -run '^TestEndToEnd$' -count=1 -timeout 9h
+```
+
+Ordinary `go test` skips this test. The test calls the same build launcher and
+typed deployment library; it does not select an SDK execution path or replace
+the real tenant/workload and cleanup gates with mocks.
+The outer test deadline exceeds the eight-hour work context so bounded cleanup
+can run after its cancellation; neither duration is a completion estimate.

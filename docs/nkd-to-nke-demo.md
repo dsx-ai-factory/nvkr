@@ -8,29 +8,16 @@ The intended developer journey is: build the ARM64 artifacts with NKD, make the
 exact produced images and charts reachable by NKE, run the NKE site installer,
 create a tenant and verify it, then rebuild and retest a source change.
 
-The [guest diagnostic](local-qcow2-guest-probe.md) consumes completed Runs without
-rebuilding and requires NICoSim VM readiness, SSH, cloud-init, TPM, agent and
-staged Kubernetes-package checks followed by owned cleanup. No private guest
-acceptance record is shipped here. This is not a site/tenant install and does not
-supersede the failed complete OS smoke or missing DSX input.
+The maintained [Go local demo](local-nke-demo.md) consolidates management,
+site, chart handoff, native host controls and guest validation into one flow.
+The former standalone experiments are no longer separate runnable Python
+commands. NKE owns the pinned installer; NKD verification remains behind
+`nkdctl` subprocesses.
 
-The separate [management diagnostic](local-management-cluster.md) now consumes
-the completed five-tool Run for real Kind management/CAPI installation and
-owned node/volume cleanup. It uses pinned NKE stage bytes without rebuilding
-artifacts. It does not deploy the NKE site or create a CAPD/container tenant;
-the complete CAPNICo/QCOW2 tenant path is owned by the integrated consumer.
-
-The [deploy-only site consumer](local-site-integration.md) requires six prepared
-charts, exact controller/profiles/CAPNICo and dependency-image handoff and runtime image-ID
-checks, site health, registration and API access, then owned cleanup. Site-only
-assertions do not establish tenant/workload acceptance.
-
-The internal downstream network guard has setup/restoration and failure contracts.
-The new [integrated consumer](local-nke-demo.md) connects the guard to exact
-disk serving and simulator/guest ownership. It completed a real Colima
-tenant/workload/cleanup run with retained artifacts on October 8, 2026. See that
-guide for the exact scope and remaining clean-machine/full-source limits.
-Isolated guard tests do not establish guest delivery, BGP routes or acceptance.
+Earlier Colima tenant/workload/cleanup replays passed with retained artifacts
+on October 8, 2026. Those observations preceded the Go consumer port and do not
+prove its fresh runtime acceptance. The integrated guide records clean-machine,
+full-source and complete OS-smoke limits separately.
 
 A completed 22-output local Run alone is not proof that a site or tenant was
 installed. Use the [first-time build guide](local-development.md) to produce
@@ -67,7 +54,7 @@ values, infrastructure provisioning and tenant lifecycle.
 | CAPNICo provider | `capnico-controller-arm64`, built from pinned public Git | Reachable development image plus NKE's `CAPNICO_IMAGE=repository:tag` override. The current override is tag-shaped; do not silently turn it into a digest contract |
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
 | Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` | The integrated consumer selects the separate tools Run and verifies extraction and native versions. It is not included in `all`. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
-| Dependency images | Twelve acquired ARM64 image outputs | The consumer copies exact manifests and prepares native-digest Helm overrides; runtime checks require all twelve images, including both Bash init roles and every enabled Temporal server role. This expanded path still needs live integration validation. Other installer/NKTP images remain outside this set |
+| Dependency images | Twelve acquired ARM64 image outputs | The consumer copies exact manifests and prepares native-digest Helm overrides; runtime checks require all twelve images, including both Bash init roles and every enabled Temporal server role. The earlier expanded replay passed; the new Go consumer still needs fresh runtime acceptance. Other installer/NKTP images remain outside this set |
 | NKTP | Separate four-output `site` selection includes the source chart and locked dependency preparation | The consumer uses the packaged chart; runtime images are not a complete mirrored NKD set. Integrated validation does not establish that source-build requirement |
 | Profiles content image | Separate `profiles` Run builds `controller-profiles` from the staged-installer source | The diagnostic ARM64/26.04 plain profile was exercised with held-disk serving and the consumer's registry. It is not included in `all` or production fleet profiles |
 | Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | Both real tenant guests used the selected backing disk and passed workload/DNS. Missing DSX IMDS still prevents claiming the separate complete OS smoke contract |
@@ -137,80 +124,33 @@ disk build nor an isolated boot proves tenant readiness or workload acceptance.
 
 ## Prepare charts without rebuilding them
 
-`scripts/nke-prepare-chart-inputs.py` accepts all six exact Helm OCI layouts
-needed by the pinned installer. NKD verifies the selected manifest, all layout
-blobs, chart/config identity and bounded archive structure, then exports the
-unchanged `.tgz` bytes. The adapter copies only tracked deploy files into a new
-private directory, replaces each chart source with its prepared local archive,
-and revalidates the result with NKE's own deploy-item reader. It does not run
-Make, fetch chart dependencies, modify NKE, install a site or mint a Release.
+The integrated Go consumer supplies all six exact Helm OCI layouts to
+`PrepareChartInputs` in `internal/nkedemo/charts.go`. It invokes
+`nkdctl publish chart` to verify the selected manifest, layout blobs, chart/config
+identity and bounded archive structure, then exports the unchanged `.tgz` bytes.
 
-Prerequisites: Python 3.9 or newer, Git, a native `nkdctl` built from this change,
-and a clean NKE Git checkout at
-`8fb2d53368823bd386b4fbd55b4ab6d3c0931345`. Linux ARM64 tools from a Colima Run
-must execute inside Colima, not directly on macOS. For a host-side handoff,
-`make build` creates the native `bin/nkdctl` using the repository's pinned Go.
+The library copies only tracked deploy files from the clean pinned NKE checkout
+into a private directory. It replaces each chart-source line with that local
+archive and revalidates every release field with NKE's own deploy-item reader.
+It does not run Make, fetch chart dependencies, modify NKE or mint a Release.
+Python remains necessary for that unchanged upstream reader, not for our adapter.
 
-The following prepares inputs after the separate `site` and `components` Runs
-complete. Two separate Runs are selected; this is not a combined Run or a
-completed deployment:
+Use [step 5 of the guide](local-nke-demo.md#5-run-the-demo-without-rebuilding)
+to perform this handoff as part of the complete deployment. There is no separate
+chart-preparation CLI to configure.
+
+The contract tests cover missing/extra charts, wrong or dirty installer sources,
+hidden reader substitutions, changed deploy semantics, unsafe paths,
+no-replace output and producer failure:
 
 ```sh
-# From the NKE Recipes checkout; choose existing, completed attempts.
-set -euo pipefail
-: "${NKD_SITE_ATTEMPT:?Set the completed site attempt}"
-: "${NKD_COMPONENTS_ATTEMPT:?Set the completed components attempt}"
-: "${NKE_INSTALLER_CHECKOUT:?Set the clean, exact pinned NKE checkout}"
-: "${NKD_CHART_INPUTS:?Set a NEW output directory outside NKE and all OCI layouts}"
-make build
-
-# These are diagnostic observations, not signed Release authority.
-jq -s -e 'length == 2 and all(.[];
-       .status == "complete" and .failure == null and
-       (.expected|length) == (.observed|length))' \
-  ".nkd/runs/$NKD_SITE_ATTEMPT/lifecycle.json" \
-  ".nkd/runs/$NKD_COMPONENTS_ATTEMPT/lifecycle.json" >/dev/null
-
-chart_args=()
-for item in controller nktp postgresql spire-crds temporal spire; do
-  case "$item" in
-    controller) attempt="$NKD_SITE_ATTEMPT"; output=controller-chart ;;
-    nktp) attempt="$NKD_SITE_ATTEMPT"; output=nktp ;;
-    *) attempt="$NKD_COMPONENTS_ATTEMPT"; output="$item" ;;
-  esac
-  manifest=$(jq -er --arg name "$output" \
-    '[.observed[] | select(.name == $name and .kind == "helm-oci")] |
-     select(length == 1) | .[0].digest' \
-    ".nkd/runs/$attempt/lifecycle.json")
-  chart_args+=(--chart "$item=$(pwd)/.nkd/runs/$attempt/packages/$output"
-               --manifest "$item=$manifest")
-done
-python3 scripts/nke-prepare-chart-inputs.py \
-  --nke-checkout "$NKE_INSTALLER_CHECKOUT" --nkdctl "$(pwd)/bin/nkdctl" \
-  "${chart_args[@]}" --out "$NKD_CHART_INPUTS"
-export DEPLOY_PATH="$NKD_CHART_INPUTS/deploy"
+go test ./internal/nkedemo -run 'TestChart' -count=1
 ```
 
-Run the block in Bash. Use absolute paths for the three path variables. Versions
-must match NKE's selected items, including controller `0.0.0` and NKTP
-`0.1.0-rc.2`; an older chart fails rather than being silently substituted.
-The output is private configuration with `charts/<item>.tgz` and otherwise
-unchanged deploy semantics. Existing destinations, dirty/wrong source pins,
-missing or extra items, wrong manifests, unsafe archives and output paths inside
-NKE or a producer layout fail without leaving prepared output.
-
-NKE's renderer consumes these archives through `DEPLOY_PATH`. Its executor also
-consumes them through the local-path branch, but **a release-manifest chart
-reference takes precedence over that path** unless explicitly overridden.
-Do not claim setting `DEPLOY_PATH` alone forces the complete staged wrapper to
-use local archives when `RELEASE_FILE` supplies different chart references.
-Preserve the wrapper's source/readiness checks; do not disable them to make the
-demo pass. Registry transport, a consistent manifest/override selection and the
-real installation remain separate handoff work.
-
-The six-chart handoff requires all archives from completed NKD Runs and delegates
-rendering and deploy-item validation to NKE. It does not fetch or rebuild chart
-dependencies. Passing those checks alone is not deployment acceptance.
+NKE's renderer and executor consume the prepared archives through `DEPLOY_PATH`.
+A release-manifest chart reference takes precedence unless explicitly overridden;
+the integrated adapter supplies the consistent local-assembly inputs. Passing
+chart preparation alone is not deployment acceptance.
 
 ## Registry and release-manifest handoff
 
@@ -365,7 +305,7 @@ After SIGKILL, OOM or a Colima restart:
 3. Run the network-only restore command inside the native VM:
 
    ```sh
-   python3 -B scripts/nke-local-demo.py restore --work "$NKD_DEMO_OUT"
+   "$(pwd)/.nkd/laptop-bootstrap/demo-tools-01/nke-demo" restore --work "$NKD_DEMO_OUT"
    ```
 
 4. Confirm it exits successfully before starting a new attempt. An active

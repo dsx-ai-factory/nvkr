@@ -8,7 +8,7 @@ For the complete build-and-deploy sequence, follow the
 ## Build just this artifact
 
 Inside Colima, from the native source export prepared in
-[step 2 of the local demo guide](local-nke-demo.md#2-copy-committed-nkd-source-into-native-vm-storage):
+[execution-host setup in the local demo guide](local-nke-demo.md#1-choose-your-linux-execution-host):
 
 ```sh
 CONTAINER_RUNTIME=docker \
