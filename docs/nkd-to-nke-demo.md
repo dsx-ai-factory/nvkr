@@ -1,9 +1,8 @@
 # NKD artifacts for NKE's staged site installer
 
-This document covers the staged-installer boundary only. It is not an analysis
-of Lia's complete local Colima/NICoSim environment. See the
-[whole-demo analysis](lia-local-demo-analysis.md) for the transcript, local
-provider/runtime distinction, missing artifacts and exact-byte deployment tasks.
+This reference covers the staged-installer artifact boundary. For the local
+Colima/CAPNICo/NICoSim workflow, prerequisites and acceptance limits, use the
+[integrated demo guide](local-nke-demo.md).
 
 The intended developer journey is: build the ARM64 artifacts with NKD, make the
 exact produced images and charts reachable by NKE, run the NKE site installer,
@@ -19,7 +18,7 @@ The separate [management diagnostic](local-management-cluster.md) now consumes
 the completed five-tool Run for real Kind management/CAPI installation and
 owned node/volume cleanup. It uses pinned NKE stage bytes without rebuilding
 artifacts. It does not deploy the NKE site or create a CAPD/container tenant;
-the integrated CAPNICo/QCOW2 consumer remains unvalidated end to end.
+the complete CAPNICo/QCOW2 tenant path is owned by the integrated consumer.
 
 The [deploy-only site consumer](local-site-integration.md) requires six prepared
 charts, exact controller/profiles/CAPNICo image handoff and runtime image-ID
@@ -28,16 +27,15 @@ assertions do not establish tenant/workload acceptance.
 
 The internal downstream network guard has setup/restoration and failure contracts.
 The new [integrated consumer](local-nke-demo.md) connects the guard to exact
-disk serving and simulator/guest ownership. Private attempts have not passed;
-no private acceptance outcome is recorded in-tree. See that guide for current
-runtime limits. Isolated guard tests do not establish guest delivery, BGP routes
-or tenant/workload acceptance.
+disk serving and simulator/guest ownership. It completed a real Colima
+tenant/workload/cleanup run with retained artifacts on October 8, 2026. See that
+guide for the exact scope and remaining clean-machine/full-source limits.
+Isolated guard tests do not establish guest delivery, BGP routes or acceptance.
 
-**The build and consumer contracts are tested; the complete NKD-to-demo E2E is not yet
-validated.** Do not use a completed 22-output local Run as proof that a site or
-tenant was installed. The [first-time build guide](local-development.md) is the
-working build entry point; this document records the exact downstream handoff
-and blockers rather than inventing a completed installation recipe.
+A completed 22-output local Run alone is not proof that a site or tenant was
+installed. Use the [first-time build guide](local-development.md) to produce
+artifacts and the integrated guide to consume and validate them. This reference
+explains the downstream handoff; it does not replace the executable tutorial.
 
 ## Which demo
 
@@ -49,12 +47,9 @@ NKE `main` or on the older artifact pins. Its authoritative instructions are
 and the [site-controller guide](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/docs/site-bootstrap/install-site-controller.md).
 
 It takes an existing Kubernetes site kubeconfig, NICo endpoint and bootstrap
-trust material. That is the installer's starting boundary, not proof that Lia's
-demo used remote hardware. Her local environment is Colima plus NICoSim, as the
-user clarified. Kind hosting the management cluster does not imply a CAPD
-infrastructure provider; CAPNICo can use NICoSim. The exact simulator backend
-used in the demonstrated session is not established by the meeting transcript.
-The requested acceptance target is now explicit: tenant nodes use the existing
+trust material. The local workflow supplies Colima, a Kind management cluster
+and CAPNICo/NICoSim. Kind hosts management services; it does not select CAPD
+or container-backed tenant nodes. Tenant nodes use the existing
 NKD-built ARM64 QCOW2 through a real NICoSim VM backend. A newly built tenant-node
 OCI image is neither required nor a substitute for this target.
 
@@ -73,9 +68,9 @@ values, infrastructure provisioning and tenant lifecycle.
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
 | Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` | The integrated consumer selects the separate tools Run and verifies extraction and native versions. It is not included in `all`. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
 | Dependency images | Twelve acquired ARM64 image outputs | Align chart values or node mirrors with the reachable image locations; stage 4 and NKTP also need inputs outside this set |
-| NKTP | Separate four-output `site` selection includes the source chart and locked dependency preparation | The consumer uses the packaged chart; runtime images are not a complete mirrored NKD set. The combined site/tenant acceptance is unvalidated |
-| Profiles content image | Separate `profiles` Run builds `controller-profiles` from the staged-installer source | The diagnostic ARM64/26.04 plain profile is wired to held-disk serving and the consumer's registry. It is not included in `all`; real tenant acceptance is unvalidated |
-| Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | The integrated consumer verifies and serves the selected disk. Missing DSX IMDS prevents claiming the complete OS smoke contract; tenant/workload acceptance is unvalidated |
+| NKTP | Separate four-output `site` selection includes the source chart and locked dependency preparation | The consumer uses the packaged chart; runtime images are not a complete mirrored NKD set. Integrated validation does not establish that source-build requirement |
+| Profiles content image | Separate `profiles` Run builds `controller-profiles` from the staged-installer source | The diagnostic ARM64/26.04 plain profile was exercised with held-disk serving and the consumer's registry. It is not included in `all` or production fleet profiles |
+| Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | Both real tenant guests used the selected backing disk and passed workload/DNS. Missing DSX IMDS still prevents claiming the separate complete OS smoke contract |
 | Site cluster, NICo access, SPIRE bootstrap CA, tenant login | Operator's authorized test configuration | Not build artifacts. Keep secrets and kubeconfig outside Git; do not invent credentials, site identity or trust roots |
 
 The artifact catalog currently builds the controller from NKE `v0.21.0`, commit
@@ -221,7 +216,7 @@ dependencies. Passing those checks alone is not deployment acceptance.
 
 `packages/<name>/` contains an OCI layout, not a URL the kubelet can pull. Loading
 an image into Podman on the build host does not stage it into the site nodes.
-Lia's stage 2 pulls through each node's containerd from a registry.
+The pinned installer's stage 2 pulls through each node's containerd from a registry.
 
 For development, ORAS supports an unchanged OCI-layout copy. The following is a
 handoff pattern for an explicitly authorized, reachable development registry,
@@ -286,8 +281,9 @@ do not expose it as a production service without the NKE-owned security setup.
 and input resolution may still occur. `nico CONFIGURED` checks objects and manager
 availability; it does not establish that NICo credentials can provision hardware.
 Tenant creation must use that matched CLI's actual interface and an approved
-test site's available capacity. No verified tenant-create command or site inputs
-are available for this NKD E2E trial yet, so none are invented here.
+test site's available capacity. The integrated guide supplies a disposable local
+configuration and delegates tenant creation to the exact built CLI; these generic
+installer commands do not supply production site inputs.
 
 ## E2E completion criteria
 
@@ -311,7 +307,76 @@ scenario is already selected: local Colima plus
 CAPNICo/NICoSim with QCOW2-backed tenant VMs, not a production NICo site or CAPD
 substitute. The integrated wrapper implements owned NICoSim routing/DHCP/BGP,
 exact disk serving, tenant creation and workload checks. Their joint runtime
-acceptance, guest/bootstrap trust compatibility, source access and OS capacity
-remain gates, not facts established by isolated contracts.
-Until the combined source inputs and real acceptance run
-are complete, this is not a working copy-paste full-E2E tutorial.
+acceptance passed with retained artifacts in the dedicated Colima environment.
+Fresh clean-machine execution, complete source membership and full OS smoke
+remain separate gates. This reference is not a substitute for the integrated
+tutorial or acceptance of those remaining requirements.
+
+## Local demo safety and host changes
+
+The integrated consumer uses the same pinned installer with a real libvirt
+NICoSim backend, not the mock or container backend. It creates only its private
+management cluster, registry, guest bridge, routing/firewall rules and daemons.
+It refuses an occupied endpoint, nonempty session or overlapping network.
+
+The diagnostic guard temporarily grants private executable copies and the
+identified QEMU bridge helper required privileges. It permits guest traffic only
+to the exact owned management endpoint's SPIRE ports, withdrawing those rules
+before management-address release. Foreign ownership or an unjoined producer
+fails closed and retains dependent controls. No global Docker daemon policy is
+changed. This is a trusted single-user VM route, not production isolation.
+
+The selected NKE source hardcodes digest-pinned kube-vip with IfNotPresent; the
+held OS does not contain it. Kube-vip and the test workload still require runtime
+container acquisition. First-boot APT uses only the baked file repository and
+fails on missing packages; this is not a completely offline deployment.
+
+NICoSim guest diagnostics use a per-attempt credential and bounded private
+agent/kubelet/containerd logs. Its Bearer check is presence-only, not production
+authentication. Keep kubeconfigs, tokens, credentials and logs private.
+
+The local profiles preserve the actual single physical uplink across the worker
+reboot and disable only subsequent cloud-init network rendering. NKE/OVS then
+owns persistent Netplan configuration. See the
+[profile reference](local-controller-profiles.md) for the exact configuration.
+
+### Recover network controls after a crash
+
+New attempts persist `network-state.json` privately before granting host
+privileges. It records the owner, exact permitted intents, original file
+identities and bytes, original sysctl values and attempt-bound root staging
+path. File and directory sync precede new privileged work. This is a
+trusted-user recovery journal, not an authenticated NKD receipt or a Release.
+Keep the original output directory; older attempts without this journal need
+manual operator inspection and cannot use this recovery command.
+
+After SIGKILL, OOM or a Colima restart:
+
+1. Confirm you are in the same dedicated native VM and account. Preserve the
+   output directory and accepted Runs; do not reset Colima or prune Docker.
+2. Inspect the exact attempt's simulator, disk-HTTP and DNS producers. Stop and
+   join any surviving owned producers using fresh runtime ownership checks,
+   not PIDs copied from the journal. Inspect the explicit native libvirt session
+   and remove only independently verified attempt-owned domains. Do not remove
+   an unknown guest to make recovery pass. Tenant/Kind/registry cleanup remains
+   a separate operator task after a hard crash.
+3. Run the network-only restore command inside the native VM:
+
+   ```sh
+   python3 -B scripts/nke-local-demo.py restore --work "$NKD_DEMO_OUT"
+   ```
+
+4. Confirm it exits successfully before starting a new attempt. An active
+   guard, present original PID, live private capability-bearing executable,
+   disk-HTTP listener, simulator or libvirt domain prevents restoration.
+   Changed bridge/file identities, capabilities or routes retain controls and
+   return an error; inspect the exact discrepancy rather than forcing removal.
+
+Recovery takes the same kernel-released lock, never kills serialized PIDs and,
+on the same boot, waits 40 seconds for any in-flight bounded sudo command to
+terminate. It restores only the recorded supported controls, reads back their
+removal and can replay an interrupted rollback. VIP route restoration requires
+recorded simulator/BGP intent. A full diagnostic volume does not prevent
+withdrawing known privileges after producers have joined, but failed journal
+persistence still makes the command fail. Recovery does not create tenant,
+workload, signed-release or end-to-end acceptance evidence.

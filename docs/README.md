@@ -10,13 +10,6 @@ each concept to a worked example.
 |---|---|
 | Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-local-dev-arm64/README.md) |
 | Build once, then exercise a real QCOW2 tenant without rebuilding | [Integrated local demo command and current validation limits](local-nke-demo.md) |
-| Boot an existing NKD disk through the real local NICoSim VM backend | [Artifact-only QCOW2 guest probe](local-qcow2-guest-probe.md) |
-| Test the real NKE management Kind/CAPI path with existing NKD-built tools | [Deploy-only management diagnostic](local-management-cluster.md) |
-| Install a disposable NKE site from completed NKD images/charts, without rebuilding | [Deploy-only site integration](local-site-integration.md) |
-| Inspect native host-network setup, restoration and current runtime limits | [Integrated consumer](local-nke-demo.md) |
-| Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
-| Understand the local Colima/NICoSim demo and the NKD-to-deployment handoff | [Whole-demo analysis](lia-local-demo-analysis.md), [staged-installer handoff](nkd-to-nke-demo.md) |
-| Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
@@ -48,6 +41,18 @@ records source availability and remaining gaps.
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nke-os-live-inspection.md) |
+
+## Local ARM64 diagnostics
+
+| Task | Guide |
+|---|---|
+| Boot an existing NKD disk through the real local NICoSim VM backend | [Artifact-only QCOW2 guest probe](local-qcow2-guest-probe.md) |
+| Test the real NKE management Kind/CAPI path with existing NKD-built tools | [Deploy-only management diagnostic](local-management-cluster.md) |
+| Install a disposable NKE site from completed NKD images/charts, without rebuilding | [Deploy-only site integration](local-site-integration.md) |
+| Inspect native host-network setup, restoration and current runtime limits | [Integrated consumer](local-nke-demo.md) |
+| Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
+| Understand the NKD-to-installer artifact handoff | [Staged-installer handoff](nkd-to-nke-demo.md) |
+| Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md) |
 
 ## Engineering and maintenance
 

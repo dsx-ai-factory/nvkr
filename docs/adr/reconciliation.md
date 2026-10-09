@@ -216,17 +216,24 @@ those rules before address release. Unjoined children retain dependent controls.
 Joined restoration refusals retain exact resources without retaining live
 simulator, disk-server or DNS daemons; their independent process groups are
 stopped/joined before host restoration checks. Contract negatives cover foreign
-domains, refused BGP restoration and individual daemon join failures. Downstream
-consumers emit success only after their outermost cleanup completes.
+domains, refused BGP restoration and individual daemon join failures.
+VIP-route restoration admits only the kernel's `linkdown` next-hop flag after
+producers are idle, retaining exact bridge, destination, gateway and route
+read-back checks; unknown flags and changed bindings remain refusals.
+Downstream consumers emit success only after their outermost cleanup completes.
 Network-only crash recovery now uses a private synced intent journal and the
 same kernel-released lock. Exact executable/file/bridge bindings gate restoration;
 recovery never kills journal PIDs. Contract negatives cover changed journals,
 live owners, protected executable metadata, substituted root staging and full
 diagnostic volumes. This does not establish a full tenant crash/restart matrix.
 
-Full end-to-end acceptance remains unestablished. Private integrated attempts
-have not passed; no private runtime acceptance outcome is recorded in-tree.
-No tenant/workload/final-cleanup acceptance is claimed.
+A real private Colima run completed on October 8, 2026, using seven retained
+completed Runs: two Ready ARM64 Kubernetes 1.34.2 QCOW2 nodes, exact backing-disk
+bindings, workload/DNS success, NKE tenant deletion and owned cleanup. Independent
+readback found no remaining owned containers, domains, bridge, guest/VIP routes
+or QEMU policy; the helper returned to root-owned mode 0755 and the restoration
+journal finished. This is unqualified local execution, not an authenticated
+external acceptance record or a clean-machine/full-source build.
 The adapter uses NICoSim's guest diagnostics with per-attempt credentials,
 private-file Bearer headers, disabled ambient curl configuration and bounded
 private log retention before deletion. The HTTP contract is exercised with a
@@ -238,9 +245,9 @@ the observed first-boot physical uplink (`eth0` or `enp1s0`). An empty NamePolic
 and explicit Name avoid switching the persisted OVS uplink after reboot;
 subsequent boots disable only cloud-init network rendering. Shell contracts
 cover both names, ambiguous/missing/unsupported physical NIC refusal, idempotence
-and foreign-path refusal. Complete tenant acceptance with these corrections
-remains unexercised. None of these probes proves the full
-tenant/workload path. Local evidence reports
+and foreign-path refusal. The completed integrated run exercised the corrected
+worker uplink across its pre-join reboot and passed tenant/workload checks;
+isolated shell probes alone do not prove that path. Local evidence reports
 are intentionally not shipped in this PR. Private diagnostic logs and Run records
 are not authenticated external acceptance or qualified reproduction. The retained
 older disk's SPIRE/DSX exception, failed full boot smoke and direct-source OS
@@ -248,9 +255,9 @@ integration remain open. No complete combined 23-output Run is claimed.
 The diagnostic laptop profile disables first-boot package refresh and selects
 only the baked file-based APT repository. Install errors terminate the commands
 before service restarts or the completion marker. This removes the authored
-public APT fallback, not runtime container acquisitions; corrected first-boot
-package/tenant acceptance remains
-unestablished.
+public APT fallback, not runtime container acquisitions. The completed integrated
+run exercised that first-boot package installation and tenant/workload path;
+it did not prove a complete offline deployment or full OS smoke.
 
 The diagnostic local launcher can compile an attempt-scoped substitution from a
 freshly measured, native-validated Packer toolchain image ID; this does not update

@@ -10,8 +10,10 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 completed seven-lane artifacts, owned native networking, exact QCOW2 serving,
 VM-backed NICoSim, NKE site, a real control-plane/worker tenant and a workload
 gate. It rebuilds nothing. Read the [setup, command and validation limits](../docs/local-nke-demo.md)
-before running. Full tenant/workload runtime validation is still in progress;
-site-only and standalone guest successes are not an integrated PASS.
+before running. A real Colima run completed tenant/workload and owned cleanup
+with retained artifacts; fresh clean-machine and full-source builds remain
+separate requirements. Site-only and standalone guest successes are not an
+integrated PASS.
 
 `python3 scripts/nke-local-management.py` uses a completed source-built tools Run
 for a real private Kind management cluster and NKE's pinned CAPI stage, then
@@ -30,8 +32,8 @@ It requires an existing private NICoSim endpoint and is not tenant/workload E2E.
 
 The internal `nke-local-network.py` guard has setup/restoration and deliberate
 consumer-failure contract tests. No private acceptance record is shipped here. The integrated command
-wires it into simulator/guest ownership, but complete tenant/workload acceptance
-is still required. See the [integrated consumer guide](../docs/local-nke-demo.md)
+wires it into simulator/guest ownership and requires tenant/workload acceptance
+before success. See the [integrated consumer guide](../docs/local-nke-demo.md)
 for its network scope, cleanup and current runtime limits.
 
 For first-time ARM64 NKE development, use the [local build guide](../docs/local-development.md)

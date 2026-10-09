@@ -1,9 +1,9 @@
 # Deploy the completed local NKE site artifacts
 
 This development entrypoint connects the completed NKD output Runs to NKE's
-source-owned site installer. It is not yet the complete first-time laptop
-tenant/workload tutorial. The full journey remains tracked in the
-[demo handoff](nkd-to-nke-demo.md). Do not interpret a site-only result as
+source-owned site installer. This site-only entrypoint is not the complete
+laptop tenant/workload tutorial; use the [integrated demo](local-nke-demo.md)
+for that journey. Do not interpret a site-only result as
 QCOW2 tenant provisioning, workload acceptance or a verified Release.
 
 ## Inputs and execution boundary
@@ -22,8 +22,8 @@ An already running private NICoSim HTTP endpoint on port 18089 and its private
 token file are required. Use the real source-built simulator and libvirt backend,
 not its mock or container backend. The current site entrypoint does not start or
 stop that external simulator, configure tenant routing/DHCP/BGP, serve the disk,
-or grant native host privileges. These still need integration into the final
-owned full-demo entrypoint. Its health check proves only the supplied HTTP
+or grant native host privileges. The integrated demo owns those additional
+lifecycles. This site entrypoint's health check proves only the supplied HTTP
 interface, not that a VM can be created. NICoSim's selected source accepts a
 nonempty bearer token; this is diagnostic authentication, not production NICo
 authorization. Keep the endpoint inside the trusted dedicated VM.
@@ -118,5 +118,6 @@ acceptance record is shipped here; contract tests are not a live deployment resu
 The [integrated command](local-nke-demo.md) connects exact disk serving,
 NICoSim ownership/networking, guest bootstrap trust, tenant
 creation, a real Kubernetes workload, produced-to-deployed identity checks and
-complete teardown. Its full acceptance remains unestablished. None is inferred
-from chart rendering or a management node.
+complete teardown. See that guide for the completed retained-artifact Colima
+run and remaining clean-machine/full-source requirements. Its acceptance is not
+inferred from chart rendering or a management node.

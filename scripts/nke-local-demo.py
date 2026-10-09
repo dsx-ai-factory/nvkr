@@ -382,6 +382,7 @@ def restore_bgp(guard):
     # pinned upstream leaves its covering blackhole on shutdown. Admission
     # proved these ranges absent; never flush a range or delete unknown routes.
     guard.cleaning = True  # Restoration must not depend on writable logs.
+    guard.require_idle()
     rows = json.loads(guard.command(["ip", "-j", "route", "show", "table", "main"]))
     selected = [row for row in rows if row.get("dst", "default") != "default" and
                 ipaddress.ip_network(row["dst"], strict=False).overlaps(ipaddress.ip_network(NET.VIP_CIDR))]
@@ -391,8 +392,11 @@ def restore_bgp(guard):
                 raise VM.SmokeError("covering BGP route changed; refusing removal")
         elif ipaddress.ip_network(row["dst"], strict=False) == ipaddress.ip_network(VIP + "/32"):
             hops = row.get("nexthops") or [row]
-            if (set(row) - {"dst", "gateway", "dev", "flags", "nexthops"} or row.get("flags", []) or
-                    any(set(hop) - {"dst", "gateway", "dev", "flags", "weight"} or hop.get("flags", []) or
+            # Linux reports linkdown once the last guest tap disappears.
+            # It changes reachability, not the exact next-hop/bridge owner.
+            # Admit only this known flag after proving producers are idle.
+            if (set(row) - {"dst", "gateway", "dev", "flags", "nexthops"} or row.get("flags", []) not in ([], ["linkdown"]) or
+                    any(set(hop) - {"dst", "gateway", "dev", "flags", "weight"} or hop.get("flags", []) not in ([], ["linkdown"]) or
                         hop.get("weight", 1) != 1 or hop.get("dev") != NET.BRIDGE or not hop.get("gateway") or
                    ipaddress.ip_address(hop["gateway"]) not in ipaddress.ip_network(NET.CIDR) for hop in hops)):
                 raise VM.SmokeError("VIP next-hop route changed; refusing removal")

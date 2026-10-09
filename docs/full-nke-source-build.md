@@ -39,7 +39,7 @@ source-owned workflows. PR #113 is a separate draft, not merged support on main.
 Do not use an upstream release SBOM hash as the expected hash of a new source
 build. New bytes receive new identities. The release inventory guides membership
 and versions; it does not prove the source-to-binary relationship or qualification.
-See the [Lia demo handoff](nkd-to-nke-demo.md) for installer alignment and E2E blockers.
+See the [staged-installer handoff](nkd-to-nke-demo.md) for installer alignment and E2E blockers.
 
 ## What needs external input
 

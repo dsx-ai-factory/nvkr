@@ -22,9 +22,10 @@ NKD is the project; `nkdctl` is its command-line tool. You provide three inputs:
 
 `run plan` describes the work. `run local` executes it as a new immutable attempt.
 Local builds are unqualified diagnostics, not signed releases or cluster deployment.
-For the next step, see [NKD artifacts for the NICo site installer](nkd-to-nke-demo.md).
-That guide distinguishes artifact construction from the still-unvalidated
-installation and tenant-provisioning handoff.
+For the next step, use the [integrated local demo](local-nke-demo.md), which
+consumes completed artifacts without rebuilding. Its recorded validation used an
+existing Colima environment, not a fresh clean-machine build. The
+[staged-installer reference](nkd-to-nke-demo.md) explains the artifact boundary.
 
 ## Start from a clean machine
 
@@ -112,6 +113,15 @@ host for the existing OS producer. It is not a tenant node: the tenant must boot
 the QCOW2 built by NKD. The launcher enters the profile over SSH and uses Docker
 inside Linux, rather than running authority-bearing paths on macOS or forwarding
 a Mac Docker socket. It does not switch your default Docker context.
+
+Inspect this profile's containers from the Mac with:
+
+```sh
+colima ssh --profile nkd-demo -- docker ps
+```
+
+This uses the native VM's Docker daemon without changing the Mac's default
+context. The tenant QCOW2 VMs are libvirt guests, not Docker containers.
 
 Install Colima if absent, then explicitly create a dedicated profile. The following
 uses the checkout paths on your machine; run it from the NKE Recipes root:

@@ -421,6 +421,51 @@ class DemoTest(unittest.TestCase):
             DEMO.restore_bgp(guard)
         self.assertFalse(any("delete" in call.args[0] for call in guard.command.call_args_list))
 
+    def test_bgp_cleanup_admits_only_linkdown_on_bound_idle_next_hops(self):
+        for shape in ("single", "multipath-hop", "multipath-route"):
+            for flags in ([], ["linkdown"], ["onlink"], ["dead"], ["linkdown", "onlink"], ["linkdown", "linkdown"], "linkdown", None):
+                with self.subTest(shape=shape, flags=flags):
+                    hop = {"dev": DEMO.NET.BRIDGE, "gateway": "172.30.0.250", "flags": flags}
+                    row = dict(hop, dst=DEMO.VIP) if shape == "single" else {"dst": DEMO.VIP, "nexthops": [hop]}
+                    if shape == "multipath-route":
+                        hop["flags"] = []
+                        row["flags"] = flags
+                    guard = Mock()
+                    guard.command.side_effect = [json.dumps([row]), json.dumps([row]), "", "[]"]
+                    if flags in ([], ["linkdown"]):
+                        DEMO.restore_bgp(guard)
+                        guard.bridge_binding.assert_called_once_with()
+                        self.assertEqual(guard.command.call_args_list[2].args,
+                                         (["ip", "route", "delete", DEMO.VIP, "table", "main"], True))
+                    else:
+                        with self.assertRaises(DEMO.VM.SmokeError):
+                            DEMO.restore_bgp(guard)
+                        self.assertEqual(guard.command.call_count, 1)
+                    guard.require_idle.assert_called_once_with()
+
+    def test_bgp_cleanup_linkdown_does_not_waive_live_or_changed_bridge_refusal(self):
+        for failure in ("live", "missing-bridge", "changed-bridge", "changed-route"):
+            with self.subTest(failure=failure):
+                row = {"dst": DEMO.VIP, "dev": DEMO.NET.BRIDGE, "gateway": "172.30.0.250", "flags": ["linkdown"]}
+                guard = Mock()
+                guard.command.side_effect = [json.dumps([row]), "[]"]
+                if failure == "live":
+                    guard.require_idle.side_effect = DEMO.VM.SmokeError("live producer")
+                elif failure == "missing-bridge":
+                    guard.bridge_binding.return_value = None
+                elif failure == "changed-bridge":
+                    guard.bridge_binding.side_effect = DEMO.VM.SmokeError("changed bridge")
+                with self.assertRaises(DEMO.VM.SmokeError):
+                    DEMO.restore_bgp(guard)
+                self.assertFalse(any("delete" in call.args[0] for call in guard.command.call_args_list))
+
+    def test_bgp_cleanup_rejects_linkdown_on_covering_blackhole(self):
+        guard = Mock()
+        guard.command.return_value = json.dumps([{"dst": DEMO.NET.VIP_CIDR, "type": "blackhole", "flags": ["linkdown"]}])
+        with self.assertRaises(DEMO.VM.SmokeError):
+            DEMO.restore_bgp(guard)
+        self.assertEqual(guard.command.call_count, 1)
+
     def test_tenant_cleanup_uses_volatile_capture_and_suppresses_repeated_interrupts(self):
         with tempfile.TemporaryDirectory() as temporary:
             tenant = DEMO.Tenant("owned", Path("tools"), Path(temporary), {}, 300, Mock(), {})
