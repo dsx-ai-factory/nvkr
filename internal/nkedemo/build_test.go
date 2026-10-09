@@ -12,6 +12,30 @@ import (
 	"time"
 )
 
+func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
+	for _, home := range []string{"", "/developer/home"} {
+		t.Run("HOME="+home, func(t *testing.T) {
+			t.Setenv("HOME", home)
+			t.Setenv("GH_TOKEN", "not-forwarded")
+			build := localBuildEnvironment()
+			if got := environmentValue(build, "HOME"); got != home {
+				t.Fatalf("build HOME=%q, want %q", got, home)
+			}
+			for _, item := range build {
+				if item == "HOME=" {
+					t.Fatal("empty HOME must remain absent")
+				}
+			}
+			if environmentValue(build, "CONTAINER_RUNTIME") != "docker" || environmentValue(build, "GH_TOKEN") != "" {
+				t.Fatal("build runtime or credential isolation changed")
+			}
+			if environmentValue(NativeEnvironment(), "HOME") != "" {
+				t.Fatal("deployment inherited developer Git HOME")
+			}
+		})
+	}
+}
+
 func TestOnlyBuildLauncherStreamsOutput(t *testing.T) {
 	for _, stream := range []bool{false, true} {
 		var progress, output bytes.Buffer

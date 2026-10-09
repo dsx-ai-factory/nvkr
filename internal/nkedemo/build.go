@@ -55,7 +55,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if _, err = boundedRegularRead(script, 1<<20); err != nil {
 		return BuiltInputs{}, err
 	}
-	env := SetEnv(NativeEnvironment(), map[string]string{"CONTAINER_RUNTIME": "docker"})
+	env := localBuildEnvironment()
 	if cfg.NKEClone != "" {
 		clone, readErr := resolveExisting(cfg.NKEClone)
 		if readErr != nil {
@@ -83,6 +83,17 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	path := func(lane string) string { return filepath.Join(repo, ".nkd/runs", cfg.AttemptPrefix+"-"+lane) }
 	return BuiltInputs{RunInputs{OS: path("os"), Components: path("components"), Providers: path("components"), Site: path("site"), Tools: path("tools"), Profiles: path("profiles"), Simulator: path("simulator")}, filepath.Join(repo, ".nkd/laptop-bootstrap", cfg.AttemptPrefix+"-os", "nkdctl")}, nil
+}
+
+// Local source fetching uses the developer's Git configuration. Preserve HOME
+// only for the build launcher so private sources can use its credential helper;
+// deployment retains NativeEnvironment's exclusion of ambient credentials.
+func localBuildEnvironment() []string {
+	env := SetEnv(NativeEnvironment(), map[string]string{"CONTAINER_RUNTIME": "docker"})
+	if home := os.Getenv("HOME"); home != "" {
+		env = SetEnv(env, map[string]string{"HOME": home})
+	}
+	return env
 }
 
 func buildLocalLanes(ctx context.Context, runner Runner, script string, cfg BuildConfig, lanes []string) error {

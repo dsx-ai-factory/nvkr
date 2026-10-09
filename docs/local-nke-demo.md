@@ -86,7 +86,9 @@ overlapping networks. Python 3.12+ is an upstream NKE installer prerequisite;
 the demo itself is Go. No host Go, Packer or Helm is required.
 
 Git authorization must work **inside Linux**. The example fetches pinned remote
-sources. For a local NKE Git clone, use its absolute Linux path in
+sources. Configure Git's credential helper there; only build commands inherit
+the developer's `HOME` for Git configuration, not deployment commands. For a
+local NKE Git clone, use its absolute Linux path in
 `NKE_LOCAL_CLONE` and `build.nkeClone`; only committed pinned objects are used.
 
 ## 3. Bootstrap the demo command
