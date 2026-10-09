@@ -110,6 +110,7 @@ func PrepareExactInputs(definition Definition, environment Environment, plan *fa
 	for index, output := range plan.LifecycleOutputs {
 		frozenOutputs[index] = output
 		frozenOutputs[index].Components = append([]string(nil), output.Components...)
+		frozenOutputs[index].ImageIndex = output.ImageIndex.Clone()
 	}
 	return &ExactInputExpectation{issued: true, prepared: prepared, outputs: frozenOutputs}, nil
 }

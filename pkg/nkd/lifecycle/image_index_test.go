@@ -111,3 +111,64 @@ func TestPrepareRunFreezesExplicitNativeImageUses(t *testing.T) {
 		t.Fatal("Run aliases compiled requirements")
 	}
 }
+
+func TestPrepareExactInputsFreezesImageIndexRequirements(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*factory.ImageIndexPlan)
+	}{
+		{"child producer", func(p *factory.ImageIndexPlan) { p.Children[0].Component = "changed" }},
+		{"required platform", func(p *factory.ImageIndexPlan) { p.RequiredPlatforms[0] = "changed" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectation, err := PrepareExactInputs(plan.Definition, plan.Environment, plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			index := -1
+			for i, output := range plan.LifecycleOutputs {
+				if output.ImageIndex != nil {
+					index = i
+					break
+				}
+			}
+			if index < 0 {
+				t.Fatal("fixture lacks aggregate")
+			}
+			output := expectation.outputs[index]
+			binding := &delivery.ImageIndexBinding{RequiredPlatforms: append([]string(nil), output.ImageIndex.RequiredPlatforms...)}
+			for i, child := range output.ImageIndex.Children {
+				binding.Children = append(binding.Children, delivery.ImageIndexChildBinding{Platform: child.Platform, BuildDigest: child.BuildDigest, Component: child.Component, ManifestDigest: "sha256:" + repeat(string(rune('a'+i)), 64), Size: 500, BuildSubject: "sha256:" + repeat(string(rune('c'+i)), 64)})
+			}
+			artifact := Artifact{Name: output.Name, Kind: OutputOCI, Digest: "sha256:" + repeat("9", 64), BuildDigest: output.BuildDigest, Components: append([]string(nil), output.Components...), ImageIndex: binding}
+			check := func() {
+				t.Helper()
+				if err := factory.ValidateLifecycleOutputs([]factory.LifecycleOutputPlan{expectation.outputs[index]}, []Artifact{artifact}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			check()
+			tc.mutate(plan.LifecycleOutputs[index].ImageIndex)
+			check()
+			// A second expectation from the untouched prepared inputs must not
+			// share either nested slice with the first expectation.
+			fresh, err := factory.LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			other, err := PrepareExactInputs(fresh.Definition, fresh.Environment, fresh)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tc.mutate(other.outputs[index].ImageIndex)
+			if err := factory.ValidateLifecycleOutputs([]factory.LifecycleOutputPlan{fresh.LifecycleOutputs[index]}, []Artifact{artifact}); err != nil {
+				t.Fatal(err)
+			}
+			check()
+		})
+	}
+}
