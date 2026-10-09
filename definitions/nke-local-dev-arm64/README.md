@@ -27,15 +27,19 @@ an explicitly selected `COLIMA_PROFILE` on Apple Silicon. Neither publishes or s
 The OS selects TCG and the recorded local Packer subject through
 `os-tcg.json`. The CLI catalog adds an explicit ARM64 producer; its pin starts
 at the maintained CLI release and its stamps follow machine-managed pins.
-Its compiler subject `golang@sha256:6c2a5538f964f1c82f97ad14988bf05de100d922d159d0e398b54c7b0ca0c6c9`
+Its Go 1.27.2 compiler subject `golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c`
 deliberately differs from the `nke-v1` compiler subject
 `golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6`.
 The common build command does not imply identical release compiler or bytes.
 
 The launcher builds NKD with Go 1.27.2 from the Environment's digest-pinned
 utility image. `make build` checks that SDK against `.go-version`; the launcher
-does not download a second Go SDK. This does not repin the NKE producer images
-or claim that existing Packer/inspection images were rebuilt with Go 1.27.2.
+does not download a second Go SDK. The local CLI and site CLI/controller also
+select Go 1.27.2 on Trixie; the five source-built installer tools select its
+native ARM64 Bookworm manifest. The site controller uses its source-owned
+`GOLANG_IMAGE` argument, without modifying NKE's Dockerfile. These producer
+changes require fresh Runs and do not relabel retained outputs or claim that
+existing Packer/inspection images were rebuilt with Go 1.27.2.
 
 The combined, components and OS selections reuse catalogs under `definitions/nke-m2`.
 In particular, `os-tcg.json` binds its override to that OS catalog's exact

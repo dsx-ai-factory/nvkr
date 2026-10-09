@@ -11,7 +11,7 @@ sources:
     repo: https://github.com/kubernetes-sigs/cluster-api
     constraint: 1.12.3
     toolchainImagesByArch:
-      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
     vendorCommand:
       - bash
       - -euc
@@ -27,7 +27,7 @@ sources:
     repo: https://github.com/helm/helm
     constraint: 4.2.4
     toolchainImagesByArch:
-      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
     vendorCommand:
       - bash
       - -euc
@@ -56,7 +56,7 @@ sources:
     repo: https://github.com/kubernetes-sigs/kind
     constraint: 0.32.0
     toolchainImagesByArch:
-      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
     vendorCommand:
       - bash
       - -euc
@@ -72,13 +72,13 @@ sources:
     repo: https://github.com/kubernetes/kubernetes
     constraint: 1.36.0
     toolchainImagesByArch:
-      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
     # Kubernetes commits its vendor tree and staging workspace.
   oras:
     repo: https://github.com/oras-project/oras
     constraint: 1.3.3
     toolchainImagesByArch:
-      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
     vendorCommand:
       - bash
       - -euc

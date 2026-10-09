@@ -10,8 +10,9 @@ sources:
   nke-cli:
     repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.21.x
-    # Matches the source-owned controller Dockerfile's Go toolchain.
-    toolchainImage: golang@sha256:3680233e3204827fbdc66088528ae6d4b3d034f51d03a99d454f6de034888244
+    # Go 1.27.2 on the existing Trixie base; the controller uses the same parent
+    # through its source-owned GOLANG_IMAGE build argument below.
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
     vendorCommand:
       - bash
       - -euc
@@ -106,7 +107,7 @@ components:
     buildCommand:
       - sh
       - -ec
-      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt build-arg:GOLANG_IMAGE=docker.io/library/golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true
   nke-controller-chart:
     fromSource: true
     source: nke-controller-helm

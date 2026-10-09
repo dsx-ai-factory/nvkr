@@ -124,6 +124,7 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 
 // These are compiler contracts, not a four-output build or installation test.
 func TestLaptopSiteArtifactContract(t *testing.T) {
+	const compiler = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -216,11 +217,18 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 					case ir.KindBuild:
 						producers++
 						if build.Name == "cwe" {
-							if node.BuilderType != ir.BuilderBuildKit || node.Network != ir.NetworkDefault || !strings.Contains(strings.Join(node.Command, " "), "--local dockerfile=/src/controller") {
+							command := strings.Join(node.Command, " ")
+							if node.BuilderType != ir.BuilderBuildKit || node.Network != ir.NetworkDefault || !strings.Contains(command, "--local dockerfile=/src/controller") {
 								t.Fatal("controller must use its source-owned Dockerfile with declared build networking")
+							}
+							if strings.Count(command, "--opt build-arg:GOLANG_IMAGE=docker.io/library/"+compiler) != 1 {
+								t.Fatal("controller must bind the exact reviewed compiler through its source-owned build argument")
 							}
 						} else if node.Network != ir.NetworkNone || !node.SourceReadOnly {
 							t.Fatal("CLI/chart producers must consume prepared sources offline and read-only")
+						}
+						if build.Name == "nkectl" && node.Toolchain != compiler {
+							t.Fatal("site CLI must select the exact reviewed compiler, not the retained producer pin")
 						}
 						if build.Name == "nkectl" && !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NKECTL_TREE=clean") {
 							t.Fatal("source-owned Make must own the changed CLI linker symbols and stamp assertion")

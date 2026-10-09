@@ -109,7 +109,7 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 				case ir.KindBuild:
 					producers++
 					if node.BuilderType != ir.BuilderOCIHermetic || node.Network != ir.NetworkNone || !node.SourceReadOnly ||
-						node.Toolchain != "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b" {
+						node.Toolchain != "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9" {
 						t.Fatal("prepared tools must build offline in the exact native compiler image")
 					}
 					command := strings.Join(node.Command, " ")
