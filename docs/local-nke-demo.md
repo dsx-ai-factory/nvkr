@@ -135,6 +135,8 @@ Check unattended administrator access before starting the hours-long build:
 sudo -n true
 ```
 
+E2E also checks this before fetching its installer or starting artifact builds.
+
 If it says `interactive authentication is required`, stop and arrange approved
 non-interactive sudo access with the host administrator. Deployment and cleanup
 use `sudo -n` for host networking and temporary grants. A one-time `sudo -v`

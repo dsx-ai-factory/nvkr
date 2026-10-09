@@ -4,6 +4,7 @@
 package scripts_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -67,6 +68,8 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		{"simulator Docker without OS capacity", "Linux", "aarch64", "docker", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/docker", false},
 		{"simulator Docker requires Buildx", "Linux", "aarch64", "docker", "simulator", "running", "32000", "missing-buildx", "Buildx plugin", true},
 		{"site Docker requires Buildx", "Linux", "aarch64", "docker", "site", "running", "32000", "missing-buildx", "Buildx plugin", true},
+		{"OS Docker requires Buildx", "Linux", "aarch64", "docker", "os", "running", "100000", "missing-buildx", "Buildx plugin", true},
+		{"all Docker requires Buildx", "Linux", "aarch64", "docker", "all", "running", "100000", "missing-buildx", "Buildx plugin", true},
 		{"remote context overrides local host", "Linux", "aarch64", "docker", "providers", "running", "100000", "remote", "Remote Docker endpoints", true},
 		{"OS diagnostics without cached Packer", "Linux", "aarch64", "docker", "os", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
 		{"mutable bootstrap pin rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "admitted bootstrap image/platform/runtime", true},
@@ -185,6 +188,16 @@ esac`,
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
 				t.Fatalf("error=%v output=%s, want fail=%t message=%s", err, out, tc.fail, tc.want)
+			}
+			if strings.Contains(string(out), "nkdctl command:") {
+				t.Fatal("prerequisite check logged an nkdctl invocation")
+			}
+			if tc.daemon == "missing-buildx" {
+				for _, required := range []string{"sudo apt-get install docker-buildx", "sudo apt-get install docker-buildx-plugin", "docker buildx version", "No downloads or attempt creation"} {
+					if !strings.Contains(string(out), required) {
+						t.Fatalf("missing Buildx recovery instruction %q: %s", required, out)
+					}
+				}
 			}
 			if _, err := os.Stat(filepath.Join(dir, ".nkd")); !os.IsNotExist(err) {
 				t.Fatalf("check created attempt storage: %v", err)
@@ -513,14 +526,49 @@ esac
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
-				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NKD_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected)
-			out, err := cmd.CombinedOutput()
+				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NKD_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected,
+				"NKE_SOURCE_TOKEN=command-log-environment-sentinel")
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			err := cmd.Run()
 			if (err != nil) != tc.wantError {
-				t.Fatalf("error=%v output=%s, want failure=%t", err, out, tc.wantError)
+				t.Fatalf("error=%v stdout=%s stderr=%s, want failure=%t", err, &stdout, &stderr, tc.wantError)
+			}
+			if strings.Contains(stdout.String(), "nkdctl command:") {
+				t.Fatal("command logging contaminated stdout")
+			}
+			if strings.Contains(stdout.String()+stderr.String(), "command-log-environment-sentinel") {
+				t.Fatal("command logging exposed an environment value")
+			}
+			baseline, err := os.ReadFile(filepath.Join(dir, ".nkd/laptop-bootstrap/id-probe/baseline-plan.json"))
+			if err != nil || !json.Valid(baseline) || string(baseline) != plan+"\n" {
+				t.Fatalf("baseline Plan JSON changed: read error=%v", err)
 			}
 			calls, err := os.ReadFile(filepath.Join(dir, "calls"))
 			if err != nil {
 				t.Fatal(err)
+			}
+			runner := ".nkd/laptop-bootstrap/id-probe/nkdctl"
+			if tc.shared {
+				runner = ".nkd/laptop-bootstrap/first-os/nkdctl"
+			}
+			var logged, invoked []string
+			for _, line := range strings.Split(stderr.String(), "\n") {
+				if strings.HasPrefix(line, "nkdctl command:") {
+					logged = append(logged, line)
+				}
+			}
+			for _, line := range strings.Split(string(calls), "\n") {
+				if strings.HasPrefix(line, "run plan ") || strings.HasPrefix(line, "run local ") {
+					invoked = append(invoked, "nkdctl command: "+runner+" "+line)
+				}
+			}
+			wantCount := 3 // Baseline Plan, dry-run preview, and final exec.
+			if tc.wantError {
+				wantCount = 1 // Toolchain rejection stops after baseline admission.
+			}
+			if len(logged) != wantCount || !slices.Equal(logged, invoked) {
+				t.Fatalf("logged commands=%q, executed commands=%q; want %d", logged, invoked, wantCount)
 			}
 			if !tc.shared && strings.Contains(string(calls), "image inspect") {
 				t.Fatalf("launcher resolved validated bytes through a mutable tag: %s", calls)

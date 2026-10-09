@@ -16,7 +16,7 @@ import (
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
-	for _, name := range []string{"remote", "local", "sibling", "override", "dirty", "wrong-pin", "preflight", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt"} {
+	for _, name := range []string{"remote", "local", "sibling", "override", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt"} {
 		t.Run(name, func(t *testing.T) {
 			root := privateTestDir(t)
 			repo, tools, calls := filepath.Join(root, "repo"), filepath.Join(root, "tools"), filepath.Join(root, "calls")
@@ -32,6 +32,7 @@ func TestPrepareInstallerPinnedAttempt(t *testing.T) {
 				}
 			}
 			write(filepath.Join(repo, "scripts/nke-full-arm64-local.sh"), "#!/bin/sh\n[ \"$1:$2\" = --check:all ] && [ \"${FAIL:-}\" != preflight ]\n")
+			write(filepath.Join(tools, "sudo"), "#!/bin/sh\n[ \"$1:$2\" = -n:true ] && [ \"${FAIL:-}\" != sudo ]\n")
 			// This command fixture tests ownership and exact invocation, not Git
 			// authorization or an externally fetched commit.
 			write(filepath.Join(tools, "git"), `#!/bin/sh
@@ -132,9 +133,16 @@ esac
 				t.Fatalf("result=%+v error=%v", actual, err)
 			}
 			if !success {
-				if name == "preflight" || strings.HasPrefix(name, "output-") {
+				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") {
 					if _, e := os.Lstat(calls); !errors.Is(e, os.ErrNotExist) {
 						t.Fatal("failed preflight reached Git acquisition")
+					}
+				}
+				if name == "sudo" {
+					for _, hint := range []string{"sudo -n true", "host administrator", "sudo -v", "docs/local-nke-demo.md"} {
+						if !strings.Contains(err.Error(), hint) {
+							t.Fatalf("missing actionable sudo guidance %q: %v", hint, err)
+						}
 					}
 				}
 				if actual != (Config{}) {

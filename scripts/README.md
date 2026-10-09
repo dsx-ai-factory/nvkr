@@ -16,6 +16,7 @@ host through Colima; this is not a native Darwin build.
 `--check LANE` performs diagnostics only. The full demo compiles binaries once and shares
 one measured Packer toolchain, including Helm 4.2.4 and ORAS 1.3.3. Profiles are
 data bundles, not a separate container image. No publication/signing is enabled.
+The launcher prints its exact shell-escaped `nkdctl` invocations to stderr before execution, without printing environment values.
 
 Contract tests: `go test ./internal/nkedemo ./cmd/nke-demo -count=1`.
 See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;

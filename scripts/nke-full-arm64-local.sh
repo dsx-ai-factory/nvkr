@@ -6,6 +6,11 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "${repo_root}"
+print_nkdctl_command() {
+  printf 'nkdctl command:'
+  printf ' %q' "$@"
+  printf '\n'
+} >&2
 usage() {
   printf '%s\n' \
     'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers|simulator|site|tools|profiles]' \
@@ -162,11 +167,14 @@ if [[ "${lane}" == all || "${lane}" == os ]]; then
     echo 'Insufficient OS resources. Provide 8 CPUs, 10 GiB available RAM and 64 GiB free AFTER material preparation; allow about 90 GiB before a fresh build. No downloads started.' >&2; exit 1
   fi
   if [[ "${free}" -lt 92160 ]]; then echo 'Warning: less than 90 GiB free; material preparation may exhaust the later 64 GiB gate.' >&2; fi
-  if [[ "${runtime}" == docker ]]; then docker buildx version >/dev/null || { echo 'Install the Docker Buildx plugin for OS toolchain bootstrap.' >&2; exit 1; }; fi
 fi
-if [[ "${lane}" == simulator || "${lane}" == site ]]; then
-  if [[ "${runtime}" == docker ]] && ! docker buildx version >/dev/null; then
-    echo 'Install the Docker Buildx plugin for local toolchain bootstrap.' >&2; exit 1
+if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
+  if [[ "${runtime}" == docker ]] && ! docker buildx version >/dev/null 2>&1; then
+    printf '%s\n' 'Docker Buildx plugin is missing or unusable; local toolchain bootstrap requires it.' \
+      'Ubuntu docker.io: sudo apt-get install docker-buildx' \
+      "Docker CE from Docker's apt repository: sudo apt-get install docker-buildx-plugin" \
+      'Then verify: docker buildx version. No downloads or attempt creation.' >&2
+    exit 1
   fi
 fi
 echo "Prerequisite diagnostics passed for ${lane}/${runtime}. Git authorization and cgroup/resource/toolchain admission remain execution gates."
@@ -207,7 +215,9 @@ if [[ "${lane}" != all ]]; then definition="definitions/nke-local-dev-arm64/defi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.
-  "${runner}" run plan --definition "${definition}" --environment "${environment}" --json >"${bootstrap}/baseline-plan.json"
+  plan_command=("${runner}" run plan --definition "${definition}" --environment "${environment}" --json)
+  print_nkdctl_command "${plan_command[@]}"
+  "${plan_command[@]}" >"${bootstrap}/baseline-plan.json"
   jq -L scripts -e --arg lane "${lane}" 'include "nke-os-plan"; local_toolchain_scopes($lane)' \
     "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-scopes.json"
   if [[ -n "${shared_bootstrap}" ]]; then
@@ -251,6 +261,10 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   definition="${bootstrap}/definition.json"
   fi
 fi
-"${runner}" run local --definition "${definition}" --environment "${environment}" --attempt "${attempt}-preview" --dry-run
-exec "${runner}" run local --definition "${definition}" --environment "${environment}" \
-  --attempt "${attempt}" --attempts-root .nkd/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}"
+preview_command=("${runner}" run local --definition "${definition}" --environment "${environment}" --attempt "${attempt}-preview" --dry-run)
+print_nkdctl_command "${preview_command[@]}"
+"${preview_command[@]}"
+build_command=("${runner}" run local --definition "${definition}" --environment "${environment}" \
+  --attempt "${attempt}" --attempts-root .nkd/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}")
+print_nkdctl_command "${build_command[@]}"
+exec "${build_command[@]}"
