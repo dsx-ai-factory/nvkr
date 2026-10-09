@@ -1,12 +1,15 @@
-# Build and run NKE in a Linux VM on an Apple Silicon Mac
+# Build and run NKE on Ubuntu ARM64
 
 NKD builds the artifacts. A separate command deploys those exact outputs, creates
 a real ARM64 control-plane and worker from the QCOW2 through CAPNICo/NICoSim,
 tests a workload and Kubernetes DNS, then removes its owned resources.
 
-This is a Linux workflow with a Colima setup step for macOS. The Mac runs Colima;
-NKD builds and the demo run inside its Ubuntu ARM64 VM. It is not a native macOS
-build, and Docker Desktop alone cannot run the libvirt tenant VMs.
+All build and deployment commands run on a **Linux ARM64 execution host**.
+Use a dedicated Ubuntu ARM64 machine, or follow the additional macOS/Colima
+setup below to provide that host. This is not a native macOS build: the outputs
+are Linux ARM64 binaries, images and charts, plus an ARM64 QCOW2. Docker Desktop
+alone cannot run this demo's libvirt tenant VMs. Other architectures are not
+selected automatically by this example.
 
 A real Colima run passed on October 8, 2026, using retained completed artifacts,
 including workload/DNS testing and final cleanup. A fresh clean-machine build
@@ -19,7 +22,35 @@ with five freshly built non-OS lanes and a retained QCOW2. All fifteen selected
 site image identities were checked. This is not a fresh OS rebuild; see
 [PR #118's validation status](https://github.com/dsx-ai-factory/nke-recipes/pull/118).
 
-## 1. Prepare the Mac
+## 1. Choose your Linux execution host
+
+### Ubuntu ARM64
+
+Use a dedicated host with Docker Engine and Buildx, eight CPUs, 24 GiB RAM,
+Python 3.12+ and about 90 GiB free on the build filesystem. Install Docker using
+the [official Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/).
+No host Go, Packer or Helm is required. The recorded E2E validation below used
+Colima; it is not evidence of a separate bare-metal Ubuntu acceptance run.
+
+Clone into native ext4 storage, not a network or macOS shared filesystem. Keep
+this checkout private because its `.nkd` directory will hold build and demo data:
+
+```sh
+set -euo pipefail
+sudo apt-get update
+sudo apt-get install -y git
+umask 077
+git clone https://github.com/dsx-ai-factory/nke-recipes.git
+cd nke-recipes
+test "$(uname -m)" = aarch64
+test "$(findmnt -n -o FSTYPE -T .)" = ext4
+df -h .
+```
+
+Continue with step 2 in this same Linux terminal; skip the macOS section. The
+clone commands target `main` after merge; pre-merge instructions are in PR #118.
+
+### macOS: provide Ubuntu ARM64 through Colima
 
 You need Git, Homebrew, access to the pinned NKE sources, and about 90 GiB free
 on the Mac and build filesystem for a fresh OS build. Docker Desktop alone does
@@ -41,10 +72,9 @@ For an existing profile, inspect its architecture, resources and mounts first.
 See the [Colima reference](local-development.md#apple-silicon-mac-with-colima)
 for reuse and storage troubleshooting.
 
-## 2. Copy committed NKD source into native VM storage
-
-Run this block from the Mac checkout in Bash. The destination must be new;
-uncommitted files are not included.
+Still on the Mac, copy committed NKD source into native VM storage. Run this
+block from the checkout in Bash. The destination must be new; uncommitted files
+are not included.
 
 ```sh
 set -euo pipefail
@@ -58,12 +88,13 @@ printf 'Inside Colima, cd to: %s\n' "$NKD_NATIVE_REPO"
 colima ssh --profile nkd-demo -- bash -c 'cd "$1" && exec bash' bash "$NKD_NATIVE_REPO"
 ```
 
-**Everything below runs inside Colima**, from the directory just printed. Native
+You are now inside the Ubuntu ARM64 VM, in the directory just printed. Native
 ext4 avoids the shared-mount file-handle problem encountered during source export.
+**Run every remaining command in this Linux terminal, not on the Mac.**
 
-## 3. Install prerequisites inside the Ubuntu VM
+## 2. Install prerequisites on the Ubuntu execution host
 
-For the tested Ubuntu ARM64 host:
+On either your native Ubuntu ARM64 host or the Colima Ubuntu ARM64 VM:
 
 ```sh
 set -euo pipefail
@@ -85,13 +116,15 @@ Use Python 3.12+. The libvirt session must be empty. The demo refuses overlappin
 networks and existing owned resources rather than deleting them. Host package
 installation is explicit setup, not a hermetic NKD toolchain.
 
-Git authentication must work **inside Colima**; the Mac's `gh` login is not proof.
-Alternatively, use an exact local NKE Git repository mounted into Colima and set
-`NKE_LOCAL_CLONE` to its absolute path. Only committed, pinned Git objects are used.
+Git authentication must work **on the Linux execution host**; a Mac's `gh` login
+is not proof of access inside Colima. Alternatively, use an exact local NKE Git
+repository accessible from Linux and set `NKE_LOCAL_CLONE` to its absolute Linux
+path. Only committed, pinned Git objects are used.
 
-## 4. Build the artifacts inside the VM
+## 3. Build the Linux ARM64 artifacts
 
-From the native NKD export, run sequentially. Use new attempt names for a rerun.
+From the Linux NKD checkout or committed export, run sequentially. Use new attempt
+names for a rerun.
 
 ```sh
 set -euo pipefail
@@ -109,12 +142,15 @@ OS execution uses QEMU software acceleration; its duration is not guaranteed.
 Build the OS first to preserve its disk-space headroom. The components Run
 already contains both providers; a separate `providers` build is unnecessary
 for this demo. The historical `all` selection does not contain this whole set.
-The build umask allows the rootless builder to read source files; the native
-export's private parent still prevents access by other host users.
+The build umask allows the rootless builder to read source files; the private
+checkout or export parent still prevents access by other host users. The `tools`
+lane builds the demo's Linux Helm, kubectl, clusterctl, ORAS and Kind bundle;
+the consumer extracts it privately rather than requiring those tools on the Mac
+or preinstalled on Ubuntu.
 To reuse completed Runs instead, skip this step and supply their absolute paths
 below. Never overwrite or rebuild accepted artifacts just to relocate them.
 
-## 5. Prepare the matching installer
+## 4. Prepare the matching installer
 
 The installer must match the site/tools/profiles source pin. This creates a new
 clean clone; use an exact local Git repository instead of the URL if appropriate.
@@ -129,7 +165,7 @@ git -C "$NKE_INSTALLER_CLONE" checkout --detach 8fb2d53368823bd386b4fbd55b4ab6d3
 test "$(git -C "$NKE_INSTALLER_CLONE" rev-parse HEAD)" = 8fb2d53368823bd386b4fbd55b4ab6d3c0931345
 ```
 
-## 6. Run the demo without rebuilding
+## 5. Run the demo without rebuilding
 
 Inspect `docker network ls` and `ip route`. If `kind` does not exist and
 `172.18.0.0/16` is unused, create it once:
@@ -147,8 +183,8 @@ docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af0682
 ```
 
 Set the paths below to your completed Runs. The output directory must be new.
-Deployment requires the disk-copy bytes plus 30 GiB free inside Colima; check
-physical Mac capacity separately.
+Deployment requires the disk-copy bytes plus 30 GiB free on the Linux execution
+filesystem. If using Colima, check physical Mac capacity separately too.
 
 ```sh
 set -euo pipefail
@@ -175,7 +211,7 @@ management services only. Tenant nodes are real libvirt guests using Ubuntu
 26.04, Kubernetes 1.34.2 and OVN-Kubernetes 1.4.0. Each has four CPUs, eight GiB
 RAM and a 60-GiB overlay. Packer is not called during deployment.
 
-## 7. Recognize success
+## 6. Recognize success
 
 The command must exit zero and print:
 

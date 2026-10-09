@@ -1,8 +1,13 @@
-# Build and develop NKE locally with NKD
+# Build and develop Linux ARM64 NKE artifacts with NKD
 
 Inspect the ARM64 NKE artifact set, build it locally, and rebuild a committed source
 change. No previous NKD experience is required. Run commands from the `nke-recipes`
 repository root and keep the same terminal open.
+
+The build execution host and produced artifacts are Linux ARM64, not Darwin.
+On macOS, the launcher uses a Linux VM; Colima/Podman setup is an additional
+host-provisioning step, not a native Mac build. For the QCOW2-backed tenant demo,
+follow the [Ubuntu ARM64 guide with optional macOS/Colima setup](local-nke-demo.md).
 
 **This is not yet a full source-built NKE distribution.** The example selects
 23 outputs, including the two source-built infrastructure-provider images, but

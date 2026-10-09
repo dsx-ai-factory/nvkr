@@ -9,11 +9,14 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 `python3 scripts/nke-local-demo.py` is the new deploy-only integration command:
 completed artifacts, owned native networking, exact QCOW2 serving,
 VM-backed NICoSim, NKE site, a real control-plane/worker tenant and a workload
-gate. It rebuilds nothing. Read the [setup, command and validation limits](../docs/local-nke-demo.md)
+gate. It rebuilds nothing. Read the [Ubuntu ARM64 setup, command and validation limits](../docs/local-nke-demo.md)
 before running. A real Colima run completed tenant/workload and owned cleanup
 with retained artifacts; fresh clean-machine and full-source builds remain
 separate requirements. Site-only and standalone guest successes are not an
 integrated PASS.
+
+The integrated build/demo runs on Linux ARM64. macOS support means supplying
+that Linux host through Colima, not building or running Darwin artifacts.
 
 `python3 scripts/nke-local-management.py` uses a completed source-built tools Run
 for a real private Kind management cluster and NKE's pinned CAPI stage, then

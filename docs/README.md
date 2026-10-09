@@ -8,8 +8,8 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
-| Start local ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-local-dev-arm64/README.md) |
-| Build once, then exercise a real QCOW2 tenant without rebuilding | [Integrated local demo command and current validation limits](local-nke-demo.md) |
+| Start local Linux ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-local-dev-arm64/README.md) |
+| Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
