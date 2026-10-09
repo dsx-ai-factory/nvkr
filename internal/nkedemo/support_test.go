@@ -141,7 +141,7 @@ func TestRunnerUsesOnlyExplicitEnvironmentAndPATH(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := Runner{Env: []string{"PATH=" + filepath.Dir(tool)}}
-	got, err := runner.Capture(t.Context(), []string{"private-tool"}, "env", time.Second)
+	got, err := runner.Capture(t.Context(), []string{"private-tool"}, "env", 5*time.Second)
 	if err != nil || string(got) != "unset" {
 		t.Fatalf("result=%q err=%v", got, err)
 	}

@@ -21,11 +21,19 @@ building. These are setup allowances; execution rechecks authored requirements.
 Install Docker Engine and Buildx using the
 [Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/).
 
+If this is a fresh Ubuntu installation without Git, install it before cloning:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y git ca-certificates
+```
+
 On native Ubuntu ARM64, including an ARM64 GCP VM, clone privately and continue
 with step 2. No Colima is needed. The demo uses QEMU software acceleration,
 not a requirement for nested KVM:
 
 ```sh
+# Keep newly created checkout files private to this user; not a Git requirement.
 umask 077
 git clone https://github.com/dsx-ai-factory/nke-recipes.git
 cd nke-recipes
@@ -70,6 +78,32 @@ tenant VMs are not Docker containers.
 
 ## 2. Install prerequisites on the Ubuntu execution host
 
+First check Docker and its Buildx plugin:
+
+```sh
+docker version
+docker buildx version
+```
+
+If Docker works but `docker buildx` is an unknown command, install the plugin
+from the same package source as Docker. For Ubuntu's `docker.io` package, use
+Ubuntu's [docker-buildx package](https://packages.ubuntu.com/docker-buildx):
+
+```sh
+sudo apt-get update
+sudo apt-get install -y docker-buildx
+docker buildx version
+```
+
+For Docker's official `docker-ce` packages, use `docker-buildx-plugin` from
+Docker's configured APT repository instead. Do not mix the two package sources.
+If `docker info` reports permission denied, follow Docker's
+[Linux post-installation instructions](https://docs.docker.com/engine/install/linux-postinstall/).
+Docker access grants root-level privileges; use the dedicated trusted-user host.
+
+Install the remaining tools. This includes `virsh` and the QEMU/libvirt tenant
+runtime; Docker alone is not enough:
+
 ```sh
 set -euo pipefail
 sudo apt-get update
@@ -78,7 +112,6 @@ sudo apt-get install -y --no-install-recommends \
   libvirt-daemon-system libvirt-clients qemu-system-arm qemu-utils \
   qemu-efi-aarch64 cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
   dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs
-sudo -n true
 docker info >/dev/null
 docker buildx version
 df -h .
@@ -88,6 +121,20 @@ virsh -c qemu:///session list --all
 The libvirt session must be empty. The demo refuses occupied resources and
 overlapping networks. Python 3.12+ is an upstream NKE installer prerequisite;
 the demo itself is Go. No host Go, Packer or Helm is required.
+
+Check unattended administrator access before starting the hours-long build:
+
+```sh
+sudo -n true
+```
+
+If it says `interactive authentication is required`, stop and arrange approved
+non-interactive sudo access with the host administrator. Deployment and cleanup
+use `sudo -n` for host networking and temporary grants. A one-time `sudo -v`
+only caches authentication temporarily and may expire before deployment; it is
+not a reliable setup for the complete E2E. Do not run the whole demo as root or
+automatically change sudoers to bypass this gate. See Ubuntu's
+[sudo timestamp documentation](https://manpages.ubuntu.com/manpages/resolute/man5/sudoers_timestamp.5.html).
 
 Git authorization must work **inside Linux**. The example fetches pinned remote
 sources. Configure Git's credential helper there; only build commands inherit
