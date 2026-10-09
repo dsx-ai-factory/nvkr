@@ -177,12 +177,30 @@ of its complete fresh membership, rather than silently reusing bootstrap outputs
 
 ## 4. Build and run the demo
 
-Inspect `docker network ls` and `ip route`. Only if `kind` does not exist
-and its subnet is unused:
+Inspect existing Docker subnets and host routes first:
 
 ```sh
-docker network create --driver bridge --subnet 172.18.0.0/16 --gateway 172.18.0.1 kind
+docker network ls -q | xargs -r docker network inspect \
+  --format '{{.Name}} {{json .IPAM.Config}}'
+ip -4 route
 ```
+
+If `kind` does not exist, let Docker select a subnet that does not overlap its
+existing networks, instead of assuming `172.18.0.0/16` is free:
+
+```sh
+docker network create --driver bridge kind
+docker network inspect kind --format '{{json .IPAM.Config}}'
+```
+
+The demo discovers that network's actual IPv4 subnet and gateway; no YAML change
+is needed. Check that the chosen private subnet also avoids your host/VPN routes
+and the demo's reserved tenant ranges `172.30.0.0/24` and `172.31.0.0/24`.
+If it conflicts, choose an unused private subnet with Docker's `--subnet` and
+`--gateway` options before starting the demo. An existing `kind` network is
+inspected, not recreated. A `Pool overlaps` error means the requested subnet is
+already allocated: inspect the networks above and do not delete an unrelated
+network such as `fleet` to make room.
 
 The adapter checks the pinned Kind configuration and projects IPv4 networking
 without a Docker-socket mount into a private copy; it does not edit NKE.
