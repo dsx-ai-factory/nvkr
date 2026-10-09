@@ -41,15 +41,6 @@ test "$(uname -m)" = aarch64
 test "$(findmnt -n -o FSTYPE -T .)" = ext4
 ```
 
-Until [PR #118](https://github.com/dsx-ai-factory/nke-recipes/pull/118) merges,
-switch to its branch before continuing:
-
-```sh
-git switch codex/full-nke-arm64-local
-```
-
-After merge, stay on `main`; the temporary branch step is not needed.
-
 ### Additional macOS setup
 
 From your NKE Recipes checkout, install Colima if needed. Create the dedicated
@@ -159,8 +150,6 @@ boot a tenant yet. No host Go installation is needed: the launcher compiles
 installer bundle (Kind, kubectl, Helm, clusterctl and ORAS).
 
 ```sh
-# Use the Docker daemon on this Linux host.
-export CONTAINER_RUNTIME=docker
 # Use normal permissions for new build files; demo secrets use private files.
 umask 022
 # Read-only prerequisites check: no downloads, builds or attempt directories.
@@ -207,25 +196,25 @@ network such as `fleet` to make room.
 The adapter checks the pinned Kind configuration and projects IPv4 networking
 without a Docker-socket mount into a private copy; it does not edit NKE.
 
-Cache the explicit runtime acquisitions, then copy the example config:
+Cache the explicit runtime acquisitions:
 
 ```sh
 docker pull kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
 docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
-test ! -e .nkd/demo.local.yaml
-cp demos/local-nke.yaml .nkd/demo.local.yaml
-chmod 600 .nkd/demo.local.yaml
-printf 'build.repo: %s\nrun.out: %s\n' \
-  "$(pwd)" "$(pwd)/.nkd/e2e-demo-01"
 ```
 
-Edit those two YAML paths using the printed values. They are literal Linux
-paths: `~` and shell variables are not expanded. For each rerun, use a fresh
-`build.attempt` **and** `run.out`. Do not add retained `run.runs` or
-`run.nkdctl` references to E2E configuration.
+Run the checked-in example directly from the repository root. The flags below
+replace its placeholder repository and output paths; no YAML copy or editing
+is required. For each rerun, change both `--attempt` and `--out` to unused names.
+Do not add retained `run.runs` or `run.nkdctl` references to E2E configuration.
 
 ```sh
-"$NKE_DEMO" e2e --config .nkd/demo.local.yaml
+"$NKE_DEMO" e2e \
+  --config demos/local-nke.yaml \
+  --repo "$PWD" \
+  --attempt demo-e2e-01 \
+  --out "$PWD/.nkd/demo-e2e-01-demo" \
+  --jobs 2
 ```
 
 E2E preflights the combined selection, then builds OS, components, site, tools,
@@ -242,11 +231,8 @@ An optional `run.nkeCheckout` supplies an existing clean checkout at the exact
 installer pin instead; the demo never updates that checkout in place.
 
 `build.jobs` sets the maximum number of concurrent ready build/package operations.
-The example uses two. For a larger execution host, set `jobs: 4` or override it:
-
-```sh
-"$NKE_DEMO" e2e --config .nkd/demo.local.yaml --jobs 4
-```
+The example uses two. For a larger execution host, change `--jobs 2` to
+`--jobs 4` in the command above.
 
 Dependencies still gate execution: package work waits for its producer, and
 Packer waits for its materials. This is an operation limit, not a CPU count or
@@ -270,18 +256,87 @@ does not make this display execution evidence.
 
 The console shows elapsed time and observed START/DONE/FAIL boundaries instead
 of every compiler/download line. `build` and `e2e` print the path to a private
-console log containing the raw public build output; use `tail -f` on that path
-for details, or add `--verbose` to stream it directly. Log messages and graph
+console log retaining up to 8 MiB of raw public build output; use `tail -f` on
+that path for details, or add `--verbose` to stream it directly. At the log limit,
+one notice is printed; builds and progress continue. Log messages and graph
 views are diagnostics, not proof of artifact verification or successful E2E.
 Private installer output stays in its private logs. Ctrl+C requests cancellation;
 the adapter attempts bounded process joins and owned cleanup. If cleanup refuses,
 inspect the retained resources and recovery instructions before rerunning.
 Ordinary tests do not prove interruption at every live NKE stage.
 
-The OS uses QEMU software acceleration. The eight-hour E2E budget and 60-minute
-tenant budget are ceilings, not completion estimates. Deployment requires the
-disk-copy bytes plus 30 GiB free. Tenant guests use the selected plain ARM64 disk,
-four CPUs, eight GiB RAM and a 60-GiB overlay each.
+The default OS profile explicitly forbids KVM and uses QEMU's TCG software
+emulation, even on a KVM-capable bare-metal host. `Waiting for SSH to become
+available` includes Ubuntu autoinstall and its reboot; a quiet Packer console
+alone does not show a stall. Its 180-minute SSH timeout, the eight-hour E2E budget
+and 60-minute tenant budget are ceilings, not completion estimates. Increasing
+`--jobs` does not accelerate one guest. Deployment requires the disk-copy bytes
+plus 30 GiB free. Tenant guests use the selected plain ARM64 disk, four CPUs,
+eight GiB RAM and a 60-GiB overlay each.
+
+### Optional KVM for OS assembly on native ARM64
+
+For the Docker route, check device permissions and an actual read/write open in
+the same Linux terminal that will launch the demo:
+
+```sh
+test -r /dev/kvm && test -w /dev/kvm && echo 'KVM accessible'
+bash -c 'exec 3<>/dev/kvm && echo "KVM read/write open OK"'
+```
+
+The first command checks permissions; the second opens and closes the device
+without starting a VM. Both must succeed. NKD still validates the device and
+KVM API. If either fails, inspect `ls -l /dev/kvm` and `id -nG` first.
+For example, with a `root:kvm` device and a user outside `kvm`, the administrator
+can add that user with `sudo usermod -aG kvm "$(id -un)"`. Open a new login
+session and repeat the check; changing account groups does not update an
+existing session. Do not run the whole demo as root.
+
+If a TCG run is already active, press Ctrl+C and wait for its command and cleanup
+to finish before changing the inputs. Before a new build, run this from the
+NKE Recipes repository root on Linux. It updates [the OS overlay](../definitions/nke-local-dev-arm64/os-tcg.json)
+and [the Docker Environment](../definitions/nke-local-dev-arm64/environment-local-docker.json):
+
+```sh
+(
+  set -eu
+  kvm_os=definitions/nke-local-dev-arm64/os-tcg.json
+  kvm_env=definitions/nke-local-dev-arm64/environment-local-docker.json
+  kvm_tmp=$(mktemp)
+  jq '
+    (.components["nke-node-image"].component.buildRequirements.capabilities[]
+      | select(.name == "kvm") | .policy) = "required"
+    | .components["nke-node-image"].component.packer.variables.cpu_model = "host"
+  ' "$kvm_os" > "$kvm_tmp"
+  cp "$kvm_tmp" "$kvm_os"
+  jq '.executionClasses[0].capabilities = ["kvm"]' "$kvm_env" > "$kvm_tmp"
+  cp "$kvm_tmp" "$kvm_env"
+  rm "$kvm_tmp"
+)
+```
+
+This requires KVM for OS assembly, selects QEMU's `host` CPU model and declares
+the Docker execution class's KVM capability. It does not change source pins.
+
+The compiled Plan then requires KVM; runtime admission checks the actual device
+before VM execution. Keep the source/material pins unchanged.
+Use a fresh attempt and output path; an already-running TCG Plan cannot switch
+accelerators. These settings have been checked by compiling the complete
+29-output Plan. No real KVM build was performed for this example. They are not
+suitable for a Colima or cloud VM that does not expose usable nested KVM.
+
+Then launch a fresh attempt:
+
+```sh
+"$NKE_DEMO" e2e \
+  --config demos/local-nke.yaml \
+  --repo "$PWD" \
+  --attempt demo-kvm-01 \
+  --out "$PWD/.nkd/demo-kvm-01-demo" \
+  --jobs 2
+```
+
+The attempt name does not select acceleration; the JSON input changes do.
 
 ## 5. Recognize success
 
