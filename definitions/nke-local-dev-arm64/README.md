@@ -32,6 +32,11 @@ deliberately differs from the `nke-v1` compiler subject
 `golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6`.
 The common build command does not imply identical release compiler or bytes.
 
+The launcher builds NKD with Go 1.27.2 from the Environment's digest-pinned
+utility image. `make build` checks that SDK against `.go-version`; the launcher
+does not download a second Go SDK. This does not repin the NKE producer images
+or claim that existing Packer/inspection images were rebuilt with Go 1.27.2.
+
 The combined, components and OS selections reuse catalogs under `definitions/nke-m2`.
 In particular, `os-tcg.json` binds its override to that OS catalog's exact
 `requiresCatalogDigest`. An M2 catalog repin can therefore invalidate this local

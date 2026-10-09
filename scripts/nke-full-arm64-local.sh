@@ -144,7 +144,7 @@ if [[ "${runtime}" == docker ]]; then environment="definitions/nke-local-dev-arm
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
-utility='golang@sha256:6c2a5538f964f1c82f97ad14988bf05de100d922d159d0e398b54c7b0ca0c6c9'
+utility='golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c'
 if ! jq -e --arg image "${utility}" --arg runtime "${runtime}" '
   .utilityContainer == $image and .utilityPlatform == "linux/arm64" and
   .runtime.runtime == $runtime
@@ -175,8 +175,6 @@ mkdir -p .nkd/laptop-bootstrap
 mkdir "${bootstrap}" || { echo 'Bootstrap already exists; use a fresh attempt name.' >&2; exit 1; }
 mkdir "${bootstrap}/go-build" "${bootstrap}/go-mod" "${bootstrap}/home" "${bootstrap}/tmp"
 export TMPDIR="${repo_root}/${bootstrap}/tmp"
-go_version="$(jq -er '.go.version' toolchains/nkd-packer/toolchain.lock.json)"
-go_digest="$(jq -er '.go.archives.arm64' toolchains/nkd-packer/toolchain.lock.json)"
 network=default
 if [[ "${runtime}" == docker ]]; then network=bridge; fi
 "${runtime}" pull --platform linux/arm64 "${utility}"
@@ -185,14 +183,8 @@ if [[ "${runtime}" == docker ]]; then network=bridge; fi
   --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
   --volume "${repo_root}:/src:ro" --volume "${repo_root}/${bootstrap}:/out:rw" \
   --env CGO_ENABLED=0 --env GOTOOLCHAIN=local --env GOCACHE=/out/go-build --env GOMODCACHE=/out/go-mod --env HOME=/out/home \
-  --env "NKD_BOOTSTRAP_GO_VERSION=${go_version}" --env "NKD_BOOTSTRAP_GO_SHA256=${go_digest#sha256:}" \
   "${utility}" bash -euc '
-    archive="/out/go${NKD_BOOTSTRAP_GO_VERSION}.linux-arm64.tar.gz"
-    curl --fail --location --max-time 300 --retry 2 \
-      "https://go.dev/dl/go${NKD_BOOTSTRAP_GO_VERSION}.linux-arm64.tar.gz" --output "$archive"
-    printf "%s  %s\n" "$NKD_BOOTSTRAP_GO_SHA256" "$archive" | sha256sum --check --status
-    tar --extract --gzip --file "$archive" --directory /out
-    export PATH="/out/go/bin:$PATH"
+    # make checks the container SDK against .go-version before compiling.
     make -C /src build BIN=/out/nkdctl
   '
 runner="${bootstrap}/nkdctl"

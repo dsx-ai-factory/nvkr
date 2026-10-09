@@ -126,7 +126,7 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 				}
 				switch tc.name {
 				case "mutable bootstrap pin rejected":
-					env = []byte(strings.ReplaceAll(string(env), "golang@sha256:6c2a5538f964f1c82f97ad14988bf05de100d922d159d0e398b54c7b0ca0c6c9", "golang:latest"))
+					env = []byte(strings.ReplaceAll(string(env), "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "golang:latest"))
 				case "foreign bootstrap platform rejected":
 					env = []byte(strings.ReplaceAll(string(env), "linux/arm64", "linux/amd64"))
 				}
@@ -398,6 +398,16 @@ esac
 			calls, err := os.ReadFile(filepath.Join(dir, "calls"))
 			if err != nil {
 				t.Fatal(err)
+			}
+			for _, required := range []string{"golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "GOTOOLCHAIN=local", "make -C /src build BIN=/out/nkdctl"} {
+				if !strings.Contains(string(calls), required) {
+					t.Fatalf("bootstrap omitted pinned SDK/build contract %q: %s", required, calls)
+				}
+			}
+			for _, forbidden := range []string{"NKD_BOOTSTRAP_GO_VERSION", "go.dev/dl", "tar --extract", "export PATH=\"/out/go/bin"} {
+				if strings.Contains(string(calls), forbidden) {
+					t.Fatalf("bootstrap replaced the image SDK with a second download %q: %s", forbidden, calls)
+				}
 			}
 			if !strings.Contains(string(calls), "run plan") {
 				t.Fatalf("never reached baseline admission: %s", calls)

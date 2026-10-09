@@ -381,14 +381,14 @@ NKE_LOCAL_CLONE=/absolute/path/to/nke \
   bash scripts/nke-full-arm64-local.sh first-components 1 components
 ```
 
-The launcher downloads the exact Go archive from the toolchain lock, verifies its
-SHA-256 inside the pinned utility container and uses it to compile a static Linux ARM64
+The launcher uses Go 1.27.2 from the Environment's digest-pinned utility container
+to compile a static Linux ARM64
 `nkdctl`, then runs it inside Linux, previews the selection and executes the 22-output
 Run. Producer and utility containers still use their pinned images. One job is the conservative
 starting point. The optional local-clone route supplies exact pinned Git objects.
-The bootstrap Go version/archive are maintained in
-`toolchains/nkd-packer/toolchain.lock.json`; that version must match `.go-version`,
-which `make build` checks. Bootstrap module/build caches are private per attempt,
+`make build` requires that SDK to match `.go-version`; no second Go archive is
+downloaded. NKE producer toolchains retain their separate catalog pins.
+Bootstrap module/build caches are private per attempt,
 so a fresh attempt downloads modules again; no shared-cache integrity is claimed.
 Canonical remote fetch is available when `NKE_LOCAL_CLONE` is absent, but is not
 a validated first-time-developer quickstart here. Private-source Git authentication
@@ -834,4 +834,5 @@ access, a full-disk smoke, a complete source-built distribution or deployed NKE.
 Historical local trial reports are intentionally not shipped in this PR.
 Require complete Run records and actual consumer checks for your own outputs.
 The [integrated demo guide](local-nke-demo.md) tracks the distinct tenant/workload
-acceptance gate, which has not passed.
+gate. It passed with retained completed Runs; a fresh clean-machine build of every
+lane remains unverified.
