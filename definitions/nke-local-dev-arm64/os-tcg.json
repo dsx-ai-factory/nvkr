@@ -2,7 +2,7 @@
   "apiVersion": "nkd.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:903c30be81435740f0eee62736d4fc52617a6ff25e605f5fddbc61baaae76d50",
+  "requiresCatalogDigest": "sha256:83cab98ddd4a58708ae5b2222130ed2f4ffcfda6ef17c76d4544d49e8da10d4a",
   "components": {
     "nke-node-image": {
       "component": {

@@ -4,7 +4,7 @@
 apiVersion: nkd.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:b8a50d41e723b26bac8d4e625800f9ed1269081ad7bb2241a44a6edc6c3143eb
+requiresCatalogDigest: sha256:d95510f611e8d42e87dfe22043c83885467620574145e0397f187648df363298
 components:
   nke-node-image:
     component:

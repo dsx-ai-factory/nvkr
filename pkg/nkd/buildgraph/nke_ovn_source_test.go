@@ -38,6 +38,28 @@ const ovnForkCommit = "26cc199de8e814a7fe6d899a770fc04df0bbc2f9"
 // ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
 const ovnForkStream = "1.5.18"
 
+// Both source trees use a vendored JSON adapter incompatible with Go 1.27.
+const ovnGoBuilder = "quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564"
+
+func TestNKEOVNBuilderPinBindings(t *testing.T) {
+	for _, path := range []string{
+		"../../../definitions/nke-ovn-source/catalog",
+		"../../../definitions/nke-m2/os-catalog",
+		"../../../definitions/nke-os/catalog",
+	} {
+		t.Run(path, func(t *testing.T) {
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			command := strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n")
+			if !strings.Contains(command, "build-arg:BUILDER_IMAGE="+ovnGoBuilder) {
+				t.Fatal("OVN producer lost the compatible digest-pinned Go builder")
+			}
+		})
+	}
+}
+
 func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
 	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nke-ovn-source/catalog"))
@@ -197,7 +219,7 @@ func TestNKEOVNForkPinBindings(t *testing.T) {
 			"name=localhost/nke/ovn-kubernetes:git-" + pin.Commit,
 			// The fork's vendored JSON adapter needs Go 1.26, not Go 1.27's
 			// changed JSON v2 API. This is the measured patched 1.26.9 builder.
-			"build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564",
+			"build-arg:BUILDER_IMAGE=" + ovnGoBuilder,
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
 		}},
 		{component: "ovn-kubernetes-chart", fragments: []string{
