@@ -318,7 +318,7 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 		return admitted, err
 	}
 	if facts.OSType != "linux" || !slices.Contains([]string{"aarch64", "arm64"}, facts.Architecture) || facts.NCPU < 8 || facts.MemTotal < 20<<30 {
-		return admitted, errors.New("require native ARM64 Docker,8 CPUs and20 GiB RAM")
+		return admitted, errors.New("require native ARM64 Docker, 8 CPUs and 20 GiB RAM")
 	}
 	dir, _, err := securepath.OpenDirectory(filepath.Dir(out))
 	if err != nil {
@@ -330,7 +330,7 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 		return admitted, capacityErr
 	}
 	if free < 20<<30 {
-		return admitted, errors.New("management diagnostic requires20 GiB native disk headroom")
+		return admitted, errors.New("management diagnostic requires 20 GiB native disk headroom")
 	}
 	images, err := captureJSON[[]dockerImage](ctx, runner, []string{"docker", "image", "inspect", kindNodeImage}, "admit-kind-image")
 	if err != nil {

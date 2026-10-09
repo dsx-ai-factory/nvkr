@@ -75,13 +75,6 @@ func projectChartSource(raw []byte, archive string) ([]byte, error) {
 	return []byte(strings.Join(lines, "\n") + "\n"), nil
 }
 
-// PrepareChartInputs only consumes artifacts through nkdctl's public CLI. NKE
-// remains owner of deploy YAML and Helm remains owner of chart loading.
-func PrepareChartInputs(ctx context.Context, cfg ChartInputsConfig) (string, error) {
-	runner := Runner{Env: NativeEnvironment(), Progress: cfg.Progress}
-	return prepareChartInputs(ctx, cfg, runner.Capture)
-}
-
 func prepareChartInputs(ctx context.Context, cfg ChartInputsConfig, capture chartCapture) (deploy string, result error) {
 	if err := requireContext(ctx); err != nil {
 		return "", err

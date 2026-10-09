@@ -219,7 +219,7 @@ type demoAdmission struct {
 func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 	var admitted demoAdmission
 	if cfg.Timeout < 300*time.Second || cfg.Timeout > time.Hour {
-		return admitted, errors.New("tenant budget must be300..3600 seconds")
+		return admitted, errors.New("tenant budget must be 300..3600 seconds")
 	}
 	materials, err := AdmitSite(ctx, cfg)
 	if err != nil {
@@ -277,7 +277,7 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 		return admitted, err
 	}
 	if free < 30<<30 || free-(30<<30) < uint64(image.Disk.Size) {
-		return admitted, errors.New("need disk-copy bytes plus30 GiB free for two-VM diagnostic")
+		return admitted, errors.New("need disk-copy bytes plus 30 GiB free for two-VM diagnostic")
 	}
 	runner := Runner{Env: env, Progress: cfg.Progress}
 	binding, err := admitLibvirtEnvironment(ctx, runner)
