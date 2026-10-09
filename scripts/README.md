@@ -8,7 +8,7 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nke-demo.md) for
 `nke-demo e2e`: build selected artifacts through `nkdctl`, then deploy those
-completed Runs to a local site and QCOW2-backed tenant. macOS supplies the Linux
+completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
 host through Colima; this is not a native Darwin build.
 
 `nke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports

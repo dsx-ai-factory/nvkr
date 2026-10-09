@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -55,37 +54,39 @@ func TestOnlyBuildLauncherStreamsOutput(t *testing.T) {
 	}
 }
 
-func TestBuildSharesBootstrapOnlyAfterFirstLaneSucceeds(t *testing.T) {
-	for _, failedLane := range []string{"", "os", "site"} {
-		t.Run("failure-"+failedLane, func(t *testing.T) {
+func TestBuildInvokesOneCombinedRun(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		t.Run(map[bool]string{false: "success", true: "failure"}[fail], func(t *testing.T) {
 			dir := privateTestDir(t)
 			script, log := filepath.Join(dir, "launcher.sh"), filepath.Join(dir, "calls")
-			body := "#!/bin/sh\nset -eu\nprintf '%s:%s\\n' \"$3\" \"${NKD_LOCAL_BOOTSTRAP:-}\" >>\"$CALLS\"\n[ \"$3\" != \"$FAIL_LANE\" ]\n"
+			body := "#!/bin/sh\nset -eu\nprintf '%s:%s:%s:%s\\n' \"$1\" \"$2\" \"$3\" \"${NKD_LOCAL_BOOTSTRAP:-}\" >>\"$CALLS\"\n[ \"$FAIL\" = false ]\n"
 			if err := os.WriteFile(script, []byte(body), 0700); err != nil {
 				t.Fatal(err)
 			}
-			runner := Runner{Env: []string{"PATH=/usr/bin:/bin", "CALLS=" + log, "FAIL_LANE=" + failedLane}}
-			lanes := []string{"os", "components", "site", "tools", "profiles", "simulator"}
-			err := buildLocalLanes(t.Context(), runner, script, BuildConfig{AttemptPrefix: "fresh", Jobs: 1}, lanes)
-			if (err != nil) != (failedLane != "") {
-				t.Fatalf("error=%v failure lane=%q", err, failedLane)
+			failValue := "false"
+			if fail {
+				failValue = "true"
+			}
+			runner := Runner{Env: []string{"PATH=/usr/bin:/bin", "CALLS=" + log, "FAIL=" + failValue}}
+			err := buildLocalArtifacts(t.Context(), runner, script, BuildConfig{AttemptPrefix: "fresh", Jobs: 4})
+			if (err != nil) != fail {
+				t.Fatalf("error=%v failure=%t", err, fail)
 			}
 			calls, err := os.ReadFile(log)
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := []string{"os:"}
-			if failedLane != "os" {
-				for _, lane := range lanes[1:] {
-					want = append(want, lane+":fresh-os")
-					if lane == failedLane {
-						break
-					}
-				}
-			}
-			if string(calls) != strings.Join(want, "\n")+"\n" {
-				t.Fatalf("calls=%q, want=%v", calls, want)
+			if string(calls) != "fresh:4:all:\n" {
+				t.Fatalf("calls=%q, want one combined Run with no previous bootstrap", calls)
 			}
 		})
+	}
+}
+
+func TestBuiltInputsShareCombinedRun(t *testing.T) {
+	built := builtInputs("/repo", "fresh")
+	want := RunInputs{OS: "/repo/.nkd/runs/fresh", Components: "/repo/.nkd/runs/fresh", Providers: "/repo/.nkd/runs/fresh", Site: "/repo/.nkd/runs/fresh", Tools: "/repo/.nkd/runs/fresh", Profiles: "/repo/.nkd/runs/fresh", Simulator: "/repo/.nkd/runs/fresh"}
+	if built.Runs != want || built.NKDCTL != "/repo/.nkd/laptop-bootstrap/fresh/nkdctl" {
+		t.Fatalf("combined inputs=%#v", built)
 	}
 }

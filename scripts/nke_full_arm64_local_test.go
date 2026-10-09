@@ -306,6 +306,52 @@ func TestSiteHelmToolchainScope(t *testing.T) {
 	}
 }
 
+func TestAllLocalToolchainScopes(t *testing.T) {
+	const plan = `{"builds":[
+      {"name":"nke-node-image-arm64","catalogDigest":"os","components":["nke-node-image","nke-agent"],"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","component":"nke-node-image"}]},"catalogSnapshot":{"Components":{"nke-node-image":{"fromSource":true,"toolchainImages":{"arm64":"packer"}},"nke-agent":{"fromSource":true,"toolchainImages":{"arm64":"go"}}}}},
+      {"name":"nicosim-tools-arm64","catalogDigest":"simulator","components":["nico-sim"],"executionGraph":{"nodes":[]},"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"gcc"}}}}},
+      {"name":"controller-chart","catalogDigest":"site","components":["nke-controller-chart"],"executionGraph":{"nodes":[]},"catalogSnapshot":{"Components":{"nke-controller-chart":{"fromSource":true,"toolchainImages":{"arm64":"helm"}}}}},
+      {"name":"nktp","catalogDigest":"site","components":["nktp-chart"],"executionGraph":{"nodes":[]},"catalogSnapshot":{"Components":{"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"helm"}}}}},
+      {"name":"cwe","catalogDigest":"site","executionGraph":{"nodes":[]}}
+    ]}`
+	for _, tc := range []struct {
+		name, input, want string
+		fail              bool
+	}{
+		{"all three catalog predecessors", plan, "", false},
+		{"overlapping catalogs rejected", strings.ReplaceAll(plan, `"catalogDigest":"simulator"`, `"catalogDigest":"os"`), "distinct catalogs", true},
+		{"missing simulator rejected", strings.ReplaceAll(plan, `"name":"nicosim-tools-arm64"`, `"name":"other"`), "expected one simulator tools build", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nke-os-plan"; local_toolchain_scopes("all")`)
+			cmd.Stdin = strings.NewReader(tc.input)
+			out, err := cmd.CombinedOutput()
+			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
+				t.Fatalf("error=%v output=%s, want failure=%t message=%s", err, out, tc.fail, tc.want)
+			}
+			if tc.fail {
+				return
+			}
+			var scopes []struct {
+				Pin, CatalogDigest  string
+				Components, Outputs []string
+			}
+			if err := json.Unmarshal(out, &scopes); err != nil {
+				t.Fatal(err)
+			}
+			if len(scopes) != 3 || scopes[0].Pin != "packer" || scopes[1].Pin != "gcc" || scopes[2].Pin != "helm" ||
+				!slices.Equal(scopes[0].Components, []string{"nke-node-image"}) ||
+				!slices.Equal(scopes[0].Outputs, []string{"nke-node-image-arm64"}) ||
+				!slices.Equal(scopes[1].Outputs, []string{"nicosim-tools-arm64"}) ||
+				!slices.Equal(scopes[2].Outputs, []string{"controller-chart", "cwe", "nktp"}) {
+				t.Fatalf("unexpected catalog-scoped selection: %+v", scopes)
+			}
+		})
+	}
+}
+
 func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 	for _, tc := range []struct{ name, plan, want string }{
 		{"unsupported build", `{"builds":[]}`, "expected one simulator tools build"},
@@ -422,7 +468,7 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 				}
 				write(path, data, 0600)
 			}
-			write("definitions/nke-local-dev-arm64/definition-simulator.json", []byte(`{"catalog":{"base":"simulator-catalog"},"outputs":[]}`), 0600)
+			write("definitions/nke-local-dev-arm64/definition-simulator.json", []byte(`{"catalog":{"base":"simulator-catalog"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
 			write("toolchains/nkd-packer/build.sh", []byte(`#!/bin/sh
 printf 'toolchain-build %s\n' "$*" >>"$TEST_CALLS"
 case " $* " in *' --print-validated-image-id '*) ;; *) exit 99;; esac

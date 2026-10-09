@@ -21,12 +21,16 @@ building. These are setup allowances; execution rechecks authored requirements.
 Install Docker Engine and Buildx using the
 [Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/).
 
-On native Ubuntu ARM64, clone privately and continue with step 2:
+On native Ubuntu ARM64, including an ARM64 GCP VM, clone privately and continue
+with step 2. No Colima is needed. The demo uses QEMU software acceleration,
+not a requirement for nested KVM:
 
 ```sh
 umask 077
 git clone https://github.com/dsx-ai-factory/nke-recipes.git
 cd nke-recipes
+# Until PR #118 merges, use its branch:
+git switch --track origin/codex/full-nke-arm64-local
 test "$(uname -m)" = aarch64
 test "$(findmnt -n -o FSTYPE -T .)" = ext4
 ```
@@ -104,7 +108,7 @@ export NKE_DEMO="$(pwd)/.nkd/laptop-bootstrap/demo-bootstrap-tools-01/nke-demo"
 ```
 
 Preflight does not build. Each attempt name must be new. This bootstrap supplies
-the CLI; E2E subsequently builds its own fresh artifact Runs, including tools.
+the CLI; E2E subsequently builds one fresh artifact Run, including tools.
 Developers with the pinned Go toolchain can instead use `make demo`.
 
 ## 4. Prepare the matching installer
@@ -154,10 +158,28 @@ paths: `~` and shell variables are not expanded. For each rerun, use a fresh
 "$NKE_DEMO" e2e --config .nkd/demo.local.yaml
 ```
 
-E2E preflights all lanes, then builds OS, components, site, tools, profiles and
-simulator. The components Run supplies both providers. The first lane's bootstrap
-tools are reused by sibling lanes; artifact Runs and their observations remain
-separate. A failed lane stops deployment.
+E2E preflights the combined selection, then builds OS, components, site, tools,
+profiles and simulator in one immutable Run. Deployment consumes selected outputs
+from that completed Run; a failed build stops deployment.
+
+`build.jobs` sets the maximum number of concurrent ready build/package operations.
+The example uses two. For a larger execution host, set `jobs: 4` or override it:
+
+```sh
+"$NKE_DEMO" e2e --config .nkd/demo.local.yaml --jobs 4
+```
+
+Dependencies still gate execution: package work waits for its producer, and
+Packer waits for its materials. This is an operation limit, not a CPU count or
+resource reservation; choose it within your host's available memory and disk.
+
+The local OS selection builds OVN-Kubernetes from the NKE/NVIDIA
+[`dsx-ai-factory/ovn-kubernetes`](https://github.com/dsx-ai-factory/ovn-kubernetes)
+fork at `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`, using the producer catalog
+introduced in PR #113. The image carries its chart/image packages for stream
+`1.5.18`, and the tenant requests that stream. This uses the fork's standard
+Ubuntu image producer, not its private FIPS/STIG flavor. Access to the fork must
+work from the Linux execution host.
 
 Progress streams to the terminal with observed START/DONE/FAIL boundaries;
 private installer output stays in private logs. Ctrl+C requests cancellation;

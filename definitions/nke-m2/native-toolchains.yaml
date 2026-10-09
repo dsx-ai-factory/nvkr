@@ -4,7 +4,7 @@
 apiVersion: nkd.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nke-m2-native-toolchains
-requiresCatalogDigest: sha256:be089debd30cbfeaf36ca81f77c644a8b914b9c0a7f4edb96e7f03721b0619e4
+requiresCatalogDigest: sha256:903c30be81435740f0eee62736d4fc52617a6ff25e605f5fddbc61baaae76d50
 # Candidate-only exception: docs/evidence/2026-10-06-native-arc.md.
 toolchainSubstitutions:
   - arch: amd64

@@ -7,22 +7,22 @@ They do not publish, sign or build a complete source-only NKE distribution.
 
 | Selection | Definition | Outputs |
 | --- | --- | --- |
-| Complete selected set | `definition.json` | 23: disk, images, charts and executable bundles |
-| Faster component loop | `definition-components.json` | 22: everything above except the disk |
+| Complete demo artifact set | `definition.json` | 29: disk, images, installer-aligned charts/CLI, tools, profiles and simulator in one Run |
+| Faster component loop | `definition-components.json` | 22: historical components without the disk; not the complete demo selection |
 | OS-only loop | `definition-os.json` | One disk with its complete material closure |
 | Source-built provider loop | `definition-providers.json` | Two native provider images, no disk |
-| NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive, not included in the 23-output set |
-| Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart; not included in the 23-output set |
-| Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; separate from the acquired `operator-tools` in `all` |
-| Diagnostic controller profiles | `definition-profiles.json` | One OCI-carried tarball containing plain ARM64/Ubuntu 26.04 profile data; separate from `all`, not a runnable image or fleet profiles |
+| NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive |
+| Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart |
+| Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; distinct from the acquired `operator-tools` |
+| Diagnostic controller profiles | `definition-profiles.json` | One OCI-carried tarball containing plain ARM64/Ubuntu 26.04 profile data; not a runnable image or fleet profiles |
 
 Use `environment-local.json` with rootless Podman, or
 `environment-local-docker.json` with native Linux Docker. The OS uses TCG.
-The full demo shares its first OS lane's NKD/demo executables and measured
-Packer/Go/GCC toolchain across subsequent lanes; that image also includes
+The full demo uses one NKD/demo bootstrap and a measured
+Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
-Each lane still creates its own immutable Run and authenticates its catalog
-overlay against the exact predecessor digest. `os-tcg.json` depends on the M2
+The combined selection creates one immutable Run. Catalog
+overlays remain bound to each exact predecessor digest. `os-tcg.json` depends on the M2
 OS catalog's digest: repinning that catalog requires reviewing this binding.
 
 ```sh
@@ -53,7 +53,23 @@ The site catalog pins CLI, controller and charts to one exact NKE candidate;
 chart dependencies are acquired at exact archive digests before offline packaging,
 not independently source-built or upstream-signature-verified. The tools catalog
 compiles the installer's five Linux binaries from pinned Git. The separate older
-acquired `operator-tools` selection is unchanged.
+acquired `operator-tools` selection remains in the combined artifact membership.
+
+The local OS replaces the upstream OVN producers with PR #113's
+[NKE/NVIDIA fork producers](../nke-ovn-source/README.md). Its chart/image Debian
+packages and demo tenant select stream `1.5.18`. Packer still consumes staged
+materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
+acceptance are separate gates from compiling this selection.
+
+The combined selection also produces standalone OVN OCI image and image-bound
+Helm OCI outputs. They have their own build identities; do not assume their bytes
+equal the disk's embedded image/chart unless original-owner reuse is established.
+Local packaging does not enable production publication or signing.
+
+The launcher accepts `ATTEMPT JOBS all`; for example use `first-all 4 all` on a
+suitably sized host. In `nke-demo e2e`, use YAML `build.jobs` or `--jobs`.
+Independent ready producers and packaging operations run concurrently up to
+that limit, while dependencies still gate Packer and publication-shaped packaging.
 
 Profiles contain configuration and runbooks, packaged deterministically as data.
 NKD retains their OCI-carried bundle with the completed Run; the consumer uses

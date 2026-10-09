@@ -17,7 +17,7 @@ components:
     source: nke-profiles
     patches:
       - name: patches/local-profile.patch
-        sha256: sha256:1ecaaa68a35103f8b11c56ee036405df24e4816082e46a4644b0ce05347320f4
+        sha256: sha256:54b73a11668fc0aafb7b36ccae740db4cddab7c0bce990aec22685d1cc69e133
     artifactPath: bin/nke-local-profiles.tar.gz
     writeDir: bin
     outputType: tarball

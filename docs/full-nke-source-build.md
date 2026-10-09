@@ -17,9 +17,11 @@ producer, packaging, source-access and runtime work.
 The catalogs introduced by
 [PR #113](https://github.com/dsx-ai-factory/nke-recipes/pull/113) provide
 [public-source producers](../definitions/nke-os-source/README.md) and
-[OVN outputs](../definitions/nke-ovn-source/README.md). These are not selected
-by the maintained OS graph or this laptop OS selection.
-The remaining migration is not completed by merging those candidate catalogs.
+[OVN outputs](../definitions/nke-ovn-source/README.md). The local demo selects
+the OVN fork producers for the disk's chart/image packages. The other direct-source
+OS producers are not yet integrated into that selection, and the maintained M2
+OS graph is unchanged. The remaining migration is not completed by merging those
+candidate catalogs.
 
 | Required area | Existing implementation | Missing for the requested build |
 | --- | --- | --- |
@@ -29,7 +31,7 @@ The remaining migration is not completed by merging those candidate catalogs.
 | Fleet profiles | NKE `image.yml` identifies `nke-site-deploy` as the production source; checked-in profiles are an example fixture | Accessible Git URL and approved revision, producer and image output. Do not publish the fixture as production profiles |
 | Kubernetes/containerd/crictl/CNI/Helm/TPM | PR #113 has fourteen direct-source producers across supported versions | Integrate the candidate catalog and package the authenticated outputs for actual consumers. Its static containerd subset is not feature-equivalent to NKE's upstream release archive; held Helm preparation remains a separate hosted-route limitation, not a blocker to the local developer-fetch route |
 | Remaining OS application dependencies | PR #113's inventory maps released inputs and missing source producers | SPIRE, runc with seccomp, CoreDNS, etcd, pause, Calico/Tigera and embedded OCI images; preserve package dependencies, paths, units, hooks and import behavior |
-| OVN image/chart/packages | PR #113 builds the pinned DSX fork and declares independent OCI image and bound Helm outputs | Local selection, maintained OS material replacement, and actual Packer/boot acceptance. The image's upstream Dockerfile still uses APT; not every embedded subcomponent is Git-built |
+| OVN image/chart/packages | The local demo selects PR #113's pinned DSX fork producers for its OS material closure, with matching profile and tenant chart stream | Fresh Packer/boot acceptance and maintained M2 integration. Independently published outputs are separate from embedded-disk bytes unless original-owner reuse is established. The fork's standard Ubuntu Dockerfile still uses APT; not every embedded subcomponent is Git-built |
 | Twelve deployment runtime images | Current M2 image catalog acquires pinned native images | Source-build/image-package producers for the selected PostgreSQL, Temporal, SPIRE, CSI and related inputs. OS source producers alone do not replace these acquired images |
 | Upstream charts/operator tools | Current laptop catalog acquires four charts and Helm/kubectl | Source chart producers and source-built operator tools; retain correct values/image bindings and chart dependencies |
 | DSX IMDS | Release inventory retains payload digests but no established source revision | Accessible source with an approved pin, or a declared unavailable-source exception and accessible digest-matching payload. An older plugin-free SPIRE package is not completion |

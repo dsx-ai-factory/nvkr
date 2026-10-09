@@ -18,6 +18,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func TestTenantSelectsMaintainedOVNChartStream(t *testing.T) {
+	request := NewTenantRequest("owned")
+	if request.CNI != "ovn-kubernetes" || request.CNIVersion != "1.5.18" {
+		t.Fatalf("tenant must select the packaged NVIDIA OVN chart stream: %+v", request)
+	}
+}
+
 func TestTenantSelectionNeverAdoptsSubstitution(t *testing.T) {
 	for _, name := range []string{"exact", "absent", "unrelated", "duplicate", "changed ID", "foreign org", "foreign site", "foreign VPC", "empty ID", "path ID", "traversal ID", "whitespace ID", "NUL ID"} {
 		t.Run(name, func(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -43,6 +45,68 @@ func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 		t.Fatal(err)
 	}
 	return cat
+}
+
+// The local disk selects the same pinned fork producers as the standalone image
+// and chart outputs, while retaining the source-owned image-inputs handoff.
+func TestNKEOVNForkLocalDiskSelection(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nke-m2/os-catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nke-local-dev-arm64/os-tcg.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(base, overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fork := loadOVNForkCatalog(t)
+	for _, name := range []string{"ovn-kube-ubuntu", "ovn-kubernetes-chart", "nke-cni-ovn"} {
+		if !reflect.DeepEqual(stack.Catalog.Components[name], fork.Components[name]) {
+			t.Fatalf("local disk producer %s differs from the pinned NVIDIA fork", name)
+		}
+	}
+	if got := stack.Catalog.Components["nke-image-inputs"].Materials["ovn"]; got != "nke-cni-ovn" {
+		t.Fatalf("OS material binding = %q, want fork Debian bundle", got)
+	}
+	d, err := definition.LoadDefinition(t.Context(), "../../../definitions/nke-local-dev-arm64/definition-os.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := buildgraph.Resolve(stack.Catalog, buildgraph.Selection{
+		Components: d.Outputs[0].Components, Platform: d.Outputs[0].Platform, OutputFormat: d.Outputs[0].Format,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildgraph.CompileForHostPlatforms(resolved, map[string]execution.HostPlatform{
+		"nke-node-image": execution.HostPlatformLinuxARM64,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nke-local-dev-arm64/profiles-catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := profiles.Components["nke-local-profiles"]
+	raw, err := os.ReadFile("../../../definitions/nke-local-dev-arm64/profiles-catalog/patches/local-profile.patch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
+	if len(profile.Patches) != 1 || profile.Patches[0].SHA256 != wantDigest {
+		t.Fatal("local profile does not bind the exact fork package installation input")
+	}
+	for _, kind := range []string{"charts", "images"} {
+		if !strings.Contains(string(raw), "nke-cni-ovn-"+kind+"-"+ovnForkStream) {
+			t.Fatalf("profile does not install fork %s package", kind)
+		}
+	}
+	if strings.Contains(string(raw), "nke-cni-ovn-charts-1.4.0") {
+		t.Fatal("local profile retains the upstream OVN stream")
+	}
 }
 
 // The complete candidate selection is separate from the maintained Calico/OVN

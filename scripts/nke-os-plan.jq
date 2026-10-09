@@ -53,6 +53,21 @@ def site_helm_toolchain_scope:
   if length != 1 then error("expected one site Helm toolchain") else .[0] end |
   {pin:., catalogDigest:$digest, components:([$selected[].name] | sort)};
 
+# The full Definition uses one measured image for three catalog-scoped producer
+# groups. Keep each authenticated predecessor separate rather than applying the
+# disk catalog's substitution to unrelated catalogs.
+def local_toolchain_scopes($lane):
+  . as $plan |
+  (if $lane == "all" then [disk_toolchain_scope, simulator_toolchain_scope, site_helm_toolchain_scope]
+   elif $lane == "os" then [disk_toolchain_scope]
+   elif $lane == "simulator" then [simulator_toolchain_scope]
+   elif $lane == "site" then [site_helm_toolchain_scope]
+   else error("unsupported local toolchain selection") end) |
+  if ([.[].catalogDigest] | unique | length) != length then
+    error("local toolchain groups must have distinct catalogs")
+  else map(. as $scope | . + {outputs:
+    ([$plan.builds[] | select(.catalogDigest == $scope.catalogDigest) | .name] | sort)}) end;
+
 # Conservatively recognize the NKE project path before enforcing the one exact
 # transport URL served by the private-source handoff. This lexical diagnostic
 # also rejects that project path on other hosts; it does not parse or authenticate

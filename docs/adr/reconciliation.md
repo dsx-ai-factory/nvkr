@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-10-08. ADR-01–22 own the lane-specific engineering contracts pending named-decider
+Reviewed 2026-10-09. ADR-01–22 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -19,10 +19,16 @@ artifact-publication result does not satisfy full v1 release or qualified accept
 scopes fail before work.
 
 Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
-same filesystem view as collection after private BuildKit output promotion. It executes no producer code or
+same filesystem view as collection after bounded BuildKit output transport. It executes no producer code or
 signature verifier and remains static-unqualified. This is not a container-isolation or runtime-authentication
 claim; producer execution, other offline utilities and the held-disk observation path retain their existing
 contracts (ADR-18 §8).
+
+Rootless BuildKit's fixed UID is independent of the caller's UID. Its private-volume transport preserves
+authenticated source modes and limits ownership changes to attempt-owned volumes, with a read-only source
+mount for the non-root producer. The declared export returns through the bounded archive owner before normal
+collection. Controlled tests and a targeted native probe are distinct from the complete fresh NKE acceptance
+run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
@@ -155,10 +161,11 @@ hosted finalization or independent consumer acceptance.
 
 ## Local ARM64 development inputs
 
-The `definitions/nke-local-dev-arm64` example selects 23 outputs or its 22-output
-non-disk subset without publication/signing. The demo joins six separate
-OS, components, site, tools, profiles and simulator selections; `all` is not
-that joined flow or a complete source-built distribution. See the
+The `definitions/nke-local-dev-arm64` combined example selects 29 outputs in one
+Run without publication/signing: OS, components, installer-aligned site, tools,
+profiles and simulator. Focused selections remain available; the historical
+22-output component subset is not the complete demo. This is not a complete
+source-built distribution. See the
 [quickstart](../local-nke-demo.md) and [source gaps](../full-nke-source-build.md).
 
 Local static-unqualified mixed Plans admit offline, non-disk utility
@@ -174,9 +181,20 @@ extraction, and NKE's pinned staged installer for deployment. Kind hosts
 management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Final success
 requires two Ready nodes, workload/DNS checks, exact disk/artifact bindings and
 owned cleanup. Cobra/Viper configuration supplies descriptions, not receipts.
-The six-lane build reuses bootstrap executables and the measured toolchain,
-but retains separate Runs and per-lane admission. The upstream NKE readers
+The combined build reuses bootstrap executables and the measured toolchain;
+catalog substitutions retain their own exact predecessor binding. `--jobs`
+bounds concurrent ready producer and packaging operations in the existing
+factory scheduler. The upstream NKE readers
 still require Python; the demo does not reimplement them.
+
+The local OS selects the PR #113 NKE/NVIDIA OVN fork at pinned commit
+`26cc199de8e814a7fe6d899a770fc04df0bbc2f9`; profile packages and tenant requests
+select its `1.5.18` chart stream. The combined Definition also declares standalone
+OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
+are independently produced; this does not close original-owner cross-output
+reuse or establish equal bytes. Fork graph/profile tests and actual pinned-chart
+Helm rendering with loopback OCI push/pull passed; the changed combined Run,
+fork OS bake and tenant acceptance still require a fresh runtime run.
 
 Profiles use an OCI-carried data bundle, ORAS transport and NKD-authenticated
 extraction, followed by a read-only controller volume. The additive source

@@ -276,7 +276,7 @@ func TestDemoFileMaintainedExample(t *testing.T) {
 		t.Fatal(err)
 	}
 	build, run, err := file.E2EConfig(nil)
-	if err != nil || build.Jobs != 1 || build.AttemptPrefix != "demo-e2e-01" || run.Timeout != time.Hour || run.Runs != (RunInputs{}) || run.NKDCTL != "" {
+	if err != nil || build.Jobs != 2 || build.AttemptPrefix != "demo-e2e-01" || run.Timeout != time.Hour || run.Runs != (RunInputs{}) || run.NKDCTL != "" {
 		t.Fatalf("maintained example does not describe a fresh e2e: build=%+v run=%+v error=%v", build, run, err)
 	}
 }

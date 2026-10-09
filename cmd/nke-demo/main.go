@@ -105,7 +105,7 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 func newBuildCommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
 	flags := nkedemo.DemoFile{Version: 1, Build: nkedemo.BuildFile{Jobs: 1}}
 	command := &cobra.Command{
-		Use: "build", Short: "Build all six ARM64 artifact lanes using the existing NKD launcher", Args: cobra.NoArgs,
+		Use: "build", Short: "Build all ARM64 demo artifacts in one NKD Definition/Run", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			selected, err := configuredFile(cmd, *config, flags, actions)
 			if err != nil {
@@ -159,7 +159,7 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
 	flags := nkedemo.DemoFile{Version: 1, Build: nkedemo.BuildFile{Jobs: 1}, Run: nkedemo.RunFile{TimeoutSeconds: 3600}}
 	command := &cobra.Command{
-		Use: "e2e", Short: "Build all six lanes from scratch, then deploy their exact outputs", Args: cobra.NoArgs,
+		Use: "e2e", Short: "Build one complete artifact Run from scratch, then deploy its exact outputs", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateTimeoutFlag(cmd, flags.Run.TimeoutSeconds); err != nil {
 				return err
@@ -194,8 +194,8 @@ func addBuildFlags(command *cobra.Command, cfg *nkedemo.BuildFile) {
 	flags := command.Flags()
 	flags.StringVar(&cfg.Repo, "repo", "", "native Linux repository path")
 	flags.StringVar(&cfg.NKEClone, "nke-clone", "", "optional local source Git clone")
-	flags.StringVar(&cfg.Attempt, "attempt", "", "fresh prefix for six artifact Runs")
-	flags.IntVar(&cfg.Jobs, "jobs", 1, "parallel jobs within each lane")
+	flags.StringVar(&cfg.Attempt, "attempt", "", "fresh name for the combined artifact Run")
+	flags.IntVar(&cfg.Jobs, "jobs", 1, "maximum concurrent dependency-ready NKD operations")
 }
 func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 	flags := command.Flags()

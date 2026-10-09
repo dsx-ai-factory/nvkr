@@ -11,9 +11,10 @@ import (
 	"time"
 )
 
-// RunInputs names completed immutable attempts, not caller-supplied artifact
+// RunInputs names views of completed immutable attempts, not caller-supplied artifact
 // digests. The consumer checks their observations and asks nkdctl to verify and
-// extract the selected bytes before installation.
+// extract the selected bytes before installation. Every view may reference the
+// same combined Run; separate completed Runs remain usable for diagnostics.
 type RunInputs struct {
 	OS         string
 	Components string

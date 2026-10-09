@@ -203,8 +203,8 @@ func TestProgressOwnedStartStopObservedSynchronously(t *testing.T) {
 	}
 }
 
-func TestProgressBuildLaneOrdering(t *testing.T) {
-	for _, failLane := range []string{"", "site"} {
+func TestProgressCombinedBuildOrdering(t *testing.T) {
+	for _, failLane := range []string{"", "all"} {
 		t.Run("failure-"+failLane, func(t *testing.T) {
 			writer := &recordedProgress{}
 			script := filepath.Join(privateTestDir(t), "launcher.sh")
@@ -212,26 +212,19 @@ func TestProgressBuildLaneOrdering(t *testing.T) {
 				t.Fatal(err)
 			}
 			runner := Runner{Env: []string{"PATH=/usr/bin:/bin"}, Progress: writer}
-			var want []ProgressEvent
-			for _, lane := range []string{"os", "components", "site", "tools", "profiles", "simulator"} {
-				err := buildLane(t.Context(), runner, script, "fixture", 1, lane)
-				want = append(want, ProgressEvent{LaneStarted, lane, "started"})
-				phaseLast, laneLast, status := PhaseFinished, LaneFinished, "finished"
-				if lane == failLane {
-					phaseLast, laneLast, status = PhaseFailed, LaneFailed, "failed"
-				}
-				want = append(want, phaseEvents("build-"+lane, phaseLast)...)
-				want = append(want, ProgressEvent{laneLast, lane, status})
-				if lane == failLane {
-					if CommandExitCode(err) != 7 {
-						t.Fatal(err)
-					}
-					break
-				}
-				if err != nil {
+			err := buildLocalArtifacts(t.Context(), runner, script, BuildConfig{AttemptPrefix: "fixture", Jobs: 4})
+			phaseLast, laneLast, status := PhaseFinished, LaneFinished, "finished"
+			if failLane != "" {
+				phaseLast, laneLast, status = PhaseFailed, LaneFailed, "failed"
+				if CommandExitCode(err) != 7 {
 					t.Fatal(err)
 				}
+			} else if err != nil {
+				t.Fatal(err)
 			}
+			want := []ProgressEvent{{LaneStarted, "artifacts", "started"}}
+			want = append(want, phaseEvents("build-all", phaseLast)...)
+			want = append(want, ProgressEvent{laneLast, "artifacts", status})
 			if !reflect.DeepEqual(writer.events, want) {
 				t.Fatalf("events=%+v want=%+v", writer.events, want)
 			}

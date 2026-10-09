@@ -66,23 +66,23 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	runner := Runner{Env: env, Progress: cfg.Progress, output: cfg.Progress}
 	// All host checks and fresh-path checks precede the first bootstrap. The
 	// script remains authoritative for exact runtime/toolchain admission.
-	lanes := []string{"os", "components", "site", "tools", "profiles", "simulator"}
-	for _, lane := range lanes {
-		attempt := cfg.AttemptPrefix + "-" + lane
-		for _, root := range []string{"runs", "laptop-bootstrap"} {
-			if _, readErr := os.Lstat(filepath.Join(repo, ".nkd", root, attempt)); !errors.Is(readErr, os.ErrNotExist) {
-				return BuiltInputs{}, errors.New("attempt destination exists or cannot be inspected; choose a fresh prefix")
-			}
-		}
-		if err = runner.Run(ctx, []string{"bash", script, "--check", lane}, "preflight-"+lane, 120*time.Second); err != nil {
-			return BuiltInputs{}, err
+	for _, root := range []string{"runs", "laptop-bootstrap"} {
+		if _, readErr := os.Lstat(filepath.Join(repo, ".nkd", root, cfg.AttemptPrefix)); !errors.Is(readErr, os.ErrNotExist) {
+			return BuiltInputs{}, errors.New("attempt destination exists or cannot be inspected; choose a fresh attempt")
 		}
 	}
-	if err = buildLocalLanes(ctx, runner, script, cfg, lanes); err != nil {
+	if err = runner.Run(ctx, []string{"bash", script, "--check", "all"}, "preflight-all", 120*time.Second); err != nil {
 		return BuiltInputs{}, err
 	}
-	path := func(lane string) string { return filepath.Join(repo, ".nkd/runs", cfg.AttemptPrefix+"-"+lane) }
-	return BuiltInputs{RunInputs{OS: path("os"), Components: path("components"), Providers: path("components"), Site: path("site"), Tools: path("tools"), Profiles: path("profiles"), Simulator: path("simulator")}, filepath.Join(repo, ".nkd/laptop-bootstrap", cfg.AttemptPrefix+"-os", "nkdctl")}, nil
+	if err = buildLocalArtifacts(ctx, runner, script, cfg); err != nil {
+		return BuiltInputs{}, err
+	}
+	return builtInputs(repo, cfg.AttemptPrefix), nil
+}
+
+func builtInputs(repo, attempt string) BuiltInputs {
+	path := filepath.Join(repo, ".nkd/runs", attempt)
+	return BuiltInputs{RunInputs{OS: path, Components: path, Providers: path, Site: path, Tools: path, Profiles: path, Simulator: path}, filepath.Join(repo, ".nkd/laptop-bootstrap", attempt, "nkdctl")}
 }
 
 // Local source fetching uses the developer's Git configuration. Preserve HOME
@@ -96,24 +96,11 @@ func localBuildEnvironment() []string {
 	return env
 }
 
-func buildLocalLanes(ctx context.Context, runner Runner, script string, cfg BuildConfig, lanes []string) error {
-	for _, lane := range lanes {
-		if err := buildLane(ctx, runner, script, cfg.AttemptPrefix, cfg.Jobs, lane); err != nil {
-			return err
-		}
-		if lane == "os" {
-			// Reuse tools, never observations, from this invocation's first Run.
-			runner.Env = SetEnv(runner.Env, map[string]string{"NKD_LOCAL_BOOTSTRAP": cfg.AttemptPrefix + "-os"})
-		}
-	}
-	return nil
-}
-
-func buildLane(ctx context.Context, runner Runner, script, prefix string, jobs int, lane string) (result error) {
-	boundary := beginProgress(runner.Progress, lane, LaneStarted, LaneFinished, LaneFailed)
+func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {
+	boundary := beginProgress(runner.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
 	defer func() { boundary.finish(result) }()
 	if runner.Progress != nil {
-		fmt.Fprintf(runner.Progress, "Build lane: %s (existing launcher → nkdctl run local)\n", lane)
+		fmt.Fprintln(runner.Progress, "Build all artifacts in one Definition/Run (existing launcher → nkdctl run local)")
 	}
-	return runner.Run(ctx, []string{"bash", script, prefix + "-" + lane, strconv.Itoa(jobs), lane}, "build-"+lane, 6*time.Hour)
+	return runner.Run(ctx, []string{"bash", script, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"}, "build-all", 6*time.Hour)
 }

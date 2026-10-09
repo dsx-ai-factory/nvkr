@@ -82,14 +82,14 @@ parallel producer jobs, and selection:
 | `providers` | Two source-built infrastructure-provider images |
 | `components` | 22 outputs: CLI/controller/chart, providers and acquired dependencies/tools; no disk |
 | `os` | Plain ARM64 QCOW2 and its material closure |
-| `all` | Combined 23-output components+OS Definition, not the complete demo |
+| `all` | Combined demo artifact set: OS, components, site, tools, profiles and simulator |
 | `site` | Installer-aligned CLI, controller image/chart and NKTP chart |
 | `tools` | Source-built native installer-tools bundle |
 | `profiles` | Controller profile files in a data bundle |
 | `simulator` | NICoSim server, CLI and runtime-assets bundle |
 
-The complete demo joins six separate selections through `nke-demo e2e`;
-do not mistake `all` for that joined flow. Acquired third-party images/charts
+The complete demo builds `all` in one Run through `nke-demo e2e`, then deploys
+its exact completed outputs. Acquired third-party images/charts
 are not source compilations. Ordinary local SBOMs are composition evidence,
 not full-disk scan/qualification. AMD64, FDE, hosted signing and publication are
 not selected by this example.
@@ -98,11 +98,11 @@ not selected by this example.
 
 ```sh
 bash scripts/nke-full-arm64-local.sh first-os 1 os
-# Or the combined 23-output artifact set, without deployment:
-bash scripts/nke-full-arm64-local.sh first-all 1 all
+# Or the combined demo artifact set, without deployment (two concurrent operations):
+bash scripts/nke-full-arm64-local.sh first-all 2 all
 ```
 
-Build the OS before other heavy lanes on a laptop. Software acceleration uses
+Use a conservative jobs limit on a laptop; raise it for a larger host. Software acceleration uses
 TCG, not KVM. The launcher builds/probes pinned local toolchain sources when
 necessary and freezes the measured image ID in the attempt's catalog overlay.
 It does not update maintained locks, publish images or confer qualification.
@@ -135,7 +135,7 @@ symlinks; this does not enable hosted source fetching or qualification. Compiler
 tests do not establish organizational license/security approval.
 
 The acquired `operator-tools` in `components` is a different historical
-selection. The demo uses the separate source-built installer-tools Run.
+selection. The demo's combined Run includes the source-built installer-tools output.
 Do not run these Linux executables directly on macOS.
 
 ## Inspect completed outputs

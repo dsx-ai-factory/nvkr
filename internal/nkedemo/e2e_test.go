@@ -13,7 +13,7 @@ import (
 
 // TestEndToEnd is deliberately opt-in: ordinary go test does not download,
 // build, create tenants, grant host controls or touch a Colima installation.
-// It builds all six lanes before deploying their exact newly completed outputs.
+// It builds one combined Run before deploying its exact newly completed outputs.
 func TestEndToEnd(t *testing.T) {
 	if os.Getenv("NKD_NKE_E2E") != "1" {
 		t.Skip("set NKD_NKE_E2E=1 on dedicated Ubuntu ARM64 to build and deploy real NKE")

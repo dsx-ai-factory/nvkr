@@ -22,14 +22,38 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	}
 	all := map[string]authored.DefinitionOutput{}
 	parts := map[string]authored.DefinitionOutput{}
+	// Compare catalog relationships relative to each authored Definition, including
+	// the standalone fork Definition outside the local example directory.
+	normalize := func(output authored.DefinitionOutput, catalog authored.Catalog, dir string) authored.DefinitionOutput {
+		if output.Catalog != nil {
+			catalog = *output.Catalog
+		}
+		if !filepath.IsAbs(catalog.Base) {
+			catalog.Base = filepath.Join(dir, catalog.Base)
+		}
+		catalog.Overlays = append([]string(nil), catalog.Overlays...)
+		for i, path := range catalog.Overlays {
+			if !filepath.IsAbs(path) {
+				catalog.Overlays[i] = filepath.Join(dir, path)
+			}
+		}
+		output.Catalog = &catalog
+		return output
+	}
+	replaced := map[string]bool{}
 	for _, tc := range []struct {
 		file  string
 		count int
 		disk  bool
 	}{
-		{"definition.json", 23, true},
+		{"definition.json", 29, true},
 		{"definition-components.json", 22, false},
 		{"definition-os.json", 1, true},
+		{"definition-simulator.json", 1, false},
+		{"definition-tools.json", 1, false},
+		{"definition-profiles.json", 1, false},
+		// Installer-aligned selections replace the three older component slots.
+		{"definition-site.json", 4, false},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			d, err := authored.LoadDefinition(t.Context(), filepath.Join(root, tc.file))
@@ -47,11 +71,15 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 				if output.Format == authored.OutputDiskImage {
 					hasDisk = true
 				}
+				output = normalize(output, d.Catalog, root)
 				if tc.file == "definition.json" {
 					all[output.Name] = output
 				} else {
 					if _, exists := parts[output.Name]; exists {
-						t.Fatalf("duplicate split output %s", output.Name)
+						if tc.file != "definition-site.json" || (output.Name != "cwe" && output.Name != "controller-chart" && output.Name != "nkectl") {
+							t.Fatalf("unexpected duplicate split output %s", output.Name)
+						}
+						replaced[output.Name] = true
 					}
 					parts[output.Name] = output
 				}
@@ -61,8 +89,44 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 			}
 		})
 	}
+	if len(replaced) != 3 {
+		t.Fatal("site selections must replace exactly the controller, CLI and controller chart slots")
+	}
+	forkPath := filepath.Join(root, "..", "nke-ovn-source", "definition.yaml")
+	fork, err := authored.LoadDefinition(t.Context(), forkPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range fork.Outputs {
+		if output.Platform != "linux/arm64" {
+			continue
+		}
+		if output.Name != "ovn-chart-arm64" && output.Name != "ovn-image-arm64" {
+			t.Fatalf("unexpected fork output %s", output.Name)
+		}
+		if _, exists := parts[output.Name]; exists {
+			t.Fatalf("duplicate fork output %s", output.Name)
+		}
+		if output.Name == "ovn-chart-arm64" {
+			if output.Helm == nil || len(output.Helm.Images) != 6 {
+				t.Fatal("fork chart must bind six image roles")
+			}
+			for _, role := range []string{"control-plane", "node", "nbdb", "sbdb", "northd", "ovn-host"} {
+				if output.Helm.Images[role] != "ovn-image-arm64" {
+					t.Fatalf("fork chart role %s does not bind the selected image", role)
+				}
+			}
+		}
+		parts[output.Name] = normalize(output, fork.Catalog, filepath.Dir(forkPath))
+	}
+	if _, ok := parts["ovn-image-arm64"]; !ok {
+		t.Fatal("standalone fork image omitted")
+	}
+	if _, ok := parts["ovn-chart-arm64"]; !ok {
+		t.Fatal("standalone fork chart omitted")
+	}
 	if !reflect.DeepEqual(all, parts) {
-		t.Fatal("component and OS selections do not exactly partition the combined set")
+		t.Fatal("combined selection differs from the exact six-group union plus standalone fork outputs")
 	}
 	providers, err := authored.LoadDefinition(t.Context(), filepath.Join(root, "definition-providers.json"))
 	if err != nil {
@@ -76,11 +140,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 		if !ok {
 			t.Fatalf("provider %s omitted from combined selection", output.Name)
 		}
-		// The provider-only Definition uses CAPNICo as its default catalog.
-		// Normalize that one explicit relationship before comparing outputs.
-		if output.Catalog == nil {
-			output.Catalog = &providers.Catalog
-		}
+		output = normalize(output, providers.Catalog, root)
 		if !reflect.DeepEqual(output, combined) {
 			t.Fatalf("provider loop diverges from combined selection: %s", output.Name)
 		}
@@ -141,7 +201,7 @@ func TestLaptopARM64CatalogCompilation(t *testing.T) {
 	}{
 		{"definition-providers.json", 2},
 		{"definition-components.json", 22},
-		{"definition.json", 23},
+		{"definition.json", 29},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			path := filepath.Join(root, tc.file)

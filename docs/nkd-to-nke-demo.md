@@ -13,7 +13,7 @@ See its [deployment instructions](https://github.com/dsx-ai-factory/nke/blob/8fb
 
 ## Inputs consumed by the demo
 
-| Completed Run | Selected handoff |
+| Output group in the completed Run | Selected handoff |
 | --- | --- |
 | OS | Exact plain ARM64 QCOW2 exported by NKD; NICoSim serves these held bytes |
 | Components | Dependency OCI images/charts and CAPNICo provider; provisioned provider is built but not used by this tenant path |
@@ -22,10 +22,11 @@ See its [deployment instructions](https://github.com/dsx-ai-factory/nke/blob/8fb
 | Profiles | Profile files packaged as data, pulled/verified and mounted read-only into the controller |
 | Simulator | NICoSim server/CLI and seed/UI archive |
 
-The combined `all` Definition is not these six Runs. Older components and
-installer-aligned site selections may differ in source/tool versions; the
-adapter explicitly selects the matching site/tools inputs. A local
-`lifecycle.json` is not a signed Release.
+The combined `all` Definition selects the complete demo artifact membership in
+one Run, using the installer-aligned site and tool catalogs. The logical input
+groups above select outputs from that same Run. Focused Definitions remain
+available for individual developer loops. A local `lifecycle.json` is not a
+signed Release.
 
 Kind hosts management services. CAPNICo/NICoSim provisions **real libvirt
 QCOW2 guests**, not CAPD containers. Node readiness, exact backing disk,
@@ -83,7 +84,8 @@ To retest only deployment, use:
 Supply the clean matching `--nke-checkout`, native `--nkdctl`, fresh
 `--out`, and explicit completed `--os-run`, `--components-run`,
 `--provider-run`, `--site-run`, `--tools-run`, `--profiles-run` and
-`--simulator-run` paths. The components Run also supplies the provider path.
+`--simulator-run` paths. For a combined build, all seven selectors use the same
+completed Run directory; each consumer verifies its own required outputs.
 
 This is a retained-artifact replay, not a fresh build. For build-plus-deploy
 use `e2e --config` from the quickstart; E2E derives its own fresh paths and

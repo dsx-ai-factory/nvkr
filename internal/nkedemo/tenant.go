@@ -74,7 +74,9 @@ type NodePoolIntent struct {
 }
 
 func NewTenantRequest(name string) TenantRequest {
-	request := TenantRequest{Name: name, Kubernetes: "1.34.2", CNI: "ovn-kubernetes", CNIVersion: "1.4.0", VIP: TenantVIP, NICo: TenantProvider{OrgID, SiteID, VPCID}}
+	// The pinned agent uses this chart stream to locate the preinstalled Debian
+	// package, not to install a matching Debian revision or rewrite its image refs.
+	request := TenantRequest{Name: name, Kubernetes: "1.34.2", CNI: "ovn-kubernetes", CNIVersion: "1.5.18", VIP: TenantVIP, NICo: TenantProvider{OrgID, SiteID, VPCID}}
 	request.ControlPlane.Count = 1
 	request.ControlPlane.Reserved = "1Gi"
 	request.ControlPlane.DisableMonitor = true

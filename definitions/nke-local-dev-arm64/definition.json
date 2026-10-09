@@ -6,7 +6,7 @@
   "kind": "Definition",
   "metadata": {
     "name": "nke-local-dev-arm64",
-    "description": "Local ARM64 M2 counterpart plus source-built providers: 23 outputs, no publication or signing; not a full source-built NKE distribution; retains the mixed SPIRE-source exception."
+    "description": "One local ARM64 Run selecting 29 outputs for components, providers, OS, installer, tools, simulator, profiles and standalone NVIDIA OVN image/chart; no publication or signing; acquired inputs and the mixed SPIRE-source exception remain explicit."
   },
   "outputs": [
     {
@@ -25,7 +25,7 @@
     },
     {
       "catalog": {
-        "base": "../nke-controller/catalog"
+        "base": "./site-catalog"
       },
       "components": [
         "nke-controller-chart"
@@ -37,6 +37,13 @@
         }
       },
       "name": "controller-chart",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./profiles-catalog"},
+      "components": ["nke-local-profiles"],
+      "format": "executable",
+      "name": "controller-profiles",
       "platform": "linux/arm64"
     },
     {
@@ -52,13 +59,27 @@
     },
     {
       "catalog": {
-        "base": "../nke-controller/catalog"
+        "base": "./site-catalog"
       },
       "components": [
         "nke-controller"
       ],
       "format": "oci",
       "name": "cwe",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./tools-catalog"},
+      "components": ["clusterctl", "helm", "kind", "kubectl", "oras"],
+      "format": "executable",
+      "name": "installer-tools-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./simulator-catalog"},
+      "components": ["nico-sim", "nico-sim-runtime-assets", "nico-simctl"],
+      "format": "executable",
+      "name": "nicosim-tools-arm64",
       "platform": "linux/arm64"
     },
     {
@@ -86,23 +107,50 @@
       "platform": "linux/arm64"
     },
     {
+      "catalog": {"base": "./site-catalog"},
       "components": [
-        "nkectl-arm64"
+        "nkectl"
       ],
       "format": "executable",
       "name": "nkectl",
       "platform": "linux/arm64"
     },
     {
-      "catalog": {
-        "base": "./operator-catalog"
-      },
-      "components": [
-        "helm",
-        "kubectl"
-      ],
+      "catalog": {"base": "./site-catalog"},
+      "components": ["nktp-chart"],
+      "format": "helm-oci",
+      "name": "nktp",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./operator-catalog"},
+      "components": ["helm", "kubectl"],
       "format": "executable",
       "name": "operator-tools",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-ovn-source/catalog"},
+      "components": ["ovn-kubernetes-chart"],
+      "format": "helm-oci",
+      "helm": {
+        "images": {
+          "control-plane": "ovn-image-arm64",
+          "node": "ovn-image-arm64",
+          "nbdb": "ovn-image-arm64",
+          "sbdb": "ovn-image-arm64",
+          "northd": "ovn-image-arm64",
+          "ovn-host": "ovn-image-arm64"
+        }
+      },
+      "name": "ovn-chart-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-ovn-source/catalog"},
+      "components": ["ovn-kube-ubuntu"],
+      "format": "oci",
+      "name": "ovn-image-arm64",
       "platform": "linux/arm64"
     },
     {

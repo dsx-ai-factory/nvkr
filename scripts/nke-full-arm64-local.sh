@@ -10,7 +10,7 @@ usage() {
   printf '%s\n' \
     'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers|simulator|site|tools|profiles]' \
     '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers|simulator|site|tools|profiles]' \
-    'all: 23 outputs; components: 22; os: one disk; providers: two source-built images.' \
+    'all: one Run with 29 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
     'simulator bootstraps the same pinned Go/GCC toolchain on Podman or Docker.' \
     'site: four source-aligned installer outputs (controller, CLI, controller chart and NKTP chart).' \
@@ -24,7 +24,7 @@ usage() {
     'No VM is created, started, reset or resized automatically; Docker Desktop is not admitted.' \
     '--check performs prerequisite diagnostics only: no pull, build or attempt creation.' \
     'NKE_LOCAL_CLONE supplies pinned Git objects, not uncommitted changes.' \
-    'The Go demo reuses the first lane bootstrap via NKD_LOCAL_BOOTSTRAP; Runs remain separate.' \
+    'The Go demo builds all selections in one Run; subset selectors remain available for diagnostics.' \
     'See docs/local-development.md for clean setup and acceptance limits.'
 }
 if [[ $# == 1 && ( "$1" == --help || "$1" == -h ) ]]; then usage; exit 0; fi
@@ -208,12 +208,8 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.
   "${runner}" run plan --definition "${definition}" --environment "${environment}" --json >"${bootstrap}/baseline-plan.json"
-  case "${lane}" in
-    site) scope=site_helm_toolchain_scope ;;
-    simulator) scope=simulator_toolchain_scope ;;
-    *) scope=disk_toolchain_scope ;;
-  esac
-  baseline="$(jq -L scripts -er "include \"nke-os-plan\"; ${scope}.pin" "${bootstrap}/baseline-plan.json")"
+  jq -L scripts -e --arg lane "${lane}" 'include "nke-os-plan"; local_toolchain_scopes($lane)' \
+    "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-scopes.json"
   if [[ -n "${shared_bootstrap}" ]]; then
     # This is an explicit invocation-local tool selection, not a serialized
     # receipt. The next Plan still admits the exact image and substitution.
@@ -231,20 +227,27 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   fi
   # Freeze fresh local bytes through the existing overlay contract, not a tag
   # or a hand-edited maintained lock. Each output retains its own catalog scope.
-  if [[ "${baseline}" != "${image}" ]]; then
-  jq -e --arg root "${repo_root}" --arg out "${repo_root}/${bootstrap}" --arg lane "${lane}" '
+  jq --arg image "${image}" 'map(select(.pin != $image))' "${bootstrap}/toolchain-scopes.json" >"${bootstrap}/substitutions.json"
+  if [[ "$(jq length "${bootstrap}/substitutions.json")" != 0 ]]; then
+  while IFS= read -r index; do
+    file=toolchain-attempt.json
+    if [[ "${index}" != 0 ]]; then file="toolchain-attempt-${index}.json"; fi
+    jq -L scripts -e --argjson index "${index}" --arg to "${image}" 'include "nke-os-plan"; .[$index] |
+      toolchain_overlay("arm64"; .pin; $to; .catalogDigest; .components)' \
+      "${bootstrap}/substitutions.json" >"${bootstrap}/${file}"
+  done < <(jq -r 'keys[]' "${bootstrap}/substitutions.json")
+  jq -e --arg root "${repo_root}" --arg out "${repo_root}/${bootstrap}" \
+    --slurpfile scopes "${bootstrap}/substitutions.json" '
     def absolute: if startswith("/") then . else $root + "/definitions/nke-local-dev-arm64/" + . end;
     def locate: .base |= absolute | if .overlays then .overlays |= map(absolute) else . end;
     .catalog |= locate |
-    .outputs |= map(if .catalog then .catalog |= locate else . end) |
-    if $lane == "simulator" or $lane == "site" then
-      .catalog.overlays = ((.catalog.overlays // []) + [$out + "/toolchain-attempt.json"])
-    else .outputs |= map(if .format == "disk-image" then
-      .catalog.overlays += [$out + "/toolchain-attempt.json"] else . end) end
+    .catalog as $default |
+    .outputs |= map(.name as $name |
+      if .catalog then .catalog |= locate else .catalog = $default end |
+      .catalog.overlays = ((.catalog.overlays // []) +
+        [$scopes[0] | to_entries[] | select(.value.outputs | index($name)) |
+          $out + "/toolchain-attempt" + (if .key == 0 then "" else "-" + (.key | tostring) end) + ".json"]))
   ' "${definition}" >"${bootstrap}/definition.json"
-  jq -L scripts -e --arg to "${image}" "include \"nke-os-plan\"; ${scope} |
-    toolchain_overlay(\"arm64\"; .pin; \$to; .catalogDigest; .components)" \
-    "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-attempt.json"
   definition="${bootstrap}/definition.json"
   fi
 fi
