@@ -166,8 +166,8 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	run := file.Run
-	if file.Version != 1 || !configString(run.NKECheckout) || !configString(run.Out) || run.TimeoutSeconds < 300 || run.TimeoutSeconds > 3600 {
-		return Config{}, configUsage("run requires version 1, nkeCheckout, out and timeoutSeconds from 300 to 3600")
+	if file.Version != 1 || (run.NKECheckout != "" && !configString(run.NKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < 300 || run.TimeoutSeconds > 3600 {
+		return Config{}, configUsage("run requires version 1, out, valid optional nkeCheckout and timeoutSeconds from 300 to 3600")
 	}
 	return Config{NKECheckout: run.NKECheckout, NKDCTL: run.NKDCTL, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
@@ -177,6 +177,9 @@ func (file DemoFile) RunConfig(progress io.Writer) (Config, error) {
 	result, err := file.runDescription(progress)
 	if err != nil {
 		return Config{}, err
+	}
+	if !configString(result.NKECheckout) {
+		return Config{}, configUsage("replay run requires an explicit nkeCheckout")
 	}
 	for _, value := range []string{result.NKDCTL, result.Runs.OS, result.Runs.Components, result.Runs.Providers, result.Runs.Site, result.Runs.Tools, result.Runs.Profiles, result.Runs.Simulator} {
 		if !configString(value) {

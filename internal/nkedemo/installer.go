@@ -1,0 +1,133 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package nkedemo
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"golang.org/x/sys/unix"
+)
+
+// PrepareInstaller prepares a downstream checkout for NKE installation scripts.
+// It is not NKD build-source acquisition or artifact authority; Run rechecks it.
+// An explicit checkout remains read-only. Without one, Git prepares the pinned
+// commit in a new private attempt-local directory before the expensive build.
+func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (Config, error) {
+	result, err := prepareInstaller(ctx, build, run, Runner{Env: localBuildEnvironment(), Progress: run.Progress})
+	if err != nil {
+		code := nkderr.CodePreflightFailed
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			code = nkderr.CodeTimeout
+		}
+		return Config{}, nkderr.Wrap(code, err, "prepare pinned NKE installer")
+	}
+	return result, nil
+}
+
+func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner Runner) (result Config, returnErr error) {
+	if err := requireContext(ctx); err != nil {
+		return result, err
+	}
+	if !safePhase(build.AttemptPrefix) || !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", rune(build.AttemptPrefix[0])) || build.Jobs < 1 || run.Timeout < 300*time.Second || run.Timeout > time.Hour {
+		return result, errors.New("require a fresh attempt, positive jobs and valid tenant budget")
+	}
+	repo, err := resolveExisting(build.Repository)
+	if err != nil {
+		return result, err
+	}
+	out, err := freshDestination(run.Out)
+	if err != nil {
+		return result, err
+	}
+	work := filepath.Join(repo, ".nkd", "installers", build.AttemptPrefix)
+	for _, name := range []string{"git", "bash", "python3"} {
+		if _, err = commandPath(name, runner.Env); err != nil {
+			return result, err
+		}
+	}
+	for _, root := range []string{"runs", "laptop-bootstrap", "installers"} {
+		owned := filepath.Join(repo, ".nkd", root, build.AttemptPrefix)
+		if insidePath(out, owned) || insidePath(owned, out) {
+			return result, errors.New("diagnostic output must not overlap installer, Run or bootstrap attempt")
+		}
+		if _, err = os.Lstat(owned); !errors.Is(err, os.ErrNotExist) {
+			return result, errors.New("attempt destination exists or cannot be inspected; choose a fresh attempt")
+		}
+	}
+	source := "https://github.com/dsx-ai-factory/nke.git"
+	if build.NKEClone != "" {
+		source, err = resolveExisting(build.NKEClone)
+		if err != nil {
+			return result, err
+		}
+		runner.Env = SetEnv(runner.Env, map[string]string{"NKE_LOCAL_CLONE": source})
+	}
+	if run.NKECheckout != "" {
+		run.NKECheckout, err = resolveExisting(run.NKECheckout)
+		if err != nil {
+			return result, err
+		}
+		if insidePath(out, run.NKECheckout) {
+			return result, errors.New("diagnostic output must be outside installer")
+		}
+		if err = verifyInstaller(ctx, runner, run.NKECheckout); err != nil {
+			return result, err
+		}
+	}
+	script := filepath.Join(repo, "scripts/nke-full-arm64-local.sh")
+	if _, err = boundedRegularRead(script, 1<<20); err != nil {
+		return result, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	if err = runner.Run(ctx, []string{"bash", script, "--check", "all"}, "installer-build-preflight", 120*time.Second); err != nil {
+		return result, err
+	}
+	if run.NKECheckout != "" {
+		return run, nil
+	}
+	// The existing descriptor-relative directory owner rejects substituted
+	// symlink parents; mkdir is exclusive and never adopts a retained attempt.
+	parent, name, err := securepath.CreateParentBeneath(repo, filepath.Join(".nkd", "installers", build.AttemptPrefix))
+	if err != nil {
+		return result, err
+	}
+	defer parent.Close()
+	if err = unix.Mkdirat(int(parent.Fd()), name, 0o700); err != nil {
+		return result, err
+	}
+	defer func() {
+		if returnErr != nil && !errors.Is(returnErr, ErrUnjoined) {
+			returnErr = errors.Join(returnErr, os.RemoveAll(work))
+		}
+	}()
+	runner.Work = work
+	runner.Env = SetEnv(runner.Env, map[string]string{"GIT_TERMINAL_PROMPT": "0"})
+	checkout := filepath.Join(work, "source")
+	for _, step := range []struct {
+		args   []string
+		phase  string
+		budget time.Duration
+	}{
+		{[]string{"git", "init", "--quiet", checkout}, "installer-init", 30 * time.Second},
+		{[]string{"git", "-C", checkout, "fetch", "--no-tags", "--depth=1", source, InstallerCommit}, "installer-fetch", 240 * time.Second},
+		{[]string{"git", "-C", checkout, "checkout", "--detach", InstallerCommit}, "installer-checkout", 60 * time.Second},
+	} {
+		if err = runner.Run(ctx, step.args, step.phase, step.budget); err != nil {
+			return result, err
+		}
+	}
+	if err = verifyInstaller(ctx, runner, checkout); err != nil {
+		return result, err
+	}
+	run.NKECheckout = checkout
+	return run, nil
+}

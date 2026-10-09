@@ -29,16 +29,22 @@ func TestEndToEnd(t *testing.T) {
 		return value
 	}
 	repo := required("NKD_NKE_E2E_REPO")
-	installer := required("NKD_NKE_E2E_INSTALLER")
+	installer := os.Getenv("NKD_NKE_E2E_INSTALLER")
 	out := required("NKD_NKE_E2E_OUT")
 	attempt := required("NKD_NKE_E2E_ATTEMPT")
 	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Hour)
 	defer cancel()
-	built, err := BuildArtifacts(ctx, BuildConfig{Repository: repo, NKEClone: os.Getenv("NKE_LOCAL_CLONE"), AttemptPrefix: attempt, Jobs: 1, Progress: os.Stdout})
+	build := BuildConfig{Repository: repo, NKEClone: os.Getenv("NKE_LOCAL_CLONE"), AttemptPrefix: attempt, Jobs: 1, Progress: os.Stdout}
+	run, err := PrepareInstaller(ctx, build, Config{NKECheckout: installer, Out: out, Timeout: time.Hour, Progress: os.Stdout})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = Run(ctx, Config{NKECheckout: installer, NKDCTL: built.NKDCTL, Runs: built.Runs, Out: out, Timeout: time.Hour, Progress: os.Stdout}); err != nil {
+	built, err := BuildArtifacts(ctx, build)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run.NKDCTL, run.Runs = built.NKDCTL, built.Runs
+	if err = Run(ctx, run); err != nil {
 		t.Fatal(err)
 	}
 }

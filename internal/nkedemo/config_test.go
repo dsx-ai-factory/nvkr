@@ -270,6 +270,30 @@ func TestDemoFileConversionRefusals(t *testing.T) {
 	}
 }
 
+func TestInstallerCheckoutOptionalOnlyForE2E(t *testing.T) {
+	for _, checkout := range []string{"", "/native/installer", "\n"} {
+		t.Run("checkout="+checkout, func(t *testing.T) {
+			file := DemoFile{Version: 1, Build: BuildFile{Repo: "/native/repo", Attempt: "fresh", Jobs: 2}, Run: RunFile{NKECheckout: checkout, Out: "/native/output", TimeoutSeconds: 3600}}
+			_, run, err := file.E2EConfig(nil)
+			if checkout == "\n" {
+				assertConfigUsage(t, err)
+				return
+			}
+			if err != nil || run.NKECheckout != checkout {
+				t.Fatalf("run=%+v error=%v", run, err)
+			}
+			file.Run.NKDCTL = "/native/nkdctl"
+			file.Run.Runs = RunFileInputs{OS: "run", Components: "run", Providers: "run", Site: "run", Tools: "run", Profiles: "run", Simulator: "run"}
+			_, err = file.RunConfig(nil)
+			if checkout == "" {
+				assertConfigUsage(t, err)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestDemoFileMaintainedExample(t *testing.T) {
 	file, err := LoadDemoFile(t.Context(), "../../demos/local-nke.yaml")
 	if err != nil {

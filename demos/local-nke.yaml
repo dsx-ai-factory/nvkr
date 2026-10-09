@@ -14,7 +14,9 @@ build:
   # Maximum concurrent ready build/package operations; dependencies still gate work.
   jobs: 2
 run:
-  nkeCheckout: /workspace/nke-installer
+  # e2e prepares the pinned installer automatically; no separate clone needed.
+  # Optional read-only override at the matching installer pin:
+  # nkeCheckout: /workspace/nke-installer
   out: /workspace/nke-recipes/.nkd/e2e-demo-01
   timeoutSeconds: 3600
 # e2e obtains nkdctl and one completed Run from this invocation's fresh build.

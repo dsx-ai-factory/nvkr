@@ -163,10 +163,10 @@ func TestExplicitConfigOnlyChangedFlagsOverrideIt(t *testing.T) {
 }
 
 func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
-	for _, name := range []string{"exact", "retainedRun", "retainedTool", "buildFailure", "runFailure"} {
+	for _, name := range []string{"exact", "omittedInstaller", "retainedRun", "retainedTool", "prepareFailure", "buildFailure", "runFailure"} {
 		t.Run(name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
-			builds, runs := 0, 0
+			prepares, builds, runs := 0, 0, 0
 			var workContext context.Context
 			fresh := nkedemo.BuiltInputs{NKDCTL: "fresh-nkdctl", Runs: nkedemo.RunInputs{OS: "fresh-os", Components: "fresh-components", Providers: "fresh-components", Site: "fresh-site", Tools: "fresh-tools", Profiles: "fresh-profiles", Simulator: "fresh-simulator"}}
 			actions := demoActions{
@@ -174,6 +174,9 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 					file := configuredFixture()
 					file.Run.NKDCTL = ""
 					file.Run.Runs = nkedemo.RunFileInputs{}
+					if name == "omittedInstaller" {
+						file.Run.NKECheckout = ""
+					}
 					if name == "retainedRun" {
 						file.Run.Runs.OS = "retained"
 					}
@@ -182,11 +185,28 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 					}
 					return file, nil
 				},
+				prepare: func(ctx context.Context, build nkedemo.BuildConfig, cfg nkedemo.Config) (nkedemo.Config, error) {
+					prepares++
+					assertE2EBudget(t, ctx)
+					if builds != 0 || runs != 0 || build.AttemptPrefix != "fresh-prefix" || build.Jobs != 3 {
+						t.Fatal("installer preparation must precede the build")
+					}
+					if name == "prepareFailure" {
+						return nkedemo.Config{}, nkderr.New(nkderr.CodePreflightFailed, "installer failed")
+					}
+					if name == "omittedInstaller" {
+						if cfg.NKECheckout != "" {
+							t.Fatal("omitted checkout was fabricated by configuration")
+						}
+						cfg.NKECheckout = "prepared-installer"
+					}
+					return cfg, nil
+				},
 				build: func(ctx context.Context, cfg nkedemo.BuildConfig) (nkedemo.BuiltInputs, error) {
 					builds++
 					workContext = ctx
 					assertE2EBudget(t, ctx)
-					if cfg.AttemptPrefix != "fresh-prefix" || cfg.Jobs != 3 {
+					if prepares != 1 || cfg.AttemptPrefix != "fresh-prefix" || cfg.Jobs != 3 {
 						t.Fatal("wrong build intent")
 					}
 					if name == "buildFailure" {
@@ -197,7 +217,11 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 				run: func(ctx context.Context, cfg nkedemo.Config) error {
 					runs++
 					assertE2EBudget(t, ctx)
-					if builds != 1 || ctx != workContext || cfg.Runs != fresh.Runs || cfg.NKDCTL != fresh.NKDCTL || cfg.NKECheckout != "configured-installer" || cfg.Timeout != 600*time.Second {
+					expectedInstaller := "configured-installer"
+					if name == "omittedInstaller" {
+						expectedInstaller = "prepared-installer"
+					}
+					if builds != 1 || ctx != workContext || cfg.Runs != fresh.Runs || cfg.NKDCTL != fresh.NKDCTL || cfg.NKECheckout != expectedInstaller || cfg.Timeout != 600*time.Second {
 						t.Fatalf("deployment not bound to fresh build: %+v", cfg)
 					}
 					if name == "runFailure" {
@@ -210,8 +234,13 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 			switch name {
 			case "retainedRun", "retainedTool":
 				assertCode(t, err, nkderr.CodeUsage)
-				if builds != 0 || runs != 0 {
+				if prepares != 0 || builds != 0 || runs != 0 {
 					t.Fatal("conflicting references started work")
+				}
+			case "prepareFailure":
+				assertCode(t, err, nkderr.CodePreflightFailed)
+				if prepares != 1 || builds != 0 || runs != 0 {
+					t.Fatal("build followed failed installer preparation")
 				}
 			case "buildFailure":
 				assertCode(t, err, nkderr.CodeBuildFailed)
@@ -250,11 +279,19 @@ func assertE2EBudget(t *testing.T, ctx context.Context) {
 func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 	var out, diagnostics bytes.Buffer
 	fresh := nkedemo.BuiltInputs{NKDCTL: "new-nkdctl", Runs: nkedemo.RunInputs{OS: "new-os", Components: "new-components", Providers: "new-components", Site: "new-site", Tools: "new-tools", Profiles: "new-profiles", Simulator: "new-simulator"}}
-	order := make([]string, 0, 2)
+	order := make([]string, 0, 3)
 	actions := demoActions{
 		load: func(context.Context, string) (nkedemo.DemoFile, error) {
 			t.Fatal("searched for implicit configuration")
 			return nkedemo.DemoFile{}, nil
+		},
+		prepare: func(_ context.Context, _ nkedemo.BuildConfig, cfg nkedemo.Config) (nkedemo.Config, error) {
+			order = append(order, "prepare")
+			if cfg.NKECheckout != "" {
+				t.Fatal("no explicit installer was provided")
+			}
+			cfg.NKECheckout = "installer"
+			return cfg, nil
 		},
 		build: func(_ context.Context, cfg nkedemo.BuildConfig) (nkedemo.BuiltInputs, error) {
 			order = append(order, "build")
@@ -271,9 +308,9 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 			return nil
 		},
 	}
-	err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), []string{"e2e", "--repo", "repo", "--attempt", "fresh", "--nke-checkout", "installer", "--out", "new-out"})
+	err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), []string{"e2e", "--repo", "repo", "--attempt", "fresh", "--out", "new-out"})
 	assertCode(t, err, "")
-	if strings.Join(order, ",") != "build,run" {
+	if strings.Join(order, ",") != "prepare,build,run" {
 		t.Fatalf("wrong operation order: %v", order)
 	}
 }

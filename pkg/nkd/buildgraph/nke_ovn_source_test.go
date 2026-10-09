@@ -195,6 +195,9 @@ func TestNKEOVNForkPinBindings(t *testing.T) {
 	}{
 		{component: "ovn-kube-ubuntu", fragments: []string{
 			"name=localhost/nke/ovn-kubernetes:git-" + pin.Commit,
+			// The fork's vendored JSON adapter needs Go 1.26, not Go 1.27's
+			// changed JSON v2 API. This is the measured patched 1.26.9 builder.
+			"build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564",
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
 		}},
 		{component: "ovn-kubernetes-chart", fragments: []string{

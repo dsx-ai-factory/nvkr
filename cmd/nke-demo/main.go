@@ -31,7 +31,7 @@ func main() {
 }
 func execute(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	return executeRoot(ctx, newCommand(out, diagnostics, demoActions{
-		run: nkedemo.Run, build: nkedemo.BuildArtifacts, restore: nkedemo.Restore, load: nkedemo.LoadDemoFile,
+		run: nkedemo.Run, build: nkedemo.BuildArtifacts, prepare: nkedemo.PrepareInstaller, restore: nkedemo.Restore, load: nkedemo.LoadDemoFile,
 	}), args)
 }
 
@@ -40,6 +40,7 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer) err
 type demoActions struct {
 	run     func(context.Context, nkedemo.Config) error
 	build   func(context.Context, nkedemo.BuildConfig) (nkedemo.BuiltInputs, error)
+	prepare func(context.Context, nkedemo.BuildConfig, nkedemo.Config) (nkedemo.Config, error)
 	restore func(context.Context, string, io.Writer) error
 	load    func(context.Context, string) (nkedemo.DemoFile, error)
 }
@@ -176,6 +177,10 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			defer cancel()
 			return runProgress(budget, out, func(ctx context.Context, progress io.Writer) error {
 				build.Progress, run.Progress = progress, progress
+				run, err = actions.prepare(ctx, build, run)
+				if err != nil {
+					return err
+				}
 				built, err := actions.build(ctx, build)
 				if err != nil {
 					return err
@@ -199,7 +204,11 @@ func addBuildFlags(command *cobra.Command, cfg *nkedemo.BuildFile) {
 }
 func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 	flags := command.Flags()
-	flags.StringVar(&cfg.NKECheckout, "nke-checkout", "", "clean pinned NKE installer checkout")
+	checkoutHelp := "optional clean pinned installer checkout; e2e prepares it when omitted"
+	if existing {
+		checkoutHelp = "required clean pinned NKE installer checkout"
+	}
+	flags.StringVar(&cfg.NKECheckout, "nke-checkout", "", checkoutHelp)
 	flags.StringVar(&cfg.Out, "out", "", "fresh private demo output directory")
 	flags.IntVar(&cfg.TimeoutSeconds, "timeout", 3600, "tenant provisioning budget in seconds (300..3600)")
 	if !existing {

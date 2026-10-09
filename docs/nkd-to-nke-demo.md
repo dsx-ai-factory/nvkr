@@ -11,6 +11,12 @@ pinned NKE staged installer at
 `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`.
 See its [deployment instructions](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/deploy/README.md).
 
+`nke-demo e2e` prepares this pinned installer automatically in a private
+attempt-local directory; `run.nkeCheckout` is an optional read-only override.
+Replaying retained outputs with `nke-demo run` still requires an explicit matching
+checkout. See [pin origins and upgrades](local-nke-demo.md#where-the-nke-versions-come-from)
+before moving to another NKE release.
+
 ## Inputs consumed by the demo
 
 | Output group in the completed Run | Selected handoff |

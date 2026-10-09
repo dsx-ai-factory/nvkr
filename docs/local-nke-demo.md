@@ -41,8 +41,14 @@ test "$(uname -m)" = aarch64
 test "$(findmnt -n -o FSTYPE -T .)" = ext4
 ```
 
-When testing an unmerged PR, check out that PR's branch before continuing.
-The normal installation above uses `main`.
+Until [PR #118](https://github.com/dsx-ai-factory/nke-recipes/pull/118) merges,
+switch to its branch before continuing:
+
+```sh
+git switch codex/full-nke-arm64-local
+```
+
+After merge, stay on `main`; the temporary branch step is not needed.
 
 ### Additional macOS setup
 
@@ -145,35 +151,31 @@ local NKE Git clone, use its absolute Linux path in
 
 ## 3. Bootstrap the demo command
 
+This prepares the command you will use in step 4; it does **not** build NKE or
+boot a tenant yet. No host Go installation is needed: the launcher compiles
+`nkdctl` and `nke-demo` in its pinned Go container, then builds the five-tool
+installer bundle (Kind, kubectl, Helm, clusterctl and ORAS).
+
 ```sh
+# Use the Docker daemon on this Linux host.
 export CONTAINER_RUNTIME=docker
+# Use normal permissions for new build files; demo secrets use private files.
 umask 022
-# Optional: export NKE_LOCAL_CLONE=/absolute/Linux/path/to/nke
+# Read-only prerequisites check: no downloads, builds or attempt directories.
 bash scripts/nke-full-arm64-local.sh --check tools
+# Prepare the CLI and tools; "1" limits concurrent operations, not CPU cores.
 bash scripts/nke-full-arm64-local.sh demo-bootstrap-tools-01 1 tools
+# Point at the newly compiled CLI. This variable does not launch anything.
 export NKE_DEMO="$(pwd)/.nkd/laptop-bootstrap/demo-bootstrap-tools-01/nke-demo"
+# Show available options only. The actual build/deployment starts in step 4.
 "$NKE_DEMO" e2e --help
 ```
 
-Preflight does not build. Each attempt name must be new. This bootstrap supplies
-the CLI; E2E subsequently builds one fresh artifact Run, including tools.
-Developers with the pinned Go toolchain can instead use `make demo`.
+Each attempt name must be new. This preliminary tools Run is separate from the
+complete artifact Run: E2E subsequently builds the selected tools again as part
+of its complete fresh membership, rather than silently reusing bootstrap outputs.
 
-## 4. Prepare the matching installer
-
-```sh
-export NKE_INSTALLER_CLONE="$(pwd)/.nkd/installers/nke-8fb2d533"
-mkdir -p "$(pwd)/.nkd/installers"
-git clone --no-checkout https://github.com/dsx-ai-factory/nke.git "$NKE_INSTALLER_CLONE"
-git -C "$NKE_INSTALLER_CLONE" fetch origin 8fb2d53368823bd386b4fbd55b4ab6d3c0931345
-git -C "$NKE_INSTALLER_CLONE" checkout --detach 8fb2d53368823bd386b4fbd55b4ab6d3c0931345
-test "$(git -C "$NKE_INSTALLER_CLONE" rev-parse HEAD)" = 8fb2d53368823bd386b4fbd55b4ab6d3c0931345
-```
-
-Use a new clean clone. A different installer revision is not automatically
-compatible with these selected artifacts.
-
-## 5. Build and run the demo
+## 4. Build and run the demo
 
 Inspect `docker network ls` and `ip route`. Only if `kind` does not exist
 and its subnet is unused:
@@ -193,11 +195,11 @@ docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af0682
 test ! -e .nkd/demo.local.yaml
 cp demos/local-nke.yaml .nkd/demo.local.yaml
 chmod 600 .nkd/demo.local.yaml
-printf 'build.repo: %s\nrun.nkeCheckout: %s\nrun.out: %s\n' \
-  "$(pwd)" "$NKE_INSTALLER_CLONE" "$(pwd)/.nkd/e2e-demo-01"
+printf 'build.repo: %s\nrun.out: %s\n' \
+  "$(pwd)" "$(pwd)/.nkd/e2e-demo-01"
 ```
 
-Edit those three YAML paths using the printed values. They are literal Linux
+Edit those two YAML paths using the printed values. They are literal Linux
 paths: `~` and shell variables are not expanded. For each rerun, use a fresh
 `build.attempt` **and** `run.out`. Do not add retained `run.runs` or
 `run.nkdctl` references to E2E configuration.
@@ -209,6 +211,15 @@ paths: `~` and shell variables are not expanded. For each rerun, use a fresh
 E2E preflights the combined selection, then builds OS, components, site, tools,
 profiles and simulator in one immutable Run. Deployment consumes selected outputs
 from that completed Run; a failed build stops deployment.
+
+Before the artifact build, E2E prepares the pinned NKE installer automatically
+under `.nkd/installers/<build.attempt>/source`. This supplies NKE's deployment
+scripts, not prebuilt artifacts. No separate manual clone or folder naming is
+needed. With `build.nkeClone` configured, installer acquisition uses that local
+Git repository; otherwise it fetches the pinned commit from GitHub. NKD's build
+source acquisition remains separate and verifies the catalog's own pins.
+An optional `run.nkeCheckout` supplies an existing clean checkout at the exact
+installer pin instead; the demo never updates that checkout in place.
 
 `build.jobs` sets the maximum number of concurrent ready build/package operations.
 The example uses two. For a larger execution host, set `jobs: 4` or override it:
@@ -240,7 +251,7 @@ tenant budget are ceilings, not completion estimates. Deployment requires the
 disk-copy bytes plus 30 GiB free. Tenant guests use the selected plain ARM64 disk,
 four CPUs, eight GiB RAM and a 60-GiB overlay each.
 
-## 6. Recognize success
+## 5. Recognize success
 
 Require exit zero and this exact final message:
 
@@ -269,7 +280,7 @@ Ubuntu ARM64 host. Ordinary tests skip it.
 ```sh
 export NKD_NKE_E2E=1
 export NKD_NKE_E2E_REPO="$(pwd)"
-export NKD_NKE_E2E_INSTALLER="$NKE_INSTALLER_CLONE"
+# Optional: export NKD_NKE_E2E_INSTALLER=/absolute/path/to/a/matching/clean/checkout
 export NKD_NKE_E2E_OUT="$(pwd)/.nkd/e2e-demo-02"
 export NKD_NKE_E2E_ATTEMPT=demo-e2e-02
 go test ./internal/nkedemo -run '^TestEndToEnd$' -count=1 -timeout 9h
@@ -277,3 +288,34 @@ go test ./internal/nkedemo -run '^TestEndToEnd$' -count=1 -timeout 9h
 
 The test requires the pinned Go toolchain. Its deadline allows bounded cleanup
 after the eight-hour work context expires.
+
+## Where the NKE versions come from
+
+These are exact source selections recorded by this example, not a command to
+build whichever NKE release is newest. A Git SHA identifies a commit; NKD also
+checks its pinned tree. The guide does not establish that these candidates are
+one tagged NKE release.
+
+| Part | Selected NKE commit | Owning input |
+| --- | --- | --- |
+| Installer, site CLI/controller/charts and diagnostic profiles | [`8fb2d533`](https://github.com/dsx-ai-factory/nke/commit/8fb2d53368823bd386b4fbd55b4ab6d3c0931345) | [Site lock](../definitions/nke-local-dev-arm64/site-catalog/pins.lock.yaml), [profiles lock](../definitions/nke-local-dev-arm64/profiles-catalog/pins.lock.yaml) and the demo's [installer pin](../internal/nkedemo/model.go) |
+| OS assembly, agent and most NKE-owned OS material producers | [`ff21ba8c`](https://github.com/dsx-ai-factory/nke/commit/ff21ba8c07cafff74b68e238a8876af11e5beded) | [OS lock](../definitions/nke-m2/os-catalog/pins.lock.yaml) and [local OS overlay](../definitions/nke-local-dev-arm64/os-tcg.json) |
+| SPIRE package exception | [`726f7694`](https://github.com/dsx-ai-factory/nke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Same OS lock; this older plugin-free package is an explicit [source gap](full-nke-source-build.md), not the intended complete NKE baseline |
+| NICoSim | [`6ffc2e5c`](https://github.com/dsx-ai-factory/nke/commit/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4) | [Simulator lock](../definitions/nke-local-dev-arm64/simulator-catalog/pins.lock.yaml) |
+| Provisioned provider (built, not used by this NICoSim tenant) | [`33fb71b2`](https://github.com/dsx-ai-factory/nke/commit/33fb71b2f4224b470ebc628a9165fc4b92870406) | [Provider lock](../definitions/nke-controller/catalog/pins.lock.yaml), selecting `v0.21.0` |
+
+The OS commit added APT archive capture; the installer commit includes the staged
+deployment interface this adapter checks. The NVIDIA OVN fork, CAPNICo, NICoSim
+and upstream tools have their own source pins in the selected catalogs. A new
+NKE release does **not** automatically move any of these selections.
+
+For developers following the guide, use an NKE Recipes revision containing the
+desired maintained selection; do not replace a SHA with `main` or `latest`.
+For maintainers updating it, resolve the intended release/commit through
+`nkdctl catalog pin` ([catalog maintenance](catalog-maintenance.md)), update the
+matching installer/interface checks, profile patch and OS overlay bindings, then
+review the resulting Plan. The OS overlay contains its own resolved source pins
+and predecessor catalog digest: updating the base lock alone does not update it.
+Run `make check` and the complete fresh E2E before
+publishing the updated guide. Updating only the installer pin does not update
+the artifact graph or prove compatibility with a new release.

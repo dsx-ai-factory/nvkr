@@ -187,6 +187,13 @@ bounds concurrent ready producer and packaging operations in the existing
 factory scheduler. The upstream NKE readers
 still require Python; the demo does not reimplement them.
 
+E2E prepares its exact pinned installer automatically with bounded Git in a
+fresh private attempt directory; an explicit matching checkout remains read-only.
+Replay still requires a checkout. Preparation checks build prerequisites before
+acquisition; controlled tests cover pin/dirty/source/path/cancellation failures
+and prepare-before-build ordering, not current external Git authorization or
+fresh tenant acceptance.
+
 The local OS selects the PR #113 NKE/NVIDIA OVN fork at pinned commit
 `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`; profile packages and tenant requests
 select its `1.5.18` chart stream. The combined Definition also declares standalone
