@@ -1,17 +1,23 @@
-# Build and run NKE locally on an Apple Silicon Mac
+# Build and run NKE in a Linux VM on an Apple Silicon Mac
 
 NKD builds the artifacts. A separate command deploys those exact outputs, creates
 a real ARM64 control-plane and worker from the QCOW2 through CAPNICo/NICoSim,
 tests a workload and Kubernetes DNS, then removes its owned resources.
 
+This is a Linux workflow with a Colima setup step for macOS. The Mac runs Colima;
+NKD builds and the demo run inside its Ubuntu ARM64 VM. It is not a native macOS
+build, and Docker Desktop alone cannot run the libvirt tenant VMs.
+
 A real Colima run passed on October 8, 2026, using retained completed artifacts,
-including the worker's pre-join reboot and final cleanup. A fresh clean-machine
-build of all lanes is not yet verified. This is a trusted-user local demo, not a
+including workload/DNS testing and final cleanup. A fresh clean-machine build
+of all lanes is not yet verified. This is a trusted-user local demo, not a
 signed Release or complete source-built distribution. Acquired images/charts,
 the missing DSX input and PR #113 integration remain explicit
 [full-source gaps](full-nke-source-build.md).
-The expanded dependency-image handoff has not yet passed a live integrated replay;
-the retained run checked controller, profiles and CAPNICo image identities.
+The expanded handoff also passed an integrated tenant/workload/cleanup replay
+with five freshly built non-OS lanes and a retained QCOW2. All fifteen selected
+site image identities were checked. This is not a fresh OS rebuild; see
+[PR #118's validation status](https://github.com/dsx-ai-factory/nke-recipes/pull/118).
 
 ## 1. Prepare the Mac
 
@@ -55,7 +61,7 @@ colima ssh --profile nkd-demo -- bash -c 'cd "$1" && exec bash' bash "$NKD_NATIV
 **Everything below runs inside Colima**, from the directory just printed. Native
 ext4 avoids the shared-mount file-handle problem encountered during source export.
 
-## 3. Install native host prerequisites
+## 3. Install prerequisites inside the Ubuntu VM
 
 For the tested Ubuntu ARM64 host:
 
@@ -83,7 +89,7 @@ Git authentication must work **inside Colima**; the Mac's `gh` login is not proo
 Alternatively, use an exact local NKE Git repository mounted into Colima and set
 `NKE_LOCAL_CLONE` to its absolute path. Only committed, pinned Git objects are used.
 
-## 4. Build the artifacts
+## 4. Build the artifacts inside the VM
 
 From the native NKD export, run sequentially. Use new attempt names for a rerun.
 
