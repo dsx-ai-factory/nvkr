@@ -133,7 +133,7 @@ func TestDiskArtifactExactPlatformTransport(t *testing.T) {
 				manifest.Config.MediaType != ocispec.MediaTypeImageConfig {
 				t.Fatalf("manifest = %+v", manifest)
 			}
-			configRaw, err := os.ReadFile(diskBlobPath(root, manifest.Config.Digest.String()))
+			configRaw, err := os.ReadFile(fixtureBlobPath(root, manifest.Config.Digest.String()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -353,7 +353,7 @@ func TestOpenDiskArtifactRejectsAmbiguousOrExternalWrapper(t *testing.T) {
 				if _, err := writer.writeIndex(index); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Remove(diskBlobPath(root, pin)); err != nil {
+				if err := os.Remove(fixtureBlobPath(root, pin)); err != nil {
 					t.Fatal(err)
 				}
 				pin = newDescriptor.Digest
@@ -423,7 +423,7 @@ func TestOpenDiskArtifactRejectsLayoutTamperingAndBudget(t *testing.T) {
 	for _, kind := range []string{"payload", "extra blob", "symlink", "wrong pin", "budget", "zero budget", "platform"} {
 		t.Run(kind, func(t *testing.T) {
 			root, payload, pin := diskFixture(t, "linux/amd64")
-			path := diskBlobPath(root, digestBytes(payload))
+			path := fixtureBlobPath(root, digestBytes(payload))
 			maxBytes := int64(len(payload))
 			platform := "linux/amd64"
 			switch kind {
@@ -433,7 +433,7 @@ func TestOpenDiskArtifactRejectsLayoutTamperingAndBudget(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "extra blob":
-				if err := os.WriteFile(diskBlobPath(root, digestBytes([]byte("extra"))), []byte("extra"), 0o600); err != nil {
+				if err := os.WriteFile(fixtureBlobPath(root, digestBytes([]byte("extra"))), []byte("extra"), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			case "symlink":
@@ -471,7 +471,7 @@ func TestDiskArtifactHeldInodeAndRecheckedStream(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = artifact.Close() })
-			path := diskBlobPath(root, digestBytes(payload))
+			path := fixtureBlobPath(root, digestBytes(payload))
 			changed := bytes.Clone(payload)
 			switch kind {
 			case "path replacement":
@@ -511,7 +511,7 @@ func TestDiskArtifactMutationDuringStreamRemainsBounded(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = artifact.Close() })
-			mutable, err := os.OpenFile(diskBlobPath(root, digestBytes(payload)), os.O_RDWR, 0)
+			mutable, err := os.OpenFile(fixtureBlobPath(root, digestBytes(payload)), os.O_RDWR, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -633,10 +633,6 @@ func TestDiskArtifactFailedDestinationDoesNotReturnSuccess(t *testing.T) {
 	}
 }
 
-func diskBlobPath(root, pin string) string {
-	return filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(pin, "sha256:"))
-}
-
 func rewriteDiskFixture(t *testing.T, root, oldPin string, change func(*ociManifest, *[]byte)) string {
 	t.Helper()
 	index, _, err := readIndex(t.Context(), root)
@@ -673,12 +669,12 @@ func rewriteDiskFixture(t *testing.T, root, oldPin string, change func(*ociManif
 		t.Fatal(err)
 	}
 	if descriptor.Digest != oldPin {
-		if err := os.Remove(diskBlobPath(root, oldPin)); err != nil {
+		if err := os.Remove(fixtureBlobPath(root, oldPin)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if newConfig.Digest != oldConfig {
-		if err := os.Remove(diskBlobPath(root, oldConfig)); err != nil {
+		if err := os.Remove(fixtureBlobPath(root, oldConfig)); err != nil {
 			t.Fatal(err)
 		}
 	}

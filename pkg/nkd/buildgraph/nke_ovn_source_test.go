@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/execution"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -36,6 +38,28 @@ const ovnForkCommit = "26cc199de8e814a7fe6d899a770fc04df0bbc2f9"
 // ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
 const ovnForkStream = "1.5.18"
 
+// Both source trees use a vendored JSON adapter incompatible with Go 1.27.
+const ovnGoBuilder = "quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564"
+
+func TestNKEOVNBuilderPinBindings(t *testing.T) {
+	for _, path := range []string{
+		"../../../definitions/nke-ovn-source/catalog",
+		"../../../definitions/nke-m2/os-catalog",
+		"../../../definitions/nke-os/catalog",
+	} {
+		t.Run(path, func(t *testing.T) {
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			command := strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n")
+			if !strings.Contains(command, "build-arg:BUILDER_IMAGE="+ovnGoBuilder) {
+				t.Fatal("OVN producer lost the compatible digest-pinned Go builder")
+			}
+		})
+	}
+}
+
 func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
 	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nke-ovn-source/catalog"))
@@ -43,6 +67,68 @@ func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 		t.Fatal(err)
 	}
 	return cat
+}
+
+// The local disk selects the same pinned fork producers as the standalone image
+// and chart outputs, while retaining the source-owned image-inputs handoff.
+func TestNKEOVNForkLocalDiskSelection(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nke-m2/os-catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nke-local-dev-arm64/os-tcg.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(base, overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fork := loadOVNForkCatalog(t)
+	for _, name := range []string{"ovn-kube-ubuntu", "ovn-kubernetes-chart", "nke-cni-ovn"} {
+		if !reflect.DeepEqual(stack.Catalog.Components[name], fork.Components[name]) {
+			t.Fatalf("local disk producer %s differs from the pinned NVIDIA fork", name)
+		}
+	}
+	if got := stack.Catalog.Components["nke-image-inputs"].Materials["ovn"]; got != "nke-cni-ovn" {
+		t.Fatalf("OS material binding = %q, want fork Debian bundle", got)
+	}
+	d, err := definition.LoadDefinition(t.Context(), "../../../definitions/nke-local-dev-arm64/definition-os.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := buildgraph.Resolve(stack.Catalog, buildgraph.Selection{
+		Components: d.Outputs[0].Components, Platform: d.Outputs[0].Platform, OutputFormat: d.Outputs[0].Format,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildgraph.CompileForHostPlatforms(resolved, map[string]execution.HostPlatform{
+		"nke-node-image": execution.HostPlatformLinuxARM64,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nke-local-dev-arm64/profiles-catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := profiles.Components["nke-local-profiles"]
+	raw, err := os.ReadFile("../../../definitions/nke-local-dev-arm64/profiles-catalog/patches/local-profile.patch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
+	if len(profile.Patches) != 1 || profile.Patches[0].SHA256 != wantDigest {
+		t.Fatal("local profile does not bind the exact fork package installation input")
+	}
+	for _, kind := range []string{"charts", "images"} {
+		if !strings.Contains(string(raw), "nke-cni-ovn-"+kind+"-"+ovnForkStream) {
+			t.Fatalf("profile does not install fork %s package", kind)
+		}
+	}
+	if strings.Contains(string(raw), "nke-cni-ovn-charts-1.4.0") {
+		t.Fatal("local profile retains the upstream OVN stream")
+	}
 }
 
 // The complete candidate selection is separate from the maintained Calico/OVN
@@ -131,6 +217,9 @@ func TestNKEOVNForkPinBindings(t *testing.T) {
 	}{
 		{component: "ovn-kube-ubuntu", fragments: []string{
 			"name=localhost/nke/ovn-kubernetes:git-" + pin.Commit,
+			// The fork's vendored JSON adapter needs Go 1.26, not Go 1.27's
+			// changed JSON v2 API. This is the measured patched 1.26.9 builder.
+			"build-arg:BUILDER_IMAGE=" + ovnGoBuilder,
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
 		}},
 		{component: "ovn-kubernetes-chart", fragments: []string{

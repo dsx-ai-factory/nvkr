@@ -38,7 +38,7 @@ func TestDiskBindingUsesOnlyCurrentDescriptorWalk(t *testing.T) {
 			object.Arch = "other"
 			assertRegistryCode(t, verifyPublishedObjectBinding(t.Context(), root, object, descriptor, disks), e.CodeVerifyFailed)
 			// Reuse is scoped to one walk; an independent verifier must hash again.
-			if err := os.WriteFile(diskBlobPath(root, digestBytes(payload)), []byte("changed payload"), 0o600); err != nil {
+			if err := os.WriteFile(fixtureBlobPath(root, digestBytes(payload)), []byte("changed payload"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			assertRegistryCode(t, verifyDescriptor(t.Context(), root, descriptor, map[string]bool{}), e.CodeVerifyFailed)

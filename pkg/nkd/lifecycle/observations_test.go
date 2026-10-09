@@ -209,7 +209,7 @@ func TestObserveDiskOutputRejectsPathDescriptionWithoutHeldExecutionResult(t *te
 		slot.ArtifactID: {ID: slot.ArtifactID, Name: "image", Kind: OutputDiskImage,
 			BuildTarget: slot.Name, Component: "image", Path: ".nkd/factory/caller-supplied.qcow2"},
 	}
-	_, err := observeOutput(t.Context(), slot, artifacts, nil, nil)
+	_, err := observeOutput(t.Context(), slot, artifacts, nil, nil, "")
 	assertCode(t, err, e.CodeEngineCapability)
 }
 

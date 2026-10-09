@@ -471,10 +471,10 @@ func copyArchiveToContainer(ctx context.Context, runtime packerContainerRuntime,
 	copyErr := <-copyDone
 	if err := errors.Join(runErr, copyErr); err != nil {
 		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed,
-			"transporting authenticated Packer inputs")
+			"transporting authenticated container inputs")
 	}
 	if err := archive.AssertUnchangedContext(ctx); err != nil {
-		return e.Wrap(e.CodeUnverifiedRef, err, "rechecking held Packer transport")
+		return e.Wrap(e.CodeUnverifiedRef, err, "rechecking held container transport")
 	}
 	return nil
 }

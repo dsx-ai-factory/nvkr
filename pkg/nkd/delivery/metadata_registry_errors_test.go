@@ -128,7 +128,7 @@ func TestPullMetadataClassifiesFailuresAfterRootAcquisition(t *testing.T) {
 					t.Fatalf("successful metadata control: root=%q, error=%v", got.RootDigest, err)
 				}
 				for digest := range payloads {
-					if _, err := os.Stat(diskBlobPath(out, digest)); !errors.Is(err, os.ErrNotExist) {
+					if _, err := os.Stat(fixtureBlobPath(out, digest)); !errors.Is(err, os.ErrNotExist) {
 						t.Fatalf("metadata layout retained artifact payload %s: %v", digest, err)
 					}
 				}

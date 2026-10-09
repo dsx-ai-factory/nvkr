@@ -774,6 +774,12 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 		destination := filepath.Join(stage, filepath.FromSlash(name))
 		for parent := filepath.ToSlash(filepath.Dir(filepath.FromSlash(name))); parent != "." && parent != ""; parent = filepath.ToSlash(filepath.Dir(filepath.FromSlash(parent))) {
 			directories[parent] = true
+			// File-only archives (including Helm charts) omit directory headers.
+			// Their implicit parents must not inherit the extractor's umask;
+			// an explicit header, before or after this entry, retains precedence.
+			if _, present := directoryModes[parent]; !present {
+				directoryModes[parent] = 0o755
+			}
 		}
 		if err := noSymlinkParents(stage, destination); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "transport path %s has a symlink parent", name)
@@ -797,17 +803,25 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 				return e.Wrap(e.CodeVerifyFailed, err, "creating transport file %s", name)
 			}
 			written, copyErr := copyTransportExact(ctx, out, tr, header.Size)
-			var syncErr error
+			var modeErr, syncErr error
 			if copyErr == nil {
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					copyErr = ctxErr
 				} else {
-					syncErr = out.Sync()
+					// Creation permissions are filtered by the process umask.
+					// Restore the archive mode on this held inode before syncing.
+					modeErr = out.Chmod(fs.FileMode(header.Mode) & 0o777)
+					if modeErr == nil {
+						syncErr = out.Sync()
+					}
 				}
 			}
 			closeErr := out.Close()
 			if copyErr != nil {
 				return transportError(ctx, e.CodeVerifyFailed, copyErr, "copying transport file %s", name)
+			}
+			if modeErr != nil {
+				return transportError(ctx, e.CodeInternal, modeErr, "setting transport file mode %s", name)
 			}
 			if syncErr != nil {
 				return transportError(ctx, e.CodeInternal, syncErr, "syncing transport file %s", name)

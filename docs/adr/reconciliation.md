@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-10-08. ADR-01–22 own the lane-specific engineering contracts pending named-decider
+Reviewed 2026-10-09. ADR-01–22 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -19,10 +19,16 @@ artifact-publication result does not satisfy full v1 release or qualified accept
 scopes fail before work.
 
 Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
-same filesystem view as collection after private BuildKit output promotion. It executes no producer code or
+same filesystem view as collection after bounded BuildKit output transport. It executes no producer code or
 signature verifier and remains static-unqualified. This is not a container-isolation or runtime-authentication
 claim; producer execution, other offline utilities and the held-disk observation path retain their existing
 contracts (ADR-18 §8).
+
+Rootless BuildKit's fixed UID is independent of the caller's UID. Its private-volume transport preserves
+authenticated source modes and limits ownership changes to attempt-owned volumes, with a read-only source
+mount for the non-root producer. The declared export returns through the bounded archive owner before normal
+collection. Controlled tests and a targeted native probe are distinct from the complete fresh NKE acceptance
+run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
@@ -152,6 +158,84 @@ records native Linux ARM64 race execution of the sealed diagnostic coordinator a
 the explicitly enabled strict hosted-completion test. Both use controlled ELF/bytes
 with concrete public owners; neither establishes a real NKE bake, provider upload,
 hosted finalization or independent consumer acceptance.
+
+## Local ARM64 development inputs
+
+The `definitions/nke-local-dev-arm64` combined example selects 29 outputs in one
+Run without publication/signing: OS, components, installer-aligned site, tools,
+profiles and simulator. Focused selections remain available; the historical
+22-output component subset is not the complete demo. This is not a complete
+source-built distribution. See the
+[quickstart](../local-nke-demo.md) and [source gaps](../full-nke-source-build.md).
+
+Local static-unqualified mixed Plans admit offline, non-disk utility
+observation/SBOM/packaging in the child helper while VM/held-disk execution
+stays with the original Run owner. Network utility acquisitions remain
+unsupported. Relocated image observation retains compiled Plan identity.
+[Mixed-utility tests](../../pkg/nkd/factory/local_mixed_utility_test.go)
+use controlled OCI bytes and a descriptive, unexecuted VM; they do not prove
+a real joined bake or extend hosted, signing or qualification admission.
+
+The Go downstream consumer invokes `nkdctl` for build, verification and
+extraction, and NKE's pinned staged installer for deployment. Kind hosts
+management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Final success
+requires two Ready nodes, workload/DNS checks, exact disk/artifact bindings and
+owned cleanup. Cobra/Viper configuration supplies descriptions, not receipts.
+The combined build reuses bootstrap executables and the measured toolchain;
+catalog substitutions retain their own exact predecessor binding. `--jobs`
+bounds concurrent ready producer and packaging operations in the existing
+factory scheduler. The upstream NKE readers
+still require Python; the demo does not reimplement them.
+
+E2E prepares its exact pinned installer automatically with bounded Git in a
+fresh private attempt directory; an explicit matching checkout remains read-only.
+Replay still requires a checkout. Preparation checks build prerequisites before
+acquisition; controlled tests cover pin/dirty/source/path/cancellation failures
+and prepare-before-build ordering, not current external Git authorization or
+fresh tenant acceptance.
+
+The local OS selects the PR #113 NKE/NVIDIA OVN fork at pinned commit
+`26cc199de8e814a7fe6d899a770fc04df0bbc2f9`; profile packages and tenant requests
+select its `1.5.18` chart stream. The combined Definition also declares standalone
+OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
+are independently produced; this does not close original-owner cross-output
+reuse or establish equal bytes. Fork graph/profile tests and actual pinned-chart
+Helm rendering with loopback OCI push/pull passed; the changed combined Run,
+fork OS bake and tenant acceptance still require a fresh runtime run.
+
+Profiles use an OCI-carried data bundle, ORAS transport and NKD-authenticated
+extraction, followed by a read-only controller volume. The additive source
+overlay changes no upstream NKE files. Local-only APT installation and uplink
+naming are explicit profile choices, not a general NKE offline boot contract.
+The pinned installer still requires the unused legacy `images.profiles` field.
+[Profile factory tests](../../pkg/nkd/factory/nke_laptop_profiles_test.go)
+cover additive patch authentication, compilation and modeled APT/uplink cases.
+[Consumer tests](../../internal/nkedemo/site_test.go) cover bundle-index
+preservation, owner rejection of corrupt bytes and volume-description checks;
+the source-chart rendering test is opt-in and skipped without its chart input.
+Neither suite alone proves actual registry transport, boot or deployment.
+
+[Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
+journal, cleanup, artifact and tenant-description cases. Runner tests exercise
+bounded subprocess cancellation and joining; CLI tests exercise output-failure
+cancellation with controlled callbacks. These do not prove real SIGINT during
+NKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
+at every build/deployment phase. Network-only recovery uses version-2 journals
+and never kills serialized PIDs; restore legacy live controls before upgrading.
+A full tenant crash/restart and recovery matrix remains unverified.
+
+[TestEndToEnd](../../internal/nkedemo/e2e_test.go) is explicitly opt-in; ordinary
+tests do not build images, deploy tenants or mutate host networking. No durable
+fresh-build/deploy acceptance record is supplied by this PR. Private logs,
+retained Runs, chart renders and tool probes are not public operational evidence,
+complete OS smoke, full-source completion, signing or qualification. Validate
+the terminal result and cleanup of the exact invocation being accepted.
+
+Attempt-scoped native toolchain substitution does not update maintained pins.
+`publish chart` locally verifies/extracts a pinned Helm archive; diagnostic
+registry copies do not constitute NKD publication or Release authorization
+(ADR-18/20). The current NKE `bootstrap site` route is not a demonstrated
+drop-in replacement for the Docker/Kind and NICoSim adapter.
 
 ## Experimental OS source producers and OVN outputs
 

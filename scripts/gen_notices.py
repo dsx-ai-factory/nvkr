@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Emit THIRD_PARTY_NOTICES.md for the modules linked into nkdctl."""
+"""Emit THIRD_PARTY_NOTICES.md for modules linked into nkdctl and nke-demo."""
 import os, re, subprocess, sys
 
 def go(*a):
@@ -18,10 +18,10 @@ def go(*a):
 
 mods = [l.strip() for l in open(sys.argv[1]) if l.strip()]
 print("# Third-Party Notices\n")
-print("NKE Recipes (`nkdctl`) is distributed under the Apache License 2.0. The binary")
+print("NKE Recipes (`nkdctl` and `nke-demo`) is distributed under the Apache License 2.0. These binaries")
 print("links the third-party modules listed below. Each module's license, copyright")
 print("notice, and NOTICE file (where one exists) is reproduced in full.\n")
-print("This file lists modules linked into the `nkdctl` binary. Tools invoked as")
+print("This file lists modules linked into `nkdctl` and `nke-demo`. Tools invoked as")
 print("separate processes (the Go and GCC toolchains, `cosign`, `syft`, and `docker`)")
 print("are not linked and are not covered here.\n")
 print("The License column in the Summary is a best-effort SPDX guess from each")

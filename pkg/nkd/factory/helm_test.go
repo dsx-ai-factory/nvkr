@@ -6,13 +6,16 @@ package factory
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/transportarchive"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/assemble"
@@ -22,6 +25,7 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"golang.org/x/sys/unix"
 )
 
 func TestSourceHelmArchiveBoundary(t *testing.T) {
@@ -93,11 +97,31 @@ func TestSourceHelmProducerObservation(t *testing.T) {
 		if binding {
 			name = "bound image"
 		}
-		t.Run(name, func(t *testing.T) { testSourceHelmProducerObservation(t, binding) })
+		t.Run(name, func(t *testing.T) { testSourceHelmProducerObservation(t, binding, false) })
 	}
 }
 
-func testSourceHelmProducerObservation(t *testing.T, binding bool) {
+func TestSourceHelmProducerObservationAcrossUmasks(t *testing.T) {
+	if os.Getenv("NKD_HELM_UMASK_HELPER") == "1" {
+		// This is a dedicated subprocess: never change the suite's global umask.
+		unix.Umask(0o022)
+		testSourceHelmProducerObservation(t, true, true)
+		return
+	}
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, program, "-test.run=^TestSourceHelmProducerObservationAcrossUmasks$")
+	cmd.Env = append(os.Environ(), "NKD_HELM_UMASK_HELPER=1")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("cross-umask Helm observation: %v\n%s", err, output)
+	}
+}
+
+func testSourceHelmProducerObservation(t *testing.T, binding, fileOnly bool) {
 	t.Helper()
 	ctx := context.Background()
 	root := t.TempDir()
@@ -105,7 +129,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 	// ("controller"); an unbound tree's discovered archive root is the chart
 	// itself, since nothing else names which subdirectory would hold it.
 	chartDir := "helm"
-	if binding {
+	if binding && !fileOnly {
 		chartDir = filepath.Join("helm", "controller")
 	}
 	chart := filepath.Join(root, chartDir)
@@ -122,7 +146,33 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		t.Fatal(err)
 	}
 	archive := filepath.Join(root, "source.tar")
-	if err := transportarchive.Pack(ctx, archive, root, []string{"helm"}); err != nil {
+	if fileOnly {
+		// Real `helm package` output has regular members without directory
+		// headers; extraction must assign deterministic implicit parent modes.
+		file, err := os.Create(archive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gz := gzip.NewWriter(file)
+		writer := tar.NewWriter(gz)
+		for _, name := range []string{"Chart.yaml", "values.yaml", "templates/controller.yaml"} {
+			raw, err := os.ReadFile(filepath.Join(chart, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := writer.WriteHeader(&tar.Header{Name: "helm/" + name, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(raw))}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := writer.Write(raw); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, closer := range []io.Closer{writer, gz, file} {
+			if err := closer.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	} else if err := transportarchive.Pack(ctx, archive, root, []string{"helm"}); err != nil {
 		t.Fatal(err)
 	}
 	digest, err := digestFactoryPath(ctx, archive)
@@ -167,6 +217,9 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		artifacts["rawimage"] = Artifact{ID: "rawimage", Kind: "oci-image", BuildTarget: "charts", Component: "image"}
 		plan.Graph.Nodes = append(plan.Graph.Nodes, Node{ID: "package/image", Kind: NodePackage, PackageKind: PackageImage, Inputs: []string{"rawimage"}, Outputs: []string{"package/image"}})
 		node.HelmImage = testHelmBinding("package/image", "controller")
+		if fileOnly {
+			node.HelmImage.Chart = "."
+		}
 		node.Inputs = append(node.Inputs, "package/image")
 	}
 	plan.Graph.Nodes = append(plan.Graph.Nodes, node)
@@ -182,7 +235,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(log.String(), image.ManifestDigest) || !strings.Contains(log.String(), `Bound Helm chart "controller" to 1 image slots`) {
+		if !strings.Contains(log.String(), image.ManifestDigest) || !strings.Contains(log.String(), fmt.Sprintf("Bound Helm chart %q to 1 image slots", node.HelmImage.Chart)) {
 			t.Fatalf("missing exact binding log: %s", &log)
 		}
 	} else if strings.Contains(log.String(), "Bound Helm") {
@@ -210,6 +263,11 @@ func testSourceHelmProducerObservation(t *testing.T, binding bool) {
 		artifacts["package/charts"] = originalOutput
 	}
 	expected := LifecycleOutputPlan{Name: "charts", Kind: "helm-oci", ArtifactID: "package/charts", BuildDigest: buildDigest, Components: []string{"charts"}}
+	if fileOnly {
+		// Reproduce the exact packaged subject in a restrictive host process,
+		// unlike the producing container's 022 mask.
+		unix.Umask(0o077)
+	}
 	observed, err := ObserveLifecyclePayload(ctx, plan, expected, artifacts)
 	if err != nil {
 		t.Fatal(err)

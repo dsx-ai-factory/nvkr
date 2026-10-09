@@ -317,7 +317,12 @@ Isolation and the fixed environment/mount contract are identical across all engi
 
 - `oci-hermetic` and proposed `nix` build nodes use helper-launched pinned toolchains; unsupported execution adapters fail admission.
 - `buildkit-rootless` is the networked wrapped OCI-export mode for generated lifecycle Runs (ADR-10).
-  The shared Docker launcher owns its fixed non-root isolation settings and child-process cleanup. Run
+  The shared Docker/Podman launcher owns its fixed non-root isolation settings and child-process cleanup.
+  Authenticated source and output use separate attempt-owned volumes, not host bind mounts whose ownership
+  happens to match UID 1000. A fixed, offline preparation stage preserves source modes and changes ownership
+  only inside those volumes. It runs no producer command, mounts no host source or runtime socket, and grants
+  the build no root privilege. The producer mounts source read-only; declared output is returned through bounded
+  archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup. Run
   scheduler records reference the exact embedded producer instruction; network, container and platform are
   resolved from that instruction at execution or rendering, never serialized a second time. A future qualified
   pipeline emitter must reject this mode rather than silently render it as a network-denied build.
@@ -506,10 +511,10 @@ artifact and transport budget. An adapter may not reconstruct producer commands,
 weaken a request; a grouped provider job must satisfy every member node.
 
 Generated Docker utility containers run with the host runner's UID/GID and a temporary home, matching the local
-runner's ownership contract. The direct-Packer input-extraction stage is the sole exception and is constrained as
-specified above. Private package layouts must remain reopenable by later host transport steps. Rootless Podman's
-existing user mapping is retained; the rootless BuildKit build container keeps its separate fixed UID and private
-output-promotion contract.
+runner's ownership contract. Direct-Packer input extraction and BuildKit private-volume preparation are the
+narrow exceptions described above; neither permits privileged producer execution. Private package layouts must
+remain reopenable by later host transport steps. Rootless Podman's existing user mapping is retained; the
+BuildKit producer keeps its fixed UID and volume-transport contract.
 
 Each fetched source transports its exact receipt file, using the pipeline module's destination-to-receipt
 path mapping. A receipt carrier must not include the shared receipt directory: independent fetch jobs can
@@ -546,7 +551,7 @@ v1 invokes pinned source entrypoints instead.
 Maintained local and hosted Runs share the factory producer operation and `pipeline.Local.ExecNode` launcher.
 A producer reference resolves the exact embedded IR instruction. Offline utility operations retain their pinned
 execution containers except ordinary local non-disk terminal observation: it reopens and hashes produced bytes
-in the host process, sharing collection's filesystem view after private BuildKit output promotion. That step
+in the host process, sharing collection's filesystem view after bounded BuildKit output collection. That step
 executes no producer code or signature verifier and retains a static-unqualified observation; it does not claim
 container isolation or runtime authentication. Disk observation retains its original held-owner path, and
 hosted utility jobs are unchanged.
@@ -557,6 +562,25 @@ through `pipeline.NodeSession`, and cancels and joins pending operations on fail
 report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
 The generated Plan is the single executable input document; separate per-build graph files are retired.
+
+An unqualified local Plan may select both direct-Packer disks and ordinary outputs.
+Its offline utility child admits only non-disk observation, SBOM and ordinary packaging;
+the complete Plan is checked and the local launcher binds its child invocation to the
+original Plan digest. This flag is not mandatory on a manually invoked helper.
+It cannot execute a producer,
+consume a held disk, publish or sign. Ordinary requirement-bearing producers and unsupported
+VM drivers remain rejected before work; the original Run owner retains VM admission.
+Local static-unqualified and restored pipeline-attested lifecycle image observation
+relocate the validated Plan and descriptive paths together,
+preserving compiled identity and exact acquired-payload/result comparisons. Other ordinary
+formats retain their existing descriptive workspace-path support. Relocation is not authority.
+
+For the unqualified local diagnostic lane only, the maintained developer launcher
+may bind a freshly measured Packer toolchain image ID through an attempt-scoped
+catalog substitution after native tool/binary/platform validation. The substitution
+is not a maintained pin, publication input or qualified execution claim. Native
+Docker TCG is an explicit local diagnostic execution class; contract tests do not
+establish a successful complete OS smoke or tenant deployment.
 
 The hosted source owner admits the complete Plan and exact selected Git helper/environment, then requests a
 pipeline-issued source-workspace capability. Linux admission precedes opening the workspace; zero or closed

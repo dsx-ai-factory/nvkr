@@ -28,11 +28,11 @@ func TestOpenSingleDiskArtifactAuthenticatesCompleteClosure(t *testing.T) {
 					payloadPin := digestBytes(payload)
 					payload[0] ^= 1
 					// Keep the declared payload pin unchanged.
-					if err := os.WriteFile(diskBlobPath(root, payloadPin), payload, 0o600); err != nil {
+					if err := os.WriteFile(fixtureBlobPath(root, payloadPin), payload, 0o600); err != nil {
 						t.Fatal(err)
 					}
 				case "extra blob":
-					if err := os.WriteFile(diskBlobPath(root, digestBytes([]byte("orphan"))), []byte("orphan"), 0o600); err != nil {
+					if err := os.WriteFile(fixtureBlobPath(root, digestBytes([]byte("orphan"))), []byte("orphan"), 0o600); err != nil {
 						t.Fatal(err)
 					}
 				case "duplicate manifest":
@@ -105,7 +105,7 @@ func TestDescriptorWalkRetainsDiskInodeAndRechecksCopy(t *testing.T) {
 				defer func() { _ = owner.Close() }()
 				ctx, cancel := context.WithCancel(t.Context())
 				defer cancel()
-				path := diskBlobPath(root, digestBytes(payload))
+				path := fixtureBlobPath(root, digestBytes(payload))
 				switch scenario {
 				case "replaced path":
 					if err := os.Rename(path, path+".old"); err != nil {
@@ -138,7 +138,7 @@ func TestDescriptorWalkRetainsDiskInodeAndRechecksCopy(t *testing.T) {
 					}
 					return
 				}
-				copied, readErr := os.ReadFile(diskBlobPath(stage, digestBytes(payload)))
+				copied, readErr := os.ReadFile(fixtureBlobPath(stage, digestBytes(payload)))
 				if err != nil || readErr != nil || !bytes.Equal(copied, payload) {
 					t.Fatalf("copy did not consume the original verified inode: %v, %v", err, readErr)
 				}

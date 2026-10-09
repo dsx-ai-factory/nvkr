@@ -1,0 +1,36 @@
+{
+  "apiVersion": "nkd.dev/definition/v4",
+  "kind": "Definition",
+  "metadata": {
+    "name": "nke-local-site-artifacts-arm64",
+    "description": "Four source-aligned staged-installer artifacts. Build-only candidate; no OS, complete dependency mirror, deployment or signing claim."
+  },
+  "catalog": {"base": "./site-catalog"},
+  "outputs": [
+    {
+      "name": "controller-chart",
+      "components": ["nke-controller-chart"],
+      "format": "helm-oci",
+      "platform": "linux/arm64",
+      "helm": {"images": {"controller": "cwe"}}
+    },
+    {
+      "name": "cwe",
+      "components": ["nke-controller"],
+      "format": "oci",
+      "platform": "linux/arm64"
+    },
+    {
+      "name": "nkectl",
+      "components": ["nkectl"],
+      "format": "executable",
+      "platform": "linux/arm64"
+    },
+    {
+      "name": "nktp",
+      "components": ["nktp-chart"],
+      "format": "helm-oci",
+      "platform": "linux/arm64"
+    }
+  ]
+}

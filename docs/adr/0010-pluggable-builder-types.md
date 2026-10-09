@@ -375,8 +375,11 @@ seccomp/AppArmor/system paths for user-namespace operation, the overlayfs snapsh
 and no mounted credentials. Rootless overlay mounts require a supporting kernel (Linux 5.11+ or Ubuntu,
 per the pinned BuildKit rootless contract). Unsupported hosts fail; there is no native-snapshotter fallback
 that silently multiplies source/toolchain storage for each Dockerfile step. No `/dev/fuse` device is required.
-Its writable output mount lives beneath a private host parent, is collected after
-container exit, and is then re-hashed and imported as an exact OCI export. The package inspector verifies the
+Authenticated source is transported into an attempt-owned volume with its permission bits preserved.
+A fixed offline preparation stage changes ownership only inside the private volumes to the builder's
+UID/GID; it does not run producer commands or change host-source permissions. The build mounts source
+read-only and writes to a separate private volume. After build exit, the declared output crosses the bounded
+archive transport back to the host collector and is re-hashed and imported as an exact OCI export. The package inspector verifies the
 image manifest, platform, config and compressed/uncompressed layer identities. Neither those checks nor a
 signed production predicate claim hermeticity, independent reproduction, or qualified execution. Qualified
 and direct in-container execution reject this mode before source work.

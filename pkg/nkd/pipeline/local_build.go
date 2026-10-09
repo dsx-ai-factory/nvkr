@@ -100,19 +100,26 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 			}
 		}()
 	}
-	mountOut := outRoot
-	promoteOutput := func() error { return nil }
+	var buildKit *buildKitTransport
 	if n.BuilderType == ir.BuilderBuildKit {
-		var cleanup func()
-		mountOut, promoteOutput, cleanup, err = prepareBuildKitOutput(opts.ctx(), outRoot)
+		buildKit, err = prepareBuildKitTransport(opts.ctx(), n, opts, absSrc, buildKitCommandRuntime{opts: opts})
 		if err != nil {
 			return nil, err
 		}
-		defer cleanup()
+		defer func() {
+			if cleanupErr := buildKit.close(); cleanupErr != nil {
+				result = nil
+				returnErr = errors.Join(returnErr, e.Wrap(e.CodeBuildFailed, cleanupErr, "cleaning BuildKit transport"))
+			}
+		}()
 	}
 
 	cname := containerName(n)
 	args := []string{"run", "--rm", "--name", cname}
+	if buildKit != nil {
+		args = []string{"create", "--name", cname}
+		buildKit.resources.containers = append(buildKit.resources.containers, cname)
+	}
 	// Run the toolchain on the build's target platform (model B): forces the native
 	// arch variant of a multi-arch toolchain — or emulation on a foreign host — so
 	// GOARCH compilation is native, never a cross-compile. Derived from the IR's arch.
@@ -141,7 +148,10 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	if n.BuilderType == ir.BuilderBuildKit {
 		args = append(args, buildKitRuntimeArgs(opts.Runtime)...)
 	}
-	if isolated {
+	if buildKit != nil {
+		args = append(args, buildKitVolumeArgs(filepath.Base(opts.Runtime), buildKit.source, "/src", true)...)
+		args = append(args, buildKitVolumeArgs(filepath.Base(opts.Runtime), buildKit.output, path.Join(n.Workdir, n.WriteDir), false)...)
+	} else if isolated {
 		mountpoint, err := pathWithin(absSrc, n.WriteDir)
 		if err != nil {
 			return nil, e.Wrap(e.CodeBuildFailed, err, "resolving output mountpoint for %s", n.Component)
@@ -149,7 +159,7 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 		if err := os.MkdirAll(mountpoint, 0o755); err != nil {
 			return nil, e.Wrap(e.CodeBuildFailed, err, "preparing source mountpoint for %s", n.Component)
 		}
-		args = append(args, "-v", absSrc+":/src:ro", "-v", mountOut+":"+path.Join(n.Workdir, n.WriteDir))
+		args = append(args, "-v", absSrc+":/src:ro", "-v", outRoot+":"+path.Join(n.Workdir, n.WriteDir))
 	} else {
 		args = append(args, "-v", absSrc+":/src")
 	}
@@ -167,10 +177,15 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	if err := runContainerRuntime(opts, args...); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "building %s", n.Component)
 	}
-	opts.reap.forget(cname)
-	if err := promoteOutput(); err != nil {
-		return nil, err
+	if buildKit != nil {
+		if err := runContainerRuntime(opts, "start", "--attach", cname); err != nil {
+			return nil, e.Wrap(e.CodeBuildFailed, err, "building %s", n.Component)
+		}
+		if err := buildKit.collect(opts.ctx(), opts, n, cname); err != nil {
+			return nil, err
+		}
 	}
+	opts.reap.forget(cname)
 
 	binPath := artifactHostPath(opts, n)
 	artifactRel := artifactOutputRelative(n)

@@ -11,8 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -117,6 +120,110 @@ func TestTransportArchiveRoundTripIsDeterministicAndExact(t *testing.T) {
 	}
 	if err := Pack(context.Background(), one, producer, paths); err == nil {
 		t.Fatal("archive overwrite must fail closed")
+	}
+}
+
+func TestTransportArchiveModesIgnoreProcessUmask(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs := t.TempDir()
+	for _, mask := range []string{"022", "077"} {
+		t.Run(mask, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, executable, "-test.run=^TestTransportArchiveModesHelper$", "-test.timeout=20s")
+			command.Env = append(os.Environ(), "NKD_TRANSPORT_UMASK="+mask,
+				"NKD_TRANSPORT_OUTPUT="+filepath.Join(outputs, mask))
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("isolated umask %s extraction: %v\n%s", mask, err, output)
+			}
+		})
+	}
+	if t.Failed() {
+		return
+	}
+	one, err := os.ReadFile(filepath.Join(outputs, "022", "carrier.tar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := os.ReadFile(filepath.Join(outputs, "077", "carrier.tar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(one, two) {
+		t.Fatal("file-only Helm chart repacking changed with the extracting process's umask")
+	}
+}
+
+func TestTransportArchiveModesHelper(t *testing.T) {
+	maskText := os.Getenv("NKD_TRANSPORT_UMASK")
+	if maskText == "" {
+		t.Skip("isolated subprocess helper")
+	}
+	mask, err := strconv.ParseUint(maskText, 8, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This helper is the sole test selected in its child process. Never change
+	// the parent's umask: other tests and goroutines share that process setting.
+	previous := unix.Umask(int(mask))
+	defer unix.Umask(previous)
+	root := os.Getenv("NKD_TRANSPORT_OUTPUT")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(root, "chart.tgz")
+	writeTestTarGz(t, archive, []*tar.Header{
+		{Name: "chart/Chart.yaml", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+		{Name: "chart/templates/deployment.yaml", Typeflag: tar.TypeReg, Mode: 0o640, Size: 4},
+		{Name: "chart/bin/hook", Typeflag: tar.TypeReg, Mode: 0o755, Size: 4},
+	})
+	destination := filepath.Join(root, "extracted")
+	if _, err := DetectAndUnpackChartRoot(t.Context(), archive, destination); err != nil {
+		t.Fatal(err)
+	}
+	for name, mode := range map[string]fs.FileMode{
+		"chart": 0o755, "chart/templates": 0o755, "chart/bin": 0o755,
+		"chart/Chart.yaml": 0o644, "chart/templates/deployment.yaml": 0o640,
+		"chart/bin/hook": 0o755,
+	} {
+		info, err := os.Stat(filepath.Join(destination, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != mode {
+			t.Errorf("mode of %s = %04o, want %04o", name, info.Mode().Perm(), mode)
+		}
+	}
+	if err := Pack(t.Context(), filepath.Join(root, "carrier.tar"), root, []string{"extracted/chart"}); err != nil {
+		t.Fatal(err)
+	}
+	// A later explicit directory header overrides its earlier implicit default.
+	archive = filepath.Join(root, "restricted.tar")
+	writeTestTar(t, archive, []*tar.Header{
+		{Name: "private/first", Typeflag: tar.TypeDir, Mode: 0o700},
+		{Name: "private/first/file", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+		{Name: "private/closed/file", Typeflag: tar.TypeReg, Mode: 0o400, Size: 4},
+		{Name: "private/closed", Typeflag: tar.TypeDir, Mode: 0o700},
+		{Name: "private", Typeflag: tar.TypeDir, Mode: 0o750},
+	})
+	destination = filepath.Join(root, "restricted")
+	if err := Unpack(t.Context(), archive, destination, []string{"private"}); err != nil {
+		t.Fatal(err)
+	}
+	for name, mode := range map[string]fs.FileMode{
+		"private": 0o750, "private/closed": 0o700, "private/closed/file": 0o400,
+		"private/first": 0o700, "private/first/file": 0o644,
+	} {
+		info, err := os.Stat(filepath.Join(destination, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != mode {
+			t.Errorf("mode of %s = %04o, want %04o", name, info.Mode().Perm(), mode)
+		}
 	}
 }
 

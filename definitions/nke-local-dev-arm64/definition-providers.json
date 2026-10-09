@@ -1,0 +1,24 @@
+{
+  "apiVersion": "nkd.dev/definition/v4",
+  "catalog": {"base": "./capnico-catalog"},
+  "kind": "Definition",
+  "metadata": {
+    "name": "nke-local-dev-arm64-providers",
+    "description": "Compile CAPNICo and the provisioned provider from pinned Git; build-only development loop, not a full NKE build."
+  },
+  "outputs": [
+    {
+      "components": ["capnico-controller"],
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-controller/catalog"},
+      "components": ["cluster-api-provider-provisioned"],
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

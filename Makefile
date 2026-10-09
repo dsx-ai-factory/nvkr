@@ -5,6 +5,8 @@
 # Run `make help` for targets; `make check` is the full local completion gate.
 
 BIN         := bin/nkdctl
+DEMO_BIN    ?= bin/nke-demo
+DEMO_TEST_BIN ?= bin/nke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
@@ -43,6 +45,13 @@ info: ## Print version / toolchain info.
 .PHONY: build
 build: go-version-check ## Compile the nkdctl binary.
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nkdctl
+
+.PHONY: demo demo-test-bin
+demo: go-version-check ## Build the downstream Go local NKE demo CLI (calls nkdctl).
+	go build -o $(DEMO_BIN) ./cmd/nke-demo
+
+demo-test-bin: go-version-check ## Compile opt-in native NKE E2E tests; does not run them.
+	go test -c -o $(DEMO_TEST_BIN) ./internal/nkedemo
 
 .PHONY: install
 install: ## Install nkdctl into $$(go env GOBIN).
@@ -101,8 +110,9 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NKD_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Check CI timing report parsing and failure diagnostics.
-	python3 -B -m unittest discover -s scripts -p ci_test_summary_test.py
+test-ci-tools: ## Require Python and check the existing CI report tools.
+	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
+	python3 -B -m unittest discover -s scripts -p '*_test.py'
 
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.

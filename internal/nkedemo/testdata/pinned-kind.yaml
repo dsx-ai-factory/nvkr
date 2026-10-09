@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# The capi-spiffe-exec-auth overlay mounts the SPIRE exec-auth plugin as an OCI
+# image volume. ImageVolume is stable and enabled by default in Kubernetes 1.36;
+# keep the gate explicit because the overlay requires it.
+featureGates:
+  ImageVolume: true
+networking:
+  ipFamily: dual
+# CWE, five Temporal images, postgres, SPIRE and four CAPI/CAPD controllers all
+# land on this one node. kubelet serializes image pulls by default, so they queue
+# and whichever workload draws the back of the queue can miss its readiness
+# deadline.
+kubeadmConfigPatches:
+- |
+  kind: KubeletConfiguration
+  serializeImagePulls: false
+  maxParallelImagePulls: 4
+nodes:
+- role: control-plane
+  # Pinned to the KINDEST_NODE_TAG used by hack/capd-kindest-node/Dockerfile so
+  # the management and CAPD workload nodes share one version. Ships containerd
+  # 2.3.1, past the 2.1 floor image volumes require.
+  image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+  extraMounts:
+    - hostPath: /var/run/docker.sock
+      containerPath: /var/run/docker.sock

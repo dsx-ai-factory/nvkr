@@ -26,6 +26,31 @@ type LifecyclePayloadObservation struct {
 	Components     []string
 }
 
+// ObserveWorkspaceLifecyclePayload observes an ordinary package in a local or
+// restored workspace. Factory relocates its validated Plan as well as the
+// image descriptions, preserving the original compiled identity. Other formats
+// retain their existing descriptive-path support. This grants no
+// disk, execution, publication or qualification authority.
+func ObserveWorkspaceLifecyclePayload(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, workspace string, artifacts map[string]Artifact) (LifecyclePayloadObservation, error) {
+	if ctx == nil || plan == nil || workspace == "" {
+		return LifecyclePayloadObservation{}, e.New(e.CodeUsage, "workspace observation requires a context, Plan and workspace")
+	}
+	if err := ctx.Err(); err != nil {
+		return LifecyclePayloadObservation{}, e.Wrap(e.CodeTimeout, err, "workspace observation canceled")
+	}
+	if err := plan.Validate(); err != nil {
+		return LifecyclePayloadObservation{}, err
+	}
+	if lifecyclePackageKind(expected.Kind) != PackageImage {
+		return ObserveLifecyclePayload(ctx, plan, expected, artifacts)
+	}
+	relocated, err := relocateFactoryPlan(plan, workspace)
+	if err != nil {
+		return LifecyclePayloadObservation{}, err
+	}
+	return ObserveLifecyclePayload(ctx, relocated, expected, artifacts)
+}
+
 // observeProducerPayload owns the same-output join. Pipeline owns decoding the
 // selected record and rechecking bytes against the exact producer instruction.
 func observeProducerPayload(ctx context.Context, plan *Plan, input Artifact, artifacts map[string]Artifact) (pipeline.ArtifactResult, error) {

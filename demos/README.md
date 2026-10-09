@@ -47,6 +47,7 @@ remain unverified. The [facilitator guide](team-guide.md) explains the separate 
 | Build your first artifact in seconds after warm-up | [Tiny local demo](quickstart/README.md) and [script](demo-local.sh) |
 | Build, publish, and recover the local NKE CLI | [Local NKE walkthrough](m1-local.md) and [script](../scripts/demo-m1-local.sh) |
 | Bake an OS image on a prepared host | [OS-image routes and prerequisites](../definitions/nke-os/README.md) |
+| Build and deploy a real local ARM64 QCOW2 tenant | [Ubuntu ARM64 guide](../docs/local-nke-demo.md) and [declarative demo inputs](local-nke.yaml) |
 | Compare catalog overlays and component selection | [Runnable authoring lab](../docs/examples/authoring-lab/README.md) |
 | Preview and apply source-pin changes | [Catalog change script](../scripts/demo-catalog-change.sh) |
 | Explore digest and containment rejection | [Tamper detection script](../scripts/demo-tamper-detection.sh) |

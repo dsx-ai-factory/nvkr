@@ -210,6 +210,8 @@ func inspectImageMetadata(ctx context.Context, root string, manifest ociManifest
 }
 
 func verifyImageLayer(ctx context.Context, root string, layer Descriptor, diffID string) error {
+	// Repeat the metadata check so this helper rejects invalid descriptors before
+	// opening payloads even when called without inspectImageMetadata.
 	if err := validateImageLayerDescriptor(layer, diffID); err != nil {
 		return err
 	}

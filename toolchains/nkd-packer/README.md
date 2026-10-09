@@ -4,19 +4,28 @@ This directory defines the OCI toolchain consumed by NKD's local direct-Packer
 executor. Each host-platform image contains Packer 1.15.4, the QEMU plugin 1.1.6,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NKE
-Packer project. It also contains Go 1.27.1, crane 0.21.9, nfpm 2.47.0,
+Packer project. It also contains Go 1.27.2, crane 0.21.9, nfpm 2.47.0,
+Helm 4.2.4 and ORAS 1.3.3,
 `dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
 and xorriso. Those are the preparation and ISO-composition tools required by the
 exact NKE source at `726f76944404e1106626b8333d3576bdf67b575b` for non-FDE
-builds on the supported host architectures; the locked ARM64 local image has
-native validation. Go 1.27.1 matches that source's workspace version and the NKD
-module used to build the source-bound local bootstrap runner.
+builds on the supported host architectures. The recorded ARM64 local image
+validated the older closure, not these updated bytes. The local launcher builds
+and validates a fresh attempt-bound image; this does not update maintained pins
+or establish a complete image-bake result. Helm and ORAS share this image rather
+than requiring a separate chart wrapper image. The compiler pin matches NKD's
+`.go-version` because this image also builds the source-bound local bootstrap
+runner. `validatedNKE.goVersion` retains the historical source's workspace
+version, 1.27.1; it does not select the image compiler or validate a rebuilt image.
 
 `toolchain.lock.json` binds the Ubuntu and download-helper multi-platform base
 indexes, one immutable Ubuntu archive snapshot, and the official Packer and
 QEMU-plugin release archive and extracted executable digests for both host
 architectures. It also pins the official Go, crane and nfpm archives and the
-extracted crane and nfpm executables. The download
+extracted crane, nfpm, Helm and ORAS executables. Helm archive hashes come from
+`get.helm.sh` release checksums; ORAS archive hashes come from its GitHub release
+checksum file. Extracted binary hashes were measured from those exact archives.
+Both include Apache-2.0 license text, retained in the final image. The download
 helper supplies the CA bundle needed to bootstrap the signed Ubuntu snapshot
 from a minimal Ubuntu base. The Dockerfile reproduces Packer 1.15.4's documented
 namespaced plugin layout and checksum file from the separately verified plugin
@@ -24,7 +33,7 @@ executable. It never executes a target-architecture Go binary while assembling
 an image. No plugin discovery or download is performed by NKD at runtime.
 
 Build and validate one local host architecture. The runtime check proves the
-exact Packer, plugin, Go, crane and nfpm versions; QEMU/QCOW2 and firmware
+exact Packer, plugin, Go, crane, nfpm, Helm and ORAS versions; QEMU/QCOW2 and firmware
 availability; the SSH-key, Debian-package and ISO-composition tools; and a real
 `packer validate` call through the preinstalled QEMU plugin:
 
@@ -44,8 +53,10 @@ records a successful AMD64 Docker assembly and this script's native validation.
 It includes the retained image archive and exact identities; it grants no
 publication or redistribution approval.
 
-Use `--check` for the network-free source-lock validation. Building uses the
-fixed Ubuntu snapshot and verifies every release archive before
+Use `--check` for the network-free source-lock validation, including agreement
+with NKD's `.go-version`. When that pin changes, update the locked Go version and
+both archive digests from the [official Go downloads](https://go.dev/dl/?mode=json)
+together. Building uses the fixed Ubuntu snapshot and verifies every release archive before
 extracting them. The command does not push, sign, or write a transport digest.
 
 For Docker builds behind a TLS proxy, `NKD_BUILD_CA_BUNDLE` supplies a trusted
@@ -53,8 +64,9 @@ public CA bundle as an ephemeral, read-only BuildKit secret. Its mode permits
 APT's unprivileged downloader to read it; it is never copied into the image.
 `NKD_BUILD_ARCHIVES` selects a local directory through the `nkd_archives`
 [named build context](https://docs.docker.com/reference/cli/docker/buildx/build/#build-context).
-Place the official Packer, QEMU plugin, Go, crane and nfpm release archives there
-under their upstream filenames for the selected architecture. Local mode copies
+Place the official Packer, QEMU plugin, Go, crane, nfpm, Helm and ORAS release archives
+there under their upstream filenames for the selected architecture. Helm uses
+`helm-v4.2.4-linux-<arch>.tar.gz`; ORAS uses `oras_1.3.3_linux_<arch>.tar.gz`. Local mode copies
 them through read-only build mounts and applies the same archive and executable
 checksum checks. Missing or corrupt inputs fail; local mode never falls back to
 downloading release archives. The pinned base images and signed Ubuntu snapshot
@@ -71,8 +83,9 @@ Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` and the Docker exporter's
 timestamps. Docker explicitly streams the image archive to `docker image load`,
 separating timestamp rewriting from image-store unpacking; failure in either
 stage stops validation. The existing Podman ARM64 local pin describes the earlier
-measured image. These Dockerfile changes need a new native Podman measurement
-before that pin can be replaced; a different rebuilt ID still fails closed.
+measured image with Go 1.27.1. The Dockerfile and Go compiler changes need a new
+native Podman measurement before that pin can be replaced; a different rebuilt ID
+still fails closed.
 The fixed epoch does not itself prove identical image
 bytes. Repeat a native Docker build on fresh runners and compare the resulting
 image IDs before adding a Docker pin.
@@ -86,6 +99,22 @@ maintained toolchain. There is no toolchain publication workflow in this reposit
 `images` remains `null` because a local image ID is not an OCI repository
 digest. The build command fails if a rebuilt image differs from its recorded
 runtime-specific local ID.
+For first-time **local diagnostic** execution, `--diagnostic-local` permits fresh
+native assembly against the same locked sources without matching the older local
+image ID. Archive/executable digests, image structure and all native tool/Packer
+validation remain enforced. Cross-architecture diagnostic builds are rejected.
+The developer launcher freezes the observed ID in an attempt-specific catalog
+overlay before execution. This does not update maintained pins, establish
+reproducibility, authorize redistribution or change publication gates. Default
+builds retain the recorded-ID check. Never use a mutable tag as execution identity.
+
+For script callers, `--print-validated-image-id` prints only the exact image ID
+that passed native validation; build and validation diagnostics go to stderr.
+It emits no ID on failure and rejects `--check` and `--cross-build-only`.
+The developer launcher uses this returned ID directly, without resolving the
+build tag again. Image structure and identity also come from one inspection
+result before validation, so a retag cannot change the validated subject.
+
 After license approval and a vulnerability scan, the exact external publication
 sequence is:
 
