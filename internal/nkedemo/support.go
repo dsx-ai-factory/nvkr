@@ -301,7 +301,7 @@ func commandPath(name string, environment []string) (string, error) {
 	return "", fmt.Errorf("executable %q absent from explicit PATH", name)
 }
 
-func (r Runner) start(ctx context.Context, args []string, phase string, capture bool) (*OwnedProcess, error) {
+func (r Runner) start(ctx context.Context, args []string, phase string, capture, ownedLifetime bool) (*OwnedProcess, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
@@ -312,7 +312,13 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture 
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, path, args[1:]...)
+	commandCtx := ctx
+	if ownedLifetime {
+		// Services must outlive canceled work until dependent tenant cleanup
+		// finishes. The caller retains the explicit Stop-and-join obligation.
+		commandCtx = context.WithoutCancel(ctx)
+	}
+	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
 	cmd.Dir = r.Work
 	if err := ownedcmd.ConfigureCancellation(cmd, ownedcmd.DefaultTerminationGrace); err != nil {
@@ -362,7 +368,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture 
 	if r.Progress != nil {
 		_, _ = fmt.Fprintf(r.Progress, "Demo phase: %s\n", phase)
 	}
-	if err := cmd.Start(); err != nil {
+	err = requireContext(ctx)
+	if err == nil {
+		err = cmd.Start()
+	}
+	if err != nil {
 		if p.log != nil {
 			_ = p.log.Close()
 		}
@@ -375,10 +385,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture 
 	return p, nil
 }
 
-// Start transfers an explicit Stop obligation to the caller.
+// Start admits the work context, then transfers an explicit Stop-and-join
+// obligation to the caller. Work cancellation does not stop the owned service.
 func (r Runner) Start(ctx context.Context, args []string, phase string) (*OwnedProcess, error) {
 	boundary := beginProgress(r.Progress, phase, PhaseStarted, PhaseFinished, PhaseFailed)
-	process, err := r.start(ctx, args, phase, false)
+	process, err := r.start(ctx, args, phase, false, true)
 	if err != nil {
 		boundary.finish(err)
 		return nil, err
@@ -406,7 +417,7 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	p, err := r.start(ctx, args, phase, capture)
+	p, err := r.start(ctx, args, phase, capture, false)
 	if err != nil {
 		return nil, err
 	}

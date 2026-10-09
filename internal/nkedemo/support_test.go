@@ -228,6 +228,51 @@ func TestOwnedProcessStopAndJoin(t *testing.T) {
 	}
 }
 
+func TestOwnedProcessCancellationPreservesCleanupLifetime(t *testing.T) {
+	for _, before := range []bool{true, false} {
+		t.Run(fmt.Sprintf("canceled-before-start=%t", before), func(t *testing.T) {
+			work := privateTestDir(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if before {
+				cancel()
+			}
+			p, err := (Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin"}}).Start(ctx, []string{"/bin/sh", "-c", "exec sleep 60"}, "server")
+			if before {
+				if p != nil || !errors.Is(err, context.Canceled) {
+					t.Fatalf("canceled Start: process=%v error=%v", p, err)
+				}
+				if _, err := os.Stat(filepath.Join(work, "server.log")); !os.IsNotExist(err) {
+					t.Fatal("canceled Start performed process work")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer stop()
+			defer func() {
+				if err := p.Stop(cleanup); err != nil {
+					t.Error(err)
+				}
+			}()
+			cancel()
+			select {
+			case <-p.done:
+				t.Fatal("work cancellation killed the service before owner cleanup")
+			case <-time.After(200 * time.Millisecond):
+			}
+			if err := p.Stop(cleanup); err != nil {
+				t.Fatal(err)
+			}
+			if alive, err := groupAlive(p.PID()); err != nil || alive {
+				t.Fatalf("explicit Stop did not join: alive=%v error=%v", alive, err)
+			}
+		})
+	}
+}
+
 func TestOwnedProcessDescendantAfterLeader(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("consumer's real orphan-group admission is Linux-only")

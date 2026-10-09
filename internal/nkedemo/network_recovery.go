@@ -6,6 +6,7 @@ package nkedemo
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,8 +19,18 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
+
+const legacyNetworkRecoveryRevision = "3b24beb5cb04df352e74a8d5405bd593871412b5"
+const legacyNetworkRecoveryHelper = "scripts/nke-local-demo.py"
+
+func legacyNetworkRecoveryError() error {
+	return nkderr.New(nkderr.CodePreflightFailed,
+		"legacy network journal version 1 is not supported by Go recovery; restore with %s at commit %s before upgrading; no legacy recovery was attempted",
+		legacyNetworkRecoveryHelper, legacyNetworkRecoveryRevision)
+}
 
 func readNetworkState(work string) (networkState, error) {
 	var state networkState
@@ -42,6 +53,21 @@ func readNetworkState(work string) (networkState, error) {
 	if len(raw) > 65536 {
 		return state, fmt.Errorf("recovery journal exceeds bound")
 	}
+	// The old Python schema used different field shapes. Inspect only its version
+	// for an actionable refusal; no legacy state is adopted or executed. Existing
+	// JSON validation rejects duplicate names and trailing/invalid documents.
+	if err = canonical.ValidateJSONDocument(raw); err != nil {
+		return state, err
+	}
+	var header struct {
+		Version int `json:"version"`
+	}
+	if err = json.Unmarshal(raw, &header); err != nil {
+		return state, err
+	}
+	if header.Version == 1 {
+		return state, legacyNetworkRecoveryError()
+	}
 	if err = canonical.UnmarshalExact(raw, &state); err != nil {
 		return state, err
 	}
@@ -53,6 +79,9 @@ func readNetworkState(work string) (networkState, error) {
 
 func validNetworkID(id networkFileID) bool { return id.Inode > 0 && id.Mode <= 0o7777 }
 func validateNetworkState(s networkState, work string) error {
+	if s.Version == 1 {
+		return legacyNetworkRecoveryError()
+	}
 	if s.Version != 2 || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
 		return fmt.Errorf("recovery journal version/work/owner differs")
 	}

@@ -197,6 +197,37 @@ func TestNetworkJournalFilesystemAndJSONNegatives(t *testing.T) {
 	}
 }
 
+func TestNetworkLegacyJournalRefusesBeforeActions(t *testing.T) {
+	g := networkFixture(t)
+	// Legacy array-shaped identities must be diagnosed before Go v2 decoding.
+	raw := []byte(`{"version":1,"helperID":[1,2,493,0,0],"rules":[],"caps":[]}`)
+	path := filepath.Join(g.Work, networkJournal)
+	if err := networkWriteExclusive(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	g.capture = func(context.Context, []string, bool) ([]byte, error) { calls++; return nil, nil }
+	err := g.Start(t.Context())
+	var coded *nkderr.Error
+	if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed ||
+		!strings.Contains(err.Error(), legacyNetworkRecoveryRevision) ||
+		!strings.Contains(err.Error(), legacyNetworkRecoveryHelper) ||
+		!strings.Contains(err.Error(), "version 1") {
+		t.Fatalf("legacy refusal=%v", err)
+	}
+	if calls != 0 {
+		t.Fatal("legacy refusal executed host commands")
+	}
+	after, err := os.ReadFile(path)
+	if err != nil || string(after) != string(raw) {
+		t.Fatal("legacy refusal changed the journal", err)
+	}
+	entries, err := os.ReadDir(g.Work)
+	if err != nil || len(entries) != 1 {
+		t.Fatal("legacy refusal created recovery files", entries, err)
+	}
+}
+
 func TestNetworkCheckpointPrecedesMutation(t *testing.T) {
 	g := networkFixture(t)
 	if err := g.Checkpoint(t.Context()); err != nil {

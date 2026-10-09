@@ -90,9 +90,12 @@ func TestDemoAdmissionHasNoPartialOutput(t *testing.T) {
 	parent := t.TempDir()
 	out := filepath.Join(parent, "new")
 	var progress bytes.Buffer
-	err := Run(context.Background(), Config{Out: out, Timeout: time.Second, Progress: &progress})
+	err := Run(context.Background(), Config{Out: out, Timeout: 300 * time.Second, Progress: &progress})
 	if nkderr.ExitCode(err) != 17 {
 		t.Fatalf("expected coded preflight error,got %v", err)
+	}
+	if strings.Contains(err.Error(), "tenant budget") {
+		t.Fatal("invalid timeout masked the remaining admission checks")
 	}
 	if _, statErr := os.Lstat(out); !os.IsNotExist(statErr) {
 		t.Fatal("failed admission created output")
