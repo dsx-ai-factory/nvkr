@@ -12,9 +12,10 @@ complete source-built distribution. See [remaining source gaps](full-nke-source-
 
 ## Start from a clean machine
 
-Use native Linux ARM64 with Git, Bash, jq, GNU timeout and Docker or rootless
-Podman. Compilation runs in the pinned utility container: no host Go, Packer
-or Helm is needed. Docker OS/simulator/site lanes require Buildx.
+Use Ubuntu ARM64 with Git, Bash, jq, GNU timeout and Docker. Follow the
+[quickstart's prerequisites](local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host)
+for setup. Compilation runs in the pinned utility container: no host Go, Packer
+or Helm is needed. The OS/simulator/site lanes also require Docker Buildx.
 
 The launcher checks capabilities before downloading or creating an attempt.
 It does not install packages, start/resize VMs, prune caches or reset runtimes.
@@ -28,33 +29,14 @@ Linux, not on the Mac shared mount. Inspect physical Mac capacity separately;
 a 150-GiB sparse guest disk does not reserve that much host space.
 
 For component-only builds the launcher also supports an explicitly selected
-`CONTAINER_RUNTIME=docker COLIMA_PROFILE=NAME` route. The forwarded Mac route
+`COLIMA_PROFILE=NAME` route. The forwarded Mac route
 rejects `os` and `all`; use native Linux storage for those.
-
-### Apple Silicon Mac with Podman
-
-Install [Podman](https://podman.io/docs/installation). Only if the default
-machine does not exist:
-
-```sh
-podman machine init --cpus 8 --memory 24576 --disk-size 150 podman-machine-default
-podman machine start podman-machine-default
-podman machine ssh --username core podman-machine-default \
-  'for tool in git jq timeout; do command -v "$tool" || exit 1; done'
-```
-
-Start an existing stopped machine instead of reinitializing it. The launcher
-uses its rootless connection, not a global connection change. Missing Fedora
-CoreOS packages require that distribution's package-layering process and
-reboot, not Ubuntu `apt-get`. This build route is not proof of a Podman tenant
-demo; the complete quickstart selects Docker/Ubuntu.
 
 ## Check before building
 
 From the NKE Recipes root on the execution host:
 
 ```sh
-export CONTAINER_RUNTIME=docker
 bash scripts/nke-full-arm64-local.sh --help
 bash scripts/nke-full-arm64-local.sh --check components
 bash scripts/nke-full-arm64-local.sh --check os
@@ -108,7 +90,7 @@ necessary and freezes the measured image ID in the attempt's catalog overlay.
 It does not update maintained locks, publish images or confer qualification.
 
 The older [OS-only wrapper](../definitions/nke-os/README.md) has different
-Podman/TCG and Docker/KVM admission; its commands are not interchangeable with
+runtime/acceleration admission; its commands are not interchangeable with
 the laptop route. See [toolchain inputs](../toolchains/nkd-packer/README.md).
 
 NKD prepares agent/CNI/Kubernetes/SPIRE/OVN material bytes, image inputs and

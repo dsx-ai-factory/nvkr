@@ -16,8 +16,9 @@ They do not publish, sign or build a complete source-only NKE distribution.
 | Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; distinct from the acquired `operator-tools` |
 | Diagnostic controller profiles | `definition-profiles.json` | One OCI-carried tarball containing plain ARM64/Ubuntu 26.04 profile data; not a runnable image or fleet profiles |
 
-Use `environment-local.json` with rootless Podman, or
-`environment-local-docker.json` with native Linux Docker. The OS uses TCG.
+Use `environment-local-docker.json` with native Linux ARM64 Docker, the
+launcher's default runtime. The OS uses TCG. On macOS, follow the guide's
+Colima setup and run OS/demo commands inside Linux on native ext4 storage.
 The full demo uses one NKD/demo bootstrap and a measured
 Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
@@ -29,7 +30,7 @@ OS catalog's digest: repinning that catalog requires reviewing this binding.
 bin/nkdctl definition validate --definition definitions/nke-local-dev-arm64/definition.json
 bin/nkdctl run local \
   --definition definitions/nke-local-dev-arm64/definition.json \
-  --environment definitions/nke-local-dev-arm64/environment-local.json \
+  --environment definitions/nke-local-dev-arm64/environment-local-docker.json \
   --attempt arm64-preview --dry-run
 
 NKE_LOCAL_CLONE=/absolute/path/to/nke \
@@ -37,7 +38,7 @@ NKE_LOCAL_CLONE=/absolute/path/to/nke \
 
 # No host Go, Make or installed nkdctl needed for the launcher:
 bash scripts/nke-full-arm64-local.sh --check providers
-CONTAINER_RUNTIME=docker bash scripts/nke-full-arm64-local.sh docker-providers-01 1 providers
+bash scripts/nke-full-arm64-local.sh arm64-providers-01 1 providers
 
 # Build simulator tools separately; this does not deploy a demo.
 NKE_LOCAL_CLONE=/absolute/path/to/nke \

@@ -145,11 +145,11 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 			t.Fatalf("provider loop diverges from combined selection: %s", output.Name)
 		}
 	}
-	env, err := authored.LoadEnvironment(t.Context(), filepath.Join(root, "environment-local.json"))
+	env, err := authored.LoadEnvironment(t.Context(), filepath.Join(root, "environment-local-docker.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if env.Publication != nil || env.Signing != nil || env.GitHubARC != "" || env.UtilityPlatform != "linux/arm64" || env.RuntimeBinary() != "podman" {
+	if env.Publication != nil || env.Signing != nil || env.GitHubARC != "" || env.UtilityPlatform != "linux/arm64" || env.RuntimeBinary() != "docker" {
 		t.Fatalf("local example grants an unintended route: %+v", env)
 	}
 }
@@ -169,7 +169,7 @@ func TestLaptopARM64CAPNICoCatalogCompilation(t *testing.T) {
 		t.Fatal("provider Definition no longer starts with the catalog-local CAPNICo output")
 	}
 	doc.Outputs = doc.Outputs[:1]
-	envPath := filepath.Join(root, "environment-local.json")
+	envPath := filepath.Join(root, "environment-local-docker.json")
 	env, err := authored.LoadEnvironment(t.Context(), envPath)
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +209,7 @@ func TestLaptopARM64CatalogCompilation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			envPath := filepath.Join(root, "environment-local.json")
+			envPath := filepath.Join(root, "environment-local-docker.json")
 			env, err := authored.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)
@@ -236,7 +236,7 @@ func TestLaptopARM64OSExecutionClassAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentPath := filepath.Join(root, "environment-local.json")
+	environmentPath := filepath.Join(root, "environment-local-docker.json")
 	env, err := authored.LoadEnvironment(t.Context(), environmentPath)
 	if err != nil {
 		t.Fatal(err)
@@ -271,16 +271,5 @@ func TestLaptopARM64OSExecutionClassAdmission(t *testing.T) {
 				t.Fatal("complete Environment did not admit the exact ARM64 disk Plan")
 			}
 		})
-	}
-	dockerPath := filepath.Join(root, "environment-local-docker.json")
-	dockerEnv, err := authored.LoadEnvironment(t.Context(), dockerPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dockerEnv.RuntimeBinary() != "docker" || dockerEnv.Publication != nil || dockerEnv.Signing != nil {
-		t.Fatal("Docker developer environment grants an unintended route")
-	}
-	if _, err := factory.CompileDocuments(t.Context(), definitionPath, d, dockerPath, dockerEnv, "test"); err != nil {
-		t.Fatalf("native Docker TCG Plan: %v", err)
 	}
 }

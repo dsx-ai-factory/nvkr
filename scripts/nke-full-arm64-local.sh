@@ -17,14 +17,14 @@ usage() {
     '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers|simulator|site|tools|profiles]' \
     'all: one Run with 29 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
-    'simulator bootstraps the same pinned Go/GCC toolchain on Podman or Docker.' \
+    'simulator bootstraps the same pinned Go/GCC Docker toolchain.' \
     'site: four source-aligned installer outputs (controller, CLI, controller chart and NKTP chart).' \
     'tools: one source-built Linux ARM64 bundle (Helm, kubectl, clusterctl, ORAS and Kind).' \
     'profiles: one diagnostic ARM64 plain Ubuntu 26.04 NICoSim profiles data bundle, not fleet profiles.' \
     'This subset is NOT a full source-built NKE distribution.' \
     'No host Go/Make or installed nkdctl needed: bootstrap uses the pinned utility image.' \
-    'CONTAINER_RUNTIME=podman (default) or docker (native Linux ARM64 / explicitly selected Colima).' \
-    'On Apple Silicon: Podman uses podman-machine-default; Docker requires COLIMA_PROFILE.' \
+    'Docker is required (native Linux ARM64 / explicitly selected Colima).' \
+    'On Apple Silicon: set COLIMA_PROFILE for an existing ARM64 Docker VM.' \
     'Colima os/all: export committed source to native ext4 and run inside Linux; Mac forwarding is rejected.' \
     'No VM is created, started, reset or resized automatically; Docker Desktop is not admitted.' \
     '--check performs prerequisite diagnostics only: no pull, build or attempt creation.' \
@@ -50,69 +50,49 @@ if [[ ! "${attempt}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ || ! "${jobs}" =~ ^[1
   echo 'Supply a fresh attempt name and positive job count.' >&2; exit 2
 fi
 case "${lane}" in all|components|os|providers|simulator|site|tools|profiles) ;; *) echo 'Select all, components, os, providers, simulator, site, tools or profiles.' >&2; exit 2 ;; esac
-runtime="${CONTAINER_RUNTIME:-podman}"
-case "${runtime}" in podman|docker) ;; *) echo 'CONTAINER_RUNTIME must be podman or docker.' >&2; exit 2 ;; esac
+runtime="${CONTAINER_RUNTIME:-docker}"
+[[ "${runtime}" == docker ]] || { echo 'CONTAINER_RUNTIME must be docker for this local demo.' >&2; exit 2; }
 host_system="$(uname -s)"
 # Colima supplies Docker inside Linux; its Mac SSH entrypoint needs no Mac
-# Docker CLI. Native execution and the Podman Mac route still need their CLI.
-if [[ "${host_system}" != Darwin || "${runtime}" != docker ]] && ! command -v "${runtime}" >/dev/null; then
-  echo "Missing ${runtime}. Install a container runtime first; see docs/local-development.md#start-from-a-clean-machine." >&2
+# Docker CLI. Native Linux execution needs its own Docker CLI.
+if [[ "${host_system}" != Darwin ]] && ! command -v docker >/dev/null; then
+  echo 'Missing Docker. Install it first; see docs/local-development.md#start-from-a-clean-machine.' >&2
   exit 1
 fi
 if [[ "${host_system}" == Darwin ]]; then
   [[ "$(uname -m)" == arm64 ]] || { echo 'The macOS ARM64 launcher requires Apple Silicon.' >&2; exit 1; }
-  if [[ "${runtime}" == docker ]]; then
-    profile="${COLIMA_PROFILE:-}"
-    if [[ -z "${profile}" ]]; then
-      echo 'Docker Desktop on macOS is not an admitted OS/bootstrap route. For Colima, explicitly set COLIMA_PROFILE to a running ARM64 Docker profile; see docs/local-development.md.' >&2
-      exit 1
-    fi
-    if [[ ! "${profile}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
-      echo 'COLIMA_PROFILE must be a simple profile name (letters, digits, underscore or hyphen).' >&2; exit 2
-    fi
-    if ! command -v colima >/dev/null; then
-      echo 'Missing Colima. Install and explicitly start the selected ARM64 Docker profile; no VM was created.' >&2; exit 1
-    fi
-    if ! colima status --profile "${profile}" >/dev/null 2>&1; then
-      echo "Colima profile ${profile} is absent or stopped. Start that profile explicitly; no VM was created or started." >&2; exit 1
-    fi
-    if [[ "${lane}" == os || "${lane}" == all ]]; then
-      echo 'Colima os/all cannot run from the Mac shared mount. Export committed source to native ext4 and run inside Linux; see docs/local-development.md#apple-silicon-mac-with-colima. No downloads or attempt creation.' >&2
-      exit 1
-    fi
-    # Execute beside the daemon: host-side Docker socket forwarding does not
-    # give NKD access to the Linux workspace/kernel used by nested producers.
-    # Do not inherit a Mac Docker context/endpoint into the selected VM.
-    if [[ "${check_only}" == 1 ]]; then
-      printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh --check %q' \
-        "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${lane}"
-    else
-      printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh %q %q %q' \
-        "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${attempt}" "${jobs}" "${lane}"
-    fi
-    exec colima ssh --profile "${profile}" -- bash -c "${remote_command}"
-  fi
-  if ! podman machine inspect podman-machine-default >/dev/null 2>&1; then
-    echo 'Missing podman-machine-default. See the clean-machine guide for podman machine init; no VM was created.' >&2
+  profile="${COLIMA_PROFILE:-}"
+  if [[ -z "${profile}" ]]; then
+    echo 'Docker Desktop on macOS is not an admitted OS/bootstrap route. For Colima, explicitly set COLIMA_PROFILE to a running ARM64 Docker profile; see docs/local-development.md.' >&2
     exit 1
   fi
-  if [[ "$(podman machine inspect --format '{{.State}}' podman-machine-default)" != running ]]; then
-    echo 'Podman VM is stopped. Run: podman machine start podman-machine-default' >&2; exit 1
+  if [[ ! "${profile}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+    echo 'COLIMA_PROFILE must be a simple profile name (letters, digits, underscore or hyphen).' >&2; exit 2
   fi
+  if ! command -v colima >/dev/null; then
+    echo 'Missing Colima. Install and explicitly start the selected ARM64 Docker profile; no VM was created.' >&2; exit 1
+  fi
+  if ! colima status --profile "${profile}" >/dev/null 2>&1; then
+    echo "Colima profile ${profile} is absent or stopped. Start that profile explicitly; no VM was created or started." >&2; exit 1
+  fi
+  if [[ "${lane}" == os || "${lane}" == all ]]; then
+    echo 'Colima os/all cannot run from the Mac shared mount. Export committed source to native ext4 and run inside Linux; see docs/local-development.md#apple-silicon-mac-with-colima. No downloads or attempt creation.' >&2
+    exit 1
+  fi
+  # Execute beside the daemon: host-side Docker socket forwarding does not
+  # give NKD access to the Linux workspace/kernel used by nested producers.
+  # Do not inherit a Mac Docker context/endpoint into the selected VM.
   if [[ "${check_only}" == 1 ]]; then
-    printf -v remote_command 'cd %q && exec env CONTAINER_RUNTIME=podman NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh --check %q' \
+    printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh --check %q' \
       "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${lane}"
   else
-    printf -v remote_command 'cd %q && exec env CONTAINER_RUNTIME=podman NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh %q %q %q' \
+    printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh %q %q %q' \
       "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${attempt}" "${jobs}" "${lane}"
   fi
-  exec podman machine ssh --username core podman-machine-default "${remote_command}"
+  exec colima ssh --profile "${profile}" -- bash -c "${remote_command}"
 fi
 if [[ "$(uname -s)" != Linux || "$(uname -m)" != aarch64 ]]; then
-  echo 'Execution requires native Linux ARM64 (or Apple Silicon with Podman). AMD64 emulation is not admitted.' >&2; exit 1
-fi
-if [[ "${runtime}" == podman && "$(id -u)" == 0 ]]; then
-  echo 'Use a non-root user for the Podman route.' >&2; exit 1
+  echo 'Execution requires native Linux ARM64 (including a Colima Linux VM). AMD64 emulation is not admitted.' >&2; exit 1
 fi
 # Advisory shell diagnostics do not replace complete-Plan runtime admission.
 missing=0
@@ -123,18 +103,16 @@ done
 if ! timeout --kill-after=5s 30s "${runtime}" version --format '{{.Server.Version}}' >/dev/null; then
   echo "${runtime} daemon is unreachable. Start it or fix access for this user; no build started." >&2; exit 1
 fi
-if [[ "${runtime}" == docker ]]; then
-  daemon_platform="$(timeout --kill-after=5s 30s docker info --format '{{.OSType}}/{{.Architecture}}')"
-  case "${daemon_platform}" in linux/aarch64|linux/arm64) ;; *) echo "Docker daemon must be native Linux ARM64, got ${daemon_platform}." >&2; exit 1 ;; esac
-  if [[ -n "${DOCKER_CONTEXT:-}" ]]; then
-    endpoint="$(docker context inspect --format '{{.Endpoints.docker.Host}}' "${DOCKER_CONTEXT}")"
-  elif [[ -n "${DOCKER_HOST:-}" ]]; then
-    endpoint="${DOCKER_HOST}"
-  else
-    endpoint="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
-  fi
-  case "${endpoint}" in unix://*) ;; *) echo 'Remote Docker endpoints are not supported by this local launcher; run on the Docker host.' >&2; exit 1 ;; esac
+daemon_platform="$(timeout --kill-after=5s 30s docker info --format '{{.OSType}}/{{.Architecture}}')"
+case "${daemon_platform}" in linux/aarch64|linux/arm64) ;; *) echo "Docker daemon must be native Linux ARM64, got ${daemon_platform}." >&2; exit 1 ;; esac
+if [[ -n "${DOCKER_CONTEXT:-}" ]]; then
+  endpoint="$(docker context inspect --format '{{.Endpoints.docker.Host}}' "${DOCKER_CONTEXT}")"
+elif [[ -n "${DOCKER_HOST:-}" ]]; then
+  endpoint="${DOCKER_HOST}"
+else
+  endpoint="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
 fi
+case "${endpoint}" in unix://*) ;; *) echo 'Remote Docker endpoints are not supported by this local launcher; run on the Docker host.' >&2; exit 1 ;; esac
 if [[ -n "${NKE_LOCAL_CLONE:-}" ]]; then
   [[ "${NKE_LOCAL_CLONE}" == /* ]] || { echo 'NKE_LOCAL_CLONE must be an absolute path.' >&2; exit 2; }
   git -C "${NKE_LOCAL_CLONE}" rev-parse --git-dir >/dev/null || { echo 'NKE_LOCAL_CLONE must be an accessible Git checkout.' >&2; exit 1; }
@@ -145,8 +123,7 @@ if [[ -n "${NKE_LOCAL_CLONE:-}" ]]; then
   # source identity. The bare NKE form also prefix-matches sibling repository
   # names, so use this override only for this maintained NKE selection.
 fi
-environment="definitions/nke-local-dev-arm64/environment-local.json"
-if [[ "${runtime}" == docker ]]; then environment="definitions/nke-local-dev-arm64/environment-local-docker.json"; fi
+environment="definitions/nke-local-dev-arm64/environment-local-docker.json"
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
@@ -169,7 +146,7 @@ if [[ "${lane}" == all || "${lane}" == os ]]; then
   if [[ "${free}" -lt 92160 ]]; then echo 'Warning: less than 90 GiB free; material preparation may exhaust the later 64 GiB gate.' >&2; fi
 fi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
-  if [[ "${runtime}" == docker ]] && ! docker buildx version >/dev/null 2>&1; then
+  if ! docker buildx version >/dev/null 2>&1; then
     printf '%s\n' 'Docker Buildx plugin is missing or unusable; local toolchain bootstrap requires it.' \
       'Ubuntu docker.io: sudo apt-get install docker-buildx' \
       "Docker CE from Docker's apt repository: sudo apt-get install docker-buildx-plugin" \
@@ -194,10 +171,8 @@ mkdir "${bootstrap}/tmp"
 export TMPDIR="${repo_root}/${bootstrap}/tmp"
 if [[ -z "${shared_bootstrap}" ]]; then
   mkdir "${bootstrap}/go-build" "${bootstrap}/go-mod" "${bootstrap}/home"
-  network=default
-  if [[ "${runtime}" == docker ]]; then network=bridge; fi
   "${runtime}" pull --platform linux/arm64 "${utility}"
-  "${runtime}" run --rm --pull=never --platform linux/arm64 --network="${network}" \
+  "${runtime}" run --rm --pull=never --platform linux/arm64 --network=bridge \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges --security-opt=label=disable \
   --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
   --volume "${repo_root}:/src:ro" --volume "${repo_root}/${bootstrap}:/out:rw" \

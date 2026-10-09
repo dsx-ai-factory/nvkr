@@ -271,20 +271,19 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 	t.Chdir(root)
 	path := filepath.Join("definitions", "nke-local-dev-arm64", "definition-profiles.json")
 	for _, tc := range []struct {
-		name, environment string
-		foreign           bool
-		wantCode          e.Code
+		name     string
+		foreign  bool
+		wantCode e.Code
 	}{
-		{"Docker", "environment-local-docker.json", false, ""},
-		{"Podman", "environment-local.json", false, ""},
-		{"foreign target", "environment-local-docker.json", true, e.CodeNoMatch},
+		{"Docker", false, ""},
+		{"foreign target", true, e.CodeNoMatch},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			doc, err := definition.LoadDefinition(t.Context(), path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			envPath := filepath.Join(filepath.Dir(path), tc.environment)
+			envPath := filepath.Join(filepath.Dir(path), "environment-local-docker.json")
 			env, err := definition.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)

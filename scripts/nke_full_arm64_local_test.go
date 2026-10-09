@@ -36,7 +36,7 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		name, system, arch, runtime, lane, state, disk, daemon, want string
 		fail                                                         bool
 	}{
-		{"no runtime", "Linux", "aarch64", "missing", "providers", "running", "100000", "ok", "CONTAINER_RUNTIME must", true},
+		{"unsupported runtime", "Linux", "aarch64", "podman", "providers", "running", "100000", "ok", "CONTAINER_RUNTIME must", true},
 		{"Docker Desktop is explicit", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "Docker Desktop on macOS", true},
 		{"Colima Mac forwards check only", "Darwin", "arm64", "docker", "providers", "running", "100000", "ok", "--check providers", false},
 		{"Colima without Mac Docker CLI", "Darwin", "arm64", "docker", "providers", "running", "100000", "ok", "--check providers", false},
@@ -46,25 +46,18 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		{"Colima stopped profile", "Darwin", "arm64", "docker", "os", "stopped", "100000", "ok", "absent or stopped", true},
 		{"Colima absent profile", "Darwin", "arm64", "docker", "os", "absent", "100000", "ok", "absent or stopped", true},
 		{"Colima invalid profile", "Darwin", "arm64", "docker", "os", "running", "100000", "ok", "simple profile name", true},
-		{"stopped VM", "Darwin", "arm64", "podman", "providers", "stopped", "100000", "ok", "podman machine start", true},
-		{"missing VM", "Darwin", "arm64", "podman", "providers", "absent", "100000", "ok", "Missing podman-machine-default", true},
-		{"Mac forwards check only", "Darwin", "arm64", "podman", "providers", "running", "100000", "ok", "--check providers", false},
 		{"foreign Linux", "Linux", "x86_64", "docker", "providers", "running", "100000", "ok", "AMD64 emulation is not admitted", true},
-		{"capacity fails before pull", "Linux", "aarch64", "podman", "os", "running", "38000", "ok", "No downloads started", true},
+		{"capacity fails before pull", "Linux", "aarch64", "docker", "os", "running", "38000", "ok", "No downloads started", true},
 		{"Docker daemon unavailable", "Linux", "aarch64", "docker", "providers", "running", "100000", "failed", "daemon is unreachable", true},
 		{"Docker providers without Go", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
-		{"default check uses components", "Linux", "aarch64", "docker", "", "running", "100000", "ok", "Prerequisite diagnostics passed for components/docker", false},
+		{"default check uses components and Docker", "Linux", "aarch64", "", "", "running", "100000", "ok", "Prerequisite diagnostics passed for components/docker", false},
 		{"relative clone rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "NKE_LOCAL_CLONE must be an absolute path", true},
 		{"Docker site without OS capacity", "Linux", "aarch64", "docker", "site", "running", "32000", "ok", "Prerequisite diagnostics passed for site/docker", false},
-		{"Podman site without OS capacity", "Linux", "aarch64", "podman", "site", "running", "32000", "ok", "Prerequisite diagnostics passed for site/podman", false},
 		{"Docker tools without OS capacity", "Linux", "aarch64", "docker", "tools", "running", "32000", "ok", "Prerequisite diagnostics passed for tools/docker", false},
-		{"Podman tools without OS capacity", "Linux", "aarch64", "podman", "tools", "running", "32000", "ok", "Prerequisite diagnostics passed for tools/podman", false},
 		{"Colima tools forwards check only", "Darwin", "arm64", "docker", "tools", "running", "32000", "ok", "--check tools", false},
 		{"Docker profiles without OS capacity", "Linux", "aarch64", "docker", "profiles", "running", "32000", "ok", "Prerequisite diagnostics passed for profiles/docker", false},
-		{"Podman profiles without OS capacity", "Linux", "aarch64", "podman", "profiles", "running", "32000", "ok", "Prerequisite diagnostics passed for profiles/podman", false},
 		{"Colima profiles forwards check only", "Darwin", "arm64", "docker", "profiles", "running", "32000", "ok", "--check profiles", false},
-		{"simulator without OS capacity", "Linux", "aarch64", "podman", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/podman", false},
-		{"simulator without cached toolchain", "Linux", "aarch64", "podman", "simulator", "running", "32000", "missing-toolchain", "Prerequisite diagnostics passed", false},
+		{"simulator without cached toolchain", "Linux", "aarch64", "docker", "simulator", "running", "32000", "missing-toolchain", "Prerequisite diagnostics passed", false},
 		{"simulator Docker without OS capacity", "Linux", "aarch64", "docker", "simulator", "running", "32000", "ok", "Prerequisite diagnostics passed for simulator/docker", false},
 		{"simulator Docker requires Buildx", "Linux", "aarch64", "docker", "simulator", "running", "32000", "missing-buildx", "Buildx plugin", true},
 		{"site Docker requires Buildx", "Linux", "aarch64", "docker", "site", "running", "32000", "missing-buildx", "Buildx plugin", true},
@@ -98,20 +91,18 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			if err := os.MkdirAll(inputs, 0700); err != nil {
 				t.Fatal(err)
 			}
-			for _, name := range []string{"environment-local.json", "environment-local-docker.json"} {
-				env, err := os.ReadFile(filepath.Join("..", "definitions", "nke-local-dev-arm64", name))
-				if err != nil {
-					t.Fatal(err)
-				}
-				switch tc.name {
-				case "mutable bootstrap pin rejected":
-					env = []byte(strings.ReplaceAll(string(env), "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "golang:latest"))
-				case "foreign bootstrap platform rejected":
-					env = []byte(strings.ReplaceAll(string(env), "linux/arm64", "linux/amd64"))
-				}
-				if err := os.WriteFile(filepath.Join(inputs, name), env, 0600); err != nil {
-					t.Fatal(err)
-				}
+			env, err := os.ReadFile(filepath.Join("..", "definitions", "nke-local-dev-arm64", "environment-local-docker.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch tc.name {
+			case "mutable bootstrap pin rejected":
+				env = []byte(strings.ReplaceAll(string(env), "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "golang:latest"))
+			case "foreign bootstrap platform rejected":
+				env = []byte(strings.ReplaceAll(string(env), "linux/arm64", "linux/amd64"))
+			}
+			if err := os.WriteFile(filepath.Join(inputs, "environment-local-docker.json"), env, 0600); err != nil {
+				t.Fatal(err)
 			}
 			linkLauncherTestTimeout(t, tools)
 			for _, name := range []string{"bash", "dirname", "git", "jq", "awk"} {
@@ -128,14 +119,6 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 				"id":      "echo 1000",
 				"getconf": "echo 8",
 				"df":      "printf 'Filesystem blocks used available capacity mounted\nmock 200000 10000 %s 5%% /\n' \"$TEST_DISK\"",
-				"podman": `printf '%s\n' "$*" >>"$TEST_CALLS"
-case "$1 $2" in
-  'machine inspect') [ "$TEST_STATE" != absent ] || exit 1; case "$*" in *--format*) echo "$TEST_STATE";; esac ;;
-  'machine ssh') printf '%s\n' "$*" ;;
-  'version --format') [ "$TEST_DAEMON" != failed ] ;;
-  'image inspect') [ "$TEST_DAEMON" != missing-toolchain ] ;;
-  *) exit 99 ;;
-esac`,
 				"docker": `printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
   'version --format') [ "$TEST_DAEMON" != failed ] ;;
@@ -203,7 +186,7 @@ esac`,
 				t.Fatalf("check created attempt storage: %v", err)
 			}
 			calls, _ := os.ReadFile(filepath.Join(dir, "calls"))
-			for _, forbidden := range []string{"pull ", "run ", "buildx build", "machine init", "machine start", "start --", "context use"} {
+			for _, forbidden := range []string{"pull ", "run ", "buildx build", "start --", "context use"} {
 				if strings.Contains(string(calls), forbidden) {
 					t.Fatalf("check performed mutation/producer work %q: %s", forbidden, calls)
 				}

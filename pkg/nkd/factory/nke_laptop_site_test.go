@@ -132,21 +132,20 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 	t.Chdir(root)
 	definitionPath := filepath.Join("definitions", "nke-local-dev-arm64", "definition-site.json")
 	for _, tc := range []struct {
-		name, environment string
-		foreign, unbound  bool
-		wantCode          e.Code
+		name             string
+		foreign, unbound bool
+		wantCode         e.Code
 	}{
-		{"Docker", "environment-local-docker.json", false, false, ""},
-		{"Podman", "environment-local.json", false, false, ""},
-		{"foreign target", "environment-local-docker.json", true, false, e.CodeNoMatch},
-		{"unbound controller chart", "environment-local-docker.json", false, true, e.CodeInvalidCatalog},
+		{"Docker", false, false, ""},
+		{"foreign target", true, false, e.CodeNoMatch},
+		{"unbound controller chart", false, true, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			doc, err := definition.LoadDefinition(t.Context(), definitionPath)
 			if err != nil {
 				t.Fatal(err)
 			}
-			environmentPath := filepath.Join(filepath.Dir(definitionPath), tc.environment)
+			environmentPath := filepath.Join(filepath.Dir(definitionPath), "environment-local-docker.json")
 			env, err := definition.LoadEnvironment(t.Context(), environmentPath)
 			if err != nil {
 				t.Fatal(err)
