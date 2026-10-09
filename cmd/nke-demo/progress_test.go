@@ -101,18 +101,15 @@ func TestProgressConciseAndVerbosePublicOutput(t *testing.T) {
 }
 
 func TestProgressBoundsAndLogFailure(t *testing.T) {
-	for _, kind := range []string{"huge-line", "log-error", "verbose-log-error", "log-bound"} {
+	for _, kind := range []string{"huge-line", "log-error", "log-short", "verbose-log-error", "verbose-log-short"} {
 		t.Run(kind, func(t *testing.T) {
 			var out, raw bytes.Buffer
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			w := &checkedWriter{out: &out, raw: &raw, remaining: 8 << 20, cancel: cancel, started: time.Now()}
-			if kind == "log-error" || kind == "verbose-log-error" {
-				w.raw = failedProgressWriter{short: true}
-				w.verbose = kind == "verbose-log-error"
-			}
-			if kind == "log-bound" {
-				w.remaining = 2
+			if kind != "huge-line" {
+				w.raw = failedProgressWriter{short: strings.HasSuffix(kind, "short")}
+				w.verbose = strings.HasPrefix(kind, "verbose")
 			}
 			data := "[start] " + strings.Repeat("x", 32<<10) + "\n[done] next\n"
 			_, err := io.WriteString(w, data)
@@ -122,8 +119,62 @@ func TestProgressBoundsAndLogFailure(t *testing.T) {
 				}
 			} else if err == nil || ctx.Err() == nil {
 				t.Fatal("log failure did not cancel work")
+			} else {
+				assertCode(t, err, nkderr.CodePreflightFailed)
+				if strings.Contains(err.Error(), "private writer") {
+					t.Fatal("private log writer error exposed")
+				}
 			}
 		})
+	}
+}
+
+func TestProgressLogRetentionBound(t *testing.T) {
+	const limit = 8 << 20
+	const notice = "Build log retention reached 8 MiB; further output is not retained.\n"
+	const marker = "[done] after retention limit\n"
+	prefix := strings.Repeat("x", limit-1) + "\n"
+	for _, tc := range []struct {
+		name      string
+		chunks    []string
+		truncated bool
+	}{
+		{"exact limit", []string{prefix}, false},
+		{"one chunk crosses limit", []string{prefix + marker}, true},
+		{"later chunk crosses limit", []string{prefix[:limit-2], prefix[limit-2:] + marker}, true},
+		{"writes after limit", []string{prefix, marker, marker}, true},
+	} {
+		for _, verbose := range []bool{false, true} {
+			t.Run(tc.name+map[bool]string{false: "/concise", true: "/verbose"}[verbose], func(t *testing.T) {
+				var out, raw bytes.Buffer
+				err := progressOutput(t.Context(), &out, &raw, verbose, "", func(ctx context.Context, writer io.Writer) error {
+					for _, chunk := range tc.chunks {
+						n, err := io.WriteString(writer, chunk)
+						if err != nil || n != len(chunk) || ctx.Err() != nil {
+							t.Fatalf("retention canceled healthy work: n=%d error=%v context=%v", n, err, ctx.Err())
+						}
+					}
+					if verbose && strings.Replace(out.String(), notice, "", 1) != strings.Join(tc.chunks, "") {
+						t.Fatal("retention limit changed verbose streaming")
+					}
+					writer.(nkedemo.ProgressReporter).Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneFinished, Name: "build"})
+					return nil
+				})
+				if err != nil || raw.String() != prefix {
+					t.Fatalf("retained prefix differs: length=%d error=%v", raw.Len(), err)
+				}
+				wantNotices := 0
+				if tc.truncated {
+					wantNotices = 1
+				}
+				if strings.Count(out.String(), notice) != wantNotices || !strings.Contains(out.String(), "[DONE ") || !strings.Contains(out.String(), `"build"`) {
+					t.Fatal("retention notice count or observed progress differs")
+				}
+				if tc.truncated && !strings.Contains(out.String(), strings.TrimSuffix(marker, "\n")) {
+					t.Fatal("post-limit build marker was lost")
+				}
+			})
+		}
 	}
 }
 

@@ -66,6 +66,7 @@ type checkedWriter struct {
 	raw       io.Writer
 	verbose   bool
 	remaining int
+	truncated bool
 	started   time.Time
 	phases    map[string]time.Time
 	line      []byte
@@ -79,13 +80,20 @@ func (w *checkedWriter) Write(data []byte) (int, error) {
 		return 0, w.err
 	}
 	if w.raw != nil {
-		if len(data) > w.remaining {
-			return 0, w.fail("build log exceeds 8 MiB bound")
+		retained := min(len(data), w.remaining)
+		if retained > 0 {
+			if err := writeAll(w.raw, data[:retained]); err != nil {
+				return 0, w.fail("build log write failed")
+			}
+			w.remaining -= retained
 		}
-		if err := writeAll(w.raw, data); err != nil {
-			return 0, w.fail("build log write failed")
+		if len(data) > retained && !w.truncated {
+			w.truncated = true
+			w.emit("Build log retention reached 8 MiB; further output is not retained.\n")
+			if w.err != nil {
+				return 0, w.err
+			}
 		}
-		w.remaining -= len(data)
 	}
 	if w.verbose {
 		w.emit(string(data))
