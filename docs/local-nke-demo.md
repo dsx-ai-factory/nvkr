@@ -47,7 +47,7 @@ colima ssh --profile nkd-demo -- bash -c \
 colima ssh --profile nkd-demo -- mkdir -m 700 "$NKD_NATIVE_REPO"
 git archive "$NKD_SOURCE" | colima ssh --profile nkd-demo -- tar -xf - -C "$NKD_NATIVE_REPO"
 printf 'Inside Colima, cd to: %s\n' "$NKD_NATIVE_REPO"
-colima ssh --profile nkd-demo
+colima ssh --profile nkd-demo -- bash -c 'cd "$1" && exec bash' bash "$NKD_NATIVE_REPO"
 ```
 
 **Everything below runs inside Colima**, from the directory just printed. Native
@@ -81,7 +81,7 @@ Git authentication must work **inside Colima**; the Mac's `gh` login is not proo
 Alternatively, use an exact local NKE Git repository mounted into Colima and set
 `NKE_LOCAL_CLONE` to its absolute path. Only committed, pinned Git objects are used.
 
-## 4. Build the seven artifact lanes
+## 4. Build the artifacts
 
 From the native NKD export, run sequentially. Use new attempt names for a rerun.
 
@@ -89,7 +89,7 @@ From the native NKD export, run sequentially. Use new attempt names for a rerun.
 set -euo pipefail
 export CONTAINER_RUNTIME=docker
 # Optional: export NKE_LOCAL_CLONE=/absolute/path/to/mounted/nke
-for lane in components providers site tools profiles simulator os; do
+for lane in os components site tools profiles simulator; do
   bash scripts/nke-full-arm64-local.sh --check "$lane"
   bash scripts/nke-full-arm64-local.sh "demo-$lane-01" 1 "$lane"
 done
@@ -97,7 +97,9 @@ done
 
 A failed lane stops the sequence. `--check` is preflight, not a build.
 OS execution uses QEMU software acceleration; its duration is not guaranteed.
-The historical `all` selection does not contain all seven lanes.
+Build the OS first to preserve its disk-space headroom. The components Run
+already contains both providers; a separate `providers` build is unnecessary
+for this demo. The historical `all` selection does not contain this whole set.
 To reuse completed Runs instead, skip this step and supply their absolute paths
 below. Never overwrite or rebuild accepted artifacts just to relocate them.
 
@@ -143,7 +145,7 @@ export NKD_NATIVE_BOOTSTRAP="$(pwd)/.nkd/laptop-bootstrap/demo-tools-01/nkdctl"
 export NKD_TOOLS_RUN="$(pwd)/.nkd/runs/demo-tools-01"
 export NKD_SITE_RUN="$(pwd)/.nkd/runs/demo-site-01"
 export NKD_COMPONENTS_RUN="$(pwd)/.nkd/runs/demo-components-01"
-export NKD_PROVIDER_RUN="$(pwd)/.nkd/runs/demo-providers-01"
+export NKD_PROVIDER_RUN="$NKD_COMPONENTS_RUN"
 export NKD_PROFILES_RUN="$(pwd)/.nkd/runs/demo-profiles-01"
 export NKD_SIMULATOR_RUN="$(pwd)/.nkd/runs/demo-simulator-01"
 export NKD_OS_RUN="$(pwd)/.nkd/runs/demo-os-01"

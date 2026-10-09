@@ -7,7 +7,7 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 ## Definition → Run
 
 `python3 scripts/nke-local-demo.py` is the new deploy-only integration command:
-completed seven-lane artifacts, owned native networking, exact QCOW2 serving,
+completed artifacts, owned native networking, exact QCOW2 serving,
 VM-backed NICoSim, NKE site, a real control-plane/worker tenant and a workload
 gate. It rebuilds nothing. Read the [setup, command and validation limits](../docs/local-nke-demo.md)
 before running. A real Colima run completed tenant/workload and owned cleanup
@@ -55,8 +55,8 @@ see the [site handoff](../docs/nkd-to-nke-demo.md).
 `tools` separately selects source-built Linux ARM64 Helm, kubectl, clusterctl,
 ORAS and Kind at the staged installer's pinned versions. Compiler/preflight
 contracts cover this selection; consumers verify extraction and native versions.
-No private deployment acceptance record is shipped here; full tenant/workload
-acceptance remains unestablished. Helm's
+The integrated tenant/workload gate passed with retained artifacts; a fresh
+build of its entire input set remains unverified. Helm's
 exact fixture preparation is diagnostic Local-only, not a supported held hosted
 fetch. See the [source-tool guide](../docs/local-development.md#build-the-installer-tools-from-source).
 `profiles` separately builds the diagnostic plain ARM64/Ubuntu 26.04 controller

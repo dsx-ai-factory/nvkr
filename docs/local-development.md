@@ -198,7 +198,8 @@ physical space for a sparse disk. A native guest filesystem addresses the shared
 filesystem boundary, not insufficient physical storage. A successful preflight
 alone does not prove an OS bake or tenant lifecycle.
 
-Run component/simulator builds before the OS, not concurrently on this laptop.
+Build the OS first to preserve its disk-space headroom, then run the remaining
+lanes sequentially. Do not run heavy builds concurrently on this laptop.
 Use the dedicated 24 GiB profile; this configuration is not a capacity guarantee.
 If Packer waits for SSH, inspect the actual QEMU process and host OOM diagnostics
 before treating the guest as alive. A terminal disk build and a complete boot
@@ -399,7 +400,7 @@ preparation still need network access.
 
 ## Build the complete selection, including the OS
 
-For this seven-lane laptop demo, use this guide's
+For this laptop demo, use this guide's
 `nke-full-arm64-local.sh ... os` route, including Docker/Colima TCG. The separate
 [OS-only guide](../definitions/nke-os/README.md) and `nke-os-local.sh` retain the
 older Podman/TCG and native Docker/KVM routes. Native Docker/KVM does not fall
@@ -506,8 +507,10 @@ release qualification. Extraction uses a private directory owned by the invoking
 user. A container consumer must use that observed UID/GID (for example,
 `--user "$(id -u):$(id -g)"` inside Linux), not hard-coded UID 1000. Treat
 `nico-sim-runtime-assets` as tar+gzip data, with `ui/` and the diagnostic seed
-relative to the simulator's working directory. The guide does not yet provide a
-complete deploy-only site/tenant script.
+relative to the simulator's working directory. The
+[integrated local demo](local-nke-demo.md) provides the deploy-only site/tenant
+command. Retained artifacts passed that gate; a fresh build of the entire input
+set remains unverified.
 
 ## Build the installer-aligned site subset
 
@@ -543,8 +546,10 @@ The source installer can consume packaged charts and a prepared
 CAPNICo image. The [prepared chart adapter](nkd-to-nke-demo.md#prepare-charts-without-rebuilding-them)
 avoids source-tree dependency preparation during inventory rendering and local
 executor selection; actual staged installation and release-manifest overrides
-remain separate checks. See the [installer handoff analysis](nkd-to-nke-demo.md); this is
-not yet the promised deploy-only, QCOW2-backed site/tenant journey.
+remain separate checks. See the [installer handoff reference](nkd-to-nke-demo.md)
+and [integrated local demo](local-nke-demo.md). The QCOW2-backed site/tenant
+journey passed with retained artifacts; a fresh build of its entire input set
+remains unverified.
 
 ## Build the diagnostic controller profiles
 
