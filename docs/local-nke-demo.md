@@ -17,7 +17,21 @@ deployment replay does not establish a clean one-shot E2E build.
 ## 1. Choose your Linux execution host
 
 Use eight CPUs, 24 GiB RAM and about 90 GiB free on native ext4 storage before
-building. These are setup allowances; execution rechecks authored requirements.
+building. This is the recommended **complete-demo** setup, not the OS-only
+minimum. Capacity is not reserved and execution rechecks it at each stage:
+
+| Stage | Checked capacity |
+| --- | --- |
+| Artifact launcher / OS execution | Eight CPUs, 10 GiB available RAM and 64 GiB free workspace; the launcher recommends 90 GiB before materials consume space |
+| Management deployment | Docker reports at least eight CPUs and 20 GiB total RAM; at least 20 GiB native disk headroom |
+| Two-VM deployment | Space for a served QCOW2 copy **plus 30 GiB free**, checked after artifact building |
+
+The [launcher](../scripts/nke-full-arm64-local.sh),
+[Docker Environment](../definitions/nke-local-dev-arm64/environment-local-docker.json)
+and [deployment checks](../internal/nkedemo/run.go) own these gates. Passing the
+10-GiB/64-GiB artifact check alone does **not** prove the full demo fits. Keep
+24 GiB assigned to the dedicated host and check `df -h .` before deployment;
+parallel builds and unrelated workloads can consume the setup allowance.
 Install Docker Engine and Buildx using the
 [Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/).
 
@@ -51,20 +65,37 @@ resetting it. Keep enough physical Mac space as well as guest space.
 brew install colima
 colima list
 colima start --profile nkd-demo --arch aarch64 --runtime docker --vm-type vz \
-  --cpus 8 --memory 24 --disk 150 --activate=false --ssh-config=false \
+  -c 8 --memory 24 --disk 150 --activate=false --ssh-config=false \
   --mount "$(pwd -P):w"
 df -h .
 ```
 
 Copy committed source into native VM storage. Run this block from the Mac
-checkout in Bash. The destination must be new; dirty files are not exported.
+checkout in Bash. `-c` works with both Colima 0.7.5's `--cpu` and newer
+versions' `--cpus`. The block selects Colima's separate data volume if mounted;
+otherwise it uses the **Linux** user's home directory, not the Mac home directory.
+It checks ext4 on that existing storage before creating the copy. The destination
+must be new; dirty files are not exported.
 
 ```sh
 set -euo pipefail
 NKD_SOURCE=$(git rev-parse HEAD)
-export NKD_NATIVE_REPO=/mnt/lima-colima-nkd-demo/nkd-local/nke-recipes-$NKD_SOURCE
-colima ssh --profile nkd-demo -- bash -c \
-  'test "$(findmnt -n -o FSTYPE --mountpoint /mnt/lima-colima-nkd-demo)" = ext4 && sudo install -d -o "$(id -u)" -g "$(id -g)" -m 700 /mnt/lima-colima-nkd-demo/nkd-local'
+NKD_NATIVE_BASE=$(colima ssh --profile nkd-demo -- bash -c '
+  set -eu
+  if mountpoint -q /mnt/lima-colima-nkd-demo; then
+    base=/mnt/lima-colima-nkd-demo
+  else
+    base=$HOME
+  fi
+  test "$(findmnt -n -o FSTYPE -T "$base")" = ext4
+  if test "$base" = /mnt/lima-colima-nkd-demo; then
+    sudo install -d -o "$(id -u)" -g "$(id -g)" -m 700 "$base/nkd-local"
+  else
+    install -d -m 700 "$base/nkd-local"
+  fi
+  printf "%s\n" "$base/nkd-local"
+')
+export NKD_NATIVE_REPO=$NKD_NATIVE_BASE/nke-recipes-$NKD_SOURCE
 colima ssh --profile nkd-demo -- mkdir -m 700 "$NKD_NATIVE_REPO"
 git archive "$NKD_SOURCE" | colima ssh --profile nkd-demo -- tar -xf - -C "$NKD_NATIVE_REPO"
 colima ssh --profile nkd-demo -- bash -c 'cd "$1" && exec bash' bash "$NKD_NATIVE_REPO"
@@ -272,11 +303,24 @@ Ordinary tests do not prove interruption at every live NKE stage.
 The default OS profile explicitly forbids KVM and uses QEMU's TCG software
 emulation, even on a KVM-capable bare-metal host. `Waiting for SSH to become
 available` includes Ubuntu autoinstall and its reboot; a quiet Packer console
-alone does not show a stall. Its 180-minute SSH timeout, the eight-hour E2E budget
-and 60-minute tenant budget are ceilings, not completion estimates. Increasing
-`--jobs` does not accelerate one guest. Deployment requires the disk-copy bytes
-plus 30 GiB free. Tenant guests use the selected plain ARM64 disk, four CPUs,
-eight GiB RAM and a 60-GiB overlay each.
+alone does not show a stall. The limits apply to different scopes:
+
+| Limit | Scope and owner |
+| --- | --- |
+| Eight hours | Entire `e2e` work context, including installer preparation, artifact building and deployment; [demo command](../cmd/nke-demo/main.go) |
+| Six hours | **Entire artifact-build invocation**, including toolchain preparation, materials, Packer and packaging; [build adapter](../internal/nkedemo/build.go) |
+| Six hours | OS VM execution request, admitted by the Environment's `maxTimeoutSeconds: 21600`; [OS overlay](../definitions/nke-local-dev-arm64/os-tcg.json) and [Docker Environment](../definitions/nke-local-dev-arm64/environment-local-docker.json) |
+| 180 minutes | Packer's wait for SSH, not the whole OS build; `ssh_timeout` in the OS overlay ([Packer SSH documentation](https://developer.hashicorp.com/packer/docs/communicators/ssh)) |
+| 60 minutes | Tenant kubeconfig / two-node readiness wait after tenant creation; `run.timeoutSeconds: 3600` or `--timeout`, owned by [tenant deployment](../internal/nkedemo/tenant.go) |
+
+**The earliest active deadline wins.** For example, if artifact preparation has
+already used four hours, the six-hour build deadline leaves only two hours for
+Packer and packaging, even though SSH permits three hours. Eight hours does not
+extend that build deadline; changing `--timeout` changes only tenant readiness.
+Individual commands also have shorter bounds, and cleanup has separate bounded
+budgets. These are ceilings, not completion estimates. Increasing `--jobs` does
+not accelerate one guest. Tenant guests use the selected plain ARM64 disk, four
+CPUs, eight GiB RAM and a 60-GiB overlay each.
 
 ### Optional KVM for OS assembly on native ARM64
 
