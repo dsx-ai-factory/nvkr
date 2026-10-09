@@ -23,7 +23,7 @@
 # trigger.
 #
 # The companion workflow (fern-docs-preview-comment.yml) picks up the artifact,
-# builds the preview with DOCS_FERN_TOKEN, and posts the PR comment. This is
+# builds the preview with FERN_TOKEN, and posts the PR comment. This is
 # informational only; the required docs check is the `docs` job of merge-gate.yaml.
 
 name: "Preview Fern Docs: Build"
