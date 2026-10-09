@@ -35,11 +35,11 @@
     }
   },
   "go": {
-    "version": "1.27.1",
+    "version": "1.27.2",
     "license": "BSD-3-Clause",
     "archives": {
-      "amd64": "sha256:63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445",
-      "arm64": "sha256:3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"
+      "amd64": "sha256:ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5",
+      "arm64": "sha256:94f3e30b8e374bc285e7dadc11e0865726b9bc6e85b841ccceaabc0214c6b7c8"
     }
   },
   "crane": {

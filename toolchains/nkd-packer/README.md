@@ -4,13 +4,14 @@ This directory defines the OCI toolchain consumed by NKD's local direct-Packer
 executor. Each host-platform image contains Packer 1.15.4, the QEMU plugin 1.1.6,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NKE
-Packer project. It also contains Go 1.27.1, crane 0.21.9, nfpm 2.47.0,
+Packer project. It also contains Go 1.27.2, crane 0.21.9, nfpm 2.47.0,
 `dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
 and xorriso. Those are the preparation and ISO-composition tools required by the
 exact NKE source at `726f76944404e1106626b8333d3576bdf67b575b` for non-FDE
-builds on the supported host architectures; the locked ARM64 local image has
-native validation. Go 1.27.1 matches that source's workspace version and the NKD
-module used to build the source-bound local bootstrap runner.
+builds on the supported host architectures. The compiler pin matches NKD's
+`.go-version` because this image also builds the source-bound local bootstrap
+runner. `validatedNKE.goVersion` retains the historical source's workspace
+version, 1.27.1; it does not select the image compiler or validate a rebuilt image.
 
 `toolchain.lock.json` binds the Ubuntu and download-helper multi-platform base
 indexes, one immutable Ubuntu archive snapshot, and the official Packer and
@@ -44,8 +45,10 @@ records a successful AMD64 Docker assembly and this script's native validation.
 It includes the retained image archive and exact identities; it grants no
 publication or redistribution approval.
 
-Use `--check` for the network-free source-lock validation. Building uses the
-fixed Ubuntu snapshot and verifies every release archive before
+Use `--check` for the network-free source-lock validation, including agreement
+with NKD's `.go-version`. When that pin changes, update the locked Go version and
+both archive digests from the [official Go downloads](https://go.dev/dl/?mode=json)
+together. Building uses the fixed Ubuntu snapshot and verifies every release archive before
 extracting them. The command does not push, sign, or write a transport digest.
 
 For Docker builds behind a TLS proxy, `NKD_BUILD_CA_BUNDLE` supplies a trusted
@@ -71,8 +74,9 @@ Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` and the Docker exporter's
 timestamps. Docker explicitly streams the image archive to `docker image load`,
 separating timestamp rewriting from image-store unpacking; failure in either
 stage stops validation. The existing Podman ARM64 local pin describes the earlier
-measured image. These Dockerfile changes need a new native Podman measurement
-before that pin can be replaced; a different rebuilt ID still fails closed.
+measured image with Go 1.27.1. The Dockerfile and Go compiler changes need a new
+native Podman measurement before that pin can be replaced; a different rebuilt ID
+still fails closed.
 The fixed epoch does not itself prove identical image
 bytes. Repeat a native Docker build on fresh runners and compare the resulting
 image IDs before adding a Docker pin.
