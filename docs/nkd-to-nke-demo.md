@@ -21,7 +21,7 @@ artifacts. It does not deploy the NKE site or create a CAPD/container tenant;
 the complete CAPNICo/QCOW2 tenant path is owned by the integrated consumer.
 
 The [deploy-only site consumer](local-site-integration.md) requires six prepared
-charts, exact controller/profiles/CAPNICo image handoff and runtime image-ID
+charts, exact controller/profiles/CAPNICo and dependency-image handoff and runtime image-ID
 checks, site health, registration and API access, then owned cleanup. Site-only
 assertions do not establish tenant/workload acceptance.
 
@@ -63,11 +63,11 @@ values, infrastructure provisioning and tenant lifecycle.
 | --- | --- | --- |
 | Controller image | `cwe`, built from NKE Git | Copy unchanged manifest/layers to a registry reachable by the nodes; bind the new repository and digest |
 | Four external charts | `postgresql`, `spire-crds`, `temporal`, `spire` | Publish/copy their OCI layouts without rewriting bytes; use the matching versions in NKE's manifest |
-| Controller chart/templates | `controller-chart` is image-bound; the separate `site` selection matches the installer source | Prepared local chart inputs now cover inventory rendering and the executor's local-path branch; complete staged installation and image override still need validation |
+| Controller chart/templates | `controller-chart` is image-bound; the separate `site` selection matches the installer source | The integrated consumer passed staged installation and image overrides with retained artifacts; the fresh rebuild-and-deploy replay remains unverified |
 | CAPNICo provider | `capnico-controller-arm64`, built from pinned public Git | Reachable development image plus NKE's `CAPNICO_IMAGE=repository:tag` override. The current override is tag-shaped; do not silently turn it into a digest contract |
 | Provisioned provider | `cluster-api-provider-provisioned-arm64` | Available output, but not selected by the NICo deploy path. Building it is not proof that this demo uses it |
 | Operator CLI/tools | `nkectl`, acquired `operator-tools`; separate source-built `installer-tools-arm64` | The integrated consumer selects the separate tools Run and verifies extraction and native versions. It is not included in `all`. Python and curl remain host prerequisites; all produced tools are Linux ARM64 |
-| Dependency images | Twelve acquired ARM64 image outputs | Align chart values or node mirrors with the reachable image locations; stage 4 and NKTP also need inputs outside this set |
+| Dependency images | Twelve acquired ARM64 image outputs | The consumer copies exact manifests and prepares native-digest Helm overrides; runtime checks require all twelve images, including both Bash init roles and every enabled Temporal server role. This expanded path still needs live integration validation. Other installer/NKTP images remain outside this set |
 | NKTP | Separate four-output `site` selection includes the source chart and locked dependency preparation | The consumer uses the packaged chart; runtime images are not a complete mirrored NKD set. Integrated validation does not establish that source-build requirement |
 | Profiles content image | Separate `profiles` Run builds `controller-profiles` from the staged-installer source | The diagnostic ARM64/26.04 plain profile was exercised with held-disk serving and the consumer's registry. It is not included in `all` or production fleet profiles |
 | Node QCOW2 | `nke-node-image-arm64` in the `all`/`os` selection | Both real tenant guests used the selected backing disk and passed workload/DNS. Missing DSX IMDS still prevents claiming the separate complete OS smoke contract |

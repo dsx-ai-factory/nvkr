@@ -10,6 +10,8 @@ build of all lanes is not yet verified. This is a trusted-user local demo, not a
 signed Release or complete source-built distribution. Acquired images/charts,
 the missing DSX input and PR #113 integration remain explicit
 [full-source gaps](full-nke-source-build.md).
+The expanded dependency-image handoff has not yet passed a live integrated replay;
+the retained run checked controller, profiles and CAPNICo image identities.
 
 ## 1. Prepare the Mac
 

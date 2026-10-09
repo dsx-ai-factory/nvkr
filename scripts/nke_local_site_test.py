@@ -27,7 +27,7 @@ class SiteTest(unittest.TestCase):
             cli.chmod(0o700)
             digest = "sha256:" + "a" * 64
             outputs = {key: (work / key, {"digest": digest}) for key in
-                       [*SITE.CHART_OUTPUTS, "cwe", "profiles", "provider", "nkectl"]}
+                       [*SITE.CHART_OUTPUTS, *SITE.IMAGE_KEYS, "nkectl"]}
             def inspect(_argv, label, *_args):
                 if label == "site node address":
                     return json.dumps([{"NetworkSettings": {"Networks": {"kind": {"IPAddress": "172.18.0.2"}}}}])
@@ -35,6 +35,7 @@ class SiteTest(unittest.TestCase):
             with patch.object(SITE.MGMT, "owned_nodes", return_value=["owned"]), \
                  patch.object(SITE.MGMT, "inspect", side_effect=inspect), patch.object(SITE.MGMT, "execute"), \
                  patch.object(SITE.CHART, "prepare", return_value=work / "deploy"), \
+                 patch.object(SITE, "prepare_runtime_values") as prepare, \
                  patch.object(SITE, "wait_registry"), patch.object(SITE, "bootstrap_ca"), \
                  patch.object(SITE, "kind_nktp_values", return_value="enabled: false"), \
                  patch.object(SITE, "deployed_images", return_value={}), patch.object(SITE.VM, "digest", return_value=digest), \
@@ -45,6 +46,7 @@ class SiteTest(unittest.TestCase):
                                  "fixture", "http://172.18.0.1:18089", "172.18.0.1", "id", "owned", work, work,
                                  {"PATH": "/usr/bin"})
             cleanup.assert_called_once()
+            prepare.assert_called_once()
             self.assertNotIn("PASS:", output.getvalue())
 
     def test_site_success_is_emitted_only_after_management_returns_with_cleanup(self):
@@ -87,13 +89,195 @@ class SiteTest(unittest.TestCase):
                     if case == "duplicate pod":
                         pods *= 2
                     return json.dumps({"items": pods})
-                with patch.object(SITE.MGMT, "capture", capture):
+                with patch.object(SITE.MGMT, "capture", capture), patch.object(SITE, "deployed_runtime_images", return_value={}):
                     if case == "exact":
                         observed = SITE.deployed_images(Path("tools"), Path("private"), {"SITE_KUBECONFIG": "private/kube"}, refs)
                         self.assertEqual({key: row["imageID"] for key, row in observed.items()}, refs)
                     else:
                         with self.assertRaises(SITE.VM.SmokeError):
                             SITE.deployed_images(Path("tools"), Path("private"), {"SITE_KUBECONFIG": "private/kube"}, refs)
+
+    def test_dependency_values_bind_native_images_without_overwriting_chart_keys(self):
+        outputs = {key: (Path(key), {"digest": "sha256:" + "%064x" % (index + 1)})
+                   for index, key in enumerate([*SITE.CHART_OUTPUTS, *SITE.IMAGE_KEYS])}
+        original = outputs["postgresql"]
+        values = SITE.runtime_values("172.18.0.1:15501", outputs)
+        self.assertEqual(outputs["postgresql"], original)
+        self.assertEqual(values["postgresql"]["image"]["digest"], outputs["runtime-postgresql"][1]["digest"])
+        self.assertNotEqual(values["postgresql"]["image"]["digest"], original[1]["digest"])
+        spire = values["spire"]
+        images = {"spire-server": spire["spire-server"]["image"],
+                  "spire-controller-manager": spire["spire-server"]["controllerManager"]["image"],
+                  "spire-tpm-server": spire["spire-server"]["nodeAttestor"]["tpmDirect"]["image"],
+                  "spire-bash": spire["spire-server"]["tests"]["bash"]["image"],
+                  "spire-agent": spire["spire-agent"]["image"],
+                  "spiffe-csi": spire["spiffe-csi-driver"]["image"],
+                  "csi-node-driver-registrar": spire["spiffe-csi-driver"]["nodeDriverRegistrar"]["image"],
+                  "spire-oidc": spire["spiffe-oidc-discovery-provider"]["image"]}
+        for name, image in images.items():
+            with self.subTest(name=name):
+                self.assertEqual(image, {"registry": "172.18.0.1:15501", "repository": "nkd-local/" + name,
+                                         "tag": outputs["runtime-" + name][1]["digest"]})
+        self.assertEqual(spire["spiffe-oidc-discovery-provider"]["tests"]["bash"]["image"], images["spire-bash"])
+        self.assertEqual(spire["spire-agent"]["socketAlternate"]["image"], images["spire-bash"])
+        self.assertEqual(spire["spire-agent"]["fsGroupFix"]["image"], images["spire-bash"])
+        for item, name in (("server", "temporal-server"), ("admintools", "temporal-admin-tools"), ("web", "temporal-ui")):
+            with self.subTest(name=name):
+                self.assertEqual(values["temporal"][item]["image"], {
+                    "repository": "172.18.0.1:15501/nkd-local/" + name,
+                    "tag": SITE.TEMPORAL_TAGS[name] + "@" + outputs["runtime-" + name][1]["digest"]})
+
+    def test_copy_images_transports_every_named_manifest_and_rejects_changed_descriptor(self):
+        for case in ("exact", "changed descriptor"):
+            with self.subTest(case=case):
+                digest = "sha256:" + "a" * 64
+                outputs = {key: (Path("run/packages") / key, {"digest": digest}) for key in SITE.IMAGE_KEYS}
+                with patch.object(SITE.MGMT, "execute") as execute, \
+                     patch.object(SITE.MGMT, "inspect", return_value=json.dumps({"digest": digest if case == "exact" else "foreign"})):
+                    if case == "exact":
+                        refs = SITE.copy_images(Path("tools"), Path("private"), {}, "172.18.0.1:15501", "owned", outputs)
+                        self.assertEqual(set(refs), set(SITE.IMAGE_KEYS))
+                        self.assertEqual(execute.call_count, len(SITE.IMAGE_KEYS))
+                        for key, call in zip(SITE.IMAGE_KEYS, execute.call_args_list):
+                            self.assertEqual(call.args[0], ["tools/oras", "cp", "--concurrency", "1", "--from-oci-layout",
+                                "run/packages/" + key + "@" + digest,
+                                "172.18.0.1:15501/nkd-local/" + key.removeprefix("runtime-") + ":owned", "--to-plain-http"])
+                            self.assertTrue(refs[key].endswith("@" + digest))
+                    else:
+                        with self.assertRaisesRegex(SITE.VM.SmokeError, "registry changed observed manifest"):
+                            SITE.copy_images(Path("tools"), Path("private"), {}, "172.18.0.1:15501", "owned", outputs)
+                        self.assertEqual(execute.call_count, 1)
+
+    def test_registry_capacity_deduplicates_and_rejects_unsafe_or_excess_bytes(self):
+        for case in ("exact", "oversized blob", "combined overflow", "symlink", "conflicting size"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                outputs = {}
+                for index, key in enumerate(SITE.IMAGE_KEYS):
+                    layout = root / key
+                    blobs = layout / "blobs/sha256"
+                    blobs.mkdir(parents=True)
+                    (blobs / "shared").write_bytes(b"shared")
+                    (blobs / str(index)).write_bytes(b"unique")
+                    outputs[key] = (layout, {})
+                blob = outputs["cwe"][0] / "blobs/sha256/shared"
+                if case == "oversized blob":
+                    with blob.open("wb") as held:
+                        held.truncate(SITE.REGISTRY_BYTES + 1)
+                elif case == "combined overflow":
+                    for key in ("cwe", "profiles"):
+                        with (outputs[key][0] / "blobs/sha256/large").open("wb") as held:
+                            held.truncate(SITE.REGISTRY_BYTES // 2)
+                elif case == "symlink":
+                    (blob.parent / "link").symlink_to(blob)
+                elif case == "conflicting size":
+                    blob.write_bytes(b"foreign-size")
+                if case == "exact":
+                    self.assertEqual(SITE.registry_capacity(outputs), 64 * 1024**2 + 6 * (len(SITE.IMAGE_KEYS) + 2))
+                else:
+                    with self.assertRaises(SITE.VM.SmokeError):
+                        SITE.registry_capacity(outputs)
+
+    def test_prepared_values_append_before_requires_and_revalidate_every_field(self):
+        for case in ("exact", "duplicate header", "foreign semantics", "already exists"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                deploy = root / "deploy"
+                item = deploy / "spire"
+                item.mkdir(parents=True)
+                release = item / "release.yaml"
+                original = "chart:\n  name: spire\nvalues:\n  - values.yaml\n  - overlay.yaml\n# preserved comment\nrequires:\n  - gate\n"
+                release.write_text(original + ("values:\n  - foreign\n" if case == "duplicate header" else ""))
+                if case == "already exists":
+                    (item / "nkd-image-inputs.json").write_text("foreign")
+                before = ["single", "spire", "0.30.1", "", "charts/spire.tgz", "spire", "spire-server", "values.yaml,overlay.yaml", "gate"]
+                after = before[:]
+                after[7] += ",nkd-image-inputs.json"
+                if case == "foreign semantics":
+                    after[6] = "foreign"
+                with patch.object(SITE, "runtime_values", return_value={"spire": {"native": "sha256:fixture"}}), \
+                     patch.object(SITE.CHART, "release_fields", side_effect=[before, after]) as reader:
+                    if case == "exact":
+                        SITE.prepare_runtime_values(root / "checkout", deploy, "host", {}, Mock())
+                        self.assertEqual(release.read_text(), original.replace("requires:\n", "  - nkd-image-inputs.json\nrequires:\n"))
+                        self.assertEqual(json.loads((item / "nkd-image-inputs.json").read_text()), {"native": "sha256:fixture"})
+                        self.assertEqual(reader.call_count, 2)
+                    elif case == "already exists":
+                        with self.assertRaises(FileExistsError):
+                            SITE.prepare_runtime_values(root / "checkout", deploy, "host", {}, Mock())
+                        self.assertEqual((item / "nkd-image-inputs.json").read_text(), "foreign")
+                        self.assertEqual(release.read_text(), original)
+                    else:
+                        with self.assertRaises(SITE.VM.SmokeError):
+                            SITE.prepare_runtime_values(root / "checkout", deploy, "host", {}, Mock())
+
+    def test_dependency_runtime_requires_exact_native_ids_and_ready_or_completed_states(self):
+        for case in ("exact", "foreign spec", "foreign imageID", "not ready", "init failed", "job failed",
+                     "missing image", "missing status", "duplicate status", "foreign repository replica",
+                     "missing temporal role", "missing bash role", "unrelated same container name",
+                     "expired schema pods", "foreign schema init"):
+            with self.subTest(case=case):
+                refs = {"runtime-" + name: "172.18.0.1:15501/nkd-local/" + name + "@sha256:" + "a" * 64
+                        for name in SITE.RUNTIME_IMAGES}
+                pods = []
+                for name in SITE.RUNTIME_IMAGES:
+                    key = "runtime-" + name
+                    image = refs[key]
+                    if name in SITE.TEMPORAL_TAGS:
+                        repository, digest = image.split("@")
+                        image = repository + ":" + SITE.TEMPORAL_TAGS[name] + "@" + digest
+                    namespace, instance, application, roles = SITE.RUNTIME_ROLES[name]
+                    if name == "temporal-admin-tools" and case != "expired schema pods":
+                        roles = (*roles, *SITE.SCHEMA_ROLES)
+                    for field, container, component in roles:
+                        if (case == "missing temporal role" and container == "temporal-frontend") or (
+                                case == "missing bash role" and container == "fsgroupfix"):
+                            continue
+                        init = field == "initContainers"
+                        job = component == "database"
+                        status_field = "initContainerStatuses" if init else "containerStatuses"
+                        state = {"name": container, "imageID": refs[key], "ready": not init and not job,
+                                 "state": {"terminated": {"exitCode": 0}} if init or job else {"running": {}}}
+                        pod = {"metadata": {"uid": name + container, "namespace": namespace, "labels": {
+                            "app.kubernetes.io/instance": instance, "app.kubernetes.io/name": application,
+                            "app.kubernetes.io/component": component}}, "spec": {field: [{"name": container, "image": image}]},
+                            "status": {status_field: [state], "phase": "Succeeded" if job else "Running"}}
+                        if name == "postgresql":
+                            if case == "foreign spec":
+                                pod["spec"][field][0]["image"] = image.replace("a" * 64, "b" * 64)
+                            elif case == "foreign imageID":
+                                state["imageID"] = "foreign"
+                            elif case == "not ready":
+                                state["ready"] = False
+                            elif case == "missing image":
+                                continue
+                            elif case == "missing status":
+                                pod["status"][status_field] = []
+                            elif case == "duplicate status":
+                                pod["status"][status_field] *= 2
+                            elif case in ("foreign repository replica", "unrelated same container name"):
+                                replica = json.loads(json.dumps(pod))
+                                replica["metadata"]["uid"] = "foreign-replica"
+                                replica["spec"][field][0]["image"] = "foreign.example/postgresql:substitute"
+                                if case == "unrelated same container name":
+                                    replica["metadata"]["namespace"] = "unrelated"
+                                pods.append(replica)
+                        elif (init and name == "spire-tpm-server" and case == "init failed") or (
+                                job and container == "done" and case == "job failed"):
+                            state["state"]["terminated"]["exitCode"] = 1
+                        elif case == "foreign schema init" and container == "setup-default-store":
+                            pod["spec"][field][0]["image"] = "foreign.example/schema:substitute"
+                        pods.append(pod)
+                with patch.object(SITE.MGMT, "capture", return_value=json.dumps({"items": pods})):
+                    if case in ("exact", "unrelated same container name", "expired schema pods"):
+                        result = SITE.deployed_runtime_images(Path("tools"), Path("private"), {"SITE_KUBECONFIG": "private/kube"}, refs)
+                        self.assertEqual(set(result), set(refs))
+                        self.assertEqual({row["container"] for row in result["runtime-spire-bash"]["containers"]},
+                                         {"ensure-alternate-names", "fsgroupfix"})
+                        self.assertTrue(all(row["status"] == "observed" for row in result.values()))
+                    else:
+                        with self.assertRaises(SITE.VM.SmokeError):
+                            SITE.deployed_runtime_images(Path("tools"), Path("private"), {"SITE_KUBECONFIG": "private/kube"}, refs)
 
     def test_missing_openssl_fails_before_site_creation(self):
         with patch.object(SITE.MGMT, "admit"), patch.object(SITE.shutil, "which", return_value=None), \

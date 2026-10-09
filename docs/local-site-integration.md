@@ -32,7 +32,7 @@ authorization. Keep the endpoint inside the trusted dedicated VM.
 | --- | --- |
 | `tools` | Exact installer-matched Kind, kubectl, clusterctl, Helm and ORAS bundle |
 | `site` | Controller image, image-bound controller chart, NKTP chart, nkectl |
-| `components` | PostgreSQL, Temporal, SPIRE and SPIRE CRDs chart acquisitions |
+| `components` | PostgreSQL, Temporal, SPIRE and SPIRE CRDs charts, plus twelve acquired dependency images |
 | `providers` | Source-built CAPNICo image; provisioned provider is not selected |
 | `profiles` | Diagnostic ARM64 Ubuntu 26.04 plain profiles image |
 
@@ -73,7 +73,8 @@ The source seed's organization defaults to `novxwn552ssc`; `--nico-org` selects
 another operator-admitted organization. The entrypoint creates private Kind
 management resources, consumes exact chart archives through the existing NKD
 chart export owner, verifies/extracts the CLI and copies the completed controller,
-profiles and CAPNICo manifests through source-built ORAS to its private registry.
+profiles, CAPNICo and twelve dependency-image manifests through source-built ORAS
+to its private registry.
 Remote descriptor digests must match their local Run observations. Node access
 uses containerd's [host configuration](https://github.com/containerd/containerd/blob/main/docs/hosts.md),
 not a change to Docker's global daemon configuration.
@@ -91,6 +92,14 @@ including its development-only metrics-server `--kubelet-insecure-tls` setting;
 the produced chart bytes and Helm readiness gate are unchanged. This setting is
 not production TLS guidance.
 
+Prepared SPIRE, PostgreSQL and Temporal values select the copied native manifests,
+not aliases for their upstream multi-platform indexes. NKE's own reader validates
+the updated release declarations; Helm loads the appended values files for inventory
+rendering and installation. The source
+checkout and produced chart bytes stay unchanged; no registry mirror is selected.
+Other installer/NKTP images remain external acquisitions, so this is not an
+offline deployment or a complete source-built runtime.
+
 The installer also runs stage 06: CAPI SPIFFE exec authentication, local site
 registration and API reachability. The additional external-client NetworkPolicy
 selects the Kind gateway `/32`; existing in-cluster/node allowances remain.
@@ -99,8 +108,15 @@ authentication remains disabled, so this is
 strictly a trusted disposable development environment. CAPNICo `CONFIGURED`
 means its CRDs, Deployment and credentials Secret exist; it is not proof of
 successful NICo provisioning. The adapter additionally compares actual Pod
-image IDs for the controller, completed profiles init container and provider
-against the exact copied manifests, rather than accepting Deployment intent.
+image IDs for the controller, completed profiles init container, provider and
+all twelve dependency images against the copied manifests. Successful init
+containers are checked as well as ready running containers. Schema Job
+containers are also verified when their pods remain present; expired Job pods
+are not historical execution evidence.
+Bash supplies the SPIRE-agent socket and filesystem-group init containers as
+well as Helm-test hooks. Its two enabled init roles must both pass; Helm tests
+are not executed by this demo. Each enabled Temporal server role is checked
+separately, so one correct replica cannot mask a missing or substituted consumer.
 
 The registry stores copied artifacts in a bounded tmpfs, binds only the Kind
 bridge gateway and is removed after the consumer. The exact owned management
@@ -114,6 +130,8 @@ The command requires all site stages/checks, six Helm releases, controller
 database/Temporal health, CAPNICo readiness, registration, API access, exact
 runtime image IDs and owned cleanup. It runs no artifact build. No private replay
 acceptance record is shipped here; contract tests are not a live deployment result.
+The expanded twelve-image handoff still requires a live integration replay;
+the retained October 8 demo checked controller, profiles and CAPNICo only.
 
 The [integrated command](local-nke-demo.md) connects exact disk serving,
 NICoSim ownership/networking, guest bootstrap trust, tenant
