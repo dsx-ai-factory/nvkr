@@ -232,10 +232,13 @@ their target-platform route; utility, acquisition-tool, signing and publication 
 platform route. Each configured native job checks its realized kernel OS/architecture before checkout or
 helper use. Bootstrap builds a separate static Linux helper with explicit `GOOS`/`GOARCH` for each route;
 transport pairs each job with that route's helper. The execution entrypoint checks its own native helper
-platform against the exact Plan before work. Before source/build execution, the pipeline owner checks the
+platform against the exact Plan before work. Before build execution, the pipeline owner checks the
 actual Docker/Podman daemon platform, pulls the pinned toolchain for the selected platform, and verifies its
-reported image platform and manifest identity. A foreign daemon or image fails before source or build output
-work. Utility operations perform the same factory-owned full-Plan/node and container checks on the host
+reported image platform and manifest identity. Held source vendoring separately checks its daemon against
+the native helper platform before image materialization or Git checkout, using the source owner's isolated
+runtime environment rather than its Git credentials. It retains the pinned native vendor-image checks.
+Plain Git fetching without a vendor command launches no container and requires no daemon check.
+A foreign daemon or image fails before the corresponding source or build output work. Utility operations perform the same factory-owned full-Plan/node and container checks on the host
 before their helper-owned container launch; the helper inside the utility container revalidates the Plan and its
 own native platform without needing a nested daemon. The compact hosted helper owns this host
 preflight. The shared hosted execution projection also supplies readable Plan views with effective runner

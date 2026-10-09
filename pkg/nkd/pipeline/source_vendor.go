@@ -78,16 +78,32 @@ func admitSourceVendor(ctx context.Context, node ir.Node, runtimeName string) (_
 		return nil, err
 	}
 	platform := "linux/" + runtime.GOARCH
+	adapter := heldPackerContainerRuntime{runtime: held}
+	if err := checkSourceVendorPlatform(ctx, adapter, platform); err != nil {
+		return nil, err
+	}
 	if _, err := observeHeldContainerImage(ctx, held, ir.Node{ID: node.ID, Toolchain: node.VendorImage, Platform: platform}); err != nil {
 		return nil, err
 	}
-	adapter := heldPackerContainerRuntime{runtime: held}
 	image, err := sourceVendorImage(ctx, adapter, node.VendorImage, platform)
 	if err != nil {
 		return nil, err
 	}
 	return &sourceVendor{held: held, runtime: adapter, image: image, platform: platform,
 		network: node.Network, command: append([]string(nil), node.VendorCmd...)}, nil
+}
+
+// Use the held runtime's isolated environment, never the source credential
+// environment. Refuse foreign daemons before image pulls or source checkout.
+func checkSourceVendorPlatform(ctx context.Context, adapter packerContainerRuntime, platform string) error {
+	var output containerPlatformBuffer
+	if err := adapter.Run(ctx, nil, &output, io.Discard, "info", "--format", "{{json .}}"); err != nil {
+		return runtimeCommandError(ctx, err, "", e.CodeEngineCapability, "observing source vendor daemon platform")
+	}
+	if output.overflow {
+		return e.New(e.CodeEngineCapability, "source vendor daemon information exceeds 1 MiB")
+	}
+	return checkContainerDaemonPlatform(output.buffer.Bytes(), platform)
 }
 
 // Resolve the authenticated registry subject to its local config identity and
