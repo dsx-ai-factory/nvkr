@@ -218,6 +218,18 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   plan_command=("${runner}" run plan --definition "${definition}" --environment "${environment}" --json)
   print_nkdctl_command "${plan_command[@]}"
   "${plan_command[@]}" >"${bootstrap}/baseline-plan.json"
+  graph_command=("${runner}" run graph --plan "${bootstrap}/baseline-plan.json" --view complete --format mermaid)
+  print_nkdctl_command "${graph_command[@]}"
+  {
+    printf '# Planned build graph\n\nBaseline selection before local toolchain substitution; description only, not execution evidence.\n\n```mermaid\n'
+    "${graph_command[@]}"
+    printf '```\n'
+  } >"${bootstrap}/build-graph.md"
+  printf 'Build graph: %s/%s/build-graph.md\n' "${repo_root}" "${bootstrap}" >&2
+  jq -r '
+    "Build graph: planned outputs: \(.lifecycleOutputs | length); producer steps: \([.builds[].executionGraph.nodes[]?] | length); producer dependency edges: \([.builds[].executionGraph.nodes[]?.needs[]?] | length)",
+    (.lifecycleOutputs[]? | "  output: \(.name) [\(.kind)]: \(.components | join(", "))")
+  ' "${bootstrap}/baseline-plan.json" >&2
   jq -L scripts -e --arg lane "${lane}" 'include "nke-os-plan"; local_toolchain_scopes($lane)' \
     "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-scopes.json"
   if [[ -n "${shared_bootstrap}" ]]; then

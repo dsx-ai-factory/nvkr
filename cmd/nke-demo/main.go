@@ -66,6 +66,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 	root.SetOut(out)
 	root.SetErr(diagnostics)
 	root.PersistentFlags().StringVar(&config, "config", "", "explicit version-1 local-demo YAML file (changed flags override it)")
+	root.PersistentFlags().Bool("verbose", false, "stream raw public build output in addition to stage boundaries")
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
 	root.InitDefaultCompletionCmd()
 	for _, command := range root.Commands() {
@@ -116,7 +117,8 @@ func newBuildCommand(out io.Writer, actions demoActions, config *string) *cobra.
 			if err != nil {
 				return err
 			}
-			return runProgress(cmd.Context(), out, func(ctx context.Context, progress io.Writer) error {
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			return runBuildProgress(cmd.Context(), out, verbose, func(ctx context.Context, progress io.Writer) error {
 				cfg.Progress = progress
 				built, err := actions.build(ctx, cfg)
 				if err != nil {
@@ -175,7 +177,8 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			}
 			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Hour)
 			defer cancel()
-			return runProgress(budget, out, func(ctx context.Context, progress io.Writer) error {
+			verbose, _ := cmd.Flags().GetBool("verbose")
+			return runBuildProgress(budget, out, verbose, func(ctx context.Context, progress io.Writer) error {
 				build.Progress, run.Progress = progress, progress
 				run, err = actions.prepare(ctx, build, run)
 				if err != nil {

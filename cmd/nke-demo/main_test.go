@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 )
 
 func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	for _, test := range []struct {
 		name string
 		args []string
@@ -28,6 +30,7 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 		{"help-command", []string{"help", "run"}, ""},
 		{"run-help", []string{"run", "--help"}, ""},
 		{"build-help", []string{"build", "--help"}, ""},
+		{"verbose-build-help", []string{"build", "--verbose", "--help"}, ""},
 		{"restore-help", []string{"restore", "--help"}, ""},
 		{"e2e-help", []string{"e2e", "--help"}, ""},
 		{"configured-help", []string{"run", "--config", "/must-not-read", "--help"}, ""},
@@ -83,6 +86,9 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 			if test.code == "" && out.Len() == 0 {
 				t.Fatal("missing help or completion output")
 			}
+			if entries, err := os.ReadDir(os.Getenv("TMPDIR")); err != nil || len(entries) != 0 {
+				t.Fatal("help or invalid input created build logs")
+			}
 		})
 	}
 }
@@ -97,6 +103,7 @@ func configuredFixture() nkedemo.DemoFile {
 }
 
 func TestExplicitConfigOnlyChangedFlagsOverrideIt(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	for _, name := range []string{"run", "build", "restore", "explicit-empty", "config-failure"} {
 		t.Run(name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
@@ -163,6 +170,7 @@ func TestExplicitConfigOnlyChangedFlagsOverrideIt(t *testing.T) {
 }
 
 func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	for _, name := range []string{"exact", "omittedInstaller", "retainedRun", "retainedTool", "prepareFailure", "buildFailure", "runFailure"} {
 		t.Run(name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
@@ -277,6 +285,7 @@ func assertE2EBudget(t *testing.T, ctx context.Context) {
 }
 
 func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	var out, diagnostics bytes.Buffer
 	fresh := nkedemo.BuiltInputs{NKDCTL: "new-nkdctl", Runs: nkedemo.RunInputs{OS: "new-os", Components: "new-components", Providers: "new-components", Site: "new-site", Tools: "new-tools", Profiles: "new-profiles", Simulator: "new-simulator"}}
 	order := make([]string, 0, 3)
@@ -364,7 +373,8 @@ func TestTypedRunFlagsAndContextReachLibraryUnchanged(t *testing.T) {
 }
 
 func TestBuildAndRestoreDelegateTypedInputs(t *testing.T) {
-	for _, name := range []string{"build", "restore", "restore-failure"} {
+	t.Setenv("TMPDIR", t.TempDir())
+	for _, name := range []string{"build", "build-verbose", "restore", "restore-failure"} {
 		t.Run(name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
 			called := false
@@ -373,6 +383,9 @@ func TestBuildAndRestoreDelegateTypedInputs(t *testing.T) {
 					called = true
 					if ctx.Err() != nil || cfg.Repository != "repo" || cfg.NKEClone != "clone" || cfg.AttemptPrefix != "fresh" || cfg.Jobs != 2 || cfg.Progress.(*checkedWriter).out != &out {
 						t.Fatalf("lost build options: %+v", cfg)
+					}
+					if cfg.Progress.(*checkedWriter).verbose != (name == "build-verbose") {
+						t.Fatal("verbose flag not propagated")
 					}
 					return nkedemo.BuiltInputs{NKDCTL: "built-nkdctl"}, nil
 				},
@@ -392,8 +405,11 @@ func TestBuildAndRestoreDelegateTypedInputs(t *testing.T) {
 				},
 			}
 			args := []string{"restore", "--work", "original-work"}
-			if name == "build" {
+			if strings.HasPrefix(name, "build") {
 				args = []string{"build", "--repo", "repo", "--nke-clone", "clone", "--attempt", "fresh", "--jobs", "2"}
+				if name == "build-verbose" {
+					args = append(args, "--verbose")
+				}
 			}
 			err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), args)
 			if name == "restore-failure" {

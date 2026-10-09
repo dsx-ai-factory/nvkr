@@ -393,7 +393,7 @@ func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 				write(path, data, 0600)
 			}
 			write("toolchains/nkd-packer/build.sh", []byte("#!/bin/sh\nprintf 'unexpected toolchain build\\n' >>\"$TEST_CALLS\"\nexit 99\n"), 0700)
-			write("tools/runner", []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >>\"$TEST_CALLS\"\n[ \"$1 $2\" = 'run plan' ] || exit 99\nprintf '%s\\n' \"$TEST_PLAN\"\n"), 0700)
+			write("tools/runner", []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >>\"$TEST_CALLS\"\ncase \"$1 $2\" in 'run plan') printf '%s\\n' \"$TEST_PLAN\";; 'run graph') printf 'flowchart LR\\n';; *) exit 99;; esac\n"), 0700)
 			write("tools/uname", []byte("#!/bin/sh\nif [ \"$1\" = -s ]; then echo Linux; else echo aarch64; fi\n"), 0700)
 			write("tools/id", []byte("#!/bin/sh\necho 1000\n"), 0700)
 			write("tools/docker", []byte(`#!/bin/sh
@@ -446,20 +446,22 @@ esac
 
 func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 	const validated = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	const plan = `{"builds":[{"name":"nicosim-tools-arm64","catalogDigest":"catalog","components":["nico-sim"],"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}}]}`
+	const plan = `{"lifecycleOutputs":[{"name":"nicosim-tools-arm64","kind":"executable","components":["nico-sim"]}],"builds":[{"name":"nicosim-tools-arm64","catalogDigest":"catalog","components":["nico-sim"],"executionGraph":{"nodes":[{"id":"fetch","needs":[]},{"id":"build","needs":["fetch"]}]},"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}}]}`
 	for _, tc := range []struct {
 		name, returned, buildExit string
 		wantError                 bool
 		shared                    bool
 		inspected                 string
+		graphFail                 bool
 	}{
-		{"freeze validated ID without resolving tag", validated, "0", false, false, ""},
-		{"reject empty result", "", "0", true, false, ""},
-		{"reject result mixed with diagnostics", "diagnostic\n" + validated, "0", true, false, ""},
-		{"failed validation cannot proceed", validated, "42", true, false, ""},
-		{"reuse first lane without compiling or building", validated, "99", false, true, validated},
-		{"shared image cannot be a tag", "local:latest", "99", true, true, validated},
-		{"shared image unavailable in runtime", validated, "99", true, true, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+		{"freeze validated ID without resolving tag", validated, "0", false, false, "", false},
+		{"reject empty result", "", "0", true, false, "", false},
+		{"reject result mixed with diagnostics", "diagnostic\n" + validated, "0", true, false, "", false},
+		{"failed validation cannot proceed", validated, "42", true, false, "", false},
+		{"reuse first lane without compiling or building", validated, "99", false, true, validated, false},
+		{"shared image cannot be a tag", "local:latest", "99", true, true, validated, false},
+		{"shared image unavailable in runtime", validated, "99", true, true, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", false},
+		{"graph failure prevents toolchain work", validated, "0", true, false, "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -492,6 +494,7 @@ exit "$TEST_BUILD_EXIT"
 printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
   'run plan') printf '%s\n' "$TEST_PLAN";;
+  'run graph') [ "$TEST_GRAPH_EXIT" = 0 ] || exit "$TEST_GRAPH_EXIT"; printf 'flowchart LR\n  fetch --> build\n';;
   'run local') jq -e --arg id "$TEST_VALIDATED" '.toolchainSubstitutions[0].to == $id' "$TEST_REPO/.nkd/laptop-bootstrap/id-probe/toolchain-attempt.json";;
   *) exit 99;;
 esac
@@ -522,12 +525,16 @@ esac
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
 			linkLauncherTestTimeout(t, filepath.Join(dir, "tools"))
+			graphExit := "0"
+			if tc.graphFail {
+				graphExit = "42"
+			}
 			cmd := exec.CommandContext(ctx, "bash", filepath.Join(dir, "scripts/nke-full-arm64-local.sh"), "id-probe", "1", "simulator")
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
 				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NKD_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected,
-				"NKE_SOURCE_TOKEN=command-log-environment-sentinel")
+				"NKE_SOURCE_TOKEN=command-log-environment-sentinel", "TEST_GRAPH_EXIT="+graphExit)
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
 			err := cmd.Run()
@@ -544,6 +551,21 @@ esac
 			if err != nil || !json.Valid(baseline) || string(baseline) != plan+"\n" {
 				t.Fatalf("baseline Plan JSON changed: read error=%v", err)
 			}
+			if !tc.graphFail {
+				physicalDir, err := filepath.EvalSymlinks(dir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				graph, err := os.ReadFile(filepath.Join(dir, ".nkd/laptop-bootstrap/id-probe/build-graph.md"))
+				if err != nil || !strings.Contains(string(graph), "```mermaid\nflowchart LR\n  fetch --> build\n```\n") {
+					t.Fatalf("complete owner-rendered graph missing: read error=%v", err)
+				}
+				for _, required := range []string{"Build graph: " + physicalDir + "/.nkd/laptop-bootstrap/id-probe/build-graph.md", "Build graph: planned outputs: 1; producer steps: 2; producer dependency edges: 1", "  output: nicosim-tools-arm64 [executable]: nico-sim"} {
+					if !strings.Contains(stderr.String(), required) {
+						t.Fatalf("missing compiled graph summary %q: %s", required, &stderr)
+					}
+				}
+			}
 			calls, err := os.ReadFile(filepath.Join(dir, "calls"))
 			if err != nil {
 				t.Fatal(err)
@@ -559,16 +581,22 @@ esac
 				}
 			}
 			for _, line := range strings.Split(string(calls), "\n") {
-				if strings.HasPrefix(line, "run plan ") || strings.HasPrefix(line, "run local ") {
+				if strings.HasPrefix(line, "run plan ") || strings.HasPrefix(line, "run graph ") || strings.HasPrefix(line, "run local ") {
 					invoked = append(invoked, "nkdctl command: "+runner+" "+line)
 				}
 			}
-			wantCount := 3 // Baseline Plan, dry-run preview, and final exec.
+			wantCount := 4 // Baseline Plan, complete graph, dry-run preview, and final exec.
 			if tc.wantError {
-				wantCount = 1 // Toolchain rejection stops after baseline admission.
+				wantCount = 2 // Graph or toolchain rejection prevents execution.
 			}
 			if len(logged) != wantCount || !slices.Equal(logged, invoked) {
 				t.Fatalf("logged commands=%q, executed commands=%q; want %d", logged, invoked, wantCount)
+			}
+			if graph := strings.Index(string(calls), "run graph "); graph < 0 || (strings.Contains(string(calls), "toolchain-build") && graph > strings.Index(string(calls), "toolchain-build")) {
+				t.Fatalf("graph was not rendered before toolchain work: %s", calls)
+			}
+			if tc.graphFail && strings.Contains(string(calls), "toolchain-build") {
+				t.Fatalf("graph failure performed toolchain work: %s", calls)
 			}
 			if !tc.shared && strings.Contains(string(calls), "image inspect") {
 				t.Fatalf("launcher resolved validated bytes through a mutable tag: %s", calls)

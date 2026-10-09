@@ -260,8 +260,20 @@ introduced in PR #113. The image carries its chart/image packages for stream
 Ubuntu image producer, not its private FIPS/STIG flavor. Access to the fork must
 work from the Linux execution host.
 
-Progress streams to the terminal with observed START/DONE/FAIL boundaries;
-private installer output stays in private logs. Ctrl+C requests cancellation;
+Before toolchain preparation, the launcher prints the selected output names and
+saves the complete linked graph to
+`.nkd/laptop-bootstrap/<build.attempt>/build-graph.md`. Open it in a
+Mermaid-capable Markdown viewer to see producers, dependencies, artifacts and
+required outputs. It comes from `nkdctl run graph` over the compiled baseline
+Plan, not a hand-maintained diagram; the later attempt-local toolchain substitution
+does not make this display execution evidence.
+
+The console shows elapsed time and observed START/DONE/FAIL boundaries instead
+of every compiler/download line. `build` and `e2e` print the path to a private
+console log containing the raw public build output; use `tail -f` on that path
+for details, or add `--verbose` to stream it directly. Log messages and graph
+views are diagnostics, not proof of artifact verification or successful E2E.
+Private installer output stays in its private logs. Ctrl+C requests cancellation;
 the adapter attempts bounded process joins and owned cleanup. If cleanup refuses,
 inspect the retained resources and recovery instructions before rerunning.
 Ordinary tests do not prove interruption at every live NKE stage.
