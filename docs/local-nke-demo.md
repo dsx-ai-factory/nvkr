@@ -206,6 +206,10 @@ docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af0682
 Run the checked-in example directly from the repository root. The flags below
 replace its placeholder repository and output paths; no YAML copy or editing
 is required. For each rerun, change both `--attempt` and `--out` to unused names.
+An attempt reserves `.nkd/installers/<attempt>`,
+`.nkd/laptop-bootstrap/<attempt>` and `.nkd/runs/<attempt>`. Deleting only
+the Run or demo output does not make that attempt fresh. Prefer a new name;
+keep the bootstrap directory containing your `$NKE_DEMO` executable.
 Do not add retained `run.runs` or `run.nkdctl` references to E2E configuration.
 
 ```sh

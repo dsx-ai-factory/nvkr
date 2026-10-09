@@ -10,8 +10,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
+
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"golang.org/x/sys/unix"
 )
 
 func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
@@ -147,5 +152,53 @@ func TestBuiltInputsShareCombinedRun(t *testing.T) {
 	want := RunInputs{OS: "/repo/.nkd/runs/fresh", Components: "/repo/.nkd/runs/fresh", Providers: "/repo/.nkd/runs/fresh", Site: "/repo/.nkd/runs/fresh", Tools: "/repo/.nkd/runs/fresh", Profiles: "/repo/.nkd/runs/fresh", Simulator: "/repo/.nkd/runs/fresh"}
 	if built.Runs != want || built.NKDCTL != "/repo/.nkd/laptop-bootstrap/fresh/nkdctl" {
 		t.Fatalf("combined inputs=%#v", built)
+	}
+}
+
+func TestBuildAttemptDiagnostics(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
+		t.Skip("artifact build admission requires native Linux ARM64")
+	}
+	for _, root := range []string{"runs", "laptop-bootstrap"} {
+		for _, blockedParent := range []bool{false, true} {
+			t.Run(root+map[bool]string{false: "/existing", true: "/not-directory"}[blockedParent], func(t *testing.T) {
+				repo := privateTestDir(t)
+				if err := os.Mkdir(filepath.Join(repo, "scripts"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(repo, "scripts/nke-full-arm64-local.sh"), []byte("#!/bin/sh\nexit 99\n"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				parent := filepath.Join(repo, ".nkd", root)
+				if err := os.MkdirAll(filepath.Dir(parent), 0700); err != nil {
+					t.Fatal(err)
+				}
+				owned := filepath.Join(parent, "retained")
+				keep := owned
+				if blockedParent {
+					keep = parent
+				} else if err := os.MkdirAll(parent, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(keep, []byte("original"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				result, err := BuildArtifacts(t.Context(), BuildConfig{Repository: repo, AttemptPrefix: "retained", Jobs: 2})
+				var coded *nkderr.Error
+				if result != (BuiltInputs{}) || !errors.As(err, &coded) || coded.Code != nkderr.CodeBuildFailed || !strings.Contains(err.Error(), owned) {
+					t.Fatalf("result=%+v error=%v", result, err)
+				}
+				if blockedParent {
+					if !errors.Is(err, unix.ENOTDIR) || !strings.Contains(err.Error(), "cannot inspect") || strings.Contains(err.Error(), "already exists") {
+						t.Fatalf("inspection cause obscured: %v", err)
+					}
+				} else if !strings.Contains(err.Error(), "already exists; choose a fresh --attempt") {
+					t.Fatalf("existing path guidance absent: %v", err)
+				}
+				if raw, err := os.ReadFile(keep); err != nil || string(raw) != "original" {
+					t.Fatal("preflight modified retained input")
+				}
+			})
+		}
 	}
 }

@@ -67,8 +67,11 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	// All host checks and fresh-path checks precede the first bootstrap. The
 	// script remains authoritative for exact runtime/toolchain admission.
 	for _, root := range []string{"runs", "laptop-bootstrap"} {
-		if _, readErr := os.Lstat(filepath.Join(repo, ".nkd", root, cfg.AttemptPrefix)); !errors.Is(readErr, os.ErrNotExist) {
-			return BuiltInputs{}, errors.New("attempt destination exists or cannot be inspected; choose a fresh attempt")
+		owned := filepath.Join(repo, ".nkd", root, cfg.AttemptPrefix)
+		if _, readErr := os.Lstat(owned); readErr == nil {
+			return BuiltInputs{}, fmt.Errorf("attempt destination %q already exists; choose a fresh --attempt", owned)
+		} else if !errors.Is(readErr, os.ErrNotExist) {
+			return BuiltInputs{}, fmt.Errorf("cannot inspect attempt destination %q: %w", owned, readErr)
 		}
 	}
 	if err = runner.Run(ctx, []string{"bash", script, "--check", "all"}, "preflight-all", 120*time.Second); err != nil {

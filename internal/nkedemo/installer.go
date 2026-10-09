@@ -59,8 +59,10 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 		if insidePath(out, owned) || insidePath(owned, out) {
 			return result, errors.New("diagnostic output must not overlap installer, Run or bootstrap attempt")
 		}
-		if _, err = os.Lstat(owned); !errors.Is(err, os.ErrNotExist) {
-			return result, errors.New("attempt destination exists or cannot be inspected; choose a fresh attempt")
+		if _, err = os.Lstat(owned); err == nil {
+			return result, fmt.Errorf("attempt destination %q already exists; choose a fresh --attempt", owned)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return result, fmt.Errorf("cannot inspect attempt destination %q: %w", owned, err)
 		}
 	}
 	source := "https://github.com/dsx-ai-factory/nke.git"

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"golang.org/x/sys/unix"
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
@@ -201,5 +202,57 @@ func TestPrepareInstallerCanceledAdmissionIsCoded(t *testing.T) {
 	var coded *nkderr.Error
 	if result != (Config{}) || !errors.As(err, &coded) || coded.Code != nkderr.CodeTimeout || !errors.Is(err, context.Canceled) {
 		t.Fatalf("result=%+v error=%v", result, err)
+	}
+}
+
+func TestPrepareInstallerAttemptDiagnostics(t *testing.T) {
+	for _, root := range []string{"runs", "laptop-bootstrap", "installers"} {
+		for _, blockedParent := range []bool{false, true} {
+			t.Run(root+map[bool]string{false: "/existing", true: "/not-directory"}[blockedParent], func(t *testing.T) {
+				repo := privateTestDir(t)
+				tools := filepath.Join(repo, "tools")
+				parent := filepath.Join(repo, ".nkd", root)
+				if err := os.MkdirAll(filepath.Dir(parent), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(tools, 0700); err != nil {
+					t.Fatal(err)
+				}
+				for _, name := range []string{"git", "bash", "python3"} {
+					if err := os.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\nexit 99\n"), 0700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				t.Setenv("PATH", tools)
+				owned := filepath.Join(parent, "retained")
+				keep := owned
+				if blockedParent {
+					keep = parent
+				} else if err := os.MkdirAll(parent, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(keep, []byte("original"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				result, err := PrepareInstaller(t.Context(), BuildConfig{Repository: repo, AttemptPrefix: "retained", Jobs: 2}, Config{Out: filepath.Join(repo, "out"), Timeout: time.Hour})
+				var coded *nkderr.Error
+				if result != (Config{}) || !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !strings.Contains(err.Error(), owned) {
+					t.Fatalf("result=%+v error=%v", result, err)
+				}
+				if blockedParent {
+					if !errors.Is(err, unix.ENOTDIR) || !strings.Contains(err.Error(), "cannot inspect") || strings.Contains(err.Error(), "already exists") {
+						t.Fatalf("inspection cause obscured: %v", err)
+					}
+				} else if !strings.Contains(err.Error(), "already exists; choose a fresh --attempt") {
+					t.Fatalf("existing path guidance absent: %v", err)
+				}
+				if raw, err := os.ReadFile(keep); err != nil || string(raw) != "original" {
+					t.Fatal("preflight modified retained input")
+				}
+				if _, err := os.Lstat(filepath.Join(repo, "out")); !errors.Is(err, os.ErrNotExist) {
+					t.Fatal("preflight created output")
+				}
+			})
+		}
 	}
 }
