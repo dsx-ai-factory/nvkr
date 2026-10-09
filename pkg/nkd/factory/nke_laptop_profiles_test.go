@@ -5,56 +5,115 @@ package factory
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
 
-// Exercise the emitted shell, not a duplicate of its configuration mutation.
-// The GRUB loader is modeled; udev naming and a real reboot remain acceptance.
-func TestLaptopProfilesGRUBDropIn(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog", "registry.yaml"))
+// Apply the authenticated patch with Git, not a second patch interpreter.
+// These exact fixture bytes come from the catalog's pinned NKE source.
+func laptopProfilesPatchedFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, file := range []struct{ name, target, digest string }{
+		{"Dockerfile", "controller/test/fixtures/Dockerfile", "231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a"},
+		{"userData.tmpl", "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl", "861964b7d4bbc6d4c82c8e77891cf1cd3ceb344666d344708b54e4492f910d09"},
+	} {
+		data, err := os.ReadFile(filepath.Join("..", "..", "..", "scripts", "testdata", "nke-local-profile", "upstream", file.name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fmt.Sprintf("%x", sha256.Sum256(data)) != file.digest {
+			t.Fatal("upstream fixture bytes changed")
+		}
+		target := filepath.Join(root, file.target)
+		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var registry struct {
-		Components map[string]struct {
-			BuildCommand []string `yaml:"buildCommand"`
-		} `yaml:"components"`
+	patches := cat.Components["nke-local-profiles"].Patches
+	if len(patches) != 1 {
+		t.Fatal("expected one authenticated profile patch")
 	}
-	if err := yaml.Unmarshal(raw, &registry); err != nil {
+	for _, args := range [][]string{
+		{"apply", "--no-index", "--check", "--whitespace=nowarn", "-"},
+		{"apply", "--no-index", "--whitespace=nowarn", "-"},
+		{"apply", "--no-index", "--reverse", "--check", "--whitespace=nowarn", "-"},
+	} {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		cmd := exec.CommandContext(ctx, "git", args...)
+		cmd.Dir, cmd.WaitDelay = root, time.Second
+		cmd.Env = append(os.Environ(), "GIT_CEILING_DIRECTORIES="+filepath.Dir(root))
+		cmd.Stdin = strings.NewReader(patches[0].Content)
+		out, err := cmd.CombinedOutput()
+		cancel()
+		if err != nil {
+			t.Fatalf("apply authenticated profile patch: %v\n%s", err, out)
+		}
+	}
+	return root
+}
+
+func TestLaptopProfilesBuildArguments(t *testing.T) {
+	for _, args := range [][]string{nil, {"arm64", "extra"}, {"amd64"}} {
+		t.Run(fmt.Sprint(args), func(t *testing.T) {
+			root := laptopProfilesPatchedFixture(t)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			command := append([]string{"controller/test/fixtures/nkd-local/build.sh"}, args...)
+			cmd := exec.CommandContext(ctx, "sh", command...)
+			cmd.Dir, cmd.WaitDelay = root, time.Second
+			if out, err := cmd.CombinedOutput(); err == nil {
+				t.Fatalf("invalid arguments accepted: %s", out)
+			}
+			if _, err := os.Lstat(filepath.Join(root, "bin")); !os.IsNotExist(err) {
+				t.Fatal("invalid arguments reached output work")
+			}
+		})
+	}
+}
+
+// Exercise the patched shell, not a duplicate of its configuration mutation.
+// The GRUB loader is modeled; udev naming and a real reboot remain acceptance.
+func TestLaptopProfilesGRUBDropIn(t *testing.T) {
+	patched := laptopProfilesPatchedFixture(t)
+	raw, err := os.ReadFile(filepath.Join(patched, "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	command := registry.Components["nke-local-profiles"].BuildCommand
-	if len(command) != 3 {
-		t.Fatal("unexpected profiles producer")
-	}
-	_, stanza, found := strings.Cut(command[2], "printf '%s\\n' '#cloud-config' 'bootcmd:'")
+	boot, _, found := strings.Cut(string(raw), "\nhostname:")
 	if !found {
-		t.Fatal("missing cloud-init producer stanza")
+		t.Fatal("missing cloud-init boot command boundary")
 	}
-	stanza, _, found = strings.Cut(stanza, "\nsed '1d;98d;")
-	if !found {
-		t.Fatal("missing source-template append boundary")
+	var config struct {
+		Bootcmd []string `yaml:"bootcmd"`
 	}
-	stanza = "printf '%s\\n' '#cloud-config' 'bootcmd:'" + stanza
+	if err := yaml.Unmarshal([]byte(boot), &config); err != nil || len(config.Bootcmd) != 1 {
+		t.Fatalf("patched bootcmd differs: %v", err)
+	}
 	for _, scenario := range []string{"new-and-repeat", "eth0-new-and-repeat", "missing-uplink", "ambiguous-uplink", "unsupported-uplink", "different", "symlink", "directory", "link-different", "link-symlink", "link-directory", "link-parent-symlink"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
-			destination := filepath.Join(root, "bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain")
-			if err := os.MkdirAll(destination, 0o700); err != nil {
-				t.Fatal(err)
-			}
 			run := func(script string) ([]byte, error) {
 				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 				defer cancel()
@@ -64,19 +123,6 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 					"PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
 				cmd.WaitDelay = time.Second
 				return cmd.CombinedOutput()
-			}
-			if out, err := run(stanza); err != nil {
-				t.Fatalf("emit bootcmd: %v\n%s", err, out)
-			}
-			data, err := os.ReadFile(filepath.Join(destination, "userData.tmpl"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			var config struct {
-				Bootcmd []string `yaml:"bootcmd"`
-			}
-			if err := yaml.Unmarshal(data, &config); err != nil || len(config.Bootcmd) != 1 {
-				t.Fatalf("emitted bootcmd differs: %v", err)
 			}
 			if err := os.Mkdir(filepath.Join(root, "grub.d"), 0o700); err != nil {
 				t.Fatal(err)
@@ -167,130 +213,93 @@ func TestLaptopProfilesGRUBDropIn(t *testing.T) {
 	}
 }
 
-// Run the authored mechanical projection, not a second template transformer.
-// The producer's source checksum authenticates the real template before this
-// operation; these fixtures cover the emitted policy, not guest APT readiness.
+// Inspect and execute the actual patched APT commands. Full cloud-init template
+// rendering remains covered with NKE's owning helpers in the downstream test.
 func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog", "registry.yaml"))
+	root := laptopProfilesPatchedFixture(t)
+	raw, err := os.ReadFile(filepath.Join(root, "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var registry struct {
-		Components map[string]struct {
-			BuildCommand []string `yaml:"buildCommand"`
-		} `yaml:"components"`
-	}
-	if err := yaml.Unmarshal(raw, &registry); err != nil {
-		t.Fatal(err)
-	}
-	command := registry.Components["nke-local-profiles"].BuildCommand
-	if len(command) != 3 {
-		t.Fatal("unexpected profiles producer")
-	}
-	projection := ""
-	for _, line := range strings.Split(command[2], "\n") {
-		if strings.HasPrefix(line, "sed '1d;98d;") {
-			if projection != "" {
-				t.Fatal("ambiguous source template projection")
-			}
-			projection = line
+	value := string(raw)
+	for _, forbidden := range []string{"package_update: true", "apt-get install -y -o DPkg", "--ignore-missing", "carbide-pxe"} {
+		if strings.Contains(value, forbidden) {
+			t.Fatalf("unexpected first-boot behavior %q", forbidden)
 		}
 	}
-	if projection == "" {
-		t.Fatal("missing local APT projection")
+	if strings.Count(value, "package_update: false") != 1 {
+		t.Fatal("first-boot refresh must be disabled exactly once")
 	}
-	for _, scenario := range []string{"update-enabled", "update-disabled"} {
-		t.Run(scenario, func(t *testing.T) {
-			root := t.TempDir()
-			source := filepath.Join(root, "controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl")
-			destination := filepath.Join(root, "bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl")
-			for _, path := range []string{source, destination} {
-				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-					t.Fatal(err)
-				}
+	var commands []string
+	for _, line := range strings.Split(value, "\n") {
+		if strings.Contains(line, "apt-get install -y ") {
+			commands = append(commands, strings.TrimPrefix(line, "  - "))
+		}
+	}
+	packages := []string{
+		"teleport-ent=18.6.4",
+		"nke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
+		"nke-cni-calico-images-3.30.1 nke-cni-calico-manifests-3.30.1",
+		"nke-cni-ovn-images-1.4.0 nke-cni-ovn-charts-1.4.0",
+	}
+	if len(commands) != len(packages) {
+		t.Fatal("source-owned package selection changed")
+	}
+	for index, name := range packages {
+		want := "DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 " + name + " || exit 1"
+		if commands[index] != want {
+			t.Fatalf("unexpected install command %q; want %q", commands[index], want)
+		}
+	}
+	for _, failure := range []bool{false, true} {
+		t.Run(fmt.Sprintf("install-failure-%t", failure), func(t *testing.T) {
+			fixture := t.TempDir()
+			status := "0"
+			if failure {
+				status = "100"
 			}
-			lines := make([]string, 98)
-			for index := range lines {
-				lines[index] = "# unchanged"
-			}
-			lines[0] = "#cloud-config"
-			lines[5] = "package_update: true"
-			if scenario == "update-disabled" {
-				lines[5] = "package_update: false"
-			}
-			packages := []string{"nke-agent", "nke-kubeadm-distro-1.34.2", "nke-cni-ovn-images-1.4.0", "teleport-ent=18.6.4"}
-			lines[89] = "runcmd:"
-			for index, name := range packages {
-				lines[90+index] = "  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 " + name
-			}
-			lines[97] = "  - curl http://foreign-agent/override"
-			original := strings.Join(lines, "\n") + "\n"
-			if err := os.WriteFile(source, []byte(original), 0o600); err != nil {
+			if err := os.WriteFile(filepath.Join(fixture, "apt-get"), []byte("#!/bin/sh\nexit "+status+"\n"), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "bash", "-euc", projection)
-			cmd.Dir, cmd.WaitDelay = root, time.Second
-			if out, err := cmd.CombinedOutput(); err != nil {
-				t.Fatalf("project first-boot policy: %v\n%s", err, out)
+			// No set -e: the explicit exits must stop cloud-init's shell list.
+			run := exec.CommandContext(ctx, "sh", "-c", strings.Join(commands, "\n")+"\nprintf done > completion-marker\n")
+			run.Dir, run.WaitDelay = fixture, time.Second
+			run.Env = append(os.Environ(), "PATH="+fixture+string(os.PathListSeparator)+os.Getenv("PATH"))
+			out, err := run.CombinedOutput()
+			if (err != nil) != failure {
+				t.Fatalf("install failure propagation differs: %v\n%s", err, out)
 			}
-			data, err := os.ReadFile(destination)
-			if err != nil {
-				t.Fatal(err)
-			}
-			value := string(data)
-			if strings.Count(value, "package_update: false") != 1 || strings.Count(value, "Dir::Etc::sourceparts=-") != len(packages) {
-				t.Fatal("first-boot package refresh or install projection differs")
-			}
-			for _, forbidden := range []string{"package_update: true", "apt-get install -y -o DPkg", "--ignore-missing", "foreign-agent", "#cloud-config"} {
-				if strings.Contains(value, forbidden) {
-					t.Fatalf("unexpected first-boot behavior %q", forbidden)
-				}
-			}
-			for _, name := range packages {
-				if !strings.Contains(value, "apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 "+name+" || exit 1") {
-					t.Fatalf("lost source-owned package selection %q", name)
-				}
-			}
-			var config struct {
-				Runcmd []string `yaml:"runcmd"`
-			}
-			if err := yaml.Unmarshal(data, &config); err != nil || len(config.Runcmd) != len(packages) {
-				t.Fatalf("projected command list differs: %v", err)
-			}
-			for _, failure := range []bool{false, true} {
-				t.Run(fmt.Sprintf("install-failure-%t", failure), func(t *testing.T) {
-					fixture := t.TempDir()
-					status := "0"
-					if failure {
-						status = "100"
-					}
-					if err := os.WriteFile(filepath.Join(fixture, "apt-get"), []byte("#!/bin/sh\nexit "+status+"\n"), 0o700); err != nil {
-						t.Fatal(err)
-					}
-					ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-					defer cancel()
-					// Match cloud-init's ordinary shell commands, without set -e.
-					run := exec.CommandContext(ctx, "sh", "-c", strings.Join(config.Runcmd, "\n")+"\nprintf done > completion-marker\n")
-					run.Dir, run.WaitDelay = fixture, time.Second
-					run.Env = append(os.Environ(), "PATH="+fixture+string(os.PathListSeparator)+os.Getenv("PATH"))
-					out, err := run.CombinedOutput()
-					if (err != nil) != failure {
-						t.Fatalf("install failure propagation differs: %v\n%s", err, out)
-					}
-					_, markerErr := os.Stat(filepath.Join(fixture, "completion-marker"))
-					if failure && !os.IsNotExist(markerErr) || !failure && markerErr != nil {
-						t.Fatal("completion marker does not match installation result")
-					}
-				})
-			}
-			unchanged, err := os.ReadFile(source)
-			if err != nil || string(unchanged) != original {
-				t.Fatal("source template was modified")
+			_, markerErr := os.Stat(filepath.Join(fixture, "completion-marker"))
+			if failure && !os.IsNotExist(markerErr) || !failure && markerErr != nil {
+				t.Fatal("completion marker does not match installation result")
 			}
 		})
 	}
+}
+
+func TestLaptopProfilesRejectTamperedPatch(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog")
+	for _, name := range []string{"registry.yaml", "pins.lock.yaml", "patches/local-profile.patch"} {
+		data, err := os.ReadFile(filepath.Join(source, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if name == "patches/local-profile.patch" {
+			data = append(data, []byte("\n# substituted\n")...)
+		}
+		target := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err := catalog.LoadContext(t.Context(), catalog.Dir(dir))
+	assertFactoryErrorCode(t, err, e.CodeUnpinnedSource)
 }
 
 // This admits one diagnostic artifact, not image/profile runtime compatibility.
@@ -355,23 +364,29 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					if node.BuilderType != ir.BuilderBuildKit || node.OutputType != "oci-image" || node.WriteDir != "bin" {
 						t.Fatalf("unexpected producer: %+v", node)
 					}
-					command := strings.Join(node.Command, " ")
+					if !slices.Equal(node.Command, []string{"sh", "controller/test/fixtures/nkd-local/build.sh", "arm64"}) {
+						t.Fatalf("unexpected producer command: %v", node.Command)
+					}
+					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
+						node.Patches[0].SHA256 != "sha256:4a36de3fe026f3e8b1841c49ef4590dcc5fa65c1f4d463769c32d84b05455171" {
+						t.Fatal("Plan must retain the exact authenticated source patch")
+					}
+					command := node.Patches[0].Content
 					for _, required := range []string{
-						"sha256sum -c -", "231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a",
-						"861964b7d4bbc6d4c82c8e77891cf1cd3ceb344666d344708b54e4492f910d09",
-						"sed '1d;98d;", "package_update: false", "Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list", "Dir::Etc::sourceparts=-", " || exit 1", "net.ifnames=1", "update-grub", "bootcmd:",
+						"package_update: false", "Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list", "Dir::Etc::sourceparts=-", " || exit 1", "net.ifnames=1", "update-grub", "bootcmd:",
 						"/etc/default/grub.d/zz-nkd-local-network.cfg", "${GRUB_CMDLINE_LINUX} net.ifnames=1",
 						"set -eu", "test ! -L", "test -f", "= \"$expected\"",
 						"FROM alpine@sha256:", "nico-vms-cp.yaml", "nico-vms-worker.yaml",
 						"nke-local-26-04-arm64-plain", "ubuntu_version: \"26.04\"", "variant: local-plain-tpm",
 						"http://172.30.0.1:18080/nke-node-image-arm64.qcow2", "console=ttyAMA0,115200",
 						"--opt platform=linux/arm64", "--opt force-network-mode=none", "nke-local-profiles-arm64.oci.tar",
+						"test \"$#\" = 1", "test \"$1\" = arm64",
 					} {
 						if !strings.Contains(command, required) {
 							t.Fatalf("missing bound producer instruction %q", required)
 						}
 					}
-					for _, forbidden := range []string{"luks.key=", "set luks-key", "\nmake ", "\ndocker push", "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/."} {
+					for _, forbidden := range []string{"luks.key=", "set luks-key", "\nmake ", "\ndocker push", "sed '1d;98d;", "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/."} {
 						if strings.Contains(command, forbidden) {
 							t.Fatalf("unexpected build scope %q", forbidden)
 						}

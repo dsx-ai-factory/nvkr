@@ -14,11 +14,14 @@ producer, packaging, source-access and runtime work.
 
 ## Evidence and remaining work
 
-Point-in-time inventory checked on October 7, 2026, against main
-`105bb738521c9dbd7f1326ab15e78a699200f4f1`,
+The source-catalog status was refreshed on October 8, 2026, against main
+`d5b02b8a23d8d40456353facc1cd9beb9bbfd8ae`, which merged
 [PR #113](https://github.com/dsx-ai-factory/nke-recipes/pull/113) head
-`bb28f56614c71c04522c7be091f784f54b1c3794`, the local example and NKE's
-source-owned workflows. PR #113 is a separate draft, not merged support on main.
+`6d5c36a96baf81911b5a1c9af62b7e63cfebfe46`. Its
+[public-source producers](../definitions/nke-os-source/README.md) and
+[OVN outputs](../definitions/nke-ovn-source/README.md) now exist on main,
+but are not selected by the maintained OS graph or this laptop OS selection.
+The remaining migration is not completed by merging those candidate catalogs.
 
 | Required area | Existing implementation | Missing for the requested build |
 | --- | --- | --- |

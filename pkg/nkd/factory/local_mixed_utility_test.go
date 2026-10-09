@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	authored "github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
@@ -211,7 +212,9 @@ func TestMixedLocalUtilityLaunchBindsExactPlan(t *testing.T) {
 	if err := os.WriteFile(runtime, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" >> \"$NKD_TEST_RUNTIME_LOG\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	node := planNode(plan, "worker/terminal-observe")
+	// Ordinary terminal observation runs on the host; SBOM production still
+	// enters the offline child and must bind the complete original Plan.
+	node := planNode(plan, "worker/sbom")
 	options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/test", Runtime: runtime})
 	compiler := filepath.Join(root, "compiler")
 	if err := os.WriteFile(compiler, []byte("#!/bin/sh\n[ \"$5\" = -o ] || exit 91\nprintf 'fixture runner' > \"$6\"\n"), 0o755); err != nil {
@@ -240,4 +243,54 @@ func TestMixedLocalUtilityLaunchBindsExactPlan(t *testing.T) {
 		t.Fatalf("child argv does not bind written Plan: %v", err)
 	}
 	assertFactoryErrorCode(t, VerifyPlanDigest(written, "sha256:"+strings.Repeat("f", 64)), e.CodePipelineDrift)
+}
+
+func TestMixedLocalTerminalObservationUsesRelocatedHostBytes(t *testing.T) {
+	for _, forged := range []bool{false, true} {
+		t.Run(map[bool]string{false: "exact", true: "forged producer"}[forged], func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			plan := mixedLocalUtilityPlan(t)
+			options := withLocalDefaults(LocalRunOptions{Workspace: ".nkd/test", Runtime: "missing-runtime"})
+			if err := os.Rename(".nkd/factory", options.Workspace); err != nil {
+				t.Fatal(err)
+			}
+			relocated, err := relocateFactoryPlan(plan, options.Workspace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, artifacts := planIndex(relocated)
+			node := planNode(plan, "worker/terminal-observe")
+			if forged {
+				result, err := readProducerResult(t.Context(), artifacts["result/worker/worker"].Path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				result.Size++
+				writeAcquiredImageResult(t, artifacts["result/worker/worker"].Path, result)
+			}
+			err = executeLocalFactoryNode(t.Context(), plan, node, options, nil)
+			output := artifacts[node.Outputs[0]].Path
+			if forged {
+				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+				if _, err := os.Stat(output); !os.IsNotExist(err) {
+					t.Fatalf("forged producer exposed observation: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var observed factoryObservation
+			if err := canonical.UnmarshalExact([]byte(strings.TrimSpace(string(raw))), &observed); err != nil {
+				t.Fatal(err)
+			}
+			if observed.BuildTarget != "worker" || observed.Qualification != TierStaticUnqualified || observed.BuildDigest == "" {
+				t.Fatalf("unexpected host observation binding: %#v", observed)
+			}
+		})
+	}
 }

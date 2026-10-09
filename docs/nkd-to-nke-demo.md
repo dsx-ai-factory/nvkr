@@ -320,9 +320,11 @@ management cluster, registry, guest bridge, routing/firewall rules and daemons.
 It refuses an occupied endpoint, nonempty session or overlapping network.
 
 The diagnostic guard temporarily grants private executable copies and the
-identified QEMU bridge helper required privileges. It permits guest traffic only
-to the exact owned management endpoint's SPIRE ports, withdrawing those rules
-before management-address release. Foreign ownership or an unjoined producer
+identified QEMU bridge helper required privileges. Its Docker raw-routing
+exception admits only the exact owned management endpoint's SPIRE ports and is
+withdrawn before address release. The guard also supplies guest forwarding/NAT
+and the declared DHCP/DNS/metadata/BGP services; it is not a SPIRE-only egress
+policy. Foreign ownership or an unjoined producer
 fails closed and retains dependent controls. No global Docker daemon policy is
 changed. This is a trusted single-user VM route, not production isolation.
 

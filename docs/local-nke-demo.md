@@ -58,12 +58,13 @@ ext4 avoids the shared-mount file-handle problem encountered during source expor
 For the tested Ubuntu ARM64 host:
 
 ```sh
+set -euo pipefail
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
   git jq coreutils python3 openssh-client bash curl openssl \
   libvirt-daemon-system libvirt-clients qemu-system-arm qemu-utils \
   qemu-efi-aarch64 cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
-  dnsmasq iptables iproute2 libcap2-bin e2fsprogs
+  dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs
 sudo -n true
 docker info >/dev/null
 docker buildx version
@@ -124,9 +125,11 @@ Inspect `docker network ls` and `ip route`. If `kind` does not exist and
 docker network create --driver bridge --subnet 172.18.0.0/16 --gateway 172.18.0.1 kind
 ```
 
-Do not recreate an existing network. Cache the pinned registry service:
+Do not recreate an existing network. Cache the pinned management-node and
+registry images (runtime acquisitions, not NKD source-built outputs):
 
 ```sh
+docker pull kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
 docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
 ```
 

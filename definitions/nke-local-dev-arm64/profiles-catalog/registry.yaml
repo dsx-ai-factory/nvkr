@@ -17,108 +17,11 @@ components:
     source: nke-profiles
     builderType: buildkit-rootless
     toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    patches:
+      - name: patches/local-profile.patch
+        sha256: sha256:4a36de3fe026f3e8b1841c49ef4590dcc5fa65c1f4d463769c32d84b05455171
     artifactPath: bin/nke-local-profiles-{{.Arch}}.oci.tar
     writeDir: bin
     outputType: oci-image
     platforms: [linux/arm64]
-    buildCommand:
-      - sh
-      - -ec
-      - |
-        # Exact fixture bytes make these mechanical edits fail closed when
-        # upstream changes. All preparation stays inside the declared writeDir.
-        printf '%s\n' \
-          '231af133082e6591e55318b1ad23e9a094dc600833bdc81168f1417bcba9e87a  controller/test/fixtures/Dockerfile' \
-          '861964b7d4bbc6d4c82c8e77891cf1cd3ceb344666d344708b54e4492f910d09  controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl' | sha256sum -c -
-        mkdir -p bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain
-        mkdir -p bin/profiles-context/profiles/configProfiles
-        cp -R controller/test/fixtures/runbooks bin/profiles-context/runbooks
-        cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles-context/profiles/configProfiles/
-        # Preserve the NKE Dockerfile except for freezing its base image bytes.
-        sed 's|FROM ${BASE_REGISTRY}/alpine:3.24.1|FROM alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6|' controller/test/fixtures/Dockerfile > bin/profiles-context/Dockerfile
-        # At the authenticated fixture revision, line 98 downloads a different
-        # agent over HTTP. Remove that override. The accepted disk already has
-        # the local NKE repository and its APT lists. Do not refresh public
-        # Ubuntu repositories on first boot. APT may read only that file:
-        # repository; no public source or source-parts directory is selected.
-        # Explicit exit propagation prevents cloud-init continuing after an
-        # install failure. Installed bytes still need downstream runtime
-        # verification; this is not full offline acceptance.
-        # The measured first boot can retain enp1s0 or become seed-named eth0.
-        # OVN's source-owned reconciliation persists that actual uplink in
-        # netplan. Freeze that one physical device's name across reboot. NICoSim
-        # prepends its own GRUB bootcmd to this list; this item runs afterward.
-        # The installer writes 99-console.cfg, which overrides /etc/default/grub.
-        # Source this exact local snippet after it, preserving the console value.
-        # Ubuntu's generated MAC-matched Netplan .link loses set-name when NKE
-        # moves L3 to OVS. Set an explicit Name in that generated link's drop-in,
-        # clearing NamePolicy so neither "keep" nor "path" overrides it.
-        # Only one physical NIC with one of the measured names is admitted;
-        # this is not a general eth0 naming policy for multi-interface hosts.
-        # Preserve Netplan's MAC match and MTU rather than replacing its file.
-        # First boot receives NICoSim's network seed before this bootcmd runs.
-        # Subsequent boots must use NKE's persisted OVS Netplan, not reapply
-        # that seed's set-name: eth0. Only network rendering is disabled in the
-        # next GRUB command line; cloud-init and its other modules stay enabled.
-        printf '%s\n' '#cloud-config' 'bootcmd:' '  - |' \
-          '    set -eu' \
-          '    uplink=' \
-          '    for device in /sys/class/net/*; do' \
-          '      test -e "$device/device" || continue' \
-          '      candidate="${device##*/}"' \
-          '      case "$candidate" in eth0|enp1s0) ;; *) exit 1 ;; esac' \
-          '      test -z "$uplink"' \
-          '      uplink="$candidate"' \
-          '    done' \
-          '    test -n "$uplink"' \
-          '    test ! -L /etc/systemd/network' \
-          '    test -d /etc/systemd/network' \
-          '    directory="/etc/systemd/network/10-netplan-$uplink.link.d"' \
-          '    test ! -L "$directory"' \
-          '    mkdir -p "$directory"' \
-          '    link="$directory/10-nkd-local-name.conf"' \
-          '    link_expected="$(printf "[Link]\\nNamePolicy=\\nName=%s\\n" "$uplink")"' \
-          '    test ! -L "$link"' \
-          '    if [ -e "$link" ]; then' \
-          '      test -f "$link"' \
-          '      test "$(cat "$link")" = "$link_expected"' \
-          '    else' \
-          '      printf "%s\n" "$link_expected" > "$link"' \
-          '    fi' \
-          '    file=/etc/default/grub.d/zz-nkd-local-network.cfg' \
-          '    expected='\''GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} net.ifnames=1 network-config=disabled"'\''' \
-          '    test ! -L "$file"' \
-          '    if [ -e "$file" ]; then' \
-          '      test -f "$file"' \
-          '      test "$(cat "$file")" = "$expected"' \
-          '    else' \
-          '      printf "%s\n" "$expected" > "$file"' \
-          '    fi' \
-          '    update-grub' > bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
-        sed '1d;98d;s/^package_update: true$/package_update: false/;s|apt-get install -y |apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- |g;/apt-get install -y /s/$/ || exit 1/' controller/test/fixtures/profiles/osProfiles/nke-nico-vms-24.04-arm64-fde/userData.tmpl >> bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl
-        # Downstream owns this local endpoint and must bind/read back the actual
-        # disk bytes. This URL is not a digest, receipt or production location.
-        printf '%b\n' \
-          '#!ipxe' \
-          'set boot-loader http://172.30.0.1:18080/qcow-imager.efi' \
-          'set image-url http://172.30.0.1:18080/nke-node-image-arm64.qcow2' \
-          'set disk-strategy \173\173.DiskSelectionStrategy\175\175' \
-          'set console-config console=tty0 console=ttyAMA0,115200' \
-          'set kernel-params loglevel=1 iommu.passthrough=1' \
-          'set cloud-init-ds ds=nocloud-net;s=${cloudinit-url}' \
-          'chain ${boot-loader} ${console-config} ${kernel-params} image_url=${image-url} disk_strategy=${disk-strategy} ${cloud-init-ds} update_grub_template=yes update_grub_cfg=yes' \
-          'boot' > bin/profiles-context/profiles/osProfiles/nke-local-26-04-arm64-plain/ipxeScript
-        printf '%s\n' \
-          'profiles:' \
-          '  nke-local-26-04-arm64-plain:' \
-          '    kubernetes_version: ""' \
-          '    kubernetes_version_injected: true' \
-          '    architecture: arm64' \
-          '    build_date: "2026-10-08"' \
-          '    ubuntu_version: "26.04"' \
-          '    variant: local-plain-tpm' > bin/profiles-context/profiles/osProfiles/metadata.yaml
-        buildctl-daemonless.sh build --frontend dockerfile.v0 \
-          --local context=/src/bin/profiles-context --local dockerfile=/src/bin/profiles-context \
-          --opt platform=linux/{{.Arch}} --opt force-network-mode=none \
-          --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
-          --output type=oci,dest=/src/bin/nke-local-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true
+    buildCommand: [sh, controller/test/fixtures/nkd-local/build.sh, '{{.Arch}}']

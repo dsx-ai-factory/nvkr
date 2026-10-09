@@ -1,129 +1,85 @@
 # Build the local controller profiles image
 
-The separate `profiles` lane builds one small Linux ARM64 OCI image with the
-configuration tree NKE's controller chart materializes under `/profiles`.
-It does not rebuild the OS, start NICoSim, install NKE or create a tenant.
-Start with [Docker/Colima setup](local-development.md#start-from-a-clean-machine).
+The `profiles` lane builds the small ARM64 OCI image that NKE's controller
+uses for node configuration. It does not build the QCOW2 or start a cluster.
+For the complete build-and-deploy sequence, follow the
+[local demo guide](local-nke-demo.md).
+
+## Build just this artifact
+
+Inside Colima, from the native source export prepared in
+[step 2 of the local demo guide](local-nke-demo.md#2-copy-committed-nkd-source-into-native-vm-storage):
 
 ```sh
-# Apple Silicon: explicitly select your already running ARM64 Colima profile.
-CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
+CONTAINER_RUNTIME=docker \
   bash scripts/nke-full-arm64-local.sh --check profiles
-CONTAINER_RUNTIME=docker COLIMA_PROFILE=nkd-demo \
-  NKE_LOCAL_CLONE=/absolute/path/to/nke \
-  bash scripts/nke-full-arm64-local.sh first-profiles 1 profiles
+CONTAINER_RUNTIME=docker \
+  bash scripts/nke-full-arm64-local.sh my-profiles-01 1 profiles
 ```
 
-Use a fresh attempt name. Omit `NKE_LOCAL_CLONE` for canonical remote Git;
-private-source access must then work inside the VM. Native Linux ARM64 runs the
-same commands without `COLIMA_PROFILE`. Podman uses `CONTAINER_RUNTIME=podman`.
-Docker and Podman have compiler/preflight contracts. No private profiles-build
-acceptance report is shipped here; check your own completed Run and image content.
+Use a fresh attempt name. Native Linux ARM64 uses the same commands.
+The Mac shared mount failed source-snapshot copying during the fresh profile
+build; use native ext4 storage as the full demo guide specifies.
+If remote Git access is unavailable inside Colima, supply
+`NKE_LOCAL_CLONE=/absolute/path/to/nke`; only the pinned committed objects are used.
+
+## What is built
 
 The [Definition](../definitions/nke-local-dev-arm64/definition-profiles.json)
-selects `controller-profiles` from its own
-[catalog](../definitions/nke-local-dev-arm64/profiles-catalog/registry.yaml).
-Its [machine-managed lock](../definitions/nke-local-dev-arm64/profiles-catalog/pins.lock.yaml)
-selects the same NKE `8fb2d53368823bd386b4fbd55b4ab6d3c0931345` candidate as
-the four-output `site` lane. This is not an approved release pin.
+selects one output, `controller-profiles`.
+Its [catalog](../definitions/nke-local-dev-arm64/profiles-catalog/registry.yaml)
+now has a short source-owned build command, not an embedded template generator:
 
-## Contents and differences from the source fixture
-
-| Input | Produced content |
-| --- | --- |
-| NKE fixture Dockerfile | Same copy/materialization layout; base changed from its `alpine:3.24.1` tag to the already maintained exact Alpine digest, observed as Alpine 3.24.2 |
-| ARM64 VM cloud-init fixture | SHA-guarded source template projected without line 98's HTTP agent override. First-boot package refresh is disabled; APT installs select only the baked local repository and explicitly exit on failure. Idempotent boot configuration adds `net.ifnames=1 network-config=disabled` after the console override and preserves the observed single physical uplink through its generated Netplan link; different existing content or symlinks fail |
-| NKE VM config profiles | Source `nico-vms-cp` and `nico-vms-worker`, unchanged |
-| NKE fixture runbooks | All nine source runbooks, unchanged |
-| Local OS metadata | One `nke-local-26-04-arm64-plain` entry: ARM64, Ubuntu 26.04, injected Kubernetes version, diagnostic `local-plain-tpm` variant |
-| Local boot script | ARM64 console, local QCOW2 URL, no LUKS key or FDE claim |
-
-The producer prepares a private context only in its declared `bin` write
-directory. It checks both upstream file hashes before the mechanical edits;
-source drift fails instead of editing an arbitrary line. The fixture files in
-the NKE checkout and the accepted source closure remain unchanged. BuildKit
-resolves the pinned image base; Dockerfile build steps use network mode `none`.
-The enclosing wrapped producer still has declared build networking and is not
-a qualified or completely hermetic closure.
-
-The local profile admits exactly one physical NIC, named `eth0` or `enp1s0`,
-and adds its `10-netplan-<name>.link.d` drop-in with an empty `NamePolicy=` and
-explicit `Name=<name>`. Netplan still owns the MAC match and MTU. The explicit
-name preserves the first boot's actual uplink used by NKE's OVS configuration,
-whether NICoSim's seed rename succeeded or the device remained PCI-path named.
-See [systemd's Name precedence](https://github.com/systemd/systemd/blob/v259/man/systemd.link.xml).
-Using a kernel-style name such as `eth0` is not a general multi-interface policy;
-the command rejects missing, multiple or unsupported physical NICs before writes.
-Shell contracts cover both names, repeated execution and foreign content,
-symlinks and directories; a full reboot/tenant run is still required.
-Old completed profiles images are unchanged.
-
-NICoSim's pinned seed requests `set-name: eth0`. First boot still consumes that
-seed before the profile's boot command runs. The command adds
-[`network-config=disabled`](https://docs.cloud-init.io/en/latest/reference/network-config.html#kernel-command-line)
-to the next GRUB command line: subsequent boots use the persistent Netplan
-configuration, including NKE's OVS bridge, without cloud-init reapplying the old
-seed or renaming its uplink. Cloud-init itself and its other modules remain
-enabled. This is scoped laptop network ownership, not a generic cloud-image
-policy or proof of reboot acceptance.
-
-Cloud-init still installs source-declared NKE/Kubernetes/CNI packages using APT,
-including the unversioned `nke-agent` command. The laptop projection selects only
-`/etc/apt/sources.list.d/nke-local.list`, whose `file:/usr/lib/nke/debs` package
-bytes and indexes are prepared during the bake. Missing packages terminate the
-command sequence before service restarts and the completion marker; they do not
-authorize public-repository downloads. This does not prevent separate runtime
-container-image acquisitions or prove complete offline deployment. Removing the HTTP override does
-not guarantee preservation of the held disk's installed agent bytes: the
-downstream runtime must verify the selected packages and resulting executable.
-Its Calico and OVN branches select 3.30.1 and 1.4.0 respectively. Successful
-rendering does not establish that either package set is available, compatible or
-boots successfully with every selected disk. TPM attestation is not proved by
-having the plugin path in a template. The retained disk's missing DSX material
-and failed complete OS smoke remain separate limitations.
-
-## NKE handoff, not an NKD deployment feature
-
-NKE's chart runs the profiles image as an init container and copies `/profiles`
-into its shared profiles volume. The downstream installer takes the resulting
-image reference in `images.profiles`. Use the accepted manifest digest and a
-registry reachable by the management cluster; don't rebuild or edit the produced
-image during deployment. See the [NKE handoff guide](nkd-to-nke-demo.md).
-
-The authored local QCOW2 location is:
-
-```text
-http://172.30.0.1:18080/nke-node-image-arm64.qcow2
+```yaml
+patches:
+  - name: patches/local-profile.patch
+    sha256: sha256:4a36de3fe026f3e8b1841c49ef4590dcc5fa65c1f4d463769c32d84b05455171
+buildCommand: [sh, controller/test/fixtures/nkd-local/build.sh, '{{.Arch}}']
 ```
 
-This is a diagnostic endpoint description, not a content digest or an
-authenticated disk receipt. The new [deploy-only adapter](local-nke-demo.md) must
-serve the exact held Run output there, read back/recheck its SHA-256 and size,
-and establish actual NICoSim/controller/node reachability; complete runtime
-validation remains in progress. It must reject an
-occupied/foreign endpoint and incompatible disk selection. The EFI URL is a
-NICoSim parser placeholder, not a supplied bare-metal EFI artifact; this image
-does not enable physical-node provisioning.
-Port 18080 is reserved here for the disk HTTP service, not NICoSim's API. The
-existing guest probe uses API port 18089. Do not start a simulator with its
-default API port 18080 and assume that it also serves this disk URL; the complete
-adapter must explicitly choose distinct ports and own both services.
+NKD verifies the [patch](../definitions/nke-local-dev-arm64/profiles-catalog/patches/local-profile.patch)
+before applying it to a private source snapshot. The patch and prepared source
+enter build identity. The developer's NKE checkout is not modified.
+The [source lock](../definitions/nke-local-dev-arm64/profiles-catalog/pins.lock.yaml)
+still selects `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`, the site/installer
+candidate, not an approved release.
 
-## Validation scope
+The reviewed patch makes the local differences explicit:
 
-The separate selection requires one observed output. The diagnostic content test
-uses NKE's actual metadata loader and template helpers to validate its profile
-selection and render both CNI branches as YAML. This is neither a complete OS
-smoke nor deployment acceptance; no private Run acceptance report is shipped here.
+- Freeze the Alpine base image by digest.
+- Retain the source's two VM config profiles and nine runbooks unchanged.
+- Supply one plain Ubuntu 26.04 ARM64 profile and its local QCOW2 URL.
+- Remove the fixture's HTTP agent override and disable first-boot package refresh.
+- Install from the baked file-based APT repository only; missing packages stop boot setup.
+- Preserve the single observed physical uplink across the worker's reboot.
 
-The diagnostic test source is
-[`contract_test.go`](../scripts/testdata/nke-local-profile/contract_test.go).
-It belongs in a disposable copy of the pinned NKE `controller/internal/utils`
-package, with `NKD_PROFILES_DIR` pointing to content extracted from the produced
-image. Never add it to an accepted Run's source closure or your NKE checkout.
-The diagnostic command is `go test ./internal/utils -run TestNKDLocalProfile
--count=1 -v` with the source's existing module pins. It is not a new YAML/iPXE
-parser and does not validate the source's entire provisioning protocol.
+The private build context is written only under `bin`. BuildKit exports
+`bin/nke-local-profiles-arm64.oci.tar`; Dockerfile steps use network mode
+`none`. This is diagnostic execution, not qualified or completely hermetic
+production.
 
-`profiles` is separate from `all`, `components` and `site`. Their membership is
-unchanged; separate completed Runs do not become one aggregate success.
+## How NKE consumes it
+
+The controller chart copies `/profiles` from this image into its profiles volume.
+The deploy-only consumer imports the exact completed Run output and supplies
+its image reference as `images.profiles`. It does not edit or rebuild the image.
+
+The local profile points to
+`http://172.30.0.1:18080/nke-node-image-arm64.qcow2`.
+The consumer serves the held QCOW2 there, verifies its bytes and binds each real
+guest to that backing disk. The EFI URL is only NICoSim's parser placeholder;
+no bare-metal EFI artifact or FDE support is supplied.
+
+## Validation limits
+
+Tests apply the actual authenticated patch using Git. They cover local-only APT,
+install-error propagation, both admitted uplink names, idempotence, foreign paths
+and tampered patch rejection. NKE's own metadata/template helpers validate the
+produced content through
+[the downstream contract test](../scripts/testdata/nke-local-profile/contract_test.go).
+
+The retained Colima demo passed the real tenant/workload and worker-reboot checks.
+The simplified producer retains identical Dockerfile, cloud-init, iPXE and
+metadata bytes. That content comparison is not a fresh end-to-end acceptance run.
+Full-source OS integration, the missing DSX material and full OS smoke remain
+[separate gaps](full-nke-source-build.md).
