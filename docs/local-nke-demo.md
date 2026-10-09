@@ -88,6 +88,7 @@ From the native NKD export, run sequentially. Use new attempt names for a rerun.
 ```sh
 set -euo pipefail
 export CONTAINER_RUNTIME=docker
+umask 022
 # Optional: export NKE_LOCAL_CLONE=/absolute/path/to/mounted/nke
 for lane in os components site tools profiles simulator; do
   bash scripts/nke-full-arm64-local.sh --check "$lane"
@@ -100,6 +101,8 @@ OS execution uses QEMU software acceleration; its duration is not guaranteed.
 Build the OS first to preserve its disk-space headroom. The components Run
 already contains both providers; a separate `providers` build is unnecessary
 for this demo. The historical `all` selection does not contain this whole set.
+The build umask allows the rootless builder to read source files; the native
+export's private parent still prevents access by other host users.
 To reuse completed Runs instead, skip this step and supply their absolute paths
 below. Never overwrite or rebuild accepted artifacts just to relocate them.
 
