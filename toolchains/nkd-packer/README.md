@@ -13,7 +13,10 @@ builds on the supported host architectures. The recorded ARM64 local image
 validated the older closure, not these updated bytes. The local launcher builds
 and validates a fresh attempt-bound image; this does not update maintained pins
 or establish a complete image-bake result. Helm and ORAS share this image rather
-than requiring a separate chart wrapper image.
+than requiring a separate chart wrapper image. The compiler pin matches NKD's
+`.go-version` because this image also builds the source-bound local bootstrap
+runner. `validatedNKE.goVersion` retains the historical source's workspace
+version, 1.27.1; it does not select the image compiler or validate a rebuilt image.
 
 `toolchain.lock.json` binds the Ubuntu and download-helper multi-platform base
 indexes, one immutable Ubuntu archive snapshot, and the official Packer and
@@ -50,8 +53,10 @@ records a successful AMD64 Docker assembly and this script's native validation.
 It includes the retained image archive and exact identities; it grants no
 publication or redistribution approval.
 
-Use `--check` for the network-free source-lock validation. Building uses the
-fixed Ubuntu snapshot and verifies every release archive before
+Use `--check` for the network-free source-lock validation, including agreement
+with NKD's `.go-version`. When that pin changes, update the locked Go version and
+both archive digests from the [official Go downloads](https://go.dev/dl/?mode=json)
+together. Building uses the fixed Ubuntu snapshot and verifies every release archive before
 extracting them. The command does not push, sign, or write a transport digest.
 
 For Docker builds behind a TLS proxy, `NKD_BUILD_CA_BUNDLE` supplies a trusted
@@ -78,8 +83,9 @@ Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` and the Docker exporter's
 timestamps. Docker explicitly streams the image archive to `docker image load`,
 separating timestamp rewriting from image-store unpacking; failure in either
 stage stops validation. The existing Podman ARM64 local pin describes the earlier
-measured image. These Dockerfile changes need a new native Podman measurement
-before that pin can be replaced; a different rebuilt ID still fails closed.
+measured image with Go 1.27.1. The Dockerfile and Go compiler changes need a new
+native Podman measurement before that pin can be replaced; a different rebuilt ID
+still fails closed.
 The fixed epoch does not itself prove identical image
 bytes. Repeat a native Docker build on fresh runners and compare the resulting
 image IDs before adding a Docker pin.

@@ -84,6 +84,18 @@ fi
 
 command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
 
+# This image also compiles the NKD bootstrap, whose Makefile requires the
+# repository's exact Go patch. Reject drift before building either architecture.
+bootstrap_go_version="$(cat "${here}/../../.go-version")"
+if [[ ! "${bootstrap_go_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "invalid bootstrap Go pin in .go-version" >&2
+  exit 1
+fi
+if ! jq -e --arg version "${bootstrap_go_version}" '.go.version == $version' "${lock}" >/dev/null; then
+  echo "Packer toolchain Go version must match .go-version (${bootstrap_go_version}); update the locked version and both archive digests" >&2
+  exit 1
+fi
+
 jq -e '
   .schemaVersion == "nkd.dev/packer-toolchain/v1" and
   (.ubuntuSnapshot | type == "string" and test("^[0-9]{8}T[0-9]{6}Z$")) and
@@ -98,7 +110,6 @@ jq -e '
   .qemuPlugin.source == "github.com/hashicorp/qemu" and
   .qemuPlugin.version == "1.1.6" and
   .qemuPlugin.license == "MPL-2.0" and
-  .go.version == "1.27.2" and
   .go.license == "BSD-3-Clause" and
   .helm.version == "4.2.4" and .helm.license == "Apache-2.0" and
   .oras.version == "1.3.3" and .oras.license == "Apache-2.0" and

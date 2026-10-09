@@ -101,7 +101,7 @@ func TestPublicationRejectsMalformedDiskBeforePayloadCapture(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Remove(diskBlobPath(root, request.Objects[0].Output.Disk.PayloadDigest)); err != nil {
+				if err := os.Remove(fixtureBlobPath(root, request.Objects[0].Output.Disk.PayloadDigest)); err != nil {
 					t.Fatal(err)
 				}
 				disks, err := publicationDiskPayloads(t.Context(), root, pin)

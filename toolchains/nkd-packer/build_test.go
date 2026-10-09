@@ -18,6 +18,24 @@ import (
 	"time"
 )
 
+// Copied scripts keep their repository-relative compiler pin, matching the
+// production layout rather than bypassing build.sh's Go admission check.
+func toolchainFixtureDir(t *testing.T, root string) string {
+	t.Helper()
+	pin, err := os.ReadFile("../../.go-version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".go-version"), pin, 0600); err != nil {
+		t.Fatal(err)
+	}
+	here := filepath.Join(root, "toolchains", "nkd-packer")
+	if err := os.MkdirAll(here, 0700); err != nil {
+		t.Fatal(err)
+	}
+	return here
+}
+
 func TestToolchainValidatedImageID(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("requires jq")
@@ -48,12 +66,13 @@ func TestToolchainValidatedImageID(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
+			here := toolchainFixtureDir(t, dir)
 			for _, name := range []string{"build.sh", "toolchain.lock.json"} {
 				data, err := os.ReadFile(name)
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := os.WriteFile(filepath.Join(dir, name), data, 0600); err != nil {
+				if err := os.WriteFile(filepath.Join(here, name), data, 0600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -86,7 +105,7 @@ esac
 					t.Fatal(err)
 				}
 			}
-			args := append([]string{filepath.Join(dir, "build.sh"), "--arch", runtime.GOARCH,
+			args := append([]string{filepath.Join(here, "build.sh"), "--arch", runtime.GOARCH,
 				"--diagnostic-local", "--print-validated-image-id"}, tc.flags...)
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
@@ -134,6 +153,100 @@ esac
 				t.Fatalf("failed export loaded an archive: %s", calls)
 			}
 		})
+	}
+}
+
+func TestToolchainGoMatchesBootstrap(t *testing.T) {
+	raw, err := os.ReadFile("toolchain.lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lock struct {
+		Go struct{ Version string } `json:"go"`
+	}
+	if err := json.Unmarshal(raw, &lock); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	// Replay the compiler version selected by the image against the same
+	// Makefile gate used by scripts/nke-os-local.sh's containerized bootstrap.
+	const goProbe = `#!/bin/sh
+test "$*" = 'env GOVERSION' || exit 99
+printf 'go%s\n' "$TEST_GO_VERSION"
+`
+	if err := os.WriteFile(filepath.Join(dir, "go"), []byte(goProbe), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "make", "-C", "../..", "go-version-check")
+	cmd.Env = append(os.Environ(), "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"GOTOOLCHAIN=local", "TEST_GO_VERSION="+lock.Go.Version)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("locked Packer compiler cannot build the NKD bootstrap: %v:\n%s", err, output)
+	}
+}
+
+func TestToolchainRejectsBootstrapGoDriftBeforeRuntime(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Fatal("toolchain script requires jq")
+	}
+	script, err := os.ReadFile("build.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile("toolchain.lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, checkOnly := range []bool{false, true} {
+		for _, tc := range []struct{ name, pin string }{
+			{name: "mismatched", pin: "0.0.0\n"},
+			{name: "empty", pin: "\n"},
+			{name: "missing"},
+		} {
+			name := tc.name
+			if checkOnly {
+				name += "/check"
+			}
+			t.Run(name, func(t *testing.T) {
+				dir := t.TempDir()
+				here := filepath.Join(dir, "toolchains", "nkd-packer")
+				if err := os.MkdirAll(here, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				files := map[string][]byte{
+					filepath.Join(here, "build.sh"):            script,
+					filepath.Join(here, "toolchain.lock.json"): lock,
+					filepath.Join(dir, "docker"):               []byte("#!/bin/sh\ntouch \"$TEST_MARKER\"\nexit 99\n"),
+				}
+				if tc.pin != "" {
+					files[filepath.Join(dir, ".go-version")] = []byte(tc.pin)
+				}
+				for path, data := range files {
+					if err := os.WriteFile(path, data, 0o700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				marker := filepath.Join(dir, "called")
+				args := []string{filepath.Join(here, "build.sh"), "--arch", runtime.GOARCH}
+				if checkOnly {
+					args = append(args, "--check")
+				}
+				ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, "bash", args...)
+				cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+filepath.Join(dir, "docker"),
+					"TEST_MARKER="+marker, "NKD_BUILD_ARCHIVES=", "NKD_BUILD_CA_BUNDLE=")
+				output, err := cmd.CombinedOutput()
+				if err == nil || !strings.Contains(string(output), ".go-version") {
+					t.Fatalf("bootstrap Go drift was not diagnosed: %v:\n%s", err, output)
+				}
+				if _, err := os.Stat(marker); !os.IsNotExist(err) {
+					t.Fatalf("runtime reached before Go pin admission: %v", err)
+				}
+			})
+		}
 	}
 }
 
@@ -325,6 +438,7 @@ func TestDiagnosticToolchainPinDoesNotGrantMaintainedAcceptance(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
+			here := toolchainFixtureDir(t, dir)
 			for _, name := range []string{"build.sh", "toolchain.lock.json"} {
 				data, err := os.ReadFile(name)
 				if err != nil {
@@ -343,7 +457,7 @@ func TestDiagnosticToolchainPinDoesNotGrantMaintainedAcceptance(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				if err := os.WriteFile(filepath.Join(dir, name), data, 0600); err != nil {
+				if err := os.WriteFile(filepath.Join(here, name), data, 0600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -363,7 +477,7 @@ esac
 			if err := os.WriteFile(fake, []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}
-			args := append([]string{filepath.Join(dir, "build.sh"), "--arch", tc.arch}, tc.flags...)
+			args := append([]string{filepath.Join(here, "build.sh"), "--arch", tc.arch}, tc.flags...)
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "bash", args...)
