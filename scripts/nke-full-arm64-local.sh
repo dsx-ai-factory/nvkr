@@ -50,6 +50,15 @@ if [[ ! "${attempt}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ || ! "${jobs}" =~ ^[1
   echo 'Supply a fresh attempt name and positive job count.' >&2; exit 2
 fi
 case "${lane}" in all|components|os|providers|simulator|site|tools|profiles) ;; *) echo 'Select all, components, os, providers, simulator, site, tools or profiles.' >&2; exit 2 ;; esac
+# Keep invocation-local redirects when a second local repository is selected.
+# Bound the scalar before arithmetic, host diagnostics or any producer work.
+git_config_count="${GIT_CONFIG_COUNT-0}"
+if [[ ! "${git_config_count}" =~ ^(0|[1-9]|1[0-6])$ ]]; then
+  echo 'GIT_CONFIG_COUNT must be a decimal integer from 0 through 16.' >&2; exit 2
+fi
+if [[ -n "${NKE_LOCAL_CLONE:-}" && "${git_config_count}" -gt 14 ]]; then
+  echo 'NKE_LOCAL_CLONE requires two free Git configuration entries (total limit 16).' >&2; exit 2
+fi
 runtime="${CONTAINER_RUNTIME:-docker}"
 [[ "${runtime}" == docker ]] || { echo 'CONTAINER_RUNTIME must be docker for this local demo.' >&2; exit 2; }
 host_system="$(uname -s)"
@@ -117,8 +126,10 @@ if [[ -n "${NKE_LOCAL_CLONE:-}" ]]; then
   [[ "${NKE_LOCAL_CLONE}" == /* ]] || { echo 'NKE_LOCAL_CLONE must be an absolute path.' >&2; exit 2; }
   git -C "${NKE_LOCAL_CLONE}" rev-parse --git-dir >/dev/null || { echo 'NKE_LOCAL_CLONE must be an accessible Git checkout.' >&2; exit 1; }
   nke_clone="$(cd "${NKE_LOCAL_CLONE}" && pwd -P)"
-  export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0="url.${nke_clone}.insteadOf" GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nke.git
-  export GIT_CONFIG_KEY_1="url.${nke_clone}.insteadOf" GIT_CONFIG_VALUE_1=https://github.com/dsx-ai-factory/nke
+  export "GIT_CONFIG_KEY_${git_config_count}=url.${nke_clone}.insteadOf" "GIT_CONFIG_VALUE_${git_config_count}=https://github.com/dsx-ai-factory/nke.git"
+  git_config_count=$((git_config_count + 1))
+  export "GIT_CONFIG_KEY_${git_config_count}=url.${nke_clone}.insteadOf" "GIT_CONFIG_VALUE_${git_config_count}=https://github.com/dsx-ai-factory/nke"
+  export GIT_CONFIG_COUNT=$((git_config_count + 1))
   # Git insteadOf is prefix-based; pinned commit/tree verification still owns
   # source identity. The bare NKE form also prefix-matches sibling repository
   # names, so use this override only for this maintained NKE selection.

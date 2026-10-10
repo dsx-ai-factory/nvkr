@@ -200,7 +200,9 @@ Ordinary local source Git and installer preparation now use the existing
 templates and line-ending conversion. Developer credential and selected proxy/TLS
 trust settings are projected only into network fetch; explicit absolute local-repository redirects remain
 available. Real Git fixtures cover exact checkout bytes, callback exclusion,
-local redirects and authenticated fetch. These fixtures are not proof of current
+local redirects and authenticated fetch. The E2E build adapter preserves these
+bounded, owner-validated redirects, and the NKE clone launcher appends its two
+redirects instead of discarding other local source inputs. These fixtures are not proof of current
 private-repository access; the stricter held hosted-source admission is unchanged.
 The downstream site installer now takes a full detached private checkout of its
 exact source pin instead of enabling sparse checkout, which Git configures through

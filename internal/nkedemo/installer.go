@@ -27,7 +27,11 @@ func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (resul
 	if err != nil {
 		return Config{}, err
 	}
-	runner := Runner{Env: localBuildEnvironment(), Progress: run.Progress}
+	environment, err := localBuildEnvironment()
+	if err != nil {
+		return Config{}, nkderr.Wrap(nkderr.CodePreflightFailed, err, "prepare pinned NKE installer")
+	}
+	runner := Runner{Env: environment, Progress: run.Progress}
 	admitHost := func() error {
 		if run.Network == "ovn" {
 			if err := admitSiteOVNKernel(); err != nil {

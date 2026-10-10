@@ -208,6 +208,23 @@ and line-ending settings. Deployment does not inherit source credentials. For a
 local NKE Git clone, use its absolute Linux path in
 `NKE_LOCAL_CLONE` and `build.nkeClone`; only committed pinned objects are used.
 
+Other repositories can use explicit local Git fetch redirects too. For example,
+with a local NVIDIA OVN checkout containing the catalog's pinned commit:
+
+```sh
+OVN_LOCAL_CLONE=/absolute/Linux/path/to/ovn-kubernetes
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0="url.$OVN_LOCAL_CLONE.insteadOf"
+export GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/ovn-kubernetes
+```
+
+Set these in the shell that runs `nke-demo e2e`. Its NKE clone option preserves
+this redirect and adds its own two entries. At most 16 entries are admitted;
+only absolute local-repository redirects are accepted. Commit, tree and source
+closure verification still apply, and deployment inherits none of these settings.
+This supplies Git objects locally, not a fully offline build: other acquisitions
+still need their configured repositories and registries.
+
 ## 3. Bootstrap the demo command
 
 This prepares the command you will use in step 4; it does **not** build NKE or
@@ -268,14 +285,6 @@ selected image's existing entrypoint. Management-node readiness and Cluster API
 installation follow site-network readiness; the tenant remains a separate
 QCOW2-backed cluster.
 
-For an explicit temporary networking test while the NVIDIA OVN runtime issue is
-being investigated, add `--network kind-calico` to `nke-demo e2e` (or `run`).
-This keeps Kind's default site networking and selects Calico `3.30.1` for the
-QCOW2 tenant. The default remains `--network ovn`. Neither option edits the
-maintained catalogs: the artifact build still produces its declared OVN inputs,
-even when this test does not deploy them. A passing test in this mode does not
-validate NVIDIA OVN. The selected mode is retained in `demo-inputs.json`.
-
 Cache the explicit runtime acquisitions:
 
 ```sh
@@ -314,6 +323,23 @@ Do not add retained `run.runs` or `run.nkdctl` references to E2E configuration.
   --attempt demo-e2e-01 \
   --out "$PWD/.nkd/demo-e2e-01-demo" \
   --jobs 2
+```
+
+For a **temporary diagnostic** while the NVIDIA OVN runtime issue is unresolved,
+use this alternative command. `--network kind-calico` keeps Kind's default site
+networking and selects Calico `3.30.1` for the QCOW2 tenant; the default remains
+OVN. It does not rewrite catalogs or remove OVN build outputs. A passing run in
+this mode does **not** validate NVIDIA OVN or establish M2 acceptance. The selected
+mode is retained in `demo-inputs.json`; `nke-demo run` accepts the same flag.
+
+```sh
+"$NKE_DEMO" e2e \
+  --config demos/local-nke.yaml \
+  --repo "$PWD" \
+  --attempt demo-kind-calico-01 \
+  --out "$PWD/.nkd/demo-kind-calico-01-demo" \
+  --jobs 2 \
+  --network kind-calico
 ```
 
 E2E preflights the combined selection, then builds OS, components, site, tools,

@@ -25,7 +25,10 @@ func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
 		t.Run("HOME="+home, func(t *testing.T) {
 			t.Setenv("HOME", home)
 			t.Setenv("GH_TOKEN", "not-forwarded")
-			build := localBuildEnvironment()
+			build, err := localBuildEnvironment()
+			if err != nil {
+				t.Fatal(err)
+			}
 			if got := environmentValue(build, "HOME"); got != home {
 				t.Fatalf("build HOME=%q, want %q", got, home)
 			}
@@ -53,7 +56,10 @@ func TestBuildTransportSettingsReachOnlyGitFetch(t *testing.T) {
 	for _, key := range keys {
 		t.Setenv(key, "synthetic-transport-setting")
 	}
-	build := localBuildEnvironment()
+	build, err := localBuildEnvironment()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, operation := range []string{"fetch", "init", "checkout", "status"} {
 		t.Run(operation, func(t *testing.T) {
 			cmd, err := sourcegit.LocalCommand(t.Context(), build, "", operation)
@@ -79,6 +85,56 @@ func TestBuildTransportSettingsReachOnlyGitFetch(t *testing.T) {
 		if environmentValue(deployment, key) != "" {
 			t.Fatalf("deployment inherited source acquisition setting %s", key)
 		}
+	}
+}
+
+func TestBuildLocalSourceRedirectsAreValidatedAndFetchOnly(t *testing.T) {
+	for _, test := range []struct {
+		name, count, key string
+		valid            bool
+	}{
+		{"local OVN", "1", "url./local/ovn.git.insteadOf", true},
+		{"none", "0", "", true},
+		{"callback", "1", "credential.helper", false},
+		{"relative", "1", "url.relative.insteadOf", false},
+		{"unbounded", "17", "", false},
+		{"malformed", "invalid", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("GIT_CONFIG_COUNT", test.count)
+			t.Setenv("GIT_CONFIG_KEY_0", test.key)
+			t.Setenv("GIT_CONFIG_VALUE_0", "https://github.com/dsx-ai-factory/ovn-kubernetes")
+			t.Setenv("GIT_CONFIG_KEY_9", "credential.helper")
+			t.Setenv("GIT_CONFIG_VALUE_9", "!unselected-callback")
+			build, err := localBuildEnvironment()
+			if !test.valid {
+				var coded *nkderr.Error
+				if build != nil || !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability {
+					t.Fatalf("invalid redirect admitted: %v", err)
+				}
+				return
+			}
+			if err != nil || environmentValue(build, "GIT_CONFIG_COUNT") != test.count || environmentValue(build, "GIT_CONFIG_VALUE_9") != "" {
+				t.Fatalf("redirect projection changed: %v", err)
+			}
+			for _, operation := range []string{"fetch", "init", "checkout", "status"} {
+				cmd, err := sourcegit.LocalCommand(t.Context(), build, "", operation)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := ""
+				if operation == "fetch" && test.count == "1" {
+					want = test.key
+				}
+				if got := environmentValue(cmd.Env, "GIT_CONFIG_KEY_1"); got != want {
+					t.Fatalf("%s redirect=%q, want %q", operation, got, want)
+				}
+			}
+			if environmentValue(NativeEnvironment(), "GIT_CONFIG_COUNT") != "" {
+				t.Fatal("deployment inherited build source redirects")
+			}
+		})
 	}
 }
 

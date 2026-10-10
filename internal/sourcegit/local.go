@@ -107,20 +107,14 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 		}
 		// Existing launchers explicitly redirect canonical sources to read-only
 		// local repositories. Do not inherit arbitrary GIT_CONFIG_* settings.
-		redirects := 0
-		if declared := localEnvironmentValue(environment, "GIT_CONFIG_COUNT"); declared != "" {
-			redirects, err = strconv.Atoi(declared)
-			if err != nil || redirects < 0 || redirects > 16 {
-				return nil, e.New(e.CodeEngineCapability, "local source Git requires a bounded explicit repository redirect count")
-			}
+		redirectEnvironment, err := LocalRedirectEnvironment(environment)
+		if err != nil {
+			return nil, err
 		}
+		redirects, _ := strconv.Atoi(localEnvironmentValue(redirectEnvironment, "GIT_CONFIG_COUNT"))
 		for index := 0; index < redirects; index++ {
-			key := localEnvironmentValue(environment, "GIT_CONFIG_KEY_"+strconv.Itoa(index))
-			local := strings.TrimSuffix(strings.TrimPrefix(key, "url."), ".insteadOf")
-			value := localEnvironmentValue(environment, "GIT_CONFIG_VALUE_"+strconv.Itoa(index))
-			if !strings.HasPrefix(key, "url.") || !strings.HasSuffix(key, ".insteadOf") || !filepath.IsAbs(local) || filepath.Clean(local) != local || value == "" {
-				return nil, e.New(e.CodeEngineCapability, "local source Git accepts only explicit absolute local repository redirects")
-			}
+			key := localEnvironmentValue(redirectEnvironment, "GIT_CONFIG_KEY_"+strconv.Itoa(index))
+			value := localEnvironmentValue(redirectEnvironment, "GIT_CONFIG_VALUE_"+strconv.Itoa(index))
 			child = append(child, "GIT_CONFIG_KEY_"+strconv.Itoa(count)+"="+key,
 				"GIT_CONFIG_VALUE_"+strconv.Itoa(count)+"="+value)
 			count++
@@ -149,6 +143,33 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 	cmd := exec.CommandContext(ctx, executable, append(prefix, args...)...)
 	cmd.Env = child
 	return cmd, nil
+}
+
+// LocalRedirectEnvironment projects only the already-supported explicit local
+// fetch redirects. Launchers may carry these through build preparation without
+// forwarding arbitrary Git configuration, callbacks or credentials. Fetch still
+// verifies the pinned commit, tree and source closure at its owning boundary.
+func LocalRedirectEnvironment(environment []string) ([]string, error) {
+	declared := localEnvironmentValue(environment, "GIT_CONFIG_COUNT")
+	if declared == "" {
+		return nil, nil
+	}
+	count, err := strconv.Atoi(declared)
+	if err != nil || count < 0 || count > 16 {
+		return nil, e.New(e.CodeEngineCapability, "local source Git requires a bounded explicit repository redirect count")
+	}
+	result := []string{"GIT_CONFIG_COUNT=" + strconv.Itoa(count)}
+	for index := 0; index < count; index++ {
+		suffix := strconv.Itoa(index)
+		key := localEnvironmentValue(environment, "GIT_CONFIG_KEY_"+suffix)
+		local := strings.TrimSuffix(strings.TrimPrefix(key, "url."), ".insteadOf")
+		value := localEnvironmentValue(environment, "GIT_CONFIG_VALUE_"+suffix)
+		if !strings.HasPrefix(key, "url.") || !strings.HasSuffix(key, ".insteadOf") || !filepath.IsAbs(local) || filepath.Clean(local) != local || value == "" {
+			return nil, e.New(e.CodeEngineCapability, "local source Git accepts only explicit absolute local repository redirects")
+		}
+		result = append(result, "GIT_CONFIG_KEY_"+suffix+"="+key, "GIT_CONFIG_VALUE_"+suffix+"="+value)
+	}
+	return result, nil
 }
 
 // UnsupportedConfiguration is the shared Git-owned query used at both local

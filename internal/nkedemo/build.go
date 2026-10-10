@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -55,7 +56,10 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if _, err = boundedRegularRead(script, 1<<20); err != nil {
 		return BuiltInputs{}, err
 	}
-	env := localBuildEnvironment()
+	env, err := localBuildEnvironment()
+	if err != nil {
+		return BuiltInputs{}, err
+	}
 	if cfg.NKEClone != "" {
 		clone, readErr := resolveExisting(cfg.NKEClone)
 		if readErr != nil {
@@ -91,7 +95,11 @@ func builtInputs(repo, attempt string) BuiltInputs {
 // HOME selects the developer's source credentials. The sourcegit owner projects
 // only credential configuration into network fetches; other Git operations use
 // its closed baseline. Deployment excludes ambient source credentials.
-func localBuildEnvironment() []string {
+func localBuildEnvironment() ([]string, error) {
+	redirects, err := sourcegit.LocalRedirectEnvironment(os.Environ())
+	if err != nil {
+		return nil, err
+	}
 	env := SetEnv(NativeEnvironment(), map[string]string{"CONTAINER_RUNTIME": "docker"})
 	for _, key := range []string{"HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK",
 		"https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy",
@@ -100,7 +108,7 @@ func localBuildEnvironment() []string {
 			env = SetEnv(env, map[string]string{key: value})
 		}
 	}
-	return env
+	return append(env, redirects...), nil
 }
 
 func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {

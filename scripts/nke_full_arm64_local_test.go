@@ -67,6 +67,9 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 		{"OS diagnostics without cached Packer", "Linux", "aarch64", "docker", "os", "running", "100000", "ok", "Prerequisite diagnostics passed", false},
 		{"mutable bootstrap pin rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "admitted bootstrap image/platform/runtime", true},
 		{"foreign bootstrap platform rejected", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "admitted bootstrap image/platform/runtime", true},
+		{"invalid Git count", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "GIT_CONFIG_COUNT must", true},
+		{"overflowing Git count", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "GIT_CONFIG_COUNT must", true},
+		{"no room for local clone redirects", "Linux", "aarch64", "docker", "providers", "running", "100000", "ok", "two free Git configuration entries", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -158,6 +161,14 @@ esac`,
 			if tc.name == "relative clone rejected" {
 				cmd.Env = append(cmd.Env, "NKE_LOCAL_CLONE=../nke")
 			}
+			switch tc.name {
+			case "invalid Git count":
+				cmd.Env = append(cmd.Env, "GIT_CONFIG_COUNT=not-a-count")
+			case "overflowing Git count":
+				cmd.Env = append(cmd.Env, "GIT_CONFIG_COUNT=999999999999999999999999999999")
+			case "no room for local clone redirects":
+				cmd.Env = append(cmd.Env, "GIT_CONFIG_COUNT=15", "NKE_LOCAL_CLONE=/must-not-be-inspected")
+			}
 			if strings.HasPrefix(tc.name, "Colima ") {
 				profile := "nkd-demo"
 				if tc.name == "Colima invalid profile" {
@@ -186,6 +197,11 @@ esac`,
 				t.Fatalf("check created attempt storage: %v", err)
 			}
 			calls, _ := os.ReadFile(filepath.Join(dir, "calls"))
+			if strings.Contains(tc.name, "Git count") || tc.name == "no room for local clone redirects" {
+				if len(calls) != 0 {
+					t.Fatalf("invalid Git configuration reached host or producer work: %s", calls)
+				}
+			}
 			for _, forbidden := range []string{"pull ", "run ", "buildx build", "start --", "context use"} {
 				if strings.Contains(string(calls), forbidden) {
 					t.Fatalf("check performed mutation/producer work %q: %s", forbidden, calls)
@@ -445,6 +461,7 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 		{"shared image cannot be a tag", "local:latest", "99", true, true, validated, false},
 		{"shared image unavailable in runtime", validated, "99", true, true, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", false},
 		{"graph failure prevents toolchain work", validated, "0", true, false, "", true},
+		{"preserve OVN redirect with NKE clone", validated, "0", false, false, "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -478,7 +495,13 @@ printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
   'run plan') printf '%s\n' "$TEST_PLAN";;
   'run graph') [ "$TEST_GRAPH_EXIT" = 0 ] || exit "$TEST_GRAPH_EXIT"; printf 'flowchart LR\n  fetch --> build\n';;
-  'run local') jq -e --arg id "$TEST_VALIDATED" '.toolchainSubstitutions[0].to == $id' "$TEST_REPO/.nkd/laptop-bootstrap/id-probe/toolchain-attempt.json";;
+  'run local')
+    jq -e --arg id "$TEST_VALIDATED" '.toolchainSubstitutions[0].to == $id' "$TEST_REPO/.nkd/laptop-bootstrap/id-probe/toolchain-attempt.json" || exit 99
+    if [ -n "${TEST_CAPTURE_REDIRECTS:-}" ]; then
+      printf '%s\n' "$GIT_CONFIG_COUNT" >"$TEST_CAPTURE_REDIRECTS"
+      git config --get-all url./local-ovn.git.insteadOf >>"$TEST_CAPTURE_REDIRECTS"
+      git config --get-all "url.$TEST_NKE_CLONE.insteadOf" >>"$TEST_CAPTURE_REDIRECTS"
+    fi;;
   *) exit 99;;
 esac
 `), 0700)
@@ -518,6 +541,20 @@ esac
 				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
 				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NKD_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected,
 				"NKE_SOURCE_TOKEN=command-log-environment-sentinel", "TEST_GRAPH_EXIT="+graphExit)
+			if tc.name == "preserve OVN redirect with NKE clone" {
+				clone := filepath.Join(dir, "nke-clone")
+				init := exec.CommandContext(ctx, "git", "init", "--quiet", clone)
+				if output, err := init.CombinedOutput(); err != nil {
+					t.Fatalf("prepare local Git fixture: %v %s", err, output)
+				}
+				clone, err := filepath.EvalSymlinks(clone)
+				if err != nil {
+					t.Fatal(err)
+				}
+				cmd.Env = append(cmd.Env, "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url./local-ovn.git.insteadOf",
+					"GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/ovn-kubernetes.git", "NKE_LOCAL_CLONE="+clone,
+					"TEST_NKE_CLONE="+clone, "TEST_CAPTURE_REDIRECTS="+filepath.Join(dir, "redirects"))
+			}
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
 			err := cmd.Run()
@@ -526,6 +563,13 @@ esac
 			}
 			if strings.Contains(stdout.String(), "nkdctl command:") {
 				t.Fatal("command logging contaminated stdout")
+			}
+			if tc.name == "preserve OVN redirect with NKE clone" {
+				redirects, err := os.ReadFile(filepath.Join(dir, "redirects"))
+				const want = "3\nhttps://github.com/dsx-ai-factory/ovn-kubernetes.git\nhttps://github.com/dsx-ai-factory/nke.git\nhttps://github.com/dsx-ai-factory/nke\n"
+				if err != nil || string(redirects) != want {
+					t.Fatalf("Git did not observe preserved OVN and appended NKE redirects: %v %q", err, redirects)
+				}
 			}
 			if strings.Contains(stdout.String()+stderr.String(), "command-log-environment-sentinel") {
 				t.Fatal("command logging exposed an environment value")
