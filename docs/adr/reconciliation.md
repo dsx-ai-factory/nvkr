@@ -8,7 +8,8 @@ schema results do not transfer to a changed candidate.
 ## Current boundary
 
 The maintained public workflow is **Definition → Run → Release**, with Environment, Artifact and
-Verification Policy as the other public objects. Definition v4 selects exact producers for named outputs;
+Verification Policy as the other public objects. Definition v5 selects exact producers for named outputs,
+with a native `platform` or an explicit OCI aggregate `platforms` set;
 there is no authored Recipe, cluster topology, placement, inheritance or composition lifecycle. Plans and
 internal evidence records are generated or authenticated rather than separately authored public inputs.
 
@@ -368,8 +369,8 @@ scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain source
 approval, mixed-source candidate and HTTP-403 limits without copying locks into this ledger.
 
-Current Definition v4/catalog v3/IR v4/Plan and artifact-graph v4 reject retired recipe, cluster, category,
-role, composition and staging fields, including empty legacy fields. Runs/Releases and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,
+Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
+role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,
 execution-settings, AICR, release-authorization/reproduction-result/waiver and qualified-publication families
 remain reserved and nonminting. Historical signed bytes are not converted or reinterpreted. Equal Build
 Digests never waive another output's execution or evidence slots; cross-output reuse is not implemented.

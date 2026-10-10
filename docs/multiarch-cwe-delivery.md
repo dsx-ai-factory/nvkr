@@ -2,7 +2,7 @@
 
 The implementation compiles an explicit Linux AMD64/ARM64 platform set into independent native CWE
 producers and one standard runnable OCI image index. Delivery preserves each native child image's exact
-manifest, config and layer bytes. The maintained Definition keeps one public `cwe` output and eight public
+manifest, config and layer bytes. The [deploy Definition](../definitions/nke-deploy/README.md) keeps one public `cwe` output and eight public
 outputs overall, with nine native build selections. External execution and release acceptance are recorded
 separately from the contracts below.
 
