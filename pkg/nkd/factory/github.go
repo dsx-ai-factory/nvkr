@@ -110,12 +110,17 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
 		}
 		fmt.Fprintf(&body, "    steps:\n")
-		writeGitHubPlatformCheck(&body, plan, runner)
+		if err := writeGitHubPlatformCheck(&body, plan, runner); err != nil {
+			return nil, err
+		}
 		actions.writeCheckoutStep(&body)
 		actions.writeSetupGoStep(&body)
 		helperEnvironment := "CGO_ENABLED=0"
 		if len(plan.Environment.GitHubRunners) > 0 {
-			platform, _ := authored.GitHubRunnerPlatform(githubBootstrapRunner(runner)) // admitted before rendering
+			platform, err := authored.GitHubRunnerPlatform(githubBootstrapRunner(runner))
+			if err != nil {
+				return nil, err
+			}
 			helperEnvironment += " GOOS=linux GOARCH=" + strings.TrimPrefix(platform, "linux/")
 		}
 		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: %s go build -trimpath -ldflags %s -o nkd-exec ./cmd/nkdctl\n", helperEnvironment, shellQuote(linkerFlags))
@@ -210,7 +215,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			}
 		}
 		fmt.Fprintf(&body, "    steps:\n")
-		writeGitHubPlatformCheck(&body, plan, node.RunsOn)
+		if err := writeGitHubPlatformCheck(&body, plan, node.RunsOn); err != nil {
+			return nil, err
+		}
 		actions.writeCheckoutStep(&body)
 		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(node.RunsOn), ".")
 		// upload-artifact/download-artifact do not preserve the execute bit, so the helper
@@ -277,7 +284,11 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		runner := sortedKeys(bootstrapJobs)[0]
 		if len(plan.Environment.GitHubRunners) > 0 {
-			runner = plan.Environment.GitHubRunners[plan.Environment.UtilityPlatform]
+			var ok bool
+			runner, ok = plan.Environment.GitHubRunners[plan.Environment.UtilityPlatform]
+			if !ok || bootstrapJobs[runner] == "" {
+				return nil, e.New(e.CodeEngineCapability, "finalizer has no admitted utility runner/helper")
+			}
 		}
 		fmt.Fprintln(&body, "  nkd-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
@@ -295,7 +306,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			}
 		}
 		fmt.Fprintln(&body, "    steps:")
-		writeGitHubPlatformCheck(&body, plan, runner)
+		if err := writeGitHubPlatformCheck(&body, plan, runner); err != nil {
+			return nil, err
+		}
 		actions.writeCheckoutStep(&body)
 		actions.writeDownloadStep(&body, "NKD runner", "nkd-exec-"+shortStableName(runner), ".")
 		writePrepareHelperStep(&body)

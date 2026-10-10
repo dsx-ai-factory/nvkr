@@ -75,6 +75,8 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 		if err := admitGitHubNodePlatform(plan, node, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
 			return err
 		}
+		// Producer admission runs here; hosted utility admission runs on the host
+		// in executeGitHubNode before entering a container without daemon access.
 		if node.IRNode != "" {
 			if err := checkNodeContainerPlatform(ctx, plan, node, pipeline.CheckContainerPlatform); err != nil {
 				return err

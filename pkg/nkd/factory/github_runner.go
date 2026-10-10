@@ -61,6 +61,8 @@ func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHu
 		if err := admitGitHubNodePlatform(plan, node, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
 			return err
 		}
+		// Admit utility containers on the host; their isolated child has no daemon.
+		// Producer container admission remains owned by ExecuteNode.
 		if node.IRNode == "" && node.Container != "" {
 			if err := checkNodeContainerPlatform(ctx, plan, node, pipeline.CheckContainerPlatform); err != nil {
 				return err

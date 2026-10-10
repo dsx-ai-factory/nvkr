@@ -23,6 +23,8 @@ func TestGitHubRunnerAdmission(t *testing.T) {
 		{name: "empty", runners: map[string]string{}, code: e.CodeInvalidCatalog},
 		{name: "mixed selection", runners: map[string]string{"linux/amd64": "ubuntu-24.04"}, runsOn: "ubuntu-latest", code: e.CodeInvalidCatalog},
 		{name: "mismatch", runners: map[string]string{"linux/arm64": "ubuntu-24.04"}, code: e.CodeEngineCapability},
+		{name: "converse mismatch", runners: map[string]string{"linux/amd64": "ubuntu-24.04-arm"}, code: e.CodeEngineCapability},
+		{name: "too many routes", runners: map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm", "linux/riscv64": "ubuntu-24.04"}, code: e.CodeInvalidCatalog},
 		{name: "unknown platform", runners: map[string]string{"darwin/arm64": "ubuntu-24.04-arm"}, code: e.CodeEngineCapability},
 		{name: "self hosted", runners: map[string]string{"linux/amd64": "self-hosted"}, code: e.CodeEngineCapability},
 		{name: "unrecognized route", runners: map[string]string{"linux/amd64": "company-linux"}, code: e.CodeEngineCapability},

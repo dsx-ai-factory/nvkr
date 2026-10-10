@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -60,6 +61,9 @@ func CheckContainerPlatform(ctx context.Context, runtimeBinary, image, platform 
 }
 
 func checkContainerPlatform(raw []byte, image, platform string) error {
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "validating toolchain platform JSON")
+	}
 	var inspection struct {
 		OS           string   `json:"Os"`
 		Architecture string   `json:"Architecture"`
@@ -98,6 +102,9 @@ func containerPlatformOutput(ctx context.Context, runtimeBinary string, args ...
 	return output.buffer.Bytes(), nil
 }
 
+// containerPlatformBuffer drains excess subprocess output while retaining at most
+// 1 MiB. Write reports all input consumed; every caller must reject overflow before
+// interpreting the captured prefix.
 type containerPlatformBuffer struct {
 	buffer   bytes.Buffer
 	overflow bool
@@ -115,6 +122,9 @@ func (output *containerPlatformBuffer) Write(raw []byte) (int, error) {
 }
 
 func checkContainerDaemonPlatform(raw []byte, platform string) error {
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "validating container daemon JSON")
+	}
 	var information struct {
 		OSType       string `json:"OSType"`
 		Architecture string `json:"Architecture"`
@@ -129,7 +139,7 @@ func checkContainerDaemonPlatform(raw []byte, platform string) error {
 	osName, arch := information.OSType, information.Architecture
 	if information.Host.OS != "" || information.Host.Arch != "" {
 		if osName != "" || arch != "" {
-			return e.New(e.CodeEngineCapability, "ambiguous container daemon platform")
+			return e.New(e.CodeEngineCapability, "mixed top-level and host container daemon platform fields")
 		}
 		osName, arch = information.Host.OS, information.Host.Arch
 	}
