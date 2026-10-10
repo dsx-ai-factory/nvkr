@@ -255,8 +255,19 @@ Contract tests cover ownership, network/address substitutions and probe failures
 the isolated native registry test exercised the direct route, but does not prove
 the previously failing Ubuntu host's deployment. Network progress now groups
 private commands into preflight/setup/cleanup; expected absence probes no longer
-emit misleading failures. A multi-pane phase-map/live-log view is future work,
-not part of these fixes.
+emit misleading failures.
+
+The demo CLI automatically selects a terminal dashboard for interactive standard
+input/output. Its phase map, observed state and bounded public activity use typed
+owner events, not log-derived authority; narrow terminals stack the panes. `--plain`,
+pipes and redirected output retain scrolling progress; `--verbose` builds use plain
+public-log streaming. Tab changes focus, PgUp/PgDn scroll activity and End returns
+to live activity. q/Ctrl+C requests cancellation and waits for owned work and cleanup
+before terminal restoration. [CLI contracts](../../cmd/nke-demo/dashboard_test.go)
+and [simulation-screen tests](../../cmd/nke-demo/dashboard_view_test.go) exercise
+layout, bounded/sanitized snapshots, concurrent reports, cancellation joining and
+terminal failures. These are controlled presentation/race contracts, not a completed
+fresh E2E or live interruption acceptance for this candidate.
 
 [Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise

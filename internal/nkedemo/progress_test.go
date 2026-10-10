@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -276,6 +278,26 @@ func TestProgressDeploymentFailureAndCleanupOrdering(t *testing.T) {
 	}
 	if operation() == nil || !cleaned || !reflect.DeepEqual(writer.events, want) {
 		t.Fatal("cleanup failure reported success")
+	}
+}
+
+func TestProgressInstallerAdmissionFailure(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			code := nkderr.CodePreflightFailed
+			if canceled {
+				cancel()
+				code = nkderr.CodeTimeout
+			}
+			writer := &recordedProgress{}
+			_, err := PrepareInstaller(ctx, BuildConfig{}, Config{Progress: writer})
+			var coded *nkderr.Error
+			if !errors.As(err, &coded) || coded.Code != code || !reflect.DeepEqual(writer.events, phaseEvents("installer-preparation", PhaseFailed)) {
+				t.Fatalf("installer admission lost owner failure: events=%+v err=%v", writer.events, err)
+			}
+		})
 	}
 }
 

@@ -1,0 +1,231 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/gdamore/tcell/v2"
+)
+
+type testDashboardScreen struct {
+	tcell.SimulationScreen
+	closed, initFailure, panicDraw bool
+	joined                         atomic.Bool
+	lastFrame                      string
+	onFini                         func()
+}
+
+func (s *testDashboardScreen) Init() error {
+	if s.initFailure {
+		return errors.New("private terminal details")
+	}
+	err := s.SimulationScreen.Init()
+	s.SetSize(140, 48)
+	return err
+}
+
+func (s *testDashboardScreen) Fini() {
+	s.joined.Store(true)
+	s.SimulationScreen.Fini()
+	if s.onFini != nil {
+		s.onFini()
+	}
+}
+
+func (s *testDashboardScreen) Show() {
+	s.SimulationScreen.Show()
+	cells, width, _ := s.GetContents()
+	var frame strings.Builder
+	for index, cell := range cells {
+		if index > 0 && index%width == 0 {
+			frame.WriteByte('\n')
+		}
+		if len(cell.Runes) > 0 {
+			frame.WriteRune(cell.Runes[0])
+		} else {
+			frame.WriteByte(' ')
+		}
+	}
+	s.lastFrame = frame.String()
+}
+
+func (s *testDashboardScreen) Clear() {
+	if s.panicDraw {
+		panic("private renderer panic")
+	}
+	s.SimulationScreen.Clear()
+}
+
+func (s *testDashboardScreen) ChannelEvents(events chan<- tcell.Event, quit <-chan struct{}) {
+	if s.closed {
+		close(events)
+		return
+	}
+	s.SimulationScreen.ChannelEvents(events, quit)
+}
+
+func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
+	for _, mode := range []string{"context", "ctrl-c", "quit", "terminal-error", "closed-events", "output-error", "renderer-panic"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8"), closed: mode == "closed-events", panicDraw: mode == "renderer-panic"}
+			view := newDashboard()
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			started, cleaning, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			var failed atomic.Bool
+			result := make(chan error, 1)
+			go func() {
+				result <- dashboardLoop(ctx, cancel, screen, func() error {
+					if failed.Load() {
+						return nkderr.New(nkderr.CodePreflightFailed, "terminal output failed")
+					}
+					return nil
+				}, writer, view, func(ctx context.Context, _ io.Writer) error {
+					close(started)
+					<-ctx.Done()
+					close(cleaning)
+					<-release
+					return nil
+				})
+			}()
+			select {
+			case <-started:
+			case <-time.After(3 * time.Second):
+				t.Fatal("workflow did not start")
+			}
+			switch mode {
+			case "context":
+				cancel()
+			case "ctrl-c":
+				if err := screen.PostEvent(tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModNone)); err != nil {
+					t.Fatal(err)
+				}
+			case "quit":
+				if err := screen.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone)); err != nil {
+					t.Fatal(err)
+				}
+			case "terminal-error":
+				if err := screen.PostEvent(tcell.NewEventError(errors.New("private terminal details"))); err != nil {
+					t.Fatal(err)
+				}
+			case "output-error":
+				failed.Store(true)
+				if err := screen.PostEvent(tcell.NewEventResize(100, 40)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			select {
+			case <-cleaning:
+			case <-time.After(3 * time.Second):
+				t.Fatal("workflow was not canceled")
+			}
+			select {
+			case <-result:
+				t.Fatal("presenter returned before cleanup joined")
+			default:
+			}
+			close(release)
+			select {
+			case err := <-result:
+				if err == nil || !screen.joined.Load() || strings.Contains(err.Error(), "private") {
+					t.Fatalf("lost cancellation, leaked private details or terminal unjoined: %v", err)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("presenter or event pump did not join")
+			}
+		})
+	}
+}
+
+func TestDashboardInitializationAdmissionAndPlainFallback(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8"), initFailure: true}
+	err := dashboardLoop(ctx, cancel, screen, func() error { return nil }, nil, nil, func(context.Context, io.Writer) error {
+		t.Fatal("failed terminal admission started workflow")
+		return nil
+	})
+	assertCode(t, err, nkderr.CodePreflightFailed)
+	for _, plain := range []bool{false, true} {
+		var out bytes.Buffer
+		if dashboardEligible(&out, plain, false) {
+			t.Fatal("redirected writer selected terminal")
+		}
+		err := presentProgress(t.Context(), &out, nil, false, "", plain, func(_ context.Context, writer io.Writer) error {
+			_, err := io.WriteString(writer, "PASS: owner result\n")
+			return err
+		})
+		if err != nil || strings.ContainsRune(out.String(), '\x1b') || !strings.Contains(out.String(), "owner result") {
+			t.Fatalf("plain output changed: %q %v", out.String(), err)
+		}
+	}
+}
+
+type shortTTY struct{ tcell.Tty }
+
+func (shortTTY) Write([]byte) (int, error) { return 0, nil }
+
+func TestCheckedTTYShortWriteCancelsWithoutPrivateDetails(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	tty := &checkedTTY{Tty: shortTTY{}, cancel: cancel}
+	_, err := tty.Write([]byte("terminal bytes"))
+	if !errors.Is(err, io.ErrShortWrite) || ctx.Err() == nil {
+		t.Fatal("short terminal write did not cancel")
+	}
+	assertCode(t, tty.failure(), nkderr.CodePreflightFailed)
+}
+
+func TestDashboardWorkerPanicFinalFrameAndTeardown(t *testing.T) {
+	for _, mode := range []string{"worker-panic", "final-frame", "teardown-error"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8")}
+			var terminalFailed, cleaned atomic.Bool
+			if mode == "teardown-error" {
+				screen.onFini = func() { terminalFailed.Store(true) }
+			}
+			view := newDashboard()
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			err := dashboardLoop(ctx, cancel, screen, func() error {
+				if terminalFailed.Load() {
+					return nkderr.New(nkderr.CodePreflightFailed, "terminal teardown failed")
+				}
+				return nil
+			}, writer, view, func(_ context.Context, out io.Writer) error {
+				defer cleaned.Store(true)
+				if mode == "worker-panic" {
+					panic("private worker details")
+				}
+				out.(nkedemo.ProgressReporter).Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneFinished, Name: "artifacts"})
+				return nil
+			})
+			if !cleaned.Load() || !screen.joined.Load() {
+				t.Fatal("worker defers or terminal teardown did not finish")
+			}
+			if mode == "final-frame" {
+				if err != nil || !strings.Contains(screen.lastFrame, "complete") || view.snapshot().phases[1].state != "complete" {
+					t.Fatalf("final observation not rendered: %v\n%s", err, screen.lastFrame)
+				}
+			} else {
+				assertCode(t, err, nkderr.CodePreflightFailed)
+				if strings.Contains(err.Error(), "private") {
+					t.Fatal("private panic escaped presentation boundary")
+				}
+			}
+		})
+	}
+}

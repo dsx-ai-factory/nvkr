@@ -22,8 +22,10 @@ import (
 // It is not NKD build-source acquisition or artifact authority; Run rechecks it.
 // An explicit checkout remains read-only. Without one, Git prepares the pinned
 // commit in a new private attempt-local directory before the expensive build.
-func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (Config, error) {
-	result, err := prepareInstaller(ctx, build, run, Runner{Env: localBuildEnvironment(), Progress: run.Progress})
+func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (result Config, err error) {
+	boundary := beginProgress(run.Progress, "installer-preparation", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { boundary.finish(err) }()
+	result, err = prepareInstaller(ctx, build, run, Runner{Env: localBuildEnvironment(), Progress: run.Progress})
 	if err != nil {
 		code := nkderr.CodePreflightFailed
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

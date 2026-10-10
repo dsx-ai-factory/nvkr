@@ -74,10 +74,11 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 	root.SetErr(diagnostics)
 	root.PersistentFlags().StringVar(&config, "config", "", "explicit version-1 local-demo YAML file (changed flags override it)")
 	root.PersistentFlags().Bool("verbose", false, "stream raw public build output in addition to stage boundaries")
+	root.PersistentFlags().Bool("plain", false, "use scrolling plain progress instead of the interactive terminal dashboard")
 	root.AddCommand(&cobra.Command{
 		Use: "network-port-probe", Hidden: true, Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if cmd.Flags().Changed("config") || cmd.Flags().Changed("verbose") {
+			if cmd.Flags().Changed("config") || cmd.Flags().Changed("verbose") || cmd.Flags().Changed("plain") {
 				return nkderr.New(nkderr.CodeUsage, "network port probe accepts no configuration or flags")
 			}
 			return nkedemo.ProbeNetworkPrivilegedPorts(cmd.Context())
@@ -111,7 +112,8 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			return runProgress(cmd.Context(), out, func(ctx context.Context, progress io.Writer) error {
+			plain, _ := cmd.Flags().GetBool("plain")
+			return runProgress(cmd.Context(), out, plain, func(ctx context.Context, progress io.Writer) error {
 				cfg.Progress = progress
 				return actions.run(ctx, cfg)
 			})
@@ -134,7 +136,8 @@ func newBuildCommand(out io.Writer, actions demoActions, config *string) *cobra.
 				return err
 			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			return runBuildProgress(cmd.Context(), out, verbose, func(ctx context.Context, progress io.Writer) error {
+			plain, _ := cmd.Flags().GetBool("plain")
+			return runBuildProgress(cmd.Context(), out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
 				cfg.Progress = progress
 				built, err := actions.build(ctx, cfg)
 				if err != nil {
@@ -163,7 +166,8 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 			}
 			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Minute)
 			defer cancel()
-			return runProgress(budget, out, func(ctx context.Context, progress io.Writer) error {
+			plain, _ := cmd.Flags().GetBool("plain")
+			return runProgress(budget, out, plain, func(ctx context.Context, progress io.Writer) error {
 				if err := actions.restore(ctx, work, progress); err != nil {
 					return err
 				}
@@ -194,7 +198,8 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Hour)
 			defer cancel()
 			verbose, _ := cmd.Flags().GetBool("verbose")
-			return runBuildProgress(budget, out, verbose, func(ctx context.Context, progress io.Writer) error {
+			plain, _ := cmd.Flags().GetBool("plain")
+			return runBuildProgress(budget, out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
 				build.Progress, run.Progress = progress, progress
 				run, err = actions.prepare(ctx, build, run)
 				if err != nil {

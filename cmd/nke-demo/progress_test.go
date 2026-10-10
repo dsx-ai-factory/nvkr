@@ -31,7 +31,7 @@ func TestProgressFailureCancelsAndWaitsForWork(t *testing.T) {
 	for _, short := range []bool{false, true} {
 		t.Run(map[bool]string{false: "error", true: "short"}[short], func(t *testing.T) {
 			joined := false
-			err := runProgress(t.Context(), failedProgressWriter{short: short}, func(ctx context.Context, out io.Writer) error {
+			err := runProgress(t.Context(), failedProgressWriter{short: short}, false, func(ctx context.Context, out io.Writer) error {
 				out.(nkedemo.ProgressReporter).Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "build"})
 				if ctx.Err() == nil {
 					t.Fatal("output failure did not cancel work")
@@ -49,7 +49,7 @@ func TestProgressFailureCancelsAndWaitsForWork(t *testing.T) {
 
 func TestProgressKeepsObservedBoundariesSeparateFromLogs(t *testing.T) {
 	var out bytes.Buffer
-	err := runProgress(t.Context(), &out, func(_ context.Context, writer io.Writer) error {
+	err := runProgress(t.Context(), &out, false, func(_ context.Context, writer io.Writer) error {
 		reporter := writer.(nkedemo.ProgressReporter)
 		reporter.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "os"})
 		_, _ = io.WriteString(writer, "packer output\n")
@@ -181,7 +181,7 @@ func TestProgressLogRetentionBound(t *testing.T) {
 func TestBuildLogRetainedPrivatelyOnFailure(t *testing.T) {
 	t.Setenv("TMPDIR", t.TempDir())
 	var out bytes.Buffer
-	err := runBuildProgress(t.Context(), &out, false, func(_ context.Context, writer io.Writer) error {
+	err := runBuildProgress(t.Context(), &out, false, false, func(_ context.Context, writer io.Writer) error {
 		_, err := io.WriteString(writer, "complete public build bytes\n")
 		return errors.Join(err, nkderr.New(nkderr.CodeBuildFailed, "failed producer"))
 	})
@@ -217,7 +217,7 @@ func TestTenantStatusShowsMeaningNotPrivateProbeNames(t *testing.T) {
 	} {
 		t.Run(tc.stage+tc.want, func(t *testing.T) {
 			var out bytes.Buffer
-			err := runProgress(t.Context(), &out, func(_ context.Context, writer io.Writer) error {
+			err := runProgress(t.Context(), &out, false, func(_ context.Context, writer io.Writer) error {
 				writer.(nkedemo.ProgressReporter).Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: tc.stage, Status: "private-status", RegisteredNodes: tc.registered, ReadyNodes: tc.ready, Elapsed: 20 * time.Minute, Remaining: 40 * time.Minute})
 				return nil
 			})

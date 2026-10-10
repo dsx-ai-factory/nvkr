@@ -18,15 +18,15 @@ import (
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
-// Work stays synchronous: output failure cancels work without bypassing its
-// child-process joins or cleanup. No renderer, terminal mode or event queue.
-func runProgress(ctx context.Context, out io.Writer, work func(context.Context, io.Writer) error) error {
-	return progressOutput(ctx, out, nil, false, "", work)
+// Plain work stays synchronous; the terminal presenter owns and joins its one
+// worker. Neither output mode bypasses child-process joins or cleanup.
+func runProgress(ctx context.Context, out io.Writer, plain bool, work func(context.Context, io.Writer) error) error {
+	return presentProgress(ctx, out, nil, false, "", plain, work)
 }
 
 // Allocate a private retained log only after command/configuration admission.
 // Deployment captures remain private in their existing owner, not this stream.
-func runBuildProgress(ctx context.Context, out io.Writer, verbose bool, work func(context.Context, io.Writer) error) (result error) {
+func runBuildProgress(ctx context.Context, out io.Writer, verbose, plain bool, work func(context.Context, io.Writer) error) (result error) {
 	if err := ctx.Err(); err != nil {
 		return nkderr.Wrap(nkderr.CodeTimeout, err, "build progress canceled")
 	}
@@ -39,7 +39,7 @@ func runBuildProgress(ctx context.Context, out io.Writer, verbose bool, work fun
 			result = errors.Join(result, nkderr.Wrap(nkderr.CodePreflightFailed, err, "close build log"))
 		}
 	}()
-	return progressOutput(ctx, out, log, verbose, log.Name(), work)
+	return presentProgress(ctx, out, log, verbose, log.Name(), plain, work)
 }
 
 func progressOutput(ctx context.Context, out, raw io.Writer, verbose bool, logPath string, work func(context.Context, io.Writer) error) error {
@@ -77,6 +77,7 @@ type checkedWriter struct {
 	discard     bool
 	failedPhase string
 	tenantStage string
+	observer    nkedemo.ProgressReporter
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.
@@ -192,6 +193,9 @@ func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
 	default:
 		return
 	}
+	if w.observer != nil {
+		w.observer.Report(event)
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	now := time.Now()
@@ -227,6 +231,9 @@ func (w *checkedWriter) tenantStatus(event nkedemo.ProgressEvent) {
 		message = "Running tenant workload and cluster DNS checks; successful completion still required"
 	default:
 		return
+	}
+	if w.observer != nil {
+		w.observer.Report(event)
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()

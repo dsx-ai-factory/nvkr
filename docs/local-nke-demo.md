@@ -306,16 +306,26 @@ required outputs. It comes from `nkdctl run graph` over the compiled baseline
 Plan, not a hand-maintained diagram; the later attempt-local toolchain substitution
 does not make this display execution evidence.
 
-The console shows elapsed time and observed START/DONE/FAIL boundaries instead
-of every compiler/download line. `build` and `e2e` print the path to a private
-console log retaining up to 8 MiB of raw public build output; use `tail -f` on
-that path for details, or add `--verbose` to stream it directly. At the log limit,
-one notice is printed; builds and progress continue. Log messages and graph
-views are diagnostics, not proof of artifact verification or successful E2E.
-Private installer output stays in its private logs. Ctrl+C requests cancellation;
-the adapter attempts bounded process joins and owned cleanup. If cleanup refuses,
-inspect the retained resources and recovery instructions before rerunning.
-Ordinary tests do not prove interruption at every live NKE stage.
+In an interactive terminal, the demo automatically opens a dashboard with a
+phase map, observed state and bounded public activity. The phases are Prepare,
+Artifacts, Site, Tenant, Workload/DNS and Cleanup; narrow terminals stack the panes.
+The state pane explains the current wait and shows the observed tenant node counts
+and remaining readiness budget. It does not infer success from log text.
+
+| Key | Action |
+| --- | --- |
+| Tab | Change the focused pane |
+| PgUp / PgDn | Scroll retained activity |
+| End | Return to live activity |
+| q / Ctrl+C | Request cancellation, then wait for owned processes and cleanup |
+
+Add `--plain` to the command above for scrolling elapsed START/DONE/FAIL output.
+Piped or redirected output also stays plain. `build` and `e2e` retain up to 8 MiB
+of raw public build output in the private log whose path they display; use
+`tail -f` on that path, or add `--verbose` for plain streaming output instead of
+the dashboard. At the log limit, one notice is printed and work continues.
+Private installer output stays in its private logs. If terminal initialization
+fails before work, retry with `--plain`.
 
 Network progress groups private commands into preflight, setup and cleanup;
 expected absence checks do not print failures. Numbered command logs remain
@@ -326,9 +336,16 @@ Changes appear immediately; an unchanged wait repeats at most every 30 seconds.
 Before the tenant API is available, guest boot and node readiness are explicitly
 unobserved: a successful inventory or secret query does not mean provisioning
 succeeded. Two Ready nodes still require workload/DNS checks and owned cleanup.
-A future multi-pane view should show the overall phase
-map, active operations and their bounded live logs. That view is not implemented;
-the current fixes do not add a terminal UI framework.
+
+An observed substep is not completion of its entire phase. The dashboard and
+graph are diagnostics, not artifact verification receipts or a signed Release;
+the final command result and owned checks still determine success. Cancellation
+waits for bounded subprocess joining and owned cleanup before restoring the
+terminal. If cleanup refuses, inspect retained resources and recovery instructions
+before rerunning. [Dashboard tests](../cmd/nke-demo/dashboard_test.go) and
+[simulation-screen tests](../cmd/nke-demo/dashboard_view_test.go) cover presentation,
+cancellation and output failures with controlled workers. They do not prove
+interruption at every live NKE stage or a successful fresh E2E with these changes.
 
 The default OS profile explicitly forbids KVM and uses QEMU's TCG software
 emulation, even on a KVM-capable bare-metal host. `Waiting for SSH to become
