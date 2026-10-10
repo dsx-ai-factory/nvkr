@@ -234,6 +234,29 @@ with a two-node provisioning timeout, not a successful E2E video. A canonical
 source-owner fix and reviewed pin update are required; no local catalog patch
 is applied. Neither contract checks nor earlier deployment replays close this gate.
 
+The downstream demo now selects those standalone NVIDIA OVN outputs for the
+Kind site as well as selecting the fork's stream for the QCOW2 tenant. Its private
+Kind configuration disables the default CNI and kube-proxy. The site adapter
+copies the selected native image through the existing owned registry and exports
+the observed bound chart through `nkdctl publish chart`; it starts node-local OVS
+using that image's existing entrypoint before site OVN, node readiness and CAPI.
+These privileged local CNI processes are not an independently isolated provider.
+Already-loaded Open vSwitch/Geneve modules are admitted before installer
+acquisition or deployment mutation. The adapter does not issue module-load or
+unload commands, but the privileged source-owned OVS entrypoint can manipulate
+the shared kernel; prerequisite admission is not an isolation boundary.
+The changed site topology has no completed live E2E acceptance. The source-owner
+startup fix, reviewed pin update and fresh dual-cluster runtime checks remain
+required, separately from artifact and adapter tests.
+Read-only rendering of the retained chart with its built Helm 4.2.4 executable
+preserved the accepted image digest across all six site chart slots; it did not
+install a cluster. Owner validation must also cover real node startup: the
+selected [iptables wrapper](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/26cc199de8e814a7fe6d899a770fc04df0bbc2f9/dist/images/iptables-scripts/iptables#L5)
+requires `/host`, whereas the selected
+[node chart](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/26cc199de8e814a7fe6d899a770fc04df0bbc2f9/charts/ovn-kubernetes/charts/ovnkube-single-node-zone/templates/daemonset.yaml#L324)
+mounts `/host/run/dbus`, not that root. This is a source-level compatibility
+gap, not an observed subsequent runtime failure or a local workaround.
+
 Fresh profiles selections produce a native OCI image through the existing
 rootless BuildKit lane and pinned NKE profiles Dockerfile. A named build context
 selects the existing exact Alpine image digest instead of the Dockerfile's tag;

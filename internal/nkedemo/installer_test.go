@@ -18,7 +18,7 @@ import (
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
-	for _, name := range []string{"remote", "local", "sibling", "override", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed"} {
+	for _, name := range []string{"remote", "local", "sibling", "override", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed"} {
 		t.Run(name, func(t *testing.T) {
 			root := privateTestDir(t)
 			repo, tools, calls := filepath.Join(root, "repo"), filepath.Join(root, "tools"), filepath.Join(root, "calls")
@@ -166,16 +166,30 @@ esac
 				t.Setenv("PATH", tools+":/usr/bin:/bin")
 				actual, err = PrepareInstaller(ctx, build, run)
 			} else {
-				actual, err = prepareInstaller(ctx, build, run, runner)
+				admission := func() error { return nil }
+				switch name {
+				case "kernel":
+					admission = func() error { return errors.New("controlled missing host modules") }
+				case "kernel-admission-missing":
+					admission = nil
+				}
+				actual, err = prepareInstaller(ctx, build, run, runner, admission)
 			}
 			success := name == "remote" || name == "local" || name == "sibling" || name == "override"
 			if (err == nil) != success {
 				t.Fatalf("result=%+v error=%v", actual, err)
 			}
 			if !success {
-				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure {
+				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure || strings.HasPrefix(name, "kernel") {
 					if _, e := os.Lstat(calls); !errors.Is(e, os.ErrNotExist) {
 						t.Fatal("failed preflight reached Git acquisition")
+					}
+				}
+				if strings.HasPrefix(name, "kernel") {
+					for _, path := range []string{filepath.Join(repo, ".nkd"), run.Out} {
+						if _, e := os.Lstat(path); !errors.Is(e, os.ErrNotExist) {
+							t.Fatal("kernel admission failure created output or acquired source")
+						}
 					}
 				}
 				if imageFailure {

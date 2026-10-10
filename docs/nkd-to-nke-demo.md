@@ -39,6 +39,17 @@ QCOW2 guests**, not CAPD containers. Node readiness, exact backing disk,
 workload/DNS and cleanup are separate acceptance checks from artifact creation.
 See [full-source gaps](full-nke-source-build.md) for acquired/omitted inputs.
 
+Both clusters select NVIDIA OVN. The site consumes the completed standalone
+`ovn-chart-arm64` and `ovn-image-arm64` outputs through the owned registry;
+the tenant uses its disk's separately produced OVN packages. Those paths do not
+establish equal bytes. Kind's default CNI and kube-proxy are disabled. Its OVS
+helper reuses the selected image's existing `ovs-server` entrypoint; site OVN
+readiness precedes management-node readiness and Cluster API installation.
+The source-owner startup fix remains required before this selection can pass
+fresh E2E acceptance. Validate actual OVN-node startup and its iptables calls,
+not merely the presence of `firewall-cmd`; the selected image's host wrappers
+and chart mounts also need to agree. See [current validation status](adr/reconciliation.md).
+
 ## Prepare charts without rebuilding them
 
 The adapter asks `nkdctl publish chart` to verify each selected Helm layout,
@@ -143,6 +154,13 @@ and the QEMU bridge helper required privileges. It preserves process stop/join
 ownership and withdraws controls only after dependent producers stop.
 No global Docker daemon policy is changed. This is operator-trusted local
 execution, not production isolation.
+
+Site CNI/OVS containers are privileged within the owned Kind cluster and share
+the execution host's kernel. The adapter requires the Open vSwitch/Geneve
+modules to be loaded already; it does not claim this prerequisite independently
+isolates privileged source code from the host. Node-local OVS processes and
+paths are removed with the owned Kind node/volume; shared host kernel modules
+are not unloaded.
 
 First-boot APT uses the baked local repository and fails on missing packages.
 The diagnostic profile preserves the physical uplink across worker reboot.

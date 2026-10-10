@@ -6,7 +6,8 @@ through CAPNICo/NICoSim. Kind hosts management services, not tenant nodes.
 
 **Current E2E blocker:** the selected NVIDIA OVN image lacks `firewall-cmd`,
 which its startup code requires even with firewalld disabled. Artifact builds
-can succeed while tenant provisioning fails. See [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1).
+can succeed while OVN startup fails. The demo selects NVIDIA OVN for both the
+Kind site cluster and the QCOW2 tenant. See [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1).
 Wait for the source-owner fix and a reviewed pin update before expecting a
 successful complete E2E with this selection. No local catalog workaround is
 applied. The build-only development loops remain separate from tenant acceptance.
@@ -147,7 +148,7 @@ sudo apt-get install -y --no-install-recommends \
   git jq coreutils python3 openssh-client bash curl openssl \
   libvirt-daemon-system libvirt-clients qemu-system-arm qemu-utils \
   qemu-efi-aarch64 cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
-  dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs
+  dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod
 docker info >/dev/null
 docker buildx version
 df -h .
@@ -165,6 +166,26 @@ sudo -n true
 ```
 
 E2E also checks this before fetching its installer or starting artifact builds.
+
+The site uses Open vSwitch's kernel datapath inside the owned Kind node. On this
+dedicated Linux execution host, have the administrator load its kernel modules
+before E2E; these are host prerequisites, not artifacts NKD builds:
+
+```sh
+sudo modprobe openvswitch
+sudo modprobe geneve
+test -d /sys/module/openvswitch
+test -d /sys/module/geneve
+test -c /dev/net/tun
+```
+
+Run these inside Colima on a Mac, not in macOS. If a module is missing for the
+running kernel, stop and arrange compatible kernel modules with the host
+administrator. The adapter refuses missing prerequisites before installer
+acquisition or artifact building; it does not install or load modules for you.
+The privileged CNI containers share that host kernel. This is trusted local
+execution, not independent isolation. Kernel modules remain loaded after demo
+cleanup; the demo does not unload shared host modules.
 
 Network admission uses a fixed Go helper under bounded `sudo -n` to bind-check
 DNS/DHCP ports before recording host-control intent. The main demo stays
@@ -231,7 +252,8 @@ docker network inspect kind --format '{{json .IPAM.Config}}'
 
 The demo discovers that network's actual IPv4 subnet and gateway; no YAML change
 is needed. Check that the chosen private subnet also avoids your host/VPN routes
-and the demo's reserved tenant ranges `172.30.0.0/24` and `172.31.0.0/24`.
+and the demo's reserved tenant ranges `172.30.0.0/24` and `172.31.0.0/24`,
+site pod range `10.244.0.0/16`, and site service range `10.96.0.0/16`.
 If it conflicts, choose an unused private subnet with Docker's `--subnet` and
 `--gateway` options before starting the demo. An existing `kind` network is
 inspected, not recreated. A `Pool overlaps` error means the requested subnet is
@@ -239,7 +261,12 @@ already allocated: inspect the networks above and do not delete an unrelated
 network such as `fleet` to make room.
 
 The adapter checks the pinned Kind configuration and projects IPv4 networking
-without a Docker-socket mount into a private copy; it does not edit NKE.
+without a Docker-socket mount into a private copy; it does not edit NKE. It
+disables Kind's default CNI and kube-proxy, then installs the built NVIDIA OVN
+chart and image. Open vSwitch starts in an owned Kind DaemonSet using the same
+selected image's existing entrypoint. Management-node readiness and Cluster API
+installation follow site-network readiness; the tenant remains a separate
+QCOW2-backed cluster.
 
 Cache the explicit runtime acquisitions:
 

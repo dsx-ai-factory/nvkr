@@ -25,7 +25,7 @@ import (
 func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (result Config, err error) {
 	boundary := beginProgress(run.Progress, "installer-preparation", PhaseStarted, PhaseFinished, PhaseFailed)
 	defer func() { boundary.finish(err) }()
-	result, err = prepareInstaller(ctx, build, run, Runner{Env: localBuildEnvironment(), Progress: run.Progress})
+	result, err = prepareInstaller(ctx, build, run, Runner{Env: localBuildEnvironment(), Progress: run.Progress}, admitSiteOVNKernel)
 	if err != nil {
 		code := nkderr.CodePreflightFailed
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -36,7 +36,7 @@ func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (resul
 	return result, nil
 }
 
-func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner Runner) (result Config, returnErr error) {
+func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner Runner, admitKernel func() error) (result Config, returnErr error) {
 	if err := requireContext(ctx); err != nil {
 		return result, err
 	}
@@ -69,6 +69,12 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 		}
 	}
 	if err = admitInstallerImages(ctx, runner); err != nil {
+		return result, err
+	}
+	if admitKernel == nil {
+		return result, errors.New("site OVN kernel admission required before installer preparation")
+	}
+	if err = admitKernel(); err != nil {
 		return result, err
 	}
 	source := "https://github.com/dsx-ai-factory/nke.git"

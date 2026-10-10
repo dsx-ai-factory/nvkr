@@ -33,6 +33,8 @@ const kindNodeImage = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd56
 const kindNodeID = "sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const socketMount = "  extraMounts:\n    - hostPath: /var/run/docker.sock\n      containerPath: /var/run/docker.sock\n"
 const sourceKindIPFamily = "  ipFamily: dual\n"
+const managementPodCIDR = "10.244.0.0/16"
+const managementServiceCIDR = "10.96.0.0/16"
 
 var managementMembers = []string{"clusterctl", "helm", "kind", "kubectl", "oras"}
 
@@ -244,21 +246,25 @@ type managementAdmission struct {
 }
 
 // projectManagementConfig changes only this demo's private runtime copy after
-// exact source-byte admission. The tenant network is IPv4-only; requiring IPv6
-// from the shared Docker network would add an unrelated host prerequisite.
+// exact source-byte admission. Downstream topology selects IPv4 NVIDIA OVN;
+// its source-owned Kind fixture disables the default CNI and kube-proxy.
 func projectManagementConfig(source []byte) ([]byte, error) {
 	text := string(source)
 	if plainSHA(source) != kindConfigHash || strings.Count(text, socketMount) != 1 || strings.Count(text, sourceKindIPFamily) != 1 {
 		return nil, errors.New("source-owned Kind configuration differs from inspected interface")
 	}
 	text = strings.Replace(text, socketMount, "", 1)
-	return []byte(strings.Replace(text, sourceKindIPFamily, "  ipFamily: ipv4\n", 1)), nil
+	network := "  ipFamily: ipv4\n  disableDefaultCNI: true\n  kubeProxyMode: none\n  podSubnet: " + managementPodCIDR + "\n  serviceSubnet: " + managementServiceCIDR + "\n"
+	return []byte(strings.Replace(text, sourceKindIPFamily, network, 1)), nil
 }
 
 func admitManagement(ctx context.Context, cfg Config) (managementAdmission, error) {
 	var admitted managementAdmission
 	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
 		return admitted, errors.New("require native Linux ARM64 inside the dedicated VM")
+	}
+	if err := admitSiteOVNKernel(); err != nil {
+		return admitted, err
 	}
 	runner := Runner{Env: NativeEnvironment(), Progress: cfg.Progress}
 	for _, name := range []string{"docker", "git", "python3"} {
@@ -592,6 +598,9 @@ func verifyToolVersions(ctx context.Context, session ManagementSession) error {
 // WithManagement creates one exact owned node and keeps it alive through the
 // callback. Failed stop/join or retained controls prohibit dependent cleanup.
 func WithManagement(ctx context.Context, cfg Config, consumer func(context.Context, ManagementSession) error) (result error) {
+	if consumer == nil {
+		return errors.New("management requires the site OVN consumer before readiness")
+	}
 	admitted, err := admitManagement(ctx, cfg)
 	if err != nil {
 		return err
@@ -690,7 +699,7 @@ func WithManagement(ctx context.Context, cfg Config, consumer func(context.Conte
 	defer func() {
 		result = cleanupAfterJoinedWork(ctx, result, 3*time.Minute, func(cleanupCtx context.Context) error { return cleanupManagement(cleanupCtx, session, existing) })
 	}()
-	if err = session.Runner.Run(ctx, []string{filepath.Join(tools, "kind"), "create", "cluster", "--name", name, "--config", filepath.Join(admitted.out, "kind.yaml"), "--kubeconfig", environmentValue(session.Runner.Env, "SITE_KUBECONFIG"), "--wait", "5m"}, "create-management", 600*time.Second); err != nil {
+	if err = session.Runner.Run(ctx, []string{filepath.Join(tools, "kind"), "create", "cluster", "--name", name, "--config", filepath.Join(admitted.out, "kind.yaml"), "--kubeconfig", environmentValue(session.Runner.Env, "SITE_KUBECONFIG")}, "create-management", 600*time.Second); err != nil {
 		return err
 	}
 	ids, err = ownedManagementNodes(ctx, preflight, name)
@@ -700,23 +709,5 @@ func WithManagement(ctx context.Context, cfg Config, consumer func(context.Conte
 	if len(ids) != 1 {
 		return errors.New("expected exactly one owned management node")
 	}
-	if err = session.Runner.Run(ctx, []string{filepath.Join(tools, "kubectl"), "--kubeconfig", environmentValue(session.Runner.Env, "SITE_KUBECONFIG"), "wait", "nodes", "--all", "--for=condition=Ready", "--timeout=180s"}, "management-ready", 210*time.Second); err != nil {
-		return err
-	}
-	stage := filepath.Join(admitted.out, "source/deploy/stages/04-install-cluster-api.sh")
-	for _, step := range []struct {
-		action, phase string
-		timeout       time.Duration
-	}{{"run", "install-capi", 1200 * time.Second}, {"check", "check-capi", 180 * time.Second}} {
-		if err = session.Runner.Run(ctx, []string{"bash", stage, step.action}, step.phase, step.timeout); err != nil {
-			return err
-		}
-	}
-	if err = session.Runner.Run(ctx, []string{filepath.Join(tools, "kubectl"), "--kubeconfig", environmentValue(session.Runner.Env, "SITE_KUBECONFIG"), "get", "pods", "-A", "-o", "json"}, "management-pods", 30*time.Second); err != nil {
-		return err
-	}
-	if consumer != nil {
-		return consumer(ctx, session)
-	}
-	return nil
+	return consumer(ctx, session)
 }

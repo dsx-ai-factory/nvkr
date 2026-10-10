@@ -113,9 +113,9 @@ func TestManagementConfigProjectionAdmitsExactSourceAndUsesIPv4(t *testing.T) {
 				}
 				return
 			}
-			want := strings.Replace(strings.Replace(before, socketMount, "", 1), sourceKindIPFamily, "  ipFamily: ipv4\n", 1)
+			want := strings.Replace(strings.Replace(before, socketMount, "", 1), sourceKindIPFamily, "  ipFamily: ipv4\n  disableDefaultCNI: true\n  kubeProxyMode: none\n  podSubnet: "+managementPodCIDR+"\n  serviceSubnet: "+managementServiceCIDR+"\n", 1)
 			if projectErr != nil || string(projected) != want || string(source) != before || !strings.Contains(string(projected), kindNodeImage) {
-				t.Fatal("projection changed anything except the two admitted runtime settings", projectErr)
+				t.Fatal("projection differs from the admitted IPv4 OVN topology", projectErr)
 			}
 		})
 	}

@@ -55,7 +55,7 @@ func profilesImageValues(reference string) map[string]any {
 }
 
 func imageKeys() []string {
-	keys := []string{"cwe", "profiles", "provider"}
+	keys := []string{"cwe", "profiles", "provider", "ovn"}
 	for _, name := range runtimeImages {
 		keys = append(keys, "runtime-"+name)
 	}
@@ -166,6 +166,16 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 		}
 		outputs["runtime-"+name] = selected
 	}
+	for _, item := range []struct{ key, name, kind string }{{"ovn", "ovn-image-arm64", "oci"}, {"ovn-chart", "ovn-chart-arm64", "helm-oci"}} {
+		selected, readErr := selectSiteOutput(ctx, cfg.Runs.Components, item.name, item.kind)
+		if readErr != nil {
+			return nil, readErr
+		}
+		outputs[item.key] = selected
+	}
+	if err = admitSiteOVNChart(ctx, outputs["ovn-chart"], outputs["ovn"]); err != nil {
+		return nil, err
+	}
 	if _, err = registryCapacity(outputs); err != nil {
 		return nil, err
 	}
@@ -214,6 +224,9 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 	}
 	if gateway == "" {
 		return nil, errors.New("missing private Kind IPv4 gateway")
+	}
+	if err = admitSiteCIDRs(cidr); err != nil {
+		return nil, err
 	}
 	return &SiteMaterials{Outputs: outputs, Gateway: gateway, RegistryID: images[0].ID, KindCIDR: cidr, KindNetworkID: networks[0].ID}, nil
 }
@@ -620,6 +633,7 @@ type sitePod struct {
 	Spec     struct {
 		Containers, InitContainers []podContainer
 		Volumes                    []profileVolume
+		HostNetwork                bool
 	}
 	Status struct {
 		ContainerStatuses, InitContainerStatuses []podContainerState
@@ -1043,6 +1057,9 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 		return err
 	}
 	if err = session.Runner.Run(ctx, []string{"docker", "cp", hostConfig, node + ":" + certs + "/hosts.toml"}, "node-registry-config", 30*time.Second); err != nil {
+		return err
+	}
+	if err = installSiteNetwork(ctx, session, tool, materials.Outputs, refs["ovn"], "https://"+vip+":6443", captureSiteNetwork); err != nil {
 		return err
 	}
 	if err = bootstrapCA(ctx, session); err != nil {

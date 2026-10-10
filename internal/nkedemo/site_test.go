@@ -831,7 +831,7 @@ func TestSiteImageCopyChecksEveryNativeReadback(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if len(refs) != 15 {
+				if len(refs) != 16 || refs["ovn"] == "" {
 					t.Fatal("not all site images copied")
 				}
 				for _, key := range imageKeys() {
