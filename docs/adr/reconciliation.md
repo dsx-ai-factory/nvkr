@@ -225,15 +225,20 @@ select its `1.5.18` chart stream. The combined Definition also declares standalo
 OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
 are independently produced; this does not close original-owner cross-output
 reuse or establish equal bytes. Fork graph/profile tests and actual pinned-chart
-Helm rendering with loopback OCI push/pull passed; the changed combined Run,
-fork OS bake and tenant acceptance still require a fresh runtime run.
+Helm rendering with loopback OCI push/pull passed. Retained attempt
+`kind-calico-e2e-20261010-09` at `de31a87` completed the combined artifact Run,
+including the fork OS bake, with 29 expected and 29 observed outputs in the
+`unqualified-local-execution` lane. Its lifecycle content subject is
+`sha256:99e74fe81dc754b28a04f85b31694aeb2902f8a1f3b6cbb3ba054479b55e7af9`.
+Artifact completion does not establish tenant acceptance or default OVN startup.
 
 The selected fork's Ubuntu runtime omits `firewall-cmd`, while its non-DPU
 executable initialization requires it even when firewalld is disabled.
 [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1)
 records the source paths and observed startup failure: artifact builds can
-succeed without a Ready tenant. The last retained continuous attempt ended
-with a two-node provisioning timeout, not a successful E2E video. A canonical
+succeed without a Ready tenant. The latest completed continuous attempt above
+used the explicitly selected `kind-calico` diagnostic and ended with a two-node
+readiness timeout, not a successful E2E video or an OVN startup test. A canonical
 source-owner fix and reviewed pin update are required; no local catalog patch
 is applied. Neither contract checks nor earlier deployment replays close this gate.
 
@@ -278,9 +283,13 @@ native ARM64 rootless BuildKit test produced manifest
 `sha256:197fe058d0fbcff5d7841abfee58067aa05f7cdd21040642fe7e327096b574a0`.
 ORAS transport/readback, manifest retrieval from the Kind network and the image's
 init copy command passed with exact staged profile/runbook comparison. This is
-not a completed NKD profiles Run or Kubernetes init-container observation; fresh
-integrated acceptance remains unverified. The current retained recording uses an
-older data-bundle Run and is not acceptance evidence for this changed producer/consumer.
+not by itself a completed NKD profiles Run or Kubernetes init-container observation.
+The retained 29-output attempt above subsequently observed `controller-profiles`
+as `kind: oci` with that exact manifest digest. Its site handoff and the actual
+`materialize-profiles` init container retained the matching image ID, `/profiles`
+path and pod UID; the init container exited zero with reason `Completed`.
+This exercises the changed producer/consumer, but its tenant readiness failure
+still leaves full E2E acceptance unverified.
 
 E2E now admits cached ARM64 Kind and registry images before installer acquisition
 or artifact builds. Deployment authenticates its owned registry's direct IPv4
@@ -297,8 +306,11 @@ input/output. Its phase map, observed state and bounded public activity use type
 owner events, not log-derived authority; narrow terminals stack the panes. `--plain`,
 pipes and redirected output retain scrolling progress; `--verbose` builds use plain
 public-log streaming. Tab changes focus, PgUp/PgDn scroll activity and End returns
-to live activity. q/Ctrl+C requests cancellation and waits for owned work and cleanup
-before terminal restoration. Failed deployment stops unfinished active panes without
+to live activity. q asks for confirmation; y requests cancellation, while Ctrl+C
+requests it immediately. Normal cancellation waits for owned work and cleanup
+before terminal restoration. During cancellation, f then y restores the terminal
+and exits 130 without joining cleanup; resources may remain and no success is claimed.
+Failed deployment stops unfinished active panes without
 claiming that their individual checks failed. [CLI contracts](../../cmd/nke-demo/dashboard_test.go)
 and [simulation-screen tests](../../cmd/nke-demo/dashboard_view_test.go) exercise
 layout, bounded/sanitized snapshots, concurrent reports, cancellation joining and

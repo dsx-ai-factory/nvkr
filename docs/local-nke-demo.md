@@ -167,9 +167,10 @@ sudo -n true
 
 E2E also checks this before fetching its installer or starting artifact builds.
 
-The site uses Open vSwitch's kernel datapath inside the owned Kind node. On this
-dedicated Linux execution host, have the administrator load its kernel modules
-before E2E; these are host prerequisites, not artifacts NKD builds:
+In the default OVN mode, the site uses Open vSwitch's kernel datapath inside
+the owned Kind node. On this dedicated Linux execution host, have the
+administrator load its kernel modules before E2E; these are host prerequisites,
+not artifacts NKD builds:
 
 ```sh
 sudo modprobe openvswitch
@@ -185,7 +186,9 @@ administrator. The adapter refuses missing prerequisites before installer
 acquisition or artifact building; it does not install or load modules for you.
 The privileged CNI containers share that host kernel. This is trusted local
 execution, not independent isolation. Kernel modules remain loaded after demo
-cleanup; the demo does not unload shared host modules.
+cleanup; the demo does not unload shared host modules. The temporary
+`--network kind-calico` diagnostic skips this OVN module admission, but still
+requires the common Docker, libvirt and host-network prerequisites above.
 
 Network admission uses a fixed Go helper under bounded `sudo -n` to bind-check
 DNS/DHCP ports before recording host-control intent. The main demo stays
