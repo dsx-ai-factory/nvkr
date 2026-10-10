@@ -319,7 +319,14 @@ Ordinary tests do not prove interruption at every live NKE stage.
 
 Network progress groups private commands into preflight, setup and cleanup;
 expected absence checks do not print failures. Numbered command logs remain
-available for diagnosis. A future multi-pane view should show the overall phase
+available for diagnosis. Tenant polling likewise keeps individual inventory,
+kubeconfig and node commands in private logs. The console shows the current
+wait, elapsed/remaining readiness budget, and observed registered/Ready counts.
+Changes appear immediately; an unchanged wait repeats at most every 30 seconds.
+Before the tenant API is available, guest boot and node readiness are explicitly
+unobserved: a successful inventory or secret query does not mean provisioning
+succeeded. Two Ready nodes still require workload/DNS checks and owned cleanup.
+A future multi-pane view should show the overall phase
 map, active operations and their bounded live logs. That view is not implemented;
 the current fixes do not add a terminal UI framework.
 

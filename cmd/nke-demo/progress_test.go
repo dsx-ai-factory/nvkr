@@ -199,3 +199,31 @@ func TestBuildLogRetainedPrivatelyOnFailure(t *testing.T) {
 		t.Fatalf("log=%q error=%v", data, err)
 	}
 }
+
+func TestTenantStatusShowsMeaningNotPrivateProbeNames(t *testing.T) {
+	for _, tc := range []struct {
+		stage, want       string
+		registered, ready int
+	}{
+		{"tenant-kubeconfig", "guest boot and node readiness not yet observed", 0, 0},
+		{"tenant-api", "successful tenant API node query", 0, 0},
+		{"tenant-nodes", "1/2 registered, 0/2 Ready", 1, 0},
+		{"tenant-nodes", "2/2 registered, 1/2 Ready", 2, 1},
+		{"tenant-nodes", "workload and DNS checks still required", 2, 2},
+		{"tenant-workload", "successful completion still required", 2, 2},
+		{"unknown-private-value", "", 0, 0},
+		{"tenant-nodes", "", 3, 2},
+		{"tenant-nodes", "", 1, 2},
+	} {
+		t.Run(tc.stage+tc.want, func(t *testing.T) {
+			var out bytes.Buffer
+			err := runProgress(t.Context(), &out, func(_ context.Context, writer io.Writer) error {
+				writer.(nkedemo.ProgressReporter).Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: tc.stage, Status: "private-status", RegisteredNodes: tc.registered, ReadyNodes: tc.ready, Elapsed: 20 * time.Minute, Remaining: 40 * time.Minute})
+				return nil
+			})
+			if err != nil || tc.want == "" && out.Len() != 0 || tc.want != "" && (!strings.Contains(out.String(), tc.want) || !strings.Contains(out.String(), "20m0s elapsed · 40m0s remaining")) || strings.Contains(out.String(), "private-") {
+				t.Fatalf("unhelpful or private output: %q error=%v", out.String(), err)
+			}
+		})
+	}
+}

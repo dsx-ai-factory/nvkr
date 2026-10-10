@@ -76,6 +76,7 @@ type checkedWriter struct {
 	line        []byte
 	discard     bool
 	failedPhase string
+	tenantStage string
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.
@@ -176,6 +177,10 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
+	if event.Kind == nkedemo.TenantWaiting {
+		w.tenantStatus(event)
+		return
+	}
 	var status string
 	switch event.Kind {
 	case nkedemo.LaneStarted, nkedemo.PhaseStarted, nkedemo.DeploymentStarted:
@@ -201,4 +206,33 @@ func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
 		w.failedPhase = event.Name
 	}
 	w.emit(fmt.Sprintf("[%s %s] %s\n", status, elapsed, terminalText(event.Name)))
+}
+
+func (w *checkedWriter) tenantStatus(event nkedemo.ProgressEvent) {
+	var message string
+	switch event.Name {
+	case "tenant-kubeconfig":
+		message = "Waiting for NKE to publish tenant kubeconfig; guest boot and node readiness not yet observed"
+	case "tenant-api":
+		message = "Tenant kubeconfig available; waiting for a successful tenant API node query (not yet Ready)"
+	case "tenant-nodes":
+		if event.RegisteredNodes < 0 || event.RegisteredNodes > 2 || event.ReadyNodes < 0 || event.ReadyNodes > event.RegisteredNodes {
+			return
+		}
+		message = fmt.Sprintf("Tenant nodes: %d/2 registered, %d/2 Ready; waiting for both control plane and worker", event.RegisteredNodes, event.ReadyNodes)
+		if event.RegisteredNodes == 2 && event.ReadyNodes == 2 {
+			message = "Tenant nodes: 2/2 registered, 2/2 Ready; workload and DNS checks still required"
+		}
+	case "tenant-workload":
+		message = "Running tenant workload and cluster DNS checks; successful completion still required"
+	default:
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.tenantStage != event.Name {
+		w.tenantStage = event.Name
+		w.emit("\n  Artifacts → Site → [Tenant] → Workload/DNS → Cleanup\n")
+	}
+	w.emit(fmt.Sprintf("  Tenant  %s elapsed · %s remaining\n          %s\n", max(time.Duration(0), event.Elapsed).Truncate(time.Second), max(time.Duration(0), event.Remaining).Truncate(time.Second), message))
 }

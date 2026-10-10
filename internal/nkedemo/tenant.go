@@ -194,6 +194,9 @@ type tenant struct {
 func (t *tenant) capture(ctx context.Context, args []string, phase string, budget time.Duration) ([]byte, error) {
 	t.sequence++
 	runner := t.session.Runner
+	// Commands retain their private numbered logs. Their exit status is not
+	// provisioning success; report interpreted state from the owning wait loop.
+	runner.Progress = nil
 	if t.cleaning {
 		runner.Work = ""
 	}
@@ -233,7 +236,9 @@ func (t *tenant) kubectl(config string, args ...string) []string {
 	return append([]string{filepath.Join(t.session.Tools, "kubectl"), "--kubeconfig", config}, args...)
 }
 
-func (t *tenant) run(ctx context.Context, budget time.Duration) error {
+func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
+	boundary := beginProgress(t.session.Runner.Progress, "tenant-provisioning", DeploymentStarted, DeploymentFinished, DeploymentFailed)
+	defer func() { boundary.finish(result) }()
 	rows, err := t.inventory(ctx)
 	if err != nil {
 		return err
@@ -262,6 +267,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) error {
 	}
 	provision, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
+	deadline, _ := provision.Deadline()
+	progress := tenantProgress{writer: t.session.Runner.Progress, started: time.Now(), deadline: deadline}
+	progress.update(time.Now(), "tenant-kubeconfig", nil)
 	kubeconfig := filepath.Join(t.session.Work, "tenant-kubeconfig")
 	for {
 		if err = t.alive(provision); err != nil {
@@ -284,8 +292,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) error {
 			break
 		}
 		if err = pause(provision, 10*time.Second); err != nil {
-			return fmt.Errorf("tenant provisioning budget: %w", err)
+			return fmt.Errorf("waiting for NKE to publish tenant kubeconfig (private diagnostics: %s): %w", t.session.Work, err)
 		}
+		progress.update(time.Now(), "tenant-kubeconfig", nil)
 	}
 	raw, err := t.capture(provision, t.kubectl(kubeconfig, "config", "view", "-o", "json"), "tenant-config", 30*time.Second)
 	if err != nil {
@@ -301,6 +310,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) error {
 		return errors.New("tenant kubeconfig does not select the admitted VM VIP")
 	}
 	var nodes struct{ Items []tenantNode }
+	progress.update(time.Now(), "tenant-api", nil)
 	for {
 		if err = t.alive(provision); err != nil {
 			return err
@@ -310,6 +320,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) error {
 			if CommandExitCode(err) != 1 {
 				return err
 			}
+			progress.update(time.Now(), "tenant-api", nil)
 		} else {
 			if err = json.Unmarshal(raw, &nodes); err != nil {
 				return err
@@ -318,12 +329,13 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) error {
 			if checkErr != nil {
 				return checkErr
 			}
+			progress.update(time.Now(), "tenant-nodes", nodes.Items)
 			if ready {
 				break
 			}
 		}
 		if err = pause(provision, 10*time.Second); err != nil {
-			return fmt.Errorf("two-node provisioning budget: %w", err)
+			return fmt.Errorf("waiting for two Ready tenant nodes (private diagnostics: %s): %w", t.session.Work, err)
 		}
 	}
 	domains, err := vmEvidence(ctx, filepath.Join(filepath.Dir(t.session.Work), "simulator"), t.image, t.domains)
@@ -331,6 +343,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) error {
 		return err
 	}
 	job := filepath.Join(t.session.Work, "workload.json")
+	progress.update(time.Now(), "tenant-workload", nodes.Items)
 	if err = privateJSON(job, workloadJob()); err != nil {
 		return err
 	}

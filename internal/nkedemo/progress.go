@@ -6,6 +6,7 @@ package nkedemo
 import (
 	"io"
 	"sync"
+	"time"
 )
 
 const (
@@ -18,14 +19,47 @@ const (
 	DeploymentStarted  = "deployment-started"
 	DeploymentFinished = "deployment-finished"
 	DeploymentFailed   = "deployment-failed"
+	TenantWaiting      = "tenant-waiting"
 )
 
 // ProgressEvent describes an observed operation boundary, never percentage,
 // artifact verification, Release authority, arguments or private diagnostics.
 type ProgressEvent struct {
-	Kind   string
-	Name   string
-	Status string
+	Kind            string
+	Name            string
+	Status          string
+	RegisteredNodes int
+	ReadyNodes      int
+	Elapsed         time.Duration
+	Remaining       time.Duration
+}
+
+// Tenant polling reports interpreted observations, not successful subprocess
+// exits. Repeat an unchanged wait at most once per 30 seconds; transitions are
+// immediate. No private response, node name or condition message is exposed.
+type tenantProgress struct {
+	writer                  io.Writer
+	started, deadline, last time.Time
+	previous                ProgressEvent
+}
+
+func (p *tenantProgress) update(now time.Time, stage string, nodes []tenantNode) {
+	event := ProgressEvent{Kind: TenantWaiting, Name: stage, RegisteredNodes: len(nodes)}
+	for _, node := range nodes {
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == "Ready" && condition.Status == "True" {
+				event.ReadyNodes++
+				break
+			}
+		}
+	}
+	if event == p.previous && now.Sub(p.last) < 30*time.Second {
+		return
+	}
+	p.previous, p.last = event, now
+	event.Elapsed = max(time.Duration(0), now.Sub(p.started)).Truncate(time.Second)
+	event.Remaining = max(time.Duration(0), p.deadline.Sub(now)).Truncate(time.Second)
+	reportProgress(p.writer, event)
 }
 
 // ProgressReporter is optional on an existing progress writer. Report is called

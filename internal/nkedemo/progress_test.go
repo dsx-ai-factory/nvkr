@@ -37,7 +37,7 @@ func phaseEvents(name, last string) []ProgressEvent {
 	if last == PhaseFailed {
 		status = "failed"
 	}
-	return []ProgressEvent{{PhaseStarted, name, "started"}, {last, name, status}}
+	return []ProgressEvent{{Kind: PhaseStarted, Name: name, Status: "started"}, {Kind: last, Name: name, Status: status}}
 }
 
 func TestProgressRunnerObservedBoundaries(t *testing.T) {
@@ -222,9 +222,9 @@ func TestProgressCombinedBuildOrdering(t *testing.T) {
 			} else if err != nil {
 				t.Fatal(err)
 			}
-			want := []ProgressEvent{{LaneStarted, "artifacts", "started"}}
+			want := []ProgressEvent{{Kind: LaneStarted, Name: "artifacts", Status: "started"}}
 			want = append(want, phaseEvents("build-all", phaseLast)...)
-			want = append(want, ProgressEvent{laneLast, "artifacts", status})
+			want = append(want, ProgressEvent{Kind: laneLast, Name: "artifacts", Status: status})
 			if !reflect.DeepEqual(writer.events, want) {
 				t.Fatalf("events=%+v want=%+v", writer.events, want)
 			}
@@ -257,7 +257,7 @@ func TestProgressDeploymentFailureAndCleanupOrdering(t *testing.T) {
 	if err := Run(ctx, Config{Progress: writer}); err == nil {
 		t.Fatal("invalid deployment succeeded")
 	}
-	want := []ProgressEvent{{DeploymentStarted, "local-demo", "started"}, {DeploymentFailed, "local-demo", "failed"}}
+	want := []ProgressEvent{{Kind: DeploymentStarted, Name: "local-demo", Status: "started"}, {Kind: DeploymentFailed, Name: "local-demo", Status: "failed"}}
 	if !reflect.DeepEqual(writer.events, want) {
 		t.Fatal(writer.events)
 	}
@@ -276,5 +276,47 @@ func TestProgressDeploymentFailureAndCleanupOrdering(t *testing.T) {
 	}
 	if operation() == nil || !cleaned || !reflect.DeepEqual(writer.events, want) {
 		t.Fatal("cleanup failure reported success")
+	}
+}
+
+func TestTenantProgressReportsTransitionsAndBoundedHeartbeat(t *testing.T) {
+	writer := &recordedProgress{}
+	start := time.Unix(1000, 0)
+	p := tenantProgress{writer: writer, started: start, deadline: start.Add(time.Minute)}
+	p.update(start, "tenant-kubeconfig", nil)
+	p.update(start.Add(10*time.Second), "tenant-kubeconfig", nil)
+	p.update(start.Add(30*time.Second), "tenant-kubeconfig", nil)
+	nodes := readyTenantFixture()
+	nodes[0].Status.Conditions[0].Status = "False"
+	p.update(start.Add(31*time.Second), "tenant-nodes", nodes[:1])
+	p.update(start.Add(32*time.Second), "tenant-nodes", nodes)
+	p.update(start.Add(33*time.Second), "tenant-nodes", nodes)
+	if len(writer.events) != 4 {
+		t.Fatalf("expected initial wait, heartbeat and two transitions: %+v", writer.events)
+	}
+	for i, event := range writer.events {
+		wantRegistered, wantReady := 0, 0
+		if i == 2 {
+			wantRegistered = 1
+		}
+		if i == 3 {
+			wantRegistered, wantReady = 2, 1
+		}
+		if event.Kind != TenantWaiting || event.RegisteredNodes != wantRegistered || event.ReadyNodes != wantReady || event.Elapsed+event.Remaining != time.Minute {
+			t.Fatalf("wrong interpreted observation: %+v", event)
+		}
+	}
+}
+
+func TestTenantPollingKeepsPrivateLogWithoutSuccessSpam(t *testing.T) {
+	writer := &recordedProgress{}
+	work := privateTestDir(t)
+	tenant := tenant{session: ManagementSession{Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin"}, Progress: writer}}}
+	raw, err := tenant.capture(t.Context(), []string{"/bin/sh", "-c", "printf private-response; exit 1"}, "kubeconfig-secret", time.Second)
+	if CommandExitCode(err) != 1 || string(raw) != "private-response" || len(writer.events) != 0 || writer.Len() != 0 {
+		t.Fatalf("polling output escaped interpretation: events=%+v error=%v", writer.events, err)
+	}
+	if _, err := os.Stat(filepath.Join(work, "tenant-001-kubeconfig-secret.log")); err != nil {
+		t.Fatal("private command diagnostics lost", err)
 	}
 }
