@@ -28,13 +28,13 @@ contracts (ADR-18 §8).
 Rootless BuildKit's fixed UID is independent of the caller's UID. Its private-volume transport preserves
 authenticated source modes and limits ownership changes to attempt-owned volumes, with a read-only source
 mount for the non-root producer. The declared export returns through the bounded archive owner before normal
-collection. Controlled tests and a targeted native probe are distinct from the complete fresh NKE acceptance
+collection. Controlled tests and a targeted native probe are distinct from the complete fresh NVKE acceptance
 run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
 ARC hosted route is separately admitted under ADR-18. The
-[recorded 34-output M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated native
+[recorded 34-output M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated native
 disk builds, publication, signing, verification and Run finalization under a validation-branch exception.
 Its `build-provenance-v1` evidence binds live producer/material subjects and explicitly defers inspection.
 This is scoped candidate pipeline-attested delivery, not a claim of main-only workflow execution,
@@ -42,7 +42,7 @@ independent full-payload disk consumption, strict full-disk inspection, organiza
 or completed M1–M4 acceptance.
 
 Strict disk inspection and reconciliation remain the M3 requirement. Controlled receipt/export/transport
-contracts and retained-disk diagnostics exist, but a successful real native NKE live-Run full-content join
+contracts and retained-disk diagnostics exist, but a successful real native NVKE live-Run full-content join
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, encrypted VM execution and air-gap operation remain unavailable.
 
@@ -58,7 +58,7 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
 | 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected unencrypted local execution; exact component/material bindings and acquisition-carrier retention | Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation, fused general wrapped-job phase isolation and embedded-version consistency remain closed |
 | 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
-| 13 Evidence | Exact offline binary/image dependency scanning and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Real native NKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
+| 13 Evidence | Exact offline binary/image dependency scanning and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted/object-store delivery is unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics | Qualified receipt/clearance assembly, release-specific trusted time, M3 qualification and M4 manifests/revocation remain unimplemented |
@@ -108,7 +108,7 @@ disk. Retention closes before immutable Run recording and does not mask the prim
 secrets are not admitted through this sink.
 
 Diagnostic installed-package inspection of a retained QCOW2 is distinct from full content inspection. The
-[recorded native observations](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md) cover exact ARM64 subjects,
+[recorded native observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md) cover exact ARM64 subjects,
 unchanged-helper replays, 730 installed packages and scoped mount/cancellation behavior. They do not prove
 current-helper execution, Docker/native AMD64 inspection, original-live-Run joins or complete disk coverage.
 The diagnostic runtime binds caller-selected runtime/image/tool identities; those are not automatically
@@ -119,12 +119,12 @@ An opaque installed-inventory receipt binds attempt/output/Plan/Build, exact QCO
 identities. Receipt substitution, sibling replay, post-close use, cancellation and failed commit are rejected.
 A process-wide permit owns queueing, snapshot creation, scan/cleanup and close; it reserves no kernel resources
 against unrelated processes. Opted-in inspection failure fails the Run and discards uncommitted delivery
-bytes; default builds remain build-only. Controlled tests exercise these boundaries, not a real joined NKE bake.
+bytes; default builds remain build-only. Controlled tests exercise these boundaries, not a real joined NVKE bake.
 
 The separate full-content profile binds the native inspector/codec/guestfish/Syft/dpkg-deb image/tool closure,
 resource budgets, exact acquisition carriers, staged materials and exported filesystem. Class-separated
 correspondence, observed file hashes, method-scoped CycloneDX subjects and original-owner export receipts
-are implemented with controlled issuer/export and negative tests. They do not establish actual native NKE
+are implemented with controlled issuer/export and negative tests. They do not establish actual native NVKE
 scanner discovery or a successful strict live receipt-to-package-to-hosted-finalization path. Modern mixed
 Docker-save archives, prefixed OCI members, foreign/unknown attestation descriptors and nested Debian package
 databases remain unsupported. Mounted-tree export does not prove coverage of unmounted/unrecognized extents.
@@ -136,7 +136,7 @@ descriptor/configuration must match the consumer platform before each unique ima
 private Docker-archive projection; observations remain bound to the original held carrier and closure is
 revalidated afterward. Docker/gzip, prefixed members, unsupported attestations and malformed carriers fail
 without partial inventory. Shared member/image and pre-deduplication component limits still apply. Real
-NKE material complexity, cold-cache timing and full-matrix inspection remain unverified.
+NVKE material complexity, cold-cache timing and full-matrix inspection remain unverified.
 
 ADR-13 owns the exact evidence vocabulary and bounds: 32 MiB documents, 64 MiB signed bundles and 16 MiB
 composition reports; provenance retains its independent 4 MiB bound. Oversize evidence fails without
@@ -162,31 +162,31 @@ Required evidence uploads remain mandatory. M2 build-provenance mode emits neith
 upload. Rebuilt-helper deployment, full native inspection and corrected production timeout behavior remain
 unexercised.
 
-The [October 7 PR #97 contract record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-07-pr97-review-fix-contracts.md)
+The [October 7 PR #97 contract record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-07-pr97-review-fix-contracts.md)
 records native Linux ARM64 race execution of the sealed diagnostic coordinator and
 the explicitly enabled strict hosted-completion test. Both use controlled ELF/bytes
-with concrete public owners; neither establishes a real NKE bake, provider upload,
+with concrete public owners; neither establishes a real NVKE bake, provider upload,
 hosted finalization or independent consumer acceptance.
 
 ## Local ARM64 development inputs
 
-The `definitions/nke-local-dev-arm64` combined example selects 29 outputs in one
+The `definitions/nvke-local-dev-arm64` combined example selects 29 outputs in one
 Run without publication/signing: OS, components, installer-aligned site, tools,
 profiles and simulator. Focused selections remain available; the historical
 22-output component subset is not the complete demo. This is not a complete
 source-built distribution. See the
-[quickstart](../local-nke-demo.md) and [source gaps](../full-nke-source-build.md).
+[quickstart](../local-nvke-demo.md) and [source gaps](../full-nvke-source-build.md).
 
 Local static-unqualified mixed Plans admit offline, non-disk utility
 observation/SBOM/packaging in the child helper while VM/held-disk execution
 stays with the original Run owner. Network utility acquisitions remain
 unsupported. Relocated image observation retains compiled Plan identity.
-[Mixed-utility tests](../../pkg/nkd/factory/local_mixed_utility_test.go)
+[Mixed-utility tests](../../pkg/nvkr/factory/local_mixed_utility_test.go)
 use controlled OCI bytes and a descriptive, unexecuted VM; they do not prove
 a real joined bake or extend hosted, signing or qualification admission.
 
-The Go downstream consumer invokes `nkdctl` for build, verification and
-extraction, and NKE's pinned staged installer for deployment. Kind hosts
+The Go downstream consumer invokes `nvkr` for build, verification and
+extraction, and NVKE's pinned staged installer for deployment. Kind hosts
 management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Full E2E success
 requires two Ready nodes, workload/DNS checks, exact disk/artifact bindings and
 owned cleanup. The explicit `--cleanup` route retains that full acceptance
@@ -196,7 +196,7 @@ owner, its serialized description and historical Ready time are not current
 Kubernetes health, joined cleanup or a release receipt. The actual launch/peer
 selection, detach, operation cancellation, partial retention and explicit
 teardown have controlled native Linux ARM64 process fixtures; these are not a
-fresh NKE retained deployment or proof of SSH/logout/cgroup persistence.
+fresh NVKE retained deployment or proof of SSH/logout/cgroup persistence.
 Live access presentation executes bounded read-only bundled kubectl API/node
 queries for the site and tenant and keeps raw responses private. Its focused
 tests do not establish real Ubuntu runtime acceptance. New retained work does
@@ -205,7 +205,7 @@ Cobra/Viper configuration supplies descriptions, not receipts.
 The combined build reuses bootstrap executables and the measured toolchain;
 catalog substitutions retain their own exact predecessor binding. `--jobs`
 bounds concurrent ready producer and packaging operations in the existing
-factory scheduler. The upstream NKE readers
+factory scheduler. The upstream NVKE readers
 still require Python; the demo does not reimplement them.
 
 E2E prepares its exact pinned installer automatically with bounded Git in a
@@ -242,7 +242,7 @@ configuration-query failures explain the supported fetch-only credential policy
 without assigning an authentication cause or changing cancellation codes.
 Real Git fixtures cover exact checkout bytes, callback exclusion,
 local redirects and authenticated fetch. The E2E build adapter preserves these
-bounded, owner-validated redirects, and the NKE clone launcher appends its two
+bounded, owner-validated redirects, and the NVKE clone launcher appends its two
 redirects instead of discarding other local source inputs. These fixtures are not proof of current
 private-repository access; the stricter held hosted-source admission is unchanged.
 The downstream site installer now takes a full detached private checkout of its
@@ -255,12 +255,12 @@ tests do not establish a completed Ubuntu site replay.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
-NKD Podman support remains. The ARM64 catalog baseline retains the already-published
+NVKR Podman support remains. The ARM64 catalog baseline retains the already-published
 historical M2 Docker candidate, not a newly measured current toolchain. Local Docker
 launchers still freeze their freshly validated image into an attempt overlay.
 Static Plan and wrapper tests cover these selections, not a new native bake.
 
-The local OS selects the PR #113 NKE/NVIDIA OVN fork at pinned commit
+The local OS selects the PR #113 NVKE/NVIDIA OVN fork at pinned commit
 `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`; profile packages and tenant requests
 select its `1.5.18` chart stream. The combined Definition also declares standalone
 OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
@@ -295,7 +295,7 @@ The downstream demo now selects those standalone NVIDIA OVN outputs for the
 Kind site as well as selecting the fork's stream for the QCOW2 tenant. Its private
 Kind configuration disables the default CNI and kube-proxy. The site adapter
 copies the selected native image through the existing owned registry and exports
-the observed bound chart through `nkdctl publish chart`; it starts node-local OVS
+the observed bound chart through `nvkr publish chart`; it starts node-local OVS
 using that image's existing entrypoint before site OVN, node readiness and CAPI.
 These privileged local CNI processes are not an independently isolated provider.
 Already-loaded Open vSwitch/Geneve modules are admitted before installer
@@ -346,17 +346,17 @@ release combination, M2 or qualification. This option neither fixes nor
 validates the NVIDIA fork's open startup issue.
 
 Fresh profiles selections produce a native OCI image through the existing
-rootless BuildKit lane and pinned NKE profiles Dockerfile. A named build context
+rootless BuildKit lane and pinned NVKE profiles Dockerfile. A named build context
 selects the existing exact Alpine image digest instead of the Dockerfile's tag;
-the additive source overlay changes no upstream NKE files. ORAS transports the
+the additive source overlay changes no upstream NVKE files. ORAS transports the
 observed image to the local registry without changing its manifest. The consumer
 uses the chart's standard image init container and read-only shared volume,
 checking the exact image and successful init exit instead of injecting files
 into a Kind host directory. Local-only APT installation and uplink naming are
-explicit profile choices, not a general NKE offline boot contract.
-[Profile factory tests](../../pkg/nkd/factory/nke_laptop_profiles_test.go)
+explicit profile choices, not a general NVKE offline boot contract.
+[Profile factory tests](../../pkg/nvkr/factory/nvke_laptop_profiles_test.go)
 cover additive patch authentication, native-image compilation, exact staging
-bytes and modeled APT/uplink cases. [Consumer tests](../../internal/nkedemo/site_test.go)
+bytes and modeled APT/uplink cases. [Consumer tests](../../internal/nvkedemo/site_test.go)
 reject substituted images, incomplete/failed init states and alternate volumes.
 The opt-in exact pinned source-chart rendering check and the following native
 exercises were reported locally; their private attempt paths are not a
@@ -365,7 +365,7 @@ native ARM64 rootless BuildKit test produced manifest
 `sha256:197fe058d0fbcff5d7841abfee58067aa05f7cdd21040642fe7e327096b574a0`.
 ORAS transport/readback, manifest retrieval from the Kind network and the image's
 init copy command passed with exact staged profile/runbook comparison. This is
-not by itself a completed NKD profiles Run or Kubernetes init-container observation.
+not by itself a completed NVKR profiles Run or Kubernetes init-container observation.
 The retained 29-output attempt above subsequently observed `controller-profiles`
 as `kind: oci` with that exact manifest digest. Its site handoff and the actual
 `materialize-profiles` init container retained the matching image ID, `/profiles`
@@ -399,7 +399,7 @@ private diagnostics, rule substitutions and recovery. Hosts with an INPUT-drop
 policy require this scoped route even when host-side health succeeds. A separate
 nftables/firewalld input-hook drop can still reject it; the owned-node probe,
 not an iptables accept alone, decides admission. The demo does not override that
-administrator policy; see the [operator firewall guidance](../local-nke-demo.md).
+administrator policy; see the [operator firewall guidance](../local-nvke-demo.md).
 Live acceptance of the new route remains unexercised.
 
 The demo CLI automatically selects a terminal dashboard for interactive standard
@@ -455,8 +455,8 @@ Normal confirmed cancellation retains its cleanup screen.
 Plain guest summaries suppress unchanged
 snapshots and independently advancing ages.
 Failed deployment stops unfinished active panes without
-claiming that their individual checks failed. [CLI contracts](../../cmd/nke-demo/dashboard_test.go)
-and [simulation-screen tests](../../cmd/nke-demo/dashboard_view_test.go) exercise
+claiming that their individual checks failed. [CLI contracts](../../cmd/nvke-demo/dashboard_test.go)
+and [simulation-screen tests](../../cmd/nvke-demo/dashboard_view_test.go) exercise
 layout, bounded/sanitized snapshots, concurrent reports, cancellation joining and
 terminal failures. These are controlled presentation/race contracts, not a completed
 fresh E2E or live interruption acceptance for this candidate.
@@ -521,7 +521,7 @@ later deployment-only replay naturally completed NKE deletion and owned cleanup
 with the longer budgets, while preserving its failed smoke result. This does
 not establish a fresh successful E2E; that acceptance remains unproven.
 
-[Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
+[Ordinary adapter tests](../../internal/nvkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise
 bounded subprocess cancellation and joining; CLI tests exercise output-failure
 cancellation with controlled callbacks. The live cluster projection now crosses
@@ -533,8 +533,8 @@ existing authenticated private control as a single typed result, with unchanged
 32 KiB queue/envelope and sequence-gap refusal. Mixed payloads and oversized
 results fail before presentation. JSON-relay contracts and native retained
 launch fixtures cover typed/plain output and cursor/error behavior; their
-synthetic cluster answers are not fresh retained NKE runtime acceptance.
-Synthetic Kubernetes answers establish presentation wiring only, not fresh NKE
+synthetic cluster answers are not fresh retained NVKE runtime acceptance.
+Synthetic Kubernetes answers establish presentation wiring only, not fresh NVKE
 cluster acceptance. DNS/DHCP port admission now invokes a
 fixed Go helper through the existing bounded sudo runner before recording host
 intent; executable admission precedes artifact inspection. Controlled tests
@@ -545,12 +545,12 @@ Foreign executable ownership requires the isolated Linux root fixture; the real
 TCP/UDP 53 and UDP 67 collision rows additionally require native ARM64 root.
 Ordinary hosted tests do not establish those privileged socket observations.
 These tests do not prove real SIGINT during
-NKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
+NVKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
 at every build/deployment phase. Network-only recovery uses version-2 journals
 and never kills serialized PIDs; restore legacy live controls before upgrading.
 A full tenant crash/restart and recovery matrix remains unverified.
 
-[TestEndToEnd](../../internal/nkedemo/e2e_test.go) is explicitly opt-in; ordinary
+[TestEndToEnd](../../internal/nvkedemo/e2e_test.go) is explicitly opt-in; ordinary
 tests do not build images, deploy tenants or mutate host networking. No durable
 fresh-build/deploy acceptance record is supplied by this PR. Private logs,
 retained Runs, chart renders and tool probes are not public operational evidence,
@@ -559,27 +559,27 @@ the terminal result and cleanup of the exact invocation being accepted.
 
 Attempt-scoped native toolchain substitution does not update maintained pins.
 `publish chart` locally verifies/extracts a pinned Helm archive; diagnostic
-registry copies do not constitute NKD publication or Release authorization
-(ADR-18/20). The current NKE `bootstrap site` route is not a demonstrated
+registry copies do not constitute NVKR publication or Release authorization
+(ADR-18/20). The current NVKE `bootstrap site` route is not a demonstrated
 drop-in replacement for the Docker/Kind and NICoSim adapter.
 
 ## Experimental OS source producers and OVN outputs
 
-The separate `definitions/nke-os-source` catalog builds public OS binaries from
-pinned Git sources. Its read-only `nke-os-source-build.yaml` workflow exercises
+The separate `definitions/nvke-os-source` catalog builds public OS binaries from
+pinned Git sources. Its read-only `nvke-os-source-build.yaml` workflow exercises
 `pipeline.Local` diagnostics on generic native AMD64/ARM64 hosted runners without
 internal-source credentials. This is not full package-folder migration, OS-image
 integration or a generated Run/Release. Helm's held `ExecNode` preparation remains
 blocked by pristine external fixture links; local diagnostic preparation does not
 admit that production route.
 
-[Hosted run 37829955849](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37829955849)
+[Hosted run 37829955849](https://github.com/dsx-ai-factory/nvkr/actions/runs/37829955849)
 passed all public-source producer builds on native AMD64 and ARM64 at
 `335ace1e75829c061eac92caf42d8da0bc2fbd80`. It exercises unqualified
 `pipeline.Local` execution, not OVN, full QCOW2 builds, production publication
 or the held `ExecNode` preparation route.
 
-The separate `definitions/nke-ovn-source` Definition selects native image and
+The separate `definitions/nvke-ovn-source` Definition selects native image and
 digest-bound Helm OCI outputs for both architectures. Contracts compile the
 four-output Plan, enforce six same-platform image bindings, reject missing
 slots/outputs and cross-platform joins, exclude publication destinations from Build
@@ -591,7 +591,7 @@ chart mutation. Ordinary hosted ARM64 producers select `ubuntu-24.04-arm` when
 These are experimental candidate inputs, not maintained M2 membership or proof of
 GHCR publication, signed Release acceptance or OS integration. Internal fork access
 requires separate acceptance. Authenticated cross-output image/final-chart handoff
-into OS material composition remains absent ([issue #116](https://github.com/dsx-ai-factory/nke-recipes/issues/116)).
+into OS material composition remains absent ([issue #116](https://github.com/dsx-ai-factory/nvkr/issues/116)).
 Rebuilding equal pins does not establish same-byte correspondence; opt-in producer
 and Helm OCI interoperability tests do not establish hosted or release acceptance.
 
@@ -618,7 +618,7 @@ The root reader rejects extra blobs and bounds control/evidence to 512 MiB per r
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
 config-declared platforms and derived sibling locators, without reading payload layers or verifying policy.
 Filtering follows complete metadata validation; detached views establish no registry-availability claim.
-[Registry browsing of the recorded candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
+[Registry browsing of the recorded candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
 retains the external scope and binary identity.
 
 The generator/validator/writer enforce a 500,000-byte workflow limit. YAML compaction must preserve expanded
@@ -627,7 +627,7 @@ avoid restoring its full material closure on publication runners. Consumed carri
 storage but does not establish a measured hosted storage bound.
 
 ## Native ARC disk route
-The current Makefile drift gate and the single checked-in `nkd-run.yml` select the M2 candidate Definition
+The current Makefile drift gate and the single checked-in `nvkr-run.yml` select the M2 candidate Definition
 and Environment, replacing the earlier six-output deploy selection at that fixed generated path. Dispatch
 does not choose among Definitions, and no parallel generated six-output deploy workflow is maintained there.
 The retained deploy and three-output inputs can be generated into a scratch root with their matching
@@ -648,7 +648,7 @@ Both native builds and terminal checks completed in run `37445475840`; both deep
 The user earlier moved deep disk/content inspection and dependent reconciliation to M3. The narrower candidate
 `diskEvidence: build-provenance-v1` selects live producer/material evidence with signed uninspected scope,
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
-The [inspection deferral record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
+The [inspection deferral record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
 The strict inspection path remains available. The October 7, 2026 PR #97 task chat contains Ilya Kislenko's
 instruction: "Preserve main/#106: producer provenance for M2, inspection for M3". This is a task-chat instruction,
 not an independently published decider approval; no such approval record is supplied here.
@@ -659,17 +659,17 @@ additional ARM64 outputs are an implementation extension. Both native jobs and e
 required for this candidate's complete Run and Release; the product floor waives none of those requirements.
 Organizational ADR ratification remains separate.
 Both candidate disk jobs succeeded in run `37486058412`, but the aggregate release download failed with ENOSPC
-before publication. The [dated carrier evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records
+before publication. The [dated carrier evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records
 that failed attempt. The subsequent validation-branch run `37533806963` at commit `625980e` passed
 all candidate outputs and aggregate publication, signing, verification and finalization. That historical run
 predates the consumer-policy and timeout changes here; it is not evidence for this updated head, current main
 execution, strict inspection or independent full-payload consumer acceptance. Per-output storage peaks remain unmeasured.
-The [October 6 preparation record](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md) retains final-source
+The [October 6 preparation record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md) retains final-source
 ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
 and unprivileged libguestfs appliance filesystem probes. The earlier preparation Environment admitted
 `codex/m2-arc-validation` through `githubDispatchBranches` and its signer identity.
 The October 7 PR #97 test temporarily authored `codex/m2-native-arc-foundation` as an exact dispatch/signing
-exception. [Run 37661490433](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37661490433)
+exception. [Run 37661490433](https://github.com/dsx-ai-factory/nvkr/actions/runs/37661490433)
 at `562a609` completed with conclusion `cancelled`. Provider annotations rejected the exact branch under
 `nkd-release` (sample attestation job `112931037919`, finalizer `112933977061`) and `nkd-arc`
 (native ARM64 job `112932239664`); the failed jobs had no executed steps. This is a deployment-policy refusal,
@@ -684,14 +684,14 @@ execution remain external acceptance requirements.
 
 ## Maintained input and schema boundaries
 
-The [M2 Definition instructions](../../definitions/nke-m2/README.md) own example-specific selection and input
+The [M2 Definition instructions](../../definitions/nvke-m2/README.md) own example-specific selection and input
 preparation. The candidate requires 35 named outputs: eleven CLI/controller/chart/operator/disk outputs plus twelve
 third-party runtime images per native architecture. The chosen runtime-image set follows pinned deployment
-values, not chart defaults; chart-test images and NKE images outside the disk retain explicit owner questions.
+values, not chart defaults; chart-test images and NVKE images outside the disk retain explicit owner questions.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
-[acquisition observations](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain source
+[acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain source
 approval, mixed-source candidate and HTTP-403 limits without copying locks into this ledger.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,

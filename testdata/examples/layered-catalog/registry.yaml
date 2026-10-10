@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/catalog/v3
+apiVersion: nvkr.dev/catalog/v3
 components:
   capi-core:
     outputType: oci-image
@@ -143,7 +143,7 @@ kind: SourceBuildRegistry
 metadata:
   description: Pinned component catalog for direct Definition output selection.
     Each component declares its supported target platforms. Resolve the kubectl
-    producer with `nkdctl resolve --data testdata/examples/layered-catalog
+    producer with `nvkr resolve --data testdata/examples/layered-catalog
     --component kubectl --platform linux/amd64`.
   name: layered-demo
 sources:

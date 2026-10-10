@@ -6,30 +6,30 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
-Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nke-demo.md) for
-`nke-demo e2e`: build selected artifacts through `nkdctl`, then deploy those
+Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nvke-demo.md) for
+`nvke-demo e2e`: build selected artifacts through `nvkr`, then deploy those
 completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
 host through Colima; this is not a native Darwin build.
 
-`nke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
-[focused selections](../definitions/nke-local-dev-arm64/README.md);
+`nvke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
+[focused selections](../definitions/nvke-local-dev-arm64/README.md);
 `--check LANE` performs diagnostics only. The full demo compiles binaries once and shares
 one measured Packer toolchain, including Helm 4.2.4 and ORAS 1.3.3. Profiles are
 data bundles, not a separate container image. No publication/signing is enabled.
-The launcher prints its exact shell-escaped `nkdctl` invocations to stderr before execution, without printing environment values.
+The launcher prints its exact shell-escaped `nvkr` invocations to stderr before execution, without printing environment values.
 
-Contract tests: `go test ./internal/nkedemo ./cmd/nke-demo -count=1`.
+Contract tests: `go test ./internal/nvkedemo ./cmd/nvke-demo -count=1`.
 See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;
 the reduced flow has not passed a new clean-machine end-to-end run. This is not
-a [full source-built distribution](../docs/full-nke-source-build.md).
+a [full source-built distribution](../docs/full-nvke-source-build.md).
 
 ```sh
 # Plan only: validates and creates no attempt storage.
-nkdctl run plan --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-local.yaml
+nvkr run plan --definition definitions/nvke-v1/definition.yaml --environment definitions/nvke-v1/environment-local.yaml
 
 # Local execution; Docker, Go and acquisition/build network access are required.
 # Despite its historical name, the M1 script executes CLI + CWE + Helm.
-NKE_LOCAL_CLONE=/path/to/nke scripts/demo-m1-local.sh
+NVKE_LOCAL_CLONE=/path/to/nvke scripts/demo-m1-local.sh
 ```
 
 `demo-m1-local.sh` generates and checks its three-output GitHub bundle in a fresh temporary directory,
@@ -43,7 +43,7 @@ immutable attempt names.
 
 The non-FDE OS-image bootstrap uses one shared catalog. Its maintained routes
 are native ARM64 and AMD64 Linux Docker/KVM. The older Podman/TCG route and its
-stale toolchain pin are removed; generic NKD Podman execution support is unchanged.
+stale toolchain pin are removed; generic NVKR Podman execution support is unchanged.
 
 These OS-only commands require KVM. For Docker/Colima TCG and attempt-pinned
 fresh toolchain bytes, follow the
@@ -51,17 +51,17 @@ fresh toolchain bytes, follow the
 instead; its validation does not change the older wrapper's pin contract.
 
 ```sh
-CONTAINER_RUNTIME=docker NKE_OS_ARCH=arm64 scripts/nke-os-local.sh local-arm64-docker-001 1
-CONTAINER_RUNTIME=docker NKE_OS_ARCH=amd64 scripts/nke-os-local.sh local-amd64-docker-001 1
+CONTAINER_RUNTIME=docker NVKE_OS_ARCH=arm64 scripts/nvke-os-local.sh local-arm64-docker-001 1
+CONTAINER_RUNTIME=docker NVKE_OS_ARCH=amd64 scripts/nvke-os-local.sh local-amd64-docker-001 1
 ```
 
 Use a different immutable attempt name for each run. The historical Podman
-[full build and boot smoke](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md)
+[full build and boot smoke](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md)
 does not validate a current maintained route.
-The [ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
+The [ARC evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
 Docker/KVM builds and boot smoke at an earlier exact commit, not validation of the latest changes.
-See the [Definition guide](../definitions/nke-os/README.md) for route requirements and limitations.
-Set `NKE_LOCAL_CLONE` to reuse an exact local NKE checkout, accessible at the
+See the [Definition guide](../definitions/nvke-os/README.md) for route requirements and limitations.
+Set `NVKE_LOCAL_CLONE` to reuse an exact local NVKE checkout, accessible at the
 same absolute path to the native Linux runner and Docker daemon.
 
 Local attempts deliberately retain their frozen inputs, bootstrap runner and Run outputs. After reviewing an
@@ -69,19 +69,19 @@ attempt, archive those three attempt-scoped directories together instead of reus
 
 ```sh
 attempt=local-arm64-docker-001
-archive_root=/absolute/path/to/nkd-attempt-archive
+archive_root=/absolute/path/to/nvkr-attempt-archive
 for area in inputs bootstrap runs; do
-  if [[ -e ".nkd/${area}/${attempt}" ]]; then
+  if [[ -e ".nvkr/${area}/${attempt}" ]]; then
     mkdir -p "${archive_root}/${area}"
-    mv -- ".nkd/${area}/${attempt}" "${archive_root}/${area}/"
+    mv -- ".nvkr/${area}/${attempt}" "${archive_root}/${area}/"
   fi
 done
 ```
 
-The toolchain uses `localhost/nkd-packer-toolchain:dev-arm64` or `localhost/nkd-packer-toolchain:dev-amd64`,
+The toolchain uses `localhost/nvkr-packer-toolchain:dev-arm64` or `localhost/nvkr-packer-toolchain:dev-amd64`,
 according to the selected architecture, not a per-attempt tag. Once no
 build is running and no retained workflow needs the local image, remove that optional cache with
-`docker image rm localhost/nkd-packer-toolchain:dev-arm64`. Archiving or
+`docker image rm localhost/nvkr-packer-toolchain:dev-arm64`. Archiving or
 removing storage does not make an attempt name reusable; choose a new name for every Run.
 
 ## Release consumption
@@ -94,7 +94,7 @@ The consumer takes one digest-pinned reference and one explicit Verification
 Policy with `artifact-publication` scope. This does not establish M3 qualification or M4 Release-manifest
 acceptance. It requires a real statically linked, digest-pinned Linux cosign executable
 and a signed current v4 GitHub publication; local dry-run output is insufficient.
-On macOS the script automatically builds a Linux amd64 NKD helper and verifies inside
+On macOS the script automatically builds a Linux amd64 NVKR helper and verifies inside
 the pinned Docker toolchain image. Linux defaults to native execution; `--runtime docker`
 selects the container route explicitly, and `--runtime native` selects the host CLI.
 Docker mode needs the pinned Go toolchain and a Linux amd64 cosign executable.
@@ -120,5 +120,5 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 
 Package representation details remain covered
 by contract tests rather than parallel public workflows. Workspaces live below
-`.nkd/`; scripts either create immutable attempts or require their own workspace
+`.nvkr/`; scripts either create immutable attempts or require their own workspace
 marker before resetting derived output.

@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-ovn-source
+  description: Publish candidate source-built OVN native images and digest-bound Helm OCI charts for both architectures. Does not build node OS images.
+catalog:
+  base: ../nvke-v1/catalog
+sbomTool: syft
+cosignTool: cosign
+outputs:
+  - name: ovn-chart-amd64
+    platform: linux/amd64
+    catalog:
+      base: ./catalog
+    components: [ovn-kubernetes-chart]
+    format: helm-oci
+    helm:
+      images:
+        control-plane: ovn-image-amd64
+        node: ovn-image-amd64
+        nbdb: ovn-image-amd64
+        sbdb: ovn-image-amd64
+        northd: ovn-image-amd64
+        ovn-host: ovn-image-amd64
+  - name: ovn-chart-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./catalog
+    components: [ovn-kubernetes-chart]
+    format: helm-oci
+    helm:
+      images:
+        control-plane: ovn-image-arm64
+        node: ovn-image-arm64
+        nbdb: ovn-image-arm64
+        sbdb: ovn-image-arm64
+        northd: ovn-image-arm64
+        ovn-host: ovn-image-arm64
+  - name: ovn-image-amd64
+    platform: linux/amd64
+    catalog:
+      base: ./catalog
+    components: [ovn-kube-ubuntu]
+    format: oci
+  - name: ovn-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./catalog
+    components: [ovn-kube-ubuntu]
+    format: oci

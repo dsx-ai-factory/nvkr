@@ -10,13 +10,13 @@ import (
 	"reflect"
 	"testing"
 
-	client "github.com/NVIDIA/nke-recipes/client/v1"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
+	client "github.com/dsx-ai-factory/nvkr/client/v1"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
 func TestSDKEnvironmentLoadPreservesDocumentIdentity(t *testing.T) {
-	path := filepath.Join("..", "..", "definitions", "nke-v1", "environment-local.yaml")
+	path := filepath.Join("..", "..", "definitions", "nvke-v1", "environment-local.yaml")
 	want, err := lifecycle.LoadEnvironment(t.Context(), path)
 	if err != nil {
 		t.Fatal(err)

@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-11 in the consolidated NKD ADR set.
+- **Index:** ADR-11 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-02 (identity over the resolved graph), ADR-12 (target inputs), ADR-07 (reproduction identity),
   ADR-05 (inventory).
 - **Scope:** both evidence lanes share direct selection and graph admission; neither selection nor compilation
@@ -36,7 +36,7 @@ platforms are coded failures, never empty selections. For a disk output, resolut
 closure. Compilation lowers the root's typed command or Packer contract and exact producer edges. Execution,
 observation and publication remain unavailable and fail capability admission before source or output work.
 
-`pkg/nkd/buildgraph` owns selection and compilation. Its resolved value describes validated inputs and owns
+`pkg/nvkr/buildgraph` owns selection and compilation. Its resolved value describes validated inputs and owns
 copies of them; it does not grant authority. Direct compilation revalidates that description. CLI and SDK callers
 use this same owner rather than implementing another resolver.
 
@@ -47,8 +47,8 @@ fetch/build/acquire/terminal-verification relationships plus declared VM materia
 arbitrary producer dependency language. Duplicate fetches of the same pinned source can be shared within one graph. Every selected producer
 must be covered by the terminal node, and the full graph is validated before identity or execution.
 
-The generated graph uses `nkd.dev/ir/v4`; its transport-independent logical projection is identified under
-`nkd.build` (ADR-01/02). An unrelated catalog producer cannot change the selected graph's identity. Changing
+The generated graph uses `nvkr.dev/ir/v4`; its transport-independent logical projection is identified under
+`nvkr.build` (ADR-01/02). An unrelated catalog producer cannot change the selected graph's identity. Changing
 selected membership, target, pins or output-affecting instructions must change it.
 Output labels, packaging and Environment settings remain outside build identity and inside their owning records.
 Deployment categories, node roles and cluster composition are removed rather than transported as unused metadata.
@@ -115,8 +115,8 @@ membership and evidence joins remain independent of deployment topology.
 
 ## Acceptance evidence
 
-The migration requires direct-selection contracts in `pkg/nkd/buildgraph`, strict catalog loading contracts,
-and identity/full-graph tests in `pkg/nkd/ir`. Preserve source pins, complete terminal coverage, builder/capability
+The migration requires direct-selection contracts in `pkg/nvkr/buildgraph`, strict catalog loading contracts,
+and identity/full-graph tests in `pkg/nvkr/ir`. Preserve source pins, complete terminal coverage, builder/capability
 admission, source deduplication within a graph, deterministic ordering, transport purity and target sensitivity.
 Deleted matching/merge mechanisms need rejection coverage, not replacement golden inheritance fixtures.
 

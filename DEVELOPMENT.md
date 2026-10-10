@@ -60,16 +60,16 @@ The [lifecycle guide](docs/lifecycle.md) covers Definition → Run → Release. 
 resume capabilities. The [demo index](demos/README.md) provides bounded generation, identity and local-build
 journeys with their prerequisites.
 
-The committed bundle selects the 35-output [M2 candidate](definitions/nke-m2/README.md).
+The committed bundle selects the 35-output [M2 candidate](definitions/nvke-m2/README.md).
 Regenerate it after changing its Definition, Environment, catalog pins or generator code:
 
 ```sh
-go run ./cmd/nkdctl run generate \
-  --definition definitions/nke-m2/definition.yaml \
-  --environment definitions/nke-m2/environment-github.yaml --engine github --root .
-go run ./cmd/nkdctl run generate \
-  --definition definitions/nke-m2/definition.yaml \
-  --environment definitions/nke-m2/environment-github.yaml --engine github --root . --check
+go run ./cmd/nvkr run generate \
+  --definition definitions/nvke-m2/definition.yaml \
+  --environment definitions/nvke-m2/environment-github.yaml --engine github --root .
+go run ./cmd/nvkr run generate \
+  --definition definitions/nvke-m2/definition.yaml \
+  --environment definitions/nvke-m2/environment-github.yaml --engine github --root . --check
 ```
 
 Use the same generator version and input selection for generation and checking. Generated files are owned by
@@ -83,7 +83,7 @@ Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other exa
 
 ## Generated and handwritten GitHub files
 
-The generator owns `.github/workflows/nkd-run.yml` and every manifest member beneath `.github/nkd-run/`.
+The generator owns `.github/workflows/nvkr-run.yml` and every manifest member beneath `.github/nvkr-run/`.
 Its checker rejects unexpected managed-directory entries, including symlinks. Human-maintained repository
 workflows, Dependabot configuration, and issue templates have separate ownership. Action pins for generated
 CI come from its selected catalog and lock, rather than edits to rendered YAML.
@@ -107,39 +107,39 @@ profiling commands.
 
 The ordinary suite skips integrations requiring external tools, private source, or exceptional host capacity.
 A skipped test provides no interoperability evidence. With an installed Helm executable, run the
-[mapping fixture](pkg/nkd/factory/helm_mapping_test.go):
+[mapping fixture](pkg/nvkr/factory/helm_mapping_test.go):
 
 ```sh
-NKD_TEST_HELM_BINDINGS=1 go test ./pkg/nkd/factory \
+NVKR_TEST_HELM_BINDINGS=1 go test ./pkg/nvkr/factory \
   -run '^TestMappedBindingsWithHelm$' -count=1 -v
 ```
 
-For the source-chart case, set `NKD_NKE_CHART` to the controller chart from the exact upstream revision
-you intend to exercise, and run `TestNKEDeclarativeBindingWithHelm`. Both tests render local chart bytes;
+For the source-chart case, set `NVKR_NVKE_CHART` to the controller chart from the exact upstream revision
+you intend to exercise, and run `TestNVKEDeclarativeBindingWithHelm`. Both tests render local chart bytes;
 they do not build images, publish, install or verify upstream signatures.
 
-The Linux [public disk-issuer fixture](pkg/nkd/factory/disk_evidence_runtime_linux_test.go) uses a controlled
+The Linux [public disk-issuer fixture](pkg/nvkr/factory/disk_evidence_runtime_linux_test.go) uses a controlled
 native ELF daemon protocol and synthetic capture/disk bytes. On a native host with sufficient observed
 composition capacity, explicitly request its issuer and memory-profile checks:
 
 ```sh
-NKD_TEST_DISK_EVIDENCE_RUNTIME=1 go test -race ./pkg/nkd/factory \
+NVKR_TEST_DISK_EVIDENCE_RUNTIME=1 go test -race ./pkg/nvkr/factory \
   -run '^TestDiskEvidencePublicRuntime(Issuer|RejectsMemoryProfile)$' -count=1 -v
 ```
 
 An opted-in run fails on inadequate capacity rather than skipping its positive case. It checks public
-owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NKE image.
+owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NVKE image.
 Actual native disk build/inspection evidence remains separately scoped in the evidence index.
 
 ## Repository layout
 
 - `definitions/`: tutorial, deploy, combined candidate, and OS-image Definitions, Environments, and catalogs.
 - `testdata/examples/`: multi-output, worker, and catalog contract fixtures.
-- `pkg/nkd/definition/`: authored inputs, admission and identity.
-- `pkg/nkd/factory/`: complete compilation, Run operations and provider generation.
-- `pkg/nkd/lifecycle/`: immutable attempts and policy-scoped Release consumption.
-- `pkg/nkd/delivery/`: checked publication content and bounded held-resource lifetime.
-- `.github/nkd-run/`: generated NKE bundle; regenerate from its Definition and Environment.
+- `pkg/nvkr/definition/`: authored inputs, admission and identity.
+- `pkg/nvkr/factory/`: complete compilation, Run operations and provider generation.
+- `pkg/nvkr/lifecycle/`: immutable attempts and policy-scoped Release consumption.
+- `pkg/nvkr/delivery/`: checked publication content and bounded held-resource lifetime.
+- `.github/nvkr-run/`: generated NVKE bundle; regenerate from its Definition and Environment.
 - `toolchains/`: development adapter toolchains and helper pins; maintained demos use their declared utility image.
 
 Package comments and the ownership map below identify starting operations. CLI and SDK files group operations
@@ -150,15 +150,15 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 
 | Work | Owner |
 |---|---|
-| Definition/Environment admission and identity | `pkg/nkd/definition` |
-| Immutable attempts and Release consumer workflow | `pkg/nkd/lifecycle` |
-| Complete compilation, output joins, scheduling, packaging and provider generation | `pkg/nkd/factory` |
+| Definition/Environment admission and identity | `pkg/nvkr/definition` |
+| Immutable attempts and Release consumer workflow | `pkg/nvkr/lifecycle` |
+| Complete compilation, output joins, scheduling, packaging and provider generation | `pkg/nvkr/factory` |
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
 | Producer execution, observations and qualified receipts | `pipeline`, `profile` |
 | Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
 | Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `trust`, `sign` |
 | Release authority and delivery | `release`, `status`, `delivery` |
-| Public adapters | `client/v1`, `cmd/nkdctl` — delegate authority |
+| Public adapters | `client/v1`, `cmd/nvkr` — delegate authority |
 
 Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation.md) before changing authority.
 Use package-issued opaque receipts, admit capabilities before side effects, validate the complete graph at

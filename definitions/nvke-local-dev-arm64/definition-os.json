@@ -1,0 +1,37 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "./cli-catalog"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-local-dev-arm64-os",
+    "description": "Local ARM64 non-FDE TCG disk and its material closure; no publication or signing; retains mixed SPIRE exception."
+  },
+  "outputs": [
+    {
+      "catalog": {
+        "base": "../nvke-m2/os-catalog",
+        "overlays": [
+          "./os-tcg.json"
+        ]
+      },
+      "components": [
+        "nvke-agent",
+        "nvke-cni-calico",
+        "nvke-cni-ovn",
+        "nvke-image-inputs",
+        "nvke-kubeadm-distro",
+        "nvke-node-image",
+        "nvke-patched-installer-iso",
+        "nvke-spire-agent",
+        "ovn-kube-ubuntu",
+        "ovn-kubernetes-chart",
+        "ubuntu-installer-iso"
+      ],
+      "format": "disk-image",
+      "name": "nvke-node-image-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

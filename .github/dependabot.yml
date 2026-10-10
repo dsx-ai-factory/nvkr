@@ -13,7 +13,7 @@ updates:
       go-deps:
         patterns: ["*"]
 
-  # Keep the scanner out of NKD's production module graph while making its
+  # Keep the scanner out of NVKR's production module graph while making its
   # go.mod pin and go.sum visible to Dependabot. Go marks tool requirements as
   # indirect, so opt in to updates for both the tool and its dependencies.
   - package-ecosystem: gomod
@@ -29,10 +29,10 @@ updates:
 
   - package-ecosystem: github-actions
     directory: /
-    # Generated workflow pins must change through NKD inputs and regeneration.
+    # Generated workflow pins must change through NVKR inputs and regeneration.
     # Keep Dependabot updates for the handwritten merge-gate.yaml workflow.
     exclude-paths:
-      - .github/workflows/nkd-run.yml
+      - .github/workflows/nvkr-run.yml
     schedule:
       interval: weekly
     # One PR per round: github/codeql-action init and analyze must move together,

@@ -22,12 +22,12 @@ navigation:
         path: catalog-maintenance.md
       - page: Generic Pin Sets
         path: generic-pin-set-example.md
-      - page: Pin NKE Deploy Charts
-        path: nke-pin-set-usage.md
+      - page: Pin NVKE Deploy Charts
+        path: nvke-pin-set-usage.md
       - page: Declarative Helm Bindings
         path: declarative-helm-bindings.md
       - page: M2 Inputs and Customer Choices
-        path: nke-m2-customer-choices.md
+        path: nvke-m2-customer-choices.md
       - page: Authoring Lab
         path: examples/authoring-lab/README.md
 

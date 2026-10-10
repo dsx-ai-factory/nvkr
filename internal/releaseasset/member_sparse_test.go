@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func sparseReleaseArchive(t *testing.T, size int64) []byte {

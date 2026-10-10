@@ -6,7 +6,7 @@
 set -euo pipefail
 DEMO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$DEMO_DIR/.." && pwd)
-NKD=${NKDCTL_BIN:-$ROOT/bin/nkdctl}
+NVKR=${NVKR_BIN:-$ROOT/bin/nvkr}
 REFERENCE=
 LAYOUT=
 OUTPUT=
@@ -34,13 +34,13 @@ Options:
   --non-interactive   skip guided pauses
   -h, --help          show this help
 
-Prerequisites: a compatible nkdctl (or NKDCTL_BIN), Python 3,
+Prerequisites: a compatible nvkr (or NVKR_BIN), Python 3,
 and registry access/credentials unless using --layout. New --out must not exist;
 its parent must exist. Registry browsing downloads bounded metadata and evidence
 documents, never artifact payload layers. --output and --mermaid each repeat the
 metadata read; use --layout with a saved metadata carrier for repeated offline
 views. --layout cannot use --anonymous.
-Current NVKE Recipes requires publication-root v4. Historical v3 roots require their
+Current NVKR requires publication-root v4. Historical v3 roots require their
 matching historical CLI; changing a metadata file cannot upgrade a release.
 For signature and policy verification, see demos/team-guide.md.
 EOF
@@ -57,7 +57,7 @@ heading() {
 show_command() {
   # Display short variable names; ARGS below always uses the complete values.
   # shellcheck disable=SC2016
-  printf '$ nkdctl release browse --reference "$RELEASE_REF"'
+  printf '$ nvkr release browse --reference "$RELEASE_REF"'
   # shellcheck disable=SC2016
   if [ -n "$LAYOUT" ]; then printf ' --layout "$LAYOUT"'; fi
   if [ "$ANONYMOUS" -eq 1 ]; then printf ' --anonymous'; fi
@@ -80,11 +80,11 @@ while [ "$#" -gt 0 ]; do
 done
 [[ "$REFERENCE" =~ ^[^[:space:]@]+/[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || die 'supply the exact registry/repository@sha256:<64 lowercase hex> release root from the Run'
 if [ -n "$LAYOUT" ] && [ "$ANONYMOUS" -eq 1 ]; then die '--layout cannot be combined with --anonymous'; fi
-[ -x "$NKD" ] || die "build nkdctl from this checkout (make build), or set NKDCTL_BIN: $NKD"
+[ -x "$NVKR" ] || die "build nvkr from this checkout (make build), or set NVKR_BIN: $NVKR"
 command -v python3 >/dev/null || die 'Python 3 is required for the readable summary'
 if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive when stdin is not a terminal'; fi
-if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-team-release.XXXXXX"); fi
-heading 'NVKE Recipes / Explore a release'
+if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-release.XXXXXX"); fi
+heading 'NVKR / Explore a release'
 printf 'Follow one immutable release from outputs to supporting evidence.\n'
 printf 'Exports: %s\n' "$OUT"
 ARGS=(release browse --reference "$REFERENCE" --timeout "$TIMEOUT")
@@ -94,7 +94,7 @@ if [ "$ANONYMOUS" -eq 1 ]; then ARGS+=(--anonymous); fi
 heading '1 / 3  What is in this release?'
 printf 'Reading metadata and evidence; payload layers are not read.\n'
 show_command --format json
-"$NKD" "${ARGS[@]}" --format json > "$OUT/release-view.json"
+"$NVKR" "${ARGS[@]}" --format json > "$OUT/release-view.json"
 python3 - "$OUT/release-view.json" <<'PY'
 from collections import Counter
 import json
@@ -120,12 +120,12 @@ import json
 import sys
 view = json.load(open(sys.argv[1]))
 names = [o['name'] for o in view['outputs']]
-print('nke-node-image-arm64' if 'nke-node-image-arm64' in names else names[0])
+print('nvke-node-image-arm64' if 'nvke-node-image-arm64' in names else names[0])
 PY
   )
 fi
 show_command --output "$OUTPUT"
-"$NKD" "${ARGS[@]}" --output "$OUTPUT" > "$OUT/selected-output.txt"
+"$NVKR" "${ARGS[@]}" --output "$OUTPUT" > "$OUT/selected-output.txt"
 python3 - "$OUT/release-view.json" "$OUTPUT" <<'PY'
 import json
 import sys
@@ -153,7 +153,7 @@ PY
 printf 'Components identify contributors; evidence records bind their recorded subjects to this output.\n'
 printf '\nOpen demos/demo-team-explorer.html and load:\n  %s/release-view.json\n' "$OUT"
 if [ "$MERMAID" -eq 1 ]; then
-  "$NKD" "${ARGS[@]}" --format mermaid > "$OUT/release-graph.mmd"
+  "$NVKR" "${ARGS[@]}" --format mermaid > "$OUT/release-graph.mmd"
   printf 'Native Mermaid export: %s/release-graph.mmd\n' "$OUT"
 fi
 printf 'Native text with full details: %s/selected-output.txt\n' "$OUT"

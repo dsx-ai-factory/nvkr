@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-16 in the consolidated NKD ADR set.
+- **Index:** ADR-16 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-06 (status / selection), ADR-04 (verify / signing),
   ADR-19 (deployment-scope boundary).
 - **Satisfies:** FR-18 (atomic promotion), FR-24 (incremental validation), SEC-08 (independent gates), SEC-13
@@ -20,7 +20,7 @@
 
 Above per-component verification sits the release lifecycle: promoting a complete, compatible, digest-verified
 set under two independent gates, selecting and rolling back by immutable digest, and handing a consumable result
-to a downstream consumer. Throughout, NKD **produces** evidence and re-selectable verified sets and **does not
+to a downstream consumer. Throughout, NVKR **produces** evidence and re-selectable verified sets and **does not
 operate the fleet**. This ADR fixes those gates, the selection model, and that boundary.
 
 ## Decision
@@ -74,7 +74,7 @@ private state; it cannot be serialized or reconstructed from public fields. A fi
 reference, untyped `verified` or `complete` flag, decoded report, or receipt or capability for a different
 artifact, evidence document, or policy is rejected.
 
-- NKD **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**. It **never
+- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**. It **never
   runs the conformance suite**; running it would break verifier isolation and cross into fleet operation.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
@@ -91,15 +91,15 @@ artifact, evidence document, or policy is rejected.
   `PublicationManifest`. Downstream consumers authenticate and rehydrate this exact object rather than
   reconstructing success from flags or trusting a same-process capability.
 
-The removed implementation used `nkd.dev/reproduction-result/v3`, `nkd.dev/evidence-waiver/v3` and
-`nkd.dev/release-authorization/v9`. Their canonical families, along with compatibility, conformance and
+The removed implementation used `nvkr.dev/reproduction-result/v3`, `nvkr.dev/evidence-waiver/v3` and
+`nvkr.dev/release-authorization/v9`. Their canonical families, along with compatibility, conformance and
 publication-manifest families, remain reserved and nonminting. No current issuer or reader supplies these
 qualified operations. A future implementation must explicitly define schema admission and retain exact
 component, build, artifact, platform, policy and signer bindings without deployment metadata.
 Inventory/ReleaseSet v4 and PromotionPolicy v1 remain implemented with unchanged canonical document schemas.
 
 The `PublicationManifest` is exhaustive. For each OCI subject it lists the cleared artifact and every required
-referrer, with both its NKD semantic identity (domain-separated canonical digest) and its raw OCI blob digest and
+referrer, with both its NVKR semantic identity (domain-separated canonical digest) and its raw OCI blob digest and
 media type. Publication rejects a missing, extra, type-confused, or substituted attachment; transport
 configuration may change the destination but never this authorized set. The signed clearance is the root commit
 over the manifest and so is not recursively listed as its own referrer.
@@ -115,7 +115,7 @@ verification: consumers always select by immutable digest and reject a lifecycle
 minimum or high-water mark.
 
 For a ReleaseSet, the status target is
-`publicationIdentity = Digest("nkd.publication", exact canonical ReleaseSet bytes)`, not the raw `releaseSetDigest`.
+`publicationIdentity = Digest("nvkr.publication", exact canonical ReleaseSet bytes)`, not the raw `releaseSetDigest`.
 A future qualified clearance protocol must bind both identities; they cannot be caller-selected.
 The current ReleaseSet authentication operation checks signed document bytes and grants no clearance.
 
@@ -135,12 +135,12 @@ ReleaseSet selection and tag resolution remain deferred; no standalone selector 
   and re-verifiable by immutable digest** and re-run the clearance path using a fresh opaque
   `CheckpointReceipt`. The checkpoint must target the exact candidate and must already have passed current
   signer-policy, completeness, freshness, and monotonic high-water validation under ADR-06; raw declarations or a
-  caller-selected signer policy cannot bypass that path. NKD performs **no infrastructure rollback** and is
+  caller-selected signer policy cannot bypass that path. NVKR performs **no infrastructure rollback** and is
   idempotent: re-running to the same digest is a no-op. The standalone command currently rejects this operation;
   the unused same-process rollback helper is removed.
 - **Downstream clearance (SEC-17, deferred).** A future qualified publisher must emit a consumable, digest-addressable clearance result — asserting
   that identity, signature, provenance, completeness, and compatibility all passed — which a downstream consumer
-  checks **before** mutating infrastructure. NKD does **not** gate or authorize the mutation itself.
+  checks **before** mutating infrastructure. NVKR does **not** gate or authorize the mutation itself.
 
 ### 5. Evidence tiers and pipeline-attested release acceptance
 
@@ -177,8 +177,8 @@ and a tooling smoke test in a network-disabled container. Every subject receives
 a waiver binds component, reason and approver. Failing evidence is never attested. This gate is neither runtime
 conformance nor deployment qualification.
 
-The separate qualification workflow signs `nkd.qualification-evidence/v1`; the build workflow cannot sign in
-that role. A versioned `nkd.release-manifest/v1` lists every selected artifact from one default-branch Run with
+The separate qualification workflow signs `nvkr.qualification-evidence/v1`; the build workflow cannot sign in
+that role. A versioned `nvkr.release-manifest/v1` lists every selected artifact from one default-branch Run with
 its source lane, digest, signature, provenance, qualification evidence, and explicit deferred members. A fail
 verdict makes the Run fail and prevents manifest issuance. Both documents require ADR-01 canonical schema and
 family registration before implementation. The public Release view does not turn them into caller-authored
@@ -191,7 +191,7 @@ does not establish full-release acceptance. M3/M4 remain unimplemented.
 
 ### 6. Passive external qualification handoff — deferred producer protocol
 
-The external suite owns execution, provisioning, process context and lifecycle. NKD never initiates or
+The external suite owns execution, provisioning, process context and lifecycle. NVKR never initiates or
 supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
 suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
 `resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
@@ -210,20 +210,20 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
   rollback restores a known-good candidate only after current authorization and status checks pass.
 
 **Negative / costs**
-- The conformance-result contract and its signer identity are an external dependency — the suite producer, NKE.
+- The conformance-result contract and its signer identity are an external dependency — the suite producer, NVKE.
 - The clearance result is a new consumable object the downstream must agree to check.
 
 **Neutral**
-- The boundary is load-bearing: NKD consumes a conformance result and emits a clearance or verification result.
+- The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
   It runs no suite, performs no infra rollback, and authorizes no mutation.
 
 ## Alternatives considered
 
 - **Infer conformance from reproduction (single gate).** Rejected — SEC-08 requires two independent gates.
-- **Run the conformance suite inside NKD.** Rejected — it breaks verifier isolation and the produce-vs-operate
+- **Run the conformance suite inside NVKR.** Rejected — it breaks verifier isolation and the produce-vs-operate
   boundary.
 - **Select releases by tag.** Rejected — a mutable tag must never bypass digest and signature verification.
-- **Rollback that mutates running infrastructure.** Rejected — NKD re-selects a verified set; the engine makes
+- **Rollback that mutates running infrastructure.** Rejected — NVKR re-selects a verified set; the engine makes
   any infra change.
 
 ## Follow-ups
@@ -236,8 +236,8 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nkd/release/*_test.go`, `pkg/nkd/status/checkpoint_test.go`, and
-`pkg/nkd/trust/document_test.go` covers exact authenticated ReleaseSet and promotion-policy documents, strict
+Current module evidence in `pkg/nvkr/release/*_test.go`, `pkg/nvkr/status/checkpoint_test.go`, and
+`pkg/nvkr/trust/document_test.go` covers exact authenticated ReleaseSet and promotion-policy documents, strict
 schemas and artifact-kind rules, canonical ordering, required-member/artifact completeness, role rejection,
 cancellation and diagnostic checkpoint rollback rejection. Command tests separately cover durable status
 high-water CAS. These tests do not establish release authorization, evidence-waiver evaluation, trusted-time

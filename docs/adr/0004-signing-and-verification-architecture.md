@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-04 in the consolidated NKD ADR set.
+- **Index:** ADR-04 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-03 (trust-failure codes), ADR-05 (trust objects), ADR-07 (builder-profile signing), ADR-06
   (publication signing), ADR-16 / air-gap (offline verify).
 
@@ -14,7 +14,7 @@
 
 ## Context
 
-NKD supports two explicit trust contracts. Qualified reproduction authenticates detached publisher expectations
+NVKR supports two explicit trust contracts. Qualified reproduction authenticates detached publisher expectations
 and independently produced bytes. The v1 pipeline-attested lane publishes artifact bytes with keyless signatures
 and production provenance from a named hosted workflow. Both require external consumer trust policy; neither
 allows a catalog or signed object to choose its own trusted identity. Offline equivalence belongs to the
@@ -50,7 +50,7 @@ qualified contract. The mechanisms below have separate claims and admission requ
   specific issuer or identity.
 - **Stock signing protocol.** Stock signing holds a defensive copy of the exact subject and streams it to cosign
   on stdin. cosign receives only anonymous inherited writable descriptors for signature, certificate, and
-  optional bundle output. After a successful child exit, NKD seals and captures those exact descriptor contents
+  optional bundle output. After a successful child exit, NVKR seals and captures those exact descriptor contents
   and returns an opaque receipt bound to the subject digest. The production signer requires an explicit expected
   OIDC identity and issuer, passes the issuer as a qualified argument, extracts the issued certificate claims,
   and refuses a mismatch before returning the receipt. Cosign/Sigstore/TUF and loader environment overrides are
@@ -151,7 +151,7 @@ It authenticates who produced the artifact; Build Digest separately identifies t
 build/evidence qualification workflow has its own identity; build provenance and qualification evidence cannot
 substitute for one another. Consumer instructions publish both identities and use stock
 `cosign verify-attestation` with the explicit signature or SLSA predicate type. Downloaded bundles are also
-independently verifiable with `verify-blob-attestation` and an independently selected digest. An NKD reader is
+independently verifiable with `verify-blob-attestation` and an independently selected digest. An NVKR reader is
 a convenience, never a mandatory trust service. Event and credential admission are owned by ADR-18.
 
 A Verification Policy explicitly selects lane and acceptance scope:
@@ -173,7 +173,7 @@ minimum disk-evidence requirement; closing it
 invalidates shallow copies. Public descriptions and inspection never supply verification authority.
 
 Live keyless acceptance requires the protected hosted workflow, public-transparency disclosure approval before
-the first signed NKE bytes, bounded service retry/availability policy, and an independent cosign-only consumer
+the first signed NVKE bytes, bounded service retry/availability policy, and an independent cosign-only consumer
 exercise. Unit tests and local dry-run records establish none of those operational facts.
 
 ## Consequences
@@ -226,9 +226,9 @@ exercise. Unit tests and local dry-run records establish none of those operation
 
 ## Acceptance evidence
 
-Current contract evidence lives in `pkg/nkd/internal/heldfile`, `pkg/nkd/sign/signer_test.go`,
-`pkg/nkd/sign/signer_linux_test.go`, `pkg/nkd/sign/qualified_test.go`, `pkg/nkd/trust/document_test.go`,
-`cmd/nkdctl/qualified_lifecycle_test.go`, and `cmd/nkdctl/verify_test.go`. It covers exact-byte signing, private
+Current contract evidence lives in `pkg/nvkr/internal/heldfile`, `pkg/nvkr/sign/signer_test.go`,
+`pkg/nvkr/sign/signer_linux_test.go`, `pkg/nvkr/sign/qualified_test.go`, `pkg/nvkr/trust/document_test.go`,
+`cmd/nvkr/qualified_lifecycle_test.go`, and `cmd/nvkr/verify_test.go`. It covers exact-byte signing, private
 snapshots of diagnostic subject/output bytes, anonymous held production signing outputs, strict role/schema
 dispatch, offline inclusion-proof arguments, actual certificate identity/issuer extraction, mutation and
 insecure-option rejection, and a stock measure-only verifier that refuses to rebuild. It also covers rejection

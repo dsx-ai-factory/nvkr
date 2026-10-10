@@ -1,4 +1,4 @@
-module github.com/NVIDIA/nke-recipes/toolchains/govulncheck
+module github.com/dsx-ai-factory/nvkr/toolchains/govulncheck
 
 go 1.27.0
 

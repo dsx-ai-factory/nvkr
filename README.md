@@ -1,14 +1,14 @@
-# NVKE Recipes
+# NVKR
 
-NVKE Recipes turns pinned NKE components into traceable, signed software releases. Its goal is to bring
-NKE's CLI, container images, Helm charts, operator tools, and node images into one declarative build and
+NVKR turns pinned NVKE components into traceable, signed software releases. Its goal is to bring
+NVKE's CLI, container images, Helm charts, operator tools, and node images into one declarative build and
 delivery workflow, connecting the delivered bytes to their inputs and evidence.
 
-The **`nkdctl`** CLI exposes the build and release engine, alongside reusable NKE catalogs and product
-Definitions. Release engineers declare what to ship; NVKE Recipes derives the
+The **`nvkr`** CLI exposes the build and release engine, alongside reusable NVKE catalogs and product
+Definitions. Release engineers declare what to ship; NVKR derives the
 dependency graphs and generates the pipelines that build or acquire, package, sign, and publish it.
 Consumers can navigate a release's artifacts and evidence, then verify a supported claim against their
-own policy. NKE and downstream systems own installation and deployment.
+own policy. NVKE and downstream systems own installation and deployment.
 
 ## From components to releases
 
@@ -28,10 +28,10 @@ The public lifecycle is **Definition → Run → Release**:
 ## What signed attestations do
 
 An **attestation** is a statement about a specific artifact, bound to its digest: a fingerprint of its
-content. For signed GitHub releases, NVKE Recipes signs production provenance recording the Run, selected inputs,
+content. For signed GitHub releases, NVKR signs production provenance recording the Run, selected inputs,
 and producing workflow. Signed SBOMs state their evidence scope: inspected composition where supported,
 or, for M2 disks, exact producer/material subjects with disk inspection explicitly marked `not-performed`.
-Uninspected producer evidence does not establish installed disk contents. NVKE Recipes also signs
+Uninspected producer evidence does not establish installed disk contents. NVKR also signs
 the published artifacts and release root. These signatures let a verifier authenticate the signer and
 detect changes to the signed statements; the digest binds each claim to its intended artifact.
 
@@ -40,7 +40,7 @@ components. It identifies the signer making the recorded production or publicati
 
 The consumer still chooses whom to trust. A Verification Policy supplies the accepted workflow identity
 and **issuer**, the service that issued that identity; verification also requires a pinned verifier.
-NVKE Recipes checks the required signatures and production attestations against that policy, then checks the
+NVKR checks the required signatures and production attestations against that policy, then checks the
 referenced artifact and evidence bytes. Missing evidence, mismatched digests, or an unaccepted signer
 fail verification. A valid signature authenticates a claim; it does not establish complete inspection,
 freedom from vulnerabilities, independent reproduction, qualification, or deployment readiness.
@@ -48,15 +48,15 @@ See the [release quickstart](docs/release-quickstart.md) to apply your policy.
 
 ## Start here
 
-Start with the [quickstart](docs/quickstart.md) to validate the small three-output NKE example and preview
+Start with the [quickstart](docs/quickstart.md) to validate the small three-output NVKE example and preview
 a Run. You need Git, Make, and the Go version in [.go-version](.go-version); these planning commands work
-on macOS and Linux without Docker, a registry, or an NKE source checkout. From the repository root:
+on macOS and Linux without Docker, a registry, or an NVKE source checkout. From the repository root:
 
 ```sh
 GOTOOLCHAIN=local make build
-bin/nkdctl definition validate --definition definitions/nke-v1/definition.yaml
-bin/nkdctl run plan --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-local.yaml
+bin/nvkr definition validate --definition definitions/nvke-v1/definition.yaml
+bin/nvkr run plan --definition definitions/nvke-v1/definition.yaml \
+  --environment definitions/nvke-v1/environment-local.yaml
 ```
 
 Planning does not build or publish artifacts. The [documentation map](docs/README.md) connects the next steps:
@@ -69,8 +69,8 @@ Planning does not build or publish artifacts. The [documentation map](docs/READM
 | Find outputs and verify a published claim | [Release quickstart](docs/release-quickstart.md) |
 | Look up terminology and features | [Concept reference](docs/user-concepts.md) |
 
-The [tutorial Definition](definitions/nke-v1/README.md) selects the CLI, CWE image, and Helm bundle.
-The [combined NKE candidate](definitions/nke-m2/README.md) selects 34 outputs, including AMD64 and ARM64
+The [tutorial Definition](definitions/nvke-v1/README.md) selects the CLI, CWE image, and Helm bundle.
+The [combined NVKE candidate](definitions/nvke-m2/README.md) selects 34 outputs, including AMD64 and ARM64
 container and node images, and supplies the repository's generated GitHub workflow.
 
 ## Current scope
@@ -79,7 +79,7 @@ GitHub is the maintained hosted generator and signing/publication provider. Actu
 declared runtime, source access, and capabilities; the combined candidate's hosted disk jobs use explicit
 KVM routes. Consumer verification requires Linux, pinned tools, and an explicit identity and issuer policy.
 
-The [October 6 candidate Run](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37533806963) completed all 34 outputs,
+The [October 6 candidate Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963) completed all 34 outputs,
 publication, keyless signing, workflow verification, and Run finalization, including both disk images.
 The record covers that validation branch and does not establish independent full-payload consumer
 acceptance or general production readiness.
@@ -100,12 +100,12 @@ The [demo index](demos/README.md) provides presentations and runnable walkthroug
 
 ## Support
 
-Use [GitHub Discussions](https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/q-a) for usage
-questions and [GitHub Issues](https://github.com/dsx-ai-factory/nke-recipes/issues) for reproducible bugs,
+Use [GitHub Discussions](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a) for usage
+questions and [GitHub Issues](https://github.com/dsx-ai-factory/nvkr/issues) for reproducible bugs,
 feature requests, and documentation gaps. See [SUPPORT.md](SUPPORT.md) for support channels. Report
 security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
-NVKE Recipes is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
+NVKR is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-06 in the consolidated NKD ADR set.
+- **Index:** ADR-06 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-05 (publication objects), ADR-04 (signing), ADR-16 (digest-first selection), ADR-15
   (air-gap / mirror).
 - **Satisfies:** SEC-16 (immutable publication), UC-11 (supersede / deprecate / withdraw).
@@ -23,7 +23,7 @@ modifying** the original publication or its evidence. This must hold with **no N
 standard interfaces.
 
 An earlier design posited a publisher-maintained “append-only ledger.” Content-addressing already makes each
-publication immutable, so NKD needs no bespoke publication ledger. A registry referrer listing, however, is
+publication immutable, so NVKR needs no bespoke publication ledger. A registry referrer listing, however, is
 neither complete nor monotonic: a registry or mirror can omit a withdrawal or replay an older, correctly signed
 view, and transparency-log inclusion proves that an object existed rather than that a consumer saw the latest
 status. The status path therefore needs its own authenticated freshness and anti-rollback mechanism.
@@ -35,7 +35,7 @@ status. The status path therefore needs its own authenticated freshness and anti
 This is a deferred qualified publication contract. The unused publication-identity constructor is removed;
 its canonical family remains reserved and cannot mint identities. Current pipeline publication uses ADR-20 §6.
 
-`publicationIdentity = Digest("nkd.publication", <exact canonical ValidationVector / ReleaseSet>)`, **distinct** from
+`publicationIdentity = Digest("nvkr.publication", <exact canonical ValidationVector / ReleaseSet>)`, **distinct** from
 `buildDigest`, which covers only the compiled graph's logical projection — two profiles or manifests over one graph would
 otherwise collide. Immutability needs no ledger: a publication *is* its digest, so any byte change is a
 **different publication**. Registry listing is a discovery aid; the signed objects and their transparency
@@ -142,7 +142,7 @@ publishing another manifest. Every other existing release tag is immutable. Conc
 validation, partial-write reconciliation, and channel ordering require an implemented registry commit protocol;
 content addressing alone does not provide it.
 
-V1 revocation requires all three actions: a signed `nkd.dev/revocation/v1` marker naming subject/manifest digest,
+V1 revocation requires all three actions: a signed `nvkr.dev/revocation/v1` marker naming subject/manifest digest,
 reason and time, attested by the qualification identity; removal of the channel tag from that digest; and consumer
 rejection of the revoked digest even when its original signature still verifies. Keep the immutable tag and
 transparency evidence. This is separate from qualified withdrawal: it has no trusted-time authority, high-water
@@ -188,7 +188,7 @@ mark, or freshness window. These v1 lifecycle operations remain unimplemented.
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/status/*_test.go` and `cmd/nkdctl/qualified_lifecycle_test.go` covers exact
+Current contract evidence in `pkg/nvkr/status/*_test.go` and `cmd/nvkr/qualified_lifecycle_test.go` covers exact
 authenticated checkpoint/declaration bytes, signer policy, validity at an explicit diagnostic epoch,
 lower-sequence replay, same-sequence equivocation, predecessor and complete-declaration binding, withdrawal,
 and durable high-water locking, crash recovery and CAS. It does not establish trusted-time release authority,

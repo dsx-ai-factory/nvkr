@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-12 in the consolidated NKD ADR set.
+- **Index:** ADR-12 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-11 (direct producer selection), ADR-05 (ReleaseSet / Inventory), ADR-14 (delivery), ADR-10 (builder
   types), ADR-19 (deployment topology boundary).
 - **Scope:** target admission in both evidence lanes.
@@ -14,7 +14,7 @@
 ## Context
 
 Build targets select the exact bytes an output must produce: a target selects producer/toolchain/artifact
-routes. Neither requires an NKD Recipe, deployment topology, or a generic criteria query.
+routes. Neither requires an NVKR Recipe, deployment topology, or a generic criteria query.
 
 ## Decision
 
@@ -23,7 +23,7 @@ routes. Neither requires an NKD Recipe, deployment topology, or a generic criter
 Every native Definition output declares `platform: linux/amd64` or `linux/arm64`; no wildcard, missing value or
 host-derived default is admitted. Catalog components declare sorted supported `platforms`, with complete exact
 pin/toolchain routes for those declarations. Selecting an unsupported route fails before external work.
-`pkg/nkd/target` owns the platform and architecture domains.
+`pkg/nvkr/target` owns the platform and architecture domains.
 
 An OCI output may instead declare `platforms`, a nonempty sorted unique subset of the supported platform
 domain. It is mutually exclusive with `platform` and selects exactly one image component. The single public
@@ -42,7 +42,7 @@ from the explicit target. Other command values are never inferred from deploymen
 This ADR previously also owned an accelerated-runtime rendering path: a catalog-declared `aicrProfiles` map, an
 output-owned `aicr` producer selecting a pinned upstream profile and generator, output-owned `aicr.bundle`
 rendering settings bound into Build Digest, a qualified same-process render/publish adapter
-(`pkg/nkd/aicr`), and a `nkd.aicr-bundle` typed digest family for the rendered tree. That implementation has been
+(`pkg/nvkr/aicr`), and a `nvkr.aicr-bundle` typed digest family for the rendered tree. That implementation has been
 removed: it had no concrete consumer, and the rendering/publication boundary (§4 of the prior revision) was never
 closed end-to-end. `canonical.KindAICRBundle` remains a permanently reserved, retired digest domain (ADR-01 §3) so
 no future family can silently reuse its identity.
@@ -63,5 +63,5 @@ Target route admission has an explicit owner and no selector fallback.
 
 ## Acceptance evidence
 
-`pkg/nkd/target` and `pkg/nkd/ir` cover concrete targets, exact pins, and fail-before-output admission.
+`pkg/nvkr/target` and `pkg/nvkr/ir` cover concrete targets, exact pins, and fail-before-output admission.
 Repository checks and external evidence limits are recorded in reconciliation.

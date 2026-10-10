@@ -14,14 +14,14 @@ import (
 	"sort"
 	"strings"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-const Token = "NKD_SOURCE_TOKEN"
+const Token = "NVKR_SOURCE_TOKEN"
 
 // CredentialHelper is the existing repository-scoped Git helper. Never accept
 // arbitrary caller-provided shell helpers in the held source route.
-const CredentialHelper = `!f() { if [ "$1" = get ]; then printf '%s\n' 'username=x-access-token' "password=$NKD_SOURCE_TOKEN"; fi; }; f`
+const CredentialHelper = `!f() { if [ "$1" = get ]; then printf '%s\n' 'username=x-access-token' "password=$NVKR_SOURCE_TOKEN"; fi; }; f`
 
 // Baseline excludes ambient Git configuration, credentials and proxies. PATH is
 // explicit and contains only absolute directories with an executable Git.

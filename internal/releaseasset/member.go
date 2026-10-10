@@ -14,7 +14,7 @@ import (
 	"io/fs"
 	"strings"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 type Limits struct {

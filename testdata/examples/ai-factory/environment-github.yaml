@@ -1,11 +1,11 @@
-apiVersion: nkd.dev/environment/v1
+apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
   description: Registry destinations are independently selected settings.
   name: github-production
 publication:
-  credentialRef: github:NKD_REGISTRY_AUTH
-  repositoryPrefix: ghcr.io/example-ai-factory/nke
+  credentialRef: github:NVKR_REGISTRY_AUTH
+  repositoryPrefix: ghcr.io/example-ai-factory/nvke
 runtime:
   toolchainRegistry: ghcr.io/example-ai-factory
 utilityContainer: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161

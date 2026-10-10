@@ -92,7 +92,7 @@ func CreateTemporarySibling(parent *os.File) (*os.File, string, error) {
 		if _, err := rand.Read(token[:]); err != nil {
 			return nil, "", err
 		}
-		name := ".nkd-download-" + hex.EncodeToString(token[:])
+		name := ".nvkr-download-" + hex.EncodeToString(token[:])
 		fd, err := unix.Openat(int(parent.Fd()), name,
 			unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0o600)
 		if err == unix.EEXIST {

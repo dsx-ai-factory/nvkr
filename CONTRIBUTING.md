@@ -1,6 +1,6 @@
-# Contributing to NKE Recipes
+# Contributing to NVKR
 
-Thanks for your interest. NKE Recipes is an Apache-2.0 implementation of a pinned, verifiable
+Thanks for your interest. NVKR is an Apache-2.0 implementation of a pinned, verifiable
 Definition → Run → Release architecture. Exact-byte reproduction is a separate qualified claim for an exact
 subject; it is not inherited by every pipeline or aggregate artifact. This guide covers the dev loop, the
 contribution mechanics, and the invariants a change must respect. See **[DEVELOPMENT.md](DEVELOPMENT.md)**
@@ -10,9 +10,9 @@ for a deeper environment walkthrough and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.
 ## Getting started
 
 ```sh
-git clone https://github.com/NVIDIA/nke-recipes && cd nke-recipes
+git clone https://github.com/dsx-ai-factory/nvkr && cd nvkr
 make help          # list all targets
-make build         # compile bin/nkdctl; catalogs are supplied explicitly
+make build         # compile bin/nvkr; catalogs are supplied explicitly
 make check         # the full local gate, including the Go vulnerability check
 ```
 
@@ -38,7 +38,7 @@ vulnerability check needs access to the Go vulnerability database; see the
 [maintainer procedure](docs/cve-management.md) for triage and scope.
 
 Expensive capacity and full-product integration fixtures require
-`NKD_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
+`NVKR_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
 Enable them selectively when changing large-document limits, attestation or
 publication readback, catalog serialization limits, maintained workflow
 generation, or the authoring lab. Go's `-short` flag keeps them skipped even when
@@ -59,7 +59,7 @@ baseline pending ratification, and [`docs/adr/reconciliation.md`](docs/adr/recon
 current implementation boundary:
 
 - **Fail closed.** An unpinned source ref, a tag-pinned toolchain, an unknown component or unsupported target platform must error with a coded, distinct exit status — never a silent default.
-- **Deterministic IR.** `buildDigest` identifies the validated graph's logical projection under `nkd.build`.
+- **Deterministic IR.** `buildDigest` identifies the validated graph's logical projection under `nvkr.build`.
   Transport and execution metadata remain in the full graph and Plan. No host paths,
   clocks, UUIDs, random values, invalid UTF-8 normalization, or Go map-iteration order may feed a semantic
   identity, manifest, or signature.
@@ -81,13 +81,13 @@ current implementation boundary:
 Adding a component is a **declarative** change in the selected Definition’s catalog under `definitions/`.
 Select it directly in an output with a concrete platform, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
-waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nkdctl definition validate --definition <path>`. A source bake-off is useful contract evidence, but
+waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. A source bake-off is useful contract evidence, but
 release qualification also requires the authenticated producer, terminal, evidence, policy, and status chain
 described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--data` (see
 `testdata/examples/operator-catalog/`).
 
 Catalog diagnostics require an explicit `--data` path. There is no embedded worker catalog or backward-compatibility
-requirement. Worker binaries belong to the NKE OS-image build; add product outputs through a Definition.
+requirement. Worker binaries belong to the NVKE OS-image build; add product outputs through a Definition.
 
 ## Pull request process
 

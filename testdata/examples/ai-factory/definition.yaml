@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/definition/v5
+apiVersion: nvkr.dev/definition/v5
 catalog:
   base: ../../catalogs/kubernetes-layered
   overlays:
@@ -6,7 +6,7 @@ catalog:
 kind: Definition
 metadata:
   description: Pinned GPU runtime and worker deliverables.
-  name: nke-gpu-tenant
+  name: nvke-gpu-tenant
 outputs:
 - catalog:
     base: ../layered-catalog

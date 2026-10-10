@@ -18,16 +18,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func localFixtureGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...)
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull,
-		"GIT_AUTHOR_NAME=NKD Fixture", "GIT_AUTHOR_EMAIL=nkd@example.test", "GIT_COMMITTER_NAME=NKD Fixture", "GIT_COMMITTER_EMAIL=nkd@example.test"}
+		"GIT_AUTHOR_NAME=NVKR Fixture", "GIT_AUTHOR_EMAIL=nvkr@example.test", "GIT_COMMITTER_NAME=NVKR Fixture", "GIT_COMMITTER_EMAIL=nvkr@example.test"}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("fixture Git failed: %v: %s", err, out)
@@ -80,12 +80,12 @@ func TestLocalGitNeutralizesGlobalCallbacksAndConversions(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(configuration), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			environment := []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url." + source + ".insteadOf", "GIT_CONFIG_VALUE_0=https://example.test/nke.git"}
+			environment := []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url." + source + ".insteadOf", "GIT_CONFIG_VALUE_0=https://example.test/nvke.git"}
 			if withHome {
 				environment = append(environment, "HOME="+home)
 			}
 			runLocalFixture(t, environment, checkout, "init", "-q")
-			runLocalFixture(t, environment, checkout, "fetch", "-q", "--depth=1", "https://example.test/nke.git", commit)
+			runLocalFixture(t, environment, checkout, "fetch", "-q", "--depth=1", "https://example.test/nvke.git", commit)
 			runLocalFixture(t, environment, checkout, "checkout", "-q", "--detach", "FETCH_HEAD")
 			runLocalFixture(t, environment, checkout, "status", "--porcelain=v1")
 			body, err := os.ReadFile(filepath.Join(checkout, "input.txt"))
@@ -288,21 +288,21 @@ func TestLocalGitAdmitsOnlyAuthenticatedEmptyDescriptor(t *testing.T) {
 // only; Git fetches its objects into a fresh checkout without network access.
 // It does not claim coverage of unrelated maintained sources or an image build.
 func TestLocalGitMaintainedOVNForkPin(t *testing.T) {
-	source := os.Getenv("NKD_OVN_SOURCE_REPOSITORY")
+	source := os.Getenv("NVKR_OVN_SOURCE_REPOSITORY")
 	if source == "" {
-		t.Skip("set NKD_OVN_SOURCE_REPOSITORY to a local repository containing the maintained NVIDIA OVN pin")
+		t.Skip("set NVKR_OVN_SOURCE_REPOSITORY to a local repository containing the maintained NVIDIA OVN pin")
 	}
 	if !filepath.IsAbs(source) || filepath.Clean(source) != source {
-		t.Fatal("NKD_OVN_SOURCE_REPOSITORY must be a canonical absolute local repository path")
+		t.Fatal("NVKR_OVN_SOURCE_REPOSITORY must be a canonical absolute local repository path")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	overlay, err := catalog.LoadOverlayContext(ctx, "../../definitions/nke-local-dev-arm64/os-tcg.json")
+	overlay, err := catalog.LoadOverlayContext(ctx, "../../definitions/nvke-local-dev-arm64/os-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var pin *catalog.Component
-	for _, name := range []string{"nke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"} {
+	for _, name := range []string{"nvke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"} {
 		component := overlay.Components[name].Component
 		if component == nil || !component.FromSource || component.Repo != "https://github.com/dsx-ai-factory/ovn-kubernetes" ||
 			component.Commit == "" || component.TreeHash == "" {
@@ -395,7 +395,7 @@ func TestLocalGitIndexQueryFailsClosed(t *testing.T) {
 		{"output bound", []string{"ls-files", "--format=%(objectmode)"}, 1},
 		// Git config's documented no-match exit 1 is tolerated only by the
 		// config adapter, never by the mandatory index-admission query.
-		{"empty nonzero exit", []string{"config", "--get", "nkd.synthetic-private-absent"}, 64 << 10},
+		{"empty nonzero exit", []string{"config", "--get", "nvkr.synthetic-private-absent"}, 64 << 10},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			args := append([]string{"-C", source}, test.args...)
@@ -945,7 +945,7 @@ func TestLocalGitRejectsUnselectedProcessConfiguration(t *testing.T) {
 		{"GIT_CONFIG_COUNT=17"},
 		{"GIT_CONFIG_COUNT=-1"},
 		{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=credential.helper", "GIT_CONFIG_VALUE_0=!unexpected"},
-		{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url.relative.insteadOf", "GIT_CONFIG_VALUE_0=https://example.test/nke"},
+		{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url.relative.insteadOf", "GIT_CONFIG_VALUE_0=https://example.test/nvke"},
 		{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url./tmp/repository.insteadOf"},
 	} {
 		cmd, err := LocalCommand(t.Context(), append([]string{"PATH=" + os.Getenv("PATH")}, fields...), "", "fetch")

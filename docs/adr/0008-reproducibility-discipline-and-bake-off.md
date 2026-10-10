@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-08 in the consolidated NKD ADR set.
+- **Index:** ADR-08 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-07 (reproduction identity & builder profile), ADR-10 (pluggable builder types), ADR-05
   (trust objects / evidence bundle), ADR-04 (signing).
 
@@ -14,7 +14,7 @@
 
 ## Context
 
-Qualified reproducibility is an NKD load-bearing claim, so it must be **demonstrated, not asserted** for each
+Qualified reproducibility is an NVKR load-bearing claim, so it must be **demonstrated, not asserted** for each
 subject that receives it. The SRD calls for a
 two-environment bit-identity gate. This ADR settles *whose* gate that is and *what it proves*, defines the
 protocol, specifies how empirical evidence graduates a builder-profile attribute from advisory to fail-closed

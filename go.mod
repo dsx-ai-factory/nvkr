@@ -1,4 +1,4 @@
-module github.com/NVIDIA/nke-recipes
+module github.com/dsx-ai-factory/nvkr
 
 go 1.27.0
 

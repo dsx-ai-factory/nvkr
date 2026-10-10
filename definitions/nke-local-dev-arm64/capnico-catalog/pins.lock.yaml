@@ -1,9 +1,0 @@
-# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
-apiVersion: nkd.dev/lock/v1
-kind: PinLock
-pins:
-  capnico:
-    commit: 30882520888ab7bb75d125cb7bb9aa89e48acd6a
-    sourceDateEpoch: 1789170151
-    tag: v0.0.45
-    treeHash: 4bc81a40160d655bddaadc1b96f9413703351b0e

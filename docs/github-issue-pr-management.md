@@ -1,6 +1,6 @@
 # GitHub issue, discussion, and pull request management
 
-This is the NKE Recipes repository procedure under the NVIDIA-internal
+This is the NVKR repository procedure under the NVIDIA-internal
 [DGXC OSS GitHub issue and PR policy](https://nvidia.atlassian.net/wiki/spaces/DGXCLD/pages/3062795945/DGXC+OSS+Policy+For+Github+Issue+and+PR+Mgmt).
 The central policy owns portfolio-wide priority definitions, internal service
 targets, access rules, and dashboard reporting. This document explains how
@@ -14,8 +14,8 @@ turn [best-effort community support](../SUPPORT.md) into a public fix promise.
 | Reproducible defect | [Bug form](../.github/ISSUE_TEMPLATE/bug_report.yml) |
 | Concrete enhancement | [Feature form](../.github/ISSUE_TEMPLATE/feature_request.yml) |
 | Documentation correction or request | [Documentation form](../.github/ISSUE_TEMPLATE/documentation_request.yml) |
-| Usage question | [Discussions Q&A](https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/q-a) |
-| Open-ended design idea | [Discussions Ideas](https://github.com/dsx-ai-factory/nke-recipes/discussions/categories/ideas) |
+| Usage question | [Discussions Q&A](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a) |
+| Open-ended design idea | [Discussions Ideas](https://github.com/dsx-ai-factory/nvkr/discussions/categories/ideas) |
 | Suspected vulnerability | [Private NVIDIA PSIRT reporting](../SECURITY.md), never a public issue or PR |
 
 The issue chooser exposes the three work-item forms and the security reporting

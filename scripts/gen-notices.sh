@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Regenerate THIRD_PARTY_NOTICES.md from the modules linked into nkdctl and
-# the local nke-demo command. Tools invoked as separate processes are excluded: they
+# Regenerate THIRD_PARTY_NOTICES.md from the modules linked into nvkr and
+# the local nvke-demo command. Tools invoked as separate processes are excluded: they
 # are not linked, so Apache-2.0 section 4(d) does not reach them.
 #
 # The linked-module set is the union over GOOS in {linux, darwin} at
@@ -38,13 +38,12 @@ generated=$(mktemp)
 trap 'rm -f "$linked" "$generated"' EXIT
 
 # The module excludes itself: `go list -deps` reports the main module, and its
-# own licence is LICENSE, not a third-party notice. The path stays
-# github.com/NVIDIA/nke-recipes because Go module paths do not follow a GitHub
-# organization rename.
+# own licence is LICENSE, not a third-party notice. Exclude the renamed main
+# module rather than reproducing its own license as a dependency notice.
 for goos in linux darwin; do
   GOOS="$goos" GOARCH=amd64 \
-    go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nkdctl ./cmd/nke-demo
-done | sort -u | grep -v '^$' | grep -v '^github.com/NVIDIA/nke-recipes' > "$linked"
+    go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nvkr ./cmd/nvke-demo
+done | sort -u | grep -v '^$' | grep -v '^github.com/dsx-ai-factory/nvkr' > "$linked"
 
 python3 scripts/gen_notices.py "$linked" > "$generated"
 

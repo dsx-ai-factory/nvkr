@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Local combined NKE walkthrough. The historical M1 name predates the addition
+# Local combined NVKE walkthrough. The historical M1 name predates the addition
 # of CWE and Helm: the current Definition builds and publishes all three outputs.
 # The CLI build is offline; CWE wraps the upstream network-enabled Dockerfile.
 # This script inspects the CLI SBOM and dry-run signing records, pulls its
@@ -19,22 +19,22 @@ cd "$SCRIPT_DIR/.."
 # shellcheck source=scripts/_demo-common.sh
 source "$SCRIPT_DIR/_demo-common.sh"
 
-ATTEMPTS_ROOT=${ATTEMPTS_ROOT:-.nkd/m1-local}
+ATTEMPTS_ROOT=${ATTEMPTS_ROOT:-.nvkr/m1-local}
 ATTEMPT=${ATTEMPT:-$(demo_default_attempt m1)}
 WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
-CONSUME=${CONSUME:-.nkd/m1-local-consume}
-DEFINITIONS=${DEFINITIONS:-definitions/nke-v1}
+CONSUME=${CONSUME:-.nvkr/m1-local-consume}
+DEFINITIONS=${DEFINITIONS:-definitions/nvke-v1}
 ROUTE=${ROUTE:-release}
-BUNDLE=${BUNDLE:-nkectl}
-BUILD_TARGET=${BUILD_TARGET:-nkectl}
+BUNDLE=${BUNDLE:-nvkectl}
+BUILD_TARGET=${BUILD_TARGET:-nvkectl}
 JOBS=${JOBS:-1}
-REGISTRY_CONTAINER=${REGISTRY_CONTAINER:-nkd-m1-registry}
+REGISTRY_CONTAINER=${REGISTRY_CONTAINER:-nvkr-m1-registry}
 REGISTRY_IMAGE=${REGISTRY_IMAGE:-registry:3}
 REGISTRY_HOSTPORT=${REGISTRY_HOSTPORT:-127.0.0.1:5000}
 RUNTIME=${RUNTIME:-docker}
 KEEP_REGISTRY=1
 
-# The same pinned toolchain image the catalog builds nkectl with, reused here as the
+# The same pinned toolchain image the catalog builds nvkectl with, reused here as the
 # amd64 execution environment for the recovered binary. Reusing it keeps this script from
 # introducing another execution image. The loopback registry service uses registry:3.
 RUN_IMAGE=golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
@@ -45,10 +45,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/demo-m1-local.sh [options]
 
-Run the combined NKE local walkthrough (M1 requires the CLI slice only):
-  pinned NKE sources -> CLI + CWE image + Helm bundle -> per-artifact SBOMs
+Run the combined NVKE local walkthrough (M1 requires the CLI slice only):
+  pinned NVKE sources -> CLI + CWE image + Helm bundle -> per-artifact SBOMs
     -> one OCI release index -> loopback registry -> dry-run signing records
-    -> pull the release by digest -> check SBOM digest -> run recovered nkectl
+    -> pull the release by digest -> check SBOM digest -> run recovered nvkectl
 
 The CLI build is offline; CWE uses network-enabled rootless BuildKit. All three
 outputs must complete, but pull-back and version checks cover the CLI only.
@@ -57,17 +57,17 @@ Nothing is signed, and this walkthrough does not complete M1 acceptance.
 
 Options:
   --attempts-root DIR
-                    root for immutable Run attempts (default: .nkd/m1-local)
+                    root for immutable Run attempts (default: .nvkr/m1-local)
   --attempt NAME    new immutable attempt name (default: timestamp plus process ID)
   --consume DIR     scratch directory for the pull/extract half of the demo
-                    (default: .nkd/m1-local-consume)
+                    (default: .nvkr/m1-local-consume)
   --stop-registry   remove the demo registry container after successful completion
   -h, --help        show this help
 
 Environment:
-  NKE_LOCAL_CLONE   path to a local NKE clone containing the exact pinned commits. When set, git is
+  NVKE_LOCAL_CLONE   path to a local NVKE clone containing the exact pinned commits. When set, git is
                     redirected to it for this process only, via GIT_CONFIG_COUNT.
-                    The catalog keeps its https://github.com/dsx-ai-factory/nke identity and
+                    The catalog keeps its https://github.com/dsx-ai-factory/nvke identity and
                     the user's own git configuration is never modified.
 
 Requires docker with rootless BuildKit/overlayfs support, git, curl, a Go toolchain,
@@ -87,10 +87,10 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-case "$ATTEMPTS_ROOT" in .nkd/?*) ;; *) demo_die "--attempts-root must be a repository-relative child of .nkd" ;; esac
+case "$ATTEMPTS_ROOT" in .nvkr/?*) ;; *) demo_die "--attempts-root must be a repository-relative child of .nvkr" ;; esac
 case "$ATTEMPT" in ""|*/*|*..*) demo_die "--attempt must be one clean name" ;; esac
 WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
-case "$CONSUME" in .nkd/?*) ;; *) demo_die "--consume must be a repository-relative child of .nkd" ;; esac
+case "$CONSUME" in .nvkr/?*) ;; *) demo_die "--consume must be a repository-relative child of .nvkr" ;; esac
 [ "$WORKSPACE" != "$CONSUME" ] || demo_die "the Run attempt and --consume must differ"
 
 demo_need_command docker
@@ -109,26 +109,26 @@ demo_show_json() {
   fi
 }
 
-demo_section "0/8  Build nkdctl from this checkout"
-demo_prepare_nkdctl
-printf 'nkdctl: %s\n' "$NKD"
+demo_section "0/8  Build nvkr from this checkout"
+demo_prepare_nvkr
+printf 'nvkr: %s\n' "$NVKR"
 
 # The catalog names the real upstream repository, because that is the component's
 # identity. Redirecting the TRANSPORT for a local run is environment configuration, so it
 # is expressed as git configuration scoped to this process — not as a catalog edit and
 # not as a mutation of the user's ~/.gitconfig.
-if [ -n "${NKE_LOCAL_CLONE:-}" ]; then
-  [ -d "$NKE_LOCAL_CLONE" ] || demo_die "NKE_LOCAL_CLONE is not a directory: $NKE_LOCAL_CLONE"
-  NKE_LOCAL_CLONE=$(demo_absolute_path "$NKE_LOCAL_CLONE")
+if [ -n "${NVKE_LOCAL_CLONE:-}" ]; then
+  [ -d "$NVKE_LOCAL_CLONE" ] || demo_die "NVKE_LOCAL_CLONE is not a directory: $NVKE_LOCAL_CLONE"
+  NVKE_LOCAL_CLONE=$(demo_absolute_path "$NVKE_LOCAL_CLONE")
   export GIT_CONFIG_COUNT=1
-  export GIT_CONFIG_KEY_0="url.${NKE_LOCAL_CLONE}.insteadOf"
-  export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nke"
+  export GIT_CONFIG_KEY_0="url.${NVKE_LOCAL_CLONE}.insteadOf"
+  export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nvke"
   printf 'git transport redirected for this process only: %s -> %s\n' \
-    "https://github.com/dsx-ai-factory/nke" "$NKE_LOCAL_CLONE"
+    "https://github.com/dsx-ai-factory/nvke" "$NVKE_LOCAL_CLONE"
 fi
 
 demo_section "1/8  Start or reuse the loopback OCI registry"
-registry_owner_label=dev.nkd.demo.owner
+registry_owner_label=dev.nvkr.demo.owner
 registry_owner=m1-local
 if docker container inspect "$REGISTRY_CONTAINER" >/dev/null 2>&1; then
   owner=$(docker container inspect --format "{{index .Config.Labels \"$registry_owner_label\"}}" "$REGISTRY_CONTAINER")
@@ -158,24 +158,24 @@ done
 printf 'registry ready: http://%s/v2/\n' "$REGISTRY_HOSTPORT"
 
 demo_section "2/8  Validate the pinned component catalog"
-"$NKD" catalog validate --data "$DEFINITIONS/catalog"
+"$NVKR" catalog validate --data "$DEFINITIONS/catalog"
 
 demo_section "3/8  Validate the Definition and generate its hosted Run in scratch space"
-"$NKD" definition validate --definition "$DEFINITIONS/definition.yaml"
-"$NKD" run plan --definition "$DEFINITIONS/definition.yaml" \
+"$NVKR" definition validate --definition "$DEFINITIONS/definition.yaml"
+"$NVKR" run plan --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-local.yaml"
 # The committed workflow selects M2, while this demo selects the three-output v1
 # Definition. Generate and check that example with the same binary in a fresh root.
-HOSTED_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-m1-hosted.XXXXXX")
-"$NKD" run generate --definition "$DEFINITIONS/definition.yaml" \
+HOSTED_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-m1-hosted.XXXXXX")
+"$NVKR" run generate --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-github.yaml" --engine github --root "$HOSTED_ROOT"
-"$NKD" run generate --definition "$DEFINITIONS/definition.yaml" \
+"$NVKR" run generate --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-github.yaml" --engine github --root "$HOSTED_ROOT" --check
 printf 'scratch hosted bundle: %s\n' "$HOSTED_ROOT"
 
 demo_section "4/8  Build and publish all three outputs in one immutable Run"
 run_started=$SECONDS
-"$NKD" run local --definition "$DEFINITIONS/definition.yaml" \
+"$NVKR" run local --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-local.yaml" --attempts-root "$ATTEMPTS_ROOT" --attempt "$ATTEMPT" \
   --runtime "$RUNTIME" --jobs "$JOBS" --publish
 run_seconds=$((SECONDS - run_started))
@@ -245,29 +245,29 @@ demo_section "7/8  Pull the publication back BY DIGEST and extract the binary bu
 CONSUME_ABS=$(demo_absolute_path "$CONSUME")
 demo_prepare_work "$CONSUME_ABS" "m1-local-consume"
 pull_started=$SECONDS
-"$NKD" publish pull --ref "$REFERENCE" --out "$CONSUME_ABS/root" --plain-http --anonymous
+"$NVKR" publish pull --ref "$REFERENCE" --out "$CONSUME_ABS/root" --plain-http --anonymous
 pull_seconds=$((SECONDS - pull_started))
-"$NKD" publish inspect --layout "$CONSUME_ABS/root"
-"$NKD" publish extract --layout "$CONSUME_ABS/root" --bundle "$BUNDLE" --out "$CONSUME_ABS/extract"
+"$NVKR" publish inspect --layout "$CONSUME_ABS/root"
+"$NVKR" publish extract --layout "$CONSUME_ABS/root" --bundle "$BUNDLE" --out "$CONSUME_ABS/extract"
 
-NKECTL="$CONSUME_ABS/extract/nkectl"
-[ -f "$NKECTL" ] || demo_die "the extracted bundle does not contain nkectl: $NKECTL"
-NKECTL_SHA256=$(demo_sha256 "$NKECTL")
+NVKECTL="$CONSUME_ABS/extract/nvkectl"
+[ -f "$NVKECTL" ] || demo_die "the extracted bundle does not contain nvkectl: $NVKECTL"
+NVKECTL_SHA256=$(demo_sha256 "$NVKECTL")
 
 # Close the loop on the SBOM from step 5: the digest it billed for the built binary must
 # equal the sha256 of the binary we just recovered by digest from the registry. If they
 # disagree, the SBOM describes something other than what shipped, so fail closed.
-grep -q "$NKECTL_SHA256" "$sbom_dir"/*.cdx.json ||
-  demo_die "no per-artifact SBOM bills the recovered binary digest sha256:$NKECTL_SHA256"
+grep -q "$NVKECTL_SHA256" "$sbom_dir"/*.cdx.json ||
+  demo_die "no per-artifact SBOM bills the recovered binary digest sha256:$NVKECTL_SHA256"
 
-demo_section "8/8  Run the recovered nkectl under the pinned amd64 image"
+demo_section "8/8  Run the recovered nvkectl under the pinned amd64 image"
 # The definition targets linux/amd64; on an arm64 host this runs under emulation.
 VERSION_OUTPUT=$(docker run --rm --platform linux/amd64 -v "$CONSUME_ABS/extract:/w" \
-  "$RUN_IMAGE" /w/nkectl version 2>&1)
+  "$RUN_IMAGE" /w/nvkectl version 2>&1)
 printf '%s\n' "$VERSION_OUTPUT"
 case "$VERSION_OUTPUT" in
   *"$EXPECT_VERSION"*) ;;
-  *) demo_die "recovered nkectl reported '$VERSION_OUTPUT', which does not contain $EXPECT_VERSION" ;;
+  *) demo_die "recovered nvkectl reported '$VERSION_OUTPUT', which does not contain $EXPECT_VERSION" ;;
 esac
 
 if [ "$KEEP_REGISTRY" -eq 0 ]; then
@@ -277,23 +277,23 @@ fi
 
 cat <<EOF
 
-LOCAL NKE WALKTHROUGH COMPLETE — UNQUALIFIED-LOCAL-EXECUTION, NO SIGNATURES
+LOCAL NVKE WALKTHROUGH COMPLETE — UNQUALIFIED-LOCAL-EXECUTION, NO SIGNATURES
   definition:          $DEFINITIONS/definition.yaml
-  produced outputs:    nkectl, cwe, nke-helm (default Definition)
-  pull-back check:     nkectl only
+  produced outputs:    nvkectl, cwe, nvke-helm (default Definition)
+  pull-back check:     nvkectl only
   registry:            http://$REGISTRY_HOSTPORT/v2/ (container $REGISTRY_CONTAINER)
   published reference: $REFERENCE
   index digest:        $DIGEST
-  nkectl sha256:       $NKECTL_SHA256
-  nkectl version:      $VERSION_OUTPUT
+  nvkectl sha256:       $NVKECTL_SHA256
+  nvkectl version:      $VERSION_OUTPUT
   run record:          $WORKSPACE/lifecycle.json
-  hosted bundle:       $HOSTED_ROOT/.github/nkd-run/manifest.json
+  hosted bundle:       $HOSTED_ROOT/.github/nvkr-run/manifest.json
   SBOM index:          $sbom_index ($sbom_count CLI CycloneDX doc(s), unqualified composition evidence)
   signing record:      $signature_record
   SLSA v1 predicate:   $predicate_record
   predicate sha256:    $PREDICATE_SHA256
   verification record: $verification_record
-  extracted binary:    $NKECTL
+  extracted binary:    $NVKECTL
   timings:             Run ${run_seconds}s, pull ${pull_seconds}s
 
 Nothing was signed: dry-run mode executed no cosign and used no signing identity.

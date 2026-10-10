@@ -1,0 +1,446 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvke-os-public-sources
+  description: Direct public-source OS binary producers. Experimental; not the complete node-image closure.
+sources:
+  spire-tpm-1-9-0:
+    repo: https://github.com/spiffe/spire-tpm-plugin
+    constraint: 1.9.0
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        pins="$(sha256sum go.mod go.sum)"
+        timeout --kill-after=10s 240s go mod download
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 120s go mod vendor
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+  crictl-1-34-0:
+    repo: https://github.com/kubernetes-sigs/cri-tools
+    constraint: 1.34.0
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  crictl-1-35-0:
+    repo: https://github.com/kubernetes-sigs/cri-tools
+    constraint: 1.35.0
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  crictl-1-36-0:
+    repo: https://github.com/kubernetes-sigs/cri-tools
+    constraint: 1.36.0
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  helm-3-20-2:
+    repo: https://github.com/helm/helm
+    constraint: 3.20.2
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        pins="$(sha256sum go.mod go.sum)"
+        timeout --kill-after=10s 240s go mod download
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 120s go mod vendor
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        # Upstream negative-test fixtures are not inputs to cmd/helm. Remove only
+        # these exact, pinned external symlinks before closure authentication.
+        test "$(readlink pkg/chart/loader/testdata/frobnitz_with_dev_null/null)" = /dev/null
+        test "$(readlink internal/third_party/dep/fs/testdata/symlinks/invalid-symlink)" = /non/existing/file
+        test "$(readlink internal/third_party/dep/fs/testdata/symlinks/windows-file-symlink)" = C:/Users/ibrahim/go/src/github.com/golang/dep/internal/fs/testdata/test.file
+        git rm -- pkg/chart/loader/testdata/frobnitz_with_dev_null/null \
+          internal/third_party/dep/fs/testdata/symlinks/invalid-symlink \
+          internal/third_party/dep/fs/testdata/symlinks/windows-file-symlink
+  helm-4-1-4:
+    repo: https://github.com/helm/helm
+    constraint: 4.1.4
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        pins="$(sha256sum go.mod go.sum)"
+        timeout --kill-after=10s 240s go mod download
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 120s go mod vendor
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        # Diagnostic Local preparation only; held ExecNode source admission
+        # rejects these fixtures before vendor execution (see the README).
+        test "$(readlink internal/chart/v3/loader/testdata/frobnitz_with_dev_null/null)" = /dev/null
+        test "$(readlink pkg/chart/v2/loader/testdata/frobnitz_with_dev_null/null)" = /dev/null
+        test "$(readlink internal/third_party/dep/fs/testdata/symlinks/invalid-symlink)" = /non/existing/file
+        test "$(readlink internal/third_party/dep/fs/testdata/symlinks/windows-file-symlink)" = C:/Users/ibrahim/go/src/github.com/golang/dep/internal/fs/testdata/test.file
+        git rm -- internal/chart/v3/loader/testdata/frobnitz_with_dev_null/null \
+          pkg/chart/v2/loader/testdata/frobnitz_with_dev_null/null \
+          internal/third_party/dep/fs/testdata/symlinks/invalid-symlink \
+          internal/third_party/dep/fs/testdata/symlinks/windows-file-symlink
+  cni-plugins-1-6-0:
+    repo: https://github.com/containernetworking/plugins
+    constraint: 1.6.0
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  containerd-2-1-7:
+    repo: https://github.com/containerd/containerd
+    constraint: 2.1.7
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  containerd-2-2-3:
+    repo: https://github.com/containerd/containerd
+    constraint: 2.2.3
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  containerd-2-3-0:
+    repo: https://github.com/containerd/containerd
+    constraint: 2.3.0
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  kubernetes-1-34-2:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.34.2
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  kubernetes-1-35-3:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.35.3
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  kubernetes-1-36-3:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.36.3
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+components:
+  tpm-attestor-agent-1-9-0:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: spire-tpm-1-9-0
+    outputType: raw
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        go build -mod=vendor -ldflags "-s -w -buildid=" \
+          -o /src/nvkr-output/tpm_attestor_agent ./cmd/tpm_attestor_agent
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/tpm_attestor_agent
+  get-tpm-pubhash-1-9-0:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: spire-tpm-1-9-0
+    outputType: raw
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        go build -mod=vendor -ldflags "-s -w -buildid=" \
+          -o /src/nvkr-output/get_tpm_pubhash ./cmd/get_tpm_pubhash
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/get_tpm_pubhash
+  crictl-1-34-0:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: crictl-1-34-0
+    outputType: raw
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        go build -mod=vendor -ldflags "-s -w -buildid= -X sigs.k8s.io/cri-tools/pkg/version.Version=$BUILD_VERSION" \
+          -o /src/nvkr-output/crictl ./cmd/crictl
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/crictl
+  crictl-1-35-0:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: crictl-1-35-0
+    outputType: raw
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        go build -mod=vendor -ldflags "-s -w -buildid= -X sigs.k8s.io/cri-tools/pkg/version.Version=$BUILD_VERSION" \
+          -o /src/nvkr-output/crictl ./cmd/crictl
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/crictl
+  crictl-1-36-0:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: crictl-1-36-0
+    outputType: raw
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        go build -mod=vendor -ldflags "-s -w -buildid= -X sigs.k8s.io/cri-tools/pkg/version.Version=$BUILD_VERSION" \
+          -o /src/nvkr-output/crictl ./cmd/crictl
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/crictl
+  helm-3-20-2:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: helm-3-20-2
+    outputType: raw
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        # Match the pinned upstream Makefile's client-go-derived defaults.
+        client_version="$(go list -mod=vendor -m k8s.io/client-go | awk '{print $2}')"
+        test "$client_version" = v0.35.1
+        IFS=. read -r client_major k8s_minor client_patch <<<"${client_version#v}"
+        k8s_major=$((client_major + 1))
+        # Removed negative-test fixture links are not cmd/helm compilation inputs.
+        go build -mod=vendor -ldflags "-s -w -buildid= -X helm.sh/helm/v3/pkg/chartutil.k8sVersionMajor=$k8s_major -X helm.sh/helm/v3/pkg/chartutil.k8sVersionMinor=$k8s_minor -X helm.sh/helm/v3/pkg/lint/rules.k8sVersionMajor=$k8s_major -X helm.sh/helm/v3/pkg/lint/rules.k8sVersionMinor=$k8s_minor -X helm.sh/helm/v3/internal/version.version=$BUILD_VERSION -X helm.sh/helm/v3/internal/version.gitCommit=$GIT_VERSION -X helm.sh/helm/v3/internal/version.gitTreeState=clean" \
+          -o /src/nvkr-output/helm ./cmd/helm
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/helm
+  cni-plugins-1-6-0:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: cni-plugins-1-6-0
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        mkdir -p /src/nvkr-output/bin
+        for directory in plugins/meta/* plugins/main/* plugins/ipam/*; do
+          test -d "$directory" || continue
+          plugin="$(basename "$directory")"
+          test "$plugin" != windows || continue
+          go build -mod=vendor -ldflags "-s -w -buildid= -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=$BUILD_VERSION" \
+            -o "/src/nvkr-output/bin/$plugin" "./$directory"
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/bin \
+          -cf /src/nvkr-output/cni-plugins-1-6-0.tar .
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/cni-plugins-1-6-0.tar
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+  containerd-2-1-7:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: containerd-2-1-7
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        mkdir -p /src/nvkr-output/bin
+        for binary in containerd ctr containerd-shim-runc-v2; do
+          tags=urfave_cli_no_docs
+          if test "$binary" = containerd-shim-runc-v2; then tags="$tags no_grpc"; fi
+          go build -mod=vendor -tags "$tags" \
+            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=github.com/containerd/containerd/v2" \
+            -o "/src/nvkr-output/bin/$binary" "./cmd/$binary"
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/bin \
+          -cf /src/nvkr-output/containerd-2-1-7.tar .
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/containerd-2-1-7.tar
+  containerd-2-2-3:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: containerd-2-2-3
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        mkdir -p /src/nvkr-output/bin
+        for binary in containerd ctr containerd-shim-runc-v2; do
+          tags=urfave_cli_no_docs
+          if test "$binary" = containerd-shim-runc-v2; then tags="$tags no_grpc"; fi
+          go build -mod=vendor -tags "$tags" \
+            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=github.com/containerd/containerd/v2" \
+            -o "/src/nvkr-output/bin/$binary" "./cmd/$binary"
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/bin \
+          -cf /src/nvkr-output/containerd-2-2-3.tar .
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/containerd-2-2-3.tar
+  containerd-2-3-0:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: containerd-2-3-0
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        mkdir -p /src/nvkr-output/bin
+        for binary in containerd ctr containerd-shim-runc-v2; do
+          tags=urfave_cli_no_docs
+          if test "$binary" = containerd-shim-runc-v2; then tags="$tags no_grpc"; fi
+          go build -mod=vendor -tags "$tags" \
+            -ldflags "-s -w -buildid= -X github.com/containerd/containerd/v2/version.Version=$BUILD_VERSION -X github.com/containerd/containerd/v2/version.Revision=$GIT_VERSION -X github.com/containerd/containerd/v2/version.Package=github.com/containerd/containerd/v2" \
+            -o "/src/nvkr-output/bin/$binary" "./cmd/$binary"
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/bin \
+          -cf /src/nvkr-output/containerd-2-3-0.tar .
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/containerd-2-3-0.tar
+  kubernetes-1-34-2:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: kubernetes-1-34-2
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=/src/go.work GOPROXY=off
+        mkdir -p /src/nvkr-output/bin
+        build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+        for binary in kubeadm kubectl kubelet kube-apiserver kube-controller-manager kube-scheduler kube-proxy; do
+          go build -mod=vendor -tags selinux,notest,grpcnotrace \
+            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
+            -o "/src/nvkr-output/bin/$binary" "./cmd/$binary"
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/bin \
+          -cf /src/nvkr-output/kubernetes-1-34-2.tar .
+    versionStamp:
+      KUBE_GIT_VERSION: '{{.Tag}}'
+      KUBE_GIT_COMMIT: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+      KUBE_GIT_TREE_STATE: 'clean'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/kubernetes-1-34-2.tar
+  kubernetes-1-35-3:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: kubernetes-1-35-3
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=/src/go.work GOPROXY=off
+        mkdir -p /src/nvkr-output/bin
+        build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+        for binary in kubeadm kubectl kubelet kube-apiserver kube-controller-manager kube-scheduler kube-proxy; do
+          go build -mod=vendor -tags selinux,notest,grpcnotrace \
+            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
+            -o "/src/nvkr-output/bin/$binary" "./cmd/$binary"
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/bin \
+          -cf /src/nvkr-output/kubernetes-1-35-3.tar .
+    versionStamp:
+      KUBE_GIT_VERSION: '{{.Tag}}'
+      KUBE_GIT_COMMIT: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+      KUBE_GIT_TREE_STATE: 'clean'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/kubernetes-1-35-3.tar
+  kubernetes-1-36-3:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: kubernetes-1-36-3
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=/src/go.work GOPROXY=off
+        mkdir -p /src/nvkr-output/bin
+        build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+        for binary in kubeadm kubectl kubelet kube-apiserver kube-controller-manager kube-scheduler kube-proxy; do
+          go build -mod=vendor -tags selinux,notest,grpcnotrace \
+            -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/component-base/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$KUBE_GIT_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$KUBE_GIT_COMMIT -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=$KUBE_GIT_TREE_STATE -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
+            -o "/src/nvkr-output/bin/$binary" "./cmd/$binary"
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/bin \
+          -cf /src/nvkr-output/kubernetes-1-36-3.tar .
+    versionStamp:
+      KUBE_GIT_VERSION: '{{.Tag}}'
+      KUBE_GIT_COMMIT: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+      KUBE_GIT_TREE_STATE: 'clean'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/kubernetes-1-36-3.tar
+  helm-4-1-4:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: helm-4-1-4
+    outputType: raw
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        export GOENV=off GOWORK=off GOPROXY=off
+        # Removed negative-test fixture links are not cmd/helm compilation inputs.
+        go build -mod=vendor -ldflags "-s -w -buildid= -X helm.sh/helm/v4/internal/version.version=$BUILD_VERSION -X helm.sh/helm/v4/internal/version.gitCommit=$GIT_VERSION -X helm.sh/helm/v4/internal/version.gitTreeState=clean" \
+          -o /src/nvkr-output/helm ./cmd/helm
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/helm

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func testPath(t *testing.T) string {

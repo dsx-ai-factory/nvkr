@@ -6,13 +6,13 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-17 in the consolidated NKD ADR set.
+- **Index:** ADR-17 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-03 (exit codes), ADR-18 (runner / ctx), ADR-20 (publish seams), ADR-01 (canonical codec).
 - **Satisfies:** FR-21 (standard, replaceable interfaces); supports FR-20 (coded errors — owned by ADR-03).
 
 ## Context
 
-NKD is a **thin CLI over a reusable SDK**. It needs an embeddable facade, context/cancellation discipline,
+NVKR is a **thin CLI over a reusable SDK**. It needs an embeddable facade, context/cancellation discipline,
 swappable external-transport seams, and a clean package topology, so later work does not re-accrete orchestration
 in `main` or double-author types.
 
@@ -54,7 +54,7 @@ ADR-18 separately admits generated native ARC jobs for unencrypted direct-Packer
 M2 candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
 deferring inspection, under a validation-branch exception. General hosted VM adapters, FDE and qualified
 execution remain capability-gated. The strict live full-disk evidence/publication path has guarded APIs
-without a successful real NKE join; main-only execution, independent full-payload disk consumption,
+without a successful real NVKE join; main-only execution, independent full-payload disk consumption,
 M3 inventory/qualification and organizational acceptance remain separate gaps in
 [reconciliation](reconciliation.md).
 
@@ -65,7 +65,7 @@ Environment separately supplies runtime, runner, publication namespace, credenti
 (ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
 
-`pkg/nkd/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
+`pkg/nvkr/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
 accepts those exact inputs and owns the complete Plan, output joins and evidence requirements. It returns no
 partially completed plan and exposes no independently authored CompileSpec or ExecutionSettings handoff.
 `lifecycle` owns preparation, immutable attempt persistence and consumer workflow. Preparation retains an owned
@@ -239,7 +239,7 @@ record; absence of a record proves neither success nor absence of remote effects
 - Downstream integrators embed the SDK to prepare and execute Runs or verify Releases, branching on coded failures.
 - ctx and cancellation are explicit on every public operation; the options-carried deep-runner context
   remains visible migration debt and fails closed when omitted.
-- Swappable transports keep NKD integrating only via standard interfaces, while missing authority adapters fail
+- Swappable transports keep NVKR integrating only via standard interfaces, while missing authority adapters fail
   honestly instead of falling back to declarations.
 - The package map prevents `main` re-accretion and double-authored types.
 
@@ -267,9 +267,9 @@ record; absence of a record proves neither success nor absence of remote effects
 
 ## Acceptance evidence
 
-Current contract evidence in `client/v1/*_test.go`, `cmd/nkdctl/*_test.go`, `pkg/nkd/pipeline/local*_test.go`,
-`pkg/nkd/pipeline/container_lifecycle_test.go`, and
-`pkg/nkd/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
+Current contract evidence in `client/v1/*_test.go`, `cmd/nvkr/*_test.go`, `pkg/nvkr/pipeline/local*_test.go`,
+`pkg/nvkr/pipeline/container_lifecycle_test.go`, and
+`pkg/nvkr/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
 catalog/runner/consumer seams, local cancellation propagation, an explicitly stopped and joined container-reaper
 waiter, bounded lock-free cleanup I/O, held-child SIGTERM→SIGKILL escalation, atomic output, exact-byte
 receipt checks in the owning modules, rejection of unauthenticated inputs, and absence of implicit publication I/O.

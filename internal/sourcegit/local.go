@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 // LocalCredentialPolicy is static guidance, not a diagnosis of a Git failure.

@@ -11,7 +11,7 @@ import (
 	"errors"
 	"testing"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func releaseArchive(t *testing.T, headers ...tar.Header) []byte {

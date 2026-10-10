@@ -1,0 +1,436 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvke-m2-os
+  description: Non-FDE NVKE node image from explicit authenticated component outputs.
+sources:
+  nvke-os:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.1.x
+    tagPrefix: os-image/
+    toolchainImagesByArch:
+      # AMD64 is a substitution-only local baseline. ARM64 retains the historical
+      # M2 Docker candidate publication, not reproduction of the current Dockerfile.
+      # Each local Docker attempt freezes its own observed ID before Plan execution.
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        cd agent
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        pins="$(sha256sum go.mod go.sum)"
+        # Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.
+        # Go owns transport fallback; checksum failures never select another proxy.
+        # Keep direct fallback limited to a missing proxy module (404/410).
+        proxy=https://proxy.golang.org
+        GOPROXY="${proxy}|${proxy}/|${proxy}//,direct" \
+          timeout --kill-after=10s 540s go mod download || {
+            status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit "$status";
+          }
+        printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+          echo 'agent module pins changed during download' >&2; exit 1;
+        }
+        # Offline verification and vendoring run once, after acquisition succeeds.
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify || {
+          status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit "$status";
+        }
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor || {
+          status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit "$status";
+        }
+        printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+          echo 'agent module pins changed during vendoring' >&2; exit 1;
+        }
+  nvke-cni-calico-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.1.x
+    tagPrefix: os-image/
+    toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        make -C os-image/packages/cni-calico bundle nfpm \
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+  ovn-kubernetes:
+    repo: https://github.com/ovn-kubernetes/ovn-kubernetes
+    constraint: 1.4.x
+    toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+  nvke-kubeadm-distro-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.1.x
+    tagPrefix: os-image/
+    toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        make -C os-image/packages/kubeadm-distro bundle nfpm \
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+  nvke-spire-agent-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.1.x
+    tagPrefix: os-image/
+    toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        make -C os-image/packages/spire-agent bundle nfpm \
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+components:
+  nvke-agent:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: nvke-os
+    cgo: true
+    outputType: host-package
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
+          VERSION=v0.2.1-81-gff21ba8 \
+          NFPM_BIN=/usr/local/bin/nfpm \
+          DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
+    writeDir: agent/bin
+    artifactPath: agent/bin/nvke-agent.deb
+  nvke-cni-calico:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: nvke-cni-calico-source
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        mkdir -p /src/nvkr-output/work /src/nvkr-output/calico
+        cp -a os-image/packages/cni-common os-image/packages/cni-calico \
+          /src/nvkr-output/work/
+        CNI=cni-calico PRODUCT=Calico CONTENT_KIND=manifests \
+          CONTENT_SPEC=/src/nvkr-output/work/cni-calico/packaging/nfpm-manifests.yaml \
+          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
+          /src/nvkr-output/work/cni-common/build-deb.sh v3.30.1 \
+          /src/os-image/packages/cni-calico/dist/v3.30.1 \
+          /src/nvkr-output/calico
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/calico \
+          -cf /src/nvkr-output/nvke-cni-calico.tar .
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvke-cni-calico.tar
+  nvke-cni-ovn:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: nvke-os
+    builderType: oci-hermetic
+    outputType: tarball
+    materials:
+      ovn-chart: ovn-kubernetes-chart
+      ovn-image: ovn-kube-ubuntu
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        readonly stage=/src/nvkr-output/stage
+        readonly work=/src/nvkr-output/work
+        mkdir -p "${stage}/charts" "${work}" /src/nvkr-output/ovn
+        cp -a os-image/packages/cni-common os-image/packages/cni-ovn \
+          "${work}/"
+        tar -xf /nvkr/inputs/materials/ovn-chart -C "${stage}/charts"
+        gzip -n -9 -c /nvkr/inputs/materials/ovn-image >"${stage}/images.tgz"
+        printf '%s  ovn-images_1.4.0_linux_{{.Arch}}.tgz\n' \
+          "$(sha256sum "${stage}/images.tgz" | cut -d' ' -f1)" \
+          >"${stage}/images.tgz.sha256"
+        CNI=cni-ovn PRODUCT=OVN CONTENT_KIND=charts \
+          CONTENT_SPEC="${work}/cni-ovn/packaging/nfpm-charts.yaml" \
+          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
+          "${work}/cni-common/build-deb.sh" 1.4.0 "${stage}" \
+          /src/nvkr-output/ovn
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/ovn \
+          -cf /src/nvkr-output/nvke-cni-ovn.tar .
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvke-cni-ovn.tar
+  ovn-kube-ubuntu:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: ovn-kubernetes
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
+    outputType: oci-image
+    buildCommand:
+      - buildctl-daemonless.sh
+      - build
+      - --frontend
+      - dockerfile.v0
+      - --local
+      - context=/src
+      - --local
+      - dockerfile=/src/dist/images
+      - --opt
+      - filename=Dockerfile.ubuntu
+      - --opt
+      - platform=linux/{{.Arch}}
+      - --opt
+      - build-arg:OVN_KUBERNETES_DIR=.
+      - --opt
+      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564
+      - --opt
+      - build-arg:KUBECTL_MINOR=1.36
+      - --opt
+      - build-arg:UBUNTU_BASE_IMAGE=docker.io/library/ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
+      - --output
+      - type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu:release-1.4
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/ovn-kube-ubuntu.oci.tar
+  ovn-kubernetes-chart:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: ovn-kubernetes
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        readonly chart=/src/helm/ovn-kubernetes
+        readonly out=/src/nvkr-output/ovn-kubernetes
+        test -f "${chart}/Chart.yaml"
+        grep -qx 'version: 1.4.0' "${chart}/Chart.yaml"
+        mkdir -p "${out}"
+        cp -a "${chart}/." "${out}/"
+        cat >"${out}/values-nke.yaml" <<'EOF'
+        tags:
+          ovs-node: false
+        global:
+          image:
+            repository: ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu
+            tag: release-1.4
+        EOF
+        find "${out}" -type d -exec chmod 0755 {} +
+        find "${out}" -type f -exec chmod 0644 {} +
+        find "${out}" -exec touch -d '2026-01-01 00:00:00Z' {} +
+        tar --sort=name --mtime='2026-01-01 00:00:00Z' \
+          --owner=0 --group=0 --numeric-owner -C /src/nvkr-output \
+          -cf /src/nvkr-output/ovn-kubernetes-chart.tar ovn-kubernetes
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/ovn-kubernetes-chart.tar
+  nvke-image-inputs:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: nvke-os
+    builderType: oci-hermetic
+    outputType: tarball
+    materials:
+      agent: nvke-agent
+      calico: nvke-cni-calico
+      kubeadm-distro: nvke-kubeadm-distro
+      ovn: nvke-cni-ovn
+      spire-agent: nvke-spire-agent
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        exec python3 /src/os-image/packer/scripts/compose-image-inputs.py \
+          --architecture {{.Arch}} \
+          --materials-dir /nvkr/inputs/materials \
+          --source-files-dir /src/os-image/files \
+          --output /src/nvkr-output/image-inputs.tar \
+          --source-date-epoch "$SOURCE_DATE_EPOCH"
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/image-inputs.tar
+  nvke-kubeadm-distro:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: nvke-kubeadm-distro-source
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        mkdir -p /src/nvkr-output/work /src/nvkr-output/kubeadm-distro
+        cp -a os-image/packages/kubeadm-distro /src/nvkr-output/work/
+        for version in v1.36.3 v1.35.3 v1.34.2; do
+          PEER_VERSIONS='v1.36.3 v1.35.3 v1.34.2' DEB_REVISION=1 \
+            NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} \
+            /src/nvkr-output/work/kubeadm-distro/packaging/build-deb.sh \
+            "$version" "/src/os-image/packages/kubeadm-distro/dist/$version" \
+            /src/nvkr-output/kubeadm-distro
+        done
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/kubeadm-distro \
+          -cf /src/nvkr-output/nvke-kubeadm-distro.tar .
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvke-kubeadm-distro.tar
+  nvke-node-image:
+    platforms: [linux/arm64]
+    fromSource: true
+    source: nvke-os
+    builderType: vm-image
+    buildNetwork: default
+    outputType: disk-image
+    disk:
+      format: qcow2
+      encryption: none
+    buildRequirements:
+      resources:
+        cpuMillis: 8000
+        memoryMiB: 10240
+        ephemeralStorageMiB: 65536
+      allowedHostPlatforms: [linux/arm64]
+      capabilities:
+        - name: kvm
+          policy: required
+      timeoutSeconds: 21600
+    packer:
+      projectPath: os-image/packer
+      packerVersion: 1.15.4
+      buildName: nke-node-non-fde.qemu.nke-non-fde
+      architectureVariable: architecture
+      acceleratorVariable: accelerator
+      materialManifestVariable: material_manifest
+      materialManifest:
+        schemaVersion: nke.dev/os-image-materials/v1
+        kinds:
+          image-inputs: archive
+          installer-iso: disk-image
+      outputDirectoryVariable: output_directory
+      sshPrivateKeyVariable: ssh_private_key_file
+      sshPublicKeyVariable: ssh_public_key_file
+      buildLogDirectoryVariable: build_log_directory
+      acquisitionArchive: non-fde/apt-acquisitions.tar
+      variables:
+        capture_apt_acquisitions: "true"
+        efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
+        efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
+        guest_memory_mib: 4096
+        ssh_timeout: 180m
+    materials:
+      image-inputs: nvke-image-inputs
+      installer-iso: nvke-patched-installer-iso
+    artifactPath: non-fde/nke-node.qcow2
+  nvke-node-image-amd64:
+    platforms: [linux/amd64]
+    fromSource: true
+    source: nvke-os
+    builderType: vm-image
+    buildNetwork: default
+    outputType: disk-image
+    disk:
+      format: qcow2
+      encryption: none
+    buildRequirements:
+      resources:
+        cpuMillis: 8000
+        memoryMiB: 10240
+        ephemeralStorageMiB: 65536
+      allowedHostPlatforms: [linux/amd64]
+      capabilities:
+        - name: kvm
+          policy: required
+      timeoutSeconds: 21600
+    packer:
+      projectPath: os-image/packer
+      packerVersion: 1.15.4
+      buildName: nke-node-non-fde.qemu.nke-non-fde
+      architectureVariable: architecture
+      acceleratorVariable: accelerator
+      materialManifestVariable: material_manifest
+      materialManifest:
+        schemaVersion: nke.dev/os-image-materials/v1
+        kinds:
+          image-inputs: archive
+          installer-iso: disk-image
+      outputDirectoryVariable: output_directory
+      sshPrivateKeyVariable: ssh_private_key_file
+      sshPublicKeyVariable: ssh_public_key_file
+      buildLogDirectoryVariable: build_log_directory
+      acquisitionArchive: non-fde/apt-acquisitions.tar
+      variables:
+        capture_apt_acquisitions: "true"
+        efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
+        efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
+        ssh_timeout: 180m
+    materials:
+      image-inputs: nvke-image-inputs
+      installer-iso: nvke-patched-installer-iso-amd64
+    artifactPath: non-fde/nke-node.qcow2
+  nvke-patched-installer-iso:
+    platforms: [linux/arm64]
+    fromSource: true
+    source: nvke-os
+    builderType: oci-hermetic
+    outputType: raw
+    materials:
+      installer-source: ubuntu-installer-iso
+    buildCommand:
+      - bash
+      - /src/os-image/packer/scripts/patch-installer-iso.sh
+      - /nvkr/inputs/materials/installer-source
+      - /src/nvkr-output/installer.iso
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/installer.iso
+  nvke-spire-agent:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: nvke-spire-agent-source
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent
+        cp -a os-image/packages/spire-agent /src/nvkr-output/work/os-image/packages/
+        cp -a os-image/files /src/nvkr-output/work/os-image/
+        SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
+          NFPM_BIN=/usr/local/bin/nfpm \
+          /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
+          {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \
+          /src/nvkr-output/spire-agent
+        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output/spire-agent \
+          -cf /src/nvkr-output/nvke-spire-agent.tar .
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvke-spire-agent.tar
+  ubuntu-installer-iso:
+    platforms: [linux/arm64]
+    source: nvke-os
+    outputType: raw
+    prebuilt:
+      url: https://cdimage.ubuntu.com/ubuntu/releases/26.04.1/release/ubuntu-26.04.1-live-server-arm64.iso
+      evidence:
+        none: true
+  ubuntu-installer-iso-amd64:
+    platforms: [linux/amd64]
+    source: nvke-os
+    outputType: raw
+    prebuilt:
+      url: https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso
+      evidence:
+        none: true
+  nvke-patched-installer-iso-amd64:
+    platforms: [linux/amd64]
+    fromSource: true
+    source: nvke-os
+    builderType: oci-hermetic
+    outputType: raw
+    materials:
+      installer-source: ubuntu-installer-iso-amd64
+    buildCommand:
+      - bash
+      - /src/os-image/packer/scripts/patch-installer-iso.sh
+      - /nvkr/inputs/materials/installer-source
+      - /src/nvkr-output/installer.iso
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/installer.iso

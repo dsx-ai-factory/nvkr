@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-07 in the consolidated NKD ADR set.
+- **Index:** ADR-07 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-10 (pluggable builder types), ADR-04 (signing & verification), ADR-05 (trust object model /
   ValidationVector), ADR-08 (bake-off gate).
 
@@ -14,7 +14,7 @@
 
 ## Context
 
-NKD’s value rests on a precise, defensible meaning for **`Reproduced`**. The SRD scopes byte-for-byte
+NVKR’s value rests on a precise, defensible meaning for **`Reproduced`**. The SRD scopes byte-for-byte
 reproducibility to a single tuple — the same build, build engine, input manifest, and **builder profile** — and
 requires the builder profile to be **immutable, identified by a signed digest**, with a **fail-closed preflight**
 that aborts *before inputs resolve* when the environment does not satisfy output-affecting profile requirements.
@@ -56,7 +56,7 @@ A builder profile is an immutable, digest-identified descriptor that declares:
    sandbox/privilege set from ADR-10; for `oci-hermetic`: the runtime identity and image-pinning discipline);
 2. its **output-affecting attributes**, each classified **fail-closed** or **advisory**, in two tiers:
    - **Builder-identity attributes** — the builder versions, container-runtime identity, the sandbox/privilege
-     set, the source-date policy, and the **from-source `nkd-runner` digest** (ADR-18) — are **fail-closed by
+     set, the source-date policy, and the **from-source `nvkr-runner` digest** (ADR-18) — are **fail-closed by
      classification**, because they are *definitionally* output-affecting. No empirical demonstration is required
      to justify treating them as fatal.
    - **Host-environment attributes** — kernel, libc, microarchitecture — remain **evidence-gated**: advisory
@@ -69,7 +69,7 @@ Profile fields are also classified by **how they can be measured**:
   executing build inputs: architecture, kernel/libc constraints, availability and configured isolation mode of
   the host container runtime, and required host capabilities.
 - **Execution identities** are expected identities of artifacts or executables that participate in execution:
-  the exact `nkd-runner` bytes, the bootstrap toolchain image **when that execution actually bootstraps the
+  the exact `nvkr-runner` bytes, the bootstrap toolchain image **when that execution actually bootstraps the
   runner**, the component toolchain image, the Nix executable and realized closure, and the sandbox configuration
   actually used. They are verified at their execution seam, never as pseudo-host observations. The expected
   runner identity and any applicable bootstrap identity come from the profile (T2); expected component toolchain
@@ -212,8 +212,8 @@ qualified reproduction gate. A nonmatching output is a new Artifact identity eve
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nkd/profile/execution_test.go` and
-`pkg/nkd/pipeline/execution_identity_integration_test.go` covers opaque host/execution receipts, exact
+Current module evidence in `pkg/nvkr/profile/execution_test.go` and
+`pkg/nvkr/pipeline/execution_identity_integration_test.go` covers opaque host/execution receipts, exact
 profile/node binding, conditional bootstrap identity, zero/changed/extra-input attacks, explicit report
 qualification, concurrent validation, and the local stage-two barrier after authenticated source materialization.
 The Linux local OCI adapter measures sealed runner/runtime capabilities, the selected image manifest, the runtime

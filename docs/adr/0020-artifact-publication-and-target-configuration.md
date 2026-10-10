@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-20 in the consolidated NKD ADR set (added to close the publish-targets gap).
+- **Index:** ADR-20 in the consolidated NVKR ADR set (added to close the publish-targets gap).
 - **Relates to:** ADR-17 (external-interface seams), ADR-18 (pipeline emission), ADR-06 (publication / referrers),
   ADR-16 (promotion), ADR-04 (signing).
 - **Satisfies:** FR-21 (standard, replaceable interfaces), SEC-03 (zero-binary), SEC-09 (secret handling),
@@ -34,7 +34,7 @@ cross-environment byte-identity.
 
 ### 2. Target configuration surface
 
-Environment (`nkd.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
+Environment (`nvkr.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
 credential references and signing identity/issuer policy. `publication.repositoryPrefix` is an explicitly
 qualified, untagged repository prefix; credentials, anonymous access and plain HTTP are transport settings.
 When publication is configured, the release index and metadata publish under
@@ -143,14 +143,14 @@ been removed; the transport representation remains implemented for diagnostic an
 
 Artifacts publish **by digest**. The authenticated Authorization (clearance) carries an exhaustive canonical
 publication manifest for every cleared subject and every required ValidationVector, SBOM, provenance, and status
-referrer. Each attachment binds both its NKD semantic identity and its raw OCI blob digest and media type.
+referrer. Each attachment binds both its NVKR semantic identity and its raw OCI blob digest and media type.
 Publication must match that manifest exactly: zero, missing, extra, type-confused, or substituted referrers fail
 before a push. Consumers select ReleaseSets by **immutable digest**, and a mutable tag cannot bypass
 digest-plus-signature verification (SEC-13).
 
 The clearance is the signed **root/commit object over that manifest**, not a member of its own referrer closure;
 including its own blob or detached signature would be circular. It is published separately by its
-`nkd.clearance` identity with exact detached `RoleClearance` signature material, and it is the discovery and
+`nvkr.clearance` identity with exact detached `RoleClearance` signature material, and it is the discovery and
 commit point a downstream consumer authenticates before trusting the manifest. A status checkpoint targets the
 ADR-06 `publicationIdentity`, so it is discoverable from this Publication Root; it MUST NOT be attached to
 arbitrary component OCI subjects. Package and object releases carry their ValidationVector and evidence closure
@@ -159,23 +159,23 @@ inputs.
 
 That non-circular root/discovery/signature protocol is mandatory for a qualified publication claim. The delivery
 module implements its transport representation as an OCI image index with artifact type
-`application/vnd.nkd.publication-root.v4`: every child is an exact OCI manifest or nested index, and the canonical
+`application/vnd.nvkr.publication-root.v4`: every child is an exact OCI manifest or nested index, and the canonical
 root config binds each child's name, kind, artifact type, OCI descriptor digest, exact payload or root blob
 digest, semantic digest, size, and optional platform. The registry tag is only a discovery hint; the publisher
 returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
-The config uses `nkd.dev/publication-root/v4` and `application/vnd.nkd.publication-root.config.v4+json`.
+The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.
 Its release metadata binds the exact Definition, Environment, compiled Plan and release-content identities.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
 removed. Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
 remain implemented. The retired clearance and publication-manifest families remain reserved and nonminting;
 retained transport media identifiers do not imply a current clearance issuer or verifier.
 
-Loose executables use `application/vnd.nkd.binary-bundle.v1`. The Binary Bundle's canonical config binds OS,
+Loose executables use `application/vnd.nvkr.binary-bundle.v1`. The Binary Bundle's canonical config binds OS,
 architecture, purpose, optional ReleaseSet and Inventory identities, and every file's name, absolute install
 suggestion, mode, ordinary SHA-256, and size. Its one deterministic
-`application/vnd.nkd.binary-bundle.layer.v1.tar+gzip` layer has an OCI title, so a general-purpose client such as
+`application/vnd.nvkr.binary-bundle.layer.v1.tar+gzip` layer has an OCI title, so a general-purpose client such as
 ORAS can download it and ordinary `tar` can unpack it. Debian packages may also be projected into a deterministic
 Acquire-By-Hash repository; that APT Projection is not a new release artifact, and an unsigned `Release` file is
 development-only.
@@ -246,7 +246,7 @@ secret mechanism, which is transport. **No secret** enters any artifact, manifes
 itself (SEC-09); signatures remain detached (SEC-03).
 
 Publication verification admits a declared credential before registry resolution or pull. A missing username
-or secret returns `NKD-E-TRUST-POLICY-MISSING`, without consulting ambient Docker credentials or writing a
+or secret returns `NVKR-E-TRUST-POLICY-MISSING`, without consulting ambient Docker credentials or writing a
 verification record. Resolution and closure retrieval use the same admitted credential values.
 
 ### 6. Pipeline-attested publication
@@ -257,7 +257,7 @@ one release index from named outputs; normal authors do not wire payload → roo
 
 The signed metadata references each deliverable manifest once in its own sibling repository: binary bundle,
 unchanged native container image, Helm artifact or exact-QCOW2 wrapper. The OCI index directly references only its metadata manifest. Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
-standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NKD-specific
+standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NVKR-specific
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
@@ -354,7 +354,7 @@ changing decoded string values, and empty build-subject collections are arrays. 
 after the whole metadata closure is checked. The diagram presents published relationships, not an inferred
 build graph. Navigation adds no canonical identity or publication authority and leaves explicit release
 verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
-payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nke-recipes/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md)
+payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nvkr/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md)
 separately records the earlier external inspection scope. Current readers require publication-root v4 and
 reject that v3 release; current-schema external acceptance is not established by the dated record.
 
@@ -421,12 +421,12 @@ inside the chart; any upstream `checksums.txt` remains chart content. Templates,
 selections fail. Values serialization preserves semantic values, not exact formatting; document-level
 comments separated from the root mapping may be omitted. Template bytes remain unchanged. No Environment publication prefix enters chart bytes. An operator supplies a repository
 containing the same image through deployment values. The source chart must already consume its digest
-value; NKD does not infer or rewrite template behavior. Normal Helm overrides remain possible, including
+value; NVKR does not infer or rewrite template behavior. Normal Helm overrides remain possible, including
 changing or clearing the digest. Deployment-value enforcement is outside this packaging contract.
 Acquired charts remain immutable and cannot use these bindings.
 
 Contract tests cover multiple slots, admission, unchanged templates and identical package bytes across
-Environment repository choices. Opt-in real Helm tests render the pinned NKE controller chart for two
+Environment repository choices. Opt-in real Helm tests render the pinned NVKE controller chart for two
 repositories using the packaged digest value. This does not establish installation, signatures, runtime
 availability or a new full CWE-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
 
@@ -436,7 +436,7 @@ snapshot against the pinned pull digest, validates the chart archive, and wraps 
 as the OCI chart layer. The layer digest therefore remains the upstream package pin; the enclosing manifest
 has its own digest. Acquired charts cannot be repacked or image-bound. Lifecycle observation independently
 reproduces the wrapper and checks its manifest. This path is exercised by a
-[local four-chart NKE Run](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#acquired-helm-charts); it establishes neither upstream
+[local four-chart NVKE Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#acquired-helm-charts); it establishes neither upstream
 signature verification nor qualification. Dependency scanning of acquired `raw` charts remains unsupported.
 
 Push, sign and pull-back verification are separate effects: later failure may leave bytes or partial evidence in
@@ -482,7 +482,7 @@ it cannot derive availability or qualification from a plan or caller-provided su
 
 - **Declare publication destinations in producer instructions.** Rejected — perturbs `buildDigest` and couples a build to one
   environment; targets are transport, not definition.
-- **NKD hosts a registry or release-stream service.** Rejected — deployment owners supply storage and discovery. The v1 NVIDIA workflow publishes bytes; qualified publication remains operator-owned.
+- **NVKR hosts a registry or release-stream service.** Rejected — deployment owners supply storage and discovery. The v1 NVIDIA workflow publishes bytes; qualified publication remains operator-owned.
 - **Qualified publication before authorization.** Rejected — only verified, cleared contents may be published
   as a qualified release. V1's distinct ordering is stated in §6.
 
@@ -497,7 +497,7 @@ The container-image delivery adapter has contract tests for exact OCI-export arc
 manifest/config/layer closure, decompressed layer identities, platform selection, safe archive members and
 unchanged image identities inside a publication root. Public OCI outputs lower to one built OCI-export
 component, checked against its producer bytes before publication; consumer projection checks the native image
-and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
+and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
 source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
 finalization. This historical layout had three duplicated publications. Independent consumers authenticated all three; downloaded payload checks
 exercise the native image, recovered CLI and rendered chart binding. Acquired native OCI and Docker-schema-2
@@ -509,11 +509,11 @@ signing or independent registry consumption of the new acquired-image outputs. S
 and exact producer observation also have focused contract tests.
 This adapter does not mint qualified execution or release authority.
 
-Current contract evidence in `pkg/nkd/factory/*_test.go` and `pkg/nkd/delivery/*_test.go` covers target exclusion
+Current contract evidence in `pkg/nvkr/factory/*_test.go` and `pkg/nvkr/delivery/*_test.go` covers target exclusion
 from build identity, independently required output membership, exact evidence closure, semantic-versus-blob
 digest separation, no implicit I/O, deterministic binary and
 APT layouts, recursive OCI closure verification, extraction, and rejection of missing, extra, or substituted
-bytes. The dated local NKE record in reconciliation establishes development registry interoperability for
+bytes. The dated local NVKE record in reconciliation establishes development registry interoperability for
 earlier inputs, not authenticated release publication or production-registry acceptance.
 
 The single-entry layout and stage-bound evidence require a new authorized hosted publication run; the earlier
@@ -524,8 +524,8 @@ component evidence membership, held consumer projection and loopback-registry by
 Guard tests reject missing or unrelated receipt owners and profiles, and local admission tests reject the
 unwired publication graph without execution. The successful original-live-Run receipt-to-package-to-hosted-finalization
 path has not been exercised by those tests. Synthetic QCOW2 fixtures and controlled inspection seams do not
-prove a complete NKE filesystem scan, the original live build-to-inspection join, native execution, keyless
-signing or production publication. Both native-generated NKE builds and independent signed disk consumption
+prove a complete NVKE filesystem scan, the original live build-to-inspection join, native execution, keyless
+signing or production publication. Both native-generated NVKE builds and independent signed disk consumption
 remain required operational evidence.
 
 Qualified end-to-end acceptance requires publishing one cleared mixed-artifact ReleaseSet to operator-selected targets,

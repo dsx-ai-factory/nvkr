@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvke-local-nicosim-arm64
+  description: Source-built Linux ARM64 NICoSim tools and pinned runtime assets for a local NICo demo; not complete demo or OS boot acceptance.
+sources:
+  nvke-nicosim:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.21.x
+    # Historical M2 Docker candidate Go/GCC toolchain. Local launchers substitute
+    # freshly validated bytes; this pin does not prove current-source reproduction
+    # or completed organizational review.
+    toolchainImagesByArch:
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        cd controller/nico-sim
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        pins="$(sha256sum go.mod go.sum)"
+        timeout --kill-after=10s 540s go mod download
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+components:
+  nico-sim:
+    fromSource: true
+    source: nvke-nicosim
+    cgo: true
+    platforms: [linux/arm64]
+    outputType: host-package
+    artifactPath: controller/nico-sim/bin/nico-sim
+    writeDir: controller/nico-sim/bin
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        make -C controller/nico-sim build-static
+  nico-simctl:
+    fromSource: true
+    source: nvke-nicosim
+    cgo: true
+    platforms: [linux/arm64]
+    outputType: host-package
+    artifactPath: controller/nico-sim/bin/nico-simctl
+    writeDir: controller/nico-sim/bin
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        cd controller/nico-sim
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
+          -ldflags '-linkmode external -extldflags -static' \
+          -o bin/nico-simctl ./cmd/nico-simctl
+  nico-sim-runtime-assets:
+    fromSource: true
+    source: nvke-nicosim
+    platforms: [linux/arm64]
+    outputType: tarball
+    artifactPath: controller/nico-sim/bin/nicosim-runtime-assets.tar.gz
+    writeDir: controller/nico-sim/bin
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        set -o pipefail
+        cd controller/nico-sim
+        # The source pin owns this diagnostic seed, UI and vendor notices.
+        # No production profiles, private credentials or VM state are included.
+        tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
+          --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
+          -cf - internal/seed/default-seed.yaml ui | \
+          gzip -n > bin/nicosim-runtime-assets.tar.gz

@@ -26,25 +26,25 @@ demo_default_attempt() {
 
 # Select an injected binary for hermetic tests, or keep the repository binary fresh
 # for a human running a demo directly after editing the Go sources.
-demo_prepare_nkdctl() {
-  NKD=${NKDCTL_BIN:-bin/nkdctl}
-  if [ -n "${NKDCTL_BIN:-}" ]; then
-    [ -x "$NKD" ] || demo_die "NKDCTL_BIN is not executable: $NKD"
+demo_prepare_nvkr() {
+  NVKR=${NVKR_BIN:-bin/nvkr}
+  if [ -n "${NVKR_BIN:-}" ]; then
+    [ -x "$NVKR" ] || demo_die "NVKR_BIN is not executable: $NVKR"
     return
   fi
 
   local need_build=0 build_input
-  if [ ! -x "$NKD" ]; then
+  if [ ! -x "$NVKR" ]; then
     need_build=1
-  elif find client cmd internal pkg -type f -newer "$NKD" -print -quit | grep -q .; then
+  elif find client cmd internal pkg -type f -newer "$NVKR" -print -quit | grep -q .; then
     need_build=1
   else
     for build_input in go.mod go.sum Makefile .go-version; do
-      [ ! "$build_input" -nt "$NKD" ] || need_build=1
+      [ ! "$build_input" -nt "$NVKR" ] || need_build=1
     done
   fi
   if [ "$need_build" -eq 1 ]; then
-    demo_section "Build nkdctl (the existing binary is missing or stale)"
+    demo_section "Build nvkr (the existing binary is missing or stale)"
     demo_need_command make
     make build
   fi
@@ -57,16 +57,16 @@ demo_absolute_path() {
   esac
 }
 
-# Admit a repository-relative workspace below .nkd before any directory is
+# Admit a repository-relative workspace below .nvkr before any directory is
 # created. Reject lexical escapes and existing symlink ancestors so a demo cannot
 # redirect its owned workspace outside the repository.
-demo_require_nkd_child_path() {
-  local work=${1:-} part current=.nkd
+demo_require_nvkr_child_path() {
+  local work=${1:-} part current=.nvkr
   case "$work" in
-    .nkd/?*) ;;
-    *) demo_die "--work must be a repository-relative child of .nkd" ;;
+    .nvkr/?*) ;;
+    *) demo_die "--work must be a repository-relative child of .nvkr" ;;
   esac
-  [ ! -L .nkd ] || demo_die ".nkd must not be a symlink"
+  [ ! -L .nvkr ] || demo_die ".nvkr must not be a symlink"
   IFS=/ read -r -a parts <<< "$work"
   for part in "${parts[@]:1}"; do
     case "$part" in
@@ -93,8 +93,8 @@ demo_prepare_work() {
   esac
   [ ! -L "$work" ] || demo_die "work directory must not be a symlink: $work"
 
-  marker="$work/.nkd-demo-work-v1"
-  expected="nkdctl-demo-work/v1
+  marker="$work/.nvkr-demo-work-v1"
+  expected="nvkr-demo-work/v1
 owner=$owner"
 
   if [ ! -e "$work" ]; then

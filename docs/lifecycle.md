@@ -2,8 +2,8 @@
 
 This reference covers output completeness, immutable attempts, release verification and SDK use.
 Start with the [quickstart](quickstart.md) for CLI setup and the [concept reference](user-concepts.md)
-for the six public objects. [ADR-17](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
-lifecycle contract; [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md) owns current implementation and evidence.
+for the six public objects. [ADR-17](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
+lifecycle contract; [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) owns current implementation and evidence.
 
 ## Declare outputs
 
@@ -16,7 +16,7 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NKE Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/definition.yaml) directly selects `nkectl`, `cwe`, and `nke-helm`
+The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
 for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
@@ -25,8 +25,8 @@ Definitions and Releases contain no cluster views, deployment roles or categorie
 
 ## Select an Environment
 
-The [local Environment](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/environment-local.yaml) supplies execution settings and a local
-registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/environment-github.yaml) supplies the
+The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-local.yaml) supplies execution settings and a local
+registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-github.yaml) supplies the
 corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
 host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
 binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
@@ -43,15 +43,15 @@ preserving build identity. A dry-run signing mode records intended operations an
 
 ## Inspect and generate
 
-With `bin/nkdctl` built as described in the quickstart, inspect the three-output NKE example:
+With `bin/nvkr` built as described in the quickstart, inspect the three-output NVKE example:
 
 ```sh
-bin/nkdctl definition validate \
-  --definition definitions/nke-v1/definition.yaml
+bin/nvkr definition validate \
+  --definition definitions/nvke-v1/definition.yaml
 
-bin/nkdctl run plan \
-  --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-local.yaml
+bin/nvkr run plan \
+  --definition definitions/nvke-v1/definition.yaml \
+  --environment definitions/nvke-v1/environment-local.yaml
 ```
 
 For saved generated Plans, `run plan --plan <path>` prints the required outputs and instructions;
@@ -63,19 +63,19 @@ uses a temporary root: the repository's committed bundle selects M2, not the thr
 The matching `--check` invocation regenerates in memory and fails if generated files differ:
 
 ```sh
-NKD_LIFECYCLE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-lifecycle.XXXXXX")
-bin/nkdctl run generate \
-  --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root "$NKD_LIFECYCLE_ROOT"
+NVKR_LIFECYCLE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-lifecycle.XXXXXX")
+bin/nvkr run generate \
+  --definition definitions/nvke-v1/definition.yaml \
+  --environment definitions/nvke-v1/environment-github.yaml \
+  --engine github --root "$NVKR_LIFECYCLE_ROOT"
 
-bin/nkdctl run generate \
-  --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-github.yaml \
-  --engine github --root "$NKD_LIFECYCLE_ROOT" --check
+bin/nvkr run generate \
+  --definition definitions/nvke-v1/definition.yaml \
+  --environment definitions/nvke-v1/environment-github.yaml \
+  --engine github --root "$NVKR_LIFECYCLE_ROOT" --check
 ```
 
-Use the [M2 instructions](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/README.md) to regenerate the committed bundle.
+Use the [M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md) to regenerate the committed bundle.
 Generated CI defaults to generic hosted runners; ADR-18 separately admits the explicit native ARC disk
 route. Publication and signing belong to the GitHub v1 lane. Generation does not prove provider execution.
 
@@ -84,15 +84,15 @@ route. Publication and signing belong to the GitHub v1 lane. Generation does not
 Inspect a local attempt without creating its workspace or executing nodes:
 
 ```sh
-bin/nkdctl run local \
-  --definition definitions/nke-v1/definition.yaml \
-  --environment definitions/nke-v1/environment-local.yaml \
+bin/nvkr run local \
+  --definition definitions/nvke-v1/definition.yaml \
+  --environment definitions/nvke-v1/environment-local.yaml \
   --attempt review-001 --dry-run
 ```
 
 The dry-run remains pending with no observed outputs. Actual execution uses an explicit attempt name under the
-selected attempts root; the default root is `.nkd/runs`. The attempts root must be a clean repository-relative
-path under `.nkd`. Publication is a separately enabled operation. The
+selected attempts root; the default root is `.nvkr/runs`. The attempts root must be a clean repository-relative
+path under `.nvkr`. Publication is a separately enabled operation. The
 implementation record distinguishes contract tests from external execution.
 
 For a completed local `disk-image` output, lifecycle retains the exact observed QCOW2 as
@@ -131,7 +131,7 @@ The CLI expresses build-evidence acceptance as `--scope artifact-publication`. O
 executable and an existing signed publication in a public registry, the consumer invocation is:
 
 ```sh
-bin/nkdctl release verify \
+bin/nvkr release verify \
   --reference "$RELEASE_REF" \
   --lane pipeline-attested --scope artifact-publication \
   --identity "$BUILD_IDENTITY_REGEXP" --issuer "$OIDC_ISSUER" \
@@ -143,7 +143,7 @@ An independent consumer can additionally require the publication to realize
 exact authored and compiled inputs by supplying all three paths:
 
 ```sh
-bin/nkdctl release verify \
+bin/nvkr release verify \
   --reference "$RELEASE_REF" \
   --lane pipeline-attested --scope artifact-publication \
   --identity "$BUILD_IDENTITY_REGEXP" --issuer "$OIDC_ISSUER" \
@@ -166,18 +166,18 @@ description directly:
 
 ```json
 {
-  "schemaVersion": "nkd.dev/release/v3",
+  "schemaVersion": "nvkr.dev/release/v3",
   "subject": "registry.example/releases@sha256:<release-digest>",
   "lane": "pipeline-attested",
   "scope": "artifact-publication",
   "artifacts": [
     {
-      "name": "nkectl",
+      "name": "nvkectl",
       "kind": "executable",
       "digest": "sha256:<artifact-digest>",
-      "reference": "registry.example/releases-nkectl@sha256:<artifact-digest>",
+      "reference": "registry.example/releases-nvkectl@sha256:<artifact-digest>",
       "buildDigest": "sha256:<build-digest>",
-      "components": ["nkectl"]
+      "components": ["nvkectl"]
     }
   ],
   "contentSubject": "sha256:<content-digest>",
@@ -190,20 +190,20 @@ verified `Release` description and the defensive exact-input description:
 
 ```json
 {
-  "schemaVersion": "nkd.dev/release-verification-result/v1",
+  "schemaVersion": "nvkr.dev/release-verification-result/v1",
   "release": {
-    "schemaVersion": "nkd.dev/release/v3",
+    "schemaVersion": "nvkr.dev/release/v3",
     "subject": "registry.example/releases@sha256:<release-digest>",
     "lane": "pipeline-attested",
     "scope": "artifact-publication",
     "artifacts": [
       {
-        "name": "nkectl",
+        "name": "nvkectl",
         "kind": "executable",
         "digest": "sha256:<artifact-digest>",
-        "reference": "registry.example/releases-nkectl@sha256:<artifact-digest>",
+        "reference": "registry.example/releases-nvkectl@sha256:<artifact-digest>",
         "buildDigest": "sha256:<build-digest>",
-        "components": ["nkectl"]
+        "components": ["nvkectl"]
       }
     ],
     "contentSubject": "sha256:<content-digest>",
@@ -234,7 +234,7 @@ acceptance. Full v1 release scope (`--scope release`) and qualified acceptance r
 The scoped consumer and exact output/content bindings have positive and negative contracts. Full v1
 release acceptance still requires its deferred qualification, membership, and revocation adapters; the scoped
 result cannot substitute for them. The ADR-04 stock-cosign consumer contract remains independent of the
-convenience NKD reader.
+convenience NVKR reader.
 
 ## Use the SDK
 
@@ -247,7 +247,7 @@ package consumer
 import (
 	"context"
 
-	client "github.com/NVIDIA/nke-recipes/client/v1"
+	client "github.com/dsx-ai-factory/nvkr/client/v1"
 )
 
 func configuredClient(cosignPath, cosignDigest string) *client.Client {

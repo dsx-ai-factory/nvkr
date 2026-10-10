@@ -6,7 +6,7 @@
 set -euo pipefail
 DEMO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$DEMO_DIR/.." && pwd)
-NKD=${NKDCTL_BIN:-$ROOT/bin/nkdctl}
+NVKR=${NVKR_BIN:-$ROOT/bin/nvkr}
 NON_INTERACTIVE=0
 ARCH=arm64
 OUT=
@@ -17,8 +17,8 @@ Usage: bash demos/demo-team-os.sh [--arch arm64|amd64] [--out NEW_DIR] [--non-in
 Export the maintained native KVM OS-image Plan and native producer graph, then
 inspect a dry-run. No Docker, KVM, Packer execution, registry access or OS image
 build is required for this tour.
-Prerequisites: Python 3 and a built nkdctl from this checkout (make build, exact Go in .go-version),
-or NKDCTL_BIN pointing to that binary. Output is retained in a new temporary
+Prerequisites: Python 3 and a built nvkr from this checkout (make build, exact Go in .go-version),
+or NVKR_BIN pointing to that binary. Output is retained in a new temporary
 directory; --out requires a nonexistent directory whose parent already exists.
 Full commands and dry-run output are saved with the exports. Set NO_COLOR to disable color.
 EOF
@@ -33,7 +33,7 @@ heading() {
   fi
 }
 show_command() {
-  local line='  $ nkdctl' argument quoted
+  local line='  $ nvkr' argument quoted
   for argument in "$@"; do
     printf -v quoted '%q' "$argument"
     if [ "$((${#line} + ${#quoted} + 1))" -gt 96 ]; then
@@ -65,23 +65,23 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$ARCH" in arm64|amd64) ;; *) die '--arch must be arm64 or amd64' ;; esac
-[ -x "$NKD" ] || die "build nkdctl first (make build), or set NKDCTL_BIN to an executable: $NKD"
+[ -x "$NVKR" ] || die "build nvkr first (make build), or set NVKR_BIN to an executable: $NVKR"
 command -v python3 >/dev/null || die 'Python 3 is required for the readable summary'
-NKD=$(cd "$(dirname "$NKD")" && printf '%s/%s\n' "$PWD" "$(basename "$NKD")")
+NVKR=$(cd "$(dirname "$NVKR")" && printf '%s/%s\n' "$PWD" "$(basename "$NVKR")")
 if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive when stdin is not a terminal'; fi
-if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nkd-team-os.XXXXXX"); fi
+if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-os.XXXXXX"); fi
 cd "$ROOT"
 printf 'cd %q\n' "$ROOT" >"$OUT/commands.txt"
-DEFINITION="definitions/nke-os/definition-$ARCH-kvm.yaml"
-ENVIRONMENT="definitions/nke-os/environment-local-linux-$ARCH-docker.yaml"
+DEFINITION="definitions/nvke-os/definition-$ARCH-kvm.yaml"
+ENVIRONMENT="definitions/nvke-os/environment-local-linux-$ARCH-docker.yaml"
 
-heading 'NVKE Recipes / Understand an OS image'
+heading 'NVKR / Understand an OS image'
 printf 'Follow components into a disk image, then preview the work.\n'
 printf 'Exports and full commands: %s\n' "$OUT"
 
 heading '1 / 3  Choose the disk output'
 show_command definition inspect --definition "$DEFINITION"
-export_command "$OUT/os-definition-$ARCH.json" "$NKD" definition inspect --definition "$DEFINITION"
+export_command "$OUT/os-definition-$ARCH.json" "$NVKR" definition inspect --definition "$DEFINITION"
 python3 - "$OUT/os-definition-$ARCH.json" <<'PY'
 import json
 import sys
@@ -95,10 +95,10 @@ pause
 
 heading '2 / 3  Match materials to the builder'
 show_command run plan --definition "$DEFINITION" --environment "$ENVIRONMENT" --json
-export_command "$OUT/os-plan-$ARCH.json" "$NKD" run plan --definition "$DEFINITION" --environment "$ENVIRONMENT" --json
-export_command "$OUT/os-plan-$ARCH.txt" "$NKD" run plan --plan "$OUT/os-plan-$ARCH.json"
-export_command "$OUT/os-producers-$ARCH.mermaid" "$NKD" run graph --plan "$OUT/os-plan-$ARCH.json" --view producers --format mermaid
-export_command "$OUT/os-graph-$ARCH.json" "$NKD" run graph --plan "$OUT/os-plan-$ARCH.json" --view complete --format json
+export_command "$OUT/os-plan-$ARCH.json" "$NVKR" run plan --definition "$DEFINITION" --environment "$ENVIRONMENT" --json
+export_command "$OUT/os-plan-$ARCH.txt" "$NVKR" run plan --plan "$OUT/os-plan-$ARCH.json"
+export_command "$OUT/os-producers-$ARCH.mermaid" "$NVKR" run graph --plan "$OUT/os-plan-$ARCH.json" --view producers --format mermaid
+export_command "$OUT/os-graph-$ARCH.json" "$NVKR" run graph --plan "$OUT/os-plan-$ARCH.json" --view complete --format json
 python3 - "$OUT/os-plan-$ARCH.json" <<'PY'
 import json
 import sys
@@ -122,8 +122,8 @@ pause
 
 heading '3 / 3  Preview the Run'
 show_command run local --definition "$DEFINITION" --environment "$ENVIRONMENT" --attempt team-os-preview --dry-run
-export_command "$OUT/os-dry-run-$ARCH.txt" "$NKD" run local --definition "$DEFINITION" --environment "$ENVIRONMENT" --attempt team-os-preview --dry-run
+export_command "$OUT/os-dry-run-$ARCH.txt" "$NVKR" run local --definition "$DEFINITION" --environment "$ENVIRONMENT" --attempt team-os-preview --dry-run
 awk '/^(lane|status|observed outputs):/ { print "  " $0 }' "$OUT/os-dry-run-$ARCH.txt"
 printf 'The preview creates no Run workspace or disk. Full operation output is saved.\n'
-printf 'For a real KVM build, start with definitions/nke-os/README.md.\n'
+printf 'For a real KVM build, start with definitions/nvke-os/README.md.\n'
 printf '\nNext: browse the hosted release to see an image that was actually published.\n'

@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Prepare native NVKR toolchains
+'on':
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: native-toolchains-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  measure:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Prepare and measure native images
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: bash scripts/prepare-native-toolchains.sh "$NATIVE_ARCH"
+      - name: Retain native measurements
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-toolchains-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            .nvkr/native-toolchains/${{ matrix.arch }}/*.log
+            .nvkr/native-toolchains/${{ matrix.arch }}/measurement.json
+            .nvkr/native-toolchains/${{ matrix.arch }}/executables.sha256
+            .nvkr/native-toolchains/${{ matrix.arch }}/packages.tsv
+            .nvkr/native-toolchains/${{ matrix.arch }}/images.tar.gz
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

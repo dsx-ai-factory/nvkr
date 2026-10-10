@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-18 in the consolidated NKD ADR set (added to close the Definition→realized-pipeline gap).
+- **Index:** ADR-18 in the consolidated NVKR ADR set (added to close the Definition→realized-pipeline gap).
 - **Relates to:** ADR-02 (IR), ADR-10 (builder types), ADR-07 (builder profile / runner-digest pin), ADR-04
   (verify), ADR-19 (deployment ownership boundary).
 - **Satisfies:** FR-05 (CI portability), FR-06 (hermetic build), SEC-06 (terminal verify), SEC-11 (build
@@ -104,7 +104,7 @@ inspection or output, so a blocking caller-controlled writer cannot defeat cance
 
 ### 2. A shared, from-source runner owns execution semantics
 
-Build execution is a single **static, from-source runner** (`nkd-exec`, a mode/subset of `nkdctl`) that executes
+Build execution is a single **static, from-source runner** (`nvkr-exec`, a mode/subset of `nvkr`) that executes
 one IR node (`fetch → build → collect`). Every job uses the same execution code as the local runner, avoiding duplicated build semantics. Reproduction still requires independently checked bytes and execution evidence.
 The IR is pinned data. Qualified graph diagnostics execute the exact admitted node bundle; maintained Runs
 execute a producer reference from the complete Plan through `factory execute-node`.
@@ -116,7 +116,7 @@ unset and no ARC policy selected, ordinary native ARM64 producer fetch/acquisiti
 AMD64 producers and utility operations retain `ubuntu-latest`. An explicit `runsOn` overrides
 this default; a VM execution binding and the complete native ARC routing projection keep their existing
 precedence. This is deterministic hosted routing, not runtime platform/capacity proof or
-qualified execution. The same-Run, source-bootstrapped `nkd-exec` helper launches each pinned toolchain container
+qualified execution. The same-Run, source-bootstrapped `nvkr-exec` helper launches each pinned toolchain container
 through the shared `pipeline.Local.ExecNode` launcher used by local and hosted Run operations. Adapters render job topology, dependencies
 and declared transport; they do not reproduce isolation as provider-specific build syntax. Fetch/pull nodes
 materialize pinned inputs first; hermetic build and verification nodes enforce network denial, read-only inputs,
@@ -143,12 +143,12 @@ unencrypted direct-Packer QCOW2 outputs with required KVM. Their execution class
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
 The operator must provision ephemeral single-job runners and restrict pool access to the reviewed workflow on the default branch and any exact
-branches explicitly admitted by `githubDispatchBranches`. The generated disk jobs use the `nkd-arc` protected Environment. Provider configuration and fresh
+branches explicitly admitted by `githubDispatchBranches`. The generated disk jobs use the `nvkr-arc` protected Environment. Provider configuration and fresh
 native interoperability are external acceptance requirements; emitting a label or naming an Environment does
 not establish those facts.
 
 The route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
-`nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
+`nvkr-arc` and `nvkr-release` deployment policies and the signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
 Docker is the initial admitted runtime. Bootstrap, source fetch, registry publication, signing and finalization remain
 on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
@@ -215,7 +215,7 @@ yet project that setting. Empty preserves the runtime's existing store selection
 
 The observed Podman identity includes UID/GID mappings, remote-service status and OCI runtime name in
 addition to the existing host, storage, security and version fields. Adding these fields changes the
-`nkd.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
+`nvkr.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
 or prove compatibility with previously recorded qualification profiles.
 
 For native multi-architecture pipeline-attested Runs, `Environment.githubRunners` maps each explicit
@@ -250,20 +250,20 @@ foreign-platform emulation. With `githubARC: native-kvm-v1`, the separately admi
 its exact ARC route and raw-disk carrier suppression; the map routes ordinary hosted work. Local Runs reject this GitHub-only field and continue using a separate local
 Environment and their existing explicit container-platform path.
 
-The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
+The repository-owned NVKE OS integration workflow is a narrow validation exception, not generated Run CI and not
 a hosted VM adapter. Each push to `main` selects that exact commit for full AMD64 and ARM64 builds, boot smoke,
 and short-retention QCOW2 uploads. Manual dispatch from the default-branch workflow remains available for
 toolchain-only or full validation of either architecture or both, after an exact main commit or copy-pr-bot
 mirror is authenticated. Runs are independent; newer pushes do not cancel earlier attempts. Both routes may
 select only the declared `arc-amd64-kvm` or `arc-arm64-kvm` KVM scale sets for full validation. Main pushes use
-the NKE pin from the merged catalog and validated Plans; manual full dispatch additionally checks the entered
-NKE commit against that pin. The cross-repository source credential must not share a job with candidate code; the
+the NVKE pin from the merged catalog and validated Plans; manual full dispatch additionally checks the entered
+NVKE commit against that pin. The cross-repository source credential must not share a job with candidate code; the
 trusted source-fetch job alone receives it. That job verifies the selected commit and tree, makes a fresh
 credential-free Git checkout, and uploads it as a one-day internal artifact with an exact SHA-256 passed as a
 job output. The build job verifies the archive digest and Git commit/tree before candidate code runs. Candidate
 code receives no authority-bearing evidence role. The build job's logs, image observations, QCOW2 digest and boot
-result are explicitly unqualified diagnostic output. The [2026-10-01 runs](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) exercise both
-ARC pools from `nke-recipes`; they do not establish lasting availability or provider isolation. Shared Actions
+result are explicitly unqualified diagnostic output. The [2026-10-01 runs](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) exercise both
+ARC pools from `nvkr`; they do not establish lasting availability or provider isolation. Shared Actions
 caches are disabled for the trusted bootstrap and generated helper so candidate cache writes are not restored
 into those trusted binaries. Mirror selection checks an open, non-draft same-repository PR head, not a human
 approval. `/ok to test` is procedural vetting; branch equality does not authenticate the mirror's writer. The
@@ -428,7 +428,7 @@ or workspace mutation until a held-output adapter exists. Every encrypted form i
 material, toolchain or VM work until a typed non-public secret channel exists.
 
 Direct-Packer execution authenticates one already-local digest-pinned OCI toolchain for the selected host platform;
-it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NKD
+it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NVKR
 overrides with a fixed value; declared image volumes and every other inherited environment entry are rejected.
 Every consumer container after input extraction has a fixed hostname, the host UID/GID, disabled health check, read-only
 root, no new privileges and all capabilities dropped. OpenSSH must be able to resolve that numeric identity.
@@ -478,7 +478,7 @@ authoritative compatibility check for the exact source-declared plugin constrain
 toolchain closure. Exactly one declared QCOW2 is collected into a held inode and re-hashed. All containers, volumes,
 held inputs and private workspace state are reaped on success, returned failure or context cancellation. This
 in-process cleanup cannot run after `SIGKILL`, a process crash or host loss. Cross-process orphan recovery remains
-deferred until NKD has an authenticated owner-liveness protocol; a label-only startup sweep must not delete volumes
+deferred until NVKR has an authenticated owner-liveness protocol; a label-only startup sweep must not delete volumes
 that may belong to another live attempt.
 
 This is current-availability authority for the current local direct-Packer VM adapter, not a resource reservation, authenticated
@@ -487,7 +487,7 @@ proves availability through the callback lifetime; it does not prove Packer or Q
 descriptor. Driver dispatch must enforce the selected device mode and use the supplied deadline context. The native ARC exception measures cgroup-capped availability and enforces the authored deadline without
 claiming authenticated provider allocation. Qualified adapters still require independent allocation evidence.
 
-For the local Docker adapter, the daemon may occupy a different PID/mount namespace from NKD. A client-side
+For the local Docker adapter, the daemon may occupy a different PID/mount namespace from NVKR. A client-side
 `/proc/<pid>/fd/<fd>` therefore is not a portable daemon device path. The adapter retains and API-validates the
 admitted KVM descriptor, observes its character-device major/minor numbers and the caller's procfs kernel boot ID,
 and requests only the daemon's fixed `/dev/kvm` with read/write access. A fixed guard in the pinned build container
@@ -665,7 +665,7 @@ rejects this GitHub-only option. Omitting it preserves default-branch-only execu
 Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
 or outputs change. Default-branch push
 publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
-`nkd-release` GitHub deployment environment; operators must configure its deployment policy to admit only
+`nvkr-release` GitHub deployment environment; operators must configure its deployment policy to admit only
 the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
 recognize those exact workflow refs. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
 The SBOM job receives no registry credentials or package permissions. The verifier needs registry read
@@ -778,7 +778,7 @@ the finalizer itself from starting; inspect provider status when no Run record e
   establish byte identity.
 - Helper-owned isolation shares the local execution path across hosted providers.
 - When self-hosting is selected, the tool itself is built from source and pinned and verified, so "trust nothing
-  pre-built" extends to `nkd-exec` without pretending every execution performed a bootstrap.
+  pre-built" extends to `nvkr-exec` without pretending every execution performed a bootstrap.
 - Adapters are genuinely thin (topology and transport); a new engine is a small adapter.
 
 **Negative / costs**
@@ -789,7 +789,7 @@ the finalizer itself from starting; inspect provider status when no Run record e
   artifact storage; emission correctly fails for those configurations.
 
 **Neutral**
-- The runner is a mode/subset of `nkdctl`. Maintained hosted steps use `nkd-exec factory github`; its utility-container
+- The runner is a mode/subset of `nvkr`. Maintained hosted steps use `nvkr-exec factory github`; its utility-container
   child uses `factory execute-node` bound to the expected Plan digest. Producer execution is shared with local Runs. Qualified graph protocols retain the separate `exec-node` entry point.
 
 ## Alternatives considered
@@ -817,7 +817,7 @@ the finalizer itself from starting; inspect provider status when no Run record e
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/pipeline/execnode_test.go` and `pkg/nkd/pipeline/results_test.go`
+Current contract evidence in `pkg/nvkr/pipeline/execnode_test.go` and `pkg/nvkr/pipeline/results_test.go`
 retains exact-node execution, explicit unqualified results and terminal receipt enforcement. Factory generation
 and lifecycle tests cover GitHub semantic validation and fail-before-input/output rejection of retired engines.
 The qualified renderers, their bundle/transport-plan models, and self-referential renderer tests are removed.

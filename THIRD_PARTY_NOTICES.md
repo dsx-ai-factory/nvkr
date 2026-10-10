@@ -1,10 +1,10 @@
 # Third-Party Notices
 
-NKE Recipes (`nkdctl` and `nke-demo`) is distributed under the Apache License 2.0. These binaries
+NVKR (`nvkr` and `nvke-demo`) is distributed under the Apache License 2.0. These binaries
 links the third-party modules listed below. Each module's license, copyright
 notice, and NOTICE file (where one exists) is reproduced in full.
 
-This file lists modules linked into `nkdctl` and `nke-demo`. Tools invoked as
+This file lists modules linked into `nvkr` and `nvke-demo`. Tools invoked as
 separate processes (the Go and GCC toolchains, `cosign`, `syft`, and `docker`)
 are not linked and are not covered here.
 

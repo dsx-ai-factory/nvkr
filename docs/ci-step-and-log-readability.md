@@ -68,21 +68,21 @@ These excerpts illustrate a controller-chart operation and finalizer. Exact name
 the selected Plan; the repository currently generates the 34-output M2 workflow.
 
 ```yaml
-      - name: 'Build nke-controller-chart (controller-chart)'
-        id: nkd-controller-chart-build-nke-controller-chart
+      - name: 'Build nvke-controller-chart (controller-chart)'
+        id: nvkr-controller-chart-build-nvke-controller-chart
         run: |
-          ./nkd-exec factory github run-node --plan .github/nkd-run/plan.json --node controller-chart/build-nke-controller-chart
-      - name: 'Prepare output carriers: Build nke-controller-chart (controller-chart)'
+          ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node controller-chart/build-nvke-controller-chart
+      - name: 'Prepare output carriers: Build nvke-controller-chart (controller-chart)'
         run: |
-          ./nkd-exec factory github pack-outputs --plan .github/nkd-run/plan.json --node controller-chart/build-nke-controller-chart
+          ./nvkr-exec factory github pack-outputs --plan .github/nvkr-run/plan.json --node controller-chart/build-nvke-controller-chart
 ```
 
 ```yaml
       - name: Recover planned carriers
         id: recover-artifacts
         env:
-          NKD_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: ./nkd-exec factory github recover --plan .github/nkd-run/plan.json
+          NVKR_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: ./nvkr-exec factory github recover --plan .github/nvkr-run/plan.json
 ```
 
 The recovery helper bounds and validates the provider JSON before touching carriers. It requires exactly the
@@ -92,7 +92,7 @@ failure to persist outcomes stops recovery. The finalizer still authenticates co
 
 ## Historical six-output workflow comparison
 
-The October 4 compact-helper review used the six-output `nke-deploy` Definition and identical canonical Plan bytes.
+The October 4 compact-helper review used the six-output `nvke-deploy` Definition and identical canonical Plan bytes.
 These measurements describe that review, rather than the current M2 workflow:
 
 | Item | Initial PR #90 (`582ab01`) | Compact helper |
@@ -112,7 +112,7 @@ conservative 21,000-byte limit still applies to every generated run script, incl
 Workflow and manifest bytes change; the Plan digest and bytes remain unchanged. Transport count and payload
 size are unchanged by this refactor, including the remaining work to minimize OS-image transfer.
 
-Current contracts live in [compact-helper tests](../pkg/nkd/factory/github_compact_test.go),
-[reporter tests](../pkg/nkd/factory/github_reporter_test.go), and
-[finalization tests](../pkg/nkd/factory/github_finalize_test.go). They cover generated commands and failure
+Current contracts live in [compact-helper tests](../pkg/nvkr/factory/github_compact_test.go),
+[reporter tests](../pkg/nvkr/factory/github_reporter_test.go), and
+[finalization tests](../pkg/nvkr/factory/github_finalize_test.go). They cover generated commands and failure
 handling; neither these tests nor the historical static counts establish hosted duration or Release acceptance.

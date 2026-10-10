@@ -1,16 +1,16 @@
 # build output
 /bin/
-/nkdctl
+/nvkr
 
 # local macOS metadata and Office lock files
 .DS_Store
 ~$*
 
 # local engine workspace: cloned sources + build artifacts (hundreds of MB)
-/.nkd/
+/.nvkr/
 
 # persistent local coordination inode for generated Run bundle updates
-/.github/nkd-run/*.lease
+/.github/nvkr-run/*.lease
 
 # advisory-lock guard `catalog pin`/`bump` leaves beside a machine-managed lock
 .pins.lock.yaml.lock
@@ -23,8 +23,8 @@ coverage.html
 # release / dist
 /dist/
 
-# generated nkd-exec helper build artifacts (binaries); the lock is committed
-/toolchains/nkd-exec/out/
+# generated nvkr-exec helper build artifacts (binaries); the lock is committed
+/toolchains/nvkr-exec/out/
 
 # personal agent overlay (see AGENTS.md "Local Overlay")
 AGENTS.local.md

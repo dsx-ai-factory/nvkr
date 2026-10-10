@@ -18,9 +18,9 @@ outputs:
 ```
 
 Read `controller: cwe` as “use the `cwe` output for this chart's `controller` image.”
-To bind another image, add another slot-to-output entry. NKD derives the build dependencies.
+To bind another image, add another slot-to-output entry. NVKR derives the build dependencies.
 
-The [catalog producer](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-controller-bindings/registry.yaml) maps the slot to the existing value:
+The [catalog producer](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/registry.yaml) maps the slot to the existing value:
 
 ```yaml
 helm:
@@ -31,16 +31,16 @@ helm:
         digest: image.digest
 ```
 
-NKD writes the verified CWE image digest to `image.digest`. For root charts, upstream checksum files
+NVKR writes the verified CWE image digest to `image.digest`. For root charts, upstream checksum files
 are preserved; nested wrappers refresh binder-owned checksums outside the chart. Templates, repository
 and tag defaults stay unchanged. Values are reserialized with the YAML library: formatting can change,
 and document-level comments separated from the root mapping may be omitted. Template bytes stay unchanged. Unknown or unbound slots and missing or ambiguous value paths fail.
 
 For a source template that already adds `sha256:`, declare `values.digestFormat: sha256-hex`
-beside `values.digest`. NKD still authenticates the complete image manifest digest, but writes
+beside `values.digest`. NVKR still authenticates the complete image manifest digest, but writes
 only its hex to that value. Omission preserves the full `sha256:<hex>` representation. Unknown
 formats fail closed; templates stay upstream-owned. The
-[OVN output example](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-ovn-source/README.md#native-image-and-helm-oci-outputs)
+[OVN output example](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-ovn-source/README.md#native-image-and-helm-oci-outputs)
 uses this mapping for its six enabled image slots.
 
 ## Registry choice
@@ -48,13 +48,13 @@ uses this mapping for its six enabled image slots.
 The installer supplies the repository holding that image:
 
 ```sh
-helm template controller ./controller --set-string image.repository=registry.operator-a.test/nke/cwe
+helm template controller ./controller --set-string image.repository=registry.operator-a.test/nvke/cwe
 helm template controller ./controller --set-string image.repository=mirror.operator-b.test/platform/cwe
 ```
 
 Both use identical chart bytes and the packaged image digest. The operator must make that image available
 at the supplied repository. Normal Helm overrides still apply: overriding `image.digest` changes the selected
-image. NKD does not enforce deployment values.
+image. NVKR does not enforce deployment values.
 
 ## Shared paths
 
@@ -67,23 +67,23 @@ Catalog pin sets and chart mappings use the same path reader:
 
 Missing fields and ambiguous matches fail. Pin sets also reject unaccounted list members.
 
-## Concrete NKE example
+## Concrete NVKE example
 
-[Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-controller-bindings/definition.yaml) and
-[catalog](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/examples/nke-controller-bindings/registry.yaml) select six outputs: CWE, its source controller chart,
-SPIRE, SPIRE CRDs, Temporal and PostgreSQL. They share the pinned NKE controller source; external charts
+[Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/definition.yaml) and
+[catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/registry.yaml) select six outputs: CWE, its source controller chart,
+SPIRE, SPIRE CRDs, Temporal and PostgreSQL. They share the pinned NVKE controller source; external charts
 remain acquired and byte-preserving. The controller source archive contains only its chart.
 
-On an AMD64 Linux Docker host, with NKE source access:
+On an AMD64 Linux Docker host, with NVKE source access:
 
 ```sh
-mkdir -p .nkd/controller-bindings
-cp docs/examples/nke-controller-bindings/*.yaml .nkd/controller-bindings/
-go run ./cmd/nkdctl catalog pin --dir .nkd/controller-bindings \
-  --tag controller/v0.1.1-rc.9 nke-controller
-go run ./cmd/nkdctl run local \
-  --definition .nkd/controller-bindings/definition.yaml \
-  --environment .nkd/controller-bindings/environment-local.yaml \
+mkdir -p .nvkr/controller-bindings
+cp docs/examples/nvke-controller-bindings/*.yaml .nvkr/controller-bindings/
+go run ./cmd/nvkr catalog pin --dir .nvkr/controller-bindings \
+  --tag controller/v0.1.1-rc.9 nvke-controller
+go run ./cmd/nvkr run local \
+  --definition .nvkr/controller-bindings/definition.yaml \
+  --environment .nvkr/controller-bindings/environment-local.yaml \
   --attempt controller-bindings-01 --runner-source .
 ```
 
@@ -93,10 +93,10 @@ installation or qualification is claimed. Acquired raw-chart dependency scanning
 
 ## Validation and migration
 
-The [compiler contracts](https://github.com/dsx-ai-factory/nke-recipes/blob/main/pkg/nkd/factory/compiler_contract_test.go) and
-[binding tests](https://github.com/dsx-ai-factory/nke-recipes/blob/main/pkg/nkd/factory/helm_mapping_test.go) cover slot accounting, unchanged templates,
+The [compiler contracts](https://github.com/dsx-ai-factory/nvkr/blob/main/pkg/nvkr/factory/compiler_contract_test.go) and
+[binding tests](https://github.com/dsx-ai-factory/nvkr/blob/main/pkg/nvkr/factory/helm_mapping_test.go) cover slot accounting, unchanged templates,
 multiple images and registry-independent package bytes. Real Helm rendering is opt-in; see
-[Development](https://github.com/dsx-ai-factory/nke-recipes/blob/main/DEVELOPMENT.md#opt-in-integration-checks) for prerequisites and commands.
+[Development](https://github.com/dsx-ai-factory/nvkr/blob/main/DEVELOPMENT.md#opt-in-integration-checks) for prerequisites and commands.
 These tests do not establish a full six-output build, installation or signed publication.
 
 Replace `helm.imageOutput` with `helm.images: {controller: cwe}`. Put the chart location and digest paths

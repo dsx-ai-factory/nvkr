@@ -1,6 +1,6 @@
 # Maintainers
 
-This document lists the maintainers of the NVIDIA NKE Recipes project.
+This document lists the maintainers of the NVIDIA NVKR project.
 
 ## Current Maintainers
 

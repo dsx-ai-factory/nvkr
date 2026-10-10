@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-os-arm64-kvm
+  description: Build the ARM64 non-FDE NVKE node QCOW2 on a native KVM host.
+catalog:
+  base: ./catalog
+  overlays:
+    - arm64-kvm.yaml
+outputs:
+  - name: nvke-node-image-arm64
+    platform: linux/arm64
+    format: disk-image
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-image
+      - nvke-patched-installer-iso
+      - nvke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso

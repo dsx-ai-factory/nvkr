@@ -2,27 +2,27 @@
 # SPDX-License-Identifier: Apache-2.0
 
 instances:
-  - url: nvidia-nke-recipes.docs.buildwithfern.com/nke-recipes
-    custom-domain: docs.nvidia.com/nke-recipes
+  - url: nvidia-nvkr.docs.buildwithfern.com/nvkr
+    custom-domain: docs.nvidia.com/nvkr
     multi-source: true
 
 redirects:
-  - source: /nke-recipes/index.html
-    destination: /nke-recipes
+  - source: /nvkr/index.html
+    destination: /nvkr
 
-title: NVIDIA NKE Recipes
+title: NVIDIA NVKR
 
 global-theme: nvidia
 
 logo:
-  href: /nke-recipes
-  right-text: NKE Recipes
+  href: /nvkr
+  right-text: NVKR
 
 navbar-links:
   - type: github
-    value: https://github.com/dsx-ai-factory/nke-recipes
+    value: https://github.com/dsx-ai-factory/nvkr
 
 products:
-  - display-name: NKE Recipes
+  - display-name: NVKR
     path: ../docs/index.yml
     slug: /

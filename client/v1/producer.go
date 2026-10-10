@@ -7,11 +7,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // ResolveRequest selects exact catalog producers for one output. OutputName optionally

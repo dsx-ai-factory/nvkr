@@ -2,7 +2,7 @@
 
 The implementation compiles an explicit Linux AMD64/ARM64 platform set into independent native CWE
 producers and one standard runnable OCI image index. Delivery preserves each native child image's exact
-manifest, config and layer bytes. The [deploy Definition](../definitions/nke-deploy/README.md) keeps one public `cwe` output and eight public
+manifest, config and layer bytes. The [deploy Definition](../definitions/nvke-deploy/README.md) keeps one public `cwe` output and eight public
 outputs overall, with nine native build selections. External execution and release acceptance are recorded
 separately from the contracts below.
 
@@ -134,7 +134,7 @@ children []ir.ImageIndexBuildChild) (string, error)`, where `ImageIndexBuildChil
 and applies `canonical.KindBuild` to this distinct versioned logical projection:
 
 ```json
-{"children":[{"buildDigest":"sha256:<native-build>","component":"controller","platform":"linux/amd64"},{"buildDigest":"sha256:<native-build>","component":"controller","platform":"linux/arm64"}],"requiredPlatforms":["linux/amd64","linux/arm64"],"schemaVersion":"nkd.dev/image-index-build/v1"}
+{"children":[{"buildDigest":"sha256:<native-build>","component":"controller","platform":"linux/amd64"},{"buildDigest":"sha256:<native-build>","component":"controller","platform":"linux/arm64"}],"requiredPlatforms":["linux/amd64","linux/arm64"],"schemaVersion":"nvkr.dev/image-index-build/v1"}
 ```
 
 The example digest placeholders are illustrative; actual values must be exact lowercase SHA-256 typed Build

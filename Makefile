@@ -1,23 +1,23 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# nkdctl — Definition -> Run -> Release tooling.
+# nvkr — Definition -> Run -> Release tooling.
 # Run `make help` for targets; `make check` is the full local completion gate.
 
-BIN         := bin/nkdctl
-DEMO_BIN    ?= bin/nke-demo
-DEMO_TEST_BIN ?= bin/nke-demo.test
+BIN         := bin/nvkr
+DEMO_BIN    ?= bin/nvke-demo
+DEMO_TEST_BIN ?= bin/nvke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
-# Module source dirs only (never the vendored trees checked out under .nkd/).
+# Module source dirs only (never the vendored trees checked out under .nvkr/).
 GOSRC       := client cmd internal pkg
 GOFILES     := $(shell find $(GOSRC) -type f -name '*.go' -print)
 GO_VERSION  := $(shell cat .go-version 2>/dev/null)
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 # Only version+commit are stamped (both git-derived, deterministic) — no build
-# date, so the tool binary itself stays reproducible in nkdctl's own spirit.
+# date, so the tool binary itself stays reproducible in nvkr's own spirit.
 LDFLAGS     := -X main.version=$(VERSION) -X main.commit=$(COMMIT)
 
 # Authority-bearing build profiles pin their own toolchain identity. For the
@@ -43,23 +43,23 @@ info: ## Print version / toolchain info.
 # --- build ------------------------------------------------------------------
 
 .PHONY: build
-build: go-version-check ## Compile the nkdctl binary.
-	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nkdctl
+build: go-version-check ## Compile the nvkr binary.
+	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nvkr
 
 .PHONY: demo demo-test-bin
-demo: go-version-check ## Build the downstream Go local NKE demo CLI (calls nkdctl).
-	go build -o $(DEMO_BIN) ./cmd/nke-demo
+demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvkr).
+	go build -o $(DEMO_BIN) ./cmd/nvke-demo
 
-demo-test-bin: go-version-check ## Compile opt-in native NKE E2E tests; does not run them.
-	go test -c -o $(DEMO_TEST_BIN) ./internal/nkedemo
+demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
+	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
 
 .PHONY: install
-install: ## Install nkdctl into $$(go env GOBIN).
-	go install -ldflags '$(LDFLAGS)' ./cmd/nkdctl
+install: ## Install nvkr into $$(go env GOBIN).
+	go install -ldflags '$(LDFLAGS)' ./cmd/nvkr
 
-.PHONY: nkd-exec-helper
-nkd-exec-helper: ## Reproducibly build the ADR-18 nkd-exec helper binaries + write the lock (ARGS=--image also assembles the image).
-	@bash toolchains/nkd-exec/build-nkd-exec.sh $(ARGS)
+.PHONY: nvkr-exec-helper
+nvkr-exec-helper: ## Reproducibly build the ADR-18 nvkr-exec helper binaries + write the lock (ARGS=--image also assembles the image).
+	@bash toolchains/nvkr-exec/build-nvkr-exec.sh $(ARGS)
 
 # --- quality ----------------------------------------------------------------
 
@@ -107,7 +107,7 @@ test-race: ## Opt-in race detection and coverage for the default suite.
 
 .PHONY: test-full
 test-full: ## Include extended capacity/integration fixtures with race + coverage.
-	NKD_TEST_EXTENDED=1 $(MAKE) test-race
+	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
 test-ci-tools: ## Require Python and check the existing CI report tools.
@@ -169,10 +169,10 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # byte, recorded evidence and example data, templates that emit workflows, and
 # build output. Keep LICENSE_UNCHECKED in step with LICENSE_IGNORES.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
-	-ignore '.github/workflows/nkd-run.yml' -ignore '**/*.tmpl' \
+	-ignore '.github/workflows/nvkr-run.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
-	-ignore '.nkd/**' -ignore '.nkd-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nkd-run\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nkd(-inputs)?/|^\.claude/|^bin/
+	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-run\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -198,16 +198,16 @@ license-header-check: ## Fail when a source file has no license header.
 .PHONY: workflows-check
 workflows-check: ## Verify the committed Run generation matches the catalog (ADR-21 drift gate).
 	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
-	@# in .github/nkd-run/plan.json as `generatorVersion`. Building via `make build`,
+	@# in .github/nvkr-run/plan.json as `generatorVersion`. Building via `make build`,
 	@# whose version comes from `git describe`, therefore always reports drift. Build
 	@# the generator with the same canonical version string the generated Run
 	@# workflow uses, so this target is reproducible locally and in CI.
 	CGO_ENABLED=0 go build -trimpath \
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
-		-o bin/nkd-exec ./cmd/nkdctl
-	bin/nkd-exec run generate --engine github \
-		--definition definitions/nke-m2/definition.yaml \
-		--environment definitions/nke-m2/environment-github.yaml \
+		-o bin/nvkr-exec ./cmd/nvkr
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-m2/definition.yaml \
+		--environment definitions/nvke-m2/environment-github.yaml \
 		--root . --check
 
 .PHONY: check
@@ -218,7 +218,7 @@ check: go-version-check fmt-check license-header-check vet lint shellcheck test-
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.
 	go clean
-	rm -rf bin coverage.out .nkd/work
+	rm -rf bin coverage.out .nvkr/work
 
 .PHONY: run-resolve
 run-resolve: build ## Resolve the pinned kubectl producer and print its build graph.

@@ -1,6 +1,6 @@
-# NKE Recipes Project Governance
+# NVKR Project Governance
 
-This document describes how the NVIDIA Kubernetes Engine Recipes (NKE Recipes) project is
+This document describes how the NVKR (NVKR) project is
 governed: the roles people hold, how decisions are made, and how maintainers
 join and leave. It is intentionally lightweight and will grow with the project.
 For the current roster and maintainer responsibilities, see
@@ -8,7 +8,7 @@ For the current roster and maintainer responsibilities, see
 
 ## Roles
 
-NKE Recipes uses three roles. Code-owner review routing is declared in
+NVKR uses three roles. Code-owner review routing is declared in
 [`.github/CODEOWNERS`](.github/CODEOWNERS), which currently resolves every path to the
 org-wide `@dsx-ai-factory/nvke-write` team pending a repository-scoped one.
 
@@ -45,8 +45,8 @@ organized into:
 - **Definitions, catalog, and evidence** — `definitions/**` (Definition, Environment,
   `registry.yaml`, and the `pins.lock.yaml` trust roots under ADR-22).
 - **Core engine** — producer resolution, build graph compilation, bundling, collection, and validation
-  (`pkg/nkd/**`).
-- **CLI** — `cmd/nkdctl`.
+  (`pkg/nvkr/**`).
+- **CLI** — `cmd/nvkr`.
 - **Toolchains** — pinned build inputs (`toolchains/**`).
 - **Supply chain and CI** — release, attestation, and workflow tooling
   (`.github/**`, `Makefile`).
@@ -57,7 +57,7 @@ Maintainers hold cross-cutting responsibility across all areas.
 
 ## Decision-Making
 
-NKE Recipes decides by **lazy consensus**: a proposal (pull request, issue, or
+NVKR decides by **lazy consensus**: a proposal (pull request, issue, or
 discussion) is accepted if no maintainer raises a blocking objection within a
 reasonable review window — at least five business days for non-trivial changes.
 Most day-to-day changes are merged through normal code-owner review under
