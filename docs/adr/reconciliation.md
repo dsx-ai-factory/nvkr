@@ -313,7 +313,7 @@ ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted poli
 The grouped helper retains original material and disk owners through reconciliation and packaging; generation
 contracts cover both architectures, individual-node bypass rejection and unsupported policy rejection. Source
 fetch, bootstrap and release credentials remain outside ARC jobs. Native preparation/measurement is provided
-separately. M2 now generates all 34 outputs with two native disk jobs from the same Definition,
+separately. M2 now generates all 35 named outputs with two native disk jobs from the same Definition,
 an exact catalog overlay and measured native inspection profiles. Four toolchain images were
 published to internal GHCR packages under the user's scoped candidate exception, with exact
 manifest/config read-back. This is not completed organizational license/security review.
@@ -360,7 +360,7 @@ execution remain external acceptance requirements.
 ## Maintained input and schema boundaries
 
 The [M2 Definition instructions](../../definitions/nke-m2/README.md) own example-specific selection and input
-preparation. The candidate requires 34 outputs: ten CLI/controller/chart/operator/disk outputs plus twelve
+preparation. The candidate requires 35 named outputs: eleven CLI/controller/chart/operator/disk outputs plus twelve
 third-party runtime images per native architecture. The chosen runtime-image set follows pinned deployment
 values, not chart defaults; chart-test images and NKE images outside the disk retain explicit owner questions.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
