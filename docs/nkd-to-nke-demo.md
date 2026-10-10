@@ -192,7 +192,7 @@ After SIGKILL/OOM or VM restart:
    find .nkd -name network-state.json -print
    DEMO_OUT="$PWD/.nkd/demo-e2e-01-demo"
    test -f "$DEMO_OUT/network-state.json" &&
-   sudo -n true &&
+   sudo -n -k timeout --signal=TERM --kill-after=5 25 true &&
    "$NKE_DEMO" restore --work "$DEMO_OUT"
    ```
 
