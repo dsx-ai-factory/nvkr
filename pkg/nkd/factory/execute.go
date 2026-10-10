@@ -70,9 +70,6 @@ func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr 
 	if err := rejectUnsupportedRuntimeStorage(plan, "factory execute-node"); err != nil {
 		return err
 	}
-	if err := admitExecuteNodeRequirements(plan, nodeID); err != nil {
-		return err
-	}
 	_, artifacts := planIndex(plan)
 	if len(plan.Environment.GitHubRunners) > 0 {
 		if err := admitGitHubNodePlatform(plan, node, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
