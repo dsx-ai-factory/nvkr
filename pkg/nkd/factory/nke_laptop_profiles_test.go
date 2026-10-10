@@ -262,7 +262,104 @@ func TestLaptopProfilesRejectTamperedPatch(t *testing.T) {
 	assertFactoryErrorCode(t, err, e.CodeUnpinnedSource)
 }
 
-// This admits one diagnostic artifact, not image/profile runtime compatibility.
+// Execute the authored staging command; BuildKit itself is an external gate.
+func TestLaptopProfilesImageContext(t *testing.T) {
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nke-local-dev-arm64", "profiles-catalog")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := cat.Components["nke-local-profiles"].BuildCommand
+	for _, tc := range []struct {
+		name    string
+		missing string
+	}{
+		{"complete", ""},
+		{"missing epoch", "epoch"},
+		{"missing runbooks", "controller/test/fixtures/runbooks/fixture.yaml"},
+		{"missing config", "controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := laptopProfilesPatchedFixture(t)
+			files := []string{
+				"controller/test/fixtures/runbooks/fixture.yaml",
+				"controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml",
+				"controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml",
+			}
+			for _, name := range files {
+				if name == tc.missing {
+					continue
+				}
+				path := filepath.Join(fixture, name)
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(name+"\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			stub := t.TempDir()
+			argsFile := filepath.Join(stub, "args")
+			if err := os.WriteFile(filepath.Join(stub, "buildctl-daemonless.sh"), []byte("#!/bin/sh\nset -eu\nprintf '%s\\n' \"$@\" > \"$BUILDKIT_ARGS\"\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			script := strings.ReplaceAll(strings.ReplaceAll(command[2], "/src", fixture), "{{.Arch}}", "arm64")
+			cmd := exec.CommandContext(ctx, command[0], command[1], script)
+			cmd.Dir, cmd.WaitDelay = fixture, time.Second
+			for _, env := range os.Environ() {
+				if !strings.HasPrefix(env, "SOURCE_DATE_EPOCH=") && !strings.HasPrefix(env, "PATH=") && !strings.HasPrefix(env, "BUILDKIT_ARGS=") {
+					cmd.Env = append(cmd.Env, env)
+				}
+			}
+			cmd.Env = append(cmd.Env, "PATH="+stub+string(os.PathListSeparator)+os.Getenv("PATH"), "BUILDKIT_ARGS="+argsFile)
+			if tc.missing != "epoch" {
+				cmd.Env = append(cmd.Env, "SOURCE_DATE_EPOCH=1791331916")
+			}
+			out, err := cmd.CombinedOutput()
+			if tc.missing != "" {
+				if err == nil {
+					t.Fatal("incomplete source launched image build")
+				}
+				if _, err := os.Stat(argsFile); !os.IsNotExist(err) {
+					t.Fatalf("BuildKit was reached on incomplete source: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("stage image context: %v\n%s", err, out)
+			}
+			contextRoot := filepath.Join(fixture, "bin/profiles-context")
+			for _, pair := range []struct{ source, staged string }{
+				{"nkd-local-profiles/osProfiles/metadata.yaml", "profiles/osProfiles/metadata.yaml"},
+				{"nkd-local-profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl", "profiles/osProfiles/nke-local-26-04-arm64-plain/userData.tmpl"},
+				{files[0], "runbooks/fixture.yaml"},
+				{files[1], "profiles/configProfiles/nico-vms-cp.yaml"},
+				{files[2], "profiles/configProfiles/nico-vms-worker.yaml"},
+			} {
+				source, err := os.ReadFile(filepath.Join(fixture, pair.source))
+				if err != nil {
+					t.Fatal(err)
+				}
+				staged, err := os.ReadFile(filepath.Join(contextRoot, pair.staged))
+				if err != nil || string(source) != string(staged) {
+					t.Fatalf("staged %s changed source bytes: %v", pair.staged, err)
+				}
+			}
+			args, err := os.ReadFile(argsFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, required := range []string{"context=" + contextRoot, "dockerfile=" + fixture + "/controller/profiles/example", "platform=linux/arm64", "build-arg:SOURCE_DATE_EPOCH=1791331916", "dest=" + fixture + "/bin/nke-local-profiles-arm64.oci.tar"} {
+				if !strings.Contains(string(args), required) {
+					t.Fatalf("missing BuildKit argument %q: %s", required, args)
+				}
+			}
+		})
+	}
+}
+
+// This admits one diagnostic native image, not profile/disk compatibility.
 func TestLaptopProfilesArtifactContract(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
@@ -305,7 +402,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "controller-profiles" || plan.LifecycleOutputs[0].Kind != "executable" {
+			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "controller-profiles" || plan.LifecycleOutputs[0].Kind != "oci" {
 				t.Fatal("profiles must remain a separate single-output selection")
 			}
 			fetches, producers := 0, 0
@@ -320,13 +417,25 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					}
 				case ir.KindBuild:
 					producers++
-					if node.BuilderType != ir.BuilderOCIHermetic || node.OutputType != "tarball" || node.WriteDir != "bin" {
+					if node.BuilderType != ir.BuilderBuildKit || node.Network != ir.NetworkDefault || node.OutputType != "oci-image" || node.WriteDir != "bin" ||
+						node.ArtifactPath != "bin/nke-local-profiles-arm64.oci.tar" || !node.SourceReadOnly ||
+						node.Toolchain != "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4" {
 						t.Fatalf("unexpected producer: %+v", node)
 					}
-					if len(node.Command) != 3 || node.Command[0] != "bash" || node.Command[1] != "-euc" ||
-						!strings.Contains(node.Command[2], "tar --sort=name") || !strings.Contains(node.Command[2], "gzip -n") ||
-						strings.Contains(node.Command[2], "buildctl") {
-						t.Fatalf("expected deterministic data packaging, got %v", node.Command)
+					if len(node.Command) != 3 || node.Command[0] != "sh" || node.Command[1] != "-ec" {
+						t.Fatalf("expected source-owned Dockerfile image packaging, got %v", node.Command)
+					}
+					for _, required := range []string{
+						"--local context=/src/bin/profiles-context", "--local dockerfile=/src/controller/profiles/example",
+						"--opt platform=linux/arm64", "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH",
+						// BuildKit dockerui.NamedContext uses reference.FamiliarString
+						// for lookup even when the source-owned FROM is fully qualified.
+						"context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d",
+						"type=oci,dest=/src/bin/nke-local-profiles-arm64.oci.tar,oci-mediatypes=true,rewrite-timestamp=true",
+					} {
+						if !strings.Contains(node.Command[2], required) {
+							t.Fatalf("missing native image instruction %q", required)
+						}
 					}
 					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
 						node.Patches[0].SHA256 != "sha256:54b73a11668fc0aafb7b36ccae740db4cddab7c0bce990aec22685d1cc69e133" {

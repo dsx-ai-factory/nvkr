@@ -378,7 +378,7 @@ type dockerContainer struct {
 	Mounts          []dockerMount
 	State           struct{ Running bool }
 	NetworkSettings struct {
-		Networks map[string]struct{ IPAddress string }
+		Networks map[string]struct{ IPAddress, NetworkID string }
 	}
 }
 type dockerVolume struct {

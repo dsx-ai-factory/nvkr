@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
@@ -149,91 +148,6 @@ func TestSiteInstallerFullCheckoutRealGit(t *testing.T) {
 	}
 }
 
-func TestProfilesTransportPreservesOriginalBundleIndex(t *testing.T) {
-	for _, scenario := range []string{"exact", "foreign-manifest", "corrupt-blob"} {
-		t.Run(scenario, func(t *testing.T) {
-			root := t.TempDir()
-			payload := filepath.Join(root, "profiles")
-			if err := os.WriteFile(payload, []byte("profiles data"), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			original, imported := filepath.Join(root, "original"), filepath.Join(root, "imported")
-			result, err := delivery.BuildBinaryBundle(t.Context(), original, delivery.BinaryBundleRequest{
-				OS: "linux", Arch: "arm64", Purpose: "controller-profiles",
-				Files: []delivery.BinaryFileInput{{Name: "profiles", Path: payload, InstallPath: "/profiles", Mode: 0o644}},
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.CopyFS(imported, os.DirFS(original)); err != nil {
-				t.Fatal(err)
-			}
-			raw, err := os.ReadFile(filepath.Join(original, "index.json"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			// ORAS creates a transport-only index without NKD bootstrap metadata.
-			var index struct {
-				SchemaVersion int    `json:"schemaVersion"`
-				MediaType     string `json:"mediaType"`
-				Manifests     []struct {
-					MediaType string `json:"mediaType"`
-					Digest    string `json:"digest"`
-					Size      int64  `json:"size"`
-				} `json:"manifests"`
-			}
-			if err := json.Unmarshal(raw, &index); err != nil {
-				t.Fatal(err)
-			}
-			digest := index.Manifests[0].Digest
-			if scenario == "foreign-manifest" {
-				index.Manifests[0].Digest = "sha256:" + strings.Repeat("a", 64)
-			}
-			generic, err := json.Marshal(index)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(imported, "index.json"), generic, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			if _, _, err := delivery.InspectBinaryBundle(t.Context(), imported); err == nil {
-				t.Fatal("generic transport index unexpectedly passed the strict owner")
-			}
-			if scenario == "corrupt-blob" {
-				entries, err := os.ReadDir(filepath.Join(imported, "blobs/sha256"))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(filepath.Join(imported, "blobs/sha256", entries[0].Name()), []byte("corrupt"), 0o600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			err = restoreBundleTransportIndex(t.Context(), original, imported, digest)
-			if scenario == "foreign-manifest" {
-				if err == nil {
-					t.Fatal("foreign manifest reached index restoration")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			restored, err := os.ReadFile(filepath.Join(imported, "index.json"))
-			if err != nil || !bytes.Equal(restored, raw) {
-				t.Fatal("original bootstrap bytes were not preserved exactly")
-			}
-			_, checked, err := delivery.InspectBinaryBundle(t.Context(), imported)
-			if scenario == "corrupt-blob" {
-				if err == nil {
-					t.Fatal("restored description concealed corrupt payload bytes")
-				}
-			} else if err != nil || checked.RootDigest != result.RootDigest || checked.SemanticDigest != result.SemanticDigest {
-				t.Fatalf("original bundle identity was not independently verified: %v", err)
-			}
-		})
-	}
-}
-
 func TestSiteEndpointAdmission(t *testing.T) {
 	for _, value := range []string{"http://172.18.0.1:18089", "http://127.0.0.1:18089", "http://0.0.0.0:18089", "https://172.18.0.1:18089", "http://172.18.0.1:18080", "http://user:password@172.18.0.1:18089", "http://172.18.0.1:18089/private", "http://example.com:18089", "http://8.8.8.8:18089", "http://172.18.0.1:18089?x=1", "http://[::1]:18089"} {
 		t.Run(value, func(t *testing.T) {
@@ -245,34 +159,29 @@ func TestSiteEndpointAdmission(t *testing.T) {
 	}
 }
 
-func TestProfilesVolumeDisablesImageAndLimitsMount(t *testing.T) {
-	values := profilesVolumeValues()
+func TestProfilesImageValuesSelectExactDigest(t *testing.T) {
+	reference := "example.invalid/profiles@sha256:" + strings.Repeat("a", 64)
+	values := profilesImageValues(reference)
 	profiles := values["profiles"].(map[string]any)
-	if profiles["path"] != "/profiles" || profiles["image"].(map[string]any)["enabled"] != false {
-		t.Fatal("data profiles must not enable the image materializer")
+	image := profiles["image"].(map[string]any)
+	if profiles["path"] != "/profiles" || image["enabled"] != true ||
+		image["repository"] != "example.invalid/profiles" || image["digest"] != "sha256:"+strings.Repeat("a", 64) || image["tag"] != "" {
+		t.Fatal("profiles must select the exact image through the chart's standard init container")
 	}
-	volumes := values["volumes"].([]any)
-	mounts := values["volumeMounts"].([]any)
-	if len(volumes) != 1 || len(mounts) != 1 {
-		t.Fatal("profiles require exactly one volume and mount")
-	}
-	host := volumes[0].(map[string]any)["hostPath"].(map[string]string)
-	mount := mounts[0].(map[string]any)
-	if host["path"] != "/var/nkd-local-profiles/profiles" || host["type"] != "Directory" ||
-		mount["mountPath"] != "/profiles" || mount["readOnly"] != true ||
-		mount["name"] != volumes[0].(map[string]any)["name"] {
-		t.Fatal("profiles must use the exact prepared read-only directory in the owned Kind node")
+	if _, found := values["volumes"]; found {
+		t.Fatal("profiles must not inject a hostPath")
 	}
 }
 
 // Optional source-owned consumer check. Supply a chart exported from the exact
 // InstallerCommit; this check renders it but creates no Kubernetes resources.
-func TestProfilesVolumeSourceChart(t *testing.T) {
+func TestProfilesImageSourceChart(t *testing.T) {
 	chart := os.Getenv("NKD_DEMO_PROFILE_CHART")
 	if chart == "" {
 		t.Skip("set NKD_DEMO_PROFILE_CHART to the pinned NKE controller chart")
 	}
-	raw, err := json.Marshal(profilesVolumeValues())
+	reference := "example.invalid/profiles@sha256:" + strings.Repeat("a", 64)
+	raw, err := json.Marshal(profilesImageValues(reference))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,39 +210,79 @@ func TestProfilesVolumeSourceChart(t *testing.T) {
 	command.WaitDelay = time.Second
 	rendered, err := command.CombinedOutput()
 	if err != nil {
-		t.Fatalf("source-owned chart rejected profiles volume: %v\n%s", err, rendered)
+		t.Fatalf("source-owned chart rejected profiles image: %v\n%s", err, rendered)
 	}
 	value := string(rendered)
-	for _, required := range []string{"mountPath: /profiles", "readOnly: true", "path: /var/nkd-local-profiles/profiles", "type: Directory", "name: PROFILES_DIR"} {
+	for _, required := range []string{"name: materialize-profiles", "cp -a /profiles/. /profiles-out/", "emptyDir: {}", "mountPath: \"/profiles\"", "readOnly: true", "name: PROFILES_DIR"} {
 		if !strings.Contains(value, required) {
-			t.Fatalf("missing source-owned profile volume field %q", required)
+			t.Fatalf("missing source-owned profiles image field %q", required)
 		}
 	}
-	if strings.Contains(value, "materialize-profiles") || strings.Contains(value, "cwe-profiles") {
-		t.Fatal("profiles data must not invoke a runnable profiles image")
+	if strings.Contains(value, "hostPath:") || strings.Contains(value, "/var/nkd-local-profiles") {
+		t.Fatal("profiles image must not use the retired host directory")
 	}
 }
 
-func TestDeployedProfilesVolumeRejectsSubstitution(t *testing.T) {
-	for _, scenario := range []string{"exact", "image", "path", "writable", "missing-volume", "duplicate-mount"} {
+func TestDeployedProfilesImageRejectsSubstitution(t *testing.T) {
+	for _, scenario := range []string{"exact", "api-token", "image", "image-id", "failed-init", "missing-exit", "running-init", "missing-init", "duplicate-init", "missing-status", "duplicate-status", "init-mount", "duplicate-init-mount", "masked-source", "masked-destination", "masked-root", "masked-controller", "path", "writable", "host-path", "missing-volume", "duplicate-mount"} {
 		t.Run(scenario, func(t *testing.T) {
+			reference := "example.invalid/profiles@sha256:" + strings.Repeat("a", 64)
+			emptyDir := json.RawMessage("{}")
+			exit := 0
 			var pod sitePod
-			pod.Spec.Volumes = []profileVolume{{Name: "local-profiles", HostPath: &struct{ Path, Type string }{"/var/nkd-local-profiles/profiles", "Directory"}}}
-			pod.Spec.Containers = []podContainer{{Name: "controller", VolumeMounts: []profileMount{{"local-profiles", "/profiles", true}}}}
+			pod.Spec.Volumes = []profileVolume{{Name: "profiles", EmptyDir: &emptyDir}}
+			pod.Spec.InitContainers = []podContainer{{Name: "materialize-profiles", Image: reference,
+				VolumeMounts: []profileMount{{"profiles", "/profiles-out", false}}}}
+			pod.Spec.Containers = []podContainer{{Name: "controller", VolumeMounts: []profileMount{{"profiles", "/profiles", true}}}}
+			pod.Status.InitContainerStatuses = []podContainerState{{Name: "materialize-profiles", ImageID: reference}}
+			pod.Status.InitContainerStatuses[0].State.Terminated = &struct{ ExitCode *int }{&exit}
 			switch scenario {
+			case "api-token":
+				pod.Spec.InitContainers[0].VolumeMounts = append(pod.Spec.InitContainers[0].VolumeMounts,
+					profileMount{"kube-api-access-test", "/var/run/secrets/kubernetes.io/serviceaccount", true})
 			case "image":
-				pod.Spec.InitContainers = []podContainer{{Name: "materialize-profiles"}}
+				pod.Spec.InitContainers[0].Image = "foreign:latest"
+			case "image-id":
+				pod.Status.InitContainerStatuses[0].ImageID = "foreign"
+			case "failed-init":
+				exit = 1
+			case "missing-exit":
+				pod.Status.InitContainerStatuses[0].State.Terminated.ExitCode = nil
+			case "running-init":
+				pod.Status.InitContainerStatuses[0].State.Terminated = nil
+			case "missing-init":
+				pod.Spec.InitContainers = nil
+			case "duplicate-init":
+				pod.Spec.InitContainers = append(pod.Spec.InitContainers, pod.Spec.InitContainers[0])
+			case "missing-status":
+				pod.Status.InitContainerStatuses = nil
+			case "duplicate-status":
+				pod.Status.InitContainerStatuses = append(pod.Status.InitContainerStatuses, pod.Status.InitContainerStatuses[0])
+			case "init-mount":
+				pod.Spec.InitContainers[0].VolumeMounts[0].MountPath = "/profiles"
+			case "duplicate-init-mount":
+				pod.Spec.InitContainers[0].VolumeMounts = append(pod.Spec.InitContainers[0].VolumeMounts, pod.Spec.InitContainers[0].VolumeMounts[0])
+			case "masked-source":
+				pod.Spec.InitContainers[0].VolumeMounts = append(pod.Spec.InitContainers[0].VolumeMounts, profileMount{"foreign", "/profiles/osProfiles", true})
+			case "masked-destination":
+				pod.Spec.InitContainers[0].VolumeMounts = append(pod.Spec.InitContainers[0].VolumeMounts, profileMount{"foreign", "/profiles-out/osProfiles", false})
+			case "masked-root":
+				pod.Spec.InitContainers[0].VolumeMounts = append(pod.Spec.InitContainers[0].VolumeMounts, profileMount{"foreign", "/", true})
+			case "masked-controller":
+				pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, profileMount{"foreign", "/profiles/osProfiles", true})
 			case "path":
-				pod.Spec.Volumes[0].HostPath.Path = "/var"
+				pod.Spec.Containers[0].VolumeMounts[0].MountPath = "/different"
 			case "writable":
 				pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = false
+			case "host-path":
+				pod.Spec.Volumes[0].HostPath = &struct{ Path, Type string }{"/var", "Directory"}
 			case "missing-volume":
 				pod.Spec.Volumes = nil
 			case "duplicate-mount":
 				pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, pod.Spec.Containers[0].VolumeMounts[0])
 			}
-			if err := validateProfilesVolume(pod, "controller"); (err == nil) != (scenario == "exact") {
-				t.Fatalf("profiles volume acceptance: %v", err)
+			if err := validateProfilesImage(pod, "controller", reference); (err == nil) != (scenario == "exact" || scenario == "api-token") {
+				t.Fatalf("profiles image acceptance: %v", err)
 			}
 		})
 	}
@@ -369,6 +318,185 @@ func TestRegistryOwnershipRejectsForeignResources(t *testing.T) {
 			err := validateRegistryOwnership(rows, []string{"owned-id"}, "private-registry", "private-owner", "accepted")
 			if (err == nil) != (name == "exact") {
 				t.Fatalf("registry ownership:%v", err)
+			}
+		})
+	}
+}
+
+func TestRegistryAddressRequiresOwnedKindIdentity(t *testing.T) {
+	for _, scenario := range []string{"exact", "id", "name", "owner", "image", "stopped", "bind", "volume", "missing", "duplicate", "no-kind", "extra-network", "network-id", "missing-network-id", "missing-image-id", "missing-gateway", "no-address", "address", "ipv6", "public", "outside", "gateway", "subnet", "broadcast", "unmasked-subnet"} {
+		t.Run(scenario, func(t *testing.T) {
+			var rows []dockerContainer
+			fixture := `[{"Id":"owned-id","Name":"/private-registry","Image":"accepted","Config":{"Labels":{"dev.nkd.demo.owner":"private-owner"}},"State":{"Running":true},"Mounts":[{"Type":"tmpfs"}],"NetworkSettings":{"Networks":{"kind":{"IPAddress":"172.18.0.2","NetworkID":"kind-id"}}}}]`
+			if err := json.Unmarshal([]byte(fixture), &rows); err != nil {
+				t.Fatal(err)
+			}
+			materials := &SiteMaterials{RegistryID: "accepted", KindNetworkID: "kind-id", Gateway: "172.18.0.1", KindCIDR: "172.18.0.0/16"}
+			row := &rows[0]
+			network := row.NetworkSettings.Networks["kind"]
+			switch scenario {
+			case "id":
+				row.ID = "foreign"
+			case "name":
+				row.Name = "/foreign"
+			case "owner":
+				row.Config.Labels["dev.nkd.demo.owner"] = "foreign"
+			case "image":
+				row.Image = "foreign"
+			case "stopped":
+				row.State.Running = false
+			case "bind", "volume":
+				row.Mounts[0].Type = scenario
+			case "missing":
+				rows = nil
+			case "duplicate":
+				rows = append(rows, rows[0])
+			case "no-kind":
+				delete(row.NetworkSettings.Networks, "kind")
+			case "extra-network":
+				row.NetworkSettings.Networks["bridge"] = network
+			case "network-id":
+				network.NetworkID = "foreign"
+			case "missing-network-id":
+				materials.KindNetworkID = ""
+			case "missing-image-id":
+				materials.RegistryID = ""
+			case "missing-gateway":
+				materials.Gateway = ""
+			case "no-address":
+				network.IPAddress = ""
+			case "address":
+				network.IPAddress = "172.018.0.2"
+			case "ipv6":
+				network.IPAddress = "fd00::2"
+			case "public":
+				network.IPAddress = "8.8.8.8"
+			case "outside":
+				network.IPAddress = "172.19.0.2"
+			case "gateway":
+				network.IPAddress = materials.Gateway
+			case "subnet":
+				network.IPAddress = "172.18.0.0"
+			case "broadcast":
+				network.IPAddress = "172.18.255.255"
+			case "unmasked-subnet":
+				materials.KindCIDR = "172.18.0.1/16"
+			}
+			if scenario != "no-kind" {
+				row.NetworkSettings.Networks["kind"] = network
+			}
+			host, err := registryAddress(rows, "owned-id", "private-registry", "private-owner", materials)
+			if scenario == "exact" {
+				if err != nil || host != "172.18.0.2:5000" {
+					t.Fatalf("owned registry address %q: %v", host, err)
+				}
+			} else if err == nil || host != "" {
+				t.Fatal("unadmitted registry address escaped")
+			}
+		})
+	}
+}
+
+func TestRegistryStartRejectsIdentityBeforeNodeProbe(t *testing.T) {
+	for _, scenario := range []string{"foreign-id", "missing-id", "multiple-ids", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := privateTestDir(t)
+			trace := filepath.Join(work, "commands")
+			tool := filepath.Join(work, "docker")
+			script := "#!/bin/sh\nset -eu\nprintf '%s\\n' \"$@\" >> \"$TRACE\"\ncase \"$1\" in\n run) printf '%s\\n' \"$START_ID\";;\n inspect) printf '%s\\n' '[{\"Id\":\"foreign\"}]';;\n *) exit 42;;\nesac\n"
+			if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			id := "owned-id"
+			switch scenario {
+			case "missing-id":
+				id = ""
+			case "multiple-ids":
+				id = "one two"
+			}
+			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "START_ID=" + id}}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			host, err := startSiteRegistry(ctx, runner, "private-registry", "private-owner", "owned-node", &SiteMaterials{RegistryID: "accepted", KindNetworkID: "kind-id", KindCIDR: "172.18.0.0/16"})
+			if err == nil || host != "" {
+				t.Fatal("unadmitted registry can reach image upload")
+			}
+			if scenario == "canceled" {
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("lost cancellation: %v", err)
+				}
+				if _, err := os.Stat(trace); !os.IsNotExist(err) {
+					t.Fatal("canceled admission launched a child")
+				}
+				return
+			}
+			raw, err := os.ReadFile(trace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			commands := string(raw)
+			if strings.Contains(commands, "--publish") || strings.Contains(commands, "exec\n") || strings.Contains(commands, "15501") {
+				t.Fatal("registry start published a host port or probed an unadmitted node route")
+			}
+			for _, expected := range []string{"--network\nkind\n", "--read-only\n", "--cap-drop=ALL\n", registryImage} {
+				if !strings.Contains(commands, expected) {
+					t.Fatalf("registry start lost %q", expected)
+				}
+			}
+		})
+	}
+}
+
+func TestNodeRegistryProbeUsesBoundedDirectRoute(t *testing.T) {
+	for _, scenario := range []string{"exact", "foreign-response", "null", "curl-failure", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := privateTestDir(t)
+			trace := filepath.Join(work, "commands")
+			script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$TRACE\"\nprintf '%s' \"$RESPONSE\"\nexit \"$STATUS\"\n"
+			if err := os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			response, status := "{}\n", "0"
+			switch scenario {
+			case "foreign-response":
+				response = `{"foreign":true}`
+			case "null":
+				response = "null"
+			case "curl-failure":
+				status = "7"
+			}
+			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "RESPONSE=" + response, "STATUS=" + status}}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			err := probeNodeRegistry(ctx, runner, "owned-node", "172.18.0.2:5000")
+			if (err == nil) != (scenario == "exact") {
+				t.Fatalf("node registry response: %v", err)
+			}
+			if scenario == "canceled" {
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("lost cancellation: %v", err)
+				}
+				return
+			}
+			if scenario == "curl-failure" {
+				var command *CommandError
+				if !errors.As(err, &command) || command.Phase != "node-registry-connectivity" || command.ExitCode != 7 {
+					t.Fatalf("lost owned node failure: %v", err)
+				}
+			}
+			raw, err := os.ReadFile(trace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "exec\nowned-node\ncurl\n--fail\n--silent\n--show-error\n--max-time\n10\nhttp://172.18.0.2:5000/v2/\n"
+			if string(raw) != want {
+				t.Fatalf("unexpected node probe %q", raw)
 			}
 		})
 	}
@@ -681,7 +809,7 @@ func TestSiteImageCopyChecksEveryNativeReadback(t *testing.T) {
 				t.Fatal(err)
 			}
 			tool := filepath.Join(tools, "oras")
-			script := "#!/bin/sh\ncase \"$1\" in\n cp) exit 0;;\n manifest) printf '{\"digest\":\"%s\"}\\n' \"$DESCRIPTOR\";;\n *) exit 42;;\nesac\n"
+			script := "#!/bin/sh\nset -eu\ntest \"$NO_PROXY\" = 'existing.example,172.18.0.2'\ntest \"$no_proxy\" = 'lower.example,172.18.0.2'\ntest \"$HTTP_PROXY\" = 'http://proxy.example:8080'\ncase \"$1\" in\n cp) exit 0;;\n manifest) printf '{\"digest\":\"%s\"}\\n' \"$DESCRIPTOR\";;\n *) exit 42;;\nesac\n"
 			if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -694,8 +822,11 @@ func TestSiteImageCopyChecksEveryNativeReadback(t *testing.T) {
 			for _, key := range imageKeys() {
 				outputs[key] = SelectedOutput{Layout: filepath.Join(work, "run/packages", key), Observation: lifecycle.Artifact{Digest: digest}}
 			}
-			session := ManagementSession{Name: "owned", Tools: tools, Work: work, Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "DESCRIPTOR=" + descriptor}}}
-			refs, err := copySiteImages(context.Background(), session, "172.18.0.1:15501", outputs)
+			session := ManagementSession{Name: "owned", Tools: tools, Work: work, Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "DESCRIPTOR=" + descriptor, "NO_PROXY=existing.example", "no_proxy=lower.example", "HTTP_PROXY=http://proxy.example:8080"}}}
+			refs, err := copySiteImages(t.Context(), session, "172.18.0.2:5000", outputs)
+			if environmentValue(session.Runner.Env, "NO_PROXY") != "existing.example" || environmentValue(session.Runner.Env, "no_proxy") != "lower.example" {
+				t.Fatal("registry proxy scope escaped the image-copy runner")
+			}
 			if name == "exact" {
 				if err != nil {
 					t.Fatal(err)

@@ -241,6 +241,16 @@ docker pull kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939
 docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
 ```
 
+E2E checks both cached images on this same Linux Docker daemon before fetching
+the installer or building artifacts. Missing images fail early with the exact
+pull command. Artifact-only builds do not require these deployment images.
+
+During deployment, the demo starts an owned registry directly on the admitted
+Kind network, discovers its IPv4 address and checks `/v2/` from the actual
+management node before uploading anything. It does not use a host-published
+registry port. Local transfers bypass proxies only for this registry address;
+external source and registry traffic retains your proxy settings.
+
 Run the checked-in example directly from the repository root. The flags below
 replace its placeholder repository and output paths; no YAML copy or editing
 is required. For each rerun, change both `--attempt` and `--out` to unused names.
@@ -306,6 +316,12 @@ Private installer output stays in its private logs. Ctrl+C requests cancellation
 the adapter attempts bounded process joins and owned cleanup. If cleanup refuses,
 inspect the retained resources and recovery instructions before rerunning.
 Ordinary tests do not prove interruption at every live NKE stage.
+
+Network progress groups private commands into preflight, setup and cleanup;
+expected absence checks do not print failures. Numbered command logs remain
+available for diagnosis. A future multi-pane view should show the overall phase
+map, active operations and their bounded live logs. That view is not implemented;
+the current fixes do not add a terminal UI framework.
 
 The default OS profile explicitly forbids KVM and uses QEMU's TCG software
 emulation, even on a KVM-capable bare-metal host. `Waiting for SSH to become

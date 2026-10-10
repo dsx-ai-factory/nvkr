@@ -27,7 +27,10 @@ func TestRunnerGitAdmissionNamesFailingPhase(t *testing.T) {
 	if err := runner.Run(t.Context(), []string{"git", "init", checkout}, "init-source", 10*time.Second); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.CommandContext(t.Context(), "git", "-C", checkout, "config", "extensions.worktreeConfig", "true")
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", checkout, "config", "extensions.worktreeConfig", "true")
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
 	cmd.WaitDelay = time.Second
 	if raw, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("fixture config: %v: %s", err, raw)

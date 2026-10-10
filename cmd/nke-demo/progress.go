@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,23 +55,33 @@ func progressOutput(ctx context.Context, out, raw io.Writer, verbose bool, logPa
 	err := work(workCtx, writer)
 	writer.mu.Lock()
 	writer.lineOutput()
+	if err != nil && writer.failedPhase != "" {
+		writer.emit(fmt.Sprintf("\nStopped at: %s\nDiagnostics: inspect the private logs in the retained demo output; build details use the private build log when listed above.\n", terminalText(writer.failedPhase)))
+	}
 	writer.mu.Unlock()
 	return errors.Join(err, writer.failure())
 }
 
 type checkedWriter struct {
-	mu        sync.Mutex
-	out       io.Writer
-	err       error
-	cancel    context.CancelFunc
-	raw       io.Writer
-	verbose   bool
-	remaining int
-	truncated bool
-	started   time.Time
-	phases    map[string]time.Time
-	line      []byte
-	discard   bool
+	mu          sync.Mutex
+	out         io.Writer
+	err         error
+	cancel      context.CancelFunc
+	raw         io.Writer
+	verbose     bool
+	remaining   int
+	truncated   bool
+	started     time.Time
+	phases      map[string]time.Time
+	line        []byte
+	discard     bool
+	failedPhase string
+}
+
+// Escape controls without surrounding ordinary progress text in quoted strings.
+func terminalText(value string) string {
+	quoted := strconv.Quote(value)
+	return quoted[1 : len(quoted)-1]
 }
 
 func (w *checkedWriter) Write(data []byte) (int, error) {
@@ -143,13 +154,13 @@ func (w *checkedWriter) lineOutput() {
 		return
 	}
 	if strings.HasPrefix(line, "==> ") && strings.HasSuffix(line, ": Waiting for SSH to become available...") {
-		w.emit(fmt.Sprintf("[log +%s] %q\n", time.Since(w.started).Truncate(time.Second), line))
+		w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), terminalText(line)))
 		return
 	}
 	// Human subprocess markers are labeled logs, not authenticated Run events.
 	for _, prefix := range []string{"[start] ", "[done] ", "[cached] ", "nkdctl command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Deployment is separate:", "Tenant created;", "PASS:", "Unqualified local diagnostic"} {
 		if strings.HasPrefix(line, prefix) {
-			w.emit(fmt.Sprintf("[log +%s] %q\n", time.Since(w.started).Truncate(time.Second), line))
+			w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), terminalText(line)))
 			return
 		}
 	}
@@ -161,7 +172,7 @@ func (w *checkedWriter) failure() error {
 	return w.err
 }
 
-// Only observed operation boundaries are presented. Quoted names cannot emit
+// Only observed operation boundaries are presented. Escaped names cannot emit
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
@@ -186,5 +197,8 @@ func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
 		elapsed = now.Sub(start).Truncate(time.Second)
 		delete(w.phases, event.Name)
 	}
-	w.emit(fmt.Sprintf("[%s %s] %q\n", status, elapsed, event.Name))
+	if status == "FAIL" && w.failedPhase == "" {
+		w.failedPhase = event.Name
+	}
+	w.emit(fmt.Sprintf("[%s %s] %s\n", status, elapsed, terminalText(event.Name)))
 }

@@ -18,7 +18,7 @@ import (
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
-	for _, name := range []string{"remote", "local", "sibling", "override", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt"} {
+	for _, name := range []string{"remote", "local", "sibling", "override", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed"} {
 		t.Run(name, func(t *testing.T) {
 			root := privateTestDir(t)
 			repo, tools, calls := filepath.Join(root, "repo"), filepath.Join(root, "tools"), filepath.Join(root, "calls")
@@ -35,6 +35,28 @@ func TestPrepareInstallerPinnedAttempt(t *testing.T) {
 			}
 			write(filepath.Join(repo, "scripts/nke-full-arm64-local.sh"), "#!/bin/sh\n[ \"$1:$2\" = --check:all ] && [ \"${FAIL:-}\" != preflight ]\n")
 			write(filepath.Join(tools, "sudo"), "#!/bin/sh\n[ \"$1:$2\" = -n:true ] && [ \"${FAIL:-}\" != sudo ]\n")
+			imageCalls := filepath.Join(root, "image-calls")
+			write(filepath.Join(tools, "docker"), fmt.Sprintf("#!/bin/sh\nset -eu\nFAIL=%q\nIMAGE_CALLS=%q\nKIND=%q\nREGISTRY=%q\nKIND_ID=%q\n", name, imageCalls, kindNodeImage, registryImage, kindNodeID)+`
+[ "$1:$2" = image:inspect ] || exit 99
+printf '%s\n' "$3" >>"$IMAGE_CALLS"
+if [ "$3" = "$KIND" ]; then
+  [ "$FAIL" != kind-missing ] || exit 1
+  id="$KIND_ID"; arch=arm64
+  [ "$FAIL" != kind-wrong-id ] || id=foreign
+  [ "$FAIL" != kind-wrong-arch ] || arch=amd64
+  printf '[{"Id":"%s","Architecture":"%s"}]\n' "$id" "$arch"
+elif [ "$3" = "$REGISTRY" ]; then
+  [ "$FAIL" != registry-missing ] || exit 1
+  id="$KIND_ID"; arch=arm64
+  [ "$FAIL" != registry-wrong-arch ] || arch=amd64
+  [ "$FAIL" != registry-empty-id ] || id=
+  [ "$FAIL" != registry-invalid-id ] || id=foreign
+  if [ "$FAIL" = registry-malformed ]; then printf malformed; exit 0; fi
+  if [ "$FAIL" = registry-duplicate ]; then printf '[{},{}]'; exit 0; fi
+  printf '[{"Id":"%s","Architecture":"%s"}]\n' "$id" "$arch"
+else exit 99
+fi
+`)
 			// This command fixture tests ownership and exact invocation, not Git
 			// authorization or an externally fetched commit.
 			started := filepath.Join(root, "fetch-started")
@@ -137,15 +159,39 @@ esac
 					}
 				}()
 			}
-			actual, err := prepareInstaller(ctx, build, run, runner)
+			imageFailure := strings.HasPrefix(name, "kind-") || strings.HasPrefix(name, "registry-")
+			var actual Config
+			var err error
+			if imageFailure {
+				t.Setenv("PATH", tools+":/usr/bin:/bin")
+				actual, err = PrepareInstaller(ctx, build, run)
+			} else {
+				actual, err = prepareInstaller(ctx, build, run, runner)
+			}
 			success := name == "remote" || name == "local" || name == "sibling" || name == "override"
 			if (err == nil) != success {
 				t.Fatalf("result=%+v error=%v", actual, err)
 			}
 			if !success {
-				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") {
+				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure {
 					if _, e := os.Lstat(calls); !errors.Is(e, os.ErrNotExist) {
 						t.Fatal("failed preflight reached Git acquisition")
+					}
+				}
+				if imageFailure {
+					var coded *nkderr.Error
+					image := registryImage
+					if strings.HasPrefix(name, "kind-") {
+						image = kindNodeImage
+					}
+					if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !strings.Contains(err.Error(), "docker pull "+image) || !strings.Contains(err.Error(), "same native Linux Docker daemon") {
+						t.Fatalf("missing coded image admission or actionable guidance: %v", err)
+					}
+					if _, e := os.Lstat(filepath.Join(repo, ".nkd")); !errors.Is(e, os.ErrNotExist) {
+						t.Fatal("image failure created attempt or build output")
+					}
+					if _, e := os.Lstat(run.Out); !errors.Is(e, os.ErrNotExist) {
+						t.Fatal("image failure created diagnostic output")
 					}
 				}
 				if name == "sudo" {
@@ -199,6 +245,9 @@ esac
 			}
 			if actual.Out != run.Out || actual.Timeout != run.Timeout {
 				t.Fatal("preparation changed deployment intent")
+			}
+			if raw, e := os.ReadFile(imageCalls); e != nil || string(raw) != kindNodeImage+"\n"+registryImage+"\n" {
+				t.Fatalf("deployment images were not admitted by exact pinned references: %q %v", raw, e)
 			}
 		})
 	}

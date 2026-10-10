@@ -57,15 +57,19 @@ func TestNetworkPlatformBeforeFilesystemOrCommands(t *testing.T) {
 		t.Skip("native admitted platform exercised by opt-in real E2E")
 	}
 	for _, recovery := range []bool{false, true} {
+		writer := &recordedProgress{}
 		var err error
 		if recovery {
 			_, err = RecoverNetworkGuard(t.Context(), Runner{Work: "/does-not-exist"})
 		} else {
-			_, err = NewNetworkGuard(t.Context(), Runner{Work: "/does-not-exist"}, "172.18.0.0/16", "/does-not-exist")
+			_, err = NewNetworkGuard(t.Context(), Runner{Work: "/does-not-exist", Progress: writer}, "172.18.0.0/16", "/does-not-exist")
 		}
 		var coded *nkderr.Error
 		if !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability {
 			t.Fatalf("platform admission=%v", err)
+		}
+		if !recovery && !slices.Equal(writer.events, phaseEvents("network-preflight", PhaseFailed)) {
+			t.Fatalf("preflight boundary=%+v", writer.events)
 		}
 	}
 }
@@ -767,6 +771,72 @@ func TestNetworkCleanupDoesNotNeedDiagnosticFiles(t *testing.T) {
 	}
 	if _, err := os.Stat(g.runner.Work); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("cleanup created diagnostic storage")
+	}
+}
+
+func TestNetworkProbeProgressKeepsDiagnosticsWithoutFalseFailures(t *testing.T) {
+	for _, exit := range []int{0, 1, 2} {
+		t.Run(strconv.Itoa(exit), func(t *testing.T) {
+			g := networkFixture(t)
+			writer := &recordedProgress{}
+			tools := privateTestDir(t)
+			script := fmt.Sprintf("#!/bin/sh\nprintf 'private network diagnostic\\n' >&2\nexit %d\n", exit)
+			if err := os.WriteFile(filepath.Join(tools, "sudo"), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			g.runner.Env = []string{"PATH=" + tools + ":/usr/bin:/bin"}
+			g.runner.Progress = writer
+			exists, err := g.ruleExists(t.Context(), networkRules(g.Owner, g.KindCIDR)[0])
+			if exists != (exit == 0) || (err != nil) != (exit == 2) {
+				t.Fatalf("exists=%t error=%v", exists, err)
+			}
+			if exit == 2 && CommandExitCode(err) != exit {
+				t.Fatal("unexpected probe failure was hidden", err)
+			}
+			if len(writer.events) != 0 || writer.Len() != 0 {
+				t.Fatalf("low-level/expected-absence probe emitted misleading progress: %+v %q", writer.events, writer.String())
+			}
+			raw, err := os.ReadFile(filepath.Join(g.Work, "network-001.log"))
+			if err != nil || string(raw) != "private network diagnostic\n" {
+				t.Fatalf("numbered diagnostic was lost: %q %v", raw, err)
+			}
+		})
+	}
+}
+
+func TestNetworkProgressReportsOwningBoundary(t *testing.T) {
+	for _, name := range []string{"setup-failed", "cleanup-failed", "cleanup-complete"} {
+		t.Run(name, func(t *testing.T) {
+			g := networkFixture(t)
+			writer := &recordedProgress{}
+			g.runner.Progress = writer
+			phase, last := "network-cleanup", PhaseFailed
+			cause := errors.New("private cause")
+			var err error
+			switch name {
+			case "setup-failed":
+				phase = "network-setup"
+				g.checkpointHook = func() error { return cause }
+				err = g.Start(t.Context())
+			case "cleanup-failed":
+				g.stopDNSHook = func(context.Context) error { return cause }
+				err = g.Close(t.Context())
+			case "cleanup-complete":
+				g.finished = true
+				last = PhaseFinished
+				err = g.Close(t.Context())
+			}
+			if name == "cleanup-complete" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if !errors.Is(err, cause) || !strings.Contains(err.Error(), strings.ReplaceAll(phase, "-", " ")) {
+				t.Fatalf("owning boundary/cause missing: %v", err)
+			}
+			if !slices.Equal(writer.events, phaseEvents(phase, last)) {
+				t.Fatalf("events=%+v", writer.events)
+			}
+		})
 	}
 }
 

@@ -67,7 +67,7 @@ parallel producer jobs, and selection:
 | `all` | Combined demo artifact set: OS, components, site, tools, profiles and simulator |
 | `site` | Installer-aligned CLI, controller image/chart and NKTP chart |
 | `tools` | Source-built native installer-tools bundle |
-| `profiles` | Controller profile files in a data bundle |
+| `profiles` | Native OCI controller profiles image with configuration and runbooks |
 | `simulator` | NICoSim server, CLI and runtime-assets bundle |
 
 The complete demo builds `all` in one Run through `nke-demo e2e`, then deploys

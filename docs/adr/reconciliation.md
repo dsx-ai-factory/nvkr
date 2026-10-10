@@ -225,17 +225,38 @@ reuse or establish equal bytes. Fork graph/profile tests and actual pinned-chart
 Helm rendering with loopback OCI push/pull passed; the changed combined Run,
 fork OS bake and tenant acceptance still require a fresh runtime run.
 
-Profiles use an OCI-carried data bundle, ORAS transport and NKD-authenticated
-extraction, followed by a read-only controller volume. The additive source
-overlay changes no upstream NKE files. Local-only APT installation and uplink
-naming are explicit profile choices, not a general NKE offline boot contract.
-The pinned installer still requires the unused legacy `images.profiles` field.
+Fresh profiles selections produce a native OCI image through the existing
+rootless BuildKit lane and pinned NKE profiles Dockerfile. A named build context
+selects the existing exact Alpine image digest instead of the Dockerfile's tag;
+the additive source overlay changes no upstream NKE files. ORAS transports the
+observed image to the local registry without changing its manifest. The consumer
+uses the chart's standard image init container and read-only shared volume,
+checking the exact image and successful init exit instead of injecting files
+into a Kind host directory. Local-only APT installation and uplink naming are
+explicit profile choices, not a general NKE offline boot contract.
 [Profile factory tests](../../pkg/nkd/factory/nke_laptop_profiles_test.go)
-cover additive patch authentication, compilation and modeled APT/uplink cases.
-[Consumer tests](../../internal/nkedemo/site_test.go) cover bundle-index
-preservation, owner rejection of corrupt bytes and volume-description checks;
-the source-chart rendering test is opt-in and skipped without its chart input.
-Neither suite alone proves actual registry transport, boot or deployment.
+cover additive patch authentication, native-image compilation, exact staging
+bytes and modeled APT/uplink cases. [Consumer tests](../../internal/nkedemo/site_test.go)
+reject substituted images, incomplete/failed init states and alternate volumes.
+The opt-in exact pinned source-chart rendering check passed locally. An isolated
+native ARM64 rootless BuildKit test produced manifest
+`sha256:197fe058d0fbcff5d7841abfee58067aa05f7cdd21040642fe7e327096b574a0`.
+ORAS transport/readback, manifest retrieval from the Kind network and the image's
+init copy command passed with exact staged profile/runbook comparison. This is
+not a completed NKD profiles Run or Kubernetes init-container observation; fresh
+integrated acceptance remains unverified. The current retained recording uses an
+older data-bundle Run and is not acceptance evidence for this changed producer/consumer.
+
+E2E now admits cached ARM64 Kind and registry images before installer acquisition
+or artifact builds. Deployment authenticates its owned registry's direct IPv4
+address on the admitted Kind network and probes `/v2/` from the actual management
+node before uploads. Scoped proxy bypass applies only to that private endpoint.
+Contract tests cover ownership, network/address substitutions and probe failures;
+the isolated native registry test exercised the direct route, but does not prove
+the previously failing Ubuntu host's deployment. Network progress now groups
+private commands into preflight/setup/cleanup; expected absence probes no longer
+emit misleading failures. A multi-pane phase-map/live-log view is future work,
+not part of these fixes.
 
 [Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise

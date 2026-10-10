@@ -188,7 +188,14 @@ func validateNetworkKind(kindCIDR string) error {
 
 // NewNetworkGuard admits the host, resources, private workspace and kernel lock,
 // then durably records an empty intent ledger before returning a Start obligation.
-func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR, demoExecutable string) (*NetworkGuard, error) {
+func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR, demoExecutable string) (result *NetworkGuard, resultErr error) {
+	boundary := beginProgress(runner.Progress, "network-preflight", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() {
+		if resultErr != nil {
+			resultErr = fmt.Errorf("network preflight: %w", resultErr)
+		}
+		boundary.finish(resultErr)
+	}()
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
@@ -435,6 +442,10 @@ func (g *NetworkGuard) Command(ctx context.Context, args []string, privileged bo
 		args = append([]string{"sudo", "-n", "timeout", "--signal=TERM", "--kill-after=5", "25"}, args...)
 	}
 	runner := g.runner
+	// Inventory and absence checks legitimately return nonzero status. Keep
+	// their private numbered logs and errors, but report progress at the owning
+	// setup/cleanup boundary only, after that status has been interpreted.
+	runner.Progress = nil
 	if g.cleaning {
 		runner.Work = ""
 	}
@@ -639,7 +650,14 @@ func (g *NetworkGuard) BridgeBinding(ctx context.Context) (string, error) {
 	return strconv.Itoa(row.Index), nil
 }
 
-func (g *NetworkGuard) Start(ctx context.Context) error {
+func (g *NetworkGuard) Start(ctx context.Context) (resultErr error) {
+	boundary := beginProgress(g.runner.Progress, "network-setup", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() {
+		if resultErr != nil {
+			resultErr = fmt.Errorf("network setup: %w", resultErr)
+		}
+		boundary.finish(resultErr)
+	}()
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.cleaning || g.finished || g.BridgeIntent {
@@ -1019,7 +1037,14 @@ func (g *NetworkGuard) SetCleaning(value bool) { g.mu.Lock(); defer g.mu.Unlock(
 
 // Close stops/joins DNS first, verifies all guest producers are idle, and restores
 // only exact held controls. Restoration does not require successful log writes.
-func (g *NetworkGuard) Close(ctx context.Context) error {
+func (g *NetworkGuard) Close(ctx context.Context) (resultErr error) {
+	boundary := beginProgress(g.runner.Progress, "network-cleanup", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() {
+		if resultErr != nil {
+			resultErr = fmt.Errorf("network cleanup: %w", resultErr)
+		}
+		boundary.finish(resultErr)
+	}()
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.finished {

@@ -25,7 +25,7 @@ before moving to another NKE release.
 | Components | Dependency OCI images/charts and CAPNICo provider; provisioned provider is built but not used by this tenant path |
 | Site | Source-aligned CLI, controller image, image-bound controller chart and NKTP chart |
 | Tools | Verified native Helm, kubectl, clusterctl, ORAS and Kind bundle |
-| Profiles | Profile files packaged as data, pulled/verified and mounted read-only into the controller |
+| Profiles | Native OCI content image; the chart's init container copies `/profiles` into its shared read-only controller volume |
 | Simulator | NICoSim server/CLI and seed/UI archive |
 
 The combined `all` Definition selects the complete demo artifact membership in
@@ -64,9 +64,20 @@ registry, reads back exact manifest digests and supplies explicit NKE image
 overrides. Source-produced archive IDs are not interchangeable with observed
 manifest subjects.
 
-Profiles are data: ORAS transfers their bundle, NKD verifies/extracts it, and
-the adapter supplies an owned read-only profiles volume. No runnable profiles
-image or separate profiles Dockerfile is required by this route.
+Profiles are a native container image, not an executable bundle or a generic OCI
+data artifact. The producer uses NKE's existing pinned profiles Dockerfile with a
+digest-pinned Alpine base that supplies `/bin/sh` and `cp`. ORAS copies the observed
+image to the same local registry and verifies the destination manifest digest.
+The adapter enables `profiles.image.*`; NKE's standard `materialize-profiles`
+init container copies `/profiles` into an `emptyDir` mounted read-only by the
+controller. Deployment checks the exact init image and its successful exit.
+No host-directory injection or additional profiles Dockerfile is needed.
+
+Older Runs whose `controller-profiles` output has `kind: executable` cannot be
+consumed as this native image. Do not relabel or rewrite a completed Run. Build
+a fresh profiles selection and supply it with `--profiles-run`, or build a new
+combined Run. A compatibility replay with the older demo binary retains its
+original data-volume behavior; it is not validation of the new image handoff.
 
 The controller's CAPNICo override is currently tag-shaped. The adapter checks
 the exact destination subject; a tag alone is not an authenticated release

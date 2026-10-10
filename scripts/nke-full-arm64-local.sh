@@ -20,7 +20,7 @@ usage() {
     'simulator bootstraps the same pinned Go/GCC Docker toolchain.' \
     'site: four source-aligned installer outputs (controller, CLI, controller chart and NKTP chart).' \
     'tools: one source-built Linux ARM64 bundle (Helm, kubectl, clusterctl, ORAS and Kind).' \
-    'profiles: one diagnostic ARM64 plain Ubuntu 26.04 NICoSim profiles data bundle, not fleet profiles.' \
+    'profiles: one native OCI image containing diagnostic ARM64 plain Ubuntu 26.04 NICoSim profiles, not fleet profiles.' \
     'This subset is NOT a full source-built NKE distribution.' \
     'No host Go/Make or installed nkdctl needed: bootstrap uses the pinned utility image.' \
     'Docker is required (native Linux ARM64 / explicitly selected Colima).' \

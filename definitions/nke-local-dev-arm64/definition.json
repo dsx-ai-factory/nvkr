@@ -42,7 +42,7 @@
     {
       "catalog": {"base": "./profiles-catalog"},
       "components": ["nke-local-profiles"],
-      "format": "executable",
+      "format": "oci",
       "name": "controller-profiles",
       "platform": "linux/arm64"
     },

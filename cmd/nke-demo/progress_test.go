@@ -58,7 +58,7 @@ func TestProgressKeepsObservedBoundariesSeparateFromLogs(t *testing.T) {
 		return nkderr.New(nkderr.CodeBuildFailed, "build failed")
 	})
 	assertCode(t, err, nkderr.CodeBuildFailed)
-	if out.String() != "[START 0s] \"os\"\n[FAIL 0s] \"boot\\x1b[2J\"\n" {
+	if !strings.HasPrefix(out.String(), "[START 0s] os\n[FAIL 0s] boot\\x1b[2J\n") || !strings.Contains(out.String(), "Stopped at: boot\\x1b[2J") {
 		t.Fatalf("unexpected progress: %q", out.String())
 	}
 }
@@ -84,7 +84,7 @@ func TestProgressConciseAndVerbosePublicOutput(t *testing.T) {
 					t.Fatalf("verbose output changed: %q", &out)
 				}
 			} else {
-				for _, marker := range []string{"[log +0s]", "[start] image", "Build graph:", "  output:", "[done] image", "Waiting for SSH", "escaped\\x1b[2J", "PASS:"} {
+				for _, marker := range []string{"[build +0s]", "[start] image", "Build graph:", "  output:", "[done] image", "Waiting for SSH", "escaped\\x1b[2J", "PASS:"} {
 					if !strings.Contains(out.String(), marker) {
 						t.Fatalf("missing %q: %q", marker, &out)
 					}
@@ -167,7 +167,7 @@ func TestProgressLogRetentionBound(t *testing.T) {
 				if tc.truncated {
 					wantNotices = 1
 				}
-				if strings.Count(out.String(), notice) != wantNotices || !strings.Contains(out.String(), "[DONE ") || !strings.Contains(out.String(), `"build"`) {
+				if strings.Count(out.String(), notice) != wantNotices || !strings.Contains(out.String(), "[DONE ") || !strings.Contains(out.String(), "build") {
 					t.Fatal("retention notice count or observed progress differs")
 				}
 				if tc.truncated && !strings.Contains(out.String(), strings.TrimSuffix(marker, "\n")) {

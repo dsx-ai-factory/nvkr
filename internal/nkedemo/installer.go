@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
@@ -64,6 +65,9 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return result, fmt.Errorf("cannot inspect attempt destination %q: %w", owned, err)
 		}
+	}
+	if err = admitInstallerImages(ctx, runner); err != nil {
+		return result, err
 	}
 	source := "https://github.com/dsx-ai-factory/nke.git"
 	if build.NKEClone != "" {
@@ -136,4 +140,23 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 	}
 	run.NKECheckout = checkout
 	return run, nil
+}
+
+// E2E checks deployment-only image prerequisites before preparing sources or
+// building artifacts. BuildArtifacts deliberately does not require these images.
+func admitInstallerImages(ctx context.Context, runner Runner) error {
+	guidance := func(image string, cause error) error {
+		return fmt.Errorf("deployment requires a cached ARM64 image before building; run `docker pull %s` against the same native Linux Docker daemon (DOCKER_HOST=%q, DOCKER_CONTEXT=%q); see docs/local-nke-demo.md: %w", image, environmentValue(runner.Env, "DOCKER_HOST"), environmentValue(runner.Env, "DOCKER_CONTEXT"), cause)
+	}
+	if err := admitKindImage(ctx, runner); err != nil {
+		return guidance(kindNodeImage, err)
+	}
+	images, err := captureJSON[[]dockerImage](ctx, runner, []string{"docker", "image", "inspect", registryImage}, "installer-registry-image-preflight")
+	if err != nil {
+		return guidance(registryImage, err)
+	}
+	if len(images) != 1 || images[0].Architecture != "arm64" || !canonical.IsDigest(images[0].ID) {
+		return guidance(registryImage, errors.New("docker inspection did not select one ARM64 registry image with a valid image ID"))
+	}
+	return nil
 }

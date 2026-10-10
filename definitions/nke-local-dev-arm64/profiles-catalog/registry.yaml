@@ -5,7 +5,7 @@ apiVersion: nkd.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: nke-local-profiles-arm64
-  description: Diagnostic profile data bundle from pinned NKE config/runbooks and an authenticated additive local profile overlay. Not fleet configuration or compatibility proof.
+  description: Native diagnostic profiles image from the pinned NKE Dockerfile/config/runbooks and an authenticated additive local profile overlay. Not fleet configuration or compatibility proof.
 sources:
   nke-profiles:
     repo: https://github.com/dsx-ai-factory/nke.git
@@ -15,23 +15,29 @@ components:
   nke-local-profiles:
     fromSource: true
     source: nke-profiles
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
     patches:
       - name: patches/local-profile.patch
         sha256: sha256:54b73a11668fc0aafb7b36ccae740db4cddab7c0bce990aec22685d1cc69e133
-    artifactPath: bin/nke-local-profiles.tar.gz
+    artifactPath: bin/nke-local-profiles-{{.Arch}}.oci.tar
     writeDir: bin
-    outputType: tarball
+    outputType: oci-image
     platforms: [linux/arm64]
     buildCommand:
-      - bash
-      - -euc
+      - sh
+      - -ec
       - |
-        set -o pipefail
-        mkdir -p bin/profiles/configProfiles
-        cp -R nkd-local-profiles/osProfiles bin/profiles/
-        cp -R controller/test/fixtures/runbooks bin/profiles/
+        : "${SOURCE_DATE_EPOCH:?}"
+        mkdir -p bin/profiles-context/profiles/configProfiles
+        cp -R nkd-local-profiles/osProfiles bin/profiles-context/profiles/
+        cp -R controller/test/fixtures/runbooks bin/profiles-context/
         cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml \
-          controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles/configProfiles/
-        tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
-          --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
-          -C bin -cf - profiles | gzip -n > bin/nke-local-profiles.tar.gz
+          controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles-context/profiles/configProfiles/
+        buildctl-daemonless.sh build --frontend dockerfile.v0 \
+          --local context=/src/bin/profiles-context \
+          --local dockerfile=/src/controller/profiles/example \
+          --opt platform=linux/{{.Arch}} \
+          --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d \
+          --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+          --output type=oci,dest=/src/bin/nke-local-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true

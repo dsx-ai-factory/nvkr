@@ -14,7 +14,7 @@ They do not publish, sign or build a complete source-only NKE distribution.
 | NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive |
 | Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart |
 | Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; distinct from the acquired `operator-tools` |
-| Diagnostic controller profiles | `definition-profiles.json` | One OCI-carried tarball containing plain ARM64/Ubuntu 26.04 profile data; not a runnable image or fleet profiles |
+| Diagnostic controller profiles | `definition-profiles.json` | One native Linux ARM64 OCI image containing plain ARM64/Ubuntu 26.04 profile data at `/profiles`; not fleet profiles |
 
 Use `environment-local-docker.json` with native Linux ARM64 Docker, the
 launcher's default runtime. The OS uses TCG. On macOS, follow the guide's
@@ -72,12 +72,18 @@ suitably sized host. In `nke-demo e2e`, use YAML `build.jobs` or `--jobs`.
 Independent ready producers and packaging operations run concurrently up to
 that limit, while dependencies still gate Packer and publication-shaped packaging.
 
-Profiles contain configuration and runbooks, packaged deterministically as data.
-NKD retains their OCI-carried bundle with the completed Run; the consumer uses
-ORAS and verified extraction to supply files to NKE's profiles volume. No
-profiles Dockerfile, BuildKit producer or runtime init image is needed. The
-diagnostic OS profile remains separate from production fleet profiles and does
-not authenticate the selected disk or establish tenant compatibility.
+Profiles contain configuration and runbooks in a native OCI image built with
+the pinned NKE source-owned `controller/profiles/example/Dockerfile` and the
+existing rootless BuildKit lane. Its Alpine 3.24.1 tag is overridden through a
+BuildKit named context with the existing digest-pinned ARM64 Alpine 3.24.2
+runtime. No new Dockerfile or upstream source mutation is needed. Only the
+authenticated local OS profile, two pinned NICoSim configuration profiles and
+pinned fixture runbooks enter the image. NKE's chart uses `/bin/sh` and
+`cp -a /profiles/. /profiles-out/` in its standard profiles init container;
+the app mounts the shared profiles volume read-only. The diagnostic OS profile
+remains separate from production fleet profiles and does not authenticate the
+selected disk or establish tenant compatibility. Local image construction is
+a networked wrapped build, not qualified execution or publication authorization.
 
 See [reconciliation](../../docs/adr/reconciliation.md) for implementation and
 test boundaries. Ordinary tests do not execute the full demo; this PR supplies
