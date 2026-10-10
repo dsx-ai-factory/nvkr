@@ -114,6 +114,16 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Create and check Kind management cluster"
 	case "start-registry", "node-registry-connectivity":
 		return 2, "Admit registry access from the actual node"
+	case "site-ovn-chart", "site-ovn-defaults":
+		return 2, "Verify the built NVIDIA OVN chart and image bindings"
+	case "site-ovs-fresh", "site-ovs-create", "site-ovs-ready":
+		return 2, "Start and check Open vSwitch for the owned Kind node"
+	case "site-ovn-install", "site-ovn-control-plane-ready", "site-ovn-node-ready":
+		return 2, "Install NVIDIA OVN and wait for its site controllers"
+	case "site-ovn-observation":
+		return 2, "Check live site OVN images against the selected output"
+	case "install-capi", "check-capi":
+		return 2, "Install and check Cluster API after site networking"
 	case "site-00-check-readiness", "check-00-check-readiness", "site-01-prepare-cluster", "check-01-prepare-cluster", "site-02-stage-images", "check-02-stage-images", "site-03-describe-site", "check-03-describe-site", "site-05-install-site-controller", "check-05-install-site-controller", "site-06-secure-and-register", "check-06-secure-and-register":
 		return 2, "Install and check the NKE site stack"
 	case "tenant-provisioning":
