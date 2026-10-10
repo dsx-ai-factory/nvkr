@@ -116,6 +116,91 @@ func TestProgressRunnerObservedBoundaries(t *testing.T) {
 	}
 }
 
+func TestProgressPublicLauncherProcessObservations(t *testing.T) {
+	for _, scenario := range []string{"success", "exit failure", "timeout", "start failure", "private command"} {
+		t.Run(scenario, func(t *testing.T) {
+			writer := &recordedProgress{}
+			runner := Runner{Env: []string{"PATH=/usr/bin:/bin", "PRIVATE=secret-process-sentinel"}, Progress: writer, output: io.Discard}
+			args := []string{"/bin/sh", "-c", "exit 0", "secret-process-sentinel"}
+			timeout := 5 * time.Second
+			last := PhaseFinished
+			switch scenario {
+			case "exit failure":
+				args[2], last = "exit 7", PhaseFailed
+			case "timeout":
+				args[2], last, timeout = "exec sleep 60", PhaseFailed, 100*time.Millisecond
+			case "start failure":
+				args, last = []string{"/absent/secret-process-sentinel"}, PhaseFailed
+			case "private command":
+				runner.output = nil
+			}
+			err := runner.Run(t.Context(), args, "build-all", timeout)
+			if (err == nil) != (last == PhaseFinished) || errors.Is(err, ErrUnjoined) {
+				t.Fatalf("unexpected lifecycle outcome: %v", err)
+			}
+			want := phaseEvents("build-all", last)
+			if scenario != "start failure" && scenario != "private command" {
+				want = []ProgressEvent{want[0],
+					{Kind: ProcessStarted, Name: "build-all", Status: "started"},
+					{Kind: ProcessExited, Name: "build-all", Status: "exited"}, want[1]}
+			}
+			if !reflect.DeepEqual(writer.events, want) {
+				t.Fatalf("wrong process observations: %+v want %+v", writer.events, want)
+			}
+		})
+	}
+}
+
+func TestProgressOwnedProcessObservationIsSynchronousAndJoined(t *testing.T) {
+	for _, scenario := range []string{"exit success", "exit failure", "stop joined", "join unconfirmed"} {
+		t.Run(scenario, func(t *testing.T) {
+			writer := &recordedProgress{}
+			if scenario == "join unconfirmed" {
+				process := &OwnedProcess{phase: "build-all", done: make(chan struct{}), processWriter: writer, joinErr: ErrUnjoined}
+				close(process.done)
+				if exited, err := process.Exited(); !exited || !errors.Is(err, ErrUnjoined) || len(writer.events) != 0 {
+					t.Fatalf("unconfirmed group fabricated an exit observation: %+v %v", writer.events, err)
+				}
+				return
+			}
+			command, last := "exit 0", PhaseFinished
+			switch scenario {
+			case "exit failure":
+				command, last = "exit 7", PhaseFailed
+			case "stop joined":
+				command = "exec sleep 60"
+			}
+			process, err := (Runner{Env: []string{"PATH=/usr/bin:/bin"}, Progress: writer, output: io.Discard}).Start(t.Context(), []string{"/bin/sh", "-c", command}, "build-all")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scenario == "stop joined" {
+				if err := process.Stop(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				select {
+				case <-process.done:
+				case <-time.After(5 * time.Second):
+					t.Fatal("owner did not join")
+				}
+				if len(writer.events) != 2 {
+					t.Fatal("Wait goroutine reported presentation or inferred liveness")
+				}
+				_, _ = process.Exited()
+			}
+			_, _ = process.Exited()
+			_ = process.Stop(t.Context())
+			phases := phaseEvents("build-all", last)
+			want := []ProgressEvent{phases[0], {Kind: ProcessStarted, Name: "build-all", Status: "started"},
+				{Kind: ProcessExited, Name: "build-all", Status: "exited"}, phases[1]}
+			if !reflect.DeepEqual(writer.events, want) {
+				t.Fatalf("wrong synchronous observations: %+v want %+v", writer.events, want)
+			}
+		})
+	}
+}
+
 func TestProgressOwnedStartStopObservedSynchronously(t *testing.T) {
 	for _, name := range []string{"exit success", "exit failure", "stop first exit success", "stop first exit failure", "stop joined", "start failure", "stop unjoined"} {
 		t.Run(name, func(t *testing.T) {

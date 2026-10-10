@@ -92,6 +92,9 @@ func (w *checkedWriter) Write(data []byte) (int, error) {
 	if w.err != nil {
 		return 0, w.err
 	}
+	if observer, ok := w.observer.(interface{ BuildOutput(int) }); ok && len(data) > 0 {
+		observer.BuildOutput(len(data))
+	}
 	if w.raw != nil {
 		retained := min(len(data), w.remaining)
 		if retained > 0 {
@@ -155,12 +158,23 @@ func (w *checkedWriter) lineOutput() {
 	if w.discard || line == "" {
 		return
 	}
-	if strings.HasPrefix(line, "==> ") && strings.HasSuffix(line, ": Waiting for SSH to become available...") {
+	// Owner-generated graph projections use existing JSON records. Keep them
+	// out of the activity wall and plain output; only the dashboard consumes
+	// them as bounded descriptions. The retained raw log still has the trace.
+	for _, prefix := range []string{"Build vertex: ", "Build edge: ", "Build display: "} {
+		if strings.HasPrefix(line, prefix) {
+			if w.observer != nil {
+				w.emit(line + "\n")
+			}
+			return
+		}
+	}
+	if dashboardGuestReport(line) != "" || strings.HasPrefix(line, "==> ") && strings.HasSuffix(line, ": Waiting for SSH to become available...") {
 		w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), terminalText(line)))
 		return
 	}
 	// Human subprocess markers are labeled logs, not authenticated Run events.
-	for _, prefix := range []string{"[start] ", "[done] ", "[cached] ", "nkdctl command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Deployment is separate:", "Tenant created;", "PASS:", "Unqualified local diagnostic"} {
+	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nkdctl command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Deployment is separate:", "Tenant created;", "PASS:", "Unqualified local diagnostic"} {
 		if strings.HasPrefix(line, prefix) {
 			w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), terminalText(line)))
 			return
@@ -178,6 +192,12 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
+	if event.Kind == nkedemo.ProcessStarted || event.Kind == nkedemo.ProcessExited {
+		if w.observer != nil {
+			w.observer.Report(event)
+		}
+		return
+	}
 	if event.Kind == nkedemo.TenantWaiting {
 		w.tenantStatus(event)
 		return

@@ -22,6 +22,14 @@ const (
 	TenantWaiting      = "tenant-waiting"
 )
 
+// Process observations apply only to the opted-in public build launcher.
+// Started proves cmd.Start returned; exited proves the owner joined the
+// child and its private group. Neither describes descendant health.
+const (
+	ProcessStarted = "process-started"
+	ProcessExited  = "process-exited"
+)
+
 // TenantConditionStatus is a descriptive NKE API observation, not node readiness
 // or NKD evidence. Values follow controller/api/models.gen.go at InstallerCommit.
 type TenantConditionStatus string

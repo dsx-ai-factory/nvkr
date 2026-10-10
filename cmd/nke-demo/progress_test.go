@@ -67,7 +67,7 @@ func TestProgressConciseAndVerbosePublicOutput(t *testing.T) {
 	for _, verbose := range []bool{false, true} {
 		t.Run(map[bool]string{false: "concise", true: "verbose"}[verbose], func(t *testing.T) {
 			var out, raw bytes.Buffer
-			input := "raw compiler noise\n[start] image (build)\nBuild graph: 29 outputs\n  output: image [oci]\n[start] escaped\x1b[2J\n==> qemu.node: Waiting for SSH to become available...\r\n[done] image\nPASS: actual owner result"
+			input := "raw compiler noise\n[dry-run] image (build)\n[start] image (build)\nBuild graph: 29 outputs\n  output: image [oci]\n[start] escaped\x1b[2J\n==> qemu.node: Waiting for SSH to become available...\r\n[done] image\nPASS: actual owner result"
 			err := progressOutput(t.Context(), &out, &raw, verbose, "", func(_ context.Context, writer io.Writer) error {
 				for _, b := range []byte(input) {
 					if _, err := writer.Write([]byte{b}); err != nil {
@@ -84,7 +84,7 @@ func TestProgressConciseAndVerbosePublicOutput(t *testing.T) {
 					t.Fatalf("verbose output changed: %q", &out)
 				}
 			} else {
-				for _, marker := range []string{"[build +0s]", "[start] image", "Build graph:", "  output:", "[done] image", "Waiting for SSH", "escaped\\x1b[2J", "PASS:"} {
+				for _, marker := range []string{"[build +0s]", "[dry-run] image", "[start] image", "Build graph:", "  output:", "[done] image", "Waiting for SSH", "escaped\\x1b[2J", "PASS:"} {
 					if !strings.Contains(out.String(), marker) {
 						t.Fatalf("missing %q: %q", marker, &out)
 					}

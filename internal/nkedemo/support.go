@@ -131,6 +131,9 @@ type OwnedProcess struct {
 	groupProbe  func(int) (bool, error)
 	groupSignal func(int, unix.Signal) error
 	progress    *progressBoundary
+
+	processWriter   io.Writer
+	processExitOnce sync.Once
 }
 
 func (p *OwnedProcess) PID() int { return p.cmd.Process.Pid }
@@ -139,6 +142,7 @@ func (p *OwnedProcess) PID() int { return p.cmd.Process.Pid }
 func (p *OwnedProcess) Exited() (bool, error) {
 	select {
 	case <-p.done:
+		p.observeProcessExit()
 		p.mu.Lock()
 		err := errors.Join(p.waitErr, p.joinErr)
 		p.mu.Unlock()
@@ -148,6 +152,26 @@ func (p *OwnedProcess) Exited() (bool, error) {
 		return true, err
 	default:
 		return false, nil
+	}
+}
+
+// Observe only a joined owner from the calling lifecycle, never the Wait
+// goroutine. An unobserved exit does not prove the process is still alive.
+func (p *OwnedProcess) observeProcessExit() {
+	if p.processWriter == nil {
+		return
+	}
+	select {
+	case <-p.done:
+		p.mu.Lock()
+		joined := p.joinErr == nil
+		p.mu.Unlock()
+		if joined {
+			p.processExitOnce.Do(func() {
+				reportProgress(p.processWriter, ProgressEvent{Kind: ProcessExited, Name: p.phase, Status: "exited"})
+			})
+		}
+	default:
 	}
 }
 
@@ -219,6 +243,7 @@ func (p *OwnedProcess) finish() {
 func (p *OwnedProcess) Stop(ctx context.Context) (result error) {
 	var observedExit error
 	defer func() {
+		p.observeProcessExit()
 		if p.progress != nil {
 			p.progress.finish(errors.Join(result, observedExit))
 		}
@@ -367,6 +392,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		sink = p.diagnostic
 	}
 	if r.output != nil {
+		p.processWriter = r.Progress
 		if sink == nil {
 			sink = r.output
 		} else {
@@ -398,6 +424,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		}
 		return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
 	}
+	reportProgress(p.processWriter, ProgressEvent{Kind: ProcessStarted, Name: phase, Status: "started"})
 	go p.finish()
 	return p, nil
 }
@@ -452,6 +479,7 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 			return raw, errors.Join(joinErr, ctx.Err(), diagnosticErr)
 		}
 	}
+	p.observeProcessExit()
 	raw, outErr := p.stdout.result()
 	_, stderrErr := p.stderr.result()
 	if p.diagnostic != nil {

@@ -481,3 +481,73 @@ func TestDashboardConcurrentReportsAndDraw(t *testing.T) {
 	}
 	joined.Wait()
 }
+
+func TestDashboardBuildLogSummary(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {80, 42}, {160, 42}} {
+		width, height := size[0], size[1]
+		t.Run(fmt.Sprint(size), func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+			input := "[build +1s]   output: os [disk-image]: disk\n[build +1s]   output: chart [helm-oci]: chart\n[build +1s]   output: chart [helm-oci]: chart\n[build +1s] [dry-run] os/build-disk (build)\n[build +1s] [dry-run] chart/build (build)\n[build +1s] [dry-run] package/chart (package)\n[start] os/build-disk (build)\n[done] chart/build\n[cached] chart/build\n[start] other/build (acquire)\n[start] third/build (package)\n[start] fourth/build (build)\n"
+			for _, b := range []byte(input) {
+				_, _ = d.Write([]byte{b})
+			}
+			before := d.snapshot()
+			_, _ = io.WriteString(d, "[start] os/build-disk (build)\n")
+			if !d.snapshot().buildSteps[0].started.Equal(before.buildSteps[0].started) {
+				t.Fatal("duplicate start reset the elapsed clock")
+			}
+			screen := dashboardScreen(t, width)
+			screen.SetSize(width, height)
+			d.draw(screen, before.buildSteps[0].started.Add(75*time.Second), false)
+			text := dashboardText(screen)
+			for _, want := range []string{"Artifacts 2 planned", "1 done", "4 running", "1 queued", "Preview [######--------------]", "1/3 reported done/cached", "os/build-disk", "1m15s", "Last step change", "artifact verification still required", "ETA unknown"} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("missing %q at width %d:\n%s", want, width, text)
+				}
+			}
+			before.buildSteps[0].state = "done"
+			if d.snapshot().buildSteps[0].state != "running" || d.snapshot().phases[1].state != "running" {
+				t.Fatal("mutable snapshot or logs changed artifact authority")
+			}
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneFailed, Name: "artifacts"})
+			d.draw(screen, time.Now(), false)
+			if strings.Contains(dashboardText(screen), "Artifact pipeline") {
+				t.Fatal("failed artifact owner still shows running-step clocks")
+			}
+		})
+	}
+}
+
+func TestDashboardBuildLogBounds(t *testing.T) {
+	for _, tc := range []struct{ name, input string }{
+		{"outside lane", "[dry-run] image/build (build)\n"},
+		{"missing kind", "[dry-run] image/build\n"},
+		{"unknown kind", "[dry-run] image/build (private-secret)\n"},
+		{"terminal controls", "[start] image/\x1b[2J (build)\n"},
+		{"markup", "[start] [red]image (build)\n"},
+		{"embedded marker", "compiler says [start] image/build (build)\n"},
+		{"overlong", "[start] " + strings.Repeat("a", 257) + " (build)\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newDashboard()
+			if tc.name != "outside lane" {
+				d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+			}
+			_, _ = io.WriteString(d, tc.input)
+			if len(d.snapshot().buildSteps) != 0 || d.snapshot().buildPreview {
+				t.Fatal("unsupported text became a build listing")
+			}
+		})
+	}
+	d := newDashboard()
+	d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+	for i := range dashboardSteps + 1 {
+		_, _ = fmt.Fprintf(d, "[dry-run] image/build-%d (build)\n", i)
+	}
+	_, _ = io.WriteString(d, "[cached] image/build-0\n[start] image/build-0 (build)\n")
+	s := d.snapshot()
+	if len(s.buildSteps) != dashboardSteps || s.buildSteps[0].state != "done" || !strings.Contains(dashboardBuildRibbon(s, time.Now()), "counts incomplete") {
+		t.Fatal("unbounded listing, terminal log state regressed or truncation hidden")
+	}
+}

@@ -381,12 +381,35 @@ Mermaid-capable Markdown viewer to see producers, dependencies, artifacts and
 required outputs. It comes from `nkdctl run graph` over the compiled baseline
 Plan, not a hand-maintained diagram; the later attempt-local toolchain substitution
 does not make this display execution evidence.
+After that substitution, the launcher also saves the selected Plan and its
+complete linked display to `selected-plan.json` and `graph.json` in the same
+directory. The dashboard's dependency links come from that selected graph, not
+from a guessed sequence of fetch/build/package stages.
 
-In an interactive terminal, the demo automatically opens a dashboard with a
-phase map, observed state and bounded public activity. The phases are Prepare,
-Artifacts, Site, Tenant, Workload/DNS and Cleanup; narrow terminals stack the panes.
-The state pane explains the current wait and shows the observed tenant node counts
-and remaining readiness budget. It does not infer success from log text.
+In an interactive terminal, the demo automatically opens a dashboard. During
+artifact builds, the workspace focuses on the build pipeline: a progress and
+health ribbon, a selectable operation board, and details for the selected step.
+It lists planned artifacts separately from reported done/cached, running and
+queued operations. Rows show the producer/step, stage and running duration.
+The progress bar counts only dry-run-listed steps; it is not verified artifact
+completion, overall E2E progress or an ETA. Missing or truncated listings show
+an unknown total. Only the owning artifact operation completes the phase.
+
+The ribbon separates the age of raw build output from the age of the last step
+change, even when concise mode hides compiler output. It also shows the last
+recognized OS guest report, such as waiting for SSH, with its age. These reports
+are not a guest-health probe. Launcher start/exit observations do not establish
+the health of every Docker, Packer or QEMU descendant; silence is not classified
+as a stall.
+
+Up/Down selects an operation and opens its plan-linked inputs, outputs and retained
+public marker events. Enter toggles details; Escape closes them. Raw parallel
+output is shared, so the selected view does not mislabel it as that step's log.
+Press `a` to return to shared activity and automatic running-step selection.
+
+During deployment, the phases are Prepare, Artifacts, Site, Tenant, Workload/DNS
+and Cleanup. The state pane shows the current wait, observed tenant node counts
+and remaining readiness budget. Narrow terminals stack the panes.
 The phase map keeps the Site and Tenant checklists visible together when the
 terminal has room; compact terminals prioritize the live wait and timeout.
 The Site checklist retains individual Cluster API and NKE installation stages;
@@ -406,6 +429,9 @@ neither `Provisioning=True` nor `Provisioned=True` means tenant nodes are Ready.
 | Key | Action |
 | --- | --- |
 | Tab | Change the focused pane |
+| Up / Down during builds | Select an operation in the build pipeline |
+| Enter / Escape during build details | Toggle details / return to shared activity |
+| a during builds | Return to shared activity and automatic selection |
 | PgUp / PgDn | Scroll retained activity |
 | End | Return to live activity |
 | q | Ask for confirmation; only y/Y requests cancellation and owned cleanup |

@@ -5,11 +5,13 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/planview"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -17,6 +19,7 @@ import (
 const (
 	dashboardLines = 80
 	dashboardRunes = 4096
+	dashboardSteps = 512
 )
 
 type dashboardPhase struct{ state, detail string }
@@ -24,6 +27,12 @@ type dashboardPhase struct{ state, detail string }
 type dashboardStage struct {
 	states  [2]string
 	started [2]time.Time
+}
+
+type dashboardBuildStep struct {
+	id, state, kind string
+	started         time.Time
+	previewed       bool
 }
 
 // This bounded checklist names source-owned operations, not inferred deployment
@@ -64,6 +73,19 @@ type dashboardSnapshot struct {
 	provisioning, provisioned     nkedemo.TenantConditionStatus
 	siteStages                    [len(dashboardSiteStages)]dashboardStage
 	tenantStages                  [len(dashboardTenantStages)]dashboardStage
+	buildSteps                    []dashboardBuildStep
+	buildPreview, buildTruncated  bool
+	buildChangedAt                time.Time
+	buildOutputs                  []string
+	buildOutputAt                 time.Time
+	buildOutputBytes              uint64
+	buildProcess                  string
+	buildGuestStage               string
+	buildGuestAt                  time.Time
+	buildVertices                 []planview.Vertex
+	buildEdges                    []planview.Edge
+	buildSelected                 int
+	buildDetails                  bool
 }
 
 // Only the presentation loop touches widgets. Worker callbacks update bounded
@@ -77,13 +99,13 @@ type dashboard struct {
 }
 
 func newDashboard() *dashboard {
-	d := &dashboard{dashboardSnapshot: dashboardSnapshot{started: time.Now(), tenant: "Tenant readiness has not been observed."}}
+	d := &dashboard{dashboardSnapshot: dashboardSnapshot{started: time.Now(), tenant: "Tenant readiness has not been observed.", buildSelected: -1, buildDetails: true}}
 	for i := range d.phases {
 		d.phases[i] = dashboardPhase{"pending", "No operation observed yet"}
 	}
 	pane := func(title string) *tview.TextView {
 		view := tview.NewTextView().SetDynamicColors(true).SetTextColor(tcell.ColorLightSteelBlue).SetWrap(true)
-		view.SetBackgroundColor(tcell.ColorDefault).SetBorder(true).SetBorderColor(tcell.ColorSlateGray).SetTitle(title).SetTitleColor(tcell.ColorLightSteelBlue)
+		view.SetBackgroundColor(tcell.NewHexColor(0x1c2633)).SetBorder(true).SetBorderColor(tcell.NewHexColor(0x52657a)).SetTitle(title).SetTitleColor(tcell.ColorLightCyan)
 		return view
 	}
 	d.header, d.footer = pane(""), pane("")
@@ -112,6 +134,13 @@ func (d *dashboard) Write(data []byte) (int, error) {
 	for _, value := range data {
 		if value == '\n' {
 			line := string(d.partial)
+			if !d.dropped && d.observeBuildGraph(line) {
+				d.partial = d.partial[:0]
+				continue
+			}
+			if !d.dropped {
+				d.observeBuildLog(line)
+			}
 			if d.dropped {
 				line += "…"
 			}
@@ -126,6 +155,122 @@ func (d *dashboard) Write(data []byte) (int, error) {
 		}
 	}
 	return len(data), nil
+}
+
+// Summarize the existing human factory listing, not a Run record or receipt.
+// Only the owning artifact lane can complete artifacts; these bounded log
+// counters never change lifecycle state or execution decisions.
+func (d *dashboard) observeBuildLog(line string) {
+	if d.phases[1].state != "running" {
+		return
+	}
+	if strings.HasPrefix(line, "[build +") {
+		_, line, _ = strings.Cut(line, "] ")
+	}
+	// These fixed public Packer messages are last reports, not a guest-health
+	// probe. Do not attribute arbitrary parallel output to an operation.
+	if stage := dashboardGuestReport(line); stage != "" {
+		d.buildGuestStage, d.buildGuestAt = stage, time.Now()
+		return
+	}
+	if output, ok := strings.CutPrefix(line, "  output: "); ok {
+		name, _, found := strings.Cut(output, " [")
+		if found && dashboardBuildID(name) && !slices.Contains(d.buildOutputs, name) {
+			if len(d.buildOutputs) < dashboardSteps {
+				d.buildOutputs = append(d.buildOutputs, name)
+			} else {
+				d.buildTruncated = true
+			}
+		}
+		return
+	}
+	marker, id, ok := strings.Cut(line, "] ")
+	if !ok {
+		return
+	}
+	state := ""
+	switch marker {
+	case "[dry-run":
+		state = "queued"
+	case "[start":
+		state = "running"
+	case "[done", "[cached":
+		state = "done"
+	default:
+		return
+	}
+	kind := ""
+	if state != "done" {
+		id, kind, ok = strings.Cut(id, " (")
+		if !ok || !strings.HasSuffix(kind, ")") {
+			return
+		}
+		kind = strings.TrimSuffix(kind, ")")
+		switch kind {
+		case "fetch", "build", "acquire", "terminal-observe", "sbom", "package", "inventory":
+		default:
+			return
+		}
+	}
+	if !dashboardBuildID(id) {
+		return
+	}
+	index := slices.IndexFunc(d.buildSteps, func(step dashboardBuildStep) bool { return step.id == id })
+	if index < 0 {
+		if len(d.buildSteps) == dashboardSteps {
+			d.buildTruncated = true
+			return
+		}
+		index = len(d.buildSteps)
+		d.buildSteps = append(d.buildSteps, dashboardBuildStep{id: id})
+	}
+	step := &d.buildSteps[index]
+	if kind != "" {
+		step.kind = kind
+	}
+	if state == "queued" {
+		step.previewed, d.buildPreview = true, true
+	}
+	if step.state == "done" || state == "queued" && step.state != "" {
+		return
+	}
+	if step.state != state {
+		d.buildChangedAt = time.Now()
+	}
+	if state == "running" && step.started.IsZero() {
+		step.started = time.Now()
+	}
+	step.state = state
+}
+
+func dashboardGuestReport(line string) string {
+	message, ok := strings.CutPrefix(line, "==> nke-node-non-fde.qemu.nke-non-fde: ")
+	if !ok {
+		return ""
+	}
+	switch message {
+	case "Waiting for SSH to become available...":
+		return "Waiting for SSH from the OS-image guest"
+	case "Connected to SSH!":
+		return "SSH connected to the OS-image guest"
+	case "Gracefully halting virtual machine...":
+		return "Shutting down the OS-image guest"
+	default:
+		return ""
+	}
+}
+
+// Restrict descriptive labels to bounded printable IDs, not terminal markup.
+func dashboardBuildID(id string) bool {
+	if id == "" || len(id) > 256 {
+		return false
+	}
+	for _, value := range id {
+		if !(value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9' || strings.ContainsRune("-_/.:", value)) {
+			return false
+		}
+	}
+	return true
 }
 
 // Labels describe fixed source-owned operations, never command arguments,
@@ -244,6 +389,16 @@ func stopDashboardStages(stages []dashboardStage, state string) {
 func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if event.Kind == nkedemo.ProcessStarted || event.Kind == nkedemo.ProcessExited {
+		if event.Name == "build-all" {
+			if event.Kind == nkedemo.ProcessExited {
+				d.buildProcess = "exited"
+			} else if d.buildProcess != "exited" {
+				d.buildProcess = "started"
+			}
+		}
+		return
+	}
 	if event.Kind == nkedemo.TenantWaiting {
 		d.tenantObservation(event)
 		return
@@ -401,6 +556,10 @@ func (d *dashboard) snapshot() dashboardSnapshot {
 	defer d.mu.Unlock()
 	copy := d.dashboardSnapshot
 	copy.activity = append([]string(nil), d.activity...)
+	copy.buildSteps = slices.Clone(d.buildSteps)
+	copy.buildOutputs = slices.Clone(d.buildOutputs)
+	copy.buildVertices = slices.Clone(d.buildVertices)
+	copy.buildEdges = slices.Clone(d.buildEdges)
 	if len(d.partial) != 0 {
 		line := []rune(terminalText(string(d.partial)))
 		copy.activity = append(copy.activity, string(line[:min(len(line), dashboardRunes)]))
@@ -433,15 +592,50 @@ func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 		return false
 	}
 	switch event.Key() {
+	case tcell.KeyUp, tcell.KeyDown:
+		if dashboardBuildActive(d.dashboardSnapshot) && len(d.buildSteps) > 0 {
+			d.buildDetails, d.offset = true, 0
+			selected := dashboardSelectedStep(d.dashboardSnapshot)
+			order := dashboardBuildOrder(d.dashboardSnapshot)
+			position := slices.Index(order, selected)
+			if event.Key() == tcell.KeyUp {
+				d.buildSelected = order[max(0, position-1)]
+			} else {
+				d.buildSelected = order[min(len(order)-1, position+1)]
+			}
+		}
+	case tcell.KeyEnter:
+		if dashboardBuildActive(d.dashboardSnapshot) {
+			d.buildDetails = !d.buildDetails
+		}
 	case tcell.KeyEscape:
+		if dashboardBuildActive(d.dashboardSnapshot) && d.buildDetails {
+			d.buildDetails = false
+			return false
+		}
 		return true
 	case tcell.KeyTab:
 		d.focus = (d.focus + 1) % 3
 	case tcell.KeyPgUp:
-		d.focus, d.offset = 2, min(dashboardLines, d.offset+10)
+		d.focus = 2
+		if dashboardBuildActive(d.dashboardSnapshot) && d.buildDetails {
+			d.offset = max(0, d.offset-10)
+		} else {
+			d.offset = min(dashboardLines, d.offset+10)
+		}
 	case tcell.KeyPgDn:
-		d.focus, d.offset = 2, max(0, d.offset-10)
+		d.focus = 2
+		if dashboardBuildActive(d.dashboardSnapshot) && d.buildDetails {
+			d.offset = min(dashboardLines, d.offset+10)
+		} else {
+			d.offset = max(0, d.offset-10)
+		}
 	case tcell.KeyEnd:
+		d.offset = 0
+	}
+	if event.Key() == tcell.KeyRune && event.Rune() == 'a' {
+		d.buildDetails = false
+		d.buildSelected = -1
 		d.offset = 0
 	}
 	return false
@@ -520,8 +714,17 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	s := d.snapshot()
 	width, height := screen.Size()
 	content := max(0, height-5)
+	screen.SetStyle(tcell.StyleDefault.Background(tcell.NewHexColor(0x1c2633)).Foreground(tcell.ColorLightSteelBlue))
 	screen.Clear()
 	d.header.SetText(fmt.Sprintf("[lightcyan::b] NKE · local ARM64 build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]", max(time.Duration(0), now.Sub(s.started)).Truncate(time.Second)))
+	if dashboardBuildActive(s) && !canceling {
+		d.drawBuild(screen, s, now, width, height)
+		return
+	}
+	d.phasesView.SetTitle(" Phase map ")
+	d.phasesView.SetWrap(true)
+	d.stateView.SetTitle(" Observed state ")
+	d.activityView.SetWrap(false)
 	var phases strings.Builder
 	names := [...]string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"}
 	colors := map[string]string{"pending": "goldenrod", "running": "lightcyan", "observed": "lightsteelblue", "complete": "lightgreen", "failed": "lightcoral", "stopped": "lightsteelblue"}
@@ -583,7 +786,9 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		state += "\nETA unknown; no completion estimate reported"
 	}
 	d.stateView.SetText(state)
-	d.activityView.SetText(tview.Escape(strings.Join(s.activity, "\n")))
+	activity := s.activity
+	d.activityView.SetTitle(" Activity · public diagnostics ")
+	d.activityView.SetText(tview.Escape(strings.Join(activity, "\n")))
 	help := " Tab focus · PgUp/PgDn activity · End live · q confirm quit · Ctrl-C cancel"
 	if s.confirmCancel {
 		help = " Cancel this demo and clean up its resources? y/N"
@@ -616,7 +821,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	d.header.SetRect(0, 0, width, min(3, height))
 	d.footer.SetRect(0, max(0, height-2), width, min(2, height))
 	_, _, _, activityHeight := d.activityView.GetInnerRect()
-	d.activityView.ScrollTo(max(0, len(s.activity)-activityHeight-s.offset), 0)
+	d.activityView.ScrollTo(max(0, len(activity)-activityHeight-s.offset), 0)
 	for index, view := range []*tview.TextView{d.phasesView, d.stateView, d.activityView} {
 		color := tcell.ColorSlateGray
 		if index == s.focus {
