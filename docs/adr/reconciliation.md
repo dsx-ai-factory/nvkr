@@ -317,6 +317,23 @@ layout, bounded/sanitized snapshots, concurrent reports, cancellation joining an
 terminal failures. These are controlled presentation/race contracts, not a completed
 fresh E2E or live interruption acceptance for this candidate.
 
+Interactive Linux commands now suspend the dashboard for a bounded ordinary
+sudo prompt and revalidate authentication before each protected networking
+operation, including independently bounded cleanup. Redirected commands retain
+the cache-independent unattended check. No password is handled by the Go reader
+or diagnostic writer, and privileged operations are not replayed after failure.
+Controlled tests cover suspend/resume failures, repeated authentication and
+canceled-work cleanup. An isolated Linux ARM64 PTY test exercised child foreground
+ownership and terminal restoration after success and cancellation; this does not
+prove a real password policy or a complete fresh deployment with this change.
+
+The downstream tenant smoke now waits for the pinned CoreDNS Deployment and
+node-local DNS DaemonSet rollouts, within four minutes and the remaining tenant
+deadline. Node Ready alone does not establish DNS rollout readiness. The
+unchanged zero-retry workload still has to prove real cluster DNS and ARM64
+execution. Controlled failure/cancellation tests cover this gate; its addition
+has not yet passed a fresh complete E2E.
+
 [Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise
 bounded subprocess cancellation and joining; CLI tests exercise output-failure

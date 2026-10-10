@@ -116,7 +116,7 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			return runProgress(cmd.Context(), out, plain, func(ctx context.Context, progress io.Writer) error {
 				cfg.Progress = progress
 				return actions.run(ctx, cfg)
-			})
+			}, terminalSudoAuthenticator(out, cmd.ErrOrStderr()))
 		},
 	}
 	addRunFlags(command, &flags.Run, true)
@@ -173,7 +173,7 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 				}
 				_, err := fmt.Fprintln(progress, "PASS: recorded local network controls restored; no tenant, VM or management deletion was attempted.")
 				return err
-			})
+			}, terminalSudoAuthenticator(out, cmd.ErrOrStderr()))
 		},
 	}
 	command.Flags().StringVar(&flags.Restore.Work, "work", "", "original private Go demo workspace")
@@ -212,7 +212,7 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 				run.NKDCTL = built.NKDCTL
 				run.Runs = built.Runs
 				return actions.run(ctx, run)
-			})
+			}, terminalSudoAuthenticator(out, cmd.ErrOrStderr()))
 		},
 	}
 	addBuildFlags(command, &flags.Build)

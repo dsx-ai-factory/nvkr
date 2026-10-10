@@ -4,6 +4,7 @@
 package nkedemo
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
@@ -62,6 +64,79 @@ func TestTenantRejectsUnknownNetworkBeforeInventory(t *testing.T) {
 	entries, err := os.ReadDir(work)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("rejected network left output: %v %v", entries, err)
+	}
+}
+
+func TestTenantDNSRolloutIsBoundedAndFailClosed(t *testing.T) {
+	for _, name := range []string{"ready", "coredns failure", "node-local failure", "canceled", "deadline"} {
+		t.Run(name, func(t *testing.T) {
+			work := privateTestDir(t)
+			calls := filepath.Join(work, "calls")
+			writeTenantFixture(t, filepath.Join(work, "kubectl"), []byte(`#!/bin/sh
+set -eu
+printf '%s\n' "$*" >> "$CALLS"
+case "$FAIL:$*" in
+  "coredns failure:"*deployment/coredns*) exit 7 ;;
+  "node-local failure:"*daemonset/node-local-dns*) exit 7 ;;
+  "deadline:"*) exec sleep 60 ;;
+esac
+`), 0o700)
+			selected := tenant{session: ManagementSession{Work: work, Tools: work, Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "CALLS=" + calls, "FAIL=" + name}}}}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if name == "canceled" {
+				cancel()
+			}
+			if name == "deadline" {
+				var deadlineCancel context.CancelFunc
+				ctx, deadlineCancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer deadlineCancel()
+			}
+			err := selected.waitDNS(ctx, "owned-tenant-kubeconfig")
+			switch name {
+			case "ready":
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "canceled":
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("canceled readiness: %v", err)
+				}
+			case "deadline":
+				if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) {
+					t.Fatalf("readiness must preserve deadline and join child: %v", err)
+				}
+			default:
+				if CommandExitCode(err) != 7 {
+					t.Fatalf("rollout failure was hidden: %v", err)
+				}
+			}
+			raw, readErr := os.ReadFile(calls)
+			if name == "deadline" && os.IsNotExist(readErr) {
+				// A short remaining deadline may expire during process admission,
+				// before the shell runs; it must still prevent subsequent work.
+				return
+			}
+			if name == "canceled" {
+				if !os.IsNotExist(readErr) {
+					t.Fatalf("canceled readiness started a command: %v", readErr)
+				}
+				return
+			}
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			want := "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status deployment/coredns --timeout=240s\n"
+			if name == "ready" || name == "node-local failure" {
+				want += "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status daemonset/node-local-dns --timeout=240s\n"
+			}
+			if string(raw) != want {
+				t.Fatalf("unexpected readiness commands: %q", raw)
+			}
+			if _, statErr := os.Stat(filepath.Join(work, "workload.json")); !os.IsNotExist(statErr) {
+				t.Fatal("DNS rollout must not create or retry the smoke workload")
+			}
+		})
 	}
 }
 

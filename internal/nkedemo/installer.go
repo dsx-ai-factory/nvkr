@@ -123,7 +123,14 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 	if err = runner.Run(ctx, []string{"bash", script, "--check", "all"}, "installer-build-preflight", 120*time.Second); err != nil {
 		return result, err
 	}
-	if _, err = runner.Capture(ctx, networkSudoCommand([]string{"true"}), "installer-sudo-preflight", 40*time.Second); err != nil {
+	interactive, err := runner.authenticateSudo(ctx)
+	if err == nil {
+		_, err = runner.Capture(ctx, networkSudoCommand([]string{"true"}, interactive), "installer-sudo-preflight", 40*time.Second)
+	}
+	if err != nil {
+		if interactive {
+			return result, fmt.Errorf("interactive deployment networking authorization failed; authenticate in the original terminal before starting E2E; see docs/local-nke-demo.md: %w", err)
+		}
 		return result, fmt.Errorf("unattended deployment requires approved non-interactive networking authorization: `%s` failed; ask the host administrator to arrange access before starting E2E; temporary `sudo -v` credentials are deliberately ignored, not cleared; see docs/local-nke-demo.md: %w", networkSudoProbe, err)
 	}
 	if run.NKECheckout != "" {

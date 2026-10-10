@@ -67,6 +67,36 @@ type Runner struct {
 	output io.Writer
 }
 
+// SudoAuthorizer is an optional terminal bridge on a downstream progress writer.
+// A nil callback selects unattended execution. Authentication is not durable
+// authorization: each protected command still executes through sudo policy.
+// The presenter owns terminal admission, the bounded prompt and child joining;
+// this package never receives, stores or logs a password.
+type SudoAuthorizer interface {
+	SudoAuthentication() func(context.Context) error
+}
+
+func (r Runner) sudoAuthentication() func(context.Context) error {
+	if presenter, ok := r.Progress.(SudoAuthorizer); ok {
+		return presenter.SudoAuthentication()
+	}
+	return nil
+}
+
+func (r Runner) authenticateSudo(ctx context.Context) (bool, error) {
+	if err := requireContext(ctx); err != nil {
+		return false, err
+	}
+	authenticate := r.sudoAuthentication()
+	if authenticate == nil {
+		return false, nil
+	}
+	if err := authenticate(ctx); err != nil {
+		return true, err
+	}
+	return true, requireContext(ctx)
+}
+
 type boundedDiagnostic struct {
 	mu           sync.Mutex
 	writer       io.Writer
@@ -236,6 +266,45 @@ func (p *OwnedProcess) finish() {
 	p.waitErr, p.joinErr = waitErr, joinErr
 	p.mu.Unlock()
 	close(p.done)
+}
+
+func (p *OwnedProcess) waitOwned(ctx context.Context) error {
+	select {
+	case <-p.done:
+		return nil
+	case <-ctx.Done():
+		// Kernel-blocked work can survive KILL. Preserve the unsafe owner state
+		// rather than blocking forever or releasing dependent controls.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
+		defer cancel()
+		return errors.Join(p.Stop(cleanupCtx), ctx.Err())
+	}
+}
+
+// RunAuthenticationCommand reuses the downstream process owner while retaining
+// the caller's direct terminal streams. It never captures or logs authentication
+// input/output. The presenter admits the terminal and supplies a bounded context.
+func RunAuthenticationCommand(ctx context.Context, cmd *exec.Cmd) error {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	if _, bounded := ctx.Deadline(); !bounded || cmd == nil || cmd.Path == "" || cmd.Cancel == nil {
+		return errors.New("authentication requires a bounded context and CommandContext command")
+	}
+	if err := ownedcmd.ConfigureCancellation(cmd, ownedcmd.DefaultTerminationGrace); err != nil {
+		return err
+	}
+	p := &OwnedProcess{cmd: cmd, phase: "sudo-authentication", done: make(chan struct{}), groupProbe: groupAlive, groupSignal: signalGroup}
+	if err := cmd.Start(); err != nil {
+		return errors.Join(err, ctx.Err())
+	}
+	go p.finish()
+	if err := p.waitOwned(ctx); errors.Is(err, ErrUnjoined) {
+		return err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return errors.Join(p.waitErr, p.joinErr, ctx.Err())
 }
 
 // Stop sends TERM to the exact live group, then escalates to KILL and joins.
@@ -465,19 +534,9 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 	if err != nil {
 		return nil, err
 	}
-	select {
-	case <-p.done:
-	case <-ctx.Done():
-		// A child blocked in the kernel can outlive SIGKILL. Bound our join,
-		// report ErrUnjoined, and retain its dependent controls instead of
-		// waiting indefinitely or claiming the command has stopped.
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
-		joinErr := p.Stop(cleanupCtx)
-		cleanupCancel()
-		if joinErr != nil {
-			raw, diagnosticErr := p.stdout.result()
-			return raw, errors.Join(joinErr, ctx.Err(), diagnosticErr)
-		}
+	if err := p.waitOwned(ctx); errors.Is(err, ErrUnjoined) {
+		raw, diagnosticErr := p.stdout.result()
+		return raw, errors.Join(err, diagnosticErr)
 	}
 	p.observeProcessExit()
 	raw, outErr := p.stdout.result()

@@ -374,6 +374,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	if err != nil {
 		return err
 	}
+	if err = t.waitDNS(provision, kubeconfig); err != nil {
+		return err
+	}
 	job := filepath.Join(t.session.Work, "workload.json")
 	progress.update(time.Now(), "tenant-workload", nodes.Items)
 	if err = privateJSON(job, workloadJob()); err != nil {
@@ -421,6 +424,28 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 		Domains               []domainEvidence
 		Workload              json.RawMessage
 	}{"unqualified-local-demo", t.name, t.id, nodes.Items, domains, raw})
+}
+
+// Node Ready does not mean the pinned NKE DNS workloads have finished rolling
+// out. Wait for their owning controllers before running the unchanged DNS
+// smoke test; rollout completion alone is not functional DNS acceptance.
+func (t *tenant) waitDNS(ctx context.Context, kubeconfig string) (result error) {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	boundary := beginProgress(t.session.Runner.Progress, "tenant-dns-readiness", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { boundary.finish(result) }()
+	ready, cancel := context.WithTimeout(ctx, 4*time.Minute)
+	defer cancel()
+	for _, resource := range []struct{ name, phase string }{
+		{"deployment/coredns", "dns-coredns-rollout"},
+		{"daemonset/node-local-dns", "dns-node-local-rollout"},
+	} {
+		if _, err := t.capture(ready, t.kubectl(kubeconfig, "-n", "kube-system", "rollout", "status", resource.name, "--timeout=240s"), resource.phase, 4*time.Minute); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type workload struct {

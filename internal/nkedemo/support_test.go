@@ -323,6 +323,88 @@ func TestOwnedProcessDescendantAfterLeader(t *testing.T) {
 	// nevertheless join the descendant before returning this ordinary failure.
 }
 
+func TestAuthenticationCommandOwnership(t *testing.T) {
+	for _, scenario := range []string{"success", "exit", "cancel", "descendant"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "/bin/sh", "-c", "exit 0")
+			cmd.Env = []string{"PATH=/usr/bin:/bin"}
+			switch scenario {
+			case "exit":
+				cmd.Args = []string{"/bin/sh", "-c", "exit 7"}
+			case "cancel":
+				cmd.Args = []string{"/bin/sh", "-c", "exec sleep 60"}
+				timer := time.AfterFunc(100*time.Millisecond, cancel)
+				defer timer.Stop()
+			case "descendant":
+				if runtime.GOOS != "linux" {
+					t.Skip("real orphan-group admission is Linux-only")
+				}
+				program, err := os.Executable()
+				if err != nil {
+					t.Fatal(err)
+				}
+				cmd = exec.CommandContext(ctx, program, "-test.run=TestSupportHelperProcess")
+				cmd.Env = []string{"NKD_SUPPORT_HELPER=orphan"}
+			}
+			err := RunAuthenticationCommand(ctx, cmd)
+			if errors.Is(err, ErrUnjoined) {
+				t.Fatal(err)
+			}
+			switch scenario {
+			case "cancel":
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("cancellation lost: %v", err)
+				}
+			case "exit":
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || exit.ExitCode() != 7 {
+					t.Fatalf("exit lost: %v", err)
+				}
+			default:
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if cmd.Process == nil || cmd.ProcessState == nil {
+				t.Fatal("direct authentication child was not joined")
+			}
+			if alive, err := groupAlive(cmd.Process.Pid); err != nil || alive {
+				t.Fatalf("authentication descendants survive: alive=%t error=%v", alive, err)
+			}
+		})
+	}
+}
+
+func TestAuthenticationCommandAdmission(t *testing.T) {
+	for _, scenario := range []string{"nil-context", "unbounded", "canceled", "nil-command", "not-command-context"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "/bin/sh", "-c", "exit 0")
+			switch scenario {
+			case "nil-context":
+				ctx = nil
+			case "unbounded":
+				ctx = context.WithoutCancel(ctx)
+			case "canceled":
+				cancel()
+			case "nil-command":
+				cmd = nil
+			case "not-command-context":
+				cmd = exec.Command("/bin/sh", "-c", "exit 0")
+			}
+			if err := RunAuthenticationCommand(ctx, cmd); err == nil {
+				t.Fatal("unsafe authentication command admitted")
+			}
+			if cmd != nil && cmd.Process != nil {
+				t.Fatal("authentication launched before admission")
+			}
+		})
+	}
+}
+
 func TestUnjoinedIdentityAndExitClassification(t *testing.T) {
 	for _, cause := range []error{ErrUnjoined, context.Canceled, context.DeadlineExceeded} {
 		err := errors.Join(&CommandError{Phase: "cleanup", ExitCode: 1, Cause: errors.New("exit")}, cause)
@@ -333,5 +415,10 @@ func TestUnjoinedIdentityAndExitClassification(t *testing.T) {
 	p := &OwnedProcess{cmd: &exec.Cmd{Process: &os.Process{Pid: 123}}, phase: "fixture", done: make(chan struct{}), groupSignal: func(int, unix.Signal) error { return unix.EPERM }}
 	if err := p.Stop(t.Context()); !errors.Is(err, ErrUnjoined) {
 		t.Fatalf("permission failure lost: %v", err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := p.waitOwned(ctx); !errors.Is(err, ErrUnjoined) || !errors.Is(err, context.Canceled) {
+		t.Fatalf("unsafe authentication join lost: %v", err)
 	}
 }

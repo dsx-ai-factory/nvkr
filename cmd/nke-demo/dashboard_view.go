@@ -307,6 +307,8 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Install and check the NKE site stack"
 	case "tenant-provisioning":
 		return 3, "Provision QCOW2 control plane and worker"
+	case "tenant-dns-readiness", "tenant-dns-coredns-rollout", "tenant-dns-node-local-rollout":
+		return 4, "Wait for CoreDNS and node-local DNS rollout before the smoke test"
 	case "tenant-cleanup":
 		return 5, "Clean up the owned tenant"
 	case "tenant-diagnostics":

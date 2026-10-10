@@ -883,6 +883,113 @@ func TestNetworkProtectedHelperOwnsInnerDeadline(t *testing.T) {
 	}
 }
 
+type sudoAuthenticationProgress struct {
+	authenticate func(context.Context) error
+}
+
+func (p *sudoAuthenticationProgress) Write(raw []byte) (int, error) { return len(raw), nil }
+func (p *sudoAuthenticationProgress) SudoAuthentication() func(context.Context) error {
+	return p.authenticate
+}
+
+func TestNetworkInteractiveSudoBoundary(t *testing.T) {
+	for _, scenario := range []string{"absent", "nil", "authenticated", "recheck-cleanup", "authentication-failed", "unjoined", "sudo-failed", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			g := networkFixture(t)
+			tools := privateTestDir(t)
+			calls, admitted := filepath.Join(tools, "calls"), filepath.Join(tools, "admitted")
+			script := fmt.Sprintf("#!/bin/sh\nprintf 'command\\n' >> %q\nprintf '%%s\\n' \"$@\"\n", calls)
+			if scenario == "authenticated" || scenario == "recheck-cleanup" {
+				script += fmt.Sprintf("test -f %q || exit 99\n", admitted)
+			}
+			if scenario == "sudo-failed" {
+				script += "exit 42\n"
+			}
+			if err := os.WriteFile(filepath.Join(tools, "sudo"), []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			g.runner.Env = []string{"PATH=" + tools + ":/usr/bin:/bin"}
+			authCalls := 0
+			failure := errors.New("authentication refused")
+			if scenario != "absent" {
+				presenter := &sudoAuthenticationProgress{}
+				if scenario != "nil" {
+					presenter.authenticate = func(ctx context.Context) error {
+						authCalls++
+						if err := ctx.Err(); err != nil {
+							t.Fatal("canceled context reached authentication")
+						}
+						if scenario == "authentication-failed" {
+							return failure
+						}
+						if scenario == "unjoined" {
+							return ErrUnjoined
+						}
+						return os.WriteFile(admitted, []byte("authenticated"), 0600)
+					}
+				}
+				g.runner.Progress = presenter
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			raw, err := g.Command(ctx, []string{"true"}, true)
+			wantCalls := 1
+			switch scenario {
+			case "authentication-failed", "unjoined", "canceled":
+				wantCalls = 0
+				cause := map[string]error{"authentication-failed": failure, "unjoined": ErrUnjoined, "canceled": context.Canceled}[scenario]
+				if !errors.Is(err, cause) || len(raw) != 0 || g.unjoined.Load() != (scenario == "unjoined") {
+					t.Fatalf("failed admission: output=%q error=%v unjoined=%t", raw, err, g.unjoined.Load())
+				}
+			case "sudo-failed":
+				if CommandExitCode(err) != 42 {
+					t.Fatalf("actual sudo failure lost: %v", err)
+				}
+			default:
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := []string{"-n", "timeout", "--signal=TERM", "--kill-after=5", "25", "true"}
+				if scenario == "absent" || scenario == "nil" {
+					want = append([]string{"-n", "-k"}, want[1:]...)
+				}
+				if !slices.Equal(strings.Fields(string(raw)), want) {
+					t.Fatalf("sudo arguments=%q, want %v", raw, want)
+				}
+			}
+			if scenario == "recheck-cleanup" {
+				g.cleaning = true
+				if _, err := g.Command(t.Context(), []string{"true"}, true); err != nil {
+					t.Fatal(err)
+				}
+				wantCalls = 2
+			}
+			if err == nil {
+				if _, err := g.Command(t.Context(), []string{"true"}, false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			log, readErr := os.ReadFile(calls)
+			if wantCalls == 0 && !errors.Is(readErr, os.ErrNotExist) || wantCalls != 0 && (readErr != nil || strings.Count(string(log), "command\n") != wantCalls) {
+				t.Fatalf("command replay/admission: calls=%q error=%v, want %d", log, readErr, wantCalls)
+			}
+			wantAuth := wantCalls
+			switch scenario {
+			case "absent", "nil", "canceled":
+				wantAuth = 0
+			case "authentication-failed", "unjoined":
+				wantAuth = 1
+			}
+			if authCalls != wantAuth {
+				t.Fatalf("auth calls=%d, want %d", authCalls, wantAuth)
+			}
+		})
+	}
+}
+
 func TestNetworkUnattendedSudoAdmissionDiagnostics(t *testing.T) {
 	for _, canceled := range []bool{false, true} {
 		t.Run(fmt.Sprintf("canceled=%t", canceled), func(t *testing.T) {

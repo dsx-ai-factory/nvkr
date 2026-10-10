@@ -48,11 +48,16 @@ var networkTools = []string{"sudo", "timeout", "ip", "iptables", "dnsmasq", "set
 
 const networkSudoProbe = "sudo -n -k timeout --signal=TERM --kill-after=5 25 true"
 
-// Ignore cached credentials for this command, without invalidating the user's
-// timestamp. Admission and execution must require the same unattended policy;
-// a successful sudo -v in another terminal is not hours-long authorization.
-func networkSudoCommand(args []string) []string {
-	return append([]string{"sudo", "-n", "-k", "timeout", "--signal=TERM", "--kill-after=5", "25"}, args...)
+// Unattended commands ignore cached credentials without invalidating the user's
+// timestamp. The explicit interactive bridge reauthenticates before each command;
+// sudo -n still refuses expired credentials or a denied policy without replay.
+func networkSudoCommand(args []string, interactive bool) []string {
+	prefix := []string{"sudo", "-n"}
+	if !interactive {
+		prefix = append(prefix, "-k")
+	}
+	prefix = append(prefix, "timeout", "--signal=TERM", "--kill-after=5", "25")
+	return append(prefix, args...)
 }
 
 type networkFileID struct {
@@ -342,6 +347,9 @@ func (g *NetworkGuard) admit(ctx context.Context) error {
 		return fmt.Errorf("network journal exists or cannot be inspected; recover original work directory")
 	}
 	if _, err := g.Command(ctx, []string{"true"}, true); err != nil {
+		if g.runner.sudoAuthentication() != nil {
+			return fmt.Errorf("interactive networking authorization failed; authenticate in the original terminal and retry network recovery if controls remain; see docs/local-nke-demo.md: %w", err)
+		}
 		return fmt.Errorf("required unattended networking authorization failed; check `%s` (ignores temporary cached credentials without clearing them); see docs/local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host: %w", networkSudoProbe, err)
 	}
 	var links []networkLink
@@ -447,10 +455,17 @@ func (g *NetworkGuard) Command(ctx context.Context, args []string, privileged bo
 		}
 		return raw, err
 	}
-	if privileged {
-		args = networkSudoCommand(args)
-	}
 	runner := g.runner
+	if privileged {
+		interactive, err := runner.authenticateSudo(ctx)
+		if err != nil {
+			if errors.Is(err, ErrUnjoined) {
+				g.unjoined.Store(true)
+			}
+			return nil, fmt.Errorf("network sudo authentication: %w", err)
+		}
+		args = networkSudoCommand(args, interactive)
+	}
 	// Inventory and absence checks legitimately return nonzero status. Keep
 	// their private numbered logs and errors, but report progress at the owning
 	// setup/cleanup boundary only, after that status has been interpreted.

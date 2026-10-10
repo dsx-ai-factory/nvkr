@@ -192,9 +192,12 @@ After SIGKILL/OOM or VM restart:
    find .nkd -name network-state.json -print
    DEMO_OUT="$PWD/.nkd/demo-e2e-01-demo"
    test -f "$DEMO_OUT/network-state.json" &&
-   sudo -n -k timeout --signal=TERM --kill-after=5 25 true &&
    "$NKE_DEMO" restore --work "$DEMO_OUT"
    ```
+
+   In an interactive Linux terminal, recovery pauses for sudo authentication if
+   needed. Redirected or unattended recovery instead requires approved
+   non-interactive access; check `sudo -n -k timeout --signal=TERM --kill-after=5 25 true`.
 
 4. This restores only recorded host-network controls; it does not delete tenants,
    VMs, Kind or registry containers. Require success before a new attempt.

@@ -159,14 +159,20 @@ The libvirt session must be empty. The demo refuses occupied resources and
 overlapping networks. Python 3.12+ is an upstream NKE installer prerequisite;
 the demo itself is Go. No host Go, Packer or Helm is required.
 
-Check unattended administrator access before starting the hours-long build:
+Run the demo from an interactive Linux terminal. It validates administrator
+authentication before building and checks it again before privileged networking
+operations. When authentication expires, the dashboard pauses for the ordinary
+sudo password prompt and resumes afterward. The main demo remains unprivileged;
+passwords go directly to sudo, not through the demo's logs.
+
+For a redirected or unattended run, check non-interactive administrator access:
 
 ```sh
 sudo -n -k timeout --signal=TERM --kill-after=5 25 true
 ```
 
-E2E checks this exact bounded networking command before fetching its installer
-or starting artifact builds. `-n` forbids password prompts; `-k` with a command
+In that unattended mode, E2E checks this exact bounded networking command before
+fetching its installer or starting artifact builds. `-n` forbids password prompts; `-k` with a command
 ignores cached credentials for that invocation without clearing your timestamp.
 Unlike `sudo -n true`, this tests the command wrapper used for privileged network
 setup and cleanup, without accepting a temporary `sudo -v` cache. Success admits
@@ -202,12 +208,13 @@ unprivileged: keep the host's default privileged-port threshold and do not grant
 file capabilities to the demo executable. DNS/DHCP capabilities are granted only
 to the private dnsmasq copy and journaled for restoration.
 
-If it says `interactive authentication is required`, stop and arrange approved
-non-interactive sudo access with the host administrator. Deployment and cleanup
-use `sudo -n` for host networking and temporary grants. A one-time `sudo -v`
-only caches authentication temporarily and may expire before deployment; it is
-not a reliable setup for the complete E2E. Do not run the whole demo as root or
-automatically change sudoers to bypass this gate. See Ubuntu's
+Interactive authentication has a two-minute deadline; Ctrl+C cancels it.
+Cleanup can request authentication again after a long build. Do not pipe or
+redirect the interactive demo's standard streams: those runs cannot prompt and
+require approved unattended access. The protected operations still use bounded
+`sudo -n`; a denied operation is not retried. Authentication does not override
+command-specific sudo policy. Do not run the whole demo as root or change
+sudoers to bypass a failure. See Ubuntu's
 [sudo timestamp documentation](https://manpages.ubuntu.com/manpages/resolute/man5/sudoers_timestamp.5.html).
 
 Git authorization must work **inside Linux**. The example fetches pinned remote

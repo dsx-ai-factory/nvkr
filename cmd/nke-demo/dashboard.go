@@ -24,9 +24,9 @@ func dashboardEligible(out io.Writer, plain, verbose bool) bool {
 		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logPath string, plain bool, work func(context.Context, io.Writer) error) error {
+func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logPath string, plain bool, work func(context.Context, io.Writer) error, auth ...func(context.Context) error) error {
 	if !dashboardEligible(out, plain, verbose) {
-		return progressOutput(ctx, out, raw, verbose, logPath, work)
+		return progressOutput(ctx, out, raw, verbose, logPath, work, auth...)
 	}
 	if err := ctx.Err(); err != nil {
 		return nkderr.Wrap(nkderr.CodeTimeout, err, "demo canceled before terminal setup")
@@ -45,6 +45,9 @@ func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logP
 	}
 	view := newDashboard()
 	writer := &checkedWriter{out: view, observer: view, raw: raw, remaining: 8 << 20, started: time.Now(), phases: make(map[string]time.Time), cancel: cancel}
+	if len(auth) > 0 {
+		writer.sudoAuth = auth[0]
+	}
 	if logPath != "" {
 		writer.emit(fmt.Sprintf("Build log (private, retained; maximum 8 MiB): %q\n", logPath))
 	}
@@ -156,13 +159,42 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 	view.mu.Lock()
 	view.forceAvailable = forceExit != nil
 	view.mu.Unlock()
-	events := make(chan tcell.Event, 8)
-	quit, pumpDone := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(pumpDone)
-		screen.ChannelEvents(events, quit)
-	}()
-	defer func() { close(quit); <-pumpDone }()
+	var events chan tcell.Event
+	var quit, pumpDone chan struct{}
+	startPump := func() {
+		events = make(chan tcell.Event, 8)
+		quit, pumpDone = make(chan struct{}), make(chan struct{})
+		go func(events chan tcell.Event, quit, pumpDone chan struct{}) {
+			defer close(pumpDone)
+			screen.ChannelEvents(events, quit)
+		}(events, quit, pumpDone)
+	}
+	stopPump := func() {
+		if quit != nil {
+			close(quit)
+			<-pumpDone
+			quit, events = nil, nil
+		}
+	}
+	startPump()
+	defer stopPump()
+	requests, presenterDone := make(chan sudoRequest), make(chan struct{})
+	endPresenter := sync.OnceFunc(func() { close(presenterDone) })
+	defer endPresenter()
+	authenticate := writer.sudoAuth
+	if authenticate != nil {
+		writer.sudoAuth = func(authCtx context.Context) error {
+			request := sudoRequest{ctx: authCtx, result: make(chan error, 1)}
+			select {
+			case requests <- request:
+			case <-authCtx.Done():
+				return authCtx.Err()
+			case <-presenterDone:
+				return nkderr.New(nkderr.CodePreflightFailed, "administrator authentication presenter ended")
+			}
+			return <-request.result
+		}
+	}
 	done := make(chan error, 1)
 	go func() {
 		var err error
@@ -179,6 +211,7 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 		if recover() != nil {
 			result = errors.Join(result, nkderr.New(nkderr.CodePreflightFailed, "terminal rendering failed; work canceled"))
 		}
+		endPresenter()
 		cancel()
 		if !joined {
 			result = errors.Join(result, <-done)
@@ -200,6 +233,26 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 			}
 		}
 		select {
+		case request := <-requests:
+			if !drawing {
+				request.result <- nkderr.New(nkderr.CodePreflightFailed, "terminal unavailable for administrator authentication")
+				continue
+			}
+			// Suspend closes tcell's event stream. Join its pump deliberately,
+			// then restore normal terminal input for sudo and start a new pump.
+			stopPump()
+			resumed, authErr := suspendForAuthentication(request.ctx, screen, authenticate)
+			if resumed {
+				startPump()
+			} else {
+				drawing = false
+			}
+			request.result <- authErr
+			if !drawing {
+				presentationErr = errors.Join(presentationErr, authErr)
+				canceling = true
+				cancel()
+			}
 		case result := <-done:
 			joined = true
 			// Completion events can arrive after the last refresh. Render the

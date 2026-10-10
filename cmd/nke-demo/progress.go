@@ -20,13 +20,13 @@ import (
 
 // Plain work stays synchronous; the terminal presenter owns and joins its one
 // worker. Neither output mode bypasses child-process joins or cleanup.
-func runProgress(ctx context.Context, out io.Writer, plain bool, work func(context.Context, io.Writer) error) error {
-	return presentProgress(ctx, out, nil, false, "", plain, work)
+func runProgress(ctx context.Context, out io.Writer, plain bool, work func(context.Context, io.Writer) error, auth ...func(context.Context) error) error {
+	return presentProgress(ctx, out, nil, false, "", plain, work, auth...)
 }
 
 // Allocate a private retained log only after command/configuration admission.
 // Deployment captures remain private in their existing owner, not this stream.
-func runBuildProgress(ctx context.Context, out io.Writer, verbose, plain bool, work func(context.Context, io.Writer) error) (result error) {
+func runBuildProgress(ctx context.Context, out io.Writer, verbose, plain bool, work func(context.Context, io.Writer) error, auth ...func(context.Context) error) (result error) {
 	if err := ctx.Err(); err != nil {
 		return nkderr.Wrap(nkderr.CodeTimeout, err, "build progress canceled")
 	}
@@ -39,13 +39,16 @@ func runBuildProgress(ctx context.Context, out io.Writer, verbose, plain bool, w
 			result = errors.Join(result, nkderr.Wrap(nkderr.CodePreflightFailed, err, "close build log"))
 		}
 	}()
-	return presentProgress(ctx, out, log, verbose, log.Name(), plain, work)
+	return presentProgress(ctx, out, log, verbose, log.Name(), plain, work, auth...)
 }
 
-func progressOutput(ctx context.Context, out, raw io.Writer, verbose bool, logPath string, work func(context.Context, io.Writer) error) error {
+func progressOutput(ctx context.Context, out, raw io.Writer, verbose bool, logPath string, work func(context.Context, io.Writer) error, auth ...func(context.Context) error) error {
 	workCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	writer := &checkedWriter{out: out, raw: raw, verbose: verbose, remaining: 8 << 20, started: time.Now(), phases: make(map[string]time.Time), cancel: cancel}
+	if len(auth) > 0 {
+		writer.sudoAuth = auth[0]
+	}
 	if logPath != "" {
 		writer.emit(fmt.Sprintf("Build log (private, retained; maximum 8 MiB): %q\nUse --verbose to stream raw public build output.\n", logPath))
 		if err := writer.failure(); err != nil {
@@ -78,6 +81,7 @@ type checkedWriter struct {
 	failedPhase string
 	tenantStage string
 	observer    nkedemo.ProgressReporter
+	sudoAuth    func(context.Context) error
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.

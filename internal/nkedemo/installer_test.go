@@ -20,7 +20,7 @@ import (
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
-	for _, name := range []string{"remote", "local", "sibling", "override", "diagnostic", "budget-minimum", "budget-maximum", "budget-low", "budget-high", "budget-overflow", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed", "network-invalid-gateway", "simulator-port-busy"} {
+	for _, name := range []string{"remote", "local", "sibling", "override", "diagnostic", "interactive", "interactive-auth-failed", "interactive-sudo-failed", "budget-minimum", "budget-maximum", "budget-low", "budget-high", "budget-overflow", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed", "network-invalid-gateway", "simulator-port-busy"} {
 		t.Run(name, func(t *testing.T) {
 			root := privateTestDir(t)
 			repo, tools, calls := filepath.Join(root, "repo"), filepath.Join(root, "tools"), filepath.Join(root, "calls")
@@ -40,6 +40,9 @@ func TestPrepareInstallerPinnedAttempt(t *testing.T) {
 			// policy fixture. Only the exact cache-independent runtime probe
 			// can expose the missing unattended authorization before Git/builds.
 			write(filepath.Join(tools, "sudo"), "#!/bin/sh\nif [ \"$*\" = '-n true' ]; then exit 0; fi\n[ \"$*\" = '-n -k timeout --signal=TERM --kill-after=5 25 true' ] && [ \"${FAIL:-}\" != sudo ]\n")
+			if strings.HasPrefix(name, "interactive") {
+				write(filepath.Join(tools, "sudo"), fmt.Sprintf("#!/bin/sh\ntest -f %q || exit 99\n[ \"$*\" = '-n timeout --signal=TERM --kill-after=5 25 true' ] && [ \"${FAIL:-}\" != interactive-sudo-failed ]\n", filepath.Join(root, "authenticated")))
+			}
 			imageCalls := filepath.Join(root, "image-calls")
 			write(filepath.Join(tools, "docker"), fmt.Sprintf("#!/bin/sh\nset -eu\nFAIL=%q\nIMAGE_CALLS=%q\nKIND=%q\nREGISTRY=%q\nKIND_ID=%q\n", name, imageCalls, kindNodeImage, registryImage, kindNodeID)+`
 if [ "$1:$2:$3" = network:inspect:kind ]; then
@@ -93,6 +96,17 @@ esac
 			// helper, owns its use of Python.
 			write(filepath.Join(tools, "python3"), "#!/bin/sh\nexit 9\n")
 			runner := Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "CALLS=" + calls, "PIN=" + InstallerCommit, "FAIL=" + name, "FETCH_STARTED=" + started}}
+			authCalls := 0
+			authFailure := errors.New("terminal authentication refused")
+			if strings.HasPrefix(name, "interactive") {
+				runner.Progress = &sudoAuthenticationProgress{authenticate: func(ctx context.Context) error {
+					authCalls++
+					if name == "interactive-auth-failed" {
+						return authFailure
+					}
+					return os.WriteFile(filepath.Join(root, "authenticated"), []byte("admitted"), 0600)
+				}}
+			}
 			build := BuildConfig{Repository: repo, AttemptPrefix: "fresh", Jobs: 2}
 			run := Config{Out: filepath.Join(root, "out"), Timeout: time.Hour}
 			switch name {
@@ -207,12 +221,18 @@ esac
 				}
 				actual, err = prepareInstaller(ctx, build, run, runner, admission)
 			}
-			success := name == "remote" || name == "local" || name == "sibling" || name == "override" || name == "diagnostic" || name == "budget-minimum" || name == "budget-maximum"
+			success := name == "remote" || name == "local" || name == "sibling" || name == "override" || name == "diagnostic" || name == "interactive" || name == "budget-minimum" || name == "budget-maximum"
 			if (err == nil) != success {
 				t.Fatalf("result=%+v error=%v", actual, err)
 			}
+			if strings.HasPrefix(name, "interactive") && authCalls != 1 {
+				t.Fatalf("authentication calls=%d, want exactly one", authCalls)
+			}
+			if name == "interactive-auth-failed" && !errors.Is(err, authFailure) {
+				t.Fatalf("authentication cause lost: %v", err)
+			}
 			if !success {
-				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure || networkFailure || strings.HasPrefix(name, "kernel") || name == "simulator-port-busy" || strings.HasPrefix(name, "budget-") {
+				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "interactive-") || strings.HasPrefix(name, "output-") || imageFailure || networkFailure || strings.HasPrefix(name, "kernel") || name == "simulator-port-busy" || strings.HasPrefix(name, "budget-") {
 					if _, e := os.Lstat(calls); !errors.Is(e, os.ErrNotExist) {
 						t.Fatal("failed preflight reached Git acquisition")
 					}
