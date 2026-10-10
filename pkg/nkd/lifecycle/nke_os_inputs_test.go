@@ -36,10 +36,6 @@ func TestNKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.T
 			environment: "environment-local-linux-arm64-docker.yaml", arch: "arm64",
 			root: "nke-node-image", installer: "ubuntu-installer-iso",
 			patched: "nke-patched-installer-iso", wantKVM: true},
-		{name: "macOS Podman TCG", definition: "definition-arm64-tcg.yaml",
-			environment: "environment-local-macos-apple-m4-pro-podman.yaml", arch: "arm64",
-			root: "nke-node-image", installer: "ubuntu-installer-iso",
-			patched: "nke-patched-installer-iso", wantCPU: "cortex-a57"},
 		{name: "amd64 native KVM", definition: "definition-amd64-kvm.yaml",
 			environment: "environment-local-linux-amd64-docker.yaml", arch: "amd64",
 			root: "nke-node-image-amd64", installer: "ubuntu-installer-iso-amd64",
@@ -136,10 +132,10 @@ func TestNKEOSExecutionModesRejectCrossedEnvironments(t *testing.T) {
 	for _, test := range []struct {
 		name, definition, environment string
 	}{
-		{name: "TCG cannot select KVM", definition: "definition-arm64-tcg.yaml",
+		{name: "ARM64 cannot select AMD64 host", definition: "definition-arm64-kvm.yaml",
+			environment: "environment-local-linux-amd64-docker.yaml"},
+		{name: "AMD64 cannot select ARM64 host", definition: "definition-amd64-kvm.yaml",
 			environment: "environment-local-linux-arm64-docker.yaml"},
-		{name: "KVM cannot fall back to TCG", definition: "definition-arm64-kvm.yaml",
-			environment: "environment-local-macos-apple-m4-pro-podman.yaml"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := filepath.Join("definitions", "nke-os")

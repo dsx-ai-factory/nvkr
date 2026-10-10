@@ -206,7 +206,7 @@ func admitSourceFetchGitConfiguration(opts RunOptions, executable string, prefix
 	// are refused. Worktree/partial-clone configuration is not a held v1 source.
 	query := append([]string{"--no-pager"}, prefix...)
 	query = append(query, "config", "--local", "--no-includes", "--name-only", "--null", "--get-regexp",
-		`^(filter|include|includeif|hook|url)\.|^extensions\.(worktreeconfig|partialclone)$|^remote\..*\.promisor$|^core\.alternaterefscommand$`)
+		sourcegit.UnsupportedConfiguration)
 	cmd := execCmd(opts, executable, query...)
 	cmd.Env = append(baseline, "HOME="+homePath, "XDG_CONFIG_HOME="+homePath, "GIT_ALLOW_PROTOCOL=https:file")
 	cmd.ExtraFiles = files

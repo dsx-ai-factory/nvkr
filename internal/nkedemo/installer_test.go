@@ -6,6 +6,7 @@ package nkedemo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,11 +37,20 @@ func TestPrepareInstallerPinnedAttempt(t *testing.T) {
 			write(filepath.Join(tools, "sudo"), "#!/bin/sh\n[ \"$1:$2\" = -n:true ] && [ \"${FAIL:-}\" != sudo ]\n")
 			// This command fixture tests ownership and exact invocation, not Git
 			// authorization or an externally fetched commit.
-			write(filepath.Join(tools, "git"), `#!/bin/sh
+			started := filepath.Join(root, "fetch-started")
+			write(filepath.Join(tools, "git"), fmt.Sprintf("#!/bin/sh\nCALLS=%q\nPIN=%q\nFAIL=%q\nFETCH_STARTED=%q\n", calls, InstallerCommit, name, started)+`
 set -eu
+while [ "$#" -gt 0 ]; do
+case "$1" in
+--no-replace-objects|--literal-pathspecs|--no-pager) shift ;;
+-C|-c) shift 2 ;;
+*) break ;;
+esac
+done
+if [ "$1" = config ]; then exit 1; fi
 printf '%s\n' "$*" >>"$CALLS"
 if [ "$1" = init ]; then mkdir "$3"; exit 0; fi
-case "$3" in
+case "$1" in
 fetch) if [ "${FAIL:-}" = cancel-fetch ]; then touch "$FETCH_STARTED"; exec sleep 60; fi; [ "${FAIL:-}" != fetch ] ;;
 checkout) : ;;
 rev-parse) if [ "${FAIL:-}" = wrong-pin ]; then printf foreign; else printf '%s' "$PIN"; fi ;;
@@ -51,7 +61,6 @@ esac
 			// Only presence is checked; the downstream NKE installer, not this
 			// helper, owns its use of Python.
 			write(filepath.Join(tools, "python3"), "#!/bin/sh\nexit 9\n")
-			started := filepath.Join(root, "fetch-started")
 			runner := Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "CALLS=" + calls, "PIN=" + InstallerCommit, "FAIL=" + name, "FETCH_STARTED=" + started}}
 			build := BuildConfig{Repository: repo, AttemptPrefix: "fresh", Jobs: 2}
 			run := Config{Out: filepath.Join(root, "out"), Timeout: time.Hour}
@@ -184,7 +193,7 @@ esac
 				if name == "local" {
 					source = build.NKEClone
 				}
-				if !strings.Contains(string(log), "fetch --no-tags --depth=1 "+source+" "+InstallerCommit+"\n") || !strings.Contains(string(log), "checkout --detach "+InstallerCommit+"\n") {
+				if !strings.Contains(string(log), "fetch --upload-pack=git-upload-pack --no-recurse-submodules --no-tags --depth=1 "+source+" "+InstallerCommit+"\n") || !strings.Contains(string(log), "checkout --detach "+InstallerCommit+"\n") {
 					t.Fatal("Git did not fetch and detach the exact pin")
 				}
 			}

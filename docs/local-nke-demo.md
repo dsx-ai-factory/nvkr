@@ -168,8 +168,9 @@ automatically change sudoers to bypass this gate. See Ubuntu's
 [sudo timestamp documentation](https://manpages.ubuntu.com/manpages/resolute/man5/sudoers_timestamp.5.html).
 
 Git authorization must work **inside Linux**. The example fetches pinned remote
-sources. Configure Git's credential helper there; only build commands inherit
-the developer's `HOME` for Git configuration, not deployment commands. For a
+sources. Configure Git's credential helper there. Source fetch projects that
+credential configuration only; checkout and status ignore global hooks, filters
+and line-ending settings. Deployment does not inherit source credentials. For a
 local NKE Git clone, use its absolute Linux path in
 `NKE_LOCAL_CLONE` and `build.nkeClone`; only committed pinned objects are used.
 

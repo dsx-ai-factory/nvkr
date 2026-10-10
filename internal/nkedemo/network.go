@@ -253,7 +253,7 @@ func (g *NetworkGuard) admit(ctx context.Context) error {
 		return fmt.Errorf("network journal exists or cannot be inspected; recover original work directory")
 	}
 	if _, err := g.Command(ctx, []string{"true"}, true); err != nil {
-		return err
+		return fmt.Errorf("could not verify required unattended sudo for local networking; verify sudo -n true and the administrator-access prerequisites in docs/local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host: %w", err)
 	}
 	var links []networkLink
 	if err := g.inventory(ctx, []string{"ip", "-j", "link", "show"}, &links); err != nil {

@@ -786,6 +786,43 @@ func TestNetworkProtectedHelperOwnsInnerDeadline(t *testing.T) {
 	}
 }
 
+func TestNetworkUnattendedSudoAdmissionDiagnostics(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("canceled=%t", canceled), func(t *testing.T) {
+			g := networkFixture(t)
+			g.lockPath = filepath.Join(g.Work, "test.lock")
+			tools := privateTestDir(t)
+			script := "#!/bin/sh\nprintf '%s\\n' 'private sudo authentication diagnostic' >&2\nexit 42\n"
+			if err := os.WriteFile(filepath.Join(tools, "sudo"), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			g.runner.Env = []string{"PATH=" + tools + ":/usr/bin:/bin"}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if canceled {
+				cancel()
+			}
+			err := g.admit(ctx)
+			if err == nil || !strings.Contains(err.Error(), "required unattended sudo") || !strings.Contains(err.Error(), "sudo -n true") || !strings.Contains(err.Error(), "docs/local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host") || strings.Contains(err.Error(), "private sudo authentication diagnostic") {
+				t.Fatalf("sudo prerequisite diagnostic=%v", err)
+			}
+			if canceled {
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("cancellation cause=%v", err)
+				}
+			} else {
+				var command *CommandError
+				if !errors.As(err, &command) || command.Phase != "network-001" || command.ExitCode != 42 {
+					t.Fatalf("sudo command cause=%v", err)
+				}
+			}
+			if _, statErr := os.Lstat(filepath.Join(g.Work, networkJournal)); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("network journal created after failed sudo prerequisite: %v", statErr)
+			}
+		})
+	}
+}
+
 func TestNetworkKernelLockLifetimeAndSubstitution(t *testing.T) {
 	for _, name := range []string{"lifetime", "symlink", "hardlink", "shared"} {
 		t.Run(name, func(t *testing.T) {

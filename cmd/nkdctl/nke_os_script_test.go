@@ -299,3 +299,51 @@ func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 		})
 	}
 }
+
+func TestOSBootstrapRejectsUnsupportedRoutesBeforeOutput(t *testing.T) {
+	source, err := os.ReadFile(demoScript(t, "nke-os-local.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, runtime, os, machine, arch, message string
+		code                                      int
+	}{
+		{"removed runtime", "podman", "Linux", "aarch64", "arm64", "CONTAINER_RUNTIME must be docker", 2},
+		{"macOS requires laptop launcher", "docker", "Darwin", "arm64", "arm64", "requires native Linux with Docker and KVM", 1},
+		{"crossed architecture", "docker", "Linux", "x86_64", "arm64", "requires a native arm64 host", 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			files := map[string]string{
+				"scripts/nke-os-local.sh": string(source),
+				"bin/docker":              "#!/bin/sh\ntouch \"$TEST_RUNTIME_MARKER\"\nexit 99\n",
+				"bin/uname":               "#!/bin/sh\ncase \"$1\" in -s) echo \"$TEST_HOST_OS\";; -m) echo \"$TEST_MACHINE\";; *) exit 99;; esac\n",
+			}
+			for path, contents := range files {
+				path = filepath.Join(root, path)
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(contents), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			marker := filepath.Join(root, "runtime-called")
+			cmd := exec.CommandContext(t.Context(), "bash", filepath.Join(root, "scripts/nke-os-local.sh"), "test-attempt")
+			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(root, "bin")+":"+os.Getenv("PATH"),
+				"CONTAINER_RUNTIME="+test.runtime, "NKE_OS_ARCH="+test.arch,
+				"TEST_HOST_OS="+test.os, "TEST_MACHINE="+test.machine, "TEST_RUNTIME_MARKER="+marker)
+			output, err := cmd.CombinedOutput()
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != test.code || !strings.Contains(string(output), test.message) {
+				t.Fatalf("route admission: %v: %s", err, output)
+			}
+			for _, path := range []string{marker, filepath.Join(root, ".nkd")} {
+				if _, err := os.Stat(path); !os.IsNotExist(err) {
+					t.Fatalf("unsupported route performed work at %s: %v", path, err)
+				}
+			}
+		})
+	}
+}

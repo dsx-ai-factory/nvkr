@@ -82,15 +82,12 @@ Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` and the Docker exporter's
 `rewrite-timestamp=true` option for deterministic image creation and layer-file
 timestamps. Docker explicitly streams the image archive to `docker image load`,
 separating timestamp rewriting from image-store unpacking; failure in either
-stage stops validation. The existing Podman ARM64 local pin describes the earlier
-measured image with Go 1.27.1. The Dockerfile and Go compiler changes need a new
-native Podman measurement before that pin can be replaced; a different rebuilt ID
-still fails closed.
+stage stops validation.
 The fixed epoch does not itself prove identical image
 bytes. Repeat a native Docker build on fresh runners and compare the resulting
 image IDs before adding a Docker pin.
-`localPodmanImages` and `localDockerImages` keep the two runtime identities
-separate. A null Docker entry permits a diagnostic build but is not itself an
+`localDockerImages` records maintained local Docker identities. A null entry
+permits a diagnostic build but is not itself an
 execution pin. The local Docker wrapper freezes the exact observed image ID
 into an attempt-specific catalog overlay before compiling the Plan; NKD
 rechecks that ID before execution. This binds loaded image bytes to the attempt Plan, not toolchain provenance,
@@ -162,13 +159,13 @@ without network, then build and inspect only the matching architecture on each n
 ```sh
 toolchains/nkd-packer/build.sh --check
 packer_arch=arm64
-CONTAINER_RUNTIME=podman toolchains/nkd-packer/build.sh --arch "$packer_arch"
-podman image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
+CONTAINER_RUNTIME=docker toolchains/nkd-packer/build.sh --arch "$packer_arch"
+docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
   "localhost/nkd-packer-toolchain:dev-${packer_arch}"
 ```
 
-Use `packer_arch=amd64` on the separate native AMD64 host. Docker is an explicit alternative supported
-by the build script. A cross-build does not supply native execution proof. A rebuilt image differing from
+Use `packer_arch=amd64` on the separate native AMD64 host. This build helper requires Docker Buildx.
+A cross-build does not supply native execution proof. A rebuilt image differing from
 a recorded runtime-specific local pin must be investigated; do not overwrite or bypass the check.
 Preparation neither pushes nor signs an image, writes a source lock, or supplies an approved repository digest.
 The native preparation script/workflow can retain exact image archives and measurements for a separately

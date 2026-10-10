@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
@@ -234,7 +235,11 @@ func gitOut(ctx context.Context, dir string, args ...string) (string, error) {
 	if ctx == nil {
 		return "", e.New(e.CodeUsage, "git execution requires a non-nil context")
 	}
-	cmd := execCmd(RunOptions{Ctx: ctx}, "git", append([]string{"-C", dir}, args...)...)
+	cmd, err := sourcegit.LocalCommand(ctx, os.Environ(), dir, args...)
+	if err != nil {
+		return "", err
+	}
+	configureCommandCancellation(cmd, 10*time.Second)
 	out, err := outputOwnedCommand(ctx, cmd)
 	if err != nil {
 		if ctx.Err() != nil {

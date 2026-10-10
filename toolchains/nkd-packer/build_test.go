@@ -53,7 +53,7 @@ func TestToolchainValidatedImageID(t *testing.T) {
 		wantError, wantID          bool
 	}{
 		{name: "exact validated ID", inspected: measured, smokeExit: "0", wantID: true},
-		{name: "normalize Podman-style ID", inspected: strings.TrimPrefix(measured, "sha256:"), smokeExit: "0", wantID: true},
+		{name: "normalize bare ID", inspected: strings.TrimPrefix(measured, "sha256:"), smokeExit: "0", wantID: true},
 		{name: "native smoke failure emits no ID", inspected: measured, smokeExit: "42", wantError: true},
 		{name: "failed export emits no ID", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true},
 		{name: "unlink failure emits no ID", inspected: measured, smokeExit: "0", cleanupCommand: "rm", wantError: true, wantExit: 1},
@@ -388,7 +388,7 @@ func TestToolchainRejectsInvalidBuildInputsBeforeRuntime(t *testing.T) {
 		{"missing archives", "docker", "NKD_BUILD_ARCHIVES", "absent", "archive context is not a directory"},
 		{"file archives", "docker", "NKD_BUILD_ARCHIVES", "runtime", "archive context is not a directory"},
 		{"missing CA", "docker", "NKD_BUILD_CA_BUNDLE", "absent", "build CA bundle is not a regular file"},
-		{"unsupported runtime", "podman", "NKD_BUILD_ARCHIVES", ".", "require Docker Buildx"},
+		{"unsupported runtime", "podman", "NKD_BUILD_ARCHIVES", ".", "requires Docker Buildx"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -451,7 +451,7 @@ func TestDiagnosticToolchainPinDoesNotGrantMaintainedAcceptance(t *testing.T) {
 					}
 					// Synthetic local pins exercise either host architecture without
 					// rewriting the maintained source lock or adding approval claims.
-					lock["localPodmanImages"] = json.RawMessage(`{"amd64":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","arm64":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}`)
+					lock["localDockerImages"] = json.RawMessage(`{"amd64":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","arm64":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}`)
 					data, err = json.Marshal(lock)
 					if err != nil {
 						t.Fatal(err)
@@ -461,12 +461,14 @@ func TestDiagnosticToolchainPinDoesNotGrantMaintainedAcceptance(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			fake := filepath.Join(dir, "podman")
+			fake := filepath.Join(dir, "docker")
 			log := filepath.Join(dir, "calls")
 			const script = `#!/bin/sh
 printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
-  'build --platform') exit 0 ;;
+  'buildx version'|'version --format') exit 0 ;;
+  'buildx build') printf 'archive\n' ;;
+  'image load') [ "$3" = --input ] && [ -f "$4" ] && [ -s "$4" ] || exit 96 ;;
   'image inspect')
     [ "$3" != --format ] || exit 97
     printf '[{"Id":"%s","Os":"linux","Architecture":"%s","Config":{"Env":["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]}}]\n' "$TEST_IMAGE_ID" "$TEST_ARCH" ;;

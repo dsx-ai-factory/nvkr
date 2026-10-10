@@ -194,6 +194,21 @@ acquisition; controlled tests cover pin/dirty/source/path/cancellation failures
 and prepare-before-build ordering, not current external Git authorization or
 fresh tenant acceptance.
 
+Ordinary local source Git and installer preparation now use the existing
+`internal/sourcegit` owner to exclude ambient global hooks, fsmonitor, filters,
+templates and line-ending conversion. Developer credential settings are projected
+only into network fetch; explicit absolute local-repository redirects remain
+available. Real Git fixtures cover exact checkout bytes, callback exclusion,
+local redirects and authenticated fetch. These fixtures are not proof of current
+private-repository access; the stricter held hosted-source admission is unchanged.
+
+Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
+The older authored Podman Environment and its TCG Definition are removed; generic
+NKD Podman support remains. The ARM64 catalog baseline retains the already-published
+historical M2 Docker candidate, not a newly measured current toolchain. Local Docker
+launchers still freeze their freshly validated image into an attempt overlay.
+Static Plan and wrapper tests cover these selections, not a new native bake.
+
 The local OS selects the PR #113 NKE/NVIDIA OVN fork at pinned commit
 `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`; profile packages and tenant requests
 select its `1.5.18` chart stream. The combined Definition also declares standalone

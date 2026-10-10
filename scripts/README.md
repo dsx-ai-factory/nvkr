@@ -41,36 +41,34 @@ The local walkthrough publishes to its loopback registry using dry-run signing. 
 The demo uses the loopback registry on port 5000. It generates its own valid
 immutable attempt names.
 
-The non-FDE OS-image bootstrap uses one shared catalog. Its authored routes are ARM64 Podman/TCG and native
-ARM64 and AMD64 Linux Docker/KVM:
+The non-FDE OS-image bootstrap uses one shared catalog. Its maintained routes
+are native ARM64 and AMD64 Linux Docker/KVM. The older Podman/TCG route and its
+stale toolchain pin are removed; generic NKD Podman execution support is unchanged.
 
-These older OS-only commands differ from the laptop launcher above: Docker
-requires KVM, and Podman requires its maintained toolchain image ID. A fresh
-toolchain build can fail that ID check. For Docker/Colima TCG and attempt-pinned
+These OS-only commands require KVM. For Docker/Colima TCG and attempt-pinned
 fresh toolchain bytes, follow the
 [laptop OS route](../docs/local-development.md#build-the-complete-selection-including-the-os)
 instead; its validation does not change the older wrapper's pin contract.
 
 ```sh
-CONTAINER_RUNTIME=podman scripts/nke-os-local.sh local-arm64-podman-001 1
 CONTAINER_RUNTIME=docker NKE_OS_ARCH=arm64 scripts/nke-os-local.sh local-arm64-docker-001 1
 CONTAINER_RUNTIME=docker NKE_OS_ARCH=amd64 scripts/nke-os-local.sh local-amd64-docker-001 1
 ```
 
-Use a different immutable attempt name for each run. The Podman path has a recorded
-[full build and boot smoke](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md).
+Use a different immutable attempt name for each run. The historical Podman
+[full build and boot smoke](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md)
+does not validate a current maintained route.
 The [ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
 Docker/KVM builds and boot smoke at an earlier exact commit, not validation of the latest changes.
 See the [Definition guide](../definitions/nke-os/README.md) for route requirements and limitations.
-Set `NKE_LOCAL_CLONE` to reuse an exact local NKE checkout. On macOS the same
-path must be visible inside the Podman machine; the wrapper forwards it and
-fails before the build if the checkout is unavailable there.
+Set `NKE_LOCAL_CLONE` to reuse an exact local NKE checkout, accessible at the
+same absolute path to the native Linux runner and Docker daemon.
 
 Local attempts deliberately retain their frozen inputs, bootstrap runner and Run outputs. After reviewing an
 attempt, archive those three attempt-scoped directories together instead of reusing its name:
 
 ```sh
-attempt=local-arm64-podman-001
+attempt=local-arm64-docker-001
 archive_root=/absolute/path/to/nkd-attempt-archive
 for area in inputs bootstrap runs; do
   if [[ -e ".nkd/${area}/${attempt}" ]]; then
@@ -83,7 +81,7 @@ done
 The toolchain uses `localhost/nkd-packer-toolchain:dev-arm64` or `localhost/nkd-packer-toolchain:dev-amd64`,
 according to the selected architecture, not a per-attempt tag. Once no
 build is running and no retained workflow needs the local image, remove that optional cache with
-`podman image rm localhost/nkd-packer-toolchain:dev-arm64` or the equivalent `docker image rm` command. Archiving or
+`docker image rm localhost/nkd-packer-toolchain:dev-arm64`. Archiving or
 removing storage does not make an attempt name reusable; choose a new name for every Run.
 
 ## Release consumption

@@ -12,10 +12,11 @@ sources:
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
-      # Substitution-only baseline, not a maintained or reproducible Docker pin.
-      # Each Docker attempt freezes its own observed ID before Plan execution.
+      # AMD64 is a substitution-only local baseline. ARM64 retains the historical
+      # M2 Docker candidate publication, not reproduction of the current Dockerfile.
+      # Each local Docker attempt freezes its own observed ID before Plan execution.
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+      arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
     vendorCommand:
       - bash
       - -ec
@@ -50,7 +51,7 @@ sources:
     tagPrefix: os-image/
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+      arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
     vendorCommand:
       - bash
       - -ec
@@ -62,14 +63,14 @@ sources:
     constraint: 1.4.x
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+      arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
   nke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nke.git
     constraint: 0.1.x
     tagPrefix: os-image/
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+      arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
     vendorCommand:
       - bash
       - -ec
@@ -82,7 +83,7 @@ sources:
     tagPrefix: os-image/
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-      arm64: sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51
+      arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
     vendorCommand:
       - bash
       - -ec

@@ -129,8 +129,10 @@ cannot substitute for those gates or establish qualified reproduction.
 budgets, not observed allocation or general runner-capacity guarantees. Docker uses the typed runtime
 and producer-declared build-network controls; no ambient storage-driver workaround is selected.
 
-`native-toolchains.yaml` substitutes measured published Packer pins for each architecture's nine selected
-source-map consumers, preserving OVN's separate BuildKit pin. Internal Packer/inspector images were
+`os-catalog` directly retains the historical published ARM64 Docker Packer candidate.
+`native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine selected
+source-map consumers, preserving OVN's separate BuildKit pin. These historical images do not establish
+reproduction of the current Dockerfile or bootstrap compiler. Internal Packer/inspector images were
 published under the user's scoped candidate exception. Their source locks retain unresolved general
 license/security approval gates; the exception does not mark those reviews complete. See
 [Packer preparation and selection](../../toolchains/nkd-packer/README.md#native-preparation-and-catalog-selection)

@@ -332,12 +332,8 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 	if free < 20<<30 {
 		return admitted, errors.New("management diagnostic requires 20 GiB native disk headroom")
 	}
-	images, err := captureJSON[[]dockerImage](ctx, runner, []string{"docker", "image", "inspect", kindNodeImage}, "admit-kind-image")
-	if err != nil {
+	if err := admitKindImage(ctx, runner); err != nil {
 		return admitted, err
-	}
-	if len(images) != 1 || images[0].ID != kindNodeID || images[0].Architecture != "arm64" {
-		return admitted, errors.New("cache exact source-pinned ARM64 Kind image before execution")
 	}
 	source := make(map[string][]byte)
 	for i, path := range []string{"deploy/stages/04-install-cluster-api.sh", "deploy/lib.sh", "make/tool-versions.mk"} {
@@ -351,6 +347,17 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 		return admitted, errors.New("NKE installer tool pins differ from inspected interface")
 	}
 	return managementAdmission{checkout: checkout, tool: tool, layout: layout, out: out, config: config, source: source, toolsOutput: SelectedOutput{Layout: layout, Observation: observation}}, nil
+}
+
+func admitKindImage(ctx context.Context, runner Runner) error {
+	images, err := captureJSON[[]dockerImage](ctx, runner, []string{"docker", "image", "inspect", kindNodeImage}, "admit-kind-image")
+	if err != nil {
+		return fmt.Errorf("could not inspect the required cached ARM64 Kind image %s; verify Docker access and cache the pinned image as described in docs/local-nke-demo.md#4-build-and-run-the-demo: %w", kindNodeImage, err)
+	}
+	if len(images) != 1 || images[0].ID != kindNodeID || images[0].Architecture != "arm64" {
+		return fmt.Errorf("cache the exact source-pinned ARM64 Kind image %s before execution; see docs/local-nke-demo.md#4-build-and-run-the-demo", kindNodeImage)
+	}
+	return nil
 }
 
 type dockerImage struct {

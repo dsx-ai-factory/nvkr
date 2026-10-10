@@ -20,6 +20,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	"golang.org/x/sys/unix"
 )
 
@@ -323,6 +324,16 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	}
 	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
+	if args[0] == "git" {
+		gitArgs, dir := args[1:], ""
+		if len(gitArgs) >= 2 && gitArgs[0] == "-C" {
+			dir, gitArgs = gitArgs[1], gitArgs[2:]
+		}
+		cmd, err = sourcegit.LocalCommand(commandCtx, r.Env, dir, gitArgs...)
+		if err != nil {
+			return nil, err
+		}
+	}
 	cmd.Dir = r.Work
 	if err := ownedcmd.ConfigureCancellation(cmd, ownedcmd.DefaultTerminationGrace); err != nil {
 		return nil, err

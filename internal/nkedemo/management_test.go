@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,47 @@ func TestNativeEnvironmentExcludesForeignTargets(t *testing.T) {
 	}
 	if !slices.IsSorted(updated) {
 		t.Fatal("environment not sorted")
+	}
+}
+
+func TestManagementKindImageAdmissionDiagnostics(t *testing.T) {
+	for _, row := range []struct {
+		name, id, arch string
+		exit           int
+	}{
+		{name: "cached", id: kindNodeID, arch: "arm64"},
+		{name: "missing", exit: 1},
+		{name: "docker-unavailable", exit: 42},
+		{name: "wrong-image", id: "foreign-id", arch: "arm64"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			work := privateTestDir(t)
+			script := "#!/bin/sh\n[ \"$1 $2\" = 'image inspect' ] && [ \"$3\" = \"$PIN\" ] || exit 99\nprintf '%s\\n' 'private Docker diagnostic' >&2\nprintf '%s\\n' \"$IMAGE\"\nexit \"$EXIT\"\n"
+			if err := os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal([]dockerImage{{ID: row.id, Architecture: row.arch}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "PIN=" + kindNodeImage, "IMAGE=" + string(raw), "EXIT=" + strconv.Itoa(row.exit)}}
+			err = admitKindImage(t.Context(), runner)
+			if row.name == "cached" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "cache") || !strings.Contains(err.Error(), kindNodeImage) || !strings.Contains(err.Error(), "docs/local-nke-demo.md#4-build-and-run-the-demo") || strings.Contains(err.Error(), "private Docker diagnostic") {
+				t.Fatalf("cache prerequisite diagnostic=%v", err)
+			}
+			if row.exit != 0 {
+				var command *CommandError
+				if !errors.As(err, &command) || command.Phase != "admit-kind-image" || command.ExitCode != row.exit || !strings.Contains(err.Error(), "could not inspect") {
+					t.Fatalf("inspection cause=%v", err)
+				}
+			}
+		})
 	}
 }
 

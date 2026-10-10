@@ -569,8 +569,13 @@ do not claim immutable configuration bytes against a concurrent hostile host wri
 admission before work; the general catalog and ordinary Local route retain their existing Git/SSH behavior.
 Original checkout and receipt directories are rechecked
 through the held workspace before receipt reuse or commit. This capability grants filesystem access only, not
-producer observation, installed-content, publication or qualification authority. Ordinary Local fetch remains
-the existing developer route without these additional guarantees.
+producer observation, installed-content, publication or qualification authority. Ordinary Local fetch retains
+developer Git/SSH transport without the held workspace guarantees. Its shared Git-command owner excludes
+ambient global callbacks, templates and line-ending conversion, projects only developer credential settings
+into network fetch, and admits explicit absolute local-repository redirects. Checkout/status receive no
+developer HOME or helper. Repository-local filters, includes and delegated object sources fail admission.
+Real Git fixtures exercise exact checkout bytes, callback exclusion, authenticated fetch and local redirects;
+they do not establish current private-source access or a held workspace receipt.
 
 Dependency vendoring authenticates the selected runtime/daemon and exact native pinned image before source work.
 A bounded, Git-metadata-free archive enters a fresh private volume; the pinned entrypoint, exact vendor arguments

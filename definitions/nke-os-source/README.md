@@ -44,7 +44,7 @@ Helm's pinned Git trees contain external symlinks used only by negative-test fix
 
 The ordinary repository gate resolves all 14 producers for both architectures and checks isolated offline build nodes, no acquired producer substitution, and coded rejection of a missing compiler pin. Bundle regression tests cover both ELF architectures and reject mixed-architecture, non-ELF, truncated and invalid-membership archives.
 
-The opt-in integration test uses real source preparation and containers. On a dedicated native Linux test host with rootful Docker, keep the disposable source/output owner aligned with Docker. The hosted diagnostic compiles as the runner user, then executes this credential-free test as root. This example requires passwordless sudo; on an interactive development host, authenticate with sudo first or use the documented rootless Podman route:
+The opt-in integration test uses real source preparation and containers. On a dedicated native Linux test host with rootful Docker, keep the disposable source/output owner aligned with Docker. The hosted diagnostic compiles as the runner user, then executes this credential-free test as root. This example requires passwordless sudo; on an interactive development host, authenticate with sudo first:
 
 ```sh
 nkd_source_test_dir="$(mktemp -d)"
@@ -54,7 +54,7 @@ sudo --non-interactive env NKD_OS_SOURCE_RUNTIME=docker "$nkd_source_test_dir/nk
   -test.run '^TestNKEOSPublicSourcesLive$' -test.v -test.timeout 75m
 ```
 
-For native Linux rootless Podman, `NKD_OS_SOURCE_RUNTIME=podman go test -v ./pkg/nkd/buildgraph -run '^TestNKEOSPublicSourcesLive$' -count=1 -timeout 75m` keeps the caller and container output ownership aligned. SELinux enforcing hosts need the disposable test workspace and `TMPDIR` prepared with a shared container label. No host SELinux policy is disabled. Rootful Docker execution as an ordinary user is not validated by this diagnostic: it can fail Git's ownership checks and cleanup of root-owned module files. Neither route asserts provider isolation or qualified execution.
+Rootful Docker execution as an ordinary user is not validated by this diagnostic: it can fail Git's ownership checks and cleanup of root-owned module files. This diagnostic does not assert provider isolation or qualified execution.
 
 An optional comma-separated `NKD_OS_SOURCE_COMPONENTS` selects exact producer names for a smaller diagnostic. Without it, all 14 producers run. The test recomputes output size and SHA-256, checks ELF architecture for standalone binaries and every regular bundle member, checks exact tar membership, and executes native version probes for Helm/crictl, all Kubernetes/containerd bundle members and CNI VERSION/about output. Go build metadata checks the bundle compiler identity; declaration contracts guard both Kubernetes stamp namespaces (Go omits linker flags under `-trimpath`). Helm 3's template probe checks the client-go-derived `chartutil` Kubernetes default; the lint probe checks ordinary chart validity, while declaration contracts guard the separate `lint/rules` version stamps. Each bundled ELF is parsed through a reader bounded to that tar member's bytes. It does not exercise TPM hardware or start Kubernetes/containerd services. Its result is explicitly unqualified.
 

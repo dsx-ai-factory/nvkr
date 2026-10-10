@@ -214,9 +214,12 @@ and executor and check this catalog's packaging and chart behavior.
 ```sh
 go test ./pkg/nkd/buildgraph -run '^TestNKEOVNFork(Graphs|ReleaseOutputs)$' -count=1
 
-# Native Linux with host-side access to the fork, on a dedicated test host:
-NKD_OVN_SOURCE_RUNTIME=podman go test -v ./pkg/nkd/buildgraph \
-  -run '^TestNKEOVNForkLive$' -count=1 -timeout 70m
+# Native Linux with rootful Docker and host-side fork access on a dedicated test host:
+ovn_source_test_dir="$(mktemp -d)"
+go test -c -o "$ovn_source_test_dir/nke-ovn-source.test" ./pkg/nkd/buildgraph
+cd pkg/nkd/buildgraph
+sudo --non-interactive env NKD_OVN_SOURCE_RUNTIME=docker "$ovn_source_test_dir/nke-ovn-source.test" \
+  -test.run '^TestNKEOVNForkLive$' -test.v -test.timeout 70m
 ```
 
 The graph tests resolve both native architectures, check the source and output

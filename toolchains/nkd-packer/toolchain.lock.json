@@ -94,10 +94,6 @@
     "packerBUSLRedistributionApproval": "not-recorded",
     "vulnerabilityReviewApproval": "not-recorded"
   },
-  "localPodmanImages": {
-    "amd64": null,
-    "arm64": "sha256:03a8b35467adfd1fc3ca496adf87ac0cd23ce35782290409d2832578eaad7d51"
-  },
   "localDockerImages": {
     "amd64": null,
     "arm64": null

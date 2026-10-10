@@ -12,15 +12,13 @@ usage() {
 Usage: scripts/nke-os-local.sh ATTEMPT [JOBS]
 
 Build the locked local toolchain, freeze the exact authored recipe under
-.nkd/inputs/ATTEMPT, and execute one local non-FDE NKE OS build. On macOS the
-command delegates to the existing ARM64 Podman machine and uses QEMU TCG. This
-is a development bootstrap route, not a production runner profile.
+.nkd/inputs/ATTEMPT, and execute one local non-FDE NKE OS build on native Linux
+with Docker and KVM. This is a development bootstrap route.
 
-Set CONTAINER_RUNTIME=podman or CONTAINER_RUNTIME=docker. Podman is the default.
+CONTAINER_RUNTIME defaults to docker; this launcher requires Docker.
 Set NKE_OS_ARCH=amd64 or NKE_OS_ARCH=arm64. ARM64 is the compatibility default.
 Set NKE_LOCAL_CLONE to a local NKE Git checkout when replacing the pinned
-repository fetch. On macOS, that path must also be visible inside the Podman
-machine; the script checks it there before building.
+repository fetch.
 EOF
 }
 
@@ -39,11 +37,11 @@ if [[ ! "${jobs}" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 input_root=".nkd/inputs/${attempt}"
-runtime="${CONTAINER_RUNTIME:-podman}"
+runtime="${CONTAINER_RUNTIME:-docker}"
 arch="${NKE_OS_ARCH:-arm64}"
 case "${runtime}" in
-  podman|docker) ;;
-  *) echo "CONTAINER_RUNTIME must be podman or docker" >&2; exit 2 ;;
+  docker) ;;
+  *) echo "CONTAINER_RUNTIME must be docker" >&2; exit 2 ;;
 esac
 case "${arch}" in
   amd64|arm64) ;;
@@ -55,25 +53,8 @@ command -v "${runtime}" >/dev/null 2>&1 || {
 }
 
 host_os="$(uname -s)"
-if [[ "${host_os}" == Darwin ]]; then
-  if [[ "${arch}" != arm64 ]]; then
-    echo "the macOS bootstrap supports only the ARM64 TCG compatibility path" >&2
-    exit 1
-  fi
-  if [[ "${runtime}" != podman ]]; then
-    echo "the macOS bootstrap requires Podman; Docker is supported on native Linux hosts" >&2
-    exit 1
-  fi
-  # podman machine ssh concatenates COMMAND arguments before the remote shell
-  # evaluates them. Pass one shell-escaped command so paths and values retain
-  # their argument boundaries inside the Linux VM.
-  printf -v remote_command \
-    'cd %q && exec env CONTAINER_RUNTIME=podman NKE_OS_ARCH=arm64 NKE_LOCAL_CLONE=%q ./scripts/nke-os-local.sh %q %q' \
-    "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${attempt}" "${jobs}"
-  exec podman machine ssh "${remote_command}"
-fi
 if [[ "${host_os}" != Linux ]]; then
-  echo "the NKE image build requires native Linux or macOS with an ARM64 Podman machine" >&2
+  echo "the NKE image build requires native Linux with Docker and KVM" >&2
   exit 1
 fi
 case "$(uname -m)" in
@@ -100,26 +81,13 @@ command -v jq >/dev/null 2>&1 || {
   echo "jq is required to validate and freeze the toolchain identity" >&2
   exit 1
 }
-toolchain_image=""
-if [[ "${runtime}" == podman ]]; then
-  toolchain_image="$(jq -r --arg arch "${arch}" '.localPodmanImages[$arch] // empty' toolchains/nkd-packer/toolchain.lock.json)"
-  if [[ ! "${toolchain_image}" =~ (^|@)sha256:[0-9a-f]{64}$ ]]; then
-    echo "the Packer toolchain lock has no exact ${arch} Podman image ID" >&2
-    exit 1
-  fi
-fi
 definition_source="definitions/nke-os/definition-${arch}-kvm.yaml"
-environment_source="definitions/nke-os/environment-local-macos-apple-m4-pro-podman.yaml"
+environment_source="definitions/nke-os/environment-local-linux-${arch}-docker.yaml"
 overlay_source=""
-if [[ "${runtime}" == docker ]]; then
-  environment_source="definitions/nke-os/environment-local-linux-${arch}-docker.yaml"
-  # Only maintained Definitions that declare an architecture overlay need one.
-  # A missing declared overlay still fails when NKD loads the frozen Definition.
-  if [[ -f "definitions/nke-os/${arch}-kvm.yaml" ]]; then
-    overlay_source="definitions/nke-os/${arch}-kvm.yaml"
-  fi
-elif [[ "${arch}" == arm64 ]]; then
-  definition_source="definitions/nke-os/definition-arm64-tcg.yaml"
+# Only maintained Definitions that declare an architecture overlay need one.
+# A missing declared overlay still fails when NKD loads the frozen Definition.
+if [[ -f "definitions/nke-os/${arch}-kvm.yaml" ]]; then
+  overlay_source="definitions/nke-os/${arch}-kvm.yaml"
 fi
 required_inputs=("${definition_source}" "${environment_source}")
 if [[ -n "${overlay_source}" ]]; then
@@ -140,22 +108,16 @@ fi
 
 bootstrap_root=".nkd/bootstrap/${attempt}"
 mkdir -p "${bootstrap_root}/go-build" "${bootstrap_root}/go-mod" "${bootstrap_root}/home"
-if [[ "${runtime}" == docker ]]; then
-  # A containerized runner and its Docker daemon need not share /tmp. Keep
-  # host-side temporary bind sources in the already shared build workspace.
-  # Reserve a private directory per immutable attempt; do not reuse a caller's
-  # existing temporary tree or change the Podman compatibility path.
-  mkdir -m 0700 "${bootstrap_root}/tmp"
-  export TMPDIR="${repo_root}/${bootstrap_root}/tmp"
-fi
+# A containerized runner and its Docker daemon need not share /tmp. Keep
+# host-side temporary bind sources in the already shared build workspace.
+mkdir -m 0700 "${bootstrap_root}/tmp"
+export TMPDIR="${repo_root}/${bootstrap_root}/tmp"
 
-CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh --arch "${arch}"
-if [[ "${runtime}" == docker ]]; then
-  toolchain_image="$(docker image inspect --format '{{.Id}}' "localhost/nkd-packer-toolchain:dev-${arch}")"
-  if [[ ! "${toolchain_image}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-    echo "the native Docker build did not produce an exact local image ID" >&2
-    exit 1
-  fi
+toolchain_image="$(CONTAINER_RUNTIME="${runtime}" toolchains/nkd-packer/build.sh \
+  --arch "${arch}" --print-validated-image-id)"
+if [[ ! "${toolchain_image}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  echo "the native Docker build did not return an exact validated image ID" >&2
+  exit 1
 fi
 
 mkdir -p "${input_root}/catalog"
@@ -168,13 +130,8 @@ if [[ -n "${overlay_source}" ]]; then
 fi
 
 # Build the bootstrap runner from this checkout in the exact pinned native
-# toolchain. The Podman machine intentionally has no ambient Go or Make
-# installation, and a pre-existing bin/nkdctl may belong to an older revision.
-bootstrap_network=default
-if [[ "${runtime}" == docker ]]; then
-  bootstrap_network=bridge
-fi
-"${runtime}" run --rm --pull=never --network="${bootstrap_network}" \
+# toolchain. A pre-existing bin/nkdctl may belong to an older revision.
+"${runtime}" run --rm --pull=never --network=bridge \
   --read-only --cap-drop=all \
   --security-opt no-new-privileges --security-opt label=disable \
   --user "$(id -u):$(id -g)" \

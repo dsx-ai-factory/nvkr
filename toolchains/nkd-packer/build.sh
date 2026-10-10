@@ -125,8 +125,6 @@ jq -e '
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
   )) and
-  (.localPodmanImages | keys | sort) == ["amd64", "arm64"] and
-  all(.localPodmanImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
   (.localDockerImages | keys | sort) == ["amd64", "arm64"] and
   all(.localDockerImages[]; . == null or test("^sha256:[0-9a-f]{64}$")) and
   (.images | keys | sort) == ["amd64", "arm64"] and
@@ -159,15 +157,13 @@ if [[ "${arch}" != "${native_arch}" && "${cross_build_only}" -ne 1 ]]; then
   exit 1
 fi
 
-runtime="${CONTAINER_RUNTIME:-}"
+runtime="${CONTAINER_RUNTIME:-docker}"
 if [[ "${diagnostic_local}" -eq 1 && "${arch}" != "${native_arch}" ]]; then
   echo '--diagnostic-local requires native validation; cross builds are not admitted' >&2
   exit 1
 fi
-if [[ -z "${runtime}" ]]; then
-  runtime="$(command -v podman || command -v docker || true)"
-fi
-[[ -n "${runtime}" ]] || { echo "podman or docker is required" >&2; exit 1; }
+[[ "${runtime##*/}" == docker ]] || { echo 'this toolchain build requires Docker Buildx' >&2; exit 1; }
+command -v "${runtime}" >/dev/null 2>&1 || { echo "Docker is required" >&2; exit 1; }
 
 build_inputs=()
 if [[ -n "${NKD_BUILD_ARCHIVES:-}" || -n "${NKD_BUILD_CA_BUNDLE:-}" ]]; then
@@ -216,12 +212,6 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 case "${runtime##*/}" in
-  podman)
-    identity_args=(
-      --passwd-entry "nkd:x:${uid}:${gid}:NKD Builder:/nkd/work/home:/bin/sh"
-      --group-entry "nkd:x:${gid}:"
-    )
-    ;;
   docker)
     identity_dir="$(mktemp -d "${TMPDIR:-/tmp}/nkd-packer-identity.XXXXXX")"
     image_archive="$(mktemp "${identity_dir}/image.XXXXXX")"
@@ -349,11 +339,7 @@ image_id="$(jq -er '.[0].Id' <<<"${inspection}")"
 if [[ "${image_id}" =~ ^[0-9a-f]{64}$ ]]; then
   image_id="sha256:${image_id}"
 fi
-case "${runtime##*/}" in
-  podman) pin_family=localPodmanImages ;;
-  docker) pin_family=localDockerImages ;;
-esac
-expected_local_image="$(jq -r --arg arch "${arch}" --arg family "${pin_family}" '.[$family][$arch] // empty' "${lock}")"
+expected_local_image="$(jq -r --arg arch "${arch}" '.localDockerImages[$arch] // empty' "${lock}")"
 if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" && "${diagnostic_local}" -ne 1 ]]; then
   echo "local toolchain image ID ${image_id} does not match locked ${arch} ID ${expected_local_image}" >&2
   exit 1

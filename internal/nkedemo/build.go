@@ -88,9 +88,9 @@ func builtInputs(repo, attempt string) BuiltInputs {
 	return BuiltInputs{RunInputs{OS: path, Components: path, Providers: path, Site: path, Tools: path, Profiles: path, Simulator: path}, filepath.Join(repo, ".nkd/laptop-bootstrap", attempt, "nkdctl")}
 }
 
-// Local source fetching uses the developer's Git configuration. Preserve HOME
-// only for the build launcher so private sources can use its credential helper;
-// deployment retains NativeEnvironment's exclusion of ambient credentials.
+// HOME selects the developer's source credentials. The sourcegit owner projects
+// only credential configuration into network fetches; other Git operations use
+// its closed baseline. Deployment excludes ambient source credentials.
 func localBuildEnvironment() []string {
 	env := SetEnv(NativeEnvironment(), map[string]string{"CONTAINER_RUNTIME": "docker"})
 	if home := os.Getenv("HOME"); home != "" {
