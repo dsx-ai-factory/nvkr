@@ -96,7 +96,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 
 	if len(plan.Environment.GitHubRunners) > 0 {
 		for id, job := range document.Jobs {
-			want := githubPlatformCheck(plan, job.RunsOn)
+			want, err := githubPlatformCheck(plan, job.RunsOn)
+			if err != nil {
+				return e.Wrap(e.CodeEngineCapability, err, "GitHub job %q has an unsupported native runner", id)
+			}
 			if want == "" || len(job.Steps) == 0 || job.Steps[0].Name != githubPlatformCheckName || strings.TrimSpace(job.Steps[0].Run) != want || job.Steps[0].Uses != "" || len(job.Steps[0].Env) != 0 {
 				return e.New(e.CodeEngineCapability, "GitHub job %q omits its exact native-platform preflight", id)
 			}

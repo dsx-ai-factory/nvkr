@@ -27,6 +27,7 @@ func TestContainerPlatformAdmission(t *testing.T) {
 		{"wrong OS", `{"Os":"darwin","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodeEngineCapability},
 		{"wrong identity", `{"Os":"linux","Architecture":"arm64","RepoDigests":["example.test/tool@sha256:` + strings.Repeat("b", 64) + `"]}`, "linux/arm64", e.CodePreflightFailed},
 		{"missing identity", `{"Os":"linux","Architecture":"arm64"}`, "linux/arm64", e.CodePreflightFailed},
+		{"duplicate architecture", `{"Os":"linux","Architecture":"amd64","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodeEngineCapability},
 		{"malformed", `{`, "linux/arm64", e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -54,6 +55,9 @@ func TestContainerDaemonPlatformAdmission(t *testing.T) {
 		{"Podman ARM64", `{"host":{"os":"linux","arch":"arm64"}}`, true},
 		{"foreign daemon", `{"OSType":"linux","Architecture":"x86_64"}`, false},
 		{"missing", `{}`, false},
+		{"duplicate daemon architecture", `{"OSType":"linux","Architecture":"amd64","Architecture":"arm64"}`, false},
+		{"duplicate host architecture", `{"host":{"os":"linux","arch":"amd64","arch":"arm64"}}`, false},
+		{"partial mixed fields", `{"OSType":"linux","host":{"arch":"arm64"}}`, false},
 		{"ambiguous", `{"OSType":"linux","Architecture":"arm64","host":{"os":"linux","arch":"arm64"}}`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -101,7 +105,8 @@ func TestContainerAdmissionChecksDaemonBeforePull(t *testing.T) {
 		name, platform, daemon, wantCalls string
 		code                              e.Code
 	}{
-		{"native", "linux/arm64", "arm64", "info\npull\nimage\n", ""},
+		{"native amd64", "linux/amd64", "amd64", "info\npull\nimage\n", ""},
+		{"native arm64", "linux/arm64", "arm64", "info\npull\nimage\n", ""},
 		{"foreign", "linux/arm64", "amd64", "info\n", e.CodeEngineCapability},
 		{"unsupported", "linux/riscv64", "arm64", "", e.CodeEngineCapability},
 	} {
@@ -110,7 +115,7 @@ func TestContainerAdmissionChecksDaemonBeforePull(t *testing.T) {
 			log := filepath.Join(dir, "calls")
 			runtimePath := filepath.Join(dir, "docker")
 			t.Setenv("NKD_TEST_CALLS", log)
-			script := "#!/bin/sh\nprintf '%s\n' \"$1\" >> \"$NKD_TEST_CALLS\"\ncase \"$1\" in\ninfo) printf '%s\n' '{\"OSType\":\"linux\",\"Architecture\":\"" + tc.daemon + "\"}';;\npull) exit 0;;\nimage) printf '%s\n' '{\"Os\":\"linux\",\"Architecture\":\"arm64\",\"RepoDigests\":[\"" + image + "\"]}';;\nesac\n"
+			script := "#!/bin/sh\nprintf '%s\n' \"$1\" >> \"$NKD_TEST_CALLS\"\ncase \"$1\" in\ninfo) printf '%s\n' '{\"OSType\":\"linux\",\"Architecture\":\"" + tc.daemon + "\"}';;\npull) exit 0;;\nimage) printf '%s\n' '{\"Os\":\"linux\",\"Architecture\":\"" + tc.daemon + "\",\"RepoDigests\":[\"" + image + "\"]}';;\nesac\n"
 			if err := os.WriteFile(runtimePath, []byte(script), 0o755); err != nil {
 				t.Fatal(err)
 			}

@@ -123,3 +123,17 @@ func TestGitHubUtilityHostPreflightBeforeContainerLaunch(t *testing.T) {
 		t.Fatalf("foreign host created output: %v %v", entries, err)
 	}
 }
+
+func TestNodePlatformDiagnosticRequiresNativeRoutes(t *testing.T) {
+	plan := githubTestPlan(t)
+	node := nativeUtilityNode(t, plan)
+	called := false
+	err := checkNodePlatform(t.Context(), plan, node.ID, "linux/amd64", func(context.Context, string, string, string) error {
+		called = true
+		return nil
+	})
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if called || !strings.Contains(err.Error(), "requires explicit native GitHub routes") {
+		t.Fatalf("no-route diagnostic reached runtime or wrong refusal: called=%t err=%v", called, err)
+	}
+}

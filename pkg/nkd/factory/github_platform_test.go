@@ -55,7 +55,11 @@ func TestGitHubNativePlatformRoutesAndHelper(t *testing.T) {
 	for _, tc := range []struct{ platform, runner string }{{"linux/amd64", "ubuntu-24.04"}, {"linux/arm64", "ubuntu-24.04-arm"}} {
 		bootstrapID := "build-runner-" + shortStableName(tc.runner)
 		bootstrap := document.Jobs[bootstrapID]
-		if len(bootstrap.Steps) == 0 || strings.TrimSpace(bootstrap.Steps[0].Run) != githubPlatformCheck(plan, tc.runner) {
+		command, err := githubPlatformCheck(plan, tc.runner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bootstrap.Steps) == 0 || strings.TrimSpace(bootstrap.Steps[0].Run) != command {
 			t.Fatalf("missing %s bootstrap preflight", tc.platform)
 		}
 		if !strings.Contains(joinRuns(bootstrap.Steps), "go build -trimpath") {
@@ -163,7 +167,11 @@ func TestGitHubNativePreflightObservesKernelPlatform(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "uname"), []byte("#!/bin/sh\ncase \"$1\" in -s) printf 'Linux\\n';; -m) printf '"+tc.machine+"\\n';; esac\n"), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", githubPlatformCheck(plan, "ubuntu-24.04-arm"))
+			command, err := githubPlatformCheck(plan, "ubuntu-24.04-arm")
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", command)
 			cmd.Env = []string{"PATH=" + dir}
 			raw, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail {
@@ -193,6 +201,8 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// This fixed count and source pin below intentionally freeze the deploy input
+	// contract separately from the derived per-platform routing assertions.
 	if len(definition.Outputs) != 8 {
 		t.Fatalf("required outputs = %d, want eight", len(definition.Outputs))
 	}
@@ -346,6 +356,19 @@ func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	definition, err := authored.LoadDefinition(t.Context(), "../../../definitions/nke-m2/definition.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	armCLI := false
+	for _, output := range definition.Outputs {
+		if output.Name == "nkectl-linux-arm64" {
+			armCLI = output.Platform == "linux/arm64" && output.Format == authored.OutputExecutable && len(output.Components) == 1 && output.Components[0] == "nkectl"
+		}
+	}
+	if !armCLI {
+		t.Fatal("authored Definition lost the explicit ARM64 CLI output")
+	}
 	if !PerOutputPublication(plan) {
 		t.Fatal("M2 lost per-output publication")
 	}
@@ -370,5 +393,34 @@ func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
 	}
 	if !found["linux/amd64"] || !found["linux/arm64"] {
 		t.Fatalf("missing native CLI builds: %v", found)
+	}
+}
+
+func TestNativePlatformRenderingRejectsUnknownRunner(t *testing.T) {
+	plan := nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
+	command, err := githubPlatformCheck(plan, "unknown-runner")
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	var out bytes.Buffer
+	assertFactoryErrorCode(t, writeGitHubPlatformCheck(&out, plan, "unknown-runner"), e.CodeEngineCapability)
+	if command != "" || out.Len() != 0 {
+		t.Fatal("invalid route emitted a partial platform check")
+	}
+}
+
+func TestNativePlatformValidatorNamesUnsupportedRunner(t *testing.T) {
+	plan := nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := bytes.ReplaceAll(bundle.Files[GitHubWorkflowPath], []byte("runs-on: 'ubuntu-24.04'"), []byte("runs-on: 'unknown-runner'"))
+	if bytes.Equal(workflow, bundle.Files[GitHubWorkflowPath]) {
+		t.Fatal("fixture did not replace any runner")
+	}
+	bundle.Files[GitHubWorkflowPath], bundle.WorkflowDigest = workflow, pipeline.FileDigest(workflow)
+	err = ValidateGitHubBundle(t.Context(), plan, bundle)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if !strings.Contains(err.Error(), "unsupported native runner") {
+		t.Fatalf("runner error confused with omitted preflight: %v", err)
 	}
 }

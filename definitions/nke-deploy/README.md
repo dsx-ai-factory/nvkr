@@ -66,9 +66,11 @@ root would replace that bundle and fail the M2 drift check. A dispatch of the co
 This is the checked-in candidate configuration, not a ratified canonical-product/path or namespace decision.
 No parallel generated deploy workflow is maintained at that fixed path.
 
-Historical static validation checked this eight-output Definition and both controller Definitions with the
+Historical static validation checked the earlier six-output Definition and both controller Definitions with the
 repository gate, workflow lint and dry-runs. Those dry-runs observed zero artifacts and remained
-`static-unqualified`; no complete eight-output build or hosted publication was exercised at that revision.
+`static-unqualified`; no complete six-output build or hosted publication was exercised at that revision.
+The current eight-output Definition has separate native-route and generation contract coverage;
+those checks do not extend the historical record or establish a complete eight-output build.
 Current M2 candidate publication is separate evidence with its own exact inputs and limits.
 
 This example does not package an installer/deploy bundle, build NKTP or the provider image, mirror all

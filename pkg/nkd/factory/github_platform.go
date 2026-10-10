@@ -83,26 +83,31 @@ func admitGitHubNodePlatform(plan *Plan, node Node, observed string) error {
 
 const githubPlatformCheckName = "Check native runner platform"
 
-func githubPlatformCheck(plan *Plan, runner string) string {
+func githubPlatformCheck(plan *Plan, runner string) (string, error) {
 	if len(plan.Environment.GitHubRunners) == 0 {
-		return ""
+		return "", nil
 	}
 	platform, err := authored.GitHubRunnerPlatform(githubBootstrapRunner(runner))
 	if err != nil {
-		return ""
+		return "", err
 	}
 	machine := "x86_64"
 	if platform == "linux/arm64" {
 		machine = "aarch64"
 	}
-	return fmt.Sprintf("set -eu\nif [ \"$(uname -s)/$(uname -m)\" != %s ]; then printf 'NKD-E-ENGINE-CAPABILITY: expected native %s runner\\n' >&2; exit %d; fi", shellQuote("Linux/"+machine), platform, e.ExitCode(e.New(e.CodeEngineCapability, "foreign runner")))
+	return fmt.Sprintf("set -eu\nif [ \"$(uname -s)/$(uname -m)\" != %s ]; then printf 'NKD-E-ENGINE-CAPABILITY: expected native %s runner\\n' >&2; exit %d; fi", shellQuote("Linux/"+machine), platform, e.ExitCode(e.New(e.CodeEngineCapability, "foreign runner"))), nil
 }
 
-func writeGitHubPlatformCheck(out *bytes.Buffer, plan *Plan, runner string) {
-	if command := githubPlatformCheck(plan, runner); command != "" {
+func writeGitHubPlatformCheck(out *bytes.Buffer, plan *Plan, runner string) error {
+	command, err := githubPlatformCheck(plan, runner)
+	if err != nil {
+		return err
+	}
+	if command != "" {
 		fmt.Fprintf(out, "      - name: %s\n        run: |\n", githubPlatformCheckName)
 		for _, line := range strings.Split(command, "\n") {
 			fmt.Fprintf(out, "          %s\n", line)
 		}
 	}
+	return nil
 }
