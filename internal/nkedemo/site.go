@@ -379,20 +379,28 @@ func validateRegistryOwnership(rows []dockerContainer, ids []string, name, owner
 	return nil
 }
 
-func registryAddress(rows []dockerContainer, id, name, owner string, materials *SiteMaterials) (string, error) {
+func admitRegistryIdentity(rows []dockerContainer, id, name, owner string, materials *SiteMaterials) (netip.Prefix, netip.Addr, error) {
 	if materials == nil || id == "" || materials.RegistryID == "" || materials.KindNetworkID == "" {
-		return "", errors.New("registry omits its admitted container or network identity")
+		return netip.Prefix{}, netip.Addr{}, errors.New("registry omits its admitted container or network identity")
 	}
 	if err := validateRegistryOwnership(rows, []string{id}, name, owner, materials.RegistryID); err != nil {
-		return "", err
+		return netip.Prefix{}, netip.Addr{}, err
 	}
 	prefix, err := netip.ParsePrefix(materials.KindCIDR)
 	if err != nil || prefix != prefix.Masked() || prefix.String() != materials.KindCIDR || !prefix.Addr().Is4() || !prefix.Addr().IsPrivate() || !networkLast(prefix).IsPrivate() {
-		return "", errors.New("registry requires the admitted private Kind subnet")
+		return netip.Prefix{}, netip.Addr{}, errors.New("registry requires the admitted private Kind subnet")
 	}
 	gateway, err := netip.ParseAddr(materials.Gateway)
 	if err != nil || !gateway.Is4() || gateway.String() != materials.Gateway || !prefix.Contains(gateway) {
-		return "", errors.New("registry requires the admitted Kind gateway")
+		return netip.Prefix{}, netip.Addr{}, errors.New("registry requires the admitted Kind gateway")
+	}
+	return prefix, gateway, nil
+}
+
+func registryAddress(rows []dockerContainer, id, name, owner string, materials *SiteMaterials) (string, error) {
+	prefix, gateway, err := admitRegistryIdentity(rows, id, name, owner, materials)
+	if err != nil {
+		return "", err
 	}
 	row := rows[0]
 	network, present := row.NetworkSettings.Networks["kind"]
@@ -449,7 +457,7 @@ func waitRegistry(ctx context.Context, runner Runner, id, name, owner string, ma
 		}
 		host, err := registryAddress(rows, id, name, owner, materials)
 		if err != nil {
-			return "", err
+			return "", registryStartupDiagnostics(ctx, runner, id, name, owner, materials, err)
 		}
 		var response map[string]json.RawMessage
 		if err = localJSONRequest(budget, "http://"+host+"/v2/", 2*time.Second, &response); err == nil && response != nil && len(response) == 0 {
@@ -462,12 +470,29 @@ func waitRegistry(ctx context.Context, runner Runner, id, name, owner string, ma
 		case <-timer.C:
 		}
 	}
+	err := fmt.Errorf("registry failed startup budget;private diagnostics retained: %w", budget.Err())
+	return "", registryStartupDiagnostics(ctx, runner, id, name, owner, materials, err)
+}
+
+// Retain bounded logs before deferred cleanup, including an already exited
+// registry. Re-admit its exact identity without granting authority over a name.
+func registryStartupDiagnostics(ctx context.Context, runner Runner, id, name, owner string, materials *SiteMaterials, cause error) error {
+	if materials == nil {
+		return cause
+	}
 	diagnosticCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer stop()
-	if err := runner.Run(diagnosticCtx, []string{"docker", "logs", "--tail", "100", name}, "registry-startup-diagnostics", 30*time.Second); errors.Is(err, ErrUnjoined) {
-		return "", err
+	probe := runner
+	probe.Work = ""
+	rows, err := captureJSON[[]dockerContainer](diagnosticCtx, probe, []string{"docker", "inspect", id}, "registry-diagnostic-identity")
+	if err != nil {
+		return errors.Join(cause, err)
 	}
-	return "", fmt.Errorf("registry failed startup budget;private diagnostics retained: %w", budget.Err())
+	if _, _, err = admitRegistryIdentity(rows, id, name, owner, materials); err != nil {
+		return errors.Join(cause, err)
+	}
+	err = runner.Run(diagnosticCtx, []string{"docker", "logs", "--tail", "100", id}, "registry-startup-diagnostics", 30*time.Second)
+	return errors.Join(cause, err)
 }
 
 type pinnedImage struct {

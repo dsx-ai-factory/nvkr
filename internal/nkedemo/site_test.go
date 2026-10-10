@@ -539,6 +539,94 @@ func TestRegistryStartRejectsIdentityBeforeNodeProbe(t *testing.T) {
 	}
 }
 
+func TestRegistryStartupRetainsOnlyAuthenticatedDiagnostics(t *testing.T) {
+	for _, scenario := range []string{"stopped", "log-failure", "foreign-owner", "foreign-id", "invalid-materials", "nil-materials", "canceled", "unjoined-original"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := privateTestDir(t)
+			trace := filepath.Join(work, "commands")
+			var rows []dockerContainer
+			fixture := `[{"Id":"owned-id","Name":"/private-registry","Image":"accepted","Config":{"Labels":{"dev.nkd.demo.owner":"private-owner"}},"State":{"Running":false},"Mounts":[{"Type":"tmpfs"}]}]`
+			if err := json.Unmarshal([]byte(fixture), &rows); err != nil {
+				t.Fatal(err)
+			}
+			materials := &SiteMaterials{RegistryID: "accepted", KindNetworkID: "kind-id", Gateway: "172.18.0.1", KindCIDR: "172.18.0.0/16"}
+			wantLogs := true
+			logExit := "0"
+			switch scenario {
+			case "log-failure":
+				logExit = "7"
+			case "foreign-owner":
+				rows[0].Config.Labels["dev.nkd.demo.owner"] = "foreign"
+				wantLogs = false
+			case "foreign-id":
+				rows[0].ID = "foreign"
+				wantLogs = false
+			case "invalid-materials":
+				materials.KindCIDR = "8.8.8.0/24"
+				wantLogs = false
+			case "nil-materials":
+				materials = nil
+				wantLogs = false
+			}
+			encoded, err := json.Marshal(rows)
+			if err != nil {
+				t.Fatal(err)
+			}
+			script := "#!/bin/sh\nset -eu\nprintf '%s\\n' \"$@\" >>\"$TRACE\"\ncase \"$1\" in\n inspect) printf '%s' \"$REGISTRY\";;\n logs) printf 'owned-startup-detail\\n'; exit \"$LOG_EXIT\";;\n *) exit 42;;\nesac\n"
+			if err = os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "REGISTRY=" + string(encoded), "LOG_EXIT=" + logExit}}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			var host string
+			if scenario == "unjoined-original" {
+				err = registryStartupDiagnostics(ctx, runner, "owned-id", "private-registry", "private-owner", materials, errors.Join(errors.New("original startup reason"), ErrUnjoined))
+				if !errors.Is(err, ErrUnjoined) || !strings.Contains(err.Error(), "original startup reason") {
+					t.Fatalf("diagnostic path lost unjoined startup failure: %v", err)
+				}
+			} else {
+				host, err = waitRegistry(ctx, runner, "owned-id", "private-registry", "private-owner", materials)
+			}
+			if err == nil || host != "" {
+				t.Fatal("failed registry was admitted")
+			}
+			if scenario == "canceled" && !errors.Is(err, context.Canceled) {
+				t.Fatalf("diagnostics lost original cancellation: %v", err)
+			}
+			if scenario == "stopped" || scenario == "log-failure" {
+				if !strings.Contains(err.Error(), "exact running Kind-network IPv4 address") {
+					t.Fatalf("diagnostics lost stopped-registry reason: %v", err)
+				}
+			}
+			if scenario == "log-failure" && CommandExitCode(err) != 7 {
+				t.Fatalf("log command failure was discarded: %v", err)
+			}
+			raw, readErr := os.ReadFile(trace)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if logged := strings.Contains(string(raw), "logs\n"); logged != wantLogs {
+				t.Fatalf("unexpected diagnostic access: %s", raw)
+			}
+			if wantLogs {
+				if !strings.Contains(string(raw), "logs\n--tail\n100\nowned-id\n") {
+					t.Fatalf("logs were not bounded to exact authenticated ID: %s", raw)
+				}
+				log, readErr := os.ReadFile(filepath.Join(work, "registry-startup-diagnostics.log"))
+				if readErr != nil || !strings.Contains(string(log), "owned-startup-detail") {
+					t.Fatalf("startup details were not retained before cleanup: %s %v", log, readErr)
+				}
+			} else if _, readErr := os.Stat(filepath.Join(work, "registry-startup-diagnostics.log")); !errors.Is(readErr, os.ErrNotExist) {
+				t.Fatal("unadmitted registry acquired a diagnostic log")
+			}
+		})
+	}
+}
+
 func TestNodeRegistryProbeUsesBoundedDirectRoute(t *testing.T) {
 	for _, scenario := range []string{"exact", "foreign-response", "null", "curl-failure", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
