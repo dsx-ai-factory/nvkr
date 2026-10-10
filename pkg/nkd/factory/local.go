@@ -583,6 +583,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if PerOutputPublication(plan) {
 		return e.New(e.CodeEngineCapability, "per-output publication requires GitHub execution")
 	}
+	if len(plan.Environment.GitHubRunners) > 0 {
+		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubRunners")
+	}
 	if len(plan.Environment.GitHubDispatchBranches) > 0 {
 		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubDispatchBranches")
 	}

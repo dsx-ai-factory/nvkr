@@ -232,7 +232,7 @@ func TestExecutionClassFieldsChangeEnvironmentIdentity(t *testing.T) {
 }
 
 func TestPlanValidationRejectsAlternativeSatisfyingExecutionClass(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	buildIndex, irIndex, nodeIndex := -1, -1, -1
 	for i := range plan.Builds {
 		for j := range plan.Builds[i].Graph.Nodes {
@@ -295,7 +295,7 @@ func TestPlanValidationRejectsAlternativeSatisfyingExecutionClass(t *testing.T) 
 }
 
 func TestPlanValidationRejectsUnselectedProducerGraph(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	graph := plan.Builds[0].Graph
 	for _, node := range graph.Nodes {
 		if node.Kind != ir.KindBuild {
@@ -322,7 +322,7 @@ func TestPlanValidationRejectsUnselectedProducerGraph(t *testing.T) {
 }
 
 func TestPlanValidationRejectsExecutionRouteDrift(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	nodeIndex := bindFirstTestPlanExecution(t, plan, testExecutionRequirements())
 
 	plan.Graph.Nodes[nodeIndex].RunsOn = "substituted-route"
@@ -330,7 +330,7 @@ func TestPlanValidationRejectsExecutionRouteDrift(t *testing.T) {
 }
 
 func TestPlanValidationRejectsUnsatisfiedExecutionClassInventory(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	bindFirstTestPlanExecution(t, plan, testExecutionRequirements())
 
 	for index := range plan.Environment.ExecutionClasses {
@@ -346,7 +346,7 @@ func TestPlanValidationRejectsUnsatisfiedExecutionClassInventory(t *testing.T) {
 }
 
 func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	buildDigest := plan.Builds[0].BuildDigest
 
 	buildIndex, irIndex, nodeIndex := -1, -1, -1
@@ -472,7 +472,7 @@ func TestPlanBindsGenericNodeRequirementsAndChangesPlanIdentity(t *testing.T) {
 }
 
 func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	baselineBundle, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
@@ -604,7 +604,7 @@ func TestCurrentFactoryAdaptersRejectExecutionRequirementsBeforeOutput(t *testin
 }
 
 func TestGeneratedBundleRejectsRequirementsInjectedIntoPlan(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	bundle, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)

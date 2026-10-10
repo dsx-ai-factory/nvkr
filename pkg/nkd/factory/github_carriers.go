@@ -227,7 +227,7 @@ func githubFinalizerJobs(plan *Plan, nodeJobs map[string]string) ([]string, erro
 		if job == "" {
 			return nil, e.New(e.CodeInvalidCatalog, "GitHub node %q has no producer job", node.ID)
 		}
-		resolved, err := plan.ExecutionFor(node)
+		resolved, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return nil, err
 		}

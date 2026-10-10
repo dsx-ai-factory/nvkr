@@ -181,7 +181,11 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 	}
 	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
 	found := map[string]int{}
-	for _, job := range document.Jobs {
+	bootstraps := 0
+	for id, job := range document.Jobs {
+		if strings.HasPrefix(id, "build-runner-") {
+			bootstraps++
+		}
 		for key := range job.Env {
 			if strings.HasPrefix(key, "NKD_PIN_SOURCE_TOKEN_") {
 				t.Fatal("job-scoped pin credential")
@@ -203,13 +207,7 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			}
 		}
 	}
-	bootstraps := 0
-	for id := range document.Jobs {
-		if strings.HasPrefix(id, "build-runner-") {
-			bootstraps++
-		}
-	}
-	if found["validate-catalog"] != bootstraps || found["finalize-catalog"] != 1 {
+	if bootstraps == 0 || found["validate-catalog"] != bootstraps || found["finalize-catalog"] != 1 {
 		t.Fatalf("catalog revalidation credentials missing: %v", found)
 	}
 	for _, tc := range []struct{ name, old, replacement string }{

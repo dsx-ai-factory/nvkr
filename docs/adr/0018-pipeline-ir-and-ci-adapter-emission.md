@@ -216,6 +216,38 @@ addition to the existing host, storage, security and version fields. Adding thes
 `nkd.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
 or prove compatibility with previously recorded qualification profiles.
 
+For native multi-architecture pipeline-attested Runs, `Environment.githubRunners` maps each explicit
+`linux/amd64` or `linux/arm64` execution platform to a supported generic hosted Ubuntu runner. It cannot
+be combined with `runsOn`; unknown platforms, unrecognized labels, mismatched labels and missing output or
+utility routes fail before catalog loading or emitted output. Omission retains the default native ARM64 producer routing and any explicit `runsOn` selection. The hosted adapter rejects unrecognized legacy labels and foreign-platform
+execution rather than assuming emulation. The initial supported routes are `ubuntu-latest`, `ubuntu-22.04`
+and `ubuntu-24.04` for AMD64, and `ubuntu-22.04-arm` and `ubuntu-24.04-arm` for ARM64, as listed in the
+[GitHub runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+The adapter resolves routes from the already admitted execution view without changing producer IR or logical
+Build identity. Route selections remain bound to Environment and complete Plan identity. Producer jobs use
+their target-platform route; utility, acquisition-tool, signing and publication operations use their utility
+platform route. Each configured native job checks its realized kernel OS/architecture before checkout or
+helper use. Bootstrap builds a separate static Linux helper with explicit `GOOS`/`GOARCH` for each route;
+transport pairs each job with that route's helper. The execution entrypoint checks its own native helper
+platform against the exact Plan before work. Before build execution, the pipeline owner checks the
+actual Docker/Podman daemon platform, pulls the pinned toolchain for the selected platform, and verifies its
+reported image platform and manifest identity. Held source vendoring separately checks its daemon against
+the native helper platform before image materialization or Git checkout, using the source owner's isolated
+runtime environment rather than its Git credentials. It retains the pinned native vendor-image checks.
+Plain Git fetching without a vendor command launches no container and requires no daemon check.
+A foreign daemon or image fails before the corresponding source or build output work. Utility operations perform the same factory-owned full-Plan/node and container checks on the host
+before their helper-owned container launch; the helper inside the utility container revalidates the Plan and its
+own native platform without needing a nested daemon. The compact hosted helper owns this host
+preflight. The shared hosted execution projection also supplies readable Plan views with effective runner
+routes; presentation does not reconstruct the map. These are capability checks, not qualified runtime
+receipts or provider-allocation proof.
+
+The map does not itself admit resource requirements, VM execution, arbitrary host labels or
+foreign-platform emulation. With `githubARC: native-kvm-v1`, the separately admitted disk group retains
+its exact ARC route and raw-disk carrier suppression; the map routes ordinary hosted work. Local Runs reject this GitHub-only field and continue using a separate local
+Environment and their existing explicit container-platform path.
+
 The repository-owned NKE OS integration workflow is a narrow validation exception, not generated Run CI and not
 a hosted VM adapter. Each push to `main` selects that exact commit for full AMD64 and ARM64 builds, boot smoke,
 and short-retention QCOW2 uploads. Manual dispatch from the default-branch workflow remains available for

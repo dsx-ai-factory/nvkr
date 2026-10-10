@@ -7,6 +7,9 @@ metadata:
   description: M2 candidate publication namespace; native disk execution with build provenance; deep inspection and reconciliation deferred to M3.
   name: nke-m2-github
 githubARC: native-kvm-v1
+githubRunners:
+  linux/amd64: ubuntu-24.04
+  linux/arm64: ubuntu-24.04-arm
 diskEvidence: build-provenance-v1
 executionClasses:
   - name: arc-amd64-kvm

@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// cmdFactory retains the generated-plan execution entry points. Definition,
+// cmdFactory retains the generated-plan execution and admission adapters. Definition,
 // Environment, Run, and provider generation are owned by the lifecycle commands.
 func cmdFactory() *cli.Command {
 	return &cli.Command{
@@ -47,6 +47,21 @@ func cmdFactory() *cli.Command {
 					}
 				}
 				return factory.ExecuteNode(c.Context, plan, c.String("node"), os.Stdout, os.Stderr)
+			},
+		}, {
+			Name:   "check-node-platform",
+			Hidden: true,
+			Usage:  "check the exact node's native host and container platform before launch",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "plan", Required: true},
+				&cli.StringFlag{Name: "node", Required: true},
+			},
+			Action: func(c *cli.Context) error {
+				plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
+				if err != nil {
+					return err
+				}
+				return factory.CheckNodePlatform(c.Context, plan, c.String("node"))
 			},
 		}, cmdFactoryGitHub()},
 	}

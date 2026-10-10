@@ -163,7 +163,7 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 	var stages []githubStage
 	diskStages := make(map[string]int)
 	for _, node := range topologicalFactoryNodes(plan.Graph) {
-		node, err := plan.ExecutionFor(node)
+		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -16,7 +16,7 @@ import (
 // The sole generated executable document is the complete Plan; its exact
 // canonical bytes and semantic digest must agree with every provider command.
 func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	for _, engine := range []string{EngineGitHub} {
 		t.Run(engine, func(t *testing.T) {
 			bundle, err := Render(t.Context(), plan, engine)
@@ -118,7 +118,7 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 // (Plan) that is read back at runtime with canonical.UnmarshalExact,
 // which rejects a trailing newline. Only the workflow (.yml) may end with one.
 func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	b, err := RenderGitHub(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +150,7 @@ func TestToolAcquireNodeIsNotIRProjected(t *testing.T) {
 // TestDeliveryRuntimeConfigRendersOnGitHub covers the authored runtime image,
 // services, variables and setup on the supported hosted engine.
 func TestDeliveryRuntimeConfigRendersOnGitHub(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	plan.Environment.Runtime.RuntimeImage = "docker:27@sha256:" + strings.Repeat("a", 64)
 	plan.Environment.Runtime.Services = []string{"docker:dind@sha256:" + strings.Repeat("b", 64)}
 	plan.Environment.Runtime.Variables = map[string]string{"DOCKER_HOST": "tcp://docker:2375"}
@@ -177,7 +177,7 @@ func TestDeliveryRuntimeConfigRendersOnGitHub(t *testing.T) {
 // TestEnvironmentSelectsExecutionRunner proves the runner is environment config: a
 // delivery runsOn overrides the definition's default on every emitted node.
 func TestEnvironmentSelectsExecutionRunner(t *testing.T) {
-	plan := buildOnlyPlan(t, "generic")
+	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	if len(plan.Graph.Nodes) == 0 {
 		t.Fatal("expected a non-empty graph")
 	}
@@ -186,7 +186,7 @@ func TestEnvironmentSelectsExecutionRunner(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if n.RunsOn != "generic" {
+		if n.RunsOn != "ubuntu-24.04" {
 			t.Fatalf("delivery runsOn must override the definition default; node %q RunsOn=%q", n.ID, n.RunsOn)
 		}
 	}

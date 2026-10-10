@@ -202,8 +202,8 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authored.Outputs) != 34 {
-		t.Fatalf("got %d outputs, want original ten plus 24 native image members", len(authored.Outputs))
+	if len(authored.Outputs) != 35 {
+		t.Fatalf("got %d outputs, want eleven build/chart/tool outputs plus 24 native image members", len(authored.Outputs))
 	}
 	provider := catalog.Dir(filepath.Join(root, "image-catalog")).(catalog.ContextDataProvider)
 	cat, err := catalog.LoadContext(t.Context(), provider)

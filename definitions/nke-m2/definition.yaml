@@ -83,6 +83,11 @@ outputs:
     format: executable
     components:
       - nkectl
+  - name: nkectl-linux-arm64
+    platform: linux/arm64
+    format: executable
+    components:
+      - nkectl
   - name: operator-tools
     platform: linux/amd64
     catalog:

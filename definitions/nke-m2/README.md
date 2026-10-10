@@ -2,14 +2,14 @@
 
 This is the Definition used by the committed `nkd-run.yml`. It joins independently pinned NKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
-into one release with **34 named outputs**. This remains a candidate; completed pipeline delivery and
+into one release with **35 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
 
 ## Selected artifacts and their owners
 
 | Output group | Owning inputs | Selection |
 |---|---|---|
-| CLI | `../nke-v1/catalog` | `nkectl`, from its independent CLI module pin |
+| CLI | `../nke-v1/catalog` | AMD64 `nkectl` and ARM64 `nkectl-linux-arm64`, from their shared independent CLI module pin |
 | Controller and charts | `../nke-controller/catalog` | `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `catalog` | AMD64 Helm and kubectl executables, selected from the NKE distribution lock |
 | Node images | `os-catalog`, `native-toolchains.yaml` | Separate native AMD64 and ARM64 non-FDE QCOW2s, with explicit material producers |

@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nkd.dev/environment/v1
+githubRunners:
+  linux/amd64: ubuntu-24.04
+  linux/arm64: ubuntu-24.04-arm
 kind: Environment
 metadata:
   name: nke-deploy-github
