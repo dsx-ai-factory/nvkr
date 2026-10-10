@@ -2,7 +2,7 @@
   "schemaVersion": "nvkr.dev/helper-image/v1",
   "goToolchain": "go1.27.2",
   "canonicalToolchain": "go1.27.2",
-  "sourceRef": "afa81f31e5d931b18b2927fdc4ab6adf18e04eca",
+  "sourceRef": "c0697bf651493eb189aaa63a2241f3d1df778b35",
   "runtimeBase": "quay.io/podman/stable@sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "imageRepo": "ghcr.io/dsx-ai-factory/nvkr-exec",
   "helper": {
