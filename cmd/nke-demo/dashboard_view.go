@@ -575,10 +575,6 @@ func (d *dashboard) snapshot() dashboardSnapshot {
 func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if event.Key() == tcell.KeyCtrlC {
-		d.confirmCancel = false
-		return true
-	}
 	if d.confirmCancel {
 		switch {
 		case event.Key() == tcell.KeyRune && (event.Rune() == 'y' || event.Rune() == 'Y'):
@@ -589,7 +585,7 @@ func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 		}
 		return false
 	}
-	if event.Key() == tcell.KeyRune && (event.Rune() == 'q' || event.Rune() == 'Q') {
+	if event.Key() == tcell.KeyCtrlC || event.Key() == tcell.KeyRune && (event.Rune() == 'q' || event.Rune() == 'Q') {
 		d.confirmCancel = true
 		return false
 	}
@@ -611,11 +607,9 @@ func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 			d.buildDetails = !d.buildDetails
 		}
 	case tcell.KeyEscape:
-		if dashboardBuildActive(d.dashboardSnapshot) && d.buildDetails {
-			d.buildDetails = false
-			return false
-		}
-		return true
+		// Escape is navigation, never consent to cancel owned work. Repeated
+		// Escape after closing details must be as harmless as the first press.
+		d.buildDetails = false
 	case tcell.KeyTab:
 		d.focus = (d.focus + 1) % 3
 	case tcell.KeyPgUp:
@@ -791,7 +785,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	activity := s.activity
 	d.activityView.SetTitle(" Activity · public diagnostics ")
 	d.activityView.SetText(tview.Escape(strings.Join(activity, "\n")))
-	help := " Tab focus · PgUp/PgDn activity · End live · q confirm quit · Ctrl-C cancel"
+	help := " Tab focus · PgUp/PgDn activity · End live · q / Ctrl-C confirm cancel"
 	if s.confirmCancel {
 		help = " Cancel this demo and clean up its resources? y/N"
 	}

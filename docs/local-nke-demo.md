@@ -416,7 +416,8 @@ the health of every Docker, Packer or QEMU descendant; silence is not classified
 as a stall.
 
 Up/Down selects an operation and opens its plan-linked inputs, outputs and retained
-public marker events. Enter toggles details; Escape closes them. Raw parallel
+public marker events. Enter toggles details; Escape closes them without canceling
+work. Outside details or a confirmation prompt, Escape has no effect. Raw parallel
 output is shared, so the selected view does not mislabel it as that step's log.
 Press `a` to return to shared activity and automatic running-step selection.
 
@@ -443,14 +444,19 @@ neither `Provisioning=True` nor `Provisioned=True` means tenant nodes are Ready.
 | --- | --- |
 | Tab | Change the focused pane |
 | Up / Down during builds | Select an operation in the build pipeline |
-| Enter / Escape during build details | Toggle details / return to shared activity |
+| Enter during builds | Toggle details |
+| Escape | Close details or dismiss a confirmation; never cancel work |
 | a during builds | Return to shared activity and automatic selection |
 | PgUp / PgDn | Scroll retained activity |
 | End | Return to live activity |
-| q | Ask for confirmation; only y/Y requests cancellation and owned cleanup |
+| q / Ctrl+C | Ask for confirmation; only y/Y requests cancellation and owned cleanup |
 | n / Escape at confirmation | Dismiss the prompt and keep working |
-| Ctrl+C | Request cancellation immediately, then wait for owned cleanup |
 | f while canceling | Ask to force exit; only y/Y exits immediately, leaving cleanup unverified |
+
+Confirmation applies while the dashboard owns terminal input. In plain or verbose
+mode, or while sudo authentication has suspended the dashboard, interrupt and
+termination signals still cancel work and run owned cleanup without this dialog.
+Timeouts and terminal failures also cancel without requiring a usable prompt.
 
 Add `--plain` to the command above for scrolling elapsed START/DONE/FAIL output.
 Piped or redirected output also stays plain. `build` and `e2e` retain up to 8 MiB
@@ -544,7 +550,8 @@ can add that user with `sudo usermod -aG kvm "$(id -un)"`. Open a new login
 session and repeat the check; changing account groups does not update an
 existing session. Do not run the whole demo as root.
 
-If a TCG run is already active, press Ctrl+C and wait for its command and cleanup
+If a TCG run is already active, press Ctrl+C, confirm with `y` in the dashboard,
+and wait for its command and cleanup
 to finish before changing the inputs. Before a new build, run this from the
 NKE Recipes repository root on Linux. It updates [the OS overlay](../definitions/nke-local-dev-arm64/os-tcg.json)
 and [the Docker Environment](../definitions/nke-local-dev-arm64/environment-local-docker.json):

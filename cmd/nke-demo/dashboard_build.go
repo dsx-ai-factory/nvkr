@@ -295,9 +295,9 @@ func (d *dashboard) drawBuild(screen tcell.Screen, s dashboardSnapshot, now time
 		d.activityView.SetText(tview.Escape(strings.Join(activity, "\n")))
 	}
 	d.activityView.SetRect(boardWidth, 3+statusHeight, width-boardWidth, workspace)
-	help := " ↑/↓ select · Enter inspect · a activity · q quit · Ctrl-C cancel"
+	help := " ↑/↓ select · Enter inspect · a activity · q / Ctrl-C confirm cancel"
 	if s.buildDetails {
-		help = " ↑/↓ select · Enter/Esc activity · PgUp/PgDn scroll · q quit · Ctrl-C cancel"
+		help = " ↑/↓ select · Enter/Esc activity · PgUp/PgDn scroll · q / Ctrl-C confirm cancel"
 	}
 	if s.confirmCancel {
 		help = " Cancel this demo and clean up its resources? y/N"

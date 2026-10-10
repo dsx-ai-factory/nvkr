@@ -110,12 +110,12 @@ func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
 			switch mode {
 			case "context":
 				cancel()
-			case "ctrl-c":
-				if err := screen.PostEvent(tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModNone)); err != nil {
-					t.Fatal(err)
+			case "quit", "ctrl-c":
+				key, value := tcell.KeyRune, 'q'
+				if mode == "ctrl-c" {
+					key, value = tcell.KeyCtrlC, 0
 				}
-			case "quit":
-				if err := screen.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone)); err != nil {
+				if err := screen.PostEvent(tcell.NewEventKey(key, value, tcell.ModNone)); err != nil {
 					t.Fatal(err)
 				}
 				tick := time.NewTicker(time.Millisecond)
@@ -129,11 +129,11 @@ func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
 					}
 				}
 				if ctx.Err() != nil {
-					t.Fatal("q canceled work before confirmation")
+					t.Fatal("cancel key canceled work before confirmation")
 				}
 				select {
 				case <-cleaning:
-					t.Fatal("q started cleanup before confirmation")
+					t.Fatal("cancel key started cleanup before confirmation")
 				default:
 				}
 				if err := screen.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModNone)); err != nil {
@@ -185,7 +185,7 @@ func TestDashboardQuitConfirmationInput(t *testing.T) {
 		{"uppercase no", tcell.KeyRune, 'N', false, false},
 		{"escape dismisses", tcell.KeyEscape, 0, false, false},
 		{"enter does not confirm", tcell.KeyEnter, 0, false, true},
-		{"ctrl-c immediate", tcell.KeyCtrlC, 0, true, false},
+		{"ctrl-c is not confirmation", tcell.KeyCtrlC, 0, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := newDashboard()
@@ -245,6 +245,7 @@ func TestDashboardForceExitRequiresCancellationAndJoinsReturningCallback(t *test
 	post(tcell.KeyRune, 'f')
 	post(tcell.KeyRune, 'y')
 	post(tcell.KeyCtrlC, 0)
+	post(tcell.KeyRune, 'y')
 	select {
 	case <-cleaning:
 	case <-time.After(3 * time.Second):

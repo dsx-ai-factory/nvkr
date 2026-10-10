@@ -105,6 +105,27 @@ func TestDashboardQuitConfirmationFooter(t *testing.T) {
 	}
 }
 
+func TestDashboardEscapeNeverCancelsWork(t *testing.T) {
+	for phase, name := range []string{"prepare", "artifacts", "site", "tenant", "workload", "cleanup"} {
+		for _, details := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/details=%t", name, details), func(t *testing.T) {
+				d := newDashboard()
+				d.phases[phase].state = "running"
+				d.buildDetails = details
+				before := d.snapshot()
+				for range 2 {
+					if d.input(tcell.NewEventKey(tcell.KeyEscape, 0, tcell.ModNone)) {
+						t.Fatal("Escape canceled owned work")
+					}
+					if got := d.snapshot(); got.buildDetails || got.confirmCancel || got.phases != before.phases {
+						t.Fatal("Escape changed workflow state or left details open")
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestDashboardForceConfirmationFooter(t *testing.T) {
 	for _, width := range []int{80, 160} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
