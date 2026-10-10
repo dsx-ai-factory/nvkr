@@ -30,6 +30,10 @@ records, not the current product's naming or acceptance evidence. Historical
 provider readbacks likewise retain the environment and branch names actually
 observed at the time.
 
+Demo links into those records retain the recorded output keys. Renaming a link
+without changing its immutable record would make the saved output unavailable;
+current authored examples and exported Plans use the new names.
+
 ## Exact upstream contracts
 
 A Git repository rename does not rewrite a pinned source tree. The maintained
