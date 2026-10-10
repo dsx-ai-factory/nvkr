@@ -159,11 +159,12 @@ The libvirt session must be empty. The demo refuses occupied resources and
 overlapping networks. Python 3.12+ is an upstream NKE installer prerequisite;
 the demo itself is Go. No host Go, Packer or Helm is required.
 
-Run the demo from an interactive Linux terminal. It validates administrator
-authentication before building and checks it again before privileged networking
-operations. When authentication expires, the dashboard pauses for the ordinary
-sudo password prompt and resumes afterward. The main demo remains unprivileged;
-passwords go directly to sudo, not through the demo's logs.
+Run the demo from an interactive Linux terminal. It authenticates before opening
+the dashboard or starting the build, then refreshes that sudo session
+non-interactively every 30 seconds while the command runs. Deployment and cleanup
+do not open password prompts. The main demo remains unprivileged; passwords go
+directly to the initial sudo prompt, not through the demo's logs.
+Do not add a separate `sudo -v` before the demo: it manages authentication itself.
 
 For a redirected or unattended run, check non-interactive administrator access:
 
@@ -208,14 +209,20 @@ unprivileged: keep the host's default privileged-port threshold and do not grant
 file capabilities to the demo executable. DNS/DHCP capabilities are granted only
 to the private dnsmasq copy and journaled for restoration.
 
-Interactive authentication has a two-minute deadline; Ctrl+C cancels it.
-Cleanup can request authentication again after a long build. Do not pipe or
-redirect the interactive demo's standard streams: those runs cannot prompt and
-require approved unattended access. The protected operations still use bounded
-`sudo -n`; a denied operation is not retried. Authentication does not override
-command-specific sudo policy. Do not run the whole demo as root or change
-sudoers to bypass a failure. See Ubuntu's
-[sudo timestamp documentation](https://manpages.ubuntu.com/manpages/resolute/man5/sudoers_timestamp.5.html).
+Initial interactive authentication has a two-minute deadline; type your password
+at sudo's prompt (typing is hidden) and press Enter. Ctrl+C cancels it. The session
+refresher is stopped and joined when the command exits. It does not change sudoers
+or extend authentication after the workflow ends. If policy disallows cached
+authentication, revokes access or rejects a protected command, the run fails
+explicitly without opening a mid-run prompt or retrying that operation. Preserve
+completed artifacts and any recovery journal; cleanup may need a separate
+`restore` invocation. Do not pipe or redirect the interactive demo's standard
+streams: those runs cannot prompt and require approved unattended access.
+The protected operations still use bounded `sudo -n`. Authentication does not
+override command-specific sudo policy. Do not run the whole demo as root or change
+sudoers to bypass a failure. See the upstream
+[sudo manual](https://raw.githubusercontent.com/sudo-project/sudo/main/docs/sudo.man.in)
+for `-v` session refresh and `-n` non-interactive behavior.
 
 Git authorization must work **inside Linux**. The example fetches pinned remote
 sources. Configure Git's credential helper there. Source fetch projects that
@@ -453,9 +460,9 @@ neither `Provisioning=True` nor `Provisioned=True` means tenant nodes are Ready.
 | n / Escape at confirmation | Dismiss the prompt and keep working |
 | f while canceling | Ask to force exit; only y/Y exits immediately, leaving cleanup unverified |
 
-Confirmation applies while the dashboard owns terminal input. In plain or verbose
-mode, or while sudo authentication has suspended the dashboard, interrupt and
-termination signals still cancel work and run owned cleanup without this dialog.
+Confirmation applies while the dashboard owns terminal input. During the initial
+sudo prompt, or in plain or verbose mode, interrupt and termination signals still
+cancel work and run owned cleanup without this dialog.
 Timeouts and terminal failures also cancel without requiring a usable prompt.
 
 Add `--plain` to the command above for scrolling elapsed START/DONE/FAIL output.

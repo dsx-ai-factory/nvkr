@@ -113,10 +113,12 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 				return err
 			}
 			plain, _ := cmd.Flags().GetBool("plain")
-			return runProgress(cmd.Context(), out, plain, func(ctx context.Context, progress io.Writer) error {
-				cfg.Progress = progress
-				return actions.run(ctx, cfg)
-			}, terminalSudoAuthenticator(out, cmd.ErrOrStderr()))
+			return withTerminalSudo(cmd.Context(), out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+				return runProgress(session, out, plain, func(ctx context.Context, progress io.Writer) error {
+					cfg.Progress = progress
+					return actions.run(ctx, cfg)
+				}, refresh)
+			})
 		},
 	}
 	addRunFlags(command, &flags.Run, true)
@@ -167,13 +169,15 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Minute)
 			defer cancel()
 			plain, _ := cmd.Flags().GetBool("plain")
-			return runProgress(budget, out, plain, func(ctx context.Context, progress io.Writer) error {
-				if err := actions.restore(ctx, work, progress); err != nil {
+			return withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+				return runProgress(session, out, plain, func(ctx context.Context, progress io.Writer) error {
+					if err := actions.restore(ctx, work, progress); err != nil {
+						return err
+					}
+					_, err := fmt.Fprintln(progress, "PASS: recorded local network controls restored; no tenant, VM or management deletion was attempted.")
 					return err
-				}
-				_, err := fmt.Fprintln(progress, "PASS: recorded local network controls restored; no tenant, VM or management deletion was attempted.")
-				return err
-			}, terminalSudoAuthenticator(out, cmd.ErrOrStderr()))
+				}, refresh)
+			})
 		},
 	}
 	command.Flags().StringVar(&flags.Restore.Work, "work", "", "original private Go demo workspace")
@@ -199,20 +203,22 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			defer cancel()
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			plain, _ := cmd.Flags().GetBool("plain")
-			return runBuildProgress(budget, out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
-				build.Progress, run.Progress = progress, progress
-				run, err = actions.prepare(ctx, build, run)
-				if err != nil {
-					return err
-				}
-				built, err := actions.build(ctx, build)
-				if err != nil {
-					return err
-				}
-				run.NKDCTL = built.NKDCTL
-				run.Runs = built.Runs
-				return actions.run(ctx, run)
-			}, terminalSudoAuthenticator(out, cmd.ErrOrStderr()))
+			return withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+				return runBuildProgress(session, out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
+					build.Progress, run.Progress = progress, progress
+					run, err = actions.prepare(ctx, build, run)
+					if err != nil {
+						return err
+					}
+					built, err := actions.build(ctx, build)
+					if err != nil {
+						return err
+					}
+					run.NKDCTL = built.NKDCTL
+					run.Runs = built.Runs
+					return actions.run(ctx, run)
+				}, refresh)
+			})
 		},
 	}
 	addBuildFlags(command, &flags.Build)

@@ -195,8 +195,9 @@ After SIGKILL/OOM or VM restart:
    "$NKE_DEMO" restore --work "$DEMO_OUT"
    ```
 
-   In an interactive Linux terminal, recovery pauses for sudo authentication if
-   needed. Redirected or unattended recovery instead requires approved
+   In an interactive Linux terminal, recovery authenticates before opening its
+   dashboard and maintains that session without mid-run password prompts.
+   Redirected or unattended recovery instead requires approved
    non-interactive access; check `sudo -n -k timeout --signal=TERM --kill-after=5 25 true`.
 
 4. This restores only recorded host-network controls; it does not delete tenants,

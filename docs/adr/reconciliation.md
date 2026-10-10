@@ -306,10 +306,13 @@ input/output. Its phase map, observed state and bounded public activity use type
 owner events, not log-derived authority; narrow terminals stack the panes. `--plain`,
 pipes and redirected output retain scrolling progress; `--verbose` builds use plain
 public-log streaming. Tab changes focus, PgUp/PgDn scroll activity and End returns
-to live activity. q asks for confirmation; y requests cancellation, while Ctrl+C
-requests it immediately. Normal cancellation waits for owned work and cleanup
-before terminal restoration. During cancellation, f then y restores the terminal
-and exits 130 without joining cleanup; resources may remain and no success is claimed.
+to live activity. While the dashboard owns input, q and Ctrl+C ask for confirmation;
+only y/Y requests cancellation. Escape closes details or dismisses confirmation,
+never canceling work. Plain/verbose output and the initial sudo prompt retain
+signal-driven cancellation without a dialog. Normal cancellation waits for owned
+work and cleanup before terminal restoration. During cancellation, f then y
+restores the terminal and exits 130 without joining cleanup; resources may remain
+and no success is claimed.
 Failed deployment stops unfinished active panes without
 claiming that their individual checks failed. [CLI contracts](../../cmd/nke-demo/dashboard_test.go)
 and [simulation-screen tests](../../cmd/nke-demo/dashboard_view_test.go) exercise
@@ -317,15 +320,22 @@ layout, bounded/sanitized snapshots, concurrent reports, cancellation joining an
 terminal failures. These are controlled presentation/race contracts, not a completed
 fresh E2E or live interruption acceptance for this candidate.
 
-Interactive Linux commands now suspend the dashboard for a bounded ordinary
-sudo prompt and revalidate authentication before each protected networking
-operation, including independently bounded cleanup. Redirected commands retain
-the cache-independent unattended check. No password is handled by the Go reader
-or diagnostic writer, and privileged operations are not replayed after failure.
-Controlled tests cover suspend/resume failures, repeated authentication and
-canceled-work cleanup. An isolated Linux ARM64 PTY test exercised child foreground
-ownership and terminal restoration after success and cancellation; this does not
-prove a real password policy or a complete fresh deployment with this change.
+The interactive Linux CLI authenticates before opening the
+dashboard or starting work, then refresh its existing sudo session using bounded
+non-interactive checks while that workflow runs. Deployment and independently
+bounded cleanup must not open password prompts. Redirected commands retain the
+cache-independent unattended check. No password is handled by the Go reader or
+diagnostic writer, no sudo policy is modified, and privileged operations are not
+replayed after failure. The initial prompt names its deadline and hidden password
+input. Failure diagnostics distinguish deadline expiry, cancellation and other
+authentication failures without asserting that a password was submitted or
+accepted. Controlled tests and targeted race checks cover authentication before
+work, periodic refresh failure, cancellation and refresher joining, including
+preservation of unjoined-child errors. Isolated Linux ARM64 PTY tests exercised
+foreground ownership/restoration, dashboard checks without suspension and actual
+same-terminal sudo validation/refresh. The cache test passed on a non-interactive
+sudo-policy host; it does not prove a real password policy, hour-long credential
+retention or a complete fresh deployment with this change.
 
 The downstream tenant smoke now waits for the pinned CoreDNS Deployment and
 node-local DNS DaemonSet rollouts, within four minutes and the remaining tenant

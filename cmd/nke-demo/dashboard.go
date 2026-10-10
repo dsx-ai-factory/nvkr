@@ -206,23 +206,6 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 	}
 	startPump()
 	defer stopPump()
-	requests, presenterDone := make(chan sudoRequest), make(chan struct{})
-	endPresenter := sync.OnceFunc(func() { close(presenterDone) })
-	defer endPresenter()
-	authenticate := writer.sudoAuth
-	if authenticate != nil {
-		writer.sudoAuth = func(authCtx context.Context) error {
-			request := sudoRequest{ctx: authCtx, result: make(chan error, 1)}
-			select {
-			case requests <- request:
-			case <-authCtx.Done():
-				return authCtx.Err()
-			case <-presenterDone:
-				return nkderr.New(nkderr.CodePreflightFailed, "administrator authentication presenter ended")
-			}
-			return <-request.result
-		}
-	}
 	done := make(chan error, 1)
 	go func() {
 		var err error
@@ -239,7 +222,6 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 		if recover() != nil {
 			result = errors.Join(result, nkderr.New(nkderr.CodePreflightFailed, "terminal rendering failed; work canceled"))
 		}
-		endPresenter()
 		cancel()
 		if !joined {
 			result = errors.Join(result, <-done)
@@ -261,26 +243,6 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 			}
 		}
 		select {
-		case request := <-requests:
-			if !drawing {
-				request.result <- nkderr.New(nkderr.CodePreflightFailed, "terminal unavailable for administrator authentication")
-				continue
-			}
-			// Suspend closes tcell's event stream. Join its pump deliberately,
-			// then restore normal terminal input for sudo and start a new pump.
-			stopPump()
-			resumed, authErr := suspendForAuthentication(request.ctx, screen, authenticate)
-			if resumed {
-				startPump()
-			} else {
-				drawing = false
-			}
-			request.result <- authErr
-			if !drawing {
-				presentationErr = errors.Join(presentationErr, authErr)
-				canceling = true
-				cancel()
-			}
 		case result := <-done:
 			joined = true
 			// Completion events can arrive after the last refresh. Render the

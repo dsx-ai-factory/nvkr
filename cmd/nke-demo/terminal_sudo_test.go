@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,22 +24,15 @@ import (
 
 type authenticationScreen struct {
 	*testDashboardScreen
-	suspendFailure, resumeFailure bool
-	suspends, resumes, pumps      atomic.Int32
+	suspends, resumes, pumps atomic.Int32
 }
 
 func (s *authenticationScreen) Suspend() error {
 	s.suspends.Add(1)
-	if s.suspendFailure {
-		return errors.New("private suspend error")
-	}
 	return s.SimulationScreen.Suspend()
 }
 func (s *authenticationScreen) Resume() error {
 	s.resumes.Add(1)
-	if s.resumeFailure {
-		return errors.New("private resume error")
-	}
 	return s.SimulationScreen.Resume()
 }
 func (s *authenticationScreen) ChannelEvents(events chan<- tcell.Event, quit <-chan struct{}) {
@@ -46,20 +40,17 @@ func (s *authenticationScreen) ChannelEvents(events chan<- tcell.Event, quit <-c
 	s.testDashboardScreen.ChannelEvents(events, quit)
 }
 
-func TestDashboardAuthenticationOwnsSuspendAndResume(t *testing.T) {
-	for _, mode := range []string{"twice", "auth-failure", "suspend-failure", "resume-failure", "foreground-not-restored", "canceled-auth-cleanup"} {
+func TestDashboardAuthenticationNeverSuspends(t *testing.T) {
+	for _, mode := range []string{"twice", "auth-failure", "canceled-auth-cleanup"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			screen := &authenticationScreen{testDashboardScreen: &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8")}, suspendFailure: mode == "suspend-failure", resumeFailure: mode == "resume-failure"}
+			screen := &authenticationScreen{testDashboardScreen: &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8")}}
 			view := newDashboard()
 			var calls atomic.Int32
 			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
 			writer.sudoAuth = func(authCtx context.Context) error {
 				n := calls.Add(1)
-				if mode == "foreground-not-restored" {
-					return errors.Join(errTerminalNotRestored, nkderr.New(nkderr.CodePreflightFailed, "terminal restore failed"))
-				}
 				if mode == "auth-failure" {
 					return nkderr.New(nkderr.CodePreflightFailed, "authentication rejected")
 				}
@@ -87,21 +78,130 @@ func TestDashboardAuthenticationOwnsSuspendAndResume(t *testing.T) {
 			if !joined || !screen.joined.Load() {
 				t.Fatal("worker or terminal did not join")
 			}
+			if screen.suspends.Load() != 0 || screen.resumes.Load() != 0 || screen.pumps.Load() != 1 {
+				t.Fatal("noninteractive authentication changed terminal lifecycle")
+			}
 			if mode == "twice" {
-				if err != nil || calls.Load() != 2 || screen.suspends.Load() != 2 || screen.resumes.Load() != 2 || screen.pumps.Load() != 3 {
+				if err != nil || calls.Load() != 2 {
 					t.Fatalf("two auth cycles failed: %v calls=%d pumps=%d", err, calls.Load(), screen.pumps.Load())
 				}
 			} else if err == nil {
 				t.Fatal("authentication failure accepted")
 			}
-			if mode == "suspend-failure" && calls.Load() != 0 {
-				t.Fatal("prompt ran with raw terminal")
-			}
-			if mode == "foreground-not-restored" && screen.resumes.Load() != 0 {
-				t.Fatal("resumed terminal drawing without foreground ownership")
-			}
 			if mode == "canceled-auth-cleanup" && calls.Load() != 2 {
 				t.Fatal("canceled work prevented independently bounded cleanup authentication")
+			}
+		})
+	}
+}
+
+func TestSudoSessionAdmission(t *testing.T) {
+	for _, mode := range []string{"authenticate-fails", "refresh-fails", "success"} {
+		t.Run(mode, func(t *testing.T) {
+			cause := nkderr.New(nkderr.CodePreflightFailed, "session admission rejected")
+			var order []string
+			err := withSudoSession(t.Context(), func(context.Context) error {
+				order = append(order, "authenticate")
+				if mode == "authenticate-fails" {
+					return cause
+				}
+				return nil
+			}, func(context.Context) error {
+				order = append(order, "refresh")
+				if mode == "refresh-fails" {
+					return cause
+				}
+				return nil
+			}, time.Hour, func(context.Context, func(context.Context) error) error {
+				order = append(order, "work")
+				return nil
+			})
+			want := "authenticate,refresh,work"
+			switch mode {
+			case "authenticate-fails":
+				want = "authenticate"
+			case "refresh-fails":
+				want = "authenticate,refresh"
+			}
+			if strings.Join(order, ",") != want {
+				t.Fatalf("admission order %v, want %s", order, want)
+			}
+			if mode == "success" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if !errors.Is(err, cause) {
+				t.Fatalf("admission error lost: %v", err)
+			}
+		})
+	}
+}
+
+func TestSudoSessionRefreshOwnership(t *testing.T) {
+	for _, mode := range []string{"return", "cancel", "panic", "refresh-fails", "unjoined", "panic-unjoined"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			started, joined := make(chan struct{}), make(chan struct{})
+			cause := nkderr.New(nkderr.CodePreflightFailed, "session revoked")
+			var calls atomic.Int32
+			err := withSudoSession(ctx, func(context.Context) error { return nil }, func(refreshCtx context.Context) error {
+				if calls.Add(1) == 1 {
+					return nil
+				}
+				close(started)
+				defer close(joined)
+				if mode == "refresh-fails" {
+					return cause
+				}
+				<-refreshCtx.Done()
+				if mode == "unjoined" || mode == "panic-unjoined" {
+					return errors.Join(refreshCtx.Err(), nkedemo.ErrUnjoined)
+				}
+				return refreshCtx.Err()
+			}, time.Millisecond, func(workCtx context.Context, refresh func(context.Context) error) error {
+				select {
+				case <-started:
+				case <-workCtx.Done():
+					return workCtx.Err()
+				}
+				switch mode {
+				case "panic", "panic-unjoined":
+					panic("private workflow panic")
+				case "cancel":
+					cancel()
+					return workCtx.Err()
+				case "refresh-fails":
+					<-workCtx.Done()
+					return workCtx.Err()
+				default:
+					return nil
+				}
+			})
+			select {
+			case <-joined:
+			default:
+				t.Fatal("sudo refresh was not joined before returning")
+			}
+			switch mode {
+			case "return":
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "cancel":
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("cancellation lost: %v", err)
+				}
+			case "panic":
+				assertCode(t, err, nkderr.CodePreflightFailed)
+			case "refresh-fails":
+				if !errors.Is(err, cause) {
+					t.Fatalf("refresh failure lost: %v", err)
+				}
+			case "unjoined", "panic-unjoined":
+				if !errors.Is(err, nkedemo.ErrUnjoined) {
+					t.Fatalf("unjoined subprocess failure lost: %v", err)
+				}
 			}
 		})
 	}
@@ -122,6 +222,37 @@ func TestForegroundAuthenticationRejectsNonTerminal(t *testing.T) {
 	assertCode(t, err, nkderr.CodePreflightFailed)
 	if cmd.Process != nil {
 		t.Fatal("child started before terminal admission")
+	}
+}
+
+func TestTerminalAuthenticationFailureExplainsDeadline(t *testing.T) {
+	for _, row := range []struct {
+		name, message string
+		code          nkderr.Code
+	}{
+		{"deadline", "authentication deadline expired", nkderr.CodeTimeout},
+		{"canceled", "authentication canceled", nkderr.CodeTimeout},
+		{"rejected", "authentication failed", nkderr.CodePreflightFailed},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := t.Context()
+			switch row.name {
+			case "deadline":
+				bounded, cancel := context.WithDeadline(ctx, time.Now().Add(-time.Second))
+				defer cancel()
+				ctx = bounded
+			case "canceled":
+				canceled, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = canceled
+			}
+			cause := errors.New("authentication child stopped")
+			err := terminalAuthenticationFailure(ctx, cause)
+			assertCode(t, err, row.code)
+			if !errors.Is(err, cause) || !strings.Contains(err.Error(), row.message) || !strings.Contains(err.Error(), "no privileged command was retried") {
+				t.Fatalf("authentication diagnosis lost: %v", err)
+			}
+		})
 	}
 }
 
@@ -161,7 +292,42 @@ func TestForegroundAuthenticationTerminalContract(t *testing.T) {
 	}
 }
 
-// Exercise the real stdio reader/Drain/Stop/Start cycle, not SimulationScreen.
+// Opt-in read-only sudo-cache contract in one real Linux terminal session.
+// A NOPASSWD host can pass this test; it does not prove password policy.
+func TestSudoSessionTerminalContract(t *testing.T) {
+	if os.Getenv("NKD_TEST_SUDO_SESSION") != "1" || runtime.GOOS != "linux" {
+		t.Skip("requires an isolated real Linux terminal and explicit sudo-cache test opt-in")
+	}
+	if terminalSudoAuthenticator(os.Stdout, os.Stderr) == nil {
+		t.Fatal("sudo-cache contract requires actual terminal stdin, stdout and stderr")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	var checks atomic.Int32
+	refreshed := make(chan struct{})
+	err := withSudoSession(ctx, authenticateTerminalSudo, func(refreshCtx context.Context) error {
+		if err := refreshTerminalSudo(refreshCtx); err != nil {
+			return err
+		}
+		if checks.Add(1) == 2 {
+			close(refreshed)
+		}
+		return nil
+	}, 50*time.Millisecond, func(workCtx context.Context, refresh func(context.Context) error) error {
+		select {
+		case <-workCtx.Done():
+			return workCtx.Err()
+		case <-refreshed:
+			return refresh(workCtx)
+		}
+	})
+	if err != nil || checks.Load() < 3 {
+		t.Fatalf("same-terminal cache admission/refresh failed: checks=%d error=%v", checks.Load(), err)
+	}
+}
+
+// Exercise the real stdio reader and one owned event pump, not SimulationScreen.
+// Noninteractive authentication checks must not suspend or restart the screen.
 // No privileged command or deployment is involved in these presentation checks.
 func TestDashboardAuthenticationTerminalContract(t *testing.T) {
 	if os.Getenv("NKD_TEST_TERMINAL_AUTH") != "1" {
