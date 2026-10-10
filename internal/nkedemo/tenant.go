@@ -106,9 +106,21 @@ func newTenantRequest(name, network string) (TenantRequest, error) {
 }
 
 type tenantRow struct {
-	Name string         `json:"name"`
-	ID   string         `json:"id"`
-	NICo TenantProvider `json:"nico"`
+	Name       string           `json:"name"`
+	ID         string           `json:"id"`
+	NICo       TenantProvider   `json:"nico"`
+	Conditions tenantConditions `json:"conditions"`
+}
+
+// Retain only the two pinned API condition statuses needed for presentation.
+// Messages, transition times and unrelated response fields are not decoded.
+type tenantConditions struct {
+	Provisioning struct {
+		Status TenantConditionStatus `json:"status"`
+	} `json:"provisioning"`
+	Provisioned struct {
+		Status TenantConditionStatus `json:"status"`
+	} `json:"provisioned"`
 }
 
 func selectedTenant(rows []tenantRow, name, id string) (*tenantRow, error) {
@@ -232,18 +244,18 @@ func (t *tenant) row(ctx context.Context) (*tenantRow, error) {
 	}
 	return selectedTenant(rows, t.name, t.id)
 }
-func (t *tenant) alive(ctx context.Context) error {
+func (t *tenant) alive(ctx context.Context) (*tenantRow, error) {
 	if exited, _ := t.simulator.Exited(); exited {
-		return errors.New("NICoSim exited during tenant provisioning")
+		return nil, errors.New("NICoSim exited during tenant provisioning")
 	}
 	row, err := t.row(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if row == nil {
-		return errors.New("created tenant disappeared")
+		return nil, errors.New("created tenant disappeared")
 	}
-	return nil
+	return row, nil
 }
 func (t *tenant) kubectl(config string, args ...string) []string {
 	return append([]string{filepath.Join(t.session.Tools, "kubectl"), "--kubeconfig", config}, args...)
@@ -285,13 +297,15 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	provision, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	deadline, _ := provision.Deadline()
-	progress := tenantProgress{writer: t.session.Runner.Progress, started: time.Now(), deadline: deadline}
+	progress := tenantProgress{writer: t.session.Runner.Progress, started: time.Now(), deadline: deadline, conditions: row.Conditions}
 	progress.update(time.Now(), "tenant-kubeconfig", nil)
 	kubeconfig := filepath.Join(t.session.Work, "tenant-kubeconfig")
 	for {
-		if err = t.alive(provision); err != nil {
+		if row, err = t.alive(provision); err != nil {
 			return err
 		}
+		progress.conditions = row.Conditions
+		progress.update(time.Now(), "tenant-kubeconfig", nil)
 		raw, readErr := t.capture(provision, t.kubectl(environmentValue(t.session.Runner.Env, "SITE_KUBECONFIG"), "-n", "nke-system", "get", "secret", t.name+"-admin-kubeconfig", "--ignore-not-found", "-o", "json"), "kubeconfig-secret", 30*time.Second)
 		if readErr != nil {
 			return readErr
@@ -329,9 +343,10 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	var nodes struct{ Items []tenantNode }
 	progress.update(time.Now(), "tenant-api", nil)
 	for {
-		if err = t.alive(provision); err != nil {
+		if row, err = t.alive(provision); err != nil {
 			return err
 		}
+		progress.conditions = row.Conditions
 		raw, err = t.capture(provision, t.kubectl(kubeconfig, "--request-timeout=10s", "get", "nodes", "-o", "json"), "nodes", 30*time.Second)
 		if err != nil {
 			if CommandExitCode(err) != 1 {
@@ -576,7 +591,7 @@ func (t *tenant) preserve(ctx context.Context) error {
 	}
 	return nil
 }
-func (t *tenant) restore(ctx context.Context) error {
+func (t *tenant) restore(ctx context.Context) (result error) {
 	t.cleaning = true
 	if !t.intent {
 		return nil
@@ -589,9 +604,14 @@ func (t *tenant) restore(ctx context.Context) error {
 		return nil
 	}
 	t.id = row.ID
-	if _, err = t.capture(ctx, []string{t.cli(), "delete", "cluster", t.name}, "delete", 120*time.Second); err != nil {
+	deleteProgress := beginProgress(t.session.Runner.Progress, "tenant-delete", PhaseStarted, PhaseFinished, PhaseFailed)
+	_, err = t.capture(ctx, []string{t.cli(), "delete", "cluster", t.name}, "delete", 120*time.Second)
+	deleteProgress.finish(err)
+	if err != nil {
 		return err
 	}
+	waitProgress := beginProgress(t.session.Runner.Progress, "tenant-deletion-wait", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { waitProgress.finish(result) }()
 	deadline, cancel := context.WithTimeout(ctx, 180*time.Second)
 	defer cancel()
 	for {
@@ -607,8 +627,12 @@ func (t *tenant) restore(ctx context.Context) error {
 		}
 	}
 }
-func (t *tenant) close(ctx context.Context) error {
+func (t *tenant) close(ctx context.Context) (result error) {
+	cleanupProgress := beginProgress(t.session.Runner.Progress, "tenant-cleanup", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { cleanupProgress.finish(result) }()
+	diagnosticProgress := beginProgress(t.session.Runner.Progress, "tenant-diagnostics", PhaseStarted, PhaseFinished, PhaseFailed)
 	diagnosticErr := t.preserve(ctx)
+	diagnosticProgress.finish(diagnosticErr)
 	if errors.Is(diagnosticErr, ErrUnjoined) {
 		return diagnosticErr
 	}

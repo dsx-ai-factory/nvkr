@@ -48,7 +48,7 @@ func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logP
 	if logPath != "" {
 		writer.emit(fmt.Sprintf("Build log (private, retained; maximum 8 MiB): %q\n", logPath))
 	}
-	err = dashboardLoop(workCtx, cancel, screen, monitored.failure, writer, view, work)
+	err = dashboardLoopWithForceExit(workCtx, cancel, screen, monitored.failure, writer, view, work, forceDashboardExit)
 	err = errors.Join(err, monitored.failure())
 	// The terminal and worker have both joined before returning to scrolling
 	// output. A failed renderer cannot skip workflow cleanup or fabricate PASS.
@@ -66,6 +66,14 @@ func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logP
 	}
 	writer.mu.Unlock()
 	return errors.Join(err, writer.failure(), monitored.failure())
+}
+
+// This callback is installed only at the real interactive CLI boundary. A
+// confirmed forced exit abandons the cleanup wait, never claims successful
+// cleanup and never returns normally with an unjoined worker.
+func forceDashboardExit() {
+	_, _ = fmt.Fprintln(os.Stderr, "FORCED EXIT: stopped waiting for cleanup. Demo VMs, containers and network changes may remain; cleanup is not confirmed.")
+	os.Exit(130)
 }
 
 // tcell intentionally ignores low-level writes and terminal teardown errors.
@@ -116,11 +124,16 @@ func (t *checkedTTY) Close() error {
 	return err
 }
 
-// The event pump and workflow are the only caller-owned goroutines. Every exit
-// joins both. Presentation callbacks update bounded snapshots, never wait for
+// The event pump and workflow are the only caller-owned goroutines. Every normal
+// return joins both; only confirmed process termination bypasses the join.
+// Presentation callbacks update bounded snapshots, never wait for
 // the UI queue. No tview Application/QueueUpdate acknowledgement can deadlock
 // cancellation or cleanup when a terminal exits unexpectedly.
 func dashboardLoop(ctx context.Context, cancel context.CancelFunc, screen tcell.Screen, outputFailure func() error, writer *checkedWriter, view *dashboard, work func(context.Context, io.Writer) error) (result error) {
+	return dashboardLoopWithForceExit(ctx, cancel, screen, outputFailure, writer, view, work, nil)
+}
+
+func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, screen tcell.Screen, outputFailure func() error, writer *checkedWriter, view *dashboard, work func(context.Context, io.Writer) error, forceExit func()) (result error) {
 	if err := screen.Init(); err != nil {
 		// The pinned tcell implementation enters raw mode only in its final
 		// successful Init stage. Earlier failures have no running screen;
@@ -130,13 +143,19 @@ func dashboardLoop(ctx context.Context, cancel context.CancelFunc, screen tcell.
 		}
 		return nkderr.New(nkderr.CodePreflightFailed, "terminal initialization failed; no demo work started; retry with --plain")
 	}
+	terminalRestored := false
 	defer func() {
-		screen.Fini()
+		if !terminalRestored {
+			screen.Fini()
+		}
 		result = errors.Join(result, outputFailure())
 	}()
 	if err := outputFailure(); err != nil {
 		return err
 	}
+	view.mu.Lock()
+	view.forceAvailable = forceExit != nil
+	view.mu.Unlock()
 	events := make(chan tcell.Event, 8)
 	quit, pumpDone := make(chan struct{}), make(chan struct{})
 	go func() {
@@ -208,11 +227,18 @@ func dashboardLoop(ctx context.Context, cancel context.CancelFunc, screen tcell.
 			}
 			switch event := event.(type) {
 			case *tcell.EventKey:
-				if event.Key() == tcell.KeyCtrlC || event.Key() == tcell.KeyEscape || event.Rune() == 'q' {
+				if canceling && forceExit != nil && view.forceInput(event) {
+					// Restore the terminal before the process-exit callback. A
+					// returning test callback still follows the normal join path.
+					drawing = false
+					screen.Fini()
+					terminalRestored = true
+					exit := forceExit
+					forceExit = nil
+					exit()
+				} else if !canceling && view.input(event) {
 					canceling = true
 					cancel()
-				} else {
-					view.input(event)
 				}
 			case *tcell.EventResize:
 				screen.Sync()

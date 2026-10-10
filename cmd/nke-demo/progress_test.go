@@ -227,3 +227,34 @@ func TestTenantStatusShowsMeaningNotPrivateProbeNames(t *testing.T) {
 		})
 	}
 }
+
+func TestDashboardProgressOmitsMechanicalTraceButKeepsFailures(t *testing.T) {
+	for _, dashboardMode := range []bool{false, true} {
+		t.Run(map[bool]string{false: "plain", true: "dashboard"}[dashboardMode], func(t *testing.T) {
+			var out bytes.Buffer
+			_, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			w := &checkedWriter{out: &out, started: time.Now(), phases: make(map[string]time.Time), cancel: cancel}
+			var view *dashboard
+			if dashboardMode {
+				view = newDashboard()
+				w.observer = view
+			}
+			w.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseStarted, Name: "create-management"})
+			w.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseFinished, Name: "create-management"})
+			w.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-kubeconfig", Elapsed: time.Minute, Remaining: 59 * time.Minute})
+			w.Report(nkedemo.ProgressEvent{Kind: nkedemo.DeploymentFailed, Name: "private-check"})
+			if !strings.Contains(out.String(), "[FAIL 0s] private-check") || w.failedPhase != "private-check" {
+				t.Fatalf("failure lost: %q", out.String())
+			}
+			for _, marker := range []string{"[START", "[DONE", "Tenant  "} {
+				if strings.Contains(out.String(), marker) == dashboardMode {
+					t.Fatalf("unexpected mechanical trace for dashboard=%v: %q", dashboardMode, out.String())
+				}
+			}
+			if dashboardMode && (view.siteStages[0].states[0] != "observed" || view.tenantStages[0].states[0] != "running") {
+				t.Fatal("suppressed trace lost typed checklist observations")
+			}
+		})
+	}
+}

@@ -286,6 +286,11 @@ docker pull docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af0682
 E2E checks both cached images on this same Linux Docker daemon before fetching
 the installer or building artifacts. Missing images fail early with the exact
 pull command. Artifact-only builds do not require these deployment images.
+It also checks the discovered Kind subnet for overlap and probes its gateway's
+NICoSim API port `18089`. An occupied endpoint fails before the build and names
+the inspection command. No listener is stopped automatically; stop an earlier
+demo through its original process, or inspect its exact resources before using
+[network recovery](nkd-to-nke-demo.md#recover-network-controls-after-a-crash).
 
 During deployment, the demo starts an owned registry directly on the admitted
 Kind network, discovers its IPv4 address and checks `/v2/` from the actual
@@ -353,13 +358,31 @@ phase map, observed state and bounded public activity. The phases are Prepare,
 Artifacts, Site, Tenant, Workload/DNS and Cleanup; narrow terminals stack the panes.
 The state pane explains the current wait and shows the observed tenant node counts
 and remaining readiness budget. It does not infer success from log text.
+The phase map keeps the Site and Tenant checklists visible together when the
+terminal has room; compact terminals prioritize the live wait and timeout.
+The Site checklist retains individual Cluster API and NKE installation stages;
+an NKE stage is checked off only after both its run and verification succeed.
+The Tenant checklist shows kubeconfig, API, two-node readiness and workload/DNS
+observations. Active steps show their own elapsed time. Pending steps have not
+been observed; the display does not estimate an overall completion percentage.
+Routine command START/DONE traces and repeated wait messages stay out of the
+dashboard activity pane; failures remain visible. Use `--plain` for the full
+command-boundary trace. ETA remains unknown: a readiness budget is a timeout,
+not an estimated finish. The state pane distinguishes time since a stage, node
+count or reported NKE condition changed from the age of the latest observation.
+Repeated polling is not proof that provisioning is advancing. Only the pinned
+API's `True`, `False` and `Unknown` provisioning condition statuses are shown;
+neither `Provisioning=True` nor `Provisioned=True` means tenant nodes are Ready.
 
 | Key | Action |
 | --- | --- |
 | Tab | Change the focused pane |
 | PgUp / PgDn | Scroll retained activity |
 | End | Return to live activity |
-| q / Ctrl+C | Request cancellation, then wait for owned processes and cleanup |
+| q | Ask for confirmation; only y/Y requests cancellation and owned cleanup |
+| n / Escape at confirmation | Dismiss the prompt and keep working |
+| Ctrl+C | Request cancellation immediately, then wait for owned cleanup |
+| f while canceling | Ask to force exit; only y/Y exits immediately, leaving cleanup unverified |
 
 Add `--plain` to the command above for scrolling elapsed START/DONE/FAIL output.
 Piped or redirected output also stays plain. `build` and `e2e` retain up to 8 MiB
@@ -374,7 +397,9 @@ expected absence checks do not print failures. Numbered command logs remain
 available for diagnosis. Tenant polling likewise keeps individual inventory,
 kubeconfig and node commands in private logs. The console shows the current
 wait, elapsed/remaining readiness budget, and observed registered/Ready counts.
-Changes appear immediately; an unchanged wait repeats at most every 30 seconds.
+Changes appear immediately; in plain output an unchanged wait repeats at most
+every 30 seconds. The dashboard updates the wait in place instead of adding
+duplicate activity lines.
 Before the tenant API is available, guest boot and node readiness are explicitly
 unobserved: a successful inventory or secret query does not mean provisioning
 succeeded. Two Ready nodes still require workload/DNS checks and owned cleanup.
@@ -385,7 +410,16 @@ the final command result and owned checks still determine success. After deploym
 fails, unfinished active panes show `stopped`; explicit failures remain `failed`.
 This does not claim that every unfinished check failed. Cancellation
 waits for bounded subprocess joining and owned cleanup before restoring the
-terminal. If cleanup refuses, inspect retained resources and recovery instructions
+terminal. The state pane names diagnostics collection, tenant deletion and the
+deletion wait as their owners report them; it does not keep counting the canceled
+tenant readiness budget. Tenant cleanup has its own six-minute budget; the delete
+command allows up to two minutes and its subsequent deletion wait up to three.
+These are bounds, not completion estimates or one global cleanup deadline.
+If you confirm force exit with `f` then `y`, the terminal is restored and the
+process exits with status 130 **without waiting for cleanup**. Processes,
+containers, VMs and network controls may remain. Inspect and recover the exact
+attempt before restarting; force exit never reports success or completed cleanup.
+If cleanup refuses, inspect retained resources and recovery instructions
 before rerunning. [Dashboard tests](../cmd/nke-demo/dashboard_test.go) and
 [simulation-screen tests](../cmd/nke-demo/dashboard_view_test.go) cover presentation,
 cancellation and output failures with controlled workers. They do not prove

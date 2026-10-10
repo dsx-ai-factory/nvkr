@@ -209,7 +209,12 @@ func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
 	if status == "FAIL" && w.failedPhase == "" {
 		w.failedPhase = event.Name
 	}
-	w.emit(fmt.Sprintf("[%s %s] %s\n", status, elapsed, terminalText(event.Name)))
+	// The dashboard consumes these typed observations directly. Repeating every
+	// private mechanical step in its activity pane hides meaningful changes.
+	// Plain output retains the full trace; failures remain visible in both modes.
+	if w.observer == nil || status == "FAIL" {
+		w.emit(fmt.Sprintf("[%s %s] %s\n", status, elapsed, terminalText(event.Name)))
+	}
 }
 
 func (w *checkedWriter) tenantStatus(event nkedemo.ProgressEvent) {
@@ -237,6 +242,11 @@ func (w *checkedWriter) tenantStatus(event nkedemo.ProgressEvent) {
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.observer != nil {
+		// The live state pane owns the wait reason and budget. A repeated poll
+		// is a heartbeat, not an activity event or evidence of progress.
+		return
+	}
 	if w.tenantStage != event.Name {
 		w.tenantStage = event.Name
 		w.emit("\n  Artifacts → Site → [Tenant] → Workload/DNS → Cleanup\n")

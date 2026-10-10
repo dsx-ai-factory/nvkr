@@ -21,6 +21,32 @@ const (
 
 type dashboardPhase struct{ state, detail string }
 
+type dashboardStage struct {
+	states  [2]string
+	started [2]time.Time
+}
+
+// This bounded checklist names source-owned operations, not inferred deployment
+// milestones. Paired NKE stages need both the run and check observations.
+var dashboardSiteStages = [...]struct {
+	label      string
+	operations [2]string
+}{
+	{"Create Kind cluster", [2]string{"create-management"}},
+	{"Registry reachable", [2]string{"start-registry", "node-registry-connectivity"}},
+	{"Site nodes Ready", [2]string{"management-ready"}},
+	{"Install Cluster API", [2]string{"install-capi"}},
+	{"Check Cluster API", [2]string{"check-capi"}},
+	{"Readiness", [2]string{"site-00-check-readiness", "check-00-check-readiness"}},
+	{"Prepare cluster", [2]string{"site-01-prepare-cluster", "check-01-prepare-cluster"}},
+	{"Deliver images", [2]string{"site-02-stage-images", "check-02-stage-images"}},
+	{"Describe site", [2]string{"site-03-describe-site", "check-03-describe-site"}},
+	{"Install NKE controller", [2]string{"site-05-install-site-controller", "check-05-install-site-controller"}},
+	{"Secure and register", [2]string{"site-06-secure-and-register", "check-06-secure-and-register"}},
+}
+
+var dashboardTenantStages = [...]string{"Tenant kubeconfig", "Tenant API query", "Both nodes Ready", "Workload and DNS"}
+
 type dashboardSnapshot struct {
 	started, observedAt, deadline time.Time
 	elapsed                       time.Duration
@@ -30,6 +56,14 @@ type dashboardSnapshot struct {
 	focus, offset                 int
 	registered, ready             int
 	nodesObserved                 bool
+	confirmCancel                 bool
+	confirmForce, forceAvailable  bool
+	currentStarted                time.Time
+	tenantChangedAt               time.Time
+	tenantStage                   string
+	provisioning, provisioned     nkedemo.TenantConditionStatus
+	siteStages                    [len(dashboardSiteStages)]dashboardStage
+	tenantStages                  [len(dashboardTenantStages)]dashboardStage
 }
 
 // Only the presentation loop touches widgets. Worker callbacks update bounded
@@ -128,10 +162,83 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Install and check the NKE site stack"
 	case "tenant-provisioning":
 		return 3, "Provision QCOW2 control plane and worker"
+	case "tenant-cleanup":
+		return 5, "Clean up the owned tenant"
+	case "tenant-diagnostics":
+		return 5, "Collect bounded private guest diagnostics"
+	case "tenant-delete":
+		return 5, "Ask NKE to delete the owned tenant"
+	case "tenant-deletion-wait":
+		return 5, "Wait for NKE to confirm tenant deletion"
 	case "network-cleanup", "registry-cleanup", "owned-node-cleanup":
 		return 5, "Restore owned demo resources"
 	}
 	return -1, ""
+}
+
+func (stage *dashboardStage) observe(part int, state string, now time.Time) {
+	if stage.states[part] == "failed" || stage.states[part] == "observed" && state != "failed" {
+		return
+	}
+	if state == "running" && stage.started[part].IsZero() {
+		stage.started[part] = now
+	}
+	stage.states[part] = state
+}
+
+func (stage dashboardStage) status(required int) (state string, observed int, started time.Time) {
+	state = "pending"
+	for part := range required {
+		switch stage.states[part] {
+		case "observed":
+			observed++
+		case "running":
+			if state == "pending" {
+				state = "running"
+			}
+			if started.IsZero() || stage.started[part].Before(started) {
+				started = stage.started[part]
+			}
+		case "failed":
+			state = "failed"
+		case "stopped":
+			if state != "failed" {
+				state = "stopped"
+			}
+		}
+	}
+	if observed == required {
+		state = "observed"
+	}
+	return state, observed, started
+}
+
+func (d *dashboard) observeSiteStage(event nkedemo.ProgressEvent, state string) string {
+	for index, stage := range dashboardSiteStages {
+		for part, operation := range stage.operations {
+			if operation != "" && event.Name == operation {
+				d.siteStages[index].observe(part, state, time.Now())
+				label := stage.label
+				if strings.HasPrefix(operation, "site-") {
+					label += " · run"
+				} else if strings.HasPrefix(operation, "check-") && stage.operations[1] != "" {
+					label += " · check"
+				}
+				return label
+			}
+		}
+	}
+	return ""
+}
+
+func stopDashboardStages(stages []dashboardStage, state string) {
+	for index := range stages {
+		for part, previous := range stages[index].states {
+			if previous == "running" {
+				stages[index].states[part] = state
+			}
+		}
+	}
 }
 
 func (d *dashboard) Report(event nkedemo.ProgressEvent) {
@@ -156,13 +263,18 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 		switch event.Kind {
 		case nkedemo.DeploymentStarted:
 			d.current = "Prepare management cluster and local delivery"
+			d.currentStarted = time.Now()
 		case nkedemo.DeploymentFinished:
 			d.current = "Deployment, tenant checks and owned cleanup completed"
+			d.currentStarted = time.Time{}
 			for _, index := range []int{2, 3, 4, 5} {
 				d.phases[index] = dashboardPhase{"complete", "Owning demo operation completed"}
 			}
 		case nkedemo.DeploymentFailed:
 			d.current = "Demo stopped; inspect retained private diagnostics"
+			d.currentStarted = time.Time{}
+			stopDashboardStages(d.siteStages[:], "stopped")
+			stopDashboardStages(d.tenantStages[:], "stopped")
 			for index := range d.phases {
 				if d.phases[index].state == "running" {
 					d.phases[index] = dashboardPhase{"stopped", "Stopped without owning phase completion"}
@@ -185,6 +297,11 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 	if !strings.HasPrefix(event.Kind, family) {
 		return
 	}
+	if event.Kind == nkedemo.PhaseStarted || event.Kind == nkedemo.PhaseFinished || event.Kind == nkedemo.PhaseFailed {
+		if stageLabel := d.observeSiteStage(event, state); stageLabel != "" {
+			label = stageLabel
+		}
+	}
 	if event.Name == "artifacts" && event.Kind == nkedemo.LaneFinished || event.Name == "installer-preparation" && event.Kind == nkedemo.PhaseFinished {
 		state = "complete"
 	}
@@ -192,10 +309,21 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 		d.phases[index] = dashboardPhase{state, label}
 	}
 	d.current = label
+	if state == "running" {
+		d.currentStarted = time.Now()
+	} else {
+		d.currentStarted = time.Time{}
+	}
 	d.appendActivity(state + ": " + label)
 	if event.Name == "tenant-provisioning" && event.Kind == nkedemo.DeploymentFinished {
+		if d.tenantStages[3].states[0] == "running" {
+			d.tenantStages[3].observe(0, "observed", time.Now())
+		}
 		d.phases[3] = dashboardPhase{"complete", "Owning tenant operation completed"}
 		d.phases[4] = dashboardPhase{"complete", "Workload and DNS checks completed"}
+	}
+	if event.Name == "tenant-provisioning" && event.Kind == nkedemo.DeploymentFailed {
+		stopDashboardStages(d.tenantStages[:], "failed")
 	}
 	if event.Name == "tenant-provisioning" && event.Kind == nkedemo.DeploymentFailed && d.phases[4].state == "running" {
 		d.phases[4] = dashboardPhase{"stopped", "Tenant operation ended; workload/DNS completion unconfirmed"}
@@ -207,24 +335,53 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 		return
 	}
 	message := ""
+	now := time.Now()
+	previousRegistered, previousReady := d.registered, d.ready
 	switch event.Name {
 	case "tenant-kubeconfig":
+		d.tenantStages[0].observe(0, "running", now)
 		message = "Waiting for NKE to publish tenant kubeconfig. Guest boot and node readiness are not yet observed."
 	case "tenant-api":
+		if d.tenantStages[0].states[0] == "running" {
+			d.tenantStages[0].observe(0, "observed", now)
+		}
+		d.tenantStages[1].observe(0, "running", now)
 		message = "Kubeconfig available. Waiting for a successful tenant API node query; readiness is not yet observed."
 	case "tenant-nodes":
+		if d.tenantStages[1].states[0] == "running" {
+			d.tenantStages[1].observe(0, "observed", now)
+		}
+		d.tenantStages[2].observe(0, "running", now)
 		d.registered, d.ready, d.nodesObserved = event.RegisteredNodes, event.ReadyNodes, true
 		message = fmt.Sprintf("QCOW2 tenant: %d/2 registered · %d/2 Ready. Waiting for control plane and worker.", event.RegisteredNodes, event.ReadyNodes)
 		if event.RegisteredNodes == 2 && event.ReadyNodes == 2 {
+			d.tenantStages[2].observe(0, "observed", now)
 			message = "QCOW2 tenant: 2/2 registered · 2/2 Ready. Workload and DNS checks still required."
 		}
 	case "tenant-workload":
+		d.tenantStages[3].observe(0, "running", now)
 		message = "Running workload and cluster DNS checks. Successful completion is still required."
 		d.phases[4] = dashboardPhase{"running", "Check workload execution and cluster DNS"}
 	default:
 		return
 	}
-	now := time.Now()
+	conditionChanged := false
+	for _, condition := range []struct {
+		observed nkedemo.TenantConditionStatus
+		stored   *nkedemo.TenantConditionStatus
+	}{{event.Provisioning, &d.provisioning}, {event.Provisioned, &d.provisioned}} {
+		switch condition.observed {
+		case nkedemo.TenantConditionTrue, nkedemo.TenantConditionFalse, nkedemo.TenantConditionUnknown:
+			conditionChanged = conditionChanged || condition.observed != *condition.stored
+			*condition.stored = condition.observed
+		}
+	}
+	// A repeated wait is an observation heartbeat, not evidence of forward
+	// progress. Only a fixed stage, count or whitelisted condition change resets this.
+	if d.tenantStage != event.Name || conditionChanged || event.Name == "tenant-nodes" && (previousRegistered != event.RegisteredNodes || previousReady != event.ReadyNodes) {
+		d.tenantChangedAt = now
+	}
+	d.tenantStage = event.Name
 	if deadline := now.Add(event.Remaining); d.deadline.IsZero() || deadline.Before(d.deadline) {
 		d.deadline = deadline
 	}
@@ -235,6 +392,7 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 	}
 	d.observedAt, d.tenant = now, message
 	d.current = "Observe tenant provisioning and readiness"
+	d.currentStarted = time.Time{}
 	d.phases[3] = dashboardPhase{"running", "Observe the real tenant API and nodes"}
 }
 
@@ -253,10 +411,30 @@ func (d *dashboard) snapshot() dashboardSnapshot {
 	return copy
 }
 
-func (d *dashboard) input(event *tcell.EventKey) {
+func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if event.Key() == tcell.KeyCtrlC {
+		d.confirmCancel = false
+		return true
+	}
+	if d.confirmCancel {
+		switch {
+		case event.Key() == tcell.KeyRune && (event.Rune() == 'y' || event.Rune() == 'Y'):
+			d.confirmCancel = false
+			return true
+		case event.Key() == tcell.KeyEscape || event.Key() == tcell.KeyRune && (event.Rune() == 'n' || event.Rune() == 'N'):
+			d.confirmCancel = false
+		}
+		return false
+	}
+	if event.Key() == tcell.KeyRune && (event.Rune() == 'q' || event.Rune() == 'Q') {
+		d.confirmCancel = true
+		return false
+	}
 	switch event.Key() {
+	case tcell.KeyEscape:
+		return true
 	case tcell.KeyTab:
 		d.focus = (d.focus + 1) % 3
 	case tcell.KeyPgUp:
@@ -266,6 +444,76 @@ func (d *dashboard) input(event *tcell.EventKey) {
 	case tcell.KeyEnd:
 		d.offset = 0
 	}
+	return false
+}
+
+// Only the event-loop owner calls this while graceful cancellation is already
+// in progress. It cannot start cancellation or manipulate execution resources.
+func (d *dashboard) forceInput(event *tcell.EventKey) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if !d.forceAvailable {
+		return false
+	}
+	if d.confirmForce {
+		switch {
+		case event.Key() == tcell.KeyRune && (event.Rune() == 'y' || event.Rune() == 'Y'):
+			d.confirmForce = false
+			return true
+		case event.Key() == tcell.KeyEscape || event.Key() == tcell.KeyRune && (event.Rune() == 'n' || event.Rune() == 'N'):
+			d.confirmForce = false
+		}
+		return false
+	}
+	if event.Key() == tcell.KeyRune && (event.Rune() == 'f' || event.Rune() == 'F') {
+		d.confirmForce = true
+	}
+	return false
+}
+
+func dashboardChecklist(s dashboardSnapshot, now time.Time) (string, int) {
+	var rows strings.Builder
+	checked := 0
+	write := func(label string, stage dashboardStage, required int) {
+		state, observed, started := stage.status(required)
+		color, marker := "goldenrod", "○"
+		detail := state
+		switch state {
+		case "observed":
+			checked++
+			color, marker = "lightgreen", "✓"
+		case "running":
+			color, marker = "lightcyan", "▶"
+			if !started.IsZero() {
+				detail = max(time.Duration(0), now.Sub(started)).Truncate(time.Second).String()
+			}
+		case "failed":
+			color, marker = "lightcoral", "✗"
+		case "stopped":
+			color, marker = "lightsteelblue", "■"
+		}
+		if required == 2 && observed == 1 && state == "pending" {
+			detail = "1/2 pending"
+		} else if required == 2 && state == "running" {
+			detail = fmt.Sprintf("%d/2 · %s", observed, detail)
+		}
+		fmt.Fprintf(&rows, "[%s]%s[-] %-23s %s\n", color, marker, label, detail)
+	}
+	for index, stage := range dashboardSiteStages {
+		required := 1
+		if stage.operations[1] != "" {
+			required = 2
+		}
+		write(stage.label, s.siteStages[index], required)
+	}
+	site := fmt.Sprintf("[lightcyan::b]Site stages · %d/%d checked[-::-]\n", checked, len(dashboardSiteStages)) + rows.String()
+	rows.Reset()
+	checked = 0
+	for index, label := range dashboardTenantStages {
+		write(label, s.tenantStages[index], 1)
+	}
+	tenant := fmt.Sprintf("[lightcyan::b]Tenant stages · %d/%d checked[-::-]\n", checked, len(dashboardTenantStages)) + rows.String()
+	return site + "\n" + tenant, len(dashboardSiteStages) + len(dashboardTenantStages) + 3
 }
 
 func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
@@ -278,25 +526,66 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	names := [...]string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"}
 	colors := map[string]string{"pending": "goldenrod", "running": "lightcyan", "observed": "lightsteelblue", "complete": "lightgreen", "failed": "lightcoral", "stopped": "lightsteelblue"}
 	for index, phase := range s.phases {
-		if width <= 90 || content < 28 {
-			fmt.Fprintf(&phases, "[%s::b]%-14s[-::-] %s\n", colors[phase.state], names[index], phase.state)
+		if width <= 90 {
+			fmt.Fprintf(&phases, "[%s::b]%s[-::-] %s", colors[phase.state], names[index], phase.state)
+			if index%3 == 2 {
+				phases.WriteByte('\n')
+			} else {
+				phases.WriteString(" · ")
+			}
 		} else {
-			fmt.Fprintf(&phases, "[%s::b]%s[-::-]\n  %s · %s\n\n", colors[phase.state], names[index], phase.state, tview.Escape(phase.detail))
+			fmt.Fprintf(&phases, "[%s::b]%-14s[-::-] %s\n", colors[phase.state], names[index], phase.state)
 		}
 	}
+	checklist, stageRows := dashboardChecklist(s, now)
+	phases.WriteByte('\n')
+	phases.WriteString(checklist)
 	d.phasesView.SetText(phases.String())
-	state := tview.Escape(s.current) + "\n\n" + tview.Escape(s.tenant)
-	if s.nodesObserved {
+	current := tview.Escape(s.current)
+	if !s.currentStarted.IsZero() {
+		current += " · " + max(time.Duration(0), now.Sub(s.currentStarted)).Truncate(time.Second).String()
+	}
+	state := current
+	if canceling {
+		state += "\nCancellation requested; waiting for owned cleanup to return."
+	} else {
+		state += "\n" + tview.Escape(s.tenant)
+	}
+	if !canceling && s.nodesObserved {
 		state += fmt.Sprintf("\nLast node query: %d/2 registered · %d/2 Ready", s.registered, s.ready)
 	}
-	if !s.observedAt.IsZero() {
-		state += fmt.Sprintf("\n\nTenant budget: %s elapsed · %s remaining", (s.elapsed + max(time.Duration(0), now.Sub(s.observedAt))).Truncate(time.Second), max(time.Duration(0), s.deadline.Sub(now)).Truncate(time.Second))
+	if !canceling && (s.provisioning != "" || s.provisioned != "") {
+		conditions := []string{}
+		if s.provisioning != "" {
+			conditions = append(conditions, "Provisioning="+string(s.provisioning))
+		}
+		if s.provisioned != "" {
+			conditions = append(conditions, "Provisioned="+string(s.provisioned))
+		}
+		state += "\nLast NKE conditions: " + strings.Join(conditions, " · ")
+	}
+	if canceling {
+		state += "\nCleanup completion is not yet observed; ETA unknown."
+	} else if !s.observedAt.IsZero() {
+		state += fmt.Sprintf("\nState unchanged: %s · last observation: %s ago", max(time.Duration(0), now.Sub(s.tenantChangedAt)).Truncate(time.Second), max(time.Duration(0), now.Sub(s.observedAt)).Truncate(time.Second))
+		state += fmt.Sprintf("\nTenant budget: %s elapsed · ETA unknown\nTimeout remaining: %s (not an ETA)", (s.elapsed + max(time.Duration(0), now.Sub(s.observedAt))).Truncate(time.Second), max(time.Duration(0), s.deadline.Sub(now)).Truncate(time.Second))
+	} else {
+		state += "\nETA unknown; no completion estimate reported"
 	}
 	d.stateView.SetText(state)
 	d.activityView.SetText(tview.Escape(strings.Join(s.activity, "\n")))
-	help := " Tab focus · PgUp/PgDn activity · End live · q/Ctrl-C cancel safely"
+	help := " Tab focus · PgUp/PgDn activity · End live · q confirm quit · Ctrl-C cancel"
+	if s.confirmCancel {
+		help = " Cancel this demo and clean up its resources? y/N"
+	}
 	if canceling {
 		help = " Canceling · waiting for owned processes and resource cleanup"
+		if s.forceAvailable {
+			help += " · f force exit"
+		}
+		if s.confirmForce {
+			help = " FORCE EXIT? Cleanup may be incomplete; resources may remain. y/N"
+		}
 	}
 	d.footer.SetText("[lightcyan]" + help + "[-]\n Details: retained private build and deployment logs")
 	if width > 90 {
@@ -305,8 +594,11 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		d.stateView.SetRect(left, 3, width-left, upper)
 		d.activityView.SetRect(left, 3+upper, width-left, content-upper)
 	} else {
-		phaseHeight := min(8, content)
-		stateHeight := min(10, (content-phaseHeight)/2)
+		// Reserve live status and a small activity window before allocating the
+		// checklist. On short terminals, pending rows may clip; the current wait,
+		// observation clocks and timeout must remain visible.
+		stateHeight := min(10, max(0, content-4))
+		phaseHeight := min(stageRows+5, max(0, content-stateHeight-4))
 		d.phasesView.SetRect(0, 3, width, phaseHeight)
 		d.stateView.SetRect(0, 3+phaseHeight, width, stateHeight)
 		d.activityView.SetRect(0, 3+phaseHeight+stateHeight, width, content-phaseHeight-stateHeight)

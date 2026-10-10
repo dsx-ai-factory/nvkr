@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"os/exec"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -116,6 +118,27 @@ func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
 				if err := screen.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone)); err != nil {
 					t.Fatal(err)
 				}
+				tick := time.NewTicker(time.Millisecond)
+				defer tick.Stop()
+				deadline := time.After(3 * time.Second)
+				for !view.snapshot().confirmCancel {
+					select {
+					case <-tick.C:
+					case <-deadline:
+						t.Fatal("quit confirmation did not open")
+					}
+				}
+				if ctx.Err() != nil {
+					t.Fatal("q canceled work before confirmation")
+				}
+				select {
+				case <-cleaning:
+					t.Fatal("q started cleanup before confirmation")
+				default:
+				}
+				if err := screen.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModNone)); err != nil {
+					t.Fatal(err)
+				}
 			case "terminal-error":
 				if err := screen.PostEvent(tcell.NewEventError(errors.New("private terminal details"))); err != nil {
 					t.Fatal(err)
@@ -146,6 +169,133 @@ func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
 				t.Fatal("presenter or event pump did not join")
 			}
 		})
+	}
+}
+
+func TestDashboardQuitConfirmationInput(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		key                    tcell.Key
+		rune                   rune
+		wantCancel, wantPrompt bool
+	}{
+		{"yes", tcell.KeyRune, 'y', true, false},
+		{"uppercase yes", tcell.KeyRune, 'Y', true, false},
+		{"no", tcell.KeyRune, 'n', false, false},
+		{"uppercase no", tcell.KeyRune, 'N', false, false},
+		{"escape dismisses", tcell.KeyEscape, 0, false, false},
+		{"enter does not confirm", tcell.KeyEnter, 0, false, true},
+		{"ctrl-c immediate", tcell.KeyCtrlC, 0, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newDashboard()
+			if d.input(tcell.NewEventKey(tcell.KeyRune, 'Q', tcell.ModNone)) || !d.snapshot().confirmCancel {
+				t.Fatal("Q did not open confirmation without cancellation")
+			}
+			if got := d.input(tcell.NewEventKey(tc.key, tc.rune, tcell.ModNone)); got != tc.wantCancel || d.snapshot().confirmCancel != tc.wantPrompt {
+				t.Fatalf("cancel=%v prompt=%v", got, d.snapshot().confirmCancel)
+			}
+		})
+	}
+}
+
+func TestDashboardForceExitRequiresCancellationAndJoinsReturningCallback(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8")}
+	view := newDashboard()
+	writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+	started, cleaning, release, forced := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var restoredBeforeForce atomic.Bool
+	result := make(chan error, 1)
+	go func() {
+		result <- dashboardLoopWithForceExit(ctx, cancel, screen, func() error { return nil }, writer, view, func(ctx context.Context, _ io.Writer) error {
+			close(started)
+			<-ctx.Done()
+			close(cleaning)
+			<-release
+			return nil
+		}, func() {
+			restoredBeforeForce.Store(screen.joined.Load())
+			close(forced)
+		})
+	}()
+	<-started
+	post := func(key tcell.Key, value rune) {
+		t.Helper()
+		if err := screen.PostEvent(tcell.NewEventKey(key, value, tcell.ModNone)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waitPrompt := func(want bool) {
+		t.Helper()
+		ticker := time.NewTicker(time.Millisecond)
+		defer ticker.Stop()
+		deadline := time.After(3 * time.Second)
+		for view.snapshot().confirmForce != want {
+			select {
+			case <-ticker.C:
+			case <-deadline:
+				t.Fatal("force confirmation did not change")
+			}
+		}
+	}
+	// These keys precede Ctrl-C in the same event queue. They must not request
+	// force exit or start cleanup while the workflow is running.
+	post(tcell.KeyRune, 'f')
+	post(tcell.KeyRune, 'y')
+	post(tcell.KeyCtrlC, 0)
+	select {
+	case <-cleaning:
+	case <-time.After(3 * time.Second):
+		t.Fatal("graceful cleanup did not start")
+	}
+	if view.snapshot().confirmForce {
+		t.Fatal("running workflow opened force confirmation")
+	}
+	post(tcell.KeyRune, 'F')
+	waitPrompt(true)
+	post(tcell.KeyRune, 'N')
+	waitPrompt(false)
+	post(tcell.KeyRune, 'f')
+	waitPrompt(true)
+	post(tcell.KeyRune, 'Y')
+	select {
+	case <-forced:
+		if !restoredBeforeForce.Load() {
+			t.Fatal("force callback ran before terminal restoration")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("confirmed force callback did not run")
+	}
+	select {
+	case <-result:
+		t.Fatal("returning test callback bypassed worker join")
+	default:
+	}
+	close(release)
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("forced cancellation fabricated successful completion")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("worker or event pump did not join")
+	}
+}
+
+func TestDashboardForcedExitProcess(t *testing.T) {
+	const marker = "NKE_TEST_CONFIRMED_FORCE_EXIT"
+	if os.Getenv(marker) == "1" {
+		forceDashboardExit()
+		return
+	}
+	command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestDashboardForcedExitProcess$")
+	command.Env = append(os.Environ(), marker+"=1")
+	output, err := command.CombinedOutput()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 130 || !strings.Contains(string(output), "FORCED EXIT") || !strings.Contains(string(output), "may remain") || !strings.Contains(string(output), "cleanup is not confirmed") || strings.Contains(string(output), "PASS") {
+		t.Fatalf("forced exit must warn and return 130, never PASS: %v %q", err, output)
 	}
 }
 

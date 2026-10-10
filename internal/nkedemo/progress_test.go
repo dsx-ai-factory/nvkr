@@ -6,6 +6,7 @@ package nkedemo
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -330,6 +331,54 @@ func TestTenantProgressReportsTransitionsAndBoundedHeartbeat(t *testing.T) {
 	}
 }
 
+func TestTenantProgressProjectsOnlyPinnedInventoryConditionStatuses(t *testing.T) {
+	for _, test := range []struct {
+		name, provisioning, provisioned   string
+		wantProvisioning, wantProvisioned TenantConditionStatus
+	}{
+		{"provisioning", "True", "False", TenantConditionTrue, TenantConditionFalse},
+		{"provisioned is not nodes Ready", "False", "True", TenantConditionFalse, TenantConditionTrue},
+		{"upstream unknown", "Unknown", "Unknown", TenantConditionUnknown, TenantConditionUnknown},
+		{"absent statuses", "", "", "", ""},
+		{"unsupported status omitted", "private-response-sentinel", "ready", "", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw := fmt.Sprintf(`[{"name":"owned","id":"owned-id","nico":{"orgID":%q,"siteID":%q,"vpcID":%q},"conditions":{"provisioning":{"status":%q,"message":"private-response-sentinel","lastTransitionTime":"private-response-sentinel"},"provisioned":{"status":%q,"message":"private-response-sentinel"},"private":"private-response-sentinel"},"credentials":"private-response-sentinel"}]`, OrgID, SiteID, VPCID, test.provisioning, test.provisioned)
+			var rows []tenantRow
+			if err := json.Unmarshal([]byte(raw), &rows); err != nil {
+				t.Fatal(err)
+			}
+			row, err := selectedTenant(rows, "owned", "owned-id")
+			if err != nil || row == nil {
+				t.Fatalf("existing tenant ownership checks rejected inventory: %v", err)
+			}
+			writer := &recordedProgress{}
+			start := time.Unix(1000, 0)
+			progress := tenantProgress{writer: writer, started: start, deadline: start.Add(time.Minute), conditions: row.Conditions}
+			progress.update(start, "tenant-kubeconfig", nil)
+			if len(writer.events) != 1 {
+				t.Fatal("missing inventory observation")
+			}
+			event := writer.events[0]
+			if event.Provisioning != test.wantProvisioning || event.Provisioned != test.wantProvisioned || event.RegisteredNodes != 0 || event.ReadyNodes != 0 {
+				t.Fatalf("unexpected presentation or fabricated node readiness: %+v", event)
+			}
+			encoded, err := json.Marshal(event)
+			if err != nil || strings.Contains(string(encoded), "private-response-sentinel") || strings.Contains(string(encoded), "owned-id") || strings.Contains(string(encoded), "owned") {
+				t.Fatalf("inventory details escaped into presentation: %s %v", encoded, err)
+			}
+			progress.conditions.Provisioning.Status = TenantConditionTrue
+			if event.Provisioning == TenantConditionTrue {
+				progress.conditions.Provisioning.Status = TenantConditionFalse
+			}
+			progress.update(start.Add(time.Second), "tenant-kubeconfig", nil)
+			if len(writer.events) != 2 {
+				t.Fatal("condition transition was hidden by unchanged-wait throttle")
+			}
+		})
+	}
+}
+
 func TestTenantPollingKeepsPrivateLogWithoutSuccessSpam(t *testing.T) {
 	writer := &recordedProgress{}
 	work := privateTestDir(t)
@@ -340,5 +389,74 @@ func TestTenantPollingKeepsPrivateLogWithoutSuccessSpam(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(work, "tenant-001-kubeconfig-secret.log")); err != nil {
 		t.Fatal("private command diagnostics lost", err)
+	}
+}
+
+func TestTenantCleanupReportsBalancedPrivateOperations(t *testing.T) {
+	for _, scenario := range []string{"deleted", "no-intent", "absent", "diagnostics-failed", "inventory-failed", "delete-failed", "wait-failed", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := privateTestDir(t)
+			cliDir := filepath.Join(work, "cli")
+			if err := os.Mkdir(cliDir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			row := tenantRow{Name: "private-tenant", ID: "private-owned-id", NICo: TenantProvider{OrgID, SiteID, VPCID}}
+			encoded, err := json.Marshal([]tenantRow{row})
+			if err != nil {
+				t.Fatal(err)
+			}
+			state := filepath.Join(work, "state")
+			script := "#!/bin/sh\nset -eu\ncase \"$1:$2\" in\n get:clusters)\n  [ \"$SCENARIO\" != inventory-failed ] || exit 7\n  if [ -f \"$STATE\" ]; then\n   [ \"$SCENARIO\" != wait-failed ] || exit 7\n   printf '[]'\n  elif [ \"$SCENARIO\" = absent ]; then printf '[]'; else printf '%s' \"$ROW\"; fi;;\n delete:cluster) [ \"$SCENARIO\" != delete-failed ] || exit 7; touch \"$STATE\";;\n *) exit 42;;\nesac\n"
+			if err = os.WriteFile(filepath.Join(cliDir, "nkectl"), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(filepath.Join(work, "virsh"), []byte("#!/bin/sh\n[ \"$SCENARIO\" != diagnostics-failed ]\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			writer := &recordedProgress{}
+			env := []string{"PATH=" + work + ":/usr/bin:/bin", "SCENARIO=" + scenario, "STATE=" + state, "ROW=" + string(encoded)}
+			selected := tenant{name: row.Name, id: row.ID, intent: scenario != "no-intent", session: ManagementSession{Work: work, Runner: Runner{Work: work, Env: env, Progress: writer}}, domains: Runner{Env: env}}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			err = selected.close(ctx)
+			wantFailure := scenario == "inventory-failed" || scenario == "delete-failed" || scenario == "wait-failed" || scenario == "canceled"
+			if (err != nil) != wantFailure {
+				t.Fatalf("cleanup policy changed: %v", err)
+			}
+			want := []ProgressEvent{{Kind: PhaseStarted, Name: "tenant-cleanup", Status: "started"}}
+			diagnosticLast := PhaseFinished
+			if scenario == "diagnostics-failed" || scenario == "canceled" {
+				diagnosticLast = PhaseFailed
+			}
+			want = append(want, phaseEvents("tenant-diagnostics", diagnosticLast)...)
+			if scenario == "deleted" || scenario == "diagnostics-failed" || scenario == "delete-failed" || scenario == "wait-failed" {
+				deleteLast := PhaseFinished
+				if scenario == "delete-failed" {
+					deleteLast = PhaseFailed
+				}
+				want = append(want, phaseEvents("tenant-delete", deleteLast)...)
+				if scenario != "delete-failed" {
+					waitLast := PhaseFinished
+					if scenario == "wait-failed" {
+						waitLast = PhaseFailed
+					}
+					want = append(want, phaseEvents("tenant-deletion-wait", waitLast)...)
+				}
+			}
+			cleanupLast := phaseEvents("tenant-cleanup", PhaseFinished)[1]
+			if wantFailure {
+				cleanupLast = phaseEvents("tenant-cleanup", PhaseFailed)[1]
+			}
+			want = append(want, cleanupLast)
+			if !reflect.DeepEqual(writer.events, want) {
+				t.Fatalf("unbalanced cleanup observations: %+v want %+v", writer.events, want)
+			}
+			if strings.Contains(writer.String(), row.Name) || strings.Contains(writer.String(), row.ID) {
+				t.Fatal("private tenant identity reached progress output")
+			}
+		})
 	}
 }

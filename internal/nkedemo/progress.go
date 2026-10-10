@@ -22,6 +22,25 @@ const (
 	TenantWaiting      = "tenant-waiting"
 )
 
+// TenantConditionStatus is a descriptive NKE API observation, not node readiness
+// or NKD evidence. Values follow controller/api/models.gen.go at InstallerCommit.
+type TenantConditionStatus string
+
+const (
+	TenantConditionTrue    TenantConditionStatus = "True"
+	TenantConditionFalse   TenantConditionStatus = "False"
+	TenantConditionUnknown TenantConditionStatus = "Unknown"
+)
+
+func presentedTenantCondition(status TenantConditionStatus) TenantConditionStatus {
+	switch status {
+	case TenantConditionTrue, TenantConditionFalse, TenantConditionUnknown:
+		return status
+	default:
+		return ""
+	}
+}
+
 // ProgressEvent describes an observed operation boundary, never percentage,
 // artifact verification, Release authority, arguments or private diagnostics.
 type ProgressEvent struct {
@@ -30,6 +49,8 @@ type ProgressEvent struct {
 	Status          string
 	RegisteredNodes int
 	ReadyNodes      int
+	Provisioning    TenantConditionStatus
+	Provisioned     TenantConditionStatus
 	Elapsed         time.Duration
 	Remaining       time.Duration
 }
@@ -41,10 +62,13 @@ type tenantProgress struct {
 	writer                  io.Writer
 	started, deadline, last time.Time
 	previous                ProgressEvent
+	conditions              tenantConditions
 }
 
 func (p *tenantProgress) update(now time.Time, stage string, nodes []tenantNode) {
-	event := ProgressEvent{Kind: TenantWaiting, Name: stage, RegisteredNodes: len(nodes)}
+	event := ProgressEvent{Kind: TenantWaiting, Name: stage, RegisteredNodes: len(nodes),
+		Provisioning: presentedTenantCondition(p.conditions.Provisioning.Status),
+		Provisioned:  presentedTenantCondition(p.conditions.Provisioned.Status)}
 	for _, node := range nodes {
 		for _, condition := range node.Status.Conditions {
 			if condition.Type == "Ready" && condition.Status == "True" {
