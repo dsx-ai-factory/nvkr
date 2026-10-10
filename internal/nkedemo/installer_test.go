@@ -20,7 +20,7 @@ import (
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
-	for _, name := range []string{"remote", "local", "sibling", "override", "diagnostic", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed", "network-invalid-gateway", "simulator-port-busy"} {
+	for _, name := range []string{"remote", "local", "sibling", "override", "diagnostic", "budget-minimum", "budget-maximum", "budget-low", "budget-high", "budget-overflow", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed", "network-invalid-gateway", "simulator-port-busy"} {
 		t.Run(name, func(t *testing.T) {
 			root := privateTestDir(t)
 			repo, tools, calls := filepath.Join(root, "repo"), filepath.Join(root, "tools"), filepath.Join(root, "calls")
@@ -92,6 +92,18 @@ esac
 			runner := Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "CALLS=" + calls, "PIN=" + InstallerCommit, "FAIL=" + name, "FETCH_STARTED=" + started}}
 			build := BuildConfig{Repository: repo, AttemptPrefix: "fresh", Jobs: 2}
 			run := Config{Out: filepath.Join(root, "out"), Timeout: time.Hour}
+			switch name {
+			case "budget-minimum":
+				run.Timeout = 5 * time.Minute
+			case "budget-maximum":
+				run.Timeout = 2 * time.Hour
+			case "budget-low":
+				run.Timeout = 299 * time.Second
+			case "budget-high":
+				run.Timeout = 7201 * time.Second
+			case "budget-overflow":
+				run.Timeout = time.Duration(9223372036854775807)
+			}
 			if name == "diagnostic" || name == "network-invalid-gateway" {
 				run.Network = "kind-calico"
 			}
@@ -192,14 +204,22 @@ esac
 				}
 				actual, err = prepareInstaller(ctx, build, run, runner, admission)
 			}
-			success := name == "remote" || name == "local" || name == "sibling" || name == "override" || name == "diagnostic"
+			success := name == "remote" || name == "local" || name == "sibling" || name == "override" || name == "diagnostic" || name == "budget-minimum" || name == "budget-maximum"
 			if (err == nil) != success {
 				t.Fatalf("result=%+v error=%v", actual, err)
 			}
 			if !success {
-				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure || networkFailure || strings.HasPrefix(name, "kernel") || name == "simulator-port-busy" {
+				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure || networkFailure || strings.HasPrefix(name, "kernel") || name == "simulator-port-busy" || strings.HasPrefix(name, "budget-") {
 					if _, e := os.Lstat(calls); !errors.Is(e, os.ErrNotExist) {
 						t.Fatal("failed preflight reached Git acquisition")
+					}
+				}
+				if strings.HasPrefix(name, "budget-") {
+					if _, e := os.Lstat(imageCalls); !errors.Is(e, os.ErrNotExist) {
+						t.Fatal("invalid budget reached image inspection")
+					}
+					if _, e := os.Lstat(run.Out); !errors.Is(e, os.ErrNotExist) {
+						t.Fatal("invalid budget created diagnostic output")
 					}
 				}
 				if strings.HasPrefix(name, "kernel") {

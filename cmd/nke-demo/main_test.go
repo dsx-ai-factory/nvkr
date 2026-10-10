@@ -57,8 +57,11 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 		{"invalid-network", []string{"run", "--network", "unknown"}, nkderr.CodeUsage},
 		{"invalid-e2e-network", []string{"e2e", "--network", "unknown"}, nkderr.CodeUsage},
 		{"invalid-budget-low", []string{"run", "--timeout", "1"}, nkderr.CodePreflightFailed},
-		{"invalid-budget-high", []string{"run", "--timeout", "3601"}, nkderr.CodePreflightFailed},
+		{"invalid-budget-high", []string{"run", "--timeout", "7201"}, nkderr.CodePreflightFailed},
 		{"invalid-budget-overflow", []string{"run", "--timeout", "9223372036854775807"}, nkderr.CodePreflightFailed},
+		{"invalid-e2e-budget-low", []string{"e2e", "--config", "/must-not-read", "--timeout", "299"}, nkderr.CodePreflightFailed},
+		{"invalid-e2e-budget-high", []string{"e2e", "--config", "/must-not-read", "--timeout", "7201"}, nkderr.CodePreflightFailed},
+		{"invalid-e2e-budget-overflow", []string{"e2e", "--config", "/must-not-read", "--timeout", "9223372036854775807"}, nkderr.CodePreflightFailed},
 		{"completion-help", []string{"completion", "--help"}, ""},
 		{"completion-bash", []string{"completion", "bash"}, ""},
 		{"configured-completion", []string{"--config", "/must-not-read", "completion", "bash"}, ""},
@@ -431,8 +434,13 @@ func assertCode(t *testing.T, err error, want nkderr.Code) {
 }
 
 func TestTypedRunFlagsAndContextReachLibraryUnchanged(t *testing.T) {
-	for _, seconds := range []string{"300", "3600"} {
-		t.Run(seconds, func(t *testing.T) {
+	for _, tc := range []struct {
+		seconds string
+		want    time.Duration
+	}{
+		{"300", 5 * time.Minute}, {"3600", time.Hour}, {"7200", 2 * time.Hour},
+	} {
+		t.Run(tc.seconds, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
@@ -445,22 +453,99 @@ func TestTypedRunFlagsAndContextReachLibraryUnchanged(t *testing.T) {
 				if cfg.NKECheckout != "installer" || cfg.NKDCTL != "nkdctl" || cfg.Out != "new-output" || cfg.Runs != (nkedemo.RunInputs{OS: "os", Components: "components", Providers: "providers", Site: "site", Tools: "tools", Profiles: "profiles", Simulator: "simulator"}) {
 					t.Fatalf("lost flags: %+v", cfg)
 				}
-				expected := 300 * time.Second
-				if seconds == "3600" {
-					expected = time.Hour
-				}
-				if cfg.Timeout != expected {
+				if cfg.Timeout != tc.want {
 					t.Fatal("wrong timeout")
 				}
 				return nkderr.New(nkderr.CodeTimeout, "library canceled")
 			}}
-			args := []string{"run", "--nke-checkout", "installer", "--nkdctl", "nkdctl", "--out", "new-output", "--os-run", "os", "--components-run", "components", "--provider-run", "providers", "--site-run", "site", "--tools-run", "tools", "--profiles-run", "profiles", "--simulator-run", "simulator", "--timeout", seconds}
+			args := []string{"run", "--nke-checkout", "installer", "--nkdctl", "nkdctl", "--out", "new-output", "--os-run", "os", "--components-run", "components", "--provider-run", "providers", "--site-run", "site", "--tools-run", "tools", "--profiles-run", "profiles", "--simulator-run", "simulator", "--timeout", tc.seconds}
 			err := executeRoot(ctx, newCommand(&out, &diagnostics, actions), args)
 			assertCode(t, err, nkderr.CodeTimeout)
 			if !called {
 				t.Fatal("library not called")
 			}
 		})
+	}
+}
+
+func TestTenantBudgetConfigAndFlagSelection(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	for _, tc := range []struct {
+		name       string
+		configured int
+		flag       string
+		want       time.Duration
+	}{
+		{"configured minimum", 300, "", 5 * time.Minute},
+		{"configured default", 3600, "", time.Hour},
+		{"configured maximum", 7200, "", 2 * time.Hour},
+		{"override minimum", 7200, "300", 5 * time.Minute},
+		{"override default", 7200, "3600", time.Hour},
+		{"override maximum", 600, "7200", 2 * time.Hour},
+		{"configured low", 299, "", 0},
+		{"configured high", 7201, "", 0},
+		{"configured integer maximum", int(^uint(0) >> 1), "", 0},
+	} {
+		for _, operation := range []string{"run", "e2e"} {
+			t.Run(operation+"/"+tc.name, func(t *testing.T) {
+				calls := 0
+				actions := demoActions{
+					load: func(context.Context, string) (nkedemo.DemoFile, error) {
+						file := configuredFixture()
+						file.Run.TimeoutSeconds = tc.configured
+						if operation == "e2e" {
+							file.Run.NKDCTL = ""
+							file.Run.Runs = nkedemo.RunFileInputs{}
+						}
+						return file, nil
+					},
+					prepare: func(ctx context.Context, _ nkedemo.BuildConfig, cfg nkedemo.Config) (nkedemo.Config, error) {
+						calls++
+						assertE2EBudget(t, ctx)
+						if cfg.Timeout != tc.want {
+							t.Fatalf("prepare timeout=%s want=%s", cfg.Timeout, tc.want)
+						}
+						return cfg, nil
+					},
+					build: func(ctx context.Context, _ nkedemo.BuildConfig) (nkedemo.BuiltInputs, error) {
+						calls++
+						assertE2EBudget(t, ctx)
+						return nkedemo.BuiltInputs{NKDCTL: "fresh"}, nil
+					},
+					run: func(ctx context.Context, cfg nkedemo.Config) error {
+						calls++
+						if operation == "e2e" {
+							assertE2EBudget(t, ctx)
+						}
+						if cfg.Timeout != tc.want {
+							t.Fatalf("run timeout=%s want=%s", cfg.Timeout, tc.want)
+						}
+						return nil
+					},
+				}
+				args := []string{operation, "--config", "explicit.yaml"}
+				if tc.flag != "" {
+					args = append(args, "--timeout", tc.flag)
+				}
+				var out bytes.Buffer
+				err := executeRoot(t.Context(), newCommand(&out, io.Discard, actions), args)
+				if tc.want == 0 {
+					assertCode(t, err, nkderr.CodeUsage)
+					if calls != 0 || out.Len() != 0 {
+						t.Fatal("invalid budget started work or progress")
+					}
+					return
+				}
+				assertCode(t, err, "")
+				wantCalls := 1
+				if operation == "e2e" {
+					wantCalls = 3
+				}
+				if calls != wantCalls {
+					t.Fatalf("calls=%d want=%d", calls, wantCalls)
+				}
+			})
+		}
 	}
 }
 

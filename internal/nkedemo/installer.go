@@ -57,7 +57,7 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 	if err := requireContext(ctx); err != nil {
 		return result, err
 	}
-	if !safePhase(build.AttemptPrefix) || !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", rune(build.AttemptPrefix[0])) || build.Jobs < 1 || run.Timeout < 300*time.Second || run.Timeout > time.Hour {
+	if !safePhase(build.AttemptPrefix) || !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", rune(build.AttemptPrefix[0])) || build.Jobs < 1 || run.Timeout < MinTenantTimeoutSeconds*time.Second || run.Timeout > MaxTenantTimeoutSeconds*time.Second {
 		return result, errors.New("require a fresh attempt, positive jobs and valid tenant budget")
 	}
 	repo, err := resolveExisting(build.Repository)

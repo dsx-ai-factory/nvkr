@@ -441,6 +441,8 @@ deletion wait as their owners report them; it does not keep counting the cancele
 tenant readiness budget. Tenant cleanup has its own six-minute budget; the delete
 command allows up to two minutes and its subsequent deletion wait up to three.
 These are bounds, not completion estimates or one global cleanup deadline.
+During cancellation, the state pane displays **FORCE EXIT [f]** with a warning
+that resources may remain; this is a keyboard action, not a mouse control.
 If you confirm force exit with `f` then `y`, the terminal is restored and the
 process exits with status 130 **without waiting for cleanup**. Processes,
 containers, VMs and network controls may remain. Inspect and recover the exact
@@ -462,7 +464,7 @@ alone does not show a stall. The limits apply to different scopes:
 | Six hours | **Entire artifact-build invocation**, including toolchain preparation, materials, Packer and packaging; [build adapter](../internal/nkedemo/build.go) |
 | Six hours | OS VM execution request, admitted by the Environment's `maxTimeoutSeconds: 21600`; [OS overlay](../definitions/nke-local-dev-arm64/os-tcg.json) and [Docker Environment](../definitions/nke-local-dev-arm64/environment-local-docker.json) |
 | 180 minutes | Packer's wait for SSH, not the whole OS build; `ssh_timeout` in the OS overlay ([Packer SSH documentation](https://developer.hashicorp.com/packer/docs/communicators/ssh)) |
-| 60 minutes | Tenant kubeconfig / two-node readiness wait after tenant creation; `run.timeoutSeconds: 3600` or `--timeout`, owned by [tenant deployment](../internal/nkedemo/tenant.go) |
+| 60 minutes by default; configurable from 5 to 120 minutes | Tenant kubeconfig / two-node readiness wait after tenant creation; `run.timeoutSeconds: 3600` or `--timeout`, owned by [tenant deployment](../internal/nkedemo/tenant.go) |
 
 **The earliest active deadline wins.** For example, if artifact preparation has
 already used four hours, the six-hour build deadline leaves only two hours for
@@ -472,6 +474,15 @@ Individual commands also have shorter bounds, and cleanup has separate bounded
 budgets. These are ceilings, not completion estimates. Increasing `--jobs` does
 not accelerate one guest. Tenant guests use the selected plain ARM64 disk, four
 CPUs, eight GiB RAM and a 60-GiB overlay each.
+
+On a slow TCG host, explicitly add `--timeout 7200` to the E2E command to allow
+up to two hours for tenant readiness, or set `run.timeoutSeconds: 7200` in your
+demo YAML. The same option works with `nke-demo run`. Values outside 300..7200
+seconds are rejected before preparation or deployment. The default stays one
+hour; this does not extend the eight-hour E2E context or any shorter command
+deadline. These overlapping ceilings are not additive. More time does not fix
+network, configuration or image-startup failures, and does not relax the two
+Ready nodes, workload/DNS or owned-cleanup checks.
 
 ### Optional KVM for OS assembly on native ARM64
 

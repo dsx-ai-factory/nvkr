@@ -106,17 +106,33 @@ func TestDashboardQuitConfirmationFooter(t *testing.T) {
 }
 
 func TestDashboardForceConfirmationFooter(t *testing.T) {
-	d := newDashboard()
-	d.forceAvailable = true
-	d.forceInput(tcell.NewEventKey(tcell.KeyRune, 'f', tcell.ModNone))
-	screen := dashboardScreen(t, 80)
-	screen.SetSize(80, 24)
-	d.draw(screen, time.Now(), true)
-	if !strings.Contains(dashboardText(screen), "Cleanup may be incomplete; resources may remain. y/N") {
-		t.Fatal("forced exit warning missing")
-	}
-	if d.forceInput(tcell.NewEventKey(tcell.KeyEscape, 0, tcell.ModNone)) || d.snapshot().confirmForce {
-		t.Fatal("Escape did not dismiss force confirmation")
+	for _, width := range []int{80, 160} {
+		t.Run(fmt.Sprint(width), func(t *testing.T) {
+			d := newDashboard()
+			d.forceAvailable = true
+			screen := dashboardScreen(t, width)
+			screen.SetSize(width, 24)
+			d.draw(screen, time.Now(), false)
+			if strings.Contains(dashboardText(screen), "FORCE EXIT") {
+				t.Fatal("force exit offered before cancellation")
+			}
+			d.draw(screen, time.Now(), true)
+			for _, wanted := range []string{"CANCELING", "[ f ] FORCE EXIT", "confirmation required", "VMs, containers and network changes may remain."} {
+				if !strings.Contains(dashboardText(screen), wanted) {
+					t.Fatalf("cancellation omitted prominent action %q", wanted)
+				}
+			}
+			d.forceInput(tcell.NewEventKey(tcell.KeyRune, 'f', tcell.ModNone))
+			d.draw(screen, time.Now(), true)
+			for _, wanted := range []string{"FORCE EXIT NOW?", "[y] Exit immediately", "[n / Esc] Keep waiting", "Cleanup may be incomplete; resources may remain. y/N"} {
+				if !strings.Contains(dashboardText(screen), wanted) {
+					t.Fatalf("force confirmation omitted %q", wanted)
+				}
+			}
+			if d.forceInput(tcell.NewEventKey(tcell.KeyEscape, 0, tcell.ModNone)) || d.snapshot().confirmForce {
+				t.Fatal("Escape did not dismiss force confirmation")
+			}
+		})
 	}
 }
 

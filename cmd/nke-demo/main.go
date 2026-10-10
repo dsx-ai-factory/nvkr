@@ -97,7 +97,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 }
 
 func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
-	flags := nkedemo.DemoFile{Version: 1, Run: nkedemo.RunFile{TimeoutSeconds: 3600}}
+	flags := nkedemo.DemoFile{Version: 1, Run: nkedemo.RunFile{TimeoutSeconds: nkedemo.DefaultTenantTimeoutSeconds}}
 	command := &cobra.Command{
 		Use: "run", Short: "Deploy exact completed Run outputs and test a real QCOW2 tenant", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -180,7 +180,7 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 	return command
 }
 func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
-	flags := nkedemo.DemoFile{Version: 1, Build: nkedemo.BuildFile{Jobs: 1}, Run: nkedemo.RunFile{TimeoutSeconds: 3600}}
+	flags := nkedemo.DemoFile{Version: 1, Build: nkedemo.BuildFile{Jobs: 1}, Run: nkedemo.RunFile{TimeoutSeconds: nkedemo.DefaultTenantTimeoutSeconds}}
 	command := &cobra.Command{
 		Use: "e2e", Short: "Build one complete artifact Run from scratch, then deploy its exact outputs", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -235,7 +235,7 @@ func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 	flags.StringVar(&cfg.NKECheckout, "nke-checkout", "", checkoutHelp)
 	flags.StringVar(&cfg.Out, "out", "", "fresh private demo output directory")
 	flags.StringVar(&cfg.Network, "network", "ovn", "deployment networking: ovn, or kind-calico for a temporary diagnostic")
-	flags.IntVar(&cfg.TimeoutSeconds, "timeout", 3600, "tenant provisioning budget in seconds (300..3600)")
+	flags.IntVar(&cfg.TimeoutSeconds, "timeout", nkedemo.DefaultTenantTimeoutSeconds, fmt.Sprintf("tenant provisioning budget in seconds (%d..%d)", nkedemo.MinTenantTimeoutSeconds, nkedemo.MaxTenantTimeoutSeconds))
 	if !existing {
 		return
 	}
@@ -249,8 +249,8 @@ func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 	flags.StringVar(&cfg.Runs.Simulator, "simulator-run", "", "completed simulator attempt")
 }
 func validateTimeoutFlag(command *cobra.Command, seconds int) error {
-	if command.Flags().Changed("timeout") && (seconds < 300 || seconds > 3600) {
-		return nkderr.New(nkderr.CodePreflightFailed, "tenant provisioning budget must be 300..3600 seconds")
+	if command.Flags().Changed("timeout") && (seconds < nkedemo.MinTenantTimeoutSeconds || seconds > nkedemo.MaxTenantTimeoutSeconds) {
+		return nkderr.New(nkderr.CodePreflightFailed, "tenant provisioning budget must be %d..%d seconds", nkedemo.MinTenantTimeoutSeconds, nkedemo.MaxTenantTimeoutSeconds)
 	}
 	return nil
 }

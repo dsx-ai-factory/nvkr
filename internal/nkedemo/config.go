@@ -21,6 +21,13 @@ import (
 
 const demoFileLimit = 64 << 10
 
+// Tenant readiness is separately bounded; this does not extend the E2E context.
+const (
+	MinTenantTimeoutSeconds     = 300
+	DefaultTenantTimeoutSeconds = 3600
+	MaxTenantTimeoutSeconds     = 7200
+)
+
 // DemoFile is downstream deployment intent, not an NKD Definition or receipt.
 // Loading descriptions never builds, deploys, restores, or writes configuration.
 type DemoFile struct {
@@ -114,7 +121,7 @@ func LoadDemoFile(ctx context.Context, path string) (DemoFile, error) {
 	loader.SetConfigType("yaml")
 	loader.SetDefault("build.jobs", 1)
 	loader.SetDefault("run.network", "ovn")
-	loader.SetDefault("run.timeoutSeconds", 3600)
+	loader.SetDefault("run.timeoutSeconds", DefaultTenantTimeoutSeconds)
 	if err = loader.ReadConfig(bytes.NewReader(raw)); err != nil {
 		return result, configUsage("cannot decode demo configuration")
 	}
@@ -172,8 +179,8 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if file.Version != 1 || (run.NKECheckout != "" && !configString(run.NKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < 300 || run.TimeoutSeconds > 3600 {
-		return Config{}, configUsage("run requires version 1, out, valid optional nkeCheckout and timeoutSeconds from 300 to 3600")
+	if file.Version != 1 || (run.NKECheckout != "" && !configString(run.NKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
+		return Config{}, nkderr.New(nkderr.CodeUsage, "run requires version 1, out, valid optional nkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
 	return Config{Network: network, NKECheckout: run.NKECheckout, NKDCTL: run.NKDCTL, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil

@@ -218,8 +218,8 @@ type demoAdmission struct {
 
 func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 	var admitted demoAdmission
-	if cfg.Timeout < 300*time.Second || cfg.Timeout > time.Hour {
-		return admitted, errors.New("tenant budget must be 300..3600 seconds")
+	if cfg.Timeout < MinTenantTimeoutSeconds*time.Second || cfg.Timeout > MaxTenantTimeoutSeconds*time.Second {
+		return admitted, fmt.Errorf("tenant budget must be %d..%d seconds", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
 	if _, err := normalizeNetwork(cfg.Network); err != nil {
 		return admitted, err

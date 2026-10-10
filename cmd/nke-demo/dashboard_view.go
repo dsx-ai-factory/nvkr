@@ -547,7 +547,17 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	}
 	state := current
 	if canceling {
-		state += "\nCancellation requested; waiting for owned cleanup to return."
+		state = "[lightcoral::b]CANCELING · cleanup still running[-::-]\n" + current
+		if s.forceAvailable {
+			if s.confirmForce {
+				state += "\n\n[lightcoral::b]FORCE EXIT NOW?[-::-]\n" + tview.Escape("[y] Exit immediately   [n / Esc] Keep waiting")
+			} else {
+				state += "\n\n[lightcoral::b][ f ] FORCE EXIT[-::-] · confirmation required"
+			}
+			state += "\nVMs, containers and network changes may remain."
+		} else {
+			state += "\nCancellation requested; waiting for owned cleanup to return."
+		}
 	} else {
 		state += "\n" + tview.Escape(s.tenant)
 	}

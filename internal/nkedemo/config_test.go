@@ -143,6 +143,7 @@ func TestDemoFileSchemaRejection(t *testing.T) {
 		{"sequence", "version: 1\nrestore:\n  work: [secret-config-sentinel]\n"},
 		{"integer coercion", "version: 1\nbuild:\n  jobs: '2'\n"},
 		{"float integer", "version: 1\nbuild:\n  jobs: 2.0\n"},
+		{"timeout integer overflow", "version: 1\nrun:\n  timeoutSeconds: 9223372036854775808\n"},
 		{"nonstring key", "version: 1\nrestore:\n  12: secret-config-sentinel\n"},
 		{"alias", "version: 1\nbuild:\n  repo: &path /native\n  nkeClone: *path\n"},
 		{"merge", "version: 1\nbuild: &base\n  repo: /native\nrun:\n  <<: *base\n"},
@@ -269,7 +270,7 @@ func TestDemoFileConversionRefusals(t *testing.T) {
 		{"run executable", func(f *DemoFile) { f.Run.NKDCTL = "" }, "run"},
 		{"run version", func(f *DemoFile) { f.Version = 0 }, "run"},
 		{"run low timeout", func(f *DemoFile) { f.Run.TimeoutSeconds = 299 }, "run"},
-		{"run high timeout", func(f *DemoFile) { f.Run.TimeoutSeconds = 3601 }, "run"},
+		{"run high timeout", func(f *DemoFile) { f.Run.TimeoutSeconds = 7201 }, "run"},
 		{"run newline", func(f *DemoFile) { f.Run.Runs.Site = "/native\nforeign" }, "run"},
 		{"restore missing", func(f *DemoFile) { f.Restore.Work = "" }, "restore"},
 		{"restore version", func(f *DemoFile) { f.Version = 0 }, "restore"},
@@ -300,6 +301,45 @@ func TestDemoFileConversionRefusals(t *testing.T) {
 			*fields[name] = ""
 			_, err := file.RunConfig(nil)
 			assertConfigUsage(t, err)
+		})
+	}
+}
+
+func TestDemoFileTenantBudgetBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		seconds string
+		want    time.Duration
+	}{
+		{"299", 0}, {"300", 5 * time.Minute}, {"3600", time.Hour},
+		{"7200", 2 * time.Hour}, {"7201", 0}, {"9223372036854775807", 0},
+	} {
+		t.Run(tc.seconds, func(t *testing.T) {
+			contents := strings.Replace(fullDemoYAML, "timeoutSeconds: 900", "timeoutSeconds: "+tc.seconds, 1)
+			file, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, operation := range []string{"run", "e2e"} {
+				t.Run(operation, func(t *testing.T) {
+					selected := file
+					var run Config
+					if operation == "e2e" {
+						selected.Run.NKDCTL = ""
+						selected.Run.Runs = RunFileInputs{}
+						_, run, err = selected.E2EConfig(nil)
+					} else {
+						run, err = selected.RunConfig(nil)
+					}
+					if tc.want == 0 {
+						assertConfigUsage(t, err)
+						if run != (Config{}) {
+							t.Fatal("invalid budget returned partial inputs")
+						}
+					} else if err != nil || run.Timeout != tc.want {
+						t.Fatalf("timeout=%s want=%s error=%v", run.Timeout, tc.want, err)
+					}
+				})
+			}
 		})
 	}
 }
