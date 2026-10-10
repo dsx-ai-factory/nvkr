@@ -331,7 +331,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		}
 		cmd, err = sourcegit.LocalCommand(commandCtx, r.Env, dir, gitArgs...)
 		if err != nil {
-			return nil, err
+			return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
 		}
 	}
 	cmd.Dir = r.Work

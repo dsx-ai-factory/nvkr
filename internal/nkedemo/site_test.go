@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,8 +16,138 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/delivery"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
+
+func TestSiteInstallerFullCheckoutRealGit(t *testing.T) {
+	for _, scenario := range []string{"pinned", "canceled", "missing-pin", "sparse-regression", "delegated-worktree"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := privateTestDir(t)
+			source, checkout := filepath.Join(work, "source"), filepath.Join(work, "installer")
+			if err := os.Mkdir(source, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			git := func(dir string, args ...string) string {
+				t.Helper()
+				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+				cmd.WaitDelay = time.Second
+				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull,
+					"GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.test", "GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.test"}
+				raw, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Fatalf("real fixture Git %v: %v: %s", args, err, raw)
+				}
+				return strings.TrimSpace(string(raw))
+			}
+			git(source, "init", "-q")
+			members := []string{"deploy/input", "make/input", "controller/deploy/charts/input", "controller/deploy/k8s/capi-spiffe-exec-auth/input", "controller/hack/ci/input", "cli/previously-excluded", "README.md"}
+			for _, name := range members {
+				path := filepath.Join(source, name)
+				if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("pinned bytes\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			git(source, "add", ".")
+			git(source, "-c", "commit.gpgsign=false", "commit", "-qm", "pin")
+			pin := git(source, "rev-parse", "HEAD")
+			if err := os.WriteFile(filepath.Join(source, members[0]), []byte("newer source bytes\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			git(source, "add", ".")
+			git(source, "-c", "commit.gpgsign=false", "commit", "-qm", "newer source")
+			original := make(map[string][]byte)
+			for _, name := range append(append([]string{}, members...), ".git/config", ".git/index", ".git/HEAD") {
+				raw, err := os.ReadFile(filepath.Join(source, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				original[name] = raw
+			}
+			t.Cleanup(func() {
+				for name, want := range original {
+					raw, err := os.ReadFile(filepath.Join(source, name))
+					if err != nil || !bytes.Equal(raw, want) {
+						t.Fatalf("source checkout mutated at %s: %v", name, err)
+					}
+				}
+			})
+			runner := Runner{Work: work, Env: []string{"PATH=" + os.Getenv("PATH")}}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			if scenario == "sparse-regression" {
+				if err := runner.Run(ctx, []string{"git", "clone", "--no-hardlinks", "--no-checkout", source, checkout}, "clone-installer", time.Minute); err != nil {
+					t.Fatal(err)
+				}
+				if err := runner.Run(ctx, []string{"git", "-C", checkout, "sparse-checkout", "set", "deploy", "make", "controller/deploy/charts", "controller/deploy/k8s/capi-spiffe-exec-auth", "controller/hack/ci"}, "installer-membership", time.Minute); err != nil {
+					t.Fatal(err)
+				}
+				if git(checkout, "config", "--local", "--get", "extensions.worktreeConfig") != "true" {
+					t.Fatal("sparse fixture did not reproduce delegated configuration")
+				}
+				err := runner.Run(ctx, []string{"git", "-C", checkout, "checkout", "--detach", pin}, "checkout-installer", time.Minute)
+				var coded *nkderr.Error
+				if !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability {
+					t.Fatalf("sparse checkout no longer reproduces coded rejection: %v", err)
+				}
+				return
+			}
+			selected := pin
+			if scenario == "missing-pin" {
+				selected = strings.Repeat("0", 40)
+			}
+			err := checkoutSiteInstaller(ctx, runner, source, checkout, selected)
+			if scenario == "canceled" {
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("checkout cancellation cause=%v", err)
+				}
+				if _, statErr := os.Stat(checkout); !errors.Is(statErr, os.ErrNotExist) {
+					t.Fatal("canceled checkout created destination", statErr)
+				}
+				return
+			}
+			if scenario == "missing-pin" {
+				var command *CommandError
+				if !errors.As(err, &command) || command.Phase != "checkout-installer" || command.ExitCode != 128 {
+					t.Fatalf("unpinned checkout error=%v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range members {
+				raw, err := os.ReadFile(filepath.Join(checkout, name))
+				if err != nil || string(raw) != "pinned bytes\n" {
+					t.Fatalf("full pinned member %s=%q: %v", name, raw, err)
+				}
+			}
+			if _, err := os.Stat(filepath.Join(checkout, ".git/config.worktree")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("full checkout created delegated configuration", err)
+			}
+			if scenario == "delegated-worktree" {
+				git(checkout, "config", "extensions.worktreeConfig", "true")
+			}
+			raw, err := runner.Capture(ctx, []string{"git", "-C", checkout, "status", "--porcelain=v1"}, "installer-status", time.Minute)
+			if scenario == "delegated-worktree" {
+				var coded *nkderr.Error
+				if !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability {
+					t.Fatalf("delegated config policy relaxed: %v", err)
+				}
+			} else if err != nil || len(raw) != 0 || git(checkout, "rev-parse", "HEAD") != pin {
+				t.Fatalf("full pinned checkout not re-admitted: %q %v", raw, err)
+			}
+		})
+	}
+}
 
 func TestProfilesTransportPreservesOriginalBundleIndex(t *testing.T) {
 	for _, scenario := range []string{"exact", "foreign-manifest", "corrupt-blob"} {

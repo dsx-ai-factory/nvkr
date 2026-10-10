@@ -201,6 +201,13 @@ trust settings are projected only into network fetch; explicit absolute local-re
 available. Real Git fixtures cover exact checkout bytes, callback exclusion,
 local redirects and authenticated fetch. These fixtures are not proof of current
 private-repository access; the stricter held hosted-source admission is unchanged.
+The downstream site installer now takes a full detached private checkout of its
+exact source pin instead of enabling sparse checkout, which Git configures through
+the deliberately rejected `extensions.worktreeConfig` delegation. Real Git
+regressions cover this failure, unchanged source bytes, the exact historical pin,
+cancellation and continued rejection of delegated configuration. Command admission
+errors retain the failing phase without exposing arguments or source paths. These
+tests do not establish a completed Ubuntu site replay.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic

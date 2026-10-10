@@ -16,8 +16,37 @@ import (
 	"testing"
 	"time"
 
+	nkderrors "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
+
+func TestRunnerGitAdmissionNamesFailingPhase(t *testing.T) {
+	root := privateTestDir(t)
+	checkout := filepath.Join(root, "source")
+	runner := Runner{Env: []string{"PATH=" + os.Getenv("PATH")}}
+	if err := runner.Run(t.Context(), []string{"git", "init", checkout}, "init-source", 10*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), "git", "-C", checkout, "config", "extensions.worktreeConfig", "true")
+	cmd.WaitDelay = time.Second
+	if raw, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("fixture config: %v: %s", err, raw)
+	}
+	runner.Work = root
+	_, err := runner.Capture(t.Context(), []string{"git", "-C", checkout, "status", "--porcelain"}, "checkout-installer", 10*time.Second)
+	var command *CommandError
+	var coded *nkderrors.Error
+	if !errors.As(err, &command) || command.Phase != "checkout-installer" || command.ExitCode != -1 ||
+		!errors.As(err, &coded) || coded.Code != nkderrors.CodeEngineCapability {
+		t.Fatalf("Git admission lost phase or coded cause: %v", err)
+	}
+	if strings.Contains(err.Error(), checkout) {
+		t.Fatal("admission error leaked the source path")
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "checkout-installer.log")); !os.IsNotExist(statErr) {
+		t.Fatal("Git admission created a command log before rejecting configuration")
+	}
+}
 
 func privateTestDir(t *testing.T) string {
 	t.Helper()

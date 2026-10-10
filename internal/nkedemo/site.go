@@ -902,6 +902,16 @@ type siteConfiguration struct {
 	} `yaml:"tenant"`
 }
 
+// checkoutSiteInstaller materializes the full pinned tree in this private copy.
+// Sparse checkout writes extensions.worktreeConfig, which the shared source Git
+// owner deliberately rejects. Keep that policy and the original source intact.
+func checkoutSiteInstaller(ctx context.Context, runner Runner, source, checkout, commit string) error {
+	if err := runner.Run(ctx, []string{"git", "clone", "--no-hardlinks", "--no-checkout", source, checkout}, "clone-installer", 120*time.Second); err != nil {
+		return err
+	}
+	return runner.Run(ctx, []string{"git", "-C", checkout, "checkout", "--detach", commit}, "checkout-installer", 60*time.Second)
+}
+
 // ConsumeSite installs a site from exact selected outputs, retaining its private
 // registry through the callback. No success is emitted before owned cleanup.
 func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, connection SiteConnection, session ManagementSession, consumer func(context.Context, ManagementSession) error) (result error) {
@@ -975,14 +985,8 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	}
 	session.Runner.Env = SetEnv(session.Runner.Env, map[string]string{"PATH": cliTools + string(os.PathListSeparator) + environmentValue(session.Runner.Env, "PATH")})
 	checkout := filepath.Join(session.Work, "installer")
-	for _, step := range []struct {
-		args    []string
-		phase   string
-		timeout time.Duration
-	}{{[]string{"git", "clone", "--no-hardlinks", "--no-checkout", sourceCheckout, checkout}, "clone-installer", 120 * time.Second}, {[]string{"git", "-C", checkout, "sparse-checkout", "set", "deploy", "make", "controller/deploy/charts", "controller/deploy/k8s/capi-spiffe-exec-auth", "controller/hack/ci"}, "installer-membership", 60 * time.Second}, {[]string{"git", "-C", checkout, "checkout", "--detach", InstallerCommit}, "checkout-installer", 60 * time.Second}} {
-		if err = session.Runner.Run(ctx, step.args, step.phase, step.timeout); err != nil {
-			return err
-		}
+	if err = checkoutSiteInstaller(ctx, session.Runner, sourceCheckout, checkout, InstallerCommit); err != nil {
+		return err
 	}
 	charts, pins := make(map[string]string), make(map[string]string)
 	for item := range chartOutputs {
