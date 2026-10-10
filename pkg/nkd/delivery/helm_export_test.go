@@ -16,6 +16,126 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
+func TestReadHelmChartSharesExactExportAdmissionWithoutWrites(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code e.Code
+	}{
+		{"exact", ""}, {"empty config", e.CodeVerifyFailed}, {"wrong layer media", e.CodeVerifyFailed},
+		{"config differs", e.CodeVerifyFailed}, {"wrong manifest", e.CodeVerifyFailed},
+		{"missing pin", e.CodeUsage}, {"wrong name", e.CodeVerifyFailed}, {"wrong version", e.CodeVerifyFailed},
+		{"canceled", e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			layout := filepath.Join(root, "layout")
+			data := helmChartArchiveFixture(t, map[string]string{"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: 1.2.3\n"})
+			if _, err := BuildHelmChartArtifact(t.Context(), layout, "application/vnd.nkd.helm-chart.v1", data); err != nil {
+				t.Fatal(err)
+			}
+			descriptor, err := PayloadDescriptor(t.Context(), layout)
+			if err != nil {
+				t.Fatal(err)
+			}
+			targetDiagnostic := ""
+			if tc.name == "empty config" || tc.name == "wrong layer media" || tc.name == "config differs" {
+				manifest, err := flatManifest(t.Context(), layout, PublishedObject{DescriptorDigest: descriptor.Digest, Size: descriptor.Size})
+				if err != nil {
+					t.Fatal(err)
+				}
+				oldManifest, oldConfig := descriptor.Digest, manifest.Config.Digest
+				writer := layoutWriter{root: layout}
+				targetDiagnostic = "selected artifact is not an exact single-chart Helm OCI payload"
+				switch tc.name {
+				case "empty config":
+					manifest.Config, err = writer.addBlobBytes([]byte("{}"), MediaEmptyConfig)
+				case "wrong layer media":
+					manifest.Layers[0].MediaType = MediaOctetStream
+				case "config differs":
+					targetDiagnostic = "chart config/archive or selected name/version differ"
+					config, readErr := helmChartMetadata(data)
+					if readErr != nil {
+						t.Fatal(readErr)
+					}
+					config.Name = "sibling"
+					manifest.Config, err = writer.addJSONBlob(config, MediaHelmConfig)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				descriptor, err = writer.addJSONBlob(manifest, MediaOCIManifest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = writer.writeIndex(ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, Manifests: []Descriptor{descriptor}}); err != nil {
+					t.Fatal(err)
+				}
+				// Remove only this fixture's now-unreachable old records so these
+				// negative cases reach Helm media/metadata admission, not inventory.
+				obsolete := []string{oldManifest}
+				if manifest.Config.Digest != oldConfig {
+					obsolete = append(obsolete, oldConfig)
+				}
+				for _, digest := range obsolete {
+					if err := os.Remove(filepath.Join(layout, "blobs", "sha256", strings.TrimPrefix(digest, "sha256:"))); err != nil {
+						t.Fatal(err)
+					}
+				}
+				admitted, err := PayloadDescriptor(t.Context(), layout)
+				if err != nil || admitted.Digest != descriptor.Digest {
+					t.Fatalf("mutated fixture is not a valid complete OCI closure: %+v %v", admitted, err)
+				}
+			}
+			pin, chart, version := descriptor.Digest, "demo", "1.2.3"
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			switch tc.name {
+			case "wrong manifest":
+				pin = digestBytes([]byte("substituted"))
+			case "missing pin":
+				pin = ""
+			case "wrong name":
+				chart = "sibling"
+			case "wrong version":
+				version = "2.0.0"
+			case "canceled":
+				cancel()
+			}
+			result, held, err := ReadHelmChart(ctx, layout, pin, chart, version)
+			if tc.code != "" {
+				assertRegistryCode(t, err, tc.code)
+				if targetDiagnostic != "" && !strings.Contains(err.Error(), targetDiagnostic) {
+					t.Fatalf("fixture did not reach its intended Helm admission: %v", err)
+				}
+				if held != nil || result != (HelmChartExport{}) {
+					t.Fatal("failed admission returned a successful description or bytes")
+				}
+			} else if err != nil || !bytes.Equal(held, data) || result.ManifestDigest != pin || result.ArchiveDigest != digestBytes(data) || result.Size != int64(len(data)) {
+				t.Fatalf("read did not return exact verified diagnostic bytes: %+v %v", result, err)
+			}
+			entries, readErr := os.ReadDir(root)
+			if readErr != nil || len(entries) != 1 || entries[0].Name() != "layout" {
+				t.Fatalf("read-only admission created output: %v %v", entries, readErr)
+			}
+			if tc.code != e.CodeUsage {
+				out := filepath.Join(root, "export", "demo.tgz")
+				exported, exportErr := ExportHelmChart(ctx, layout, pin, chart, version, out)
+				if tc.code != "" {
+					assertRegistryCode(t, exportErr, tc.code)
+					if targetDiagnostic != "" && !strings.Contains(exportErr.Error(), targetDiagnostic) {
+						t.Fatalf("export did not share its intended Helm admission: %v", exportErr)
+					}
+					if _, err := os.Stat(filepath.Dir(out)); !os.IsNotExist(err) {
+						t.Fatalf("failed export created output: %v", err)
+					}
+				} else if exportErr != nil || exported != result {
+					t.Fatalf("read/export admission diverged: %+v %+v %v", result, exported, exportErr)
+				}
+			}
+		})
+	}
+}
+
 func TestExportHelmChart(t *testing.T) {
 	for _, tc := range []struct {
 		name, chart, version string
