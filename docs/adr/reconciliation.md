@@ -272,7 +272,8 @@ owner events, not log-derived authority; narrow terminals stack the panes. `--pl
 pipes and redirected output retain scrolling progress; `--verbose` builds use plain
 public-log streaming. Tab changes focus, PgUp/PgDn scroll activity and End returns
 to live activity. q/Ctrl+C requests cancellation and waits for owned work and cleanup
-before terminal restoration. [CLI contracts](../../cmd/nke-demo/dashboard_test.go)
+before terminal restoration. Failed deployment stops unfinished active panes without
+claiming that their individual checks failed. [CLI contracts](../../cmd/nke-demo/dashboard_test.go)
 and [simulation-screen tests](../../cmd/nke-demo/dashboard_view_test.go) exercise
 layout, bounded/sanitized snapshots, concurrent reports, cancellation joining and
 terminal failures. These are controlled presentation/race contracts, not a completed

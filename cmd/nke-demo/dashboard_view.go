@@ -153,6 +153,11 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 			}
 		case nkedemo.DeploymentFailed:
 			d.current = "Demo stopped; inspect retained private diagnostics"
+			for index := range d.phases {
+				if d.phases[index].state == "running" {
+					d.phases[index] = dashboardPhase{"stopped", "Stopped without owning phase completion"}
+				}
+			}
 		}
 		return
 	}
@@ -181,6 +186,9 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 	if event.Name == "tenant-provisioning" && event.Kind == nkedemo.DeploymentFinished {
 		d.phases[3] = dashboardPhase{"complete", "Owning tenant operation completed"}
 		d.phases[4] = dashboardPhase{"complete", "Workload and DNS checks completed"}
+	}
+	if event.Name == "tenant-provisioning" && event.Kind == nkedemo.DeploymentFailed && d.phases[4].state == "running" {
+		d.phases[4] = dashboardPhase{"stopped", "Tenant operation ended; workload/DNS completion unconfirmed"}
 	}
 }
 
@@ -258,7 +266,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	d.header.SetText(fmt.Sprintf("[lightcyan::b] NKE · local ARM64 build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]", max(time.Duration(0), now.Sub(s.started)).Truncate(time.Second)))
 	var phases strings.Builder
 	names := [...]string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"}
-	colors := map[string]string{"pending": "goldenrod", "running": "lightcyan", "observed": "lightsteelblue", "complete": "lightgreen", "failed": "lightcoral"}
+	colors := map[string]string{"pending": "goldenrod", "running": "lightcyan", "observed": "lightsteelblue", "complete": "lightgreen", "failed": "lightcoral", "stopped": "lightsteelblue"}
 	for index, phase := range s.phases {
 		if width <= 90 || content < 28 {
 			fmt.Fprintf(&phases, "[%s::b]%-14s[-::-] %s\n", colors[phase.state], names[index], phase.state)

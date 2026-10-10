@@ -346,7 +346,9 @@ succeeded. Two Ready nodes still require workload/DNS checks and owned cleanup.
 
 An observed substep is not completion of its entire phase. The dashboard and
 graph are diagnostics, not artifact verification receipts or a signed Release;
-the final command result and owned checks still determine success. Cancellation
+the final command result and owned checks still determine success. After deployment
+fails, unfinished active panes show `stopped`; explicit failures remain `failed`.
+This does not claim that every unfinished check failed. Cancellation
 waits for bounded subprocess joining and owned cleanup before restoring the
 terminal. If cleanup refuses, inspect retained resources and recovery instructions
 before rerunning. [Dashboard tests](../cmd/nke-demo/dashboard_test.go) and

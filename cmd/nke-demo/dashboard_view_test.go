@@ -102,6 +102,53 @@ func TestDashboardObservationBoundaries(t *testing.T) {
 	}
 }
 
+func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		events []nkedemo.ProgressEvent
+		states [6]string
+	}{
+		{
+			name: "workload stops when its tenant owner fails",
+			events: []nkedemo.ProgressEvent{
+				{Kind: nkedemo.TenantWaiting, Name: "tenant-workload", RegisteredNodes: 2, ReadyNodes: 2},
+				{Kind: nkedemo.DeploymentFailed, Name: "tenant-provisioning"},
+			},
+			states: [6]string{"pending", "pending", "pending", "failed", "stopped", "pending"},
+		},
+		{
+			name: "deployment failure stops active site and cleanup",
+			events: []nkedemo.ProgressEvent{
+				{Kind: nkedemo.PhaseStarted, Name: "create-management"},
+				{Kind: nkedemo.PhaseStarted, Name: "network-cleanup"},
+				{Kind: nkedemo.DeploymentFailed, Name: "local-demo"},
+			},
+			states: [6]string{"pending", "pending", "stopped", "pending", "pending", "stopped"},
+		},
+		{
+			name: "completed artifacts and failed cleanup remain explicit",
+			events: []nkedemo.ProgressEvent{
+				{Kind: nkedemo.LaneFinished, Name: "artifacts"},
+				{Kind: nkedemo.PhaseFailed, Name: "network-cleanup"},
+				{Kind: nkedemo.DeploymentFailed, Name: "local-demo"},
+			},
+			states: [6]string{"pending", "complete", "pending", "pending", "pending", "failed"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newDashboard()
+			for _, event := range tc.events {
+				d.Report(event)
+			}
+			for index, phase := range d.snapshot().phases {
+				if phase.state != tc.states[index] {
+					t.Fatalf("phase %d: state=%q want=%q", index, phase.state, tc.states[index])
+				}
+			}
+		})
+	}
+}
+
 func TestDashboardSanitizationAndPrivacy(t *testing.T) {
 	d := newDashboard()
 	_, _ = io.WriteString(d, "visible\x1b[2J [red]literal[-]\n")
