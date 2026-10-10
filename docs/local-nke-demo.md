@@ -4,6 +4,13 @@ This guide builds the selected artifacts with NKD, deploys their exact outputs
 using NKE's installer, and provisions a real QCOW2 control-plane and worker
 through CAPNICo/NICoSim. Kind hosts management services, not tenant nodes.
 
+**Current E2E blocker:** the selected NVIDIA OVN image lacks `firewall-cmd`,
+which its startup code requires even with firewalld disabled. Artifact builds
+can succeed while tenant provisioning fails. See [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1).
+Wait for the source-owner fix and a reviewed pin update before expecting a
+successful complete E2E with this selection. No local catalog workaround is
+applied. The build-only development loops remain separate from tenant acceptance.
+
 Run everything on a dedicated Ubuntu ARM64 host with Docker. On an Apple Silicon
 Mac, first create that Linux host with Colima below. This is **not a native macOS
 build**. Docker Desktop alone does not provide the libvirt tenant runtime.

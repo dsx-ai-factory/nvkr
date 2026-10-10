@@ -225,6 +225,15 @@ reuse or establish equal bytes. Fork graph/profile tests and actual pinned-chart
 Helm rendering with loopback OCI push/pull passed; the changed combined Run,
 fork OS bake and tenant acceptance still require a fresh runtime run.
 
+The selected fork's Ubuntu runtime omits `firewall-cmd`, while its non-DPU
+executable initialization requires it even when firewalld is disabled.
+[OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1)
+records the source paths and observed startup failure: artifact builds can
+succeed without a Ready tenant. The last retained continuous attempt ended
+with a two-node provisioning timeout, not a successful E2E video. A canonical
+source-owner fix and reviewed pin update are required; no local catalog patch
+is applied. Neither contract checks nor earlier deployment replays close this gate.
+
 Fresh profiles selections produce a native OCI image through the existing
 rootless BuildKit lane and pinned NKE profiles Dockerfile. A named build context
 selects the existing exact Alpine image digest instead of the Dockerfile's tag;
