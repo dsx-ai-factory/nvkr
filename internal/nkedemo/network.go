@@ -46,6 +46,15 @@ var networkSysctls = []string{"net.ipv4.ip_forward", "net.ipv4.fib_multipath_has
 var networkCapabilities = map[string]string{"dnsmasq": "cap_net_bind_service,cap_net_admin,cap_net_raw=ep", "nico-sim": "cap_net_admin=ep"}
 var networkTools = []string{"sudo", "timeout", "ip", "iptables", "dnsmasq", "setcap", "getcap", "virsh", "ps", "sysctl", "cp", "chmod", "install", "mv", "sha256sum", "unlink", "stat"}
 
+const networkSudoProbe = "sudo -n -k timeout --signal=TERM --kill-after=5 25 true"
+
+// Ignore cached credentials for this command, without invalidating the user's
+// timestamp. Admission and execution must require the same unattended policy;
+// a successful sudo -v in another terminal is not hours-long authorization.
+func networkSudoCommand(args []string) []string {
+	return append([]string{"sudo", "-n", "-k", "timeout", "--signal=TERM", "--kill-after=5", "25"}, args...)
+}
+
 type networkFileID struct {
 	Device uint64 `json:"device"`
 	Inode  uint64 `json:"inode"`
@@ -333,7 +342,7 @@ func (g *NetworkGuard) admit(ctx context.Context) error {
 		return fmt.Errorf("network journal exists or cannot be inspected; recover original work directory")
 	}
 	if _, err := g.Command(ctx, []string{"true"}, true); err != nil {
-		return fmt.Errorf("could not verify required unattended sudo for local networking; verify sudo -n true and the administrator-access prerequisites in docs/local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host: %w", err)
+		return fmt.Errorf("required unattended networking authorization failed; check `%s` (ignores temporary cached credentials without clearing them); see docs/local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host: %w", networkSudoProbe, err)
 	}
 	var links []networkLink
 	if err := g.inventory(ctx, []string{"ip", "-j", "link", "show"}, &links); err != nil {
@@ -439,7 +448,7 @@ func (g *NetworkGuard) Command(ctx context.Context, args []string, privileged bo
 		return raw, err
 	}
 	if privileged {
-		args = append([]string{"sudo", "-n", "timeout", "--signal=TERM", "--kill-after=5", "25"}, args...)
+		args = networkSudoCommand(args)
 	}
 	runner := g.runner
 	// Inventory and absence checks legitimately return nonzero status. Keep

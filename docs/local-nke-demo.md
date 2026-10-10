@@ -162,10 +162,16 @@ the demo itself is Go. No host Go, Packer or Helm is required.
 Check unattended administrator access before starting the hours-long build:
 
 ```sh
-sudo -n true
+sudo -n -k timeout --signal=TERM --kill-after=5 25 true
 ```
 
-E2E also checks this before fetching its installer or starting artifact builds.
+E2E checks this exact bounded networking command before fetching its installer
+or starting artifact builds. `-n` forbids password prompts; `-k` with a command
+ignores cached credentials for that invocation without clearing your timestamp.
+Unlike `sudo -n true`, this tests the command wrapper used for privileged network
+setup and cleanup, without accepting a temporary `sudo -v` cache. Success admits
+this probe only: command-specific policy can still deny later operations, and
+administrator policy changes cannot be predicted by preflight.
 
 In the default OVN mode, the site uses Open vSwitch's kernel datapath inside
 the owned Kind node. On this dedicated Linux execution host, have the

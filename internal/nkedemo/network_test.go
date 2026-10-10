@@ -877,7 +877,7 @@ func TestNetworkProtectedHelperOwnsInnerDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := []string{"-n", "timeout", "--signal=TERM", "--kill-after=5", "25", "ip", "link", "show"}
+	expected := []string{"-n", "-k", "timeout", "--signal=TERM", "--kill-after=5", "25", "ip", "link", "show"}
 	if !slices.Equal(strings.Fields(string(raw)), expected) {
 		t.Fatalf("protected command=%s", raw)
 	}
@@ -900,7 +900,7 @@ func TestNetworkUnattendedSudoAdmissionDiagnostics(t *testing.T) {
 				cancel()
 			}
 			err := g.admit(ctx)
-			if err == nil || !strings.Contains(err.Error(), "required unattended sudo") || !strings.Contains(err.Error(), "sudo -n true") || !strings.Contains(err.Error(), "docs/local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host") || strings.Contains(err.Error(), "private sudo authentication diagnostic") {
+			if err == nil || !strings.Contains(err.Error(), "required unattended networking authorization") || !strings.Contains(err.Error(), networkSudoProbe) || !strings.Contains(err.Error(), "docs/local-nke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host") || strings.Contains(err.Error(), "private sudo authentication diagnostic") {
 				t.Fatalf("sudo prerequisite diagnostic=%v", err)
 			}
 			if canceled {
@@ -1072,7 +1072,7 @@ func TestNetworkPrivilegedProbeChildError(t *testing.T) {
 	g.journal = false
 	g.probeExecutable = "/selected/bootstrap/nke-demo"
 	tools := privateTestDir(t)
-	script := "#!/bin/sh\n[ \"$#\" = 7 ] && [ \"$1\" = -n ] && [ \"$2\" = timeout ] && [ \"$3\" = --signal=TERM ] && [ \"$4\" = --kill-after=5 ] && [ \"$5\" = 25 ] && [ \"$6\" = /selected/bootstrap/nke-demo ] && [ \"$7\" = network-port-probe ] || exit 99\nprintf '%s\\n' 'private probe diagnostic' >&2\nexit 42\n"
+	script := "#!/bin/sh\n[ \"$*\" = '-n -k timeout --signal=TERM --kill-after=5 25 /selected/bootstrap/nke-demo network-port-probe' ] || exit 99\nprintf '%s\\n' 'private probe diagnostic' >&2\nexit 42\n"
 	if err := os.WriteFile(filepath.Join(tools, "sudo"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}

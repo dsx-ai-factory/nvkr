@@ -36,7 +36,10 @@ func TestPrepareInstallerPinnedAttempt(t *testing.T) {
 				}
 			}
 			write(filepath.Join(repo, "scripts/nke-full-arm64-local.sh"), "#!/bin/sh\n[ \"$1:$2\" = --check:all ] && [ \"${FAIL:-}\" != preflight ]\n")
-			write(filepath.Join(tools, "sudo"), "#!/bin/sh\n[ \"$1:$2\" = -n:true ] && [ \"${FAIL:-}\" != sudo ]\n")
+			// A weaker cached `sudo -n true` would pass even in the failing
+			// policy fixture. Only the exact cache-independent runtime probe
+			// can expose the missing unattended authorization before Git/builds.
+			write(filepath.Join(tools, "sudo"), "#!/bin/sh\nif [ \"$*\" = '-n true' ]; then exit 0; fi\n[ \"$*\" = '-n -k timeout --signal=TERM --kill-after=5 25 true' ] && [ \"${FAIL:-}\" != sudo ]\n")
 			imageCalls := filepath.Join(root, "image-calls")
 			write(filepath.Join(tools, "docker"), fmt.Sprintf("#!/bin/sh\nset -eu\nFAIL=%q\nIMAGE_CALLS=%q\nKIND=%q\nREGISTRY=%q\nKIND_ID=%q\n", name, imageCalls, kindNodeImage, registryImage, kindNodeID)+`
 if [ "$1:$2:$3" = network:inspect:kind ]; then
@@ -257,7 +260,7 @@ esac
 					}
 				}
 				if name == "sudo" {
-					for _, hint := range []string{"sudo -n true", "host administrator", "sudo -v", "docs/local-nke-demo.md"} {
+					for _, hint := range []string{networkSudoProbe, "host administrator", "sudo -v", "docs/local-nke-demo.md"} {
 						if !strings.Contains(err.Error(), hint) {
 							t.Fatalf("missing actionable sudo guidance %q: %v", hint, err)
 						}
