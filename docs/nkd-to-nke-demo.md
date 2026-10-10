@@ -165,15 +165,24 @@ After SIGKILL/OOM or VM restart:
    Stop/join only independently verified owned producers. Never kill a PID
    merely because it appears in the journal. Tenant/Kind/registry recovery after
    a hard crash is a separate operator task.
-3. Restore only recorded network controls:
+3. Find the journal for the failed attempt, then select its containing directory.
+   The example below matches the quickstart's `--out`; change `DEMO_OUT` if your
+   attempt used another output path. Do not pass the journal file itself or
+   delete its directory before recovery succeeds.
 
    ```sh
-   "$NKE_DEMO" restore --work /absolute/Linux/path/to/original-demo-output
+   find .nkd -name network-state.json -print
+   DEMO_OUT="$PWD/.nkd/demo-e2e-01-demo"
+   test -f "$DEMO_OUT/network-state.json" &&
+   sudo -n true &&
+   "$NKE_DEMO" restore --work "$DEMO_OUT"
    ```
 
-4. Require success before a new attempt. Active producers, foreign resources,
-   changed file/bridge identities or unexpected routes cause refusal. Inspect
-   the discrepancy rather than forcing removal.
+4. This restores only recorded host-network controls; it does not delete tenants,
+   VMs, Kind or registry containers. Require success before a new attempt.
+   Active producers, foreign resources, changed file/bridge identities or
+   unexpected routes cause refusal. Inspect the discrepancy rather than forcing
+   removal.
 
 The Go command accepts only version 2 journals. A Python-era version 1 journal
 must be restored **before upgrading**, using the last compatible revision
