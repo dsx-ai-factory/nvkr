@@ -93,8 +93,12 @@ func builtInputs(repo, attempt string) BuiltInputs {
 // its closed baseline. Deployment excludes ambient source credentials.
 func localBuildEnvironment() []string {
 	env := SetEnv(NativeEnvironment(), map[string]string{"CONTAINER_RUNTIME": "docker"})
-	if home := os.Getenv("HOME"); home != "" {
-		env = SetEnv(env, map[string]string{"HOME": home})
+	for _, key := range []string{"HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK",
+		"https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy",
+		"GIT_SSL_CAINFO", "SSL_CERT_FILE", "SSL_CERT_DIR"} {
+		if value, ok := os.LookupEnv(key); ok && value != "" {
+			env = SetEnv(env, map[string]string{key: value})
+		}
 	}
 	return env
 }

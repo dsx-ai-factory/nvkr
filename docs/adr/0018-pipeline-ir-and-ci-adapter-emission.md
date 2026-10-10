@@ -571,8 +571,9 @@ Original checkout and receipt directories are rechecked
 through the held workspace before receipt reuse or commit. This capability grants filesystem access only, not
 producer observation, installed-content, publication or qualification authority. Ordinary Local fetch retains
 developer Git/SSH transport without the held workspace guarantees. Its shared Git-command owner excludes
-ambient global callbacks, templates and line-ending conversion, projects only developer credential settings
-into network fetch, and admits explicit absolute local-repository redirects. Checkout/status receive no
+ambient global callbacks, templates and line-ending conversion, projects selected developer credential and
+proxy/TLS trust settings into network fetch, and admits explicit absolute local-repository redirects. Arbitrary
+SSH command overrides remain excluded. Checkout/status receive no
 developer HOME or helper. Repository-local filters, includes and delegated object sources fail admission.
 Real Git fixtures exercise exact checkout bytes, callback exclusion, authenticated fetch and local redirects;
 they do not establish current private-source access or a held workspace receipt.

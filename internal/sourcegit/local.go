@@ -135,7 +135,10 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 		for _, field := range environment {
 			key, _, _ := strings.Cut(field, "=")
 			switch key {
-			case "HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY":
+			case "HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK",
+				"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy",
+				"NO_PROXY", "no_proxy", "ALL_PROXY", "all_proxy",
+				"GIT_SSL_CAINFO", "SSL_CERT_FILE", "SSL_CERT_DIR":
 				child = append(child, field)
 			}
 		}

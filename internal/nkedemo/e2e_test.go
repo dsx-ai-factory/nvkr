@@ -6,6 +6,7 @@ package nkedemo
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -44,6 +45,7 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	run.NKDCTL, run.Runs = built.NKDCTL, built.Runs
+	run.DemoExecutable = filepath.Join(filepath.Dir(built.NKDCTL), "nke-demo")
 	if err = Run(ctx, run); err != nil {
 		t.Fatal(err)
 	}

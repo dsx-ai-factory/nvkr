@@ -201,3 +201,34 @@ func TestLocalGitPreservesImplicitCredentialBoolean(t *testing.T) {
 		t.Fatal("Git's implicit credential boolean changed during projection")
 	}
 }
+
+func TestLocalGitTransportEnvironmentIsFetchOnly(t *testing.T) {
+	transport := []string{"HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy",
+		"NO_PROXY", "no_proxy", "ALL_PROXY", "all_proxy", "GIT_SSL_CAINFO", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+	environment := []string{"PATH=" + os.Getenv("PATH"), "GIT_SSH_COMMAND=unselected-callback", "UNRELATED_SECRET=not-admitted"}
+	for _, key := range transport {
+		environment = append(environment, key+"=synthetic-transport-setting")
+	}
+	for _, operation := range []string{"init", "fetch", "checkout", "status"} {
+		t.Run(operation, func(t *testing.T) {
+			cmd, err := LocalCommand(t.Context(), environment, "", operation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range transport {
+				want := ""
+				if operation == "fetch" {
+					want = "synthetic-transport-setting"
+				}
+				if got := localEnvironmentValue(cmd.Env, key); got != want {
+					t.Fatalf("%s inherited %s=%q, want %q", operation, key, got, want)
+				}
+			}
+			for _, key := range []string{"GIT_SSH_COMMAND", "UNRELATED_SECRET"} {
+				if got := localEnvironmentValue(cmd.Env, key); got != "" {
+					t.Fatalf("%s inherited unselected %s", operation, key)
+				}
+			}
+		})
+	}
+}

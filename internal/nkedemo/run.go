@@ -314,6 +314,13 @@ func run(ctx context.Context, cfg Config) (result error) {
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
+	if err := networkPlatform(); err != nil {
+		return err
+	}
+	probeExecutable, err := admitNetworkProbeExecutable(ctx, cfg.DemoExecutable)
+	if err != nil {
+		return err
+	}
 	admitted, err := admitDemo(ctx, cfg)
 	if err != nil {
 		return err
@@ -328,7 +335,7 @@ func run(ctx context.Context, cfg Config) (result error) {
 		return err
 	}
 	runner := Runner{Work: admitted.out, Env: SetEnv(admitted.env, admitted.binding), Progress: cfg.Progress}
-	guard, err := NewNetworkGuard(ctx, runner, admitted.materials.KindCIDR)
+	guard, err := NewNetworkGuard(ctx, runner, admitted.materials.KindCIDR, probeExecutable)
 	if err != nil {
 		return err
 	}

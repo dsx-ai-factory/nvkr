@@ -31,10 +31,13 @@ type RunInputs struct {
 type Config struct {
 	NKECheckout string
 	NKDCTL      string
-	Runs        RunInputs
-	Out         string
-	Timeout     time.Duration
-	Progress    io.Writer
+	// DemoExecutable is supplied by the CLI or native Go integration, never
+	// authored YAML or flags. Only its fixed privileged-port helper is invoked.
+	DemoExecutable string
+	Runs           RunInputs
+	Out            string
+	Timeout        time.Duration
+	Progress       io.Writer
 }
 
 // BuildConfig selects the existing local launcher, which bootstraps and invokes

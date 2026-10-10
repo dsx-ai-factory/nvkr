@@ -7,10 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -59,7 +61,7 @@ func TestNetworkPlatformBeforeFilesystemOrCommands(t *testing.T) {
 		if recovery {
 			_, err = RecoverNetworkGuard(t.Context(), Runner{Work: "/does-not-exist"})
 		} else {
-			_, err = NewNetworkGuard(t.Context(), Runner{Work: "/does-not-exist"}, "172.18.0.0/16")
+			_, err = NewNetworkGuard(t.Context(), Runner{Work: "/does-not-exist"}, "172.18.0.0/16", "/does-not-exist")
 		}
 		var coded *nkderr.Error
 		if !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability {
@@ -818,6 +820,222 @@ func TestNetworkUnattendedSudoAdmissionDiagnostics(t *testing.T) {
 			}
 			if _, statErr := os.Lstat(filepath.Join(g.Work, networkJournal)); !errors.Is(statErr, os.ErrNotExist) {
 				t.Fatalf("network journal created after failed sudo prerequisite: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestNetworkProbeExecutableAdmission(t *testing.T) {
+	for _, name := range []string{"valid", "empty", "relative", "missing", "directory", "no-exec", "group-write", "other-write", "symlink"} {
+		t.Run(name, func(t *testing.T) {
+			dir := privateTestDir(t)
+			path := filepath.Join(dir, "nke-demo")
+			if err := os.WriteFile(path, []byte("fixture"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			switch name {
+			case "empty":
+				path = ""
+			case "relative":
+				path = "nke-demo"
+			case "missing":
+				path += "-missing"
+			case "directory":
+				path = dir
+			case "no-exec", "group-write", "other-write":
+				mode := map[string]os.FileMode{"no-exec": 0o600, "group-write": 0o720, "other-write": 0o702}[name]
+				if err := os.Chmod(path, mode); err != nil {
+					t.Fatal(err)
+				}
+			case "symlink":
+				link := path + "-link"
+				if err := os.Symlink(path, link); err != nil {
+					t.Fatal(err)
+				}
+				path = link
+			}
+			resolved, err := admitNetworkProbeExecutable(t.Context(), path)
+			if name == "valid" || name == "symlink" {
+				if err != nil || resolved != filepath.Join(dir, "nke-demo") {
+					t.Fatalf("selected executable=%q, %v", resolved, err)
+				}
+			} else {
+				var coded *nkderr.Error
+				if !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability || resolved != "" {
+					t.Fatalf("unsafe executable admitted=%q, %v", resolved, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNetworkPrivilegedProbeFixedTargetsAndFailure(t *testing.T) {
+	for _, name := range []string{"success", "occupied-tcp", "occupied-udp", "occupied-dhcp", "canceled", "cancel-after-first"} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if name == "canceled" {
+				cancel()
+			}
+			var calls []string
+			err := probeNetworkPrivilegedPorts(ctx, func(udp bool, port int) error {
+				calls = append(calls, fmt.Sprintf("%t:%d", udp, port))
+				if name == "cancel-after-first" {
+					cancel()
+				}
+				if name == "occupied-tcp" || name == "occupied-udp" && udp || name == "occupied-dhcp" && port == 67 {
+					return unix.EADDRINUSE
+				}
+				return nil
+			})
+			want := []string{"false:53", "true:53", "true:67"}
+			switch name {
+			case "success":
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "canceled":
+				want = nil
+			case "occupied-tcp", "cancel-after-first":
+				want = want[:1]
+			case "occupied-udp":
+				want = want[:2]
+			}
+			if !slices.Equal(calls, want) {
+				t.Fatalf("fixed helper targets=%v, want %v", calls, want)
+			}
+			if name != "success" {
+				var coded *nkderr.Error
+				cause := error(unix.EADDRINUSE)
+				if strings.HasPrefix(name, "cancel") {
+					cause = context.Canceled
+				}
+				if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !errors.Is(err, cause) {
+					t.Fatalf("helper failure=%v", err)
+				}
+			}
+		})
+	}
+	var nilContext context.Context
+	if err := ProbeNetworkPrivilegedPorts(nilContext); err == nil {
+		t.Fatal("nil helper context admitted")
+	}
+	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
+		var coded *nkderr.Error
+		if err := ProbeNetworkPrivilegedPorts(t.Context()); !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability {
+			t.Fatalf("helper platform admission=%v", err)
+		}
+	}
+}
+
+func TestNetworkPrivilegedProbeFailureBeforeJournal(t *testing.T) {
+	for _, cause := range []error{&CommandError{Phase: "network-007", ExitCode: 42, Cause: unix.EADDRINUSE}, context.Canceled, ErrUnjoined} {
+		t.Run(cause.Error(), func(t *testing.T) {
+			g := networkFixture(t)
+			g.journal = false
+			g.lockPath = filepath.Join(g.Work, "test.lock")
+			g.policyPath = filepath.Join(g.Work, "bridge.conf")
+			helper, err := resolveExisting("/usr/bin/true")
+			if err != nil {
+				t.Fatal(err)
+			}
+			g.helperPath = helper
+			g.probeExecutable = "/selected/bootstrap/nke-demo"
+			called := false
+			g.capture = func(_ context.Context, args []string, privileged bool) ([]byte, error) {
+				if args[0] == g.probeExecutable {
+					called = true
+					if !privileged || !slices.Equal(args, []string{g.probeExecutable, "network-port-probe"}) {
+						t.Fatalf("non-fixed privileged probe=%v privileged=%t", args, privileged)
+					}
+					return nil, cause
+				}
+				if privileged && !slices.Equal(args, []string{"true"}) {
+					t.Fatalf("mutation before port admission=%v", args)
+				}
+				if args[0] == "ip" {
+					return []byte("[]"), nil
+				}
+				return nil, nil
+			}
+			err = g.admit(t.Context())
+			if !called || !errors.Is(err, cause) || !strings.Contains(err.Error(), "privileged DNS/DHCP port admission") {
+				t.Fatalf("port child failure=%v called=%t", err, called)
+			}
+			if g.journal || g.unjoined.Load() != errors.Is(cause, ErrUnjoined) {
+				t.Fatal("failed helper changed journal/join authority")
+			}
+			if _, err := os.Lstat(filepath.Join(g.Work, networkJournal)); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("journal exists after failed child", err)
+			}
+		})
+	}
+}
+
+func TestNetworkPrivilegedProbeChildError(t *testing.T) {
+	g := networkFixture(t)
+	g.journal = false
+	g.probeExecutable = "/selected/bootstrap/nke-demo"
+	tools := privateTestDir(t)
+	script := "#!/bin/sh\n[ \"$#\" = 7 ] && [ \"$1\" = -n ] && [ \"$2\" = timeout ] && [ \"$3\" = --signal=TERM ] && [ \"$4\" = --kill-after=5 ] && [ \"$5\" = 25 ] && [ \"$6\" = /selected/bootstrap/nke-demo ] && [ \"$7\" = network-port-probe ] || exit 99\nprintf '%s\\n' 'private probe diagnostic' >&2\nexit 42\n"
+	if err := os.WriteFile(filepath.Join(tools, "sudo"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	g.runner.Env = []string{"PATH=" + tools + ":/usr/bin:/bin"}
+	err := g.probePrivilegedPorts(t.Context())
+	var command *CommandError
+	if !errors.As(err, &command) || command.ExitCode != 42 || command.Phase != "network-001" || !strings.Contains(err.Error(), "privileged DNS/DHCP") || strings.Contains(err.Error(), "private probe diagnostic") {
+		t.Fatalf("bounded privileged child invocation/error=%v", err)
+	}
+	if _, err = os.Lstat(filepath.Join(g.Work, networkJournal)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("failed privileged child created journal", err)
+	}
+}
+
+func TestNetworkPortProbeOccupiedSocket(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("IP_FREEBIND probe is Linux-only")
+	}
+	for _, row := range []struct {
+		udp  bool
+		port int
+	}{{false, 0}, {true, 0}, {false, 53}, {true, 53}, {true, 67}} {
+		t.Run(fmt.Sprintf("UDP=%t/port=%d", row.udp, row.port), func(t *testing.T) {
+			if row.port != 0 && (runtime.GOARCH != "arm64" || os.Geteuid() != 0) {
+				t.Skip("fixed privileged sockets require isolated native ARM64 root fixture")
+			}
+			var address string
+			var closeSocket func() error
+			target := net.JoinHostPort("0.0.0.0", strconv.Itoa(row.port))
+			if row.udp {
+				held, err := net.ListenPacket("udp4", target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				address, closeSocket = held.LocalAddr().String(), held.Close
+			} else {
+				held, err := net.Listen("tcp4", target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				address, closeSocket = held.Addr().String(), held.Close
+			}
+			t.Cleanup(func() { _ = closeSocket() })
+			_, raw, err := net.SplitHostPort(address)
+			if err != nil {
+				t.Fatal(err)
+			}
+			port, err := strconv.Atoi(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if row.port == 0 {
+				err = networkProbePort(row.udp, port)
+			} else {
+				err = ProbeNetworkPrivilegedPorts(t.Context())
+			}
+			if !errors.Is(err, unix.EADDRINUSE) {
+				t.Fatalf("occupied socket admission=%v", err)
 			}
 		})
 	}

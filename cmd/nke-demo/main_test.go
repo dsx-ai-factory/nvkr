@@ -43,6 +43,11 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 		{"build-position", []string{"build", "unexpected"}, nkderr.CodeUsage},
 		{"restore-position", []string{"restore", "unexpected"}, nkderr.CodeUsage},
 		{"e2e-position", []string{"e2e", "unexpected"}, nkderr.CodeUsage},
+		{"probe-position", []string{"network-port-probe", "53"}, nkderr.CodeUsage},
+		{"probe-address", []string{"network-port-probe", "--address", "127.0.0.1"}, nkderr.CodeUsage},
+		{"probe-config", []string{"network-port-probe", "--config", "/must-not-read"}, nkderr.CodeUsage},
+		{"probe-verbose", []string{"network-port-probe", "--verbose"}, nkderr.CodeUsage},
+		{"probe-help", []string{"network-port-probe", "--help"}, ""},
 		{"e2e-retained-input-flag", []string{"e2e", "--os-run", "retained"}, nkderr.CodeUsage},
 		{"config-empty", []string{"run", "--config="}, nkderr.CodeUsage},
 		{"restore-missing", []string{"restore"}, nkderr.CodeUsage},
@@ -90,6 +95,21 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 				t.Fatal("help or invalid input created build logs")
 			}
 		})
+	}
+}
+
+func TestNetworkPortHelperPlatformAndCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	err := executeRoot(ctx, newCommand(io.Discard, io.Discard, demoActions{}), []string{"network-port-probe"})
+	assertCode(t, err, nkderr.CodePreflightFailed)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("helper cancellation lost: %v", err)
+	}
+	root := newCommand(io.Discard, io.Discard, demoActions{})
+	command, _, err := root.Find([]string{"network-port-probe"})
+	if err != nil || !command.Hidden {
+		t.Fatal("network helper must remain hidden", err)
 	}
 }
 

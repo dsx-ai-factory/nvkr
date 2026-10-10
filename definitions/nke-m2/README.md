@@ -47,7 +47,8 @@ admits only `main`; the temporary PR #97 branch-test exception has been removed 
 cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
-Packer pins for the nine selected producers per architecture, retaining the separate BuildKit pin.
+Packer pin for the nine selected AMD64 producers only, retaining the separate BuildKit pin.
+The OS catalog directly retains its published ARM64 Docker Packer pin.
 The two inspector profiles use measured executable hashes and published native image manifests.
 Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
 224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to

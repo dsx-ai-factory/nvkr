@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
@@ -40,6 +41,44 @@ func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
 				t.Fatal("deployment inherited developer Git HOME")
 			}
 		})
+	}
+}
+
+func TestBuildTransportSettingsReachOnlyGitFetch(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("GIT_SSH_COMMAND", "unselected-callback")
+	keys := []string{"https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy",
+		"GIT_SSL_CAINFO", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+	for _, key := range keys {
+		t.Setenv(key, "synthetic-transport-setting")
+	}
+	build := localBuildEnvironment()
+	for _, operation := range []string{"fetch", "init", "checkout", "status"} {
+		t.Run(operation, func(t *testing.T) {
+			cmd, err := sourcegit.LocalCommand(t.Context(), build, "", operation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range keys {
+				want := ""
+				if operation == "fetch" {
+					want = "synthetic-transport-setting"
+				}
+				if got := environmentValue(cmd.Env, key); got != want {
+					t.Fatalf("%s received %s=%q, want %q", operation, key, got, want)
+				}
+			}
+			if environmentValue(cmd.Env, "GIT_SSH_COMMAND") != "" {
+				t.Fatal("unselected SSH command reached Git")
+			}
+		})
+	}
+	deployment := NativeEnvironment()
+	for _, key := range append(keys, "GIT_SSH_COMMAND") {
+		if environmentValue(deployment, key) != "" {
+			t.Fatalf("deployment inherited source acquisition setting %s", key)
+		}
 	}
 }
 

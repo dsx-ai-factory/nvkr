@@ -97,6 +97,29 @@ This is a retained-artifact replay, not a fresh build. For build-plus-deploy
 use `e2e --config` from the quickstart; E2E derives its own fresh paths and
 rejects retained Run references.
 
+Keep the deployment terminal open for phase progress. In a second terminal,
+set `DEMO_OUT` to the exact `--out` directory from that command. Once management
+creation has produced `site/kubeconfig`, watch site installation and provisioning:
+
+```sh
+"$DEMO_OUT/site/tools/kubectl" --kubeconfig "$DEMO_OUT/site/kubeconfig" \
+  get events --all-namespaces --watch
+```
+
+Inspect Cluster API objects with the same executable and kubeconfig using
+`get clusters,machines --all-namespaces`. Once tenant provisioning has produced
+`site/tenant-kubeconfig`, watch tenant nodes:
+
+```sh
+"$DEMO_OUT/site/tools/kubectl" --kubeconfig "$DEMO_OUT/site/tenant-kubeconfig" \
+  get nodes --watch
+```
+
+`virsh -c qemu:///session list --all` shows the QCOW2 guests. Detailed private
+stage logs remain under `"$DEMO_OUT/site"`; do not post kubeconfigs or logs without
+checking for credentials. A failed network preflight has not created these
+clusters. The adapter cleans up owned clusters and guests after acceptance.
+
 ## Local safety boundary
 
 Use a dedicated single-user Ubuntu VM. The adapter owns a private management

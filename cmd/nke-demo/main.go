@@ -31,7 +31,14 @@ func main() {
 }
 func execute(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	return executeRoot(ctx, newCommand(out, diagnostics, demoActions{
-		run: nkedemo.Run, build: nkedemo.BuildArtifacts, prepare: nkedemo.PrepareInstaller, restore: nkedemo.Restore, load: nkedemo.LoadDemoFile,
+		run: func(ctx context.Context, cfg nkedemo.Config) error {
+			path, err := os.Executable()
+			if err != nil {
+				return nkderr.Wrap(nkderr.CodeEngineCapability, err, "select native demo network probe executable")
+			}
+			cfg.DemoExecutable = path
+			return nkedemo.Run(ctx, cfg)
+		}, build: nkedemo.BuildArtifacts, prepare: nkedemo.PrepareInstaller, restore: nkedemo.Restore, load: nkedemo.LoadDemoFile,
 	}), args)
 }
 
@@ -67,6 +74,15 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 	root.SetErr(diagnostics)
 	root.PersistentFlags().StringVar(&config, "config", "", "explicit version-1 local-demo YAML file (changed flags override it)")
 	root.PersistentFlags().Bool("verbose", false, "stream raw public build output in addition to stage boundaries")
+	root.AddCommand(&cobra.Command{
+		Use: "network-port-probe", Hidden: true, Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cmd.Flags().Changed("config") || cmd.Flags().Changed("verbose") {
+				return nkderr.New(nkderr.CodeUsage, "network port probe accepts no configuration or flags")
+			}
+			return nkedemo.ProbeNetworkPrivilegedPorts(cmd.Context())
+		},
+	})
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
 	root.InitDefaultCompletionCmd()
 	for _, command := range root.Commands() {

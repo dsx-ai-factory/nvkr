@@ -124,6 +124,7 @@ type NetworkGuard struct {
 	stopDNSHook            func(context.Context) error
 	helperPath, policyPath string
 	lockPath               string
+	probeExecutable        string
 }
 
 func networkPlatform() error {
@@ -187,11 +188,15 @@ func validateNetworkKind(kindCIDR string) error {
 
 // NewNetworkGuard admits the host, resources, private workspace and kernel lock,
 // then durably records an empty intent ledger before returning a Start obligation.
-func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR string) (*NetworkGuard, error) {
+func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR, demoExecutable string) (*NetworkGuard, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
 	if err := networkPlatform(); err != nil {
+		return nil, err
+	}
+	probeExecutable, err := admitNetworkProbeExecutable(ctx, demoExecutable)
+	if err != nil {
 		return nil, err
 	}
 	for _, name := range networkTools {
@@ -203,11 +208,79 @@ func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR string) (*Netw
 	if err != nil {
 		return nil, err
 	}
+	g.probeExecutable = probeExecutable
 	if err = g.admit(ctx); err != nil {
 		g.releaseHandles()
 		return nil, err
 	}
 	return g, nil
+}
+
+func admitNetworkProbeExecutable(ctx context.Context, path string) (string, error) {
+	if err := requireContext(ctx); err != nil {
+		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "network probe executable context")
+	}
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return "", nkderr.New(nkderr.CodeEngineCapability, "require explicitly selected absolute native demo executable for network admission")
+	}
+	resolved, err := resolveExisting(path)
+	if err != nil {
+		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "resolve network probe executable")
+	}
+	held, info, err := securepath.OpenRegular(resolved)
+	if err != nil {
+		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "open network probe executable")
+	}
+	defer held.Close()
+	var st unix.Stat_t
+	if err = unix.Fstat(int(held.Fd()), &st); err != nil {
+		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "inspect network probe executable")
+	}
+	if info.Mode().Perm()&0o111 == 0 || st.Mode&0o6022 != 0 || st.Uid != 0 && st.Uid != uint32(os.Getuid()) {
+		return "", nkderr.New(nkderr.CodeEngineCapability, "network probe requires an executable owned by root/current user without set-ID or group/other write permissions")
+	}
+	if err = ctx.Err(); err != nil {
+		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "network probe executable context")
+	}
+	return resolved, nil
+}
+
+// ProbeNetworkPrivilegedPorts is the fixed native helper: it accepts no target,
+// configuration or workspace and performs no durable host mutation. The guard
+// invokes it through its existing bounded sudo child before recording intent.
+func ProbeNetworkPrivilegedPorts(ctx context.Context) error {
+	if err := requireContext(ctx); err != nil {
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "network port probe context")
+	}
+	if err := networkPlatform(); err != nil {
+		return err
+	}
+	return probeNetworkPrivilegedPorts(ctx, networkProbePort)
+}
+
+func probeNetworkPrivilegedPorts(ctx context.Context, probe func(bool, int) error) error {
+	for _, row := range []struct {
+		udp  bool
+		port int
+	}{{false, 53}, {true, 53}, {true, 67}} {
+		if err := requireContext(ctx); err != nil {
+			return nkderr.Wrap(nkderr.CodePreflightFailed, err, "network port probe context")
+		}
+		if err := probe(row.udp, row.port); err != nil {
+			return nkderr.Wrap(nkderr.CodePreflightFailed, err, "bind demo port %d (UDP=%t)", row.port, row.udp)
+		}
+	}
+	return nil
+}
+
+func (g *NetworkGuard) probePrivilegedPorts(ctx context.Context) error {
+	if g.probeExecutable == "" {
+		return nkderr.New(nkderr.CodeEngineCapability, "network port probe executable was not admitted")
+	}
+	if _, err := g.Command(ctx, []string{g.probeExecutable, "network-port-probe"}, true); err != nil {
+		return fmt.Errorf("privileged DNS/DHCP port admission: %w", err)
+	}
+	return nil
 }
 
 func (g *NetworkGuard) acquireLock() error {
@@ -315,10 +388,13 @@ func (g *NetworkGuard) admit(ctx context.Context) error {
 			}
 		}
 	}
+	if err = g.probePrivilegedPorts(ctx); err != nil {
+		return err
+	}
 	for _, row := range []struct {
 		udp  bool
 		port int
-	}{{false, 53}, {true, 53}, {true, 67}, {false, 18080}, {false, 7777}, {false, 10179}} {
+	}{{false, 18080}, {false, 7777}, {false, 10179}} {
 		if err = networkProbePort(row.udp, row.port); err != nil {
 			return err
 		}

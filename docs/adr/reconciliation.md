@@ -196,8 +196,8 @@ fresh tenant acceptance.
 
 Ordinary local source Git and installer preparation now use the existing
 `internal/sourcegit` owner to exclude ambient global hooks, fsmonitor, filters,
-templates and line-ending conversion. Developer credential settings are projected
-only into network fetch; explicit absolute local-repository redirects remain
+templates and line-ending conversion. Developer credential and selected proxy/TLS
+trust settings are projected only into network fetch; explicit absolute local-repository redirects remain
 available. Real Git fixtures cover exact checkout bytes, callback exclusion,
 local redirects and authenticated fetch. These fixtures are not proof of current
 private-repository access; the stricter held hosted-source admission is unchanged.
@@ -233,7 +233,12 @@ Neither suite alone proves actual registry transport, boot or deployment.
 [Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise
 bounded subprocess cancellation and joining; CLI tests exercise output-failure
-cancellation with controlled callbacks. These do not prove real SIGINT during
+cancellation with controlled callbacks. DNS/DHCP port admission now invokes a
+fixed Go helper through the existing bounded sudo runner before recording host
+intent; executable admission precedes artifact inspection. Controlled tests
+cover fixed targets, rejected helper arguments, failures before journaling and
+child error propagation. This does not prove a fresh tenant deployment.
+These tests do not prove real SIGINT during
 NKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
 at every build/deployment phase. Network-only recovery uses version-2 journals
 and never kills serialized PIDs; restore legacy live controls before upgrading.

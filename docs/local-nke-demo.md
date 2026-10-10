@@ -159,6 +159,12 @@ sudo -n true
 
 E2E also checks this before fetching its installer or starting artifact builds.
 
+Network admission uses a fixed Go helper under bounded `sudo -n` to bind-check
+DNS/DHCP ports before recording host-control intent. The main demo stays
+unprivileged: keep the host's default privileged-port threshold and do not grant
+file capabilities to the demo executable. DNS/DHCP capabilities are granted only
+to the private dnsmasq copy and journaled for restoration.
+
 If it says `interactive authentication is required`, stop and arrange approved
 non-interactive sudo access with the host administrator. Deployment and cleanup
 use `sudo -n` for host networking and temporary grants. A one-time `sudo -v`
