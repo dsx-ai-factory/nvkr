@@ -38,6 +38,7 @@ type BuildFile struct {
 }
 
 type RunFile struct {
+	Network        string        `yaml:"network" mapstructure:"network"`
 	NKECheckout    string        `yaml:"nkeCheckout" mapstructure:"nkeCheckout"`
 	NKDCTL         string        `yaml:"nkdctl" mapstructure:"nkdctl"`
 	Runs           RunFileInputs `yaml:"runs" mapstructure:"runs"`
@@ -112,6 +113,7 @@ func LoadDemoFile(ctx context.Context, path string) (DemoFile, error) {
 	loader := viper.New()
 	loader.SetConfigType("yaml")
 	loader.SetDefault("build.jobs", 1)
+	loader.SetDefault("run.network", "ovn")
 	loader.SetDefault("run.timeoutSeconds", 3600)
 	if err = loader.ReadConfig(bytes.NewReader(raw)); err != nil {
 		return result, configUsage("cannot decode demo configuration")
@@ -166,11 +168,28 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	run := file.Run
+	network, err := normalizeNetwork(run.Network)
+	if err != nil {
+		return Config{}, err
+	}
 	if file.Version != 1 || (run.NKECheckout != "" && !configString(run.NKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < 300 || run.TimeoutSeconds > 3600 {
 		return Config{}, configUsage("run requires version 1, out, valid optional nkeCheckout and timeoutSeconds from 300 to 3600")
 	}
-	return Config{NKECheckout: run.NKECheckout, NKDCTL: run.NKDCTL, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+	return Config{Network: network, NKECheckout: run.NKECheckout, NKDCTL: run.NKDCTL, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
+}
+
+// normalizeNetwork keeps the maintained OVN path as the default. The alternate
+// mode is explicitly diagnostic: Kind's default CNI on site, Calico on tenant.
+func normalizeNetwork(network string) (string, error) {
+	switch network {
+	case "", "ovn":
+		return "ovn", nil
+	case "kind-calico":
+		return network, nil
+	default:
+		return "", configUsage("network must be ovn or kind-calico (temporary diagnostic)")
+	}
 }
 
 func (file DemoFile) RunConfig(progress io.Writer) (Config, error) {

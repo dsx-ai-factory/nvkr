@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -22,6 +23,45 @@ func TestTenantSelectsMaintainedOVNChartStream(t *testing.T) {
 	request := NewTenantRequest("owned")
 	if request.CNI != "ovn-kubernetes" || request.CNIVersion != "1.5.18" {
 		t.Fatalf("tenant must select the packaged NVIDIA OVN chart stream: %+v", request)
+	}
+}
+
+func TestTenantNetworkSelectionIsExplicitAndPreservesTopology(t *testing.T) {
+	for _, test := range []struct {
+		name, network, cni, version string
+	}{
+		{"default", "", "ovn-kubernetes", "1.5.18"},
+		{"maintained", "ovn", "ovn-kubernetes", "1.5.18"},
+		{"temporary diagnostic", "kind-calico", "calico", "3.30.1"},
+		{"unknown", "calico", "", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			request, err := newTenantRequest("owned", test.network)
+			if test.cni == "" {
+				assertConfigUsage(t, err)
+				if !reflect.DeepEqual(request, TenantRequest{}) {
+					t.Fatalf("unknown network must reject without request: %+v %v", request, err)
+				}
+				return
+			}
+			if err != nil || request.CNI != test.cni || request.CNIVersion != test.version {
+				t.Fatalf("request selected unexpected CNI: %+v %v", request, err)
+			}
+			request.CNI, request.CNIVersion = "ovn-kubernetes", "1.5.18"
+			if !reflect.DeepEqual(request, NewTenantRequest("owned")) {
+				t.Fatal("network selection changed unrelated tenant topology")
+			}
+		})
+	}
+}
+
+func TestTenantRejectsUnknownNetworkBeforeInventory(t *testing.T) {
+	work := privateTestDir(t)
+	selected := tenant{name: "owned", network: "unknown", session: ManagementSession{Work: work, Runner: Runner{Work: work}}}
+	assertConfigUsage(t, selected.run(t.Context(), 0))
+	entries, err := os.ReadDir(work)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("rejected network left output: %v %v", entries, err)
 	}
 }
 

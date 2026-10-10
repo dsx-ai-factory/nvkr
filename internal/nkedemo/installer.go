@@ -23,9 +23,22 @@ import (
 // An explicit checkout remains read-only. Without one, Git prepares the pinned
 // commit in a new private attempt-local directory before the expensive build.
 func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (result Config, err error) {
+	run.Network, err = normalizeNetwork(run.Network)
+	if err != nil {
+		return Config{}, err
+	}
+	runner := Runner{Env: localBuildEnvironment(), Progress: run.Progress}
+	admitHost := func() error {
+		if run.Network == "ovn" {
+			if err := admitSiteOVNKernel(); err != nil {
+				return err
+			}
+		}
+		return admitSimulatorEndpoint(ctx, runner)
+	}
 	boundary := beginProgress(run.Progress, "installer-preparation", PhaseStarted, PhaseFinished, PhaseFailed)
 	defer func() { boundary.finish(err) }()
-	result, err = prepareInstaller(ctx, build, run, Runner{Env: localBuildEnvironment(), Progress: run.Progress}, admitSiteOVNKernel)
+	result, err = prepareInstaller(ctx, build, run, runner, admitHost)
 	if err != nil {
 		code := nkderr.CodePreflightFailed
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -36,7 +49,7 @@ func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (resul
 	return result, nil
 }
 
-func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner Runner, admitKernel func() error) (result Config, returnErr error) {
+func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner Runner, admitHost func() error) (result Config, returnErr error) {
 	if err := requireContext(ctx); err != nil {
 		return result, err
 	}
@@ -71,10 +84,10 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 	if err = admitInstallerImages(ctx, runner); err != nil {
 		return result, err
 	}
-	if admitKernel == nil {
-		return result, errors.New("site OVN kernel admission required before installer preparation")
+	if admitHost == nil {
+		return result, errors.New("host admission required before installer preparation")
 	}
-	if err = admitKernel(); err != nil {
+	if err = admitHost(); err != nil {
 		return result, err
 	}
 	source := "https://github.com/dsx-ai-factory/nke.git"

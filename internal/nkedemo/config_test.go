@@ -69,7 +69,7 @@ func TestDemoFileTypedConversion(t *testing.T) {
 		t.Fatalf("build=%+v error=%v", build, err)
 	}
 	run, err := file.RunConfig(&progress)
-	expected := Config{NKECheckout: "/native/nke-installer", NKDCTL: "/native/nkdctl", Out: "/native/output", Timeout: 900 * time.Second, Progress: &progress, Runs: RunInputs{
+	expected := Config{Network: "ovn", NKECheckout: "/native/nke-installer", NKDCTL: "/native/nkdctl", Out: "/native/output", Timeout: 900 * time.Second, Progress: &progress, Runs: RunInputs{
 		OS: "/native/runs/os", Components: "/native/runs/components", Providers: "/native/runs/providers", Site: "/native/runs/site", Tools: "/native/runs/tools", Profiles: "/native/runs/profiles", Simulator: "/native/runs/simulator"}}
 	if err != nil || run != expected {
 		t.Fatalf("run=%+v error=%v", run, err)
@@ -83,6 +83,40 @@ func TestDemoFileTypedConversion(t *testing.T) {
 	actual, err := os.ReadFile(path)
 	if err != nil || string(actual) != fullDemoYAML || progress.Len() != 0 {
 		t.Fatal("loading and conversion must not write files or progress")
+	}
+}
+
+func TestDemoNetworkSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name, network, expected string
+	}{
+		{"default", "", "ovn"},
+		{"maintained", "ovn", "ovn"},
+		{"temporary diagnostic", "kind-calico", "kind-calico"},
+		{"unknown", "calico", ""},
+		{"case alias", "OVN", ""},
+		{"whitespace", " ovn", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			file := DemoFile{Version: 1, Build: BuildFile{Repo: "/native/repo", Attempt: "fresh", Jobs: 1}, Run: RunFile{Network: tc.network, Out: "/native/output", TimeoutSeconds: 3600}}
+			_, run, err := file.E2EConfig(nil)
+			if tc.expected == "" {
+				assertConfigUsage(t, err)
+				return
+			}
+			if err != nil || run.Network != tc.expected {
+				t.Fatalf("network=%q error=%v", run.Network, err)
+			}
+			contents := strings.Replace(fullDemoYAML, "run:\n", "run:\n  network: "+tc.expected+"\n", 1)
+			loaded, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))
+			if err != nil {
+				t.Fatal(err)
+			}
+			configured, err := loaded.RunConfig(nil)
+			if err != nil || configured.Network != tc.expected {
+				t.Fatalf("configured network=%q error=%v", configured.Network, err)
+			}
+		})
 	}
 }
 

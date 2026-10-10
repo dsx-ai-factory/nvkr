@@ -54,6 +54,8 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 		{"restore-empty", []string{"restore", "--work="}, nkderr.CodeUsage},
 		{"bad-timeout-type", []string{"run", "--timeout", "not-seconds"}, nkderr.CodeUsage},
 		{"missing-timeout-value", []string{"run", "--timeout"}, nkderr.CodeUsage},
+		{"invalid-network", []string{"run", "--network", "unknown"}, nkderr.CodeUsage},
+		{"invalid-e2e-network", []string{"e2e", "--network", "unknown"}, nkderr.CodeUsage},
 		{"invalid-budget-low", []string{"run", "--timeout", "1"}, nkderr.CodePreflightFailed},
 		{"invalid-budget-high", []string{"run", "--timeout", "3601"}, nkderr.CodePreflightFailed},
 		{"invalid-budget-overflow", []string{"run", "--timeout", "9223372036854775807"}, nkderr.CodePreflightFailed},
@@ -95,6 +97,76 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 				t.Fatal("help or invalid input created build logs")
 			}
 		})
+	}
+}
+
+func TestDeploymentNetworkConfigAndFlagSelection(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	for _, tc := range []struct {
+		name, configured, flag, expected string
+	}{
+		{"default", "", "", "ovn"},
+		{"configured diagnostic", "kind-calico", "", "kind-calico"},
+		{"flag diagnostic", "ovn", "kind-calico", "kind-calico"},
+		{"explicit maintained override", "kind-calico", "ovn", "ovn"},
+		{"invalid configured", "unknown", "", ""},
+		{"invalid flag", "ovn", "unknown", ""},
+	} {
+		for _, operation := range []string{"run", "e2e"} {
+			t.Run(operation+"/"+tc.name, func(t *testing.T) {
+				calls := 0
+				actions := demoActions{
+					load: func(context.Context, string) (nkedemo.DemoFile, error) {
+						file := configuredFixture()
+						file.Run.Network = tc.configured
+						if operation == "e2e" {
+							file.Run.NKDCTL = ""
+							file.Run.Runs = nkedemo.RunFileInputs{}
+						}
+						return file, nil
+					},
+					prepare: func(_ context.Context, _ nkedemo.BuildConfig, cfg nkedemo.Config) (nkedemo.Config, error) {
+						calls++
+						if cfg.Network != tc.expected {
+							t.Fatalf("prepare network=%q want=%q", cfg.Network, tc.expected)
+						}
+						return cfg, nil
+					},
+					build: func(context.Context, nkedemo.BuildConfig) (nkedemo.BuiltInputs, error) {
+						calls++
+						return nkedemo.BuiltInputs{NKDCTL: "fresh"}, nil
+					},
+					run: func(_ context.Context, cfg nkedemo.Config) error {
+						calls++
+						if cfg.Network != tc.expected {
+							t.Fatalf("run network=%q want=%q", cfg.Network, tc.expected)
+						}
+						return nil
+					},
+				}
+				args := []string{operation, "--config", "explicit.yaml"}
+				if tc.flag != "" {
+					args = append(args, "--network", tc.flag)
+				}
+				var out bytes.Buffer
+				err := executeRoot(t.Context(), newCommand(&out, io.Discard, actions), args)
+				if tc.expected == "" {
+					assertCode(t, err, nkderr.CodeUsage)
+					if calls != 0 || out.Len() != 0 {
+						t.Fatal("invalid network started work or progress")
+					}
+					return
+				}
+				assertCode(t, err, "")
+				expectedCalls := 1
+				if operation == "e2e" {
+					expectedCalls = 3
+				}
+				if calls != expectedCalls {
+					t.Fatalf("calls=%d want=%d", calls, expectedCalls)
+				}
+			})
+		}
 	}
 }
 

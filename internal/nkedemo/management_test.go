@@ -121,6 +121,28 @@ func TestManagementConfigProjectionAdmitsExactSourceAndUsesIPv4(t *testing.T) {
 	}
 }
 
+func TestManagementTemporaryKindProjection(t *testing.T) {
+	source, err := os.ReadFile("testdata/pinned-kind.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"kind-calico", "invalid"} {
+		t.Run(mode, func(t *testing.T) {
+			projected, err := projectManagementConfigForNetwork(source, mode)
+			if mode == "invalid" {
+				if err == nil || projected != nil {
+					t.Fatal("unknown network accepted", err)
+				}
+				return
+			}
+			want := strings.Replace(strings.Replace(string(source), socketMount, "", 1), sourceKindIPFamily, "  ipFamily: ipv4\n  podSubnet: "+managementPodCIDR+"\n  serviceSubnet: "+managementServiceCIDR+"\n", 1)
+			if err != nil || string(projected) != want {
+				t.Fatal("Kind defaults not preserved", err)
+			}
+		})
+	}
+}
+
 func TestManagementRejectsUnsupportedHostBeforeOutput(t *testing.T) {
 	if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
 		t.Skip("unsupported-platform case does not apply")

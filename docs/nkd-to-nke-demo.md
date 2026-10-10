@@ -222,7 +222,11 @@ not migrate journals or execute the removed helper automatically. Do not change
 the journal's version number to bypass this boundary.
 
 Restoration takes the same kernel-released lock, never kills serialized PIDs
-and, on the same boot, waits for in-flight bounded sudo work. It can replay an
+and, on the same boot, waits 40 seconds for in-flight bounded sudo work. This
+safety wait may be quiet. A remaining private capability producer is reported
+with its currently observed PID and matched executable path; inspect that
+process before taking action. The diagnostic is not permission to kill other
+services, and recovery never signals the reported process. It can replay an
 interrupted rollback and reads back removals. An older attempt without the
 journal requires manual inspection. Recovery does not create E2E evidence.
 

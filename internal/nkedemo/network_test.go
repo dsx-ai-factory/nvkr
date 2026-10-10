@@ -52,6 +52,31 @@ func TestNetworkKindAdmission(t *testing.T) {
 	}
 }
 
+func TestRecoveryProducerDiagnosticsMatchExactExecutable(t *testing.T) {
+	g := &NetworkGuard{caps: []networkCapability{{Path: "/private/demo/dnsmasq", Binding: networkFileID{Device: 7, Inode: 19}}}}
+	for _, row := range []struct {
+		name          string
+		device, inode uint64
+		want          string
+	}{
+		{"exact", 7, 19, "/private/demo/dnsmasq"},
+		{"different-device", 8, 19, ""},
+		{"different-inode", 7, 20, ""},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			if got := g.ownedExecutablePath(row.device, row.inode); got != row.want {
+				t.Fatalf("executable=%q, want %q", got, row.want)
+			}
+		})
+	}
+	err := remainingProducerError(123, "/private/demo/dnsmasq")
+	for _, want := range []string{"PID 123", `"/private/demo/dnsmasq"`, "ps -p 123 -o pid=,args=", "recovery did not signal it"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("missing %q in %v", want, err)
+		}
+	}
+}
+
 func TestNetworkPlatformBeforeFilesystemOrCommands(t *testing.T) {
 	if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
 		t.Skip("native admitted platform exercised by opt-in real E2E")

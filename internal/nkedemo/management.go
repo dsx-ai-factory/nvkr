@@ -249,22 +249,40 @@ type managementAdmission struct {
 // exact source-byte admission. Downstream topology selects IPv4 NVIDIA OVN;
 // its source-owned Kind fixture disables the default CNI and kube-proxy.
 func projectManagementConfig(source []byte) ([]byte, error) {
+	return projectManagementConfigForNetwork(source, "ovn")
+}
+
+func projectManagementConfigForNetwork(source []byte, selected string) ([]byte, error) {
+	mode, err := normalizeNetwork(selected)
+	if err != nil {
+		return nil, err
+	}
 	text := string(source)
 	if plainSHA(source) != kindConfigHash || strings.Count(text, socketMount) != 1 || strings.Count(text, sourceKindIPFamily) != 1 {
 		return nil, errors.New("source-owned Kind configuration differs from inspected interface")
 	}
 	text = strings.Replace(text, socketMount, "", 1)
-	network := "  ipFamily: ipv4\n  disableDefaultCNI: true\n  kubeProxyMode: none\n  podSubnet: " + managementPodCIDR + "\n  serviceSubnet: " + managementServiceCIDR + "\n"
+	network := "  ipFamily: ipv4\n"
+	if mode == "ovn" {
+		network += "  disableDefaultCNI: true\n  kubeProxyMode: none\n"
+	}
+	network += "  podSubnet: " + managementPodCIDR + "\n  serviceSubnet: " + managementServiceCIDR + "\n"
 	return []byte(strings.Replace(text, sourceKindIPFamily, network, 1)), nil
 }
 
 func admitManagement(ctx context.Context, cfg Config) (managementAdmission, error) {
 	var admitted managementAdmission
+	mode, err := normalizeNetwork(cfg.Network)
+	if err != nil {
+		return admitted, err
+	}
 	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
 		return admitted, errors.New("require native Linux ARM64 inside the dedicated VM")
 	}
-	if err := admitSiteOVNKernel(); err != nil {
-		return admitted, err
+	if mode == "ovn" {
+		if err := admitSiteOVNKernel(); err != nil {
+			return admitted, err
+		}
 	}
 	runner := Runner{Env: NativeEnvironment(), Progress: cfg.Progress}
 	for _, name := range []string{"docker", "git", "python3"} {
@@ -302,7 +320,7 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 	if err != nil {
 		return admitted, err
 	}
-	config, err = projectManagementConfig(config)
+	config, err = projectManagementConfigForNetwork(config, mode)
 	if err != nil {
 		return admitted, err
 	}

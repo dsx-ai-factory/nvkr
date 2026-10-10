@@ -4,9 +4,11 @@
 package nkedemo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +20,7 @@ import (
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
-	for _, name := range []string{"remote", "local", "sibling", "override", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed"} {
+	for _, name := range []string{"remote", "local", "sibling", "override", "diagnostic", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed", "network-invalid-gateway", "simulator-port-busy"} {
 		t.Run(name, func(t *testing.T) {
 			root := privateTestDir(t)
 			repo, tools, calls := filepath.Join(root, "repo"), filepath.Join(root, "tools"), filepath.Join(root, "calls")
@@ -37,6 +39,10 @@ func TestPrepareInstallerPinnedAttempt(t *testing.T) {
 			write(filepath.Join(tools, "sudo"), "#!/bin/sh\n[ \"$1:$2\" = -n:true ] && [ \"${FAIL:-}\" != sudo ]\n")
 			imageCalls := filepath.Join(root, "image-calls")
 			write(filepath.Join(tools, "docker"), fmt.Sprintf("#!/bin/sh\nset -eu\nFAIL=%q\nIMAGE_CALLS=%q\nKIND=%q\nREGISTRY=%q\nKIND_ID=%q\n", name, imageCalls, kindNodeImage, registryImage, kindNodeID)+`
+if [ "$1:$2:$3" = network:inspect:kind ]; then
+  printf '[{"Id":"kind-network","Driver":"bridge","IPAM":{"Config":[{"Gateway":"invalid","Subnet":"172.19.0.0/16"}]}}]'
+  exit 0
+fi
 [ "$1:$2" = image:inspect ] || exit 99
 printf '%s\n' "$3" >>"$IMAGE_CALLS"
 if [ "$3" = "$KIND" ]; then
@@ -86,6 +92,9 @@ esac
 			runner := Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "CALLS=" + calls, "PIN=" + InstallerCommit, "FAIL=" + name, "FETCH_STARTED=" + started}}
 			build := BuildConfig{Repository: repo, AttemptPrefix: "fresh", Jobs: 2}
 			run := Config{Out: filepath.Join(root, "out"), Timeout: time.Hour}
+			if name == "diagnostic" || name == "network-invalid-gateway" {
+				run.Network = "kind-calico"
+			}
 			if name == "local" {
 				build.NKEClone = filepath.Join(root, "override")
 			}
@@ -160,9 +169,10 @@ esac
 				}()
 			}
 			imageFailure := strings.HasPrefix(name, "kind-") || strings.HasPrefix(name, "registry-")
+			networkFailure := name == "network-invalid-gateway"
 			var actual Config
 			var err error
-			if imageFailure {
+			if imageFailure || networkFailure {
 				t.Setenv("PATH", tools+":/usr/bin:/bin")
 				actual, err = PrepareInstaller(ctx, build, run)
 			} else {
@@ -172,15 +182,22 @@ esac
 					admission = func() error { return errors.New("controlled missing host modules") }
 				case "kernel-admission-missing":
 					admission = nil
+				case "simulator-port-busy":
+					listener, listenErr := net.Listen("tcp4", "127.0.0.1:18089")
+					if listenErr != nil {
+						t.Fatal(listenErr)
+					}
+					defer listener.Close()
+					admission = func() error { return admitSimulatorPort(ctx, "127.0.0.1") }
 				}
 				actual, err = prepareInstaller(ctx, build, run, runner, admission)
 			}
-			success := name == "remote" || name == "local" || name == "sibling" || name == "override"
+			success := name == "remote" || name == "local" || name == "sibling" || name == "override" || name == "diagnostic"
 			if (err == nil) != success {
 				t.Fatalf("result=%+v error=%v", actual, err)
 			}
 			if !success {
-				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure || strings.HasPrefix(name, "kernel") {
+				if name == "preflight" || name == "sudo" || strings.HasPrefix(name, "output-") || imageFailure || networkFailure || strings.HasPrefix(name, "kernel") || name == "simulator-port-busy" {
 					if _, e := os.Lstat(calls); !errors.Is(e, os.ErrNotExist) {
 						t.Fatal("failed preflight reached Git acquisition")
 					}
@@ -206,6 +223,17 @@ esac
 					}
 					if _, e := os.Lstat(run.Out); !errors.Is(e, os.ErrNotExist) {
 						t.Fatal("image failure created diagnostic output")
+					}
+				}
+				if networkFailure || name == "simulator-port-busy" {
+					var coded *nkderr.Error
+					if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed {
+						t.Fatalf("missing coded early network admission: %v", err)
+					}
+					for _, path := range []string{filepath.Join(repo, ".nkd"), run.Out} {
+						if _, e := os.Lstat(path); !errors.Is(e, os.ErrNotExist) {
+							t.Fatal("network admission failure created output or acquired source")
+						}
 					}
 				}
 				if name == "sudo" {
@@ -257,13 +285,22 @@ esac
 					t.Fatal("Git did not fetch and detach the exact pin")
 				}
 			}
-			if actual.Out != run.Out || actual.Timeout != run.Timeout {
+			if actual.Out != run.Out || actual.Timeout != run.Timeout || actual.Network != run.Network {
 				t.Fatal("preparation changed deployment intent")
 			}
 			if raw, e := os.ReadFile(imageCalls); e != nil || string(raw) != kindNodeImage+"\n"+registryImage+"\n" {
 				t.Fatalf("deployment images were not admitted by exact pinned references: %q %v", raw, e)
 			}
 		})
+	}
+}
+
+func TestPrepareInstallerUnknownNetworkDoesNotStartWork(t *testing.T) {
+	var progress bytes.Buffer
+	result, err := PrepareInstaller(t.Context(), BuildConfig{}, Config{Network: "unknown", Progress: &progress})
+	assertConfigUsage(t, err)
+	if result != (Config{}) || progress.Len() != 0 {
+		t.Fatal("invalid network produced prepared inputs or started progress")
 	}
 }
 

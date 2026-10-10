@@ -268,6 +268,14 @@ selected image's existing entrypoint. Management-node readiness and Cluster API
 installation follow site-network readiness; the tenant remains a separate
 QCOW2-backed cluster.
 
+For an explicit temporary networking test while the NVIDIA OVN runtime issue is
+being investigated, add `--network kind-calico` to `nke-demo e2e` (or `run`).
+This keeps Kind's default site networking and selects Calico `3.30.1` for the
+QCOW2 tenant. The default remains `--network ovn`. Neither option edits the
+maintained catalogs: the artifact build still produces its declared OVN inputs,
+even when this test does not deploy them. A passing test in this mode does not
+validate NVIDIA OVN. The selected mode is retained in `demo-inputs.json`.
+
 Cache the explicit runtime acquisitions:
 
 ```sh

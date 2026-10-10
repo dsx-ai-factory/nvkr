@@ -49,6 +49,32 @@ func ovnChartArchive(t *testing.T, files map[string][]byte) []byte {
 	return buffer.Bytes()
 }
 
+func TestTemporaryKindNetworkRetainsManagementAndCAPI(t *testing.T) {
+	for _, mode := range []string{"kind-calico", "invalid"} {
+		t.Run(mode, func(t *testing.T) {
+			var phases []string
+			session := ManagementSession{Work: privateTestDir(t), Tools: "/tools", Runner: Runner{Env: []string{"SITE_KUBECONFIG=/owned/kubeconfig"}}}
+			capture := func(_ context.Context, runner Runner, _ []string, phase string, _ time.Duration) ([]byte, error) {
+				phases = append(phases, phase)
+				if phase != "management-ready" && environmentValue(runner.Env, "STAGE_NEEDS_RELEASE") != "0" {
+					t.Fatal("CAPI stage lost its source-owned contract")
+				}
+				return nil, nil
+			}
+			err := installSelectedSiteNetwork(t.Context(), mode, session, "", nil, "", "", capture)
+			if mode == "invalid" {
+				if err == nil || len(phases) != 0 {
+					t.Fatal("unknown mode performed work", err)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(phases, []string{"management-ready", "install-capi", "check-capi"}) || environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "" {
+				t.Fatal("diagnostic stage order or environment differs", phases, err)
+			}
+		})
+	}
+}
+
 func TestSiteOVNChartAdmissionReadsBoundAcceptedBytesWithoutOutputs(t *testing.T) {
 	for _, scenario := range []string{"exact", "binding", "manifest", "identity", "version", "missing-values", "malformed-values", "unsafe-archive", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {

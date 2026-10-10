@@ -93,6 +93,18 @@ func NewTenantRequest(name string) TenantRequest {
 	return request
 }
 
+func newTenantRequest(name, network string) (TenantRequest, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return TenantRequest{}, err
+	}
+	request := NewTenantRequest(name)
+	if mode == "kind-calico" {
+		request.CNI, request.CNIVersion = "calico", "3.30.1"
+	}
+	return request, nil
+}
+
 type tenantRow struct {
 	Name string         `json:"name"`
 	ID   string         `json:"id"`
@@ -181,6 +193,7 @@ func pause(ctx context.Context, duration time.Duration) error {
 
 type tenant struct {
 	name, id      string
+	network       string
 	session       ManagementSession
 	simulator     *OwnedProcess
 	image         lifecycle.Artifact
@@ -239,6 +252,10 @@ func (t *tenant) kubectl(config string, args ...string) []string {
 func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	boundary := beginProgress(t.session.Runner.Progress, "tenant-provisioning", DeploymentStarted, DeploymentFinished, DeploymentFailed)
 	defer func() { boundary.finish(result) }()
+	intent, err := newTenantRequest(t.name, t.network)
+	if err != nil {
+		return err
+	}
 	rows, err := t.inventory(ctx)
 	if err != nil {
 		return err
@@ -247,7 +264,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 		return errors.New("require an empty freshly installed site before tenant creation")
 	}
 	request := filepath.Join(t.session.Work, "tenant-request.json")
-	if err = privateJSON(request, NewTenantRequest(t.name)); err != nil {
+	if err = privateJSON(request, intent); err != nil {
 		return err
 	}
 	t.intent = true
@@ -602,11 +619,15 @@ func (t *tenant) close(ctx context.Context) error {
 }
 
 func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session ManagementSession, server *OwnedProcess, image lifecycle.Artifact, domains Runner, url string) (result error) {
+	network, err := normalizeNetwork(cfg.Network)
+	if err != nil {
+		return err
+	}
 	var random [6]byte
 	if _, err := rand.Read(random[:]); err != nil {
 		return err
 	}
-	t := tenant{name: "nkd-tenant-" + hex.EncodeToString(random[:]), session: session, simulator: server, image: image, domains: domains, diagnosticURL: url}
+	t := tenant{name: "nkd-tenant-" + hex.EncodeToString(random[:]), network: network, session: session, simulator: server, image: image, domains: domains, diagnosticURL: url}
 	ids, err := ownedManagementNodes(ctx, session.Runner, session.Name)
 	if err != nil {
 		return err

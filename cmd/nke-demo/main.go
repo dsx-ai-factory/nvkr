@@ -234,6 +234,7 @@ func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 	}
 	flags.StringVar(&cfg.NKECheckout, "nke-checkout", "", checkoutHelp)
 	flags.StringVar(&cfg.Out, "out", "", "fresh private demo output directory")
+	flags.StringVar(&cfg.Network, "network", "ovn", "deployment networking: ovn, or kind-calico for a temporary diagnostic")
 	flags.IntVar(&cfg.TimeoutSeconds, "timeout", 3600, "tenant provisioning budget in seconds (300..3600)")
 	if !existing {
 		return
@@ -274,7 +275,7 @@ func configuredFile(command *cobra.Command, path string, flags nkedemo.DemoFile,
 		value       string
 	}{
 		{"repo", &selected.Build.Repo, flags.Build.Repo}, {"nke-clone", &selected.Build.NKEClone, flags.Build.NKEClone}, {"attempt", &selected.Build.Attempt, flags.Build.Attempt},
-		{"nke-checkout", &selected.Run.NKECheckout, flags.Run.NKECheckout}, {"nkdctl", &selected.Run.NKDCTL, flags.Run.NKDCTL}, {"out", &selected.Run.Out, flags.Run.Out},
+		{"nke-checkout", &selected.Run.NKECheckout, flags.Run.NKECheckout}, {"nkdctl", &selected.Run.NKDCTL, flags.Run.NKDCTL}, {"out", &selected.Run.Out, flags.Run.Out}, {"network", &selected.Run.Network, flags.Run.Network},
 		{"os-run", &selected.Run.Runs.OS, flags.Run.Runs.OS}, {"components-run", &selected.Run.Runs.Components, flags.Run.Runs.Components}, {"provider-run", &selected.Run.Runs.Providers, flags.Run.Runs.Providers},
 		{"site-run", &selected.Run.Runs.Site, flags.Run.Runs.Site}, {"tools-run", &selected.Run.Runs.Tools, flags.Run.Runs.Tools}, {"profiles-run", &selected.Run.Runs.Profiles, flags.Run.Runs.Profiles},
 		{"simulator-run", &selected.Run.Runs.Simulator, flags.Run.Runs.Simulator}, {"work", &selected.Restore.Work, flags.Restore.Work},

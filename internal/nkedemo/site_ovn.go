@@ -296,6 +296,27 @@ func captureSiteNetwork(ctx context.Context, runner Runner, args []string, phase
 	return runner.Capture(ctx, args, phase, timeout)
 }
 
+func installSelectedSiteNetwork(ctx context.Context, selected string, session ManagementSession, tool string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
+	mode, err := normalizeNetwork(selected)
+	if err != nil {
+		return err
+	}
+	if mode == "ovn" {
+		return installSiteNetwork(ctx, session, tool, outputs, reference, api, capture)
+	}
+	if err = requireContext(ctx); err != nil {
+		return err
+	}
+	kube := environmentValue(session.Runner.Env, "SITE_KUBECONFIG")
+	if kube == "" || capture == nil {
+		return errors.New("kind diagnostic requires an explicit owned kubeconfig and command runner")
+	}
+	if _, err = capture(ctx, session.Runner, []string{filepath.Join(session.Tools, "kubectl"), "--kubeconfig", kube, "wait", "nodes", "--all", "--for=condition=Ready", "--timeout=180s"}, "management-ready", 210*time.Second); err != nil {
+		return err
+	}
+	return installManagementAPI(ctx, session, capture)
+}
+
 func installSiteNetwork(ctx context.Context, session ManagementSession, tool string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
 	if err := requireContext(ctx); err != nil {
 		return err
@@ -383,6 +404,10 @@ func installSiteNetwork(ctx context.Context, session ManagementSession, tool str
 	}{"unqualified-local-site-network-diagnostic", exported, observed}); err != nil {
 		return err
 	}
+	return installManagementAPI(ctx, session, capture)
+}
+
+func installManagementAPI(ctx context.Context, session ManagementSession, capture siteNetworkCapture) error {
 	stage := filepath.Join(session.Work, "source/deploy/stages/04-install-cluster-api.sh")
 	// This source stage predates site release materialization. Keep its original
 	// release-free contract in a child-only environment; subsequent site stages
@@ -393,7 +418,7 @@ func installSiteNetwork(ctx context.Context, session ManagementSession, tool str
 		action, phase string
 		timeout       time.Duration
 	}{{"run", "install-capi", 1200 * time.Second}, {"check", "check-capi", 180 * time.Second}} {
-		if _, err = capture(ctx, capiRunner, []string{"bash", stage, step.action}, step.phase, step.timeout); err != nil {
+		if _, err := capture(ctx, capiRunner, []string{"bash", stage, step.action}, step.phase, step.timeout); err != nil {
 			return err
 		}
 	}

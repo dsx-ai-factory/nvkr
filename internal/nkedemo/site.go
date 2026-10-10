@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 	"go.yaml.in/yaml/v3"
 )
@@ -62,6 +63,16 @@ func imageKeys() []string {
 	return keys
 }
 
+// OVN is selected only for the OVN diagnostic. All other site images remain
+// mandatory in both modes, including the source-owned profiles image.
+func selectedImageKeys(outputs map[string]SelectedOutput) []string {
+	keys := imageKeys()
+	if _, selected := outputs["ovn"]; !selected {
+		keys = slices.DeleteFunc(keys, func(key string) bool { return key == "ovn" })
+	}
+	return keys
+}
+
 func selectSiteOutput(ctx context.Context, root, name, kind string) (SelectedOutput, error) {
 	var selected SelectedOutput
 	root, err := resolveExisting(root)
@@ -81,7 +92,7 @@ func selectSiteOutput(ctx context.Context, root, name, kind string) (SelectedOut
 
 func registryCapacity(outputs map[string]SelectedOutput) (int64, error) {
 	blobs := make(map[string]int64)
-	for _, key := range imageKeys() {
+	for _, key := range selectedImageKeys(outputs) {
 		selected, ok := outputs[key]
 		if !ok {
 			return 0, errors.New("missing registry input: " + key)
@@ -166,15 +177,21 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 		}
 		outputs["runtime-"+name] = selected
 	}
-	for _, item := range []struct{ key, name, kind string }{{"ovn", "ovn-image-arm64", "oci"}, {"ovn-chart", "ovn-chart-arm64", "helm-oci"}} {
-		selected, readErr := selectSiteOutput(ctx, cfg.Runs.Components, item.name, item.kind)
-		if readErr != nil {
-			return nil, readErr
-		}
-		outputs[item.key] = selected
-	}
-	if err = admitSiteOVNChart(ctx, outputs["ovn-chart"], outputs["ovn"]); err != nil {
+	mode, err := normalizeNetwork(cfg.Network)
+	if err != nil {
 		return nil, err
+	}
+	if mode == "ovn" {
+		for _, item := range []struct{ key, name, kind string }{{"ovn", "ovn-image-arm64", "oci"}, {"ovn-chart", "ovn-chart-arm64", "helm-oci"}} {
+			selected, readErr := selectSiteOutput(ctx, cfg.Runs.Components, item.name, item.kind)
+			if readErr != nil {
+				return nil, readErr
+			}
+			outputs[item.key] = selected
+		}
+		if err = admitSiteOVNChart(ctx, outputs["ovn-chart"], outputs["ovn"]); err != nil {
+			return nil, err
+		}
 	}
 	if _, err = registryCapacity(outputs); err != nil {
 		return nil, err
@@ -191,6 +208,21 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 	if len(images) != 1 || images[0].Architecture != "arm64" || images[0].ID == "" {
 		return nil, errors.New("cache exact ARM64 registry service before site execution")
 	}
+	network, err := admitKindNetwork(ctx, runner)
+	if err != nil {
+		return nil, err
+	}
+	if err = admitSiteCIDRs(network.CIDR); err != nil {
+		return nil, err
+	}
+	return &SiteMaterials{Outputs: outputs, Gateway: network.Gateway, RegistryID: images[0].ID, KindCIDR: network.CIDR, KindNetworkID: network.ID}, nil
+}
+
+type kindNetwork struct{ Gateway, CIDR, ID string }
+
+// The build and deployment preflights inspect the same native Docker network;
+// neither assumes a default subnet or accepts a caller-supplied gateway.
+func admitKindNetwork(ctx context.Context, runner Runner) (kindNetwork, error) {
 	type networkDescription struct {
 		ID, Driver string
 		IPAM       struct {
@@ -199,36 +231,64 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 	}
 	networks, err := captureJSON[[]networkDescription](ctx, runner, []string{"docker", "network", "inspect", "kind"}, "admit-kind-network")
 	if err != nil {
-		return nil, err
+		return kindNetwork{}, err
 	}
 	if len(networks) != 1 || networks[0].Driver != "bridge" || networks[0].ID == "" {
-		return nil, errors.New("require existing Kind bridge network")
+		return kindNetwork{}, errors.New("require existing Kind bridge network")
 	}
 	gateway, cidr := "", ""
 	for _, config := range networks[0].IPAM.Config {
 		address, readErr := netip.ParseAddr(config.Gateway)
 		if readErr != nil {
-			return nil, errors.New("invalid Kind gateway")
+			return kindNetwork{}, errors.New("invalid Kind gateway")
 		}
 		if !address.Is4() {
 			continue
 		}
 		if gateway != "" || !address.IsPrivate() {
-			return nil, errors.New("ambiguous private Kind IPv4 gateway")
+			return kindNetwork{}, errors.New("ambiguous private Kind IPv4 gateway")
 		}
 		prefix, readErr := netip.ParsePrefix(config.Subnet)
 		if readErr != nil || !prefix.Contains(address) {
-			return nil, errors.New("invalid Kind subnet")
+			return kindNetwork{}, errors.New("invalid Kind subnet")
 		}
 		gateway, cidr = address.String(), prefix.String()
 	}
 	if gateway == "" {
-		return nil, errors.New("missing private Kind IPv4 gateway")
+		return kindNetwork{}, errors.New("missing private Kind IPv4 gateway")
+	}
+	if err = validateNetworkKind(cidr); err != nil {
+		return kindNetwork{}, err
 	}
 	if err = admitSiteCIDRs(cidr); err != nil {
-		return nil, err
+		return kindNetwork{}, err
 	}
-	return &SiteMaterials{Outputs: outputs, Gateway: gateway, RegistryID: images[0].ID, KindCIDR: cidr, KindNetworkID: networks[0].ID}, nil
+	return kindNetwork{Gateway: gateway, CIDR: cidr, ID: networks[0].ID}, nil
+}
+
+func admitSimulatorEndpoint(ctx context.Context, runner Runner) error {
+	network, err := admitKindNetwork(ctx, runner)
+	if err != nil {
+		return err
+	}
+	return admitSimulatorPort(ctx, network.Gateway)
+}
+
+// This admission is a point-in-time availability check, not port ownership or
+// cleanup authorization. The owning simulator still has to bind at launch.
+func admitSimulatorPort(ctx context.Context, gateway string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	address := net.JoinHostPort(gateway, "18089")
+	var config net.ListenConfig
+	listener, err := config.Listen(ctx, "tcp4", address)
+	if err != nil {
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "NICoSim API endpoint %s is unavailable; inspect its listener with `sudo ss -ltnp 'sport = :18089'`; stop an existing owned demo through its original process before retrying; unrelated listeners are never stopped automatically", address)
+	}
+	if err = listener.Close(); err != nil {
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "close NICoSim API preflight listener %s", address)
+	}
+	return nil
 }
 
 func validateEndpoint(value string) (string, error) {
@@ -581,7 +641,7 @@ func copySiteImages(ctx context.Context, session ManagementSession, host string,
 		}
 		runner.Env = SetEnv(runner.Env, map[string]string{key: value + address})
 	}
-	for _, key := range imageKeys() {
+	for _, key := range selectedImageKeys(outputs) {
 		selected := outputs[key]
 		target := host + "/nkd-local/" + strings.TrimPrefix(key, "runtime-") + ":" + session.Name
 		if err := runner.Run(ctx, []string{filepath.Join(session.Tools, "oras"), "cp", "--concurrency", "1", "--from-oci-layout", selected.Layout + "@" + selected.Observation.Digest, target, "--to-plain-http"}, "copy-"+key, 180*time.Second); err != nil {
@@ -1059,7 +1119,7 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	if err = session.Runner.Run(ctx, []string{"docker", "cp", hostConfig, node + ":" + certs + "/hosts.toml"}, "node-registry-config", 30*time.Second); err != nil {
 		return err
 	}
-	if err = installSiteNetwork(ctx, session, tool, materials.Outputs, refs["ovn"], "https://"+vip+":6443", captureSiteNetwork); err != nil {
+	if err = installSelectedSiteNetwork(ctx, cfg.Network, session, tool, materials.Outputs, refs["ovn"], "https://"+vip+":6443", captureSiteNetwork); err != nil {
 		return err
 	}
 	if err = bootstrapCA(ctx, session); err != nil {

@@ -29,6 +29,7 @@ type RunInputs struct {
 // Out must be a new private directory outside sources and accepted attempts.
 // Timeout bounds tenant provisioning; cleanup has separate bounded contexts.
 type Config struct {
+	Network     string
 	NKECheckout string
 	NKDCTL      string
 	// DemoExecutable is supplied by the CLI or native Go integration, never

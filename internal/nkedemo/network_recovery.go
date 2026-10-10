@@ -307,8 +307,8 @@ func (g *NetworkGuard) requireRecoveryProducersIdle(ctx context.Context) error {
 			if devErr != nil || inoErr != nil || strconv.FormatUint(device, 10) != parts[0] || strconv.FormatUint(inode, 10) != parts[1] {
 				return fmt.Errorf("protected executable metadata malformed")
 			}
-			if g.ownedExecutable(device, inode) {
-				return fmt.Errorf("private capability producer remains; stop/join before recovery")
+			if executable := g.ownedExecutablePath(device, inode); executable != "" {
+				return remainingProducerError(pid, executable)
 			}
 			continue
 		}
@@ -316,17 +316,21 @@ func (g *NetworkGuard) requireRecoveryProducersIdle(ctx context.Context) error {
 			return err
 		}
 		id := networkStatIdentity(st)
-		if g.ownedExecutable(id.Device, id.Inode) {
-			return fmt.Errorf("private capability producer remains; stop/join before recovery")
+		if executable := g.ownedExecutablePath(id.Device, id.Inode); executable != "" {
+			return remainingProducerError(pid, executable)
 		}
 	}
 	return nil
 }
-func (g *NetworkGuard) ownedExecutable(device, inode uint64) bool {
+func remainingProducerError(pid int, executable string) error {
+	return fmt.Errorf("private capability producer remains: PID %d, executable %q; inspect it with `ps -p %d -o pid=,args=` and stop/join the independently verified owned process before recovery; recovery did not signal it", pid, executable, pid)
+}
+
+func (g *NetworkGuard) ownedExecutablePath(device, inode uint64) string {
 	for _, row := range g.caps {
 		if row.Binding.Device == device && row.Binding.Inode == inode {
-			return true
+			return row.Path
 		}
 	}
-	return false
+	return ""
 }

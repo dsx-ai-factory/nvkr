@@ -221,6 +221,12 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 	if cfg.Timeout < 300*time.Second || cfg.Timeout > time.Hour {
 		return admitted, errors.New("tenant budget must be 300..3600 seconds")
 	}
+	if _, err := normalizeNetwork(cfg.Network); err != nil {
+		return admitted, err
+	}
+	if err := admitSimulatorEndpoint(ctx, Runner{Env: NativeEnvironment(), Progress: cfg.Progress}); err != nil {
+		return admitted, err
+	}
 	materials, err := AdmitSite(ctx, cfg)
 	if err != nil {
 		return admitted, err
@@ -284,12 +290,7 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 	if err != nil {
 		return admitted, err
 	}
-	var config net.ListenConfig
-	listener, err := config.Listen(ctx, "tcp4", net.JoinHostPort(materials.Gateway, "18089"))
-	if err != nil {
-		return admitted, err
-	}
-	if err = listener.Close(); err != nil {
+	if err = admitSimulatorPort(ctx, materials.Gateway); err != nil {
 		return admitted, err
 	}
 	return demoAdmission{materials, simulator, image, disk, layout, out, env, binding}, nil
@@ -488,11 +489,12 @@ func run(ctx context.Context, cfg Config) (result error) {
 	cancel()
 	if err = privateJSON(filepath.Join(admitted.out, "demo-inputs.json"), struct {
 		Scope                             string
+		Network                           string
 		Simulator, Disk                   lifecycle.Artifact
 		HTTPReadback, WorkloadAcquisition string
 		Seed                              seedProjection
 		Outputs                           map[string]SelectedOutput
-	}{"unqualified-local-demo", admitted.simulator, admitted.image, admitted.image.Digest, WorkloadImage, seed, admitted.materials.Outputs}); err != nil {
+	}{"unqualified-local-demo", cfg.Network, admitted.simulator, admitted.image, admitted.image.Digest, WorkloadImage, seed, admitted.materials.Outputs}); err != nil {
 		return err
 	}
 	cfg.Out = filepath.Join(admitted.out, "site")
