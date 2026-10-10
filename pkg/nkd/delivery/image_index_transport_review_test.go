@@ -211,7 +211,7 @@ func TestOpenPublicationRejectsDockerChildAfterStorageSelection(t *testing.T) {
 			continue
 		}
 		var aggregate runnableIndex
-		if err := json.Unmarshal(mustReadImageFile(t, diskBlobPath(root, object.DescriptorDigest)), &aggregate); err != nil {
+		if err := json.Unmarshal(mustReadImageFile(t, fixtureBlobPath(root, object.DescriptorDigest)), &aggregate); err != nil {
 			t.Fatal(err)
 		}
 		aggregate.Manifests[0].MediaType = "application/vnd.docker.distribution.manifest.v2+json"
@@ -243,10 +243,10 @@ func TestOpenPublicationRejectsDockerChildAfterStorageSelection(t *testing.T) {
 		old := index.Manifests[i]
 		if old.ArtifactType == MediaPublicationRoot {
 			var manifest ociManifest
-			if err := json.Unmarshal(mustReadImageFile(t, diskBlobPath(root, old.Digest)), &manifest); err != nil {
+			if err := json.Unmarshal(mustReadImageFile(t, fixtureBlobPath(root, old.Digest)), &manifest); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Remove(diskBlobPath(root, manifest.Config.Digest)); err != nil {
+			if err := os.Remove(fixtureBlobPath(root, manifest.Config.Digest)); err != nil {
 				t.Fatal(err)
 			}
 			manifest.Config = config
@@ -262,7 +262,7 @@ func TestOpenPublicationRejectsDockerChildAfterStorageSelection(t *testing.T) {
 		}
 	}
 	for old := range replacements {
-		if err := os.Remove(diskBlobPath(root, old)); err != nil {
+		if err := os.Remove(fixtureBlobPath(root, old)); err != nil {
 			t.Fatal(err)
 		}
 	}

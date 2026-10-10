@@ -6,6 +6,23 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
+Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nke-demo.md) for
+`nke-demo e2e`: build selected artifacts through `nkdctl`, then deploy those
+completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
+host through Colima; this is not a native Darwin build.
+
+`nke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
+[focused selections](../definitions/nke-local-dev-arm64/README.md);
+`--check LANE` performs diagnostics only. The full demo compiles binaries once and shares
+one measured Packer toolchain, including Helm 4.2.4 and ORAS 1.3.3. Profiles are
+data bundles, not a separate container image. No publication/signing is enabled.
+The launcher prints its exact shell-escaped `nkdctl` invocations to stderr before execution, without printing environment values.
+
+Contract tests: `go test ./internal/nkedemo ./cmd/nke-demo -count=1`.
+See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;
+the reduced flow has not passed a new clean-machine end-to-end run. This is not
+a [full source-built distribution](../docs/full-nke-source-build.md).
+
 ```sh
 # Plan only: validates and creates no attempt storage.
 nkdctl run plan --definition definitions/nke-v1/definition.yaml --environment definitions/nke-v1/environment-local.yaml
@@ -26,6 +43,13 @@ immutable attempt names.
 
 The non-FDE OS-image bootstrap uses one shared catalog. Its authored routes are ARM64 Podman/TCG and native
 ARM64 and AMD64 Linux Docker/KVM:
+
+These older OS-only commands differ from the laptop launcher above: Docker
+requires KVM, and Podman requires its maintained toolchain image ID. A fresh
+toolchain build can fail that ID check. For Docker/Colima TCG and attempt-pinned
+fresh toolchain bytes, follow the
+[laptop OS route](../docs/local-development.md#build-the-complete-selection-including-the-os)
+instead; its validation does not change the older wrapper's pin contract.
 
 ```sh
 CONTAINER_RUNTIME=podman scripts/nke-os-local.sh local-arm64-podman-001 1

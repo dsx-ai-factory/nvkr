@@ -40,7 +40,7 @@ func observeHostedOutputs(ctx context.Context, workspace string, slots []require
 	observed := make([]Artifact, 0, len(slots))
 	for _, slot := range slots {
 		if slot.Kind != OutputDiskImage {
-			artifact, err := observeOutput(ctx, slot, localized, plan, nil)
+			artifact, err := observeOutput(ctx, slot, localized, plan, nil, workspace)
 			if err != nil {
 				return nil, err
 			}

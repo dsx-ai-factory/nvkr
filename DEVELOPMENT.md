@@ -8,8 +8,11 @@ macOS supports development, planning and contract tests.
 The ordinary test gate (`go test ./...`, `make test`, and `make check`) also requires Bash 3.2 or later,
 Git, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
-if a prerequisite is missing. `make check` additionally requires Python 3 (`python3` on `PATH`) for
-`make test-ci-tools`, which tests the CI timing report parser using only the Python standard library.
+if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
+for `make test-ci-tools`, which runs the CI report parser and all local adapter contract suites using
+only the Python standard library. Go-test adapter wrappers report an explicit skip when Python is
+absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
+runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
 On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
 
 ```sh

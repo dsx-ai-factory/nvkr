@@ -401,10 +401,10 @@ func createPackerVolume(ctx context.Context, runtime packerContainerRuntime, nam
 	args = append(args, name)
 	var stdout, stderr bytes.Buffer
 	if err := runtime.Run(ctx, nil, &stdout, &stderr, args...); err != nil {
-		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed, "creating Packer volume %q", name)
+		return runtimeCommandError(ctx, err, stderr.String(), e.CodeBuildFailed, "creating container volume %q", name)
 	}
 	if strings.TrimSpace(stdout.String()) != name {
-		return e.New(e.CodeBuildFailed, "container runtime did not confirm Packer volume %q", name)
+		return e.New(e.CodeBuildFailed, "container runtime did not confirm volume %q", name)
 	}
 	return nil
 }
@@ -570,7 +570,7 @@ type packerContainerResources struct {
 
 func (resources *packerContainerResources) removeContainer(ctx context.Context, name string) error {
 	if err := resources.runtime.Run(ctx, nil, io.Discard, io.Discard, "rm", "-fv", name); err != nil {
-		return e.Wrap(e.CodeInternal, err, "removing Packer container %q", name)
+		return e.Wrap(e.CodeInternal, err, "removing container %q", name)
 	}
 	resources.mu.Lock()
 	defer resources.mu.Unlock()

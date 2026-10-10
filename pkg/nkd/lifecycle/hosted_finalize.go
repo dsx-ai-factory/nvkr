@@ -13,6 +13,9 @@ import (
 // FinalizeGenerated re-admits the authored inputs and committed plan, then
 // observes artifacts restored by a hosted pipeline into one immutable Run.
 func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, planPath, generatorVersion, attempt, workspace, outputPath string) (*Run, error) {
+	if workspace == "" {
+		return nil, e.New(e.CodeUsage, "hosted Run finalization requires a workspace")
+	}
 	definition, err := LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		return nil, err

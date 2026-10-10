@@ -9,10 +9,15 @@ lock="${here}/toolchain.lock.json"
 
 usage() {
   cat <<'EOF'
-Usage: build.sh [--check] [--cross-build-only] [--arch amd64|arm64] [--tag IMAGE]
+Usage: build.sh [--check] [--cross-build-only] [--diagnostic-local] [--print-validated-image-id] [--arch amd64|arm64] [--tag IMAGE]
 
   --check             Validate the source lock without building an image.
   --cross-build-only  Build a non-native image without claiming runtime validation.
+  --diagnostic-local  Validate fresh native bytes for an attempt-specific local pin,
+                      not the older recorded local image ID. No maintained-pin update.
+  --print-validated-image-id
+                      Print only the native-validated immutable ID on stdout;
+                      send build and validation diagnostics to stderr.
   --arch              Build one host architecture. Defaults to the normalized host arch.
   --tag               Local image name. Defaults to localhost/nkd-packer-toolchain:dev-ARCH.
 
@@ -23,6 +28,8 @@ EOF
 
 check_only=0
 cross_build_only=0
+diagnostic_local=0
+print_validated_image_id=0
 arch=""
 tag=""
 while [[ $# -gt 0 ]]; do
@@ -33,6 +40,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --cross-build-only)
       cross_build_only=1
+      shift
+      ;;
+    --diagnostic-local)
+      diagnostic_local=1
+      shift
+      ;;
+    --print-validated-image-id)
+      print_validated_image_id=1
       shift
       ;;
     --arch)
@@ -57,7 +72,29 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "${print_validated_image_id}" -eq 1 ]]; then
+  if [[ "${check_only}" -eq 1 || "${cross_build_only}" -eq 1 ]]; then
+    echo '--print-validated-image-id requires native image validation, not --check or --cross-build-only' >&2
+    exit 2
+  fi
+  # Keep the result separate from build output. Emit nothing on this descriptor
+  # until the exact inspected image has passed the native smoke below.
+  exec 3>&1 1>&2
+fi
+
 command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+
+# This image also compiles the NKD bootstrap, whose Makefile requires the
+# repository's exact Go patch. Reject drift before building either architecture.
+bootstrap_go_version="$(cat "${here}/../../.go-version")"
+if [[ ! "${bootstrap_go_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "invalid bootstrap Go pin in .go-version" >&2
+  exit 1
+fi
+if ! jq -e --arg version "${bootstrap_go_version}" '.go.version == $version' "${lock}" >/dev/null; then
+  echo "Packer toolchain Go version must match .go-version (${bootstrap_go_version}); update the locked version and both archive digests" >&2
+  exit 1
+fi
 
 jq -e '
   .schemaVersion == "nkd.dev/packer-toolchain/v1" and
@@ -73,8 +110,9 @@ jq -e '
   .qemuPlugin.source == "github.com/hashicorp/qemu" and
   .qemuPlugin.version == "1.1.6" and
   .qemuPlugin.license == "MPL-2.0" and
-  .go.version == "1.27.1" and
   .go.license == "BSD-3-Clause" and
+  .helm.version == "4.2.4" and .helm.license == "Apache-2.0" and
+  .oras.version == "1.3.3" and .oras.license == "Apache-2.0" and
   .crane.version == "0.21.9" and
   .crane.license == "Apache-2.0" and
   .nfpm.version == "2.47.0" and
@@ -82,7 +120,8 @@ jq -e '
   .publicationGates.packerBUSLRedistributionApproval == "not-recorded" and
   .publicationGates.vulnerabilityReviewApproval == "not-recorded" and
   ([.packer.archives, .packer.binaries, .qemuPlugin.archives, .qemuPlugin.binaries,
-    .go.archives, .crane.archives, .crane.binaries, .nfpm.archives, .nfpm.binaries] | all(
+    .go.archives, .crane.archives, .crane.binaries, .nfpm.archives, .nfpm.binaries,
+    .helm.archives, .helm.binaries, .oras.archives, .oras.binaries] | all(
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
   )) and
@@ -121,6 +160,10 @@ if [[ "${arch}" != "${native_arch}" && "${cross_build_only}" -ne 1 ]]; then
 fi
 
 runtime="${CONTAINER_RUNTIME:-}"
+if [[ "${diagnostic_local}" -eq 1 && "${arch}" != "${native_arch}" ]]; then
+  echo '--diagnostic-local requires native validation; cross builds are not admitted' >&2
+  exit 1
+fi
 if [[ -z "${runtime}" ]]; then
   runtime="$(command -v podman || command -v docker || true)"
 fi
@@ -142,13 +185,36 @@ fi
 uid="$(id -u)"
 gid="$(id -g)"
 identity_dir=""
+image_archive=""
 cleanup_identity() {
+  local cleanup_status=0
   if [[ -n "${identity_dir}" ]]; then
-    rm -f -- "${identity_dir}/passwd" "${identity_dir}/group"
-    rmdir -- "${identity_dir}"
+    if [[ -n "${image_archive}" ]] && ! rm -f -- "${image_archive}"; then
+      cleanup_status=1
+    fi
+    if ! rm -f -- "${identity_dir}/passwd" "${identity_dir}/group"; then
+      cleanup_status=1
+    fi
+    if ! rmdir -- "${identity_dir}"; then
+      cleanup_status=1
+    fi
   fi
+  if [[ "${cleanup_status}" -ne 0 ]]; then
+    echo 'could not remove private toolchain build temporary files' >&2
+    return "${cleanup_status}"
+  fi
+  identity_dir=""
+  image_archive=""
 }
-trap cleanup_identity EXIT
+cleanup_on_exit() {
+  local exit_status=$?
+  trap - EXIT
+  if ! cleanup_identity && [[ "${exit_status}" -eq 0 ]]; then
+    exit_status=1
+  fi
+  exit "${exit_status}"
+}
+trap cleanup_on_exit EXIT
 case "${runtime##*/}" in
   podman)
     identity_args=(
@@ -158,6 +224,7 @@ case "${runtime##*/}" in
     ;;
   docker)
     identity_dir="$(mktemp -d "${TMPDIR:-/tmp}/nkd-packer-identity.XXXXXX")"
+    image_archive="$(mktemp "${identity_dir}/image.XXXXXX")"
     printf 'nkd:x:%s:%s:NKD Builder:/nkd/work/home:/bin/sh\n' "${uid}" "${gid}" \
       >"${identity_dir}/passwd"
     printf 'nkd:x:%s:\n' "${gid}" >"${identity_dir}/group"
@@ -197,8 +264,9 @@ if [[ "${runtime##*/}" == docker ]]; then
   # Buildx passes the fixed epoch into BuildKit's image config and history,
   # then rewrites image-layer file timestamps to the same epoch on export.
   # Explicit stdout export avoids the Docker driver's automatic image-store
-  # unpack, which cannot be combined with timestamp rewriting. Load the
-  # archive separately below; pipefail preserves failures from either stage.
+  # unpack, which cannot be combined with timestamp rewriting. Hold the archive
+  # in private temporary storage and load only after successful export; failed
+  # builds must not become misleading secondary image-format errors.
   # Runtime-specific recorded IDs remain independent and are checked below;
   # changes to the image sources require fresh measurements.
   "${runtime}" buildx version
@@ -234,11 +302,30 @@ build_command+=(
   --build-arg "NFPM_ARCHIVE_SHA256=${nfpm_digest#sha256:}" \
   --build-arg "NFPM_BINARY_SHA256=${nfpm_binary_digest#sha256:}" \
   --file "${here}/Dockerfile" \
-  --tag "${tag}" \
-  "${here}")
+  --tag "${tag}")
+
+# Helm and ORAS are shared preparation/transport tools, not separate images.
+for tool in helm oras; do
+  prefix="$(printf '%s' "${tool}" | tr '[:lower:]' '[:upper:]')"
+  build_command+=(
+    --build-arg "${prefix}_VERSION=$(jq -r --arg tool "${tool}" '.[$tool].version' "${lock}")"
+    --build-arg "${prefix}_ARCHIVE_SHA256=$(jq -r --arg tool "${tool}" --arg arch "${arch}" '.[$tool].archives[$arch] | ltrimstr("sha256:")' "${lock}")"
+    --build-arg "${prefix}_BINARY_SHA256=$(jq -r --arg tool "${tool}" --arg arch "${arch}" '.[$tool].binaries[$arch] | ltrimstr("sha256:")' "${lock}")")
+done
+build_command+=("${here}")
 
 if [[ "${runtime##*/}" == docker ]]; then
-  "${build_command[@]}" | "${runtime}" image load
+  if "${build_command[@]}" >"${image_archive}"; then
+    if [[ ! -f "${image_archive}" || -L "${image_archive}" || ! -s "${image_archive}" ]]; then
+      echo 'Docker Buildx returned no nonempty regular image archive; refusing image load' >&2
+      exit 1
+    fi
+  else
+    build_status=$?
+    printf 'Docker Buildx export failed (exit %s); image load and validation were not attempted\n' "${build_status}" >&2
+    exit "${build_status}"
+  fi
+  "${runtime}" image load --input "${image_archive}"
 else
   "${build_command[@]}"
 fi
@@ -246,6 +333,7 @@ fi
 inspection="$("${runtime}" image inspect "${tag}")"
 if ! jq -e --arg arch "${arch}" '
   length == 1 and
+  (.[0].Id | type == "string" and test("^(sha256:)?[0-9a-f]{64}$")) and
   .[0].Os == "linux" and
   .[0].Architecture == $arch and
   (.[0].Config.Env // []) == ["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"] and
@@ -255,7 +343,9 @@ if ! jq -e --arg arch "${arch}" '
   exit 1
 fi
 
-image_id="$("${runtime}" image inspect --format '{{.Id}}' "${tag}")"
+# Structure and identity must describe the same inspection result. A second
+# tag lookup could select different bytes before the native validation.
+image_id="$(jq -er '.[0].Id' <<<"${inspection}")"
 if [[ "${image_id}" =~ ^[0-9a-f]{64}$ ]]; then
   image_id="sha256:${image_id}"
 fi
@@ -264,11 +354,16 @@ case "${runtime##*/}" in
   docker) pin_family=localDockerImages ;;
 esac
 expected_local_image="$(jq -r --arg arch "${arch}" --arg family "${pin_family}" '.[$family][$arch] // empty' "${lock}")"
-if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" ]]; then
+if [[ -n "${expected_local_image}" && "${image_id}" != "${expected_local_image}" && "${diagnostic_local}" -ne 1 ]]; then
   echo "local toolchain image ID ${image_id} does not match locked ${arch} ID ${expected_local_image}" >&2
   exit 1
 fi
+if [[ "${diagnostic_local}" -eq 1 ]]; then
+  echo 'Diagnostic local toolchain: bind the measured ID in attempt inputs; no maintained-pin, publication or qualification claim.' >&2
+fi
 if [[ "${arch}" != "${native_arch}" ]]; then
+  cleanup_identity
+  trap - EXIT
   printf 'built structurally checked cross-architecture toolchain %s (%s)\n' "${tag}" "${image_id}"
   echo "run this build on a native ${arch} host before publication"
   exit 0
@@ -291,7 +386,7 @@ fi
   --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --env TMPDIR=/nkd/work/tmp \
   --entrypoint sh \
-  "${tag}" -ec '
+  "${image_id}" -ec '
   mkdir -p "${HOME}" "${TMPDIR}"
   test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.15.4"
   plugin=/nkd/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.6_x5.0_linux_'"${arch}"'
@@ -331,6 +426,8 @@ fi
   command -v xorriso >/dev/null
   test "$(GOTOOLCHAIN=local go version)" = "go version go${EXPECTED_GO_VERSION} linux/'"${arch}"'"
   test "$(crane version)" = "0.21.9"
+  test "$(helm version --template "{{.Version}}")" = "v4.2.4"
+  oras version | grep -Eq "^Version:[[:space:]]+1.3.3$"
   nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.47.0$"
   dpkg-scanpackages --version >/dev/null
   7z i >/dev/null
@@ -377,5 +474,10 @@ EOF
   grep -Fx "The configuration is valid." "${TMPDIR}/packer-validate.out" >/dev/null
 '
 
+cleanup_identity
+trap - EXIT
 printf 'validated local toolchain %s (%s)\n' "${tag}" "${image_id}"
 echo "publish through an approved registry workflow, then record the immutable repository digest before catalog use"
+if [[ "${print_validated_image_id}" -eq 1 ]]; then
+  printf '%s\n' "${image_id}" >&3
+fi

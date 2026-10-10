@@ -142,6 +142,11 @@ func TestImageIndexPackagingObservesEveryExactChild(t *testing.T) {
 	if observed.ImageIndex == nil || len(observed.ImageIndex.Children) != 2 {
 		t.Fatal("lost native child bindings")
 	}
+	// Workspace relocation must retain the aggregate's exact native bindings.
+	workspaceObserved, err := ObserveWorkspaceLifecyclePayload(t.Context(), p, p.LifecycleOutputs[0], ".nkd/observed-attempt", artifacts)
+	if err != nil || !reflect.DeepEqual(workspaceObserved, observed) {
+		t.Fatalf("workspace index observation differs: %+v, %v", workspaceObserved, err)
+	}
 	digest, err := factoryImagePayloadDigest(t.Context(), p, artifacts[node.Outputs[0]])
 	if err != nil || digest != observed.Digest {
 		t.Fatalf("Helm-bound aggregate digest %s: %v", digest, err)

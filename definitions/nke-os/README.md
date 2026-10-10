@@ -13,6 +13,14 @@ Their Definitions select explicit execution behavior:
 - `definition-arm64-tcg.yaml` selects the macOS Apple M4 Pro Podman developer path, forbids KVM, and uses `cortex-a57` under TCG.
 - `definition-amd64-kvm.yaml` selects the native Linux AMD64 KVM route and its separate, digest-pinned Ubuntu installer ISO.
 
+For a first-time seven-lane Apple Silicon demo with Docker/Colima TCG, use the
+[laptop build guide](../../docs/local-development.md#build-the-complete-selection-including-the-os)
+and its `nke-full-arm64-local.sh ... os` launcher instead. The older wrapper in
+this guide admits Docker only with native KVM. Its Podman route also requires
+the maintained local Packer image ID, so fresh toolchain bytes that differ fail
+that identity gate. The laptop launcher validates and freezes fresh bytes through
+an attempt overlay; it does not update or waive the older maintained pin.
+
 The AMD64 graph is authored, but neither Docker architecture has a stable maintained image ID in
 `toolchains/nkd-packer/toolchain.lock.json`. The catalog's AMD64 ID is a substitution-only baseline, not a
 maintained pin or a claim that a subsequent build will reproduce it. For a local Docker attempt, the wrapper builds the

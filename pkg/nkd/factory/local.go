@@ -786,9 +786,16 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		}
 		arch := strings.TrimPrefix(node.Platform, "linux/")
 		containerRunner := "/workspace/.nkd/factory/.runner/nkd-exec-" + arch
+		planDigest := ""
+		if hasLocalVMBuild(plan) {
+			planDigest, err = plan.Digest()
+			if err != nil {
+				return err
+			}
+		}
 		return executeUtilityNode(ctx, node, utilityRunnerLocation{
 			runtime: options.Runtime, mountSource: workspace, mountTarget: "/workspace/.nkd/factory",
-			helper: containerRunner, plan: "/workspace/.nkd/factory/" + localPlanPath,
+			helper: containerRunner, plan: "/workspace/.nkd/factory/" + localPlanPath, planDigest: planDigest,
 			user: localContainerUser(), home: true,
 		}, options.Stdout, options.Stderr)
 	}

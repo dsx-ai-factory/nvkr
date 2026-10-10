@@ -8,6 +8,8 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
+| Start local Linux ARM64 NKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nke-local-dev-arm64/README.md) |
+| Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
@@ -39,6 +41,15 @@ records source availability and remaining gaps.
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nke-os-live-inspection.md) |
+
+## Local ARM64 diagnostics
+
+| Task | Guide |
+|---|---|
+| Build artifacts, install a local site, and validate a real QCOW2-backed tenant plus workload | [Integrated Ubuntu ARM64 guide](local-nke-demo.md) |
+| Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
+| Understand the NKD-to-installer artifact handoff | [Staged-installer handoff](nkd-to-nke-demo.md) |
+| Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md) |
 
 ## Engineering and maintenance
 

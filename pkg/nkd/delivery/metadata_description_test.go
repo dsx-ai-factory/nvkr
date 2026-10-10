@@ -66,7 +66,7 @@ func TestMetadataDescriptionExcludesPayloadVerification(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					payload = diskBlobPath(root, manifest.Layers[0].Digest)
+					payload = fixtureBlobPath(root, manifest.Layers[0].Digest)
 				}
 			}
 			for _, state := range []string{"corrupt", "missing"} {
@@ -178,7 +178,7 @@ func TestMetadataDescriptionRejectsRerootedMembershipChanges(t *testing.T) {
 						t.Fatal(err)
 					}
 					for _, digest := range []string{object.DescriptorDigest, manifest.Config.Digest, manifest.Layers[0].Digest} {
-						if err := os.Remove(diskBlobPath(root, digest)); err != nil {
+						if err := os.Remove(fixtureBlobPath(root, digest)); err != nil {
 							t.Fatal(err)
 						}
 					}
@@ -227,7 +227,7 @@ func TestMetadataDescriptionRejectsMetadataWireChanges(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Remove(diskBlobPath(root, oldConfig)); err != nil {
+				if err := os.Remove(fixtureBlobPath(root, oldConfig)); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -236,7 +236,7 @@ func TestMetadataDescriptionRejectsMetadataWireChanges(t *testing.T) {
 				t.Fatal(err)
 			}
 			descriptor.ArtifactType = MediaPublicationRoot
-			if err := os.Remove(diskBlobPath(root, index.Manifests[0].Digest)); err != nil {
+			if err := os.Remove(fixtureBlobPath(root, index.Manifests[0].Digest)); err != nil {
 				t.Fatal(err)
 			}
 			index.Manifests[0] = descriptor
@@ -274,7 +274,7 @@ func TestMetadataObjectPlatformChecksImageSchemaWithoutPayloads(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, layer := range manifest.Layers {
-				if err := os.Remove(diskBlobPath(root, layer.Digest)); err != nil {
+				if err := os.Remove(fixtureBlobPath(root, layer.Digest)); err != nil {
 					t.Fatal(err)
 				}
 			}

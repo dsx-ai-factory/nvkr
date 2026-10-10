@@ -41,6 +41,12 @@ bin/nkdctl catalog pin --dir definitions/nke-ovn-source/catalog \
    the factory's held-material boundary and packs both Debian packages offline.
    No NKE package-folder command is invoked.
 
+The Dockerfile's separate builder is pinned to Quay's Go 1.26.9 image, matching
+the fork's Go 1.26 source contract and including the October security fixes.
+Its vendored JSON adapter uses APIs removed in Go 1.27, so changing that builder
+to Go 1.27 is not compatible with this source pin. NKD/demo tooling remains on
+Go 1.27.2; no host Go downgrade, source patch or custom builder is required.
+
 ```text
 Pinned DSX OVN Git source
   ├─ source-owned Dockerfile → ovn-kube-ubuntu.oci.tar

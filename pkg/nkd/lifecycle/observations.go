@@ -64,7 +64,7 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 		if slot.Kind == OutputDiskImage && stage != nil {
 			artifact, err = stage(ctx, slot, plan, execution)
 		} else {
-			artifact, err = observeOutput(ctx, slot, localized, plan, execution)
+			artifact, err = observeOutput(ctx, slot, localized, plan, execution, workspace)
 		}
 		if err != nil {
 			return nil, err
@@ -75,7 +75,7 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 }
 
 func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[string]factory.Artifact,
-	plan *factory.Plan, execution diskPayloadObserver,
+	plan *factory.Plan, execution diskPayloadObserver, workspace string,
 ) (Artifact, error) {
 	if slot.Kind == OutputDiskImage {
 		if execution == nil {
@@ -110,7 +110,7 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 	}
 	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID,
 		BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...), ImageIndex: slot.ImageIndex.Clone()}
-	observation, err := factory.ObserveLifecyclePayload(ctx, plan, expected, artifacts)
+	observation, err := factory.ObserveWorkspaceLifecyclePayload(ctx, plan, expected, workspace, artifacts)
 	if err != nil {
 		return Artifact{}, err
 	}

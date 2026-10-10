@@ -1,0 +1,31 @@
+# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
+apiVersion: nkd.dev/lock/v1
+kind: PinLock
+pins:
+  clusterctl:
+    commit: 1a1852c74072febc3fbf9823c9dd32f4cd6cc747
+    sourceDateEpoch: 1771324984
+    tag: v1.12.3
+    treeHash: adfe92aa22b7d1bae7cd787cdd0fc722ec5afbc8
+  helm:
+    commit: 3900f434fd3ef2b84065dc04508df48f288dba00
+    sourceDateEpoch: 1786632363
+    tag: v4.2.4
+    treeHash: 16e7ec45b01a241f5011caad2fe8751208a7ba94
+  kind:
+    commit: cda67ef8588f6bfdac5358233f2471cb2149ecaf
+    goVersion: 1.26.3
+    sourceDateEpoch: 1780417734
+    tag: v0.32.0
+    treeHash: be4d44635ebcab72f70760c8e04684cbd98d3969
+  kubectl:
+    commit: ecf6decece6a6de25a57aad9ba90b6ce580f6f78
+    goVersion: 1.26.2
+    sourceDateEpoch: 1776865911
+    tag: v1.36.0
+    treeHash: 5cd415ea43f3b052c5d1b97bbfa8870a4fc5d144
+  oras:
+    commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
+    sourceDateEpoch: 1783708065
+    tag: v1.3.3
+    treeHash: a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f

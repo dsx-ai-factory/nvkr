@@ -1,0 +1,322 @@
+{
+  "apiVersion": "nkd.dev/definition/v4",
+  "catalog": {
+    "base": "./cli-catalog"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nke-local-dev-arm64",
+    "description": "One local ARM64 Run selecting 29 outputs for components, providers, OS, installer, tools, simulator, profiles and standalone NVIDIA OVN image/chart; no publication or signing; acquired inputs and the mixed SPIRE-source exception remain explicit."
+  },
+  "outputs": [
+    {
+      "catalog": {"base": "./capnico-catalog"},
+      "components": ["capnico-controller"],
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-controller/catalog"},
+      "components": ["cluster-api-provider-provisioned"],
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "./site-catalog"
+      },
+      "components": [
+        "nke-controller-chart"
+      ],
+      "format": "helm-oci",
+      "helm": {
+        "images": {
+          "controller": "cwe"
+        }
+      },
+      "name": "controller-chart",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./profiles-catalog"},
+      "components": ["nke-local-profiles"],
+      "format": "executable",
+      "name": "controller-profiles",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "csi-node-driver-registrar-image"
+      ],
+      "format": "oci",
+      "name": "csi-node-driver-registrar-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "./site-catalog"
+      },
+      "components": [
+        "nke-controller"
+      ],
+      "format": "oci",
+      "name": "cwe",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./tools-catalog"},
+      "components": ["clusterctl", "helm", "kind", "kubectl", "oras"],
+      "format": "executable",
+      "name": "installer-tools-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./simulator-catalog"},
+      "components": ["nico-sim", "nico-sim-runtime-assets", "nico-simctl"],
+      "format": "executable",
+      "name": "nicosim-tools-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/os-catalog",
+        "overlays": [
+          "./os-tcg.json"
+        ]
+      },
+      "components": [
+        "nke-agent",
+        "nke-cni-calico",
+        "nke-cni-ovn",
+        "nke-image-inputs",
+        "nke-kubeadm-distro",
+        "nke-node-image",
+        "nke-patched-installer-iso",
+        "nke-spire-agent",
+        "ovn-kube-ubuntu",
+        "ovn-kubernetes-chart",
+        "ubuntu-installer-iso"
+      ],
+      "format": "disk-image",
+      "name": "nke-node-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./site-catalog"},
+      "components": [
+        "nkectl"
+      ],
+      "format": "executable",
+      "name": "nkectl",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./site-catalog"},
+      "components": ["nktp-chart"],
+      "format": "helm-oci",
+      "name": "nktp",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "./operator-catalog"},
+      "components": ["helm", "kubectl"],
+      "format": "executable",
+      "name": "operator-tools",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-ovn-source/catalog"},
+      "components": ["ovn-kubernetes-chart"],
+      "format": "helm-oci",
+      "helm": {
+        "images": {
+          "control-plane": "ovn-image-arm64",
+          "node": "ovn-image-arm64",
+          "nbdb": "ovn-image-arm64",
+          "sbdb": "ovn-image-arm64",
+          "northd": "ovn-image-arm64",
+          "ovn-host": "ovn-image-arm64"
+        }
+      },
+      "name": "ovn-chart-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../nke-ovn-source/catalog"},
+      "components": ["ovn-kube-ubuntu"],
+      "format": "oci",
+      "name": "ovn-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-controller/catalog"
+      },
+      "components": [
+        "postgresql-chart"
+      ],
+      "format": "helm-oci",
+      "name": "postgresql",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "postgresql-image"
+      ],
+      "format": "oci",
+      "name": "postgresql-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "spiffe-csi-image"
+      ],
+      "format": "oci",
+      "name": "spiffe-csi-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-controller/catalog"
+      },
+      "components": [
+        "spire-chart"
+      ],
+      "format": "helm-oci",
+      "name": "spire",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "spire-agent-image"
+      ],
+      "format": "oci",
+      "name": "spire-agent-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "spire-bash-image"
+      ],
+      "format": "oci",
+      "name": "spire-bash-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "spire-controller-manager-image"
+      ],
+      "format": "oci",
+      "name": "spire-controller-manager-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-controller/catalog"
+      },
+      "components": [
+        "spire-crds-chart"
+      ],
+      "format": "helm-oci",
+      "name": "spire-crds",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "spire-oidc-image"
+      ],
+      "format": "oci",
+      "name": "spire-oidc-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "spire-server-image"
+      ],
+      "format": "oci",
+      "name": "spire-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "spire-tpm-server-image"
+      ],
+      "format": "oci",
+      "name": "spire-tpm-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-controller/catalog"
+      },
+      "components": [
+        "temporal-chart"
+      ],
+      "format": "helm-oci",
+      "name": "temporal",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "temporal-admin-tools-image"
+      ],
+      "format": "oci",
+      "name": "temporal-admin-tools-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "temporal-server-image"
+      ],
+      "format": "oci",
+      "name": "temporal-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../nke-m2/image-catalog"
+      },
+      "components": [
+        "temporal-ui-image"
+      ],
+      "format": "oci",
+      "name": "temporal-ui-image-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}
