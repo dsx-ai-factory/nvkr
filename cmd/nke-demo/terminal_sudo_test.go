@@ -160,3 +160,70 @@ func TestForegroundAuthenticationTerminalContract(t *testing.T) {
 		})
 	}
 }
+
+// Exercise the real stdio reader/Drain/Stop/Start cycle, not SimulationScreen.
+// No privileged command or deployment is involved in these presentation checks.
+func TestDashboardAuthenticationTerminalContract(t *testing.T) {
+	if os.Getenv("NKD_TEST_TERMINAL_AUTH") != "1" {
+		t.Skip("requires an isolated real terminal")
+	}
+	if !dashboardEligible(os.Stdout, false, false) {
+		t.Fatal("real dashboard terminal is required; plain fallback cannot prove this contract")
+	}
+	for _, mode := range []string{"noop", "owned-command"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			var calls atomic.Int32
+			inputFD := int(os.Stdin.Fd())
+			inputFlags, err := unix.FcntlInt(uintptr(inputFD), unix.F_GETFL, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = presentProgress(ctx, os.Stdout, nil, false, "", false, func(workCtx context.Context, progress io.Writer) error {
+				auth := progress.(nkedemo.SudoAuthorizer).SudoAuthentication()
+				for range 2 {
+					if err := auth(workCtx); err != nil {
+						return err
+					}
+					timer := time.NewTimer(100 * time.Millisecond)
+					select {
+					case <-workCtx.Done():
+						timer.Stop()
+						return workCtx.Err()
+					case <-timer.C:
+					}
+				}
+				return nil
+			}, func(authCtx context.Context) error {
+				calls.Add(1)
+				if mode == "noop" {
+					return authCtx.Err()
+				}
+				cmd := exec.CommandContext(authCtx, "/bin/sh", "-c", "exit 0")
+				cmd.Env = nkedemo.NativeEnvironment()
+				return nkedemo.RunAuthenticationCommand(authCtx, cmd)
+			})
+			if err != nil || calls.Load() != 2 {
+				t.Fatalf("real dashboard auth cycle failed: calls=%d error=%v", calls.Load(), err)
+			}
+			flags, err := unix.FcntlInt(uintptr(inputFD), unix.F_GETFL, 0)
+			if err != nil || flags != inputFlags {
+				t.Fatalf("terminal flags changed: before=%d after=%d error=%v", inputFlags, flags, err)
+			}
+		})
+	}
+}
+
+func TestTerminalFlagRestorationFailureStopsWrite(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	tty := &checkedTTY{cancel: cancel, inputFD: -1, restoreInputFlags: true}
+	if n, err := tty.Write([]byte("must not reach a terminal")); n != 0 || !errors.Is(err, unix.EBADF) {
+		t.Fatalf("terminal flags failure ignored: n=%d error=%v", n, err)
+	}
+	if ctx.Err() == nil {
+		t.Fatal("terminal flags failure did not cancel work")
+	}
+	assertCode(t, tty.failure(), nkderr.CodePreflightFailed)
+}

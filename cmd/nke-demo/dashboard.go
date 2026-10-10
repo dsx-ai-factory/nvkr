@@ -14,6 +14,7 @@ import (
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/gdamore/tcell/v2"
+	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 )
 
@@ -37,7 +38,13 @@ func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logP
 	if err != nil {
 		return nkderr.New(nkderr.CodePreflightFailed, "cannot initialize terminal; retry with --plain")
 	}
-	monitored := &checkedTTY{Tty: tty, cancel: cancel}
+	inputFD := int(os.Stdin.Fd())
+	inputFlags, err := unix.FcntlInt(uintptr(inputFD), unix.F_GETFL, 0)
+	if err != nil {
+		_ = tty.Close()
+		return nkderr.New(nkderr.CodePreflightFailed, "cannot inspect terminal file flags; no demo work started; retry with --plain")
+	}
+	monitored := &checkedTTY{Tty: tty, cancel: cancel, inputFD: inputFD, inputFlags: inputFlags, restoreInputFlags: true}
 	screen, err := tcell.NewTerminfoScreenFromTty(monitored)
 	if err != nil {
 		_ = monitored.Close()
@@ -83,9 +90,12 @@ func forceDashboardExit() {
 // Preserve the CLI's checked-output contract without implementing terminal I/O.
 type checkedTTY struct {
 	tcell.Tty
-	mu     sync.Mutex
-	err    error
-	cancel context.CancelFunc
+	mu                sync.Mutex
+	err               error
+	cancel            context.CancelFunc
+	inputFD           int
+	inputFlags        int
+	restoreInputFlags bool
 }
 
 func (t *checkedTTY) record(err error) {
@@ -107,6 +117,12 @@ func (t *checkedTTY) failure() error {
 }
 
 func (t *checkedTTY) Write(data []byte) (int, error) {
+	// disengage joins its readers before emitting teardown writes. Restore
+	// shared stdio flags for those writes too, not only the later Stop call.
+	if err := t.restoreFlags(); err != nil {
+		t.record(err)
+		return 0, err
+	}
 	n, err := t.Tty.Write(data)
 	if err == nil && n != len(data) {
 		err = io.ErrShortWrite
@@ -115,14 +131,26 @@ func (t *checkedTTY) Write(data []byte) (int, error) {
 	return n, err
 }
 
+func (t *checkedTTY) restoreFlags() error {
+	if !t.restoreInputFlags {
+		return nil
+	}
+	_, err := unix.FcntlInt(uintptr(t.inputFD), unix.F_SETFL, t.inputFlags)
+	return err
+}
+
 func (t *checkedTTY) Stop() error {
 	err := t.Tty.Stop()
+	// The pinned stdio Tty's Drain sets O_NONBLOCK, but Stop restores only
+	// termios. stdin/stdout may share that open description. After readers join,
+	// restore admitted flags before sudo or a resumed screen reuses stdio.
+	err = errors.Join(err, t.restoreFlags())
 	t.record(err)
 	return err
 }
 
 func (t *checkedTTY) Close() error {
-	err := t.Tty.Close()
+	err := errors.Join(t.Tty.Close(), t.restoreFlags())
 	t.record(err)
 	return err
 }
