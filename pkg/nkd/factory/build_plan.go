@@ -150,7 +150,7 @@ func (plan Plan) validatePlanBuilds() error {
 	seen := map[string]bool{}
 	resolvedSources := map[string]bool{}
 	for _, buildPlan := range plan.Builds {
-		if !canonicalName.MatchString(buildPlan.Name) || seen[buildPlan.Name] || buildPlan.Graph == nil {
+		if !safeGraphID(buildPlan.Name) || seen[buildPlan.Name] || buildPlan.Graph == nil {
 			return e.New(e.CodeInvalidCatalog, "factory plan build target %q is invalid or repeated", buildPlan.Name)
 		}
 		seen[buildPlan.Name] = true
@@ -185,13 +185,12 @@ func (plan Plan) validatePlanBuilds() error {
 		if !sort.StringsAreSorted(buildPlan.Components) || hasAdjacentDuplicate(buildPlan.Components) {
 			return e.New(e.CodeInvalidCatalog, "factory build target %q components are not canonical", buildPlan.Name)
 		}
-		outputFormat := ""
-		for _, output := range plan.Definition.Outputs {
-			if output.Name == buildPlan.Name {
-				outputFormat = output.Format
-				break
-			}
+
+		selection, ok := plan.selectionForBuild(buildPlan.Name)
+		if !ok || selection.Platform != buildPlan.Platform {
+			return e.New(e.CodeUnverifiedRef, "native build %q graph identity is not selected by its Definition", buildPlan.Name)
 		}
+		outputFormat := selection.Format
 		if err := validateBuildCatalog(buildPlan, outputFormat, plan.Environment); err != nil {
 			return err
 		}

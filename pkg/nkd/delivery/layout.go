@@ -156,6 +156,16 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 			return Result{}, err
 		}
 	}
+	for _, input := range objects {
+		if input.Output != nil && input.Output.ImageIndex != nil {
+			if root.Release == nil {
+				return Result{}, e.New(e.CodeEngineCapability, "aggregate image publication requires exact release and evidence membership")
+			}
+			if err := admitImageIndexInput(input); err != nil {
+				return Result{}, err
+			}
+		}
+	}
 	sort.Slice(objects, func(i, j int) bool {
 		if (objects[i].Evidence == nil) != (objects[j].Evidence == nil) {
 			return objects[i].Evidence == nil

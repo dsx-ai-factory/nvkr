@@ -291,6 +291,14 @@ and cannot restore a live verification capability. Explicit Release verification
 policy checks. [Release navigation](release-navigation.md) documents the registry and local entry points and
 their validation scope.
 
+Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
+unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
+one image output with a sorted finite platform set; the compiler freezes a native Build, result and SBOM use
+for every member and derives a separate logical aggregate Build Digest. Run completeness and publication
+metadata retain that exact membership. Helm binds the complete index digest. Native image bytes and native
+IR identity are unchanged. Contract tests cover these joins; they do not establish native dual-architecture
+hosted execution, registry services, signing or operational release acceptance (ADR-11/12/16/20).
+
 | Identity or record | Owner and purpose | Boundary |
 |---|---|---|
 | Definition | Product author → definition admission → compiler | Named output intent; the single product-authoring input |
@@ -307,7 +315,7 @@ All structured identities use ADR-01's canonical codec and named digest families
 integer-only numeric profile; an arbitrary JSON serialization is not an identity implementation. Raw SHA-256
 remains appropriate for exact blob integrity. These distinctions explain why one build can produce different
 run evidence without changing Build Digest. The retired `nkd.recipe` family remains reserved for historical
-identities. Definition v4, catalog v3, IR v4 and Run plan/artifact graph v4 readers reject old shapes; signed bytes are not converted.
+identities. Definition v5, catalog v3, IR v4 and Run plan/artifact graph v5 readers reject old shapes; signed bytes are not converted.
 Compiler-handoff and execution-settings digest families remain reserved after removal. Production SLSA
 build-type `/v2` parameters bind the original Definition and Environment identities directly.
 

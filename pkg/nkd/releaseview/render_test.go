@@ -201,3 +201,34 @@ func TestRenderLabelsDerivedReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderImageIndexShowsExactChildrenAndPlatformEvidence(t *testing.T) {
+	binding := &delivery.ImageIndexBinding{RequiredPlatforms: []string{"linux/amd64", "linux/arm64"}, Children: []delivery.ImageIndexChildBinding{
+		{Platform: "linux/amd64", Component: "controller", ManifestDigest: "sha256:" + strings.Repeat("a", 64), BuildDigest: "sha256:" + strings.Repeat("b", 64)},
+		{Platform: "linux/arm64", Component: "controller", ManifestDigest: "sha256:" + strings.Repeat("c", 64), BuildDigest: "sha256:" + strings.Repeat("d", 64)},
+	}}
+	description := delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{{Output: delivery.Output{Name: "cwe", Kind: "oci", ImageIndex: binding}}}}
+	for _, child := range binding.Children {
+		description.Evidence = append(description.Evidence, delivery.PublicationEvidence{Kind: "sbom", Binding: delivery.EvidenceBinding{Outputs: []string{"cwe"}, Platform: child.Platform, Component: child.Component, Stage: "build-output", SubjectKind: "oci-manifest", SubjectDigest: child.ManifestDigest}})
+	}
+	for _, format := range []string{"text", "json", "mermaid"} {
+		t.Run(format, func(t *testing.T) {
+			raw, err := Render(description, Options{Format: format, Output: "cwe"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, child := range binding.Children {
+				digest := child.ManifestDigest
+				if format == "mermaid" {
+					digest = shortDigest(digest)
+				}
+				if !strings.Contains(string(raw), child.Platform) || !strings.Contains(string(raw), digest) {
+					t.Fatalf("missing platform/manifest binding: %s", raw)
+				}
+			}
+			if format == "mermaid" && (!strings.Contains(string(raw), "e0 -->|inventories| o0_p0") || !strings.Contains(string(raw), "e1 -->|inventories| o0_p1")) {
+				t.Fatalf("evidence did not join its native child: %s", raw)
+			}
+		})
+	}
+}

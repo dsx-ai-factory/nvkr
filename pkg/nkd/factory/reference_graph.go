@@ -34,10 +34,17 @@ func deriveOutputPublication(def definition.Definition, env definition.Environme
 		name := outputPublicationPackage(output.Name)
 		packages = append(packages, packageSpec{Name: name, Kind: PackageOCI, Inputs: []string{"package/" + output.Name}})
 		target := targets["release"]
+		target.ImageTags = nil
+		if tag := env.Publication.ImageTags[output.Name]; tag != "" {
+			target.ImageTags = map[string]string{output.Name: tag}
+		}
 		target.Ref = env.Publication.RepositoryPrefix + "/releases-" + output.Name
 		targets[route] = target
 		routes = append(routes, Route{Name: route, Input: "package/" + name, Target: route})
 	}
+	target := targets["release"]
+	target.ImageTags = nil // The metadata-only root cannot publish payload aliases.
+	targets["release"] = target
 	return packages, targets, routes, nil
 }
 

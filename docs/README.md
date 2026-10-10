@@ -19,7 +19,7 @@ each concept to a worked example.
 | Build and recover the local NKE CLI publication | [Local NKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nke-v1/README.md),
-[six-output deploy example](../definitions/nke-deploy/README.md), [34-output M2 candidate and committed workflow](../definitions/nke-m2/README.md),
+[eight-output deploy example](../definitions/nke-deploy/README.md), [35-output M2 candidate and committed workflow](../definitions/nke-m2/README.md),
 and [OS-image routes](../definitions/nke-os/README.md). The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
 Experimental [public OS source producers](../definitions/nke-os-source/README.md) and the
@@ -76,3 +76,5 @@ includes a fast real local build and the v4 publication from Run 37736529644; th
 own current user instructions.
 
 [NKE M2 customer choices](nke-m2-customer-choices.md) explains supplier replacement and its current validation scope.
+
+[Multiarch CWE delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.

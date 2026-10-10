@@ -14,6 +14,12 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/sbom"
 )
 
+type releaseEvidenceSlot struct{ output, platform, stage, component string }
+
+func evidenceSlot(output string, binding EvidenceBinding) releaseEvidenceSlot {
+	return releaseEvidenceSlot{output: output, platform: binding.Platform, stage: binding.Stage, component: binding.Component}
+}
+
 // verifyReleaseEvidence is shared by staged publication and consumption through
 // Inspect. Every declared output derives its required evidence slots; metadata
 // cannot waive a slot or substitute a document for another stage or subject.
@@ -21,8 +27,8 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 	if publication.Release == nil {
 		return nil
 	}
-	expected := map[string]EvidenceBinding{}
-	builds := map[string]string{}
+	expected := map[releaseEvidenceSlot]EvidenceBinding{}
+	builds := map[releaseEvidenceSlot]string{}
 	diskRoots := map[string]string{}
 	diskModes := map[string]string{}
 	for _, o := range publication.Objects {
@@ -30,7 +36,19 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		if output == nil {
 			continue
 		}
-		builds[o.Name] = output.BuildDigest
+		if output.ImageIndex != nil {
+			if err := validateImageIndexObject(o); err != nil {
+				return err
+			}
+			for _, child := range output.ImageIndex.Children {
+				binding := EvidenceBinding{Platform: child.Platform, Outputs: []string{o.Name}, Component: child.Component,
+					Stage: "build-output", SubjectKind: "oci-manifest", SubjectDigest: child.ManifestDigest,
+					InspectionInputDigest: child.BuildSubject}
+				slot := evidenceSlot(o.Name, binding)
+				expected[slot], builds[slot] = binding, child.BuildDigest
+			}
+			continue
+		}
 		subjects := map[string]string{}
 		previous := ""
 		for _, subject := range output.BuildSubjects {
@@ -95,15 +113,17 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			default:
 				return e.New(e.CodeVerifyFailed, "release has an unsupported output format")
 			}
-			expected[o.Name+"/"+binding.Stage+"/"+binding.Component] = binding
+			slot := evidenceSlot(o.Name, binding)
+			expected[slot], builds[slot] = binding, output.BuildDigest
 		}
 		if output.Format == outputFormatHelm {
 			binding := EvidenceBinding{Outputs: []string{o.Name}, Component: o.Name, Stage: "packaging", SubjectKind: "helm-bundle",
 				SubjectDigest: o.DescriptorDigest, InspectionInputDigest: o.BlobDigest}
-			expected[o.Name+"/"+binding.Stage+"/"+binding.Component] = binding
+			slot := evidenceSlot(o.Name, binding)
+			expected[slot], builds[slot] = binding, output.BuildDigest
 		}
 	}
-	seen := map[string]bool{}
+	seen := map[releaseEvidenceSlot]bool{}
 	for _, object := range publication.Objects {
 		if object.Evidence == nil {
 			if object.Kind == "sbom" || object.Kind == "sbom-index" {
@@ -117,13 +137,13 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		}
 		previousOutput := ""
 		for _, outputName := range binding.Outputs {
-			key := outputName + "/" + binding.Stage + "/" + binding.Component
+			key := evidenceSlot(outputName, binding)
 			want, ok := expected[key]
 			single := binding
 			single.Outputs = []string{outputName}
 			single.DocumentDigest = ""
 			if outputName <= previousOutput || !ok || seen[key] || !reflect.DeepEqual(single, want) || object.Kind != "sbom" || (object.ArtifactType != "application/vnd.cyclonedx+json" && object.ArtifactType != sbom.BundleMediaType) {
-				return e.New(e.CodeVerifyFailed, "missing, duplicate or substituted evidence binding %q", key)
+				return e.New(e.CodeVerifyFailed, "missing, duplicate or substituted evidence binding %v", key)
 			}
 			previousOutput = outputName
 			seen[key] = true
@@ -204,7 +224,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 			return e.New(e.CodeVerifyFailed, "SBOM document differs from its exact release subject")
 		}
 		for _, outputName := range binding.Outputs {
-			if props["nkd:buildDigest"] != builds[outputName] {
+			if props["nkd:buildDigest"] != builds[evidenceSlot(outputName, binding)] {
 				return e.New(e.CodeVerifyFailed, "SBOM build is unbound")
 			}
 			diskRoot := diskRoots[outputName]

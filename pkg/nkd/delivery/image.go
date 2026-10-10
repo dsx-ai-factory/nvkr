@@ -10,9 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"path/filepath"
 	"reflect"
-	"strings"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -44,6 +42,7 @@ type ImageInspection struct {
 type imageConfig struct {
 	OS           string `json:"os"`
 	Architecture string `json:"architecture"`
+	Variant      string `json:"variant,omitempty"`
 	Config       struct {
 		Entrypoint []string `json:"Entrypoint"`
 		Cmd        []string `json:"Cmd"`
@@ -157,14 +156,32 @@ func InspectContainerImage(ctx context.Context, root, platform string) (ImageIns
 		OS: config.OS, Arch: config.Architecture, Entrypoint: config.Config.Entrypoint, Command: config.Config.Cmd}, nil
 }
 
+// imageBlobOpener owns the returned file until its release function is called.
+// A held closure lends already verified files; path diagnostics capture new ones.
+type imageBlobOpener func(context.Context, Descriptor, int64) (*heldfile.File, func(), error)
+
+func pathImageBlobs(root string) imageBlobOpener {
+	return func(ctx context.Context, descriptor Descriptor, maximum int64) (*heldfile.File, func(), error) {
+		file, err := holdBlob(ctx, root, descriptor, maximum)
+		if err != nil {
+			return nil, nil, err
+		}
+		return file, func() { _ = file.Close() }, nil
+	}
+}
+
 func verifyImageManifest(ctx context.Context, root string, manifest ociManifest, visited map[string]bool) (imageConfig, error) {
-	config, err := inspectImageMetadata(ctx, root, manifest)
+	return verifyImageManifestFrom(ctx, manifest, visited, pathImageBlobs(root))
+}
+
+func verifyImageManifestFrom(ctx context.Context, manifest ociManifest, visited map[string]bool, open imageBlobOpener) (imageConfig, error) {
+	config, err := inspectImageMetadataFrom(ctx, manifest, open)
 	if err != nil {
 		return config, err
 	}
 	visited[manifest.Config.Digest] = true
 	for i, layer := range manifest.Layers {
-		if err := verifyImageLayer(ctx, root, layer, config.RootFS.DiffIDs[i]); err != nil {
+		if err := verifyImageLayerFrom(ctx, layer, config.RootFS.DiffIDs[i], open); err != nil {
 			return config, err
 		}
 		visited[layer.Digest] = true
@@ -172,8 +189,11 @@ func verifyImageManifest(ctx context.Context, root string, manifest ociManifest,
 	return config, nil
 }
 
-// inspectImageMetadata checks the image profile without reading output layers.
 func inspectImageMetadata(ctx context.Context, root string, manifest ociManifest) (imageConfig, error) {
+	return inspectImageMetadataFrom(ctx, manifest, pathImageBlobs(root))
+}
+
+func inspectImageMetadataFrom(ctx context.Context, manifest ociManifest, open imageBlobOpener) (imageConfig, error) {
 	var config imageConfig
 	media := types.MediaType(manifest.MediaType)
 	configMedia := types.MediaType(manifest.Config.MediaType)
@@ -183,9 +203,14 @@ func inspectImageMetadata(ctx context.Context, root string, manifest ociManifest
 		len(manifest.Layers) == 0 || len(manifest.Layers) > maxDeliveryObjects {
 		return config, e.New(e.CodeVerifyFailed, "container image manifest has an invalid schema or layer count")
 	}
-	raw, err := readBlob(ctx, root, manifest.Config, 8<<20)
+	held, release, err := open(ctx, manifest.Config, 8<<20)
 	if err != nil {
 		return config, err
+	}
+	raw, err := held.ReadAllContext(ctx, 8<<20)
+	release()
+	if err != nil {
+		return config, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "reading container image config"))
 	}
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return config, e.Wrap(e.CodeVerifyFailed, err, "validating container image config JSON")
@@ -197,6 +222,7 @@ func inspectImageMetadata(ctx context.Context, root string, manifest ociManifest
 		return config, e.Wrap(e.CodeVerifyFailed, err, "decoding container image config")
 	}
 	if config.OS != "linux" || (config.Architecture != "amd64" && config.Architecture != "arm64") ||
+		(config.Variant != "" && (config.Architecture != "arm64" || config.Variant != "v8")) ||
 		config.RootFS.Type != "layers" || len(config.RootFS.DiffIDs) != len(manifest.Layers) ||
 		(len(config.Config.Entrypoint) == 0 && len(config.Config.Cmd) == 0) {
 		return config, e.New(e.CodeVerifyFailed, "container image config has an invalid platform, rootfs or command")
@@ -209,22 +235,17 @@ func inspectImageMetadata(ctx context.Context, root string, manifest ociManifest
 	return config, nil
 }
 
-func verifyImageLayer(ctx context.Context, root string, layer Descriptor, diffID string) error {
+func verifyImageLayerFrom(ctx context.Context, layer Descriptor, diffID string, open imageBlobOpener) error {
 	// Repeat the metadata check so this helper rejects invalid descriptors before
-	// opening payloads even when called without inspectImageMetadata.
+	// opening payloads even when called without inspectImageMetadataFrom.
 	if err := validateImageLayerDescriptor(layer, diffID); err != nil {
 		return err
 	}
-
-	held, err := heldfile.OpenContext(ctx, filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(layer.Digest, "sha256:")),
-		heldfile.Options{Label: "container-image-layer", MaxBytes: maxDeliveryFileBytes})
+	held, release, err := open(ctx, layer, maxDeliveryFileBytes)
 	if err != nil {
-		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "holding container image layer"))
+		return err
 	}
-	defer func() { _ = held.Close() }()
-	if held.Digest() != layer.Digest || held.Size() != layer.Size {
-		return e.New(e.CodeVerifyFailed, "container image layer does not match its descriptor")
-	}
+	defer release()
 	var reader io.Reader = io.NewSectionReader(held, 0, held.Size())
 	if layer.MediaType == MediaImageLayerGzip || layer.MediaType == string(types.DockerLayer) {
 		gz, err := gzip.NewReader(reader)
@@ -264,6 +285,9 @@ func verifyImageLayer(ctx context.Context, root string, layer Descriptor, diffID
 // publishedManifestMediaType keeps the exact native image encoding. Other
 // deliverables and evidence are NKD-owned OCI artifact manifests.
 func publishedManifestMediaType(object PublishedObject) string {
+	if object.Output != nil && object.Output.ImageIndex != nil {
+		return MediaOCIIndex
+	}
 	if types.MediaType(object.ArtifactType).IsImage() {
 		return object.ArtifactType
 	}

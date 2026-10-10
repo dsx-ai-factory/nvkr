@@ -58,7 +58,7 @@ The [lifecycle guide](docs/lifecycle.md) covers Definition → Run → Release. 
 resume capabilities. The [demo index](demos/README.md) provides bounded generation, identity and local-build
 journeys with their prerequisites.
 
-The committed bundle selects the 34-output [M2 candidate](definitions/nke-m2/README.md).
+The committed bundle selects the 35-output [M2 candidate](definitions/nke-m2/README.md).
 Regenerate it after changing its Definition, Environment, catalog pins or generator code:
 
 ```sh

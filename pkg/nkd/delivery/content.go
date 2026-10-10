@@ -15,13 +15,14 @@ import (
 // Output describes one observed deliverable. Reference is a transport locator;
 // ContentDigest excludes it from the immutable release-content identity.
 type Output struct {
-	Name        string      `json:"name"`
-	Kind        string      `json:"kind"`
-	Digest      string      `json:"digest"`
-	Reference   string      `json:"reference,omitempty"`
-	BuildDigest string      `json:"buildDigest"`
-	Components  []string    `json:"components,omitempty"`
-	Disk        *DiskOutput `json:"disk,omitempty"`
+	Name        string             `json:"name"`
+	Kind        string             `json:"kind"`
+	Digest      string             `json:"digest"`
+	Reference   string             `json:"reference,omitempty"`
+	BuildDigest string             `json:"buildDigest"`
+	Components  []string           `json:"components,omitempty"`
+	Disk        *DiskOutput        `json:"disk,omitempty"`
+	ImageIndex  *ImageIndexBinding `json:"imageIndex,omitempty"`
 }
 
 // DiskOutput is the descriptive copy of a binding established by factory's held
@@ -60,6 +61,17 @@ func (output Output) Validate() error {
 			return e.New(e.CodeVerifyFailed, "artifact %q components must be canonical, sorted and unique", output.Name)
 		}
 		previous = component
+	}
+	if output.ImageIndex != nil {
+		if output.Kind != "oci" || len(output.Components) != 1 {
+			return e.New(e.CodeVerifyFailed, "image index metadata requires one OCI output component")
+		}
+		if err := output.ImageIndex.validateBuildDigest(output.BuildDigest); err != nil {
+			return err
+		}
+		if output.ImageIndex.Children[0].Component != output.Components[0] {
+			return e.New(e.CodeVerifyFailed, "image index child component differs from its output")
+		}
 	}
 	if output.Kind != "disk-image" {
 		if output.Disk != nil {
@@ -134,6 +146,7 @@ func cloneOutputs(source []Output) []Output {
 	for i := range result {
 		result[i].Components = append([]string(nil), source[i].Components...)
 		result[i].Disk = cloneDiskOutput(source[i].Disk)
+		result[i].ImageIndex = source[i].ImageIndex.Clone()
 	}
 	return result
 }

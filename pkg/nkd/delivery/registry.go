@@ -6,6 +6,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"sort"
@@ -34,10 +35,19 @@ type RegistryOptions struct {
 // repository and returns the digest-pinned bootstrap reference. reference must be
 // an untagged repository for digest-only publication, or an explicit discovery tag.
 func Push(ctx context.Context, layoutPath, reference string, options RegistryOptions) (string, error) {
+	return PushWithOptions(ctx, layoutPath, reference, PushOptions{Registry: options})
+}
+
+// PushWithOptions publishes immutable release bytes before optionally advancing
+// explicit image discovery tags. Tags do not establish signer or release authority.
+func PushWithOptions(ctx context.Context, layoutPath, reference string, request PushOptions) (string, error) {
+	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if err := options.Validate(); err != nil {
+	// PushOptions.Validate includes the identical registry credential validation,
+	// followed by tag admission, before Inspect or any registry operation.
+	if err := request.Validate(); err != nil {
 		return "", err
 	}
 	inspection, err := Inspect(ctx, layoutPath)
@@ -75,11 +85,18 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 	if err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "digesting OCI publication index")
 	}
+	if digest.String() != inspection.RootDigest {
+		return "", e.New(e.CodeVerifyFailed, "publication index changed after membership inspection")
+	}
 	if digestOnly {
 		ref = ref.Context().Digest(digest.String())
 	}
 	remoteOptions := registryOptions(ctx, options)
 	references, err := publicationReferences(ref, inspection.Root, options.PlainHTTP)
+	if err != nil {
+		return "", err
+	}
+	aliases, err := prepareImageAliases(inspection.Root, references, request.ImageTags)
 	if err != nil {
 		return "", err
 	}
@@ -90,6 +107,12 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 	for _, object := range objects {
 		child, ok := references[object.Name]
 		if !ok {
+			continue
+		}
+		if object.Output != nil && object.Output.ImageIndex != nil {
+			if err := pushRegistryImageIndex(ctx, layoutPath, object, child, remoteOptions); err != nil {
+				return "", err
+			}
 			continue
 		}
 		img, cleanup, err := outputImage(ctx, layoutPath, object)
@@ -129,7 +152,11 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 		}
 		return "", e.Wrap(e.CodeUnavailable, err, "publishing OCI release root to %s", ref.Name())
 	}
-	return ref.Context().Name() + "@" + digest.String(), nil
+	pinned := ref.Context().Name() + "@" + digest.String()
+	if err := publishImageAliases(ctx, pinned, aliases, options); err != nil {
+		return "", fmt.Errorf("image alias publication failed after root upload at %s (readback acceptance is not implied): %w", pinned, err)
+	}
+	return pinned, nil
 }
 
 // Pull accepts only a digest-pinned reference, materializes its complete recursive
@@ -183,6 +210,21 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 		for _, object := range publication.Objects {
 			child, ok := references[object.Name]
 			if !ok {
+				continue
+			}
+			if object.Output != nil && object.Output.ImageIndex != nil {
+				if err := validateImageIndexObject(object); err != nil {
+					return err
+				}
+				index, err := fetchRegistryImageIndex(ctx, child, object.Size, object.Output.ImageIndex.RequiredPlatforms, remoteOptions)
+				if err != nil {
+					return err
+				}
+				importErr := materializeRegistryImageIndex(ctx, stage, object, index)
+				closeErr := index.Close()
+				if err := registryImageImportResult(ctx, importErr, closeErr); err != nil {
+					return err
+				}
 				continue
 			}
 			descriptor, err := remote.Get(child, remoteOptions...)
@@ -369,6 +411,8 @@ func (options RegistryOptions) Validate() error {
 	return nil
 }
 
+func validateRegistryOptions(options RegistryOptions) error { return options.Validate() }
+
 // Only sibling repositories in the caller-selected namespace are admitted.
 // Metadata cannot redirect registry credentials to another host or namespace.
 func outputReferences(root name.Reference, publication PublicationRoot, insecure bool) (map[string]name.Digest, error) {
@@ -451,4 +495,12 @@ func OutputReferences(reference string, inspection Inspection) (map[string]strin
 		result[output] = ref.Name()
 	}
 	return result, nil
+}
+
+// Keep import classification primary while retaining a simultaneous cleanup failure.
+func registryImageImportResult(ctx context.Context, importErr, closeErr error) error {
+	if closeErr != nil {
+		closeErr = classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, closeErr, "closing registry image index"))
+	}
+	return errors.Join(importErr, closeErr)
 }

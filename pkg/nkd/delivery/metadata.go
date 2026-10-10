@@ -66,6 +66,27 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 	optionalPayloads := map[string]bool{}
 	total := index.Manifests[0].Size + manifest.Config.Size
 	for _, object := range publication.Objects {
+		if object.Output != nil && object.Output.ImageIndex != nil {
+			controls, payloads, err := imageIndexMetadata(ctx, root, object)
+			if err != nil {
+				return Inspection{}, err
+			}
+			for _, d := range controls {
+				if !visited[d.Digest] {
+					total += d.Size
+					visited[d.Digest] = true
+				}
+			}
+			if total < 0 || total > maxMetadataBytes {
+				return Inspection{}, e.New(e.CodeVerifyFailed, "metadata exceeds total size bound")
+			}
+			if allowPayloads {
+				for _, d := range payloads {
+					optionalPayloads[d.Digest] = true
+				}
+			}
+			continue
+		}
 		m, err := metadataManifest(ctx, root, object)
 		if err != nil {
 			return Inspection{}, err
@@ -139,7 +160,7 @@ func MetadataOutputs(root PublicationRoot) ([]Output, error) {
 			continue
 		}
 		b := object.Output
-		o := Output{Name: object.Name, Kind: b.Format, Digest: object.DescriptorDigest, BuildDigest: b.BuildDigest, Components: append([]string(nil), b.Components...), Disk: cloneDiskOutput(b.Disk)}
+		o := Output{Name: object.Name, Kind: b.Format, Digest: object.DescriptorDigest, BuildDigest: b.BuildDigest, Components: append([]string(nil), b.Components...), Disk: cloneDiskOutput(b.Disk), ImageIndex: b.ImageIndex.Clone()}
 		if b.Format == "apt-repository" {
 			o.Digest = object.SemanticDigest
 		}
@@ -217,6 +238,22 @@ func BuildMetadataRoot(ctx context.Context, out string, root PublicationRoot, so
 	writer := layoutWriter{root: stage, plain: true}
 	for _, o := range root.Objects {
 		source := sources[o.Name]
+		if o.Output != nil && o.Output.ImageIndex != nil {
+			controls, _, err := imageIndexMetadata(ctx, source, o)
+			if err != nil {
+				return Result{}, err
+			}
+			for _, d := range controls {
+				raw, err := readBlob(ctx, source, d, 8<<20)
+				if err != nil {
+					return Result{}, err
+				}
+				if _, err := writer.addBlobBytes(raw, d.MediaType); err != nil {
+					return Result{}, err
+				}
+			}
+			continue
+		}
 		d := Descriptor{MediaType: publishedManifestMediaType(o), Digest: o.DescriptorDigest, Size: o.Size, ArtifactType: o.ArtifactType}
 		raw, err := readBlob(ctx, source, d, 8<<20)
 		if err != nil {

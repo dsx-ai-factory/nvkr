@@ -31,6 +31,11 @@ freezes the exact required set; execution and hosted finalization join producer 
 artifacts and evidence by output name and build identity. Missing, extra, duplicated or substituted outputs fail
 closed. Removing the topology model does not remove these generic completeness checks.
 
+An aggregate image still occupies one required named output. Its exact platform set is authored and frozen;
+each native child carries an independent build/result/evidence use. Run observations retain both native
+manifest and scanned archive identities. Completeness cannot shrink the platform set to whatever succeeded,
+and read-only descriptions return independent copies of those requirements and observations.
+
 ### 2. Release owns exact artifact membership
 
 Named artifacts retain their observed payload digests. Canonical release content binds the complete named
@@ -39,7 +44,7 @@ including sibling repository/digest references. Its transport identity is distin
 cannot appear as one of its own content members. Consumers authenticate and recompute the exact membership
 before accepting or exposing materialized outputs. Names inside publication records cannot select arbitrary destination paths.
 
-No cluster composition or realization is emitted or published. Definition v4, Run/Release v3 and publication
+No cluster composition or realization is emitted or published. Definition v5, Run/Release v4 and publication
 root v4 reject earlier topology-bearing fields rather than dropping them during decoding. Retired cluster
 identity families remain reserved and cannot mint new identities. Historical signed bytes retain their original
 meaning; current readers reject pre-v4 publication roots rather than granting a compatibility alias or authority

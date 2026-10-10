@@ -67,3 +67,14 @@ func executeImagePackage(ctx context.Context, plan *Plan, node Node, output Arti
 	}
 	return err
 }
+
+// factoryImagePayloadDigest selects a descriptor only after the owning image
+// inspector has checked its exact concrete platform or frozen aggregate set.
+func factoryImagePayloadDigest(ctx context.Context, plan *Plan, artifact Artifact) (string, error) {
+	if planNode(plan, artifact.Producer).ImageIndex != nil {
+		index, err := inspectFactoryImageIndex(ctx, plan, artifact)
+		return index.Digest, err
+	}
+	image, err := inspectFactoryImage(ctx, plan, artifact)
+	return image.ManifestDigest, err
+}

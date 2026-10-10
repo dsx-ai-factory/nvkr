@@ -56,7 +56,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 		}
 	}
 	var result []delivery.ObjectInput
-	add := func(bom *sbom.BOM, output, component, stage, kind, subject, input string) error {
+	add := func(bom *sbom.BOM, output, platform, component, stage, kind, subject, input string) error {
 		bound, err := sbom.ForSubject(bom, subject, stage, input)
 		if err != nil {
 			return err
@@ -74,13 +74,30 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			inspected = input
 		}
 		result = append(result, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(digest, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: digest, Bytes: raw,
-			Evidence: &delivery.EvidenceBinding{Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspected}})
+			Evidence: &delivery.EvidenceBinding{Platform: platform, Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspected}})
 		return nil
 	}
 	for _, output := range selectedPublicationOutputs(plan, node) {
 		artifact, ok := artifacts[output.ArtifactID]
 		if !ok || !containsString(node.Inputs, artifact.ID) {
 			return nil, e.New(e.CodeProvenanceMissing, "release omits output %q", output.Name)
+		}
+		if output.ImageIndex != nil {
+			observation, err := observeImageIndex(ctx, plan, output, artifact, artifacts)
+			if err != nil {
+				return nil, err
+			}
+			for i, child := range output.ImageIndex.Children {
+				bom := boms[child.BuildTarget+"/"+child.BuildDigest+"/"+child.Component]
+				if bom == nil {
+					return nil, e.New(e.CodeProvenanceMissing, "release omits native inventory for %q/%q", output.Name, child.Platform)
+				}
+				observed := observation.ImageIndex.Children[i]
+				if err := add(bom, output.Name, child.Platform, child.Component, "build-output", "oci-manifest", observed.ManifestDigest, observed.BuildSubject); err != nil {
+					return nil, err
+				}
+			}
+			continue
 		}
 		for _, component := range output.Components {
 			bom := boms[output.Name+"/"+output.BuildDigest+"/"+component]
@@ -100,7 +117,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			case "helm-oci":
 				stage, kind = "source-build", "source-archive"
 			}
-			if err := add(bom, output.Name, component, stage, kind, subject, input); err != nil {
+			if err := add(bom, output.Name, "", component, stage, kind, subject, input); err != nil {
 				return nil, err
 			}
 		}
@@ -140,7 +157,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			if err != nil {
 				return err
 			}
-			return add(bom, output.Name, output.Name, "packaging", "helm-bundle", subject, input)
+			return add(bom, output.Name, "", output.Name, "packaging", "helm-bundle", subject, input)
 		}()
 		if funcErr != nil {
 			return nil, funcErr

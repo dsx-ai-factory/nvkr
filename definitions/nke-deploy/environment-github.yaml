@@ -9,6 +9,8 @@ kind: Environment
 metadata:
   name: nke-deploy-github
 publication:
+  imageTags:
+    cwe: candidate
   credentialRef: github:GITHUB_TOKEN
   repositoryPrefix: ghcr.io/dsx-ai-factory/nke-recipes
 runtime:

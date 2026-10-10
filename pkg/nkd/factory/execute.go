@@ -356,13 +356,14 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			return err
 		}
 	}
-	push := delivery.Push
+	push := func(ctx context.Context, source, ref string, options delivery.RegistryOptions) (string, error) {
+		return delivery.PushWithOptions(ctx, source, ref, delivery.PushOptions{Registry: options, ImageTags: target.ImageTags})
+	}
 	if PerOutputPublication(plan) && node.Target == "release" {
 		push = delivery.PushMetadata
 	}
 	ref, err := push(ctx, artifacts[node.Inputs[0]].Path, target.Ref, delivery.RegistryOptions{
-		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,
-		Username: username, Password: password,
+		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous, Username: username, Password: password,
 	})
 	if err != nil {
 		return err

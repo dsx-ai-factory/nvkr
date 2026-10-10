@@ -96,7 +96,7 @@ evidence for an exact component may remain independently inspectable, but it can
 production predicate. Likewise, a list of matching resolved dependencies records what the producer consumed;
 it does not assert exact-byte reproduction of the produced subject.
 
-The Definition and Environment parameters identify the admitted authored inputs directly. Run plan v4 carries
+The Definition and Environment parameters identify the admitted authored inputs directly. Run plan v5 carries
 those exact values and revalidates their identities before execution or attestation. The retired compile-spec
 and execution-settings objects are not provenance dependencies. Their replacement changes the NKD build-type
 URI major; a `/v1` production predicate cannot be interpreted with `/v2` parameter meanings. Reproduction

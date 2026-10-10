@@ -45,10 +45,6 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 	run := &Run{SchemaVersion: RunSchemaVersion, Attempt: attempt, DefinitionDigest: definitionDigest,
 		EnvironmentDigest: environmentDigest, PlanDigest: planDigest,
 		Lane: LaneUnqualified, Status: RunPending}
-	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
-	for _, buildPlan := range plan.Builds {
-		builds[buildPlan.Name] = buildPlan
-	}
 	outputs := make(map[string]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
 	for _, output := range plan.LifecycleOutputs {
 		outputs[output.Name] = output
@@ -58,15 +54,10 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 		artifacts[artifact.ID] = artifact
 	}
 	for _, output := range definition.Outputs {
-		buildPlan, ok := builds[output.Name]
-		if !ok {
-			return nil, e.New(e.CodeUnverifiedRef, "run plan omits output %q build %q", output.Name, output.Name)
-		}
+
 		compiledOutput, ok := outputs[output.Name]
-		if !ok || compiledOutput.Kind != output.Format || compiledOutput.BuildDigest != buildPlan.BuildDigest ||
-			!equalStrings(compiledOutput.Components, output.Components) {
-			return nil, e.New(e.CodeUnverifiedRef,
-				"run plan omits exact compiled lifecycle output %q", output.Name)
+		if !ok || compiledOutput.Kind != output.Format || !equalStrings(compiledOutput.Components, output.Components) {
+			return nil, e.New(e.CodeUnverifiedRef, "run plan omits exact compiled lifecycle output %q", output.Name)
 		}
 		artifactID := compiledOutput.ArtifactID
 		memberArtifactID := compiledOutput.ArtifactID
@@ -75,17 +66,21 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 				artifactID = "package/" + publicationPackageName
 			}
 		}
-		componentResults := make([]string, 0, len(output.Components))
-		for _, component := range output.Components {
-			resultID := "result/" + output.Name + "/" + component
-			result, exists := artifacts[resultID]
-			if !exists || result.Component != component || result.BuildTarget != output.Name {
-				return nil, e.New(e.CodeUnverifiedRef, "run plan omits exact producer result %q for output %q", resultID, output.Name)
-			}
-			componentResults = append(componentResults, resultID)
+
+		slot := requiredOutput{Name: output.Name, Kind: output.Format, ArtifactID: artifactID, MemberArtifactID: memberArtifactID,
+			BuildDigest: compiledOutput.BuildDigest, Components: append([]string(nil), output.Components...), ImageIndex: compiledOutput.ImageIndex.Clone()}
+		bindings, err := requiredProducerBindings(slot)
+		if err != nil {
+			return nil, err
 		}
-		run.Expected = append(run.Expected, requiredOutput{Name: output.Name, Kind: output.Format, ArtifactID: artifactID, MemberArtifactID: memberArtifactID,
-			BuildDigest: buildPlan.BuildDigest, Components: append([]string(nil), output.Components...), ComponentResults: componentResults})
+		for _, binding := range bindings {
+			result, exists := artifacts[binding.id]
+			if !exists || result.Kind != "producer-result" || result.Component != binding.component || result.BuildTarget != binding.target {
+				return nil, e.New(e.CodeUnverifiedRef, "run plan omits exact producer result %q for output %q", binding.id, output.Name)
+			}
+			slot.ComponentResults = append(slot.ComponentResults, binding.id)
+		}
+		run.Expected = append(run.Expected, slot)
 	}
 	sort.Slice(run.Expected, func(i, j int) bool { return run.Expected[i].Name < run.Expected[j].Name })
 	return run, nil
@@ -121,6 +116,9 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 		}
 		if artifact.Kind != slot.Kind || artifact.BuildDigest != slot.BuildDigest || !equalStrings(artifact.Components, slot.Components) {
 			return nil, e.New(e.CodeVerifyFailed, "run artifact %q does not satisfy its frozen kind/build/component slot", artifact.Name)
+		}
+		if err := factory.ValidateLifecycleOutputs([]factory.LifecycleOutputPlan{{Name: slot.Name, Kind: slot.Kind, BuildDigest: slot.BuildDigest, Components: slot.Components, ImageIndex: slot.ImageIndex}}, []factory.LifecycleBoundOutput{artifact}); err != nil {
+			return nil, err
 		}
 		if artifact.Kind == OutputDiskImage && (artifact.Disk == nil || artifact.Disk.PlanDigest != run.PlanDigest) {
 			return nil, e.New(e.CodeVerifyFailed,
@@ -169,8 +167,20 @@ func validateRun(run *Run) error {
 	previous := ""
 	for _, slot := range run.Expected {
 		if !namePattern.MatchString(slot.Name) || slot.Name <= previous || slot.ArtifactID == "" || slot.MemberArtifactID == "" || !canonical.IsDigest(slot.BuildDigest) ||
-			(slot.Kind != OutputHelm && len(slot.Components) == 0) || len(slot.ComponentResults) != len(slot.Components) {
+			(slot.Kind != OutputHelm && len(slot.Components) == 0) {
 			return e.New(e.CodeVerifyFailed, "run required outputs must be canonical, sorted, unique, and complete")
+		}
+		bindings, err := requiredProducerBindings(slot)
+		if err != nil {
+			return err
+		}
+		if len(bindings) != len(slot.ComponentResults) {
+			return e.New(e.CodeVerifyFailed, "run omits frozen native producer results")
+		}
+		for i, binding := range bindings {
+			if slot.ComponentResults[i] != binding.id {
+				return e.New(e.CodeVerifyFailed, "run substitutes frozen native producer result")
+			}
 		}
 		previous = slot.Name
 	}
@@ -208,6 +218,7 @@ func cloneRequired(source []requiredOutput) []requiredOutput {
 	clone := make([]requiredOutput, len(source))
 	for index, slot := range source {
 		clone[index] = slot
+		clone[index].ImageIndex = slot.ImageIndex.Clone()
 		clone[index].Components = append([]string(nil), slot.Components...)
 		clone[index].ComponentResults = append([]string(nil), slot.ComponentResults...)
 	}

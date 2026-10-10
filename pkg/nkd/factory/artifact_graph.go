@@ -21,6 +21,14 @@ func (graph ArtifactGraph) Validate() error {
 		if !safeGraphID(node.ID) || nodes[node.ID].ID != "" {
 			return e.New(e.CodeInvalidCatalog, "artifact graph node %q is invalid or repeated", node.ID)
 		}
+		if node.ImageIndex != nil {
+			if node.Kind != NodePackage || node.PackageKind != PackageImage || !strings.HasPrefix(node.ID, "package/") {
+				return e.New(e.CodeInvalidCatalog, "image index requirements on non-image package operation")
+			}
+			if err := node.ImageIndex.ValidateFor(strings.TrimPrefix(node.ID, "package/"), "", nil); err != nil {
+				return err
+			}
+		}
 		producer := node.IRNode != ""
 		if producer {
 			if node.BuildTarget == "" || (node.Kind != NodeFetch && node.Kind != NodeBuild && node.Kind != NodeAcquire) {

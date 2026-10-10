@@ -110,17 +110,22 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 	if !reflect.DeepEqual(plan.Targets, targets) || !reflect.DeepEqual(plan.Routes, routes) {
 		return nil, e.New(e.CodeUnverifiedRef, "run plan publication routing differs from its authored environment")
 	}
-	if len(plan.LifecycleOutputs) != len(plan.Definition.Outputs) || len(plan.Builds) != len(plan.Definition.Outputs) {
+
+	if len(plan.LifecycleOutputs) != len(plan.Definition.Outputs) {
 		return nil, e.New(e.CodeUnverifiedRef, "run plan omits or adds authored output slots")
+	}
+
+	requiredBuilds := 0
+	for _, output := range plan.Definition.Outputs {
+		requiredBuilds += len(nativeOutputSelections(output))
+	}
+	if len(plan.Builds) != requiredBuilds {
+		return nil, e.New(e.CodeUnverifiedRef, "run plan omits or adds authored output slots or native build uses")
 	}
 	for i, output := range plan.Definition.Outputs {
 		bound := plan.LifecycleOutputs[i]
-		artifactID, artifactErr := lifecycleArtifactID(output, plan.Builds[i].ResolvedComponents)
-		if artifactErr != nil {
-			return nil, artifactErr
-		}
-		if bound.Name != output.Name || bound.Kind != output.Format || bound.ArtifactID != artifactID || !equalFactoryStrings(bound.Components, output.Components) {
-			return nil, e.New(e.CodeUnverifiedRef, "run plan output %q differs from its definition", output.Name)
+		if bound.Name != output.Name || bound.Kind != output.Format || !equalFactoryStrings(bound.Components, output.Components) {
+			return nil, e.New(e.CodeUnverifiedRef, "run plan output %q differs from its Definition", output.Name)
 		}
 	}
 	return packages, nil

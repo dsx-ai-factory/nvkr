@@ -324,7 +324,7 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 		if binding == nil {
 			continue
 		} // Inspect already requires exact evidence membership for every other object.
-		output := Output{Name: object.Name, Kind: binding.Format, Digest: object.DescriptorDigest, BuildDigest: binding.BuildDigest, Components: append([]string(nil), binding.Components...), Disk: cloneDiskOutput(binding.Disk)}
+		output := Output{Name: object.Name, Kind: binding.Format, Digest: object.DescriptorDigest, BuildDigest: binding.BuildDigest, Components: append([]string(nil), binding.Components...), Disk: cloneDiskOutput(binding.Disk), ImageIndex: binding.ImageIndex.Clone()}
 		if binding.Format == "apt-repository" {
 			output.Digest = object.SemanticDigest
 		}
@@ -344,6 +344,16 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 		case "oci":
 			if len(members) != 1 || binding.TransportPath != "" {
 				return nil, e.New(e.CodeVerifyFailed, "OCI output has invalid members or transport binding")
+			}
+			if output.ImageIndex != nil {
+				index, err := openPublishedImageIndex(ctx, layout, object)
+				if err != nil {
+					return nil, err
+				}
+				if err := index.Close(); err != nil {
+					return nil, err
+				}
+				break
 			}
 			image, err := inspectPublishedContainerImage(ctx, layout, inspection, output.Name)
 			if err != nil {

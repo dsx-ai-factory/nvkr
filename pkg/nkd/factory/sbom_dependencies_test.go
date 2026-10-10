@@ -19,43 +19,54 @@ import (
 )
 
 func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
-	for _, tc := range []struct {
-		name, omit string
-		code       e.Code
-	}{
-		{"complete", "", ""},
-		{"missing scanner", "tool/syft", e.CodeEngineCapability},
-		{"missing payload", "artifact/cwe/nke-controller", e.CodeProvenanceMissing},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if plan.Definition.SBOMTool != "syft" {
-				t.Fatal("maintained workflow does not request dependency inspection")
-			}
-			if tc.omit != "" {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		for _, tc := range []struct {
+			name, omit string
+			code       e.Code
+		}{
+			{"complete", "", ""},
+			{"missing scanner", "tool/syft", e.CodeEngineCapability},
+			{"missing payload", "artifact/cwe/" + platform + "/nke-controller", e.CodeProvenanceMissing},
+		} {
+			t.Run(platform+"/"+tc.name, func(t *testing.T) {
+				plan, err := LoadPlanContext(t.Context(), "../../../.github/nkd-run/plan.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if plan.Definition.SBOMTool != "syft" {
+					t.Fatal("maintained workflow does not request dependency inspection")
+				}
+				found, removed := false, false
 				for i := range plan.Graph.Nodes {
 					node := &plan.Graph.Nodes[i]
-					if node.ID == "cwe/sbom" {
-						var inputs []string
-						for _, input := range node.Inputs {
-							if input != tc.omit {
-								inputs = append(inputs, input)
-							}
-						}
-						node.Inputs = inputs
+					if node.ID != "cwe/"+platform+"/sbom" {
+						continue
 					}
+					found = true
+					if tc.omit == "" {
+						break
+					}
+					var inputs []string
+					for _, input := range node.Inputs {
+						if input == tc.omit {
+							removed = true
+						} else {
+							inputs = append(inputs, input)
+						}
+					}
+					node.Inputs = inputs
 				}
-			}
-			err = plan.validateSBOMGraph()
-			if tc.code != "" {
-				assertFactoryErrorCode(t, err, tc.code)
-			} else if err != nil {
-				t.Fatal(err)
-			}
-		})
+				if !found || (tc.omit != "" && !removed) {
+					t.Fatal("test did not select the exact native SBOM dependency")
+				}
+				err = plan.validateSBOMGraph()
+				if tc.code != "" {
+					assertFactoryErrorCode(t, err, tc.code)
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
 	}
 }
 

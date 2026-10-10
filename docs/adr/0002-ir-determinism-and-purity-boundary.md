@@ -39,7 +39,7 @@ Every field lives in exactly one tier:
 - **T2 — deterministic metadata, *not* in the Build Digest**: the Build Digest itself, the expected
   per-artifact digests, the **builder-profile identity**, deterministic execution requirements and their
   Plan bindings, the conformance claim, the ValidationVector reference, and the accelerated-runtime reference.
-  Output names, supported-platform admission lists and packaging
+  Output names, catalog supported-platform admission lists and packaging
   are also excluded from build identity. They remain bound in the owning catalog/Definition/Plan
   records. Deployment classification and topology are not admitted NKD inputs. Authority-bearing T2 records are signed **detached**, never embedded in the bytes the identity covers.
 - **T3 — detached, non-identity record** (may carry host/clock/builder facts; **may be independently signed**):
@@ -53,6 +53,12 @@ Every field lives in exactly one tier:
 - The Build Digest is the digest of the **resolved/compiled logical T1 projection** of one Definition output
   under `nkd.build`, after exact producer and pin selection. There is no authored Recipe or intermediate group.
   Two named outputs with the same selected producers, target and pinned logical graph share one Build Digest.
+- An aggregate OCI image has a separate logical T1 projection: its exact required platform set and
+  one `(platform, component, native Build Digest)` child per platform, sorted canonically and hashed under
+  `nkd.build` with schema `nkd.dev/image-index-build/v1`. Selected required platforms are logical membership,
+  distinct from the catalog's supported-platform admission list. Labels, manifests, archive digests,
+  packaging commands, runner routes and registry locations are absent. Each native child continues to use
+  unchanged IR v4 identity. Recomputing this vector authenticates no producer execution or evidence.
 - A value **derived from a pin**, such as the source-date taken from the pinned commit's committer date, is a
   **deterministic input** and belongs in T1.
 - The **host wall clock, hostname, home directory, host timezone, and kernel** are observations. They are
@@ -75,7 +81,7 @@ The full executable graph and Plan retain transport settings and their exact byt
 from `buildDigest` does not authorize unchecked relocation. A general air-gap lifecycle remains outside the
 current scope.
 
-The separation is structural: `ir.LogicalGraph` and `ir.LogicalNode` cannot represent source URLs, artifact
+The native separation is structural: `ir.LogicalGraph` and `ir.LogicalNode` cannot represent source URLs, artifact
 locators, flake references, execution requirements or execution bindings. The complete `ir.Graph` is validated
 before projection. Clearing strings just before hashing is insufficient, because a new field could otherwise
 leak into identity unnoticed.

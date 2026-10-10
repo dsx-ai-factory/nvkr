@@ -35,11 +35,11 @@ func TestVerifyImageLayerAdmitsDescriptorBeforePayloadAccess(t *testing.T) {
 				t.Fatalf("fixture must have no payload file: %v", err)
 			}
 
-			err := verifyImageLayer(t.Context(), root, layer, diffID)
+			err := verifyImageLayerFrom(t.Context(), layer, diffID, pathImageBlobs(root))
 			assertRegistryCode(t, err, e.CodeVerifyFailed)
 			want := "container image layer has an invalid identity, size or media type"
 			if test.edit == nil {
-				want = "holding container image layer"
+				want = "opening OCI blob"
 			}
 			if !strings.Contains(err.Error(), want) {
 				t.Fatalf("wrong admission failure: %v, want %q", err, want)

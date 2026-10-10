@@ -35,12 +35,14 @@ The former GitLab-only `runtime.builderImage` schema field has no retained adapt
 fails capability admission. GitHub uses its pinned setup-go action for source bootstrap.
 A future provider must satisfy its evidence admission before receiving an implementation. Adapters map **job/step
 topology and artifact transport only**, never build semantics. Adding an engine is one thin adapter; adding a
-component is one catalog entry and no code. Definition v4 names each output, its exact catalog producers,
-and its concrete platform. Compilation derives one internal build target per output; no authored reusable
-producer group, recipe selection, criteria matcher, mixin or recipe layer participates. The BuildDigest
+component is one catalog entry and no code. Definition v5 names each output and its exact catalog producers.
+A native output declares one concrete `platform` and derives one internal build target. An OCI aggregate declares a sorted, unique `platforms` set
+and derives one native build target per member plus one image-index package output. Every native member
+retains its own producer results and evidence obligations; the aggregate binds their complete exact closure.
+No authored reusable producer group, recipe selection, criteria matcher, mixin or recipe layer participates. The BuildDigest
 identifies the selected executable producer closure and excludes the output name, packaging and transport.
 Two named outputs with equal BuildDigest retain independent executions, results and evidence obligations.
-Existing Helm image-output dependencies remain explicit packaging edges. Run-plan and artifact-graph v4 contain no cluster-composition nodes or records. Compiler handoff documents
+Existing Helm image-output dependencies remain explicit packaging edges. Run-plan and artifact-graph v5 contain no cluster-composition nodes or records. Compiler handoff documents
 are removed; the complete Plan retains the exact authored Definition and Environment.
 
 The Plan retains its base catalog snapshot and each output's selected catalog snapshot, checked against their

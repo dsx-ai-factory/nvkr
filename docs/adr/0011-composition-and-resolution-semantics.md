@@ -23,7 +23,7 @@ complete required build graph directly from those producers.
 
 ### 1. Exact producer selection
 
-Each Definition output declares a concrete target platform and a nonempty explicit component selection.
+Each Definition output declares a concrete target platform, or an explicit required platform set for an OCI image index, and a nonempty explicit component selection.
 The output uses the Definition's catalog stack unless it supplies its own.
 Catalog sources, tools and components are reusable. There is no authored Recipe, reusable build
 group, criteria query, wildcard, specificity rule, inheritance chain, mixin, enable/disable merge, or reserved-axis
@@ -52,6 +52,14 @@ The generated graph uses `nkd.dev/ir/v4`; its transport-independent logical proj
 selected membership, target, pins or output-affecting instructions must change it.
 Output labels, packaging and Environment settings remain outside build identity and inside their owning records.
 Deployment categories, node roles and cluster composition are removed rather than transported as unused metadata.
+
+For an image index, the compiler expands the single named output into independent native producer uses
+keyed by `(output, platform)`, plus one aggregate package. Each native use selects the same one image
+component and retains its own IR, Build Digest, result and SBOM. Required membership is frozen before
+execution and never inferred from successful children. The aggregate logical Build identity is the explicit
+native vector in ADR-02; observed OCI descriptors do not enter it. Missing child work cannot be supplied by
+an equal-digest sibling or a later manifest command outside the Plan. Helm packaging may bind the resulting
+index digest only when its declared platform is covered by the required set.
 
 Each output remains independently accountable even if two output graphs have identical Build Digests. Initial
 execution may produce shared components twice. Cross-output reuse requires a separate authenticated reuse

@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"reflect"
 	"sort"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
@@ -45,7 +46,21 @@ func (plan Plan) validateLifecyclePlans() error {
 	}
 	previous := ""
 	for i, output := range plan.LifecycleOutputs {
+		required, err := outputRequirements(plan.Definition.Outputs[i], builds)
+		if err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(output, required) {
+			return e.New(e.CodeUnverifiedRef, "lifecycle output %q differs from its exact Definition requirements", output.Name)
+		}
 		artifact, ok := artifacts[output.ArtifactID]
+		if output.ImageIndex != nil {
+			if !ok || artifact.Kind != PackageImage || artifact.Name != output.Name || artifact.MediaType != "application/vnd.oci.image.index.v1+json" || output.Name <= previous {
+				return e.New(e.CodeUnverifiedRef, "image index output %q lacks exact aggregate artifact", output.Name)
+			}
+			previous = output.Name
+			continue // Requirements above were rederived; graph equality checks every child edge.
+		}
 		build, buildOK := builds[output.Name]
 		producer := nodes[artifact.Producer]
 		var actualComponents []string

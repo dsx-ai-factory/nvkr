@@ -146,3 +146,42 @@ func fixtureManifest(t *testing.T, root string) (ociIndex, ociManifest) {
 	}
 	return index, manifest
 }
+
+// Direct single-image inspection shares the baseline policy with aggregate children.
+func TestContainerImageNativeVariantAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		arch, variant string
+		accepted      bool
+	}{
+		{"amd64", "", true}, {"amd64", "v3", false},
+		{"arm64", "", true}, {"arm64", "v8", true}, {"arm64", "v9", false},
+	} {
+		t.Run(tc.arch+"/"+tc.variant, func(t *testing.T) {
+			root := imageFixture(t)
+			index, _ := fixtureManifest(t, root)
+			input := ImageIndexInput{LayoutPath: root, ManifestDigest: index.Manifests[0].Digest}
+			rewriteImageChild(t, &input, func(_ *ociManifest, config map[string]any) {
+				config["architecture"] = tc.arch
+				if tc.variant == "" {
+					delete(config, "variant")
+				} else {
+					config["variant"] = tc.variant
+				}
+			})
+			got, err := InspectContainerImage(t.Context(), root, "linux/"+tc.arch)
+			if tc.accepted {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got.ManifestDigest != input.ManifestDigest {
+					t.Fatal("native manifest identity changed")
+				}
+			} else {
+				assertRegistryCode(t, err, e.CodeVerifyFailed)
+				if !strings.Contains(err.Error(), "invalid platform") {
+					t.Fatalf("unexpected rejection: %v", err)
+				}
+			}
+		})
+	}
+}

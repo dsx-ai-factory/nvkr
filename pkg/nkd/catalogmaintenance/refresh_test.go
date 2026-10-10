@@ -131,7 +131,7 @@ func maintenanceFixture(t *testing.T) (Config, func(string)) {
 	if _, err := catalog.UpdateSourcePins(t.Context(), catalog.SourcePinRequest{Directory: "catalog", Sources: cfg.Sources, SameRelease: cfg.SameRelease, Bump: true}); err != nil {
 		t.Fatal(err)
 	}
-	writeFixture(t, "definition.yaml", []byte("apiVersion: nkd.dev/definition/v4\nkind: Definition\nmetadata: {name: fixture}\ncatalog: {base: catalog}\noutputs:\n- {name: tools, format: executable, platform: linux/amd64, components: [tool]}\n"))
+	writeFixture(t, "definition.yaml", []byte("apiVersion: nkd.dev/definition/v5\nkind: Definition\nmetadata: {name: fixture}\ncatalog: {base: catalog}\noutputs:\n- {name: tools, format: executable, platform: linux/amd64, components: [tool]}\n"))
 	writeFixture(t, "environment.yaml", []byte("apiVersion: nkd.dev/environment/v1\nkind: Environment\nmetadata: {name: fixture}\nutilityContainer: "+image+"\nutilityPlatform: linux/amd64\n"))
 	writeJSON(t, "maintenance.yaml", cfg)
 	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", false); err != nil {

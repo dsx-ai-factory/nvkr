@@ -42,8 +42,8 @@ _Avoid_: Signing configuration, verification result, producer assertion
 ## Definition and production relationships
 
 **Named output**:
-A Definition's declaration of exact selected producers, concrete target platform, and the artifact format they
-must produce. Each named output is an independent required use, even when two outputs share a Build Digest.
+A Definition's declaration of exact selected producers, concrete target platform or explicit aggregate image
+platform set, and the artifact format they must produce. Each named output is an independent required use, even when two outputs share a Build Digest.
 _Avoid_: Observed artifact, delivery route
 
 **Disk-image output**:
@@ -99,6 +99,14 @@ A review-only lock and regenerated execution-bundle change under explicit source
 Static checks and optional complete local diagnostic execution precede candidate handoff; neither is release
 acceptance. Scheduling and source-role alignment are operational policy, not additional lifecycle objects.
 _Avoid_: Release, qualified reproduction, automatic promotion
+
+**Runnable OCI image index**:
+An Artifact representation: a standard OCI index selecting exact native child image manifests by explicit platform. Its blob digest is
+separate from each child's identity and from logical Build identity. Delivery can hold and verify its byte
+closure. One named output can freeze an explicit platform set, an aggregate logical Build Digest and each
+child's native build and evidence bindings (ADR-11/12/20). The aggregate logical Build identity remains distinct
+from the runnable index digest.
+_Avoid_: Release publication root, native image manifest, qualification receipt
 
 **Binary bundle**:
 An Artifact format containing exact executable files and their installation metadata.

@@ -130,19 +130,25 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		if selected := targetStacks[target.Name]; selected != nil {
 			targetStack = selected
 		}
-		build, err := compileOutputBuild(target, delivery, targetStack)
+
+		for _, selection := range nativeOutputSelections(target) {
+			build, err := compileOutputBuild(selection, delivery, targetStack)
+			if err != nil {
+				return nil, err
+			}
+			plan.Builds = append(plan.Builds, build)
+		}
+	}
+	builds := make(map[string]BuildPlan, len(plan.Builds))
+	for _, build := range plan.Builds {
+		builds[build.Name] = build
+	}
+	for _, target := range definition.Outputs {
+		required, err := outputRequirements(target, builds)
 		if err != nil {
 			return nil, err
 		}
-		plan.Builds = append(plan.Builds, build)
-		artifactID, err := lifecycleArtifactID(target, build.ResolvedComponents)
-		if err != nil {
-			return nil, err
-		}
-		plan.LifecycleOutputs = append(plan.LifecycleOutputs, LifecycleOutputPlan{
-			Name: target.Name, Kind: target.Format, ArtifactID: artifactID,
-			BuildDigest: build.BuildDigest, Components: append([]string(nil), target.Components...),
-		})
+		plan.LifecycleOutputs = append(plan.LifecycleOutputs, required)
 	}
 	packageSpecs, targets, routes, err := derivePublication(definition, delivery, plan.Builds)
 	if err != nil {

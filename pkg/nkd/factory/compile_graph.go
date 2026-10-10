@@ -36,32 +36,34 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 	for _, build := range plan.Builds {
 		builds[build.Name] = build
 	}
-	for _, target := range definition.Outputs {
-		build, ok := builds[target.Name]
-		if !ok || build.Graph == nil {
-			return ArtifactGraph{}, e.New(e.CodePipelineDrift, "output %q has no resolved producer graph", target.Name)
-		}
-		selected := make(map[string]bool, len(build.Components))
-		for _, name := range build.Components {
-			selected[name] = true
-		}
-		if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, delivery.Publication != nil, nodes, artifacts); err != nil {
-			return ArtifactGraph{}, err
-		}
-		if target.Format == "disk-image" && delivery.Publication != nil {
-			if err := admitDiskPublicationProducer(build); err != nil {
+	for _, output := range definition.Outputs {
+		for _, target := range nativeOutputSelections(output) {
+			build, ok := builds[target.Name]
+			if !ok || build.Graph == nil {
+				return ArtifactGraph{}, e.New(e.CodePipelineDrift, "output %q has no resolved producer graph", target.Name)
+			}
+			selected := make(map[string]bool, len(build.Components))
+			for _, name := range build.Components {
+				selected[name] = true
+			}
+			if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, delivery.Publication != nil, nodes, artifacts); err != nil {
 				return ArtifactGraph{}, err
 			}
-			if diskBuildProvenance(&plan) {
-				continue
+			if target.Format == "disk-image" && delivery.Publication != nil {
+				if err := admitDiskPublicationProducer(build); err != nil {
+					return ArtifactGraph{}, err
+				}
+				if diskBuildProvenance(&plan) {
+					continue
+				}
+				host, profile, err := diskPublicationInspectionProfile(build, delivery)
+				if err != nil {
+					return ArtifactGraph{}, err
+				}
+				node := nodes[target.Name+"/sbom"]
+				node.Container, node.Platform = profile.Image, host
+				nodes[node.ID] = node
 			}
-			host, profile, err := diskPublicationInspectionProfile(build, delivery)
-			if err != nil {
-				return ArtifactGraph{}, err
-			}
-			node := nodes[target.Name+"/sbom"]
-			node.Container, node.Platform = profile.Image, host
-			nodes[node.ID] = node
 		}
 	}
 	if definition.SBOMTool != "" {
@@ -108,13 +110,18 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			return ArtifactGraph{}, err
 		}
 		if spec.Kind == PackageImage {
-			input := artifacts[inputs[0]]
-			switch nodes[input.Producer].Kind {
-			case NodeBuild:
-			case NodeAcquire:
-				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
-			default:
-				return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q requires a build or acquired-image producer", spec.Name)
+			for _, inputID := range append([]string(nil), inputs...) {
+				input := artifacts[inputID]
+				switch nodes[input.Producer].Kind {
+				case NodeBuild:
+				case NodeAcquire:
+					if spec.ImageIndex != nil {
+						return ArtifactGraph{}, e.New(e.CodeEngineCapability, "aggregate image requires built OCI exports")
+					}
+					inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
+				default:
+					return ArtifactGraph{}, e.New(e.CodeEngineCapability, "image package %q requires a build or acquired-image producer", spec.Name)
+				}
 			}
 		}
 		if spec.Kind == PackageHelm {
@@ -148,6 +155,11 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				}
 			}
 		}
+		if spec.ImageIndex != nil {
+			for _, child := range spec.ImageIndex.Children {
+				inputs = append(inputs, child.ResultArtifactID, child.SBOMArtifactID)
+			}
+		}
 		if spec.Kind == PackageOCI {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
 			inputs = append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...)
@@ -157,11 +169,12 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
 			HelmImage:    spec.HelmImage,
+			ImageIndex:   spec.ImageIndex.Clone(),
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
 			Inputs: inputs, Outputs: []string{artifactID}, Network: ir.NetworkNone, RunsOn: runsOn,
 			Container: delivery.UtilityContainer, Platform: delivery.UtilityPlatform}
 		artifacts[artifactID] = Artifact{ID: artifactID, Name: spec.Name, Kind: spec.Kind,
-			MediaType: packageMediaType(spec.Kind), Path: filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", spec.Name)), Producer: nodeID}
+			MediaType: packageSpecMediaType(spec), Path: filepath.ToSlash(filepath.Join(".nkd", "factory", "packages", spec.Name)), Producer: nodeID}
 	}
 
 	routes := append([]Route(nil), plan.Routes...)
@@ -267,10 +280,12 @@ func containsString(values []string, wanted string) bool {
 // authenticating the authored inputs, catalog snapshots and producer selections.
 func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 	for _, build := range plan.Builds {
-		for _, output := range plan.Definition.Outputs {
-			if output.Name == build.Name && output.Catalog == nil && build.CatalogDigest != plan.CatalogDigest {
-				return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", output.Name)
-			}
+		selection, ok := plan.selectionForBuild(build.Name)
+		if !ok {
+			return e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
+		}
+		if selection.Catalog == nil && build.CatalogDigest != plan.CatalogDigest {
+			return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
 		}
 	}
 	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot)

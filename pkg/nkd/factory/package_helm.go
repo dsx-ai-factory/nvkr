@@ -36,12 +36,14 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 		}
 		for _, slot := range sortedKeys(node.HelmImage.Images) {
 			binding := node.HelmImage.Images[slot]
-			image, err := inspectFactoryImage(ctx, plan, artifacts[binding.From])
+
+			imageArtifact := artifacts[binding.From]
+			digest, err := factoryImagePayloadDigest(ctx, plan, imageArtifact)
 			if err != nil {
 				return err
 			}
-			imageDigests[slot] = image.ManifestDigest
-			fmt.Fprintf(stdout, "Verified Helm image slot %q at %s\n", slot, image.ManifestDigest)
+			imageDigests[slot] = digest
+			fmt.Fprintf(stdout, "Verified Helm image slot %q at %s\n", slot, digest)
 		}
 		for _, input := range inputs {
 			if input.Kind == "tarball" {

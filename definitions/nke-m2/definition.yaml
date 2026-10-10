@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: nkd.dev/definition/v4
+apiVersion: nkd.dev/definition/v5
 kind: Definition
 metadata:
   name: nke-m2
@@ -36,7 +36,7 @@ outputs:
     components:
       - csi-node-driver-registrar-image
   - name: cwe
-    platform: linux/amd64
+    platforms: [linux/amd64, linux/arm64]
     catalog:
       base: ../nke-controller/catalog
     format: oci

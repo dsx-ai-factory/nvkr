@@ -90,20 +90,26 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 	}
 	// Lifecycle owns the frozen result slots; factory owns re-observing their
 	// exact instruction, record and payload bytes.
-	if len(slot.ComponentResults) != len(slot.Components) {
+
+	bindings, err := requiredProducerBindings(slot)
+	if err != nil {
+		return Artifact{}, err
+	}
+	if len(slot.ComponentResults) != len(bindings) {
 		return Artifact{}, e.New(e.CodeReleaseIncomplete, "output %q has incomplete frozen producer mappings", slot.Name)
 	}
 	for index, id := range slot.ComponentResults {
+		binding := bindings[index]
 		result, exists := artifacts[id]
 		if !exists {
 			return Artifact{}, e.New(e.CodeReleaseIncomplete, "output %q has no frozen producer result %q", slot.Name, id)
 		}
-		if result.Kind != "producer-result" || result.BuildTarget != slot.Name || result.Component != slot.Components[index] {
+		if id != binding.id || result.Kind != "producer-result" || result.BuildTarget != binding.target || result.Component != binding.component {
 			return Artifact{}, e.New(e.CodeVerifyFailed, "output %q substitutes its frozen producer mapping %q", slot.Name, id)
 		}
 	}
 	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID,
-		BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...)}
+		BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...), ImageIndex: slot.ImageIndex.Clone()}
 	observation, err := factory.ObserveWorkspaceLifecyclePayload(ctx, plan, expected, workspace, artifacts)
 	if err != nil {
 		return Artifact{}, err
@@ -139,7 +145,7 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 		}
 	}
 	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: digest, BuildDigest: slot.BuildDigest,
-		Components: components}, nil
+		Components: components, ImageIndex: observation.ImageIndex.Clone()}, nil
 }
 
 type heldDiskObserver func(context.Context, *factory.Plan, factory.LifecycleOutputPlan) (factory.DiskPayloadObservation, error)

@@ -58,6 +58,10 @@ func verifyMetadataInventory(ctx context.Context, root string, required, optiona
 
 func metadataObjectPlatform(ctx context.Context, root string, object PublishedObject) (publicationPlatform, error) {
 	var platform publicationPlatform
+	if object.Output != nil && object.Output.ImageIndex != nil {
+		_, _, err := imageIndexMetadata(ctx, root, object)
+		return platform, err
+	}
 	manifest, err := metadataManifest(ctx, root, object)
 	if err != nil {
 		return platform, err

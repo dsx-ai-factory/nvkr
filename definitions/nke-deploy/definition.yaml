@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: nkd.dev/definition/v4
+apiVersion: nkd.dev/definition/v5
 catalog:
   base: ../nke-controller/catalog
 cosignTool: cosign
 kind: Definition
 metadata:
-  description: Build CWE, its controller chart and Linux AMD64/ARM64 CLI binaries;
+  description: Build Linux AMD64/ARM64 CWE images as one OCI index, its controller chart and CLI binaries;
     acquire the four external charts selected by NKE v0.21.0.
   name: nke-deploy
 outputs:
@@ -23,7 +23,9 @@ outputs:
   - nke-controller
   format: oci
   name: cwe
-  platform: linux/amd64
+  platforms:
+  - linux/amd64
+  - linux/arm64
 - catalog:
     base: ../nke-v1/catalog
   components:

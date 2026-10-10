@@ -35,3 +35,22 @@ func ValidArch(arch string) bool { return arch == "amd64" || arch == "arm64" }
 
 // Arches returns the supported architecture domain in canonical order.
 func Arches() []string { return []string{"amd64", "arm64"} }
+
+// ValidatePlatforms admits a nonempty, canonically ordered finite set of supported
+// targets. Membership is authored explicitly; no host or default fills omissions.
+func ValidatePlatforms(platforms []string) error {
+	if len(platforms) == 0 {
+		return e.New(e.CodeInvalidCatalog, "required platform set is empty")
+	}
+	previous := ""
+	for _, platform := range platforms {
+		if err := ValidatePlatform(platform); err != nil {
+			return err
+		}
+		if platform <= previous {
+			return e.New(e.CodeInvalidCatalog, "required platforms must be sorted and unique")
+		}
+		previous = platform
+	}
+	return nil
+}

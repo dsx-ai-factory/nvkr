@@ -19,10 +19,25 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	if err := environment.Validate(); err != nil {
 		return err
 	}
+	if publication := environment.Publication; publication != nil {
+		for _, name := range sortedKeys(publication.ImageTags) {
+			matches := 0
+			for _, output := range definition.Outputs {
+				if output.Name == name && output.Format == authored.OutputOCI && len(output.Platforms) > 0 {
+					matches++
+				}
+			}
+			if matches != 1 {
+				return e.New(e.CodeInvalidCatalog, "publication imageTags output %q requires one explicit aggregate OCI output", name)
+			}
+		}
+	}
 	if len(environment.GitHubRunners) > 0 {
 		platforms := map[string]bool{environment.UtilityPlatform: true}
 		for _, output := range definition.Outputs {
-			platforms[output.Platform] = true
+			for _, platform := range output.TargetPlatforms() {
+				platforms[platform] = true
+			}
 		}
 		for _, platform := range sortedKeys(platforms) {
 			if _, ok := environment.GitHubRunners[platform]; !ok {

@@ -11,7 +11,7 @@ unpack them.
 This is the complete [ARM64 KVM Definition](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-os/definition-arm64-kvm.yaml):
 
 ```yaml
-apiVersion: nkd.dev/definition/v4
+apiVersion: nkd.dev/definition/v5
 kind: Definition
 metadata:
   name: nke-os-arm64-kvm

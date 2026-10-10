@@ -54,7 +54,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if err := plan.Graph.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Builds) != len(authored.Outputs) || len(plan.LifecycleOutputs) != len(authored.Outputs) {
+	if len(plan.Builds) != len(authored.Outputs)+1 || len(plan.LifecycleOutputs) != len(authored.Outputs) {
 		t.Fatal("compiled Plan does not preserve every required output")
 	}
 	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
@@ -64,6 +64,18 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	images := 0
 	for _, output := range authored.Outputs {
 		t.Run(output.Name, func(t *testing.T) {
+			if len(output.Platforms) != 0 {
+				for _, platform := range output.Platforms {
+					build, ok := builds[output.Name+"/"+platform]
+					if !ok || build.Graph.Platform != platform {
+						t.Fatalf("aggregate native build missing: %s", platform)
+					}
+					if err := build.Graph.Validate(); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return
+			}
 			build, ok := builds[output.Name]
 			if !ok || build.Graph.Platform != output.Platform {
 				t.Fatal("named output or native platform missing from compiled Plan")

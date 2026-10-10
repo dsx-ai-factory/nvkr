@@ -157,6 +157,14 @@ dry-run stays static-unqualified. Pipeline-attested never satisfies qualified re
 Inventory, ReleaseSet, clearance, or stage-two receipt. The hosted design targets SLSA Build L2; that is an
 acceptance target, not a certification established by local tests.
 
+For one aggregate image output, completeness includes every predeclared native child and its exact
+producer result, terminal observation and SBOM. The required platform set and native Build vector are frozen
+in the Definition/Plan/Run before execution. Each child evidence key includes output, platform, stage and
+component; its manifest subject and scanned OCI-export archive remain distinct. The aggregate index does
+not replace either native inventory. A missing child fails the whole named output, even when another
+output has equal bytes or an equal Build Digest. This is the pipeline artifact-publication membership
+contract, not qualified reproduction or external runtime acceptance.
+
 Evidence strength is subject-scoped. A Release may expose independently reproduced or digest-verified component
 evidence beside a pipeline-attested aggregate artifact, but the stronger component evidence cannot upgrade that
 aggregate or the Release lane. A content-validated rebuild proves neither exact-byte reproduction nor upstream
