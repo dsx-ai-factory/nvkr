@@ -1194,7 +1194,7 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	if err = session.Runner.Run(ctx, []string{"docker", "cp", hostConfig, node + ":" + certs + "/hosts.toml"}, "node-registry-config", 30*time.Second); err != nil {
 		return err
 	}
-	if err = installSelectedSiteNetwork(ctx, cfg.Network, session, tool, materials.Outputs, refs["ovn"], "https://"+vip+":6443", captureSiteNetwork); err != nil {
+	if err = installSelectedSiteNetwork(ctx, cfg.Network, session, tool, node, materials.Outputs, refs["ovn"], "https://"+vip+":6443", captureSiteNetwork); err != nil {
 		return err
 	}
 	if err = bootstrapCA(ctx, session); err != nil {

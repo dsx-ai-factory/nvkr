@@ -243,11 +243,18 @@ The selected fork's Ubuntu runtime omits `firewall-cmd`, while its non-DPU
 executable initialization requires it even when firewalld is disabled.
 [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1)
 records the source paths and observed startup failure: artifact builds can
-succeed without a Ready tenant. The retained continuous attempt above
-used the explicitly selected `kind-calico` diagnostic and ended with a two-node
-readiness timeout, not a successful E2E video or an OVN startup test. A canonical
-source-owner fix and reviewed pin update are required; no local catalog patch
-is applied. Neither contract checks nor earlier deployment replays close this gate.
+succeed without a Ready tenant. A canonical source-owner fix and reviewed pin
+update are necessary for that NVIDIA selection, but are not shown to be
+sufficient for tenant, workload/DNS or cleanup acceptance. No local catalog
+patch is applied. Neither contract checks nor earlier deployment replays close
+this NVIDIA-specific gate.
+
+Separately, the retained continuous attempt above used the explicitly selected
+`kind-calico` diagnostic and ended with a two-node readiness timeout, not a
+successful E2E video or an OVN startup test. That timeout's cause was not
+established by this recording; it cannot be attributed to the uninstalled
+NVIDIA OVN startup path. Later acceptance evidence below retains its own exact
+revision and network selection, rather than retroactively explaining this failure.
 
 The downstream demo now selects those standalone NVIDIA OVN outputs for the
 Kind site as well as selecting the fork's stream for the QCOW2 tenant. Its private
@@ -264,8 +271,10 @@ The changed site topology has no completed live E2E acceptance. The source-owner
 startup fix, reviewed pin update and fresh dual-cluster runtime checks remain
 required, separately from artifact and adapter tests.
 Read-only rendering of the retained chart with its built Helm 4.2.4 executable
-preserved the accepted image digest across all six site chart slots; it did not
-install a cluster. Owner validation must also cover real node startup: the
+was reported locally to preserve the selected image digest across all six site
+chart slots. No retrievable rendering artifact is cited for that exercise;
+it does not establish validation of the exact values currently installed by the
+demo, or a running cluster. Owner validation must also cover real node startup: the
 selected [iptables wrapper](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/26cc199de8e814a7fe6d899a770fc04df0bbc2f9/dist/images/iptables-scripts/iptables#L5)
 requires `/host`, whereas the selected
 [node chart](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/26cc199de8e814a7fe6d899a770fc04df0bbc2f9/charts/ovn-kubernetes/charts/ovnkube-single-node-zone/templates/daemonset.yaml#L324)

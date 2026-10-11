@@ -34,12 +34,12 @@ func Baseline(searchPath string) ([]string, error) {
 
 func executable(searchPath string) (string, error) {
 	if searchPath == "" {
-		return "", e.New(e.CodeEngineCapability, "source fetch requires an absolute Git executable search path")
+		return "", e.New(e.CodeEngineCapability, "source Git requires a nonempty PATH containing only absolute executable search directories")
 	}
 	directories := filepath.SplitList(searchPath)
-	for _, directory := range directories {
+	for index, directory := range directories {
 		if !filepath.IsAbs(directory) {
-			return "", e.New(e.CodeEngineCapability, "source fetch requires an absolute Git executable search path")
+			return "", e.New(e.CodeEngineCapability, "source Git PATH entry %d is empty or not absolute; provide only absolute executable search directories", index+1)
 		}
 	}
 	for _, directory := range directories {
@@ -49,7 +49,7 @@ func executable(searchPath string) (string, error) {
 			return path, nil
 		}
 	}
-	return "", e.New(e.CodeEngineCapability, "source fetch requires Git on its admitted executable search path")
+	return "", e.New(e.CodeEngineCapability, "source Git requires Git on its admitted executable search path")
 }
 
 // Admit accepts only the fixed public baseline or the existing exact four-item

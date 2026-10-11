@@ -57,6 +57,30 @@ func TestBaselineUsesSelectedPathNotAmbientSearch(t *testing.T) {
 	}
 }
 
+func TestBaselinePathFailureIdentifiesEntryWithoutPrivateValues(t *testing.T) {
+	selected := testPath(t)
+	separator := string(os.PathListSeparator)
+	for _, row := range []struct {
+		name, input, diagnostic string
+	}{
+		{"missing", "", "nonempty PATH"},
+		{"relative first", "./private-path" + separator + selected, "PATH entry 1"},
+		{"relative second", selected + separator + "./private-path", "PATH entry 2"},
+		{"empty second", selected + separator, "PATH entry 2"},
+		{"empty middle", selected + separator + separator + selected, "PATH entry 2"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			environment, err := Baseline(row.input)
+			if environment != nil || errorCode(err) != e.CodeEngineCapability {
+				t.Fatalf("invalid PATH admission changed: %v %v", environment, err)
+			}
+			if !strings.Contains(err.Error(), row.diagnostic) || strings.Contains(err.Error(), "private-path") || strings.Contains(err.Error(), selected) {
+				t.Fatalf("PATH diagnostic lacks its entry or exposes private values: %v", err)
+			}
+		})
+	}
+}
+
 func TestAdmitRejectsCallerEnvironmentSubstitution(t *testing.T) {
 	baseline, err := Baseline(testPath(t))
 	if err != nil {

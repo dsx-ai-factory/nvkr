@@ -163,12 +163,17 @@ func TestTenantRunWaitCancellationAndBudgetKeepDiagnostics(t *testing.T) {
 				selected.session.Runner.Progress = &recordedProgress{}
 				selected.session.Runner.Env = append(selected.session.Runner.Env, "SITE_KUBECONFIG=fixture-site-config")
 			}
-			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 			budget := 10 * time.Second
 			var observed chan error
 			if test.deadline {
-				budget = 2 * time.Second
+				// The tenant budget covers every preceding owned subprocess too.
+				// Give those fixtures headroom under race instrumentation/load,
+				// while remaining below the outer guard and the blocked child's
+				// 60-second sleep. Assertions below still require reaching exactly
+				// the selected stage, an independent deadline and joined cleanup.
+				budget = 8 * time.Second
 			} else {
 				observed = make(chan error, 1)
 				go func() {

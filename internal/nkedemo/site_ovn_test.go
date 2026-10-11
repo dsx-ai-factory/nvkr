@@ -61,7 +61,7 @@ func TestTemporaryKindNetworkRetainsManagementAndCAPI(t *testing.T) {
 				}
 				return nil, nil
 			}
-			err := installSelectedSiteNetwork(t.Context(), mode, session, "", nil, "", "", capture)
+			err := installSelectedSiteNetwork(t.Context(), mode, session, "", "", nil, "", "", capture)
 			if mode == "invalid" {
 				if err == nil || len(phases) != 0 {
 					t.Fatal("unknown mode performed work", err)
@@ -248,7 +248,7 @@ func TestUpstreamOVNRequiresDistinctCompletedOutputSlots(t *testing.T) {
 			}
 			session := ManagementSession{Runner: Runner{Env: []string{"SITE_KUBECONFIG=owned"}}}
 			outputs := map[string]SelectedOutput{"ovn-chart": chart, "ovn": image}
-			if err := installSelectedSiteNetwork(t.Context(), network, session, "", outputs, "", "", capture); err == nil || commands != 0 {
+			if err := installSelectedSiteNetwork(t.Context(), network, session, "", "owned-node-id", outputs, "", "", capture); err == nil || commands != 0 {
 				t.Fatal("opposite-mode replay started deployment", commands, err)
 			}
 		})
@@ -538,7 +538,7 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, failed := range []string{"", "binding", "site-ovs-ready", "site-ovn-node-ready", "site-ovn-observation"} {
+		for _, failed := range []string{"", "missing-node", "binding", "site-ovs-ready", "site-ovn-node-ready", "site-ovn-observation"} {
 			t.Run(network+"/"+failed, func(t *testing.T) {
 				work := privateTestDir(t)
 				digest := "sha256:" + strings.Repeat("a", 64)
@@ -548,6 +548,10 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 					"ovn-chart": {Layout: "selected-chart", Observation: lifecycle.Artifact{Name: chartName, Kind: "helm-oci", Digest: "sha256:" + strings.Repeat("b", 64)}},
 				}
 				session := ManagementSession{Name: "owned", Work: work, Tools: "selected-tools", Runner: Runner{Env: []string{"SITE_KUBECONFIG=owned-kubeconfig", "STAGE_NEEDS_RELEASE=1"}}}
+				node := strings.Repeat("d", 64)
+				if failed == "missing-node" {
+					node = ""
+				}
 				var phases []string
 				capture := func(ctx context.Context, runner Runner, args []string, phase string, timeout time.Duration) ([]byte, error) {
 					if ctx != t.Context() || timeout <= 0 || timeout > 20*time.Minute {
@@ -565,6 +569,11 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 						return nil, &CommandError{Phase: phase, ExitCode: 1, Cause: errors.New("failed")}
 					}
 					switch phase {
+					case "site-ovs-fresh":
+						if !slices.Equal(args, []string{"docker", "exec", node, "test", "!", "-S", "/var/run/openvswitch/db.sock"}) {
+							t.Fatal("OVS freshness probe did not use the ownership-verified node identity")
+						}
+						return nil, nil
 					case "site-ovn-chart":
 						path := filepath.Join(work, "site-ovn.tgz")
 						if !slices.Contains(args, outputs["ovn-chart"].Observation.Digest) || !slices.Contains(args, version) || !slices.Contains(args, "ovn-kubernetes") {
@@ -601,11 +610,14 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 						return nil, nil
 					}
 				}
-				err := installSelectedSiteNetwork(t.Context(), network, session, "selected-nkdctl", outputs, reference, "https://172.18.0.3:6443", capture)
+				err := installSelectedSiteNetwork(t.Context(), network, session, "selected-nkdctl", node, outputs, reference, "https://172.18.0.3:6443", capture)
 				if environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "1" {
 					t.Fatal("CAPI override escaped its scoped child runner")
 				}
 				if failed != "" {
+					if failed == "missing-node" && len(phases) != 0 {
+						t.Fatalf("missing node identity reached a command: %v", phases)
+					}
 					if err == nil || slices.Contains(phases, "install-capi") || failed == "binding" && slices.Contains(phases, "site-ovs-create") {
 						t.Fatalf("failed network reached CAPI/deployment: %v %v", phases, err)
 					}

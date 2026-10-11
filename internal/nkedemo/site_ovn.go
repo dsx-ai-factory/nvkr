@@ -407,13 +407,13 @@ func captureSiteNetwork(ctx context.Context, runner Runner, args []string, phase
 	return runner.Capture(ctx, args, phase, timeout)
 }
 
-func installSelectedSiteNetwork(ctx context.Context, selected string, session ManagementSession, tool string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
+func installSelectedSiteNetwork(ctx context.Context, selected string, session ManagementSession, tool, node string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
 	mode, err := normalizeNetwork(selected)
 	if err != nil {
 		return err
 	}
 	if mode != "kind-calico" {
-		return installSiteNetworkForNetwork(ctx, mode, session, tool, outputs, reference, api, capture)
+		return installSiteNetworkForNetwork(ctx, mode, session, tool, node, outputs, reference, api, capture)
 	}
 	if err = requireContext(ctx); err != nil {
 		return err
@@ -428,7 +428,7 @@ func installSelectedSiteNetwork(ctx context.Context, selected string, session Ma
 	return installManagementAPI(ctx, session, capture)
 }
 
-func installSiteNetworkForNetwork(ctx context.Context, network string, session ManagementSession, tool string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
+func installSiteNetworkForNetwork(ctx context.Context, network string, session ManagementSession, tool, node string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
@@ -437,8 +437,8 @@ func installSiteNetworkForNetwork(ctx context.Context, network string, session M
 		return err
 	}
 	kube := environmentValue(session.Runner.Env, "SITE_KUBECONFIG")
-	if kube == "" || capture == nil {
-		return errors.New("site OVN requires an explicit owned kubeconfig and command runner")
+	if kube == "" || node == "" || capture == nil {
+		return errors.New("site OVN requires an explicit owned node, kubeconfig and command runner")
 	}
 	chart, ok := outputs["ovn-chart"]
 	image, hasImage := outputs["ovn"]
@@ -488,7 +488,7 @@ func installSiteNetworkForNetwork(ctx context.Context, network string, session M
 		phase   string
 		timeout time.Duration
 	}{
-		{[]string{"docker", "exec", session.Name + "-control-plane", "test", "!", "-S", "/var/run/openvswitch/db.sock"}, "site-ovs-fresh", 30 * time.Second},
+		{[]string{"docker", "exec", node, "test", "!", "-S", "/var/run/openvswitch/db.sock"}, "site-ovs-fresh", 30 * time.Second},
 		{[]string{kubectl, "--kubeconfig", kube, "create", "-f", ovsPath}, "site-ovs-create", 30 * time.Second},
 		{[]string{kubectl, "--kubeconfig", kube, "-n", "kube-system", "rollout", "status", "daemonset/" + siteOVSName, "--timeout=300s"}, "site-ovs-ready", 330 * time.Second},
 		{[]string{helm, "--kubeconfig", kube, "install", "ovn-kubernetes", archive, "--namespace", "ovn-kubernetes", "--create-namespace", "-f", valuesPath, "--timeout", "5m"}, "site-ovn-install", 330 * time.Second},

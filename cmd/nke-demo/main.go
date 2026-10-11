@@ -268,7 +268,7 @@ func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 }
 func validateTimeoutFlag(command *cobra.Command, seconds int) error {
 	if command.Flags().Changed("timeout") && (seconds < nkedemo.MinTenantTimeoutSeconds || seconds > nkedemo.MaxTenantTimeoutSeconds) {
-		return nkderr.New(nkderr.CodePreflightFailed, "tenant provisioning budget must be %d..%d seconds", nkedemo.MinTenantTimeoutSeconds, nkedemo.MaxTenantTimeoutSeconds)
+		return nkderr.New(nkderr.CodeUsage, "tenant provisioning budget must be %d..%d seconds", nkedemo.MinTenantTimeoutSeconds, nkedemo.MaxTenantTimeoutSeconds)
 	}
 	return nil
 }

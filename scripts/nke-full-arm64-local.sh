@@ -113,12 +113,25 @@ if [[ "${host_system}" == Darwin ]]; then
   # Execute beside the daemon: host-side Docker socket forwarding does not
   # give NKD access to the Linux workspace/kernel used by nested producers.
   # Do not inherit a Mac Docker context/endpoint into the selected VM.
+  # SSH does not forward the invocation environment. Preserve only this bounded
+  # redirect vector; the Linux sourcegit owner still validates its keys/values.
+  printf -v remote_redirects ' %q' "GIT_CONFIG_COUNT=${git_config_count}"
+  for ((index = 0; index < git_config_count; index++)); do
+    key="GIT_CONFIG_KEY_${index}"
+    value="GIT_CONFIG_VALUE_${index}"
+    if [[ -z "${!key-}" || -z "${!value-}" ]]; then
+      echo 'Each invocation-local Git entry needs a nonempty key and value.' >&2
+      exit 2
+    fi
+    printf -v remote_entry ' %q %q' "${key}=${!key}" "${value}=${!value}"
+    remote_redirects+="${remote_entry}"
+  done
   if [[ "${check_only}" == 1 ]]; then
-    printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh --check %q' \
-      "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${lane}"
+    printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q%s bash scripts/nke-full-arm64-local.sh --check %q' \
+      "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${remote_redirects}" "${lane}"
   else
-    printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q bash scripts/nke-full-arm64-local.sh %q %q %q' \
-      "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${attempt}" "${jobs}" "${lane}"
+    printf -v remote_command 'cd %q && exec env -u DOCKER_HOST -u DOCKER_CONTEXT CONTAINER_RUNTIME=docker NKE_LOCAL_CLONE=%q%s bash scripts/nke-full-arm64-local.sh %q %q %q' \
+      "${repo_root}" "${NKE_LOCAL_CLONE:-}" "${remote_redirects}" "${attempt}" "${jobs}" "${lane}"
   fi
   exec colima ssh --profile "${profile}" -- bash -c "${remote_command}"
 fi
