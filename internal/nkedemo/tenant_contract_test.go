@@ -34,6 +34,7 @@ func TestTenantNetworkSelectionIsExplicitAndPreservesTopology(t *testing.T) {
 	}{
 		{"default", "", "ovn-kubernetes", "1.5.18"},
 		{"maintained", "ovn", "ovn-kubernetes", "1.5.18"},
+		{"upstream diagnostic", "upstream-ovn", "ovn-kubernetes", "1.4.0"},
 		{"temporary diagnostic", "kind-calico", "calico", "3.30.1"},
 		{"unknown", "calico", "", ""},
 	} {
@@ -64,6 +65,79 @@ func TestTenantRejectsUnknownNetworkBeforeInventory(t *testing.T) {
 	entries, err := os.ReadDir(work)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("rejected network left output: %v %v", entries, err)
+	}
+}
+
+func TestTenantCalicoRolloutIsExplicitBoundedAndFailClosed(t *testing.T) {
+	for _, test := range []struct{ name, network string }{
+		{"default", ""}, {"ovn", "ovn"}, {"ready", "kind-calico"},
+		{"failed", "kind-calico"}, {"canceled", "kind-calico"},
+		{"deadline", "kind-calico"}, {"unknown", "calico"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			work := privateTestDir(t)
+			calls := filepath.Join(work, "calls")
+			writeTenantFixture(t, filepath.Join(work, "kubectl"), []byte(`#!/bin/sh
+set -eu
+printf '%s\n' "$*" >> "$CALLS"
+case "$FAIL" in
+  failed) exit 7 ;;
+  deadline) exec sleep 60 ;;
+esac
+`), 0o700)
+			selected := tenant{network: test.network, session: ManagementSession{Work: work, Tools: work, Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "CALLS=" + calls, "FAIL=" + test.name}}}}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if test.name == "canceled" {
+				cancel()
+			}
+			if test.name == "deadline" {
+				var deadlineCancel context.CancelFunc
+				ctx, deadlineCancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer deadlineCancel()
+			}
+			err := selected.waitCNI(ctx, "owned-tenant-kubeconfig")
+			switch test.name {
+			case "canceled":
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("canceled CNI readiness: %v", err)
+				}
+			case "deadline":
+				if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) {
+					t.Fatalf("CNI readiness must honor remaining deadline and join child: %v", err)
+				}
+			case "failed":
+				if CommandExitCode(err) != 7 {
+					t.Fatalf("Calico rollout failure was hidden: %v", err)
+				}
+			case "unknown":
+				assertConfigUsage(t, err)
+			default:
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			raw, readErr := os.ReadFile(calls)
+			if test.name == "deadline" && os.IsNotExist(readErr) {
+				return // The parent may expire before command admission.
+			}
+			if test.name == "default" || test.name == "ovn" || test.name == "unknown" || test.name == "canceled" {
+				if !os.IsNotExist(readErr) {
+					t.Fatalf("unselected or rejected CNI readiness started work: %v", readErr)
+				}
+				return
+			}
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			want := "--kubeconfig owned-tenant-kubeconfig -n calico-system rollout status daemonset/calico-node --timeout=240s\n"
+			if string(raw) != want {
+				t.Fatalf("unexpected CNI readiness commands: %q", raw)
+			}
+			if _, statErr := os.Stat(filepath.Join(work, "workload.json")); !os.IsNotExist(statErr) {
+				t.Fatal("Calico rollout must not create or retry the smoke workload")
+			}
+		})
 	}
 }
 

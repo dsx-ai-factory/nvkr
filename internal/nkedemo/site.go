@@ -137,6 +137,10 @@ func registryCapacity(outputs map[string]SelectedOutput) (int64, error) {
 // AdmitSite validates the entire host, source, tools and site selection before
 // creating outputs or granting simulator/registry/network controls.
 func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
+	profilesName, err := selectedProfilesOutput(cfg.Network)
+	if err != nil {
+		return nil, err
+	}
 	admitted, err := admitManagement(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -164,7 +168,7 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 		}
 		outputs[item] = selected
 	}
-	for _, item := range []struct{ key, root, name, kind string }{{"cwe", cfg.Runs.Site, "cwe", "oci"}, {"profiles", cfg.Runs.Profiles, "controller-profiles", "oci"}, {"provider", cfg.Runs.Providers, "capnico-controller-arm64", "oci"}, {"nkectl", cfg.Runs.Site, "nkectl", "executable"}} {
+	for _, item := range []struct{ key, root, name, kind string }{{"cwe", cfg.Runs.Site, "cwe", "oci"}, {"profiles", cfg.Runs.Profiles, profilesName, "oci"}, {"provider", cfg.Runs.Providers, "capnico-controller-arm64", "oci"}, {"nkectl", cfg.Runs.Site, "nkectl", "executable"}} {
 		selected, readErr := selectSiteOutput(ctx, item.root, item.name, item.kind)
 		if readErr != nil {
 			return nil, readErr
@@ -182,15 +186,19 @@ func AdmitSite(ctx context.Context, cfg Config) (*SiteMaterials, error) {
 	if err != nil {
 		return nil, err
 	}
-	if mode == "ovn" {
-		for _, item := range []struct{ key, name, kind string }{{"ovn", "ovn-image-arm64", "oci"}, {"ovn-chart", "ovn-chart-arm64", "helm-oci"}} {
+	if mode != "kind-calico" {
+		_, imageName, chartName, selectionErr := selectedOVNOutputs(mode)
+		if selectionErr != nil {
+			return nil, selectionErr
+		}
+		for _, item := range []struct{ key, name, kind string }{{"ovn", imageName, "oci"}, {"ovn-chart", chartName, "helm-oci"}} {
 			selected, readErr := selectSiteOutput(ctx, cfg.Runs.Components, item.name, item.kind)
 			if readErr != nil {
 				return nil, readErr
 			}
 			outputs[item.key] = selected
 		}
-		if err = admitSiteOVNChart(ctx, outputs["ovn-chart"], outputs["ovn"]); err != nil {
+		if err = admitSiteOVNChartForNetwork(ctx, mode, outputs["ovn-chart"], outputs["ovn"]); err != nil {
 			return nil, err
 		}
 	}

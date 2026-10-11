@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/planview"
 	"github.com/gdamore/tcell/v2"
@@ -33,6 +34,11 @@ type dashboardBuildStep struct {
 	id, state, kind string
 	started         time.Time
 	previewed       bool
+}
+
+type dashboardOSLogs struct {
+	record   buildactivity.Record
+	received time.Time
 }
 
 // This bounded checklist names source-owned operations, not inferred deployment
@@ -84,6 +90,7 @@ type dashboardSnapshot struct {
 	buildProcess                  string
 	buildGuestStage               string
 	buildGuestAt                  time.Time
+	buildLogs                     map[string]dashboardOSLogs
 	buildVertices                 []planview.Vertex
 	buildEdges                    []planview.Edge
 	buildSelected                 int
@@ -347,6 +354,8 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Install and check the NKE site stack"
 	case "tenant-provisioning":
 		return 3, "Provision QCOW2 control plane and worker"
+	case "tenant-cni-readiness", "tenant-cni-calico-rollout":
+		return 4, "Wait for tenant Calico node agents before DNS checks"
 	case "tenant-dns-readiness", "tenant-dns-coredns-rollout", "tenant-dns-node-local-rollout":
 		return 4, "Wait for CoreDNS and node-local DNS rollout before the smoke test"
 	case "tenant-cleanup":
@@ -431,6 +440,25 @@ func stopDashboardStages(stages []dashboardStage, state string) {
 func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if event.Kind == nkedemo.OSBuildLogs {
+		if d.phases[1].state != "running" || event.BuildLogs.Validate() != nil {
+			return
+		}
+		if !slices.ContainsFunc(d.buildSteps, func(step dashboardBuildStep) bool {
+			return step.id == event.BuildLogs.Operation && step.kind == "build" && step.state == "running"
+		}) {
+			return
+		}
+		if d.buildLogs == nil {
+			d.buildLogs = make(map[string]dashboardOSLogs)
+		}
+		if _, exists := d.buildLogs[event.BuildLogs.Operation]; !exists && len(d.buildLogs) >= 64 {
+			return
+		}
+		d.buildLogs[event.BuildLogs.Operation] = dashboardOSLogs{record: event.BuildLogs, received: time.Now()}
+		// Metadata refresh is not step progress or an authority observation.
+		return
+	}
 	if event.Kind == nkedemo.ProcessStarted || event.Kind == nkedemo.ProcessExited {
 		if event.Name == "build-all" {
 			if event.Kind == nkedemo.ProcessExited {
@@ -798,6 +826,10 @@ func (d *dashboard) snapshot() dashboardSnapshot {
 	copy.buildOutputs = slices.Clone(d.buildOutputs)
 	copy.buildVertices = slices.Clone(d.buildVertices)
 	copy.buildEdges = slices.Clone(d.buildEdges)
+	copy.buildLogs = make(map[string]dashboardOSLogs, len(d.buildLogs))
+	for operation, logs := range d.buildLogs {
+		copy.buildLogs[operation] = logs
+	}
 	if len(d.partial) != 0 {
 		line := []rune(terminalText(string(d.partial)))
 		copy.activity = append(copy.activity, string(line[:min(len(line), dashboardRunes)]))

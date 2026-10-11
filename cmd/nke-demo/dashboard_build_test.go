@@ -13,10 +13,70 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/planview"
 	"github.com/gdamore/tcell/v2"
 )
+
+func TestDashboardOSLogsExactOperationAndIndependentClocks(t *testing.T) {
+	d := newDashboard()
+	d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+	_, _ = io.WriteString(d, "[dry-run] os/build-disk (build)\n[start] os/build-disk (build)\n[done] other/build-disk\n")
+	before := d.snapshot()
+	event := nkedemo.ProgressEvent{Kind: nkedemo.OSBuildLogs, BuildLogs: buildactivity.Record{Version: 1, Operation: "os/build-disk", Available: true, Files: 2, Bytes: 2048, GrowthObserved: true, GrowthAgeMillis: 4000, SampleAgeMillis: 2000}}
+	d.Report(event)
+	after := d.snapshot()
+	if len(after.buildLogs) != 1 || after.phases != before.phases || after.buildChangedAt != before.buildChangedAt || after.buildOutputAt != before.buildOutputAt || len(after.activity) != len(before.activity) {
+		t.Fatal("OS metadata became build progress or activity-wall output")
+	}
+	now := after.buildLogs["os/build-disk"].received.Add(3 * time.Second)
+	text := dashboardBuildDetail(after, now)
+	for _, want := range []string{"OS build logs: 2 files, 2 KiB", "observed growth 9s ago", "report received 5s ago", "not guest health or readiness"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %s: %s", want, text)
+		}
+	}
+	for _, operation := range []string{"unknown/build-disk", "other/build-disk", "private host:token"} {
+		event.BuildLogs.Operation = operation
+		d.Report(event)
+	}
+	if len(d.snapshot().buildLogs) != 1 {
+		t.Fatal("telemetry invented/updated an unknown or nonrunning operation")
+	}
+	after.buildLogs["os/build-disk"] = dashboardOSLogs{}
+	if d.snapshot().buildLogs["os/build-disk"].record.Files != 2 {
+		t.Fatal("OS metadata snapshot shares mutable map")
+	}
+	event.BuildLogs = buildactivity.Record{Version: 1, Operation: "os/build-disk"}
+	d.Report(event)
+	text = dashboardBuildDetail(d.snapshot(), now)
+	if !strings.Contains(text, "metadata unavailable") || strings.Contains(text, "observed growth") || strings.Contains(text, "stuck") {
+		t.Fatal(text)
+	}
+}
+
+func TestDashboardOSLogsSmallTerminalAndSafeKeys(t *testing.T) {
+	for _, details := range []bool{false, true} {
+		d := newDashboard()
+		d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+		_, _ = io.WriteString(d, "[dry-run] os/build-disk (build)\n[start] os/build-disk (build)\n")
+		d.Report(nkedemo.ProgressEvent{Kind: nkedemo.OSBuildLogs, BuildLogs: buildactivity.Record{Version: 1, Operation: "os/build-disk", Available: true, Files: 1, Bytes: 4096}})
+		d.buildDetails = details
+		screen := dashboardScreen(t, 80)
+		screen.SetSize(80, 24)
+		d.draw(screen, time.Now(), false)
+		text := dashboardText(screen)
+		for _, want := range []string{"OS build logs", "growth not yet observed", "Operations", "q / Ctrl-C confirm cancel"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("details=%t missing %s:\n%s", details, want, text)
+			}
+		}
+		if strings.Contains(text, "guest healthy") || strings.Contains(text, "ETA 0") {
+			t.Fatal(text)
+		}
+	}
+}
 
 func graphRecord(t *testing.T, out io.Writer, prefix string, value any) {
 	t.Helper()

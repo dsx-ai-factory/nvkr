@@ -44,6 +44,23 @@ func dashboardText(screen tcell.SimulationScreen) string {
 	return text.String()
 }
 
+func TestDashboardTenantCalicoReadinessIsNotCompletion(t *testing.T) {
+	for _, name := range []string{"tenant-cni-readiness", "tenant-cni-calico-rollout"} {
+		t.Run(name, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseStarted, Name: name})
+			s := d.snapshot()
+			if s.phases[4].state != "running" || s.current != "Wait for tenant Calico node agents before DNS checks" || s.tenantStages[3].states[0] == "observed" {
+				t.Fatal("CNI admission hidden or incorrectly advanced workload completion")
+			}
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseFinished, Name: name})
+			if d.snapshot().phases[4].state == "complete" || d.snapshot().tenantStages[3].states[0] == "observed" {
+				t.Fatal("CNI rollout became E2E workload/DNS completion")
+			}
+		})
+	}
+}
+
 func TestDashboardLayout(t *testing.T) {
 	for _, width := range []int{80, 140, 160} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {

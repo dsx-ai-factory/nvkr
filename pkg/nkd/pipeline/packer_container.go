@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -71,6 +72,15 @@ type packerContainerRuntime interface {
 
 type heldPackerContainerRuntime struct{ runtime *heldRuntimeExecutable }
 
+// This private owner operation is not a caller-provided cleanup permission.
+// The bounded activity stop invokes it only after a runtime client fails to
+// join, before releasing the enclosing session's active-call ownership.
+func (runtime heldPackerContainerRuntime) retainUnjoinedPackerActivity() {
+	if runtime.runtime != nil {
+		runtime.runtime.unjoinedPackerActivity.Store(true)
+	}
+}
+
 func (runtime heldPackerContainerRuntime) Endpoint() string {
 	if runtime.runtime == nil {
 		return ""
@@ -118,20 +128,22 @@ type packerContainerBindings struct {
 }
 
 type packerContainerRunRequest struct {
-	runtime     packerContainerRuntime
-	source      *materializedSource
-	node        ir.Node
-	subject     string
-	manifest    []byte
-	digest      string
-	materials   []PackerMaterialInput
-	workspace   *os.File
-	kvm         *os.File
-	diagnostics *PackerDiagnosticSink
-	bindings    packerContainerBindings
-	stdout      io.Writer
-	stderr      io.Writer
-	identity    packerContainerIdentity
+	runtime           packerContainerRuntime
+	source            *materializedSource
+	node              ir.Node
+	subject           string
+	manifest          []byte
+	digest            string
+	materials         []PackerMaterialInput
+	workspace         *os.File
+	kvm               *os.File
+	diagnostics       *PackerDiagnosticSink
+	activity          *buildactivity.Sink
+	activityOperation string
+	bindings          packerContainerBindings
+	stdout            io.Writer
+	stderr            io.Writer
+	identity          packerContainerIdentity
 }
 
 type packerContainerIdentity struct {
@@ -146,6 +158,7 @@ type packerContainerCreateRequest struct {
 	input         string
 	inputReadOnly bool
 	work          string
+	workReadOnly  bool
 	project       string
 	packerArgs    []string
 	labels        []string
@@ -222,8 +235,14 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 		if request.inputReadOnly {
 			inputMount += ",readonly"
 		}
-		args = append(args, "--mount", inputMount)
-		args = append(args, "--mount", "type=volume,src="+request.work+",dst="+packerContainerWorkRoot+",volume-nocopy")
+		if request.input != "" {
+			args = append(args, "--mount", inputMount)
+		}
+		workMount := "type=volume,src=" + request.work + ",dst=" + packerContainerWorkRoot + ",volume-nocopy"
+		if request.workReadOnly {
+			workMount += ",readonly"
+		}
+		args = append(args, "--mount", workMount)
 	case "podman":
 		// Podman exposes named-volume copy control through --volume rather
 		// than Docker's --mount volume-nocopy option. Both source values are
@@ -232,10 +251,14 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 		if request.inputReadOnly {
 			inputOptions += ",ro"
 		}
-		args = append(args,
-			"--volume", request.input+":"+packerContainerInputRoot+":"+inputOptions,
-			"--volume", request.work+":"+packerContainerWorkRoot+":nocopy",
-		)
+		if request.input != "" {
+			args = append(args, "--volume", request.input+":"+packerContainerInputRoot+":"+inputOptions)
+		}
+		workOptions := "nocopy"
+		if request.workReadOnly {
+			workOptions += ",ro"
+		}
+		args = append(args, "--volume", request.work+":"+packerContainerWorkRoot+":"+workOptions)
 	}
 	args = append(args,
 		"--workdir", request.project,

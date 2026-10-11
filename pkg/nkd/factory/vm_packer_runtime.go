@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -25,6 +26,7 @@ type localVMPackerExecutor struct {
 	stdout      io.Writer
 	stderr      io.Writer
 	diagnostics *pipeline.PackerDiagnosticSink
+	activity    *buildactivity.Sink
 }
 
 func (localVMPackerResolver) Admit(
@@ -88,7 +90,11 @@ func (localVMPackerResolver) Admit(
 			return nil, err
 		}
 		sourceRoots[request.Subject] = sourceRoot
-		selections = append(selections, pipeline.VMImagePackerSelection{Subject: request.Subject, Node: instruction})
+		selection := pipeline.VMImagePackerSelection{Subject: request.Subject, Node: instruction}
+		if config.Activity != nil {
+			selection.ActivityOperation = selected.ID
+		}
+		selections = append(selections, selection)
 	}
 	if len(selections) == 0 {
 		return nil, e.New(e.CodeEngineCapability,
@@ -111,6 +117,7 @@ func (localVMPackerResolver) Admit(
 	return &localVMPackerExecutor{
 		inner: admitted, subjects: subjects, sourceRoots: sourceRoots,
 		stdout: config.Stdout, stderr: config.Stderr, diagnostics: config.Diagnostics,
+		activity: config.Activity,
 	}, nil
 }
 
@@ -176,6 +183,7 @@ func (executor *localVMPackerExecutor) RunPacker(
 			"local Packer subject %q has no admitted source route", subject)
 	}
 	return executor.inner.Run(ctx, subject, node, pipeline.VMImagePackerRun{
+		Activity:    executor.activity,
 		SourceRoot:  sourceRoot,
 		Manifest:    materials.manifest,
 		Materials:   materials.inputs,

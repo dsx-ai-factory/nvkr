@@ -27,7 +27,46 @@ import (
 )
 
 const siteOVNVersion = "1.5.18"
+const upstreamSiteOVNVersion = "1.4.0"
 const siteOVSName = "nkd-site-ovs"
+
+// Distinct completed output names prevent a baseline Run from being replayed
+// as the explicitly selected upstream diagnostic (including its baked disk).
+func selectedOVNOutputs(network string) (version, image, chart string, err error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return "", "", "", err
+	}
+	if mode == "upstream-ovn" {
+		return upstreamSiteOVNVersion, "upstream-ovn-image-arm64", "upstream-ovn-chart-arm64", nil
+	}
+	if mode == "ovn" {
+		return siteOVNVersion, "ovn-image-arm64", "ovn-chart-arm64", nil
+	}
+	return "", "", "", configUsage("selected network has no OVN outputs")
+}
+
+func selectedDiskOutput(network string) (string, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return "", err
+	}
+	if mode == "upstream-ovn" {
+		return "nke-node-image-upstream-ovn-arm64", nil
+	}
+	return DiskOutputName, nil
+}
+
+func selectedProfilesOutput(network string) (string, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return "", err
+	}
+	if mode == "upstream-ovn" {
+		return "controller-profiles-upstream-ovn", nil
+	}
+	return "controller-profiles", nil
+}
 
 func admitSiteOVNKernel() error {
 	return admitOVNKernel("/sys/module/openvswitch", "/sys/module/geneve", "/dev/net/tun")
@@ -74,19 +113,38 @@ func admitOVNKernel(ovs, geneve, tun string) error {
 // creating outputs or a cluster. The shared archive owner validates the whole
 // archive; the standard readers then read only its unique root values file.
 func admitSiteOVNChart(ctx context.Context, chart, image SelectedOutput) error {
-	_, raw, err := delivery.ReadHelmChart(ctx, chart.Layout, chart.Observation.Digest, "ovn-kubernetes", siteOVNVersion)
+	return admitSiteOVNChartForNetwork(ctx, "ovn", chart, image)
+}
+
+func admitSiteOVNChartForNetwork(ctx context.Context, network string, chart, image SelectedOutput) error {
+	version, imageName, chartName, err := selectedOVNOutputs(network)
 	if err != nil {
 		return err
 	}
-	return admitSiteOVNArchive(ctx, raw, image.Observation.Digest)
+	if chart.Observation.Name != chartName || image.Observation.Name != imageName || chart.Observation.Kind != "helm-oci" || image.Observation.Kind != "oci" || chart.Observation.Validate() != nil || image.Observation.Validate() != nil {
+		return errors.New("site OVN output identities differ from the selected network")
+	}
+	_, raw, err := delivery.ReadHelmChart(ctx, chart.Layout, chart.Observation.Digest, "ovn-kubernetes", version)
+	if err != nil {
+		return err
+	}
+	return admitSiteOVNArchiveForNetwork(ctx, network, raw, image.Observation.Digest)
 }
 
 func admitSiteOVNArchive(ctx context.Context, raw []byte, imageDigest string) error {
+	return admitSiteOVNArchiveForNetwork(ctx, "ovn", raw, imageDigest)
+}
+
+func admitSiteOVNArchiveForNetwork(ctx context.Context, network string, raw []byte, imageDigest string) error {
+	version, _, _, err := selectedOVNOutputs(network)
+	if err != nil {
+		return err
+	}
 	identity, err := helmarchive.Inspect(ctx, raw)
 	if err != nil {
 		return err
 	}
-	if identity.Name != "ovn-kubernetes" || identity.Version != siteOVNVersion {
+	if identity.Name != "ovn-kubernetes" || identity.Version != version {
 		return errors.New("site OVN chart identity differs from the selected source interface")
 	}
 	zipped, err := gzip.NewReader(bytes.NewReader(raw))
@@ -116,12 +174,19 @@ func admitSiteOVNArchive(ctx context.Context, raw []byte, imageDigest string) er
 		if readErr != nil {
 			return readErr
 		}
-		_, err = siteOVNDefaults(values, imageDigest)
+		_, err = siteOVNDefaultsForNetwork(network, values, imageDigest)
 		return err
 	}
 }
 
-func siteOVNDefaults(raw []byte, imageDigest string) (map[string]any, error) {
+func siteOVNDefaultsForNetwork(network string, raw []byte, imageDigest string) (map[string]any, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return nil, err
+	}
+	if mode == "kind-calico" {
+		return nil, configUsage("selected network has no OVN chart")
+	}
 	if !canonical.IsDigest(imageDigest) {
 		return nil, errors.New("site OVN requires an exact accepted image digest")
 	}
@@ -130,6 +195,9 @@ func siteOVNDefaults(raw []byte, imageDigest string) (map[string]any, error) {
 		return nil, errors.New("selected OVN chart values cannot be decoded")
 	}
 	tags := siteOVNTags()
+	if mode == "upstream-ovn" {
+		tags = upstreamSiteOVNTags()
+	}
 	actualTags, ok := defaults["tags"].(map[string]any)
 	if !ok || len(actualTags) != len(tags) {
 		return nil, errors.New("selected OVN chart component interface differs")
@@ -138,6 +206,16 @@ func siteOVNDefaults(raw []byte, imageDigest string) (map[string]any, error) {
 		if actualTags[key] != expected {
 			return nil, errors.New("selected OVN chart component interface differs")
 		}
+	}
+	if mode == "upstream-ovn" {
+		global, _ := defaults["global"].(map[string]any)
+		image, _ := global["image"].(map[string]any)
+		// The source-owned getImage helper joins these fields with ':'. Its
+		// exact output is localhost/nke/ovn-kubernetes@sha256:<bound hex>.
+		if image["repository"] != "localhost/nke/ovn-kubernetes@sha256" || image["tag"] != strings.TrimPrefix(imageDigest, "sha256:") {
+			return nil, errors.New("selected upstream OVN chart image binding differs from the accepted image")
+		}
+		return defaults, nil
 	}
 	for _, slot := range siteOVNSlots {
 		chart, _ := defaults[slot[0]].(map[string]any)
@@ -154,7 +232,19 @@ func siteOVNTags() map[string]any {
 	return map[string]any{"ovs-node": false, "ovnkube-identity": false, "ovnkube-node-dpu-host": false, "ovnkube-single-node-zone-dpu": false, "ovnkube-crds": true, "ovnkube-control-plane": true, "ovnkube-single-node-zone": true}
 }
 
+func upstreamSiteOVNTags() map[string]any {
+	return map[string]any{"ovn-ipsec": false, "ovs-node": false, "ovnkube-identity": false, "ovnkube-node-dpu-host": false, "ovnkube-single-node-zone-dpu": false, "ovnkube-control-plane": true, "ovnkube-single-node-zone": true}
+}
+
 func siteOVNValues(raw []byte, reference, api, tag string) (map[string]any, error) {
+	return siteOVNValuesForNetwork("ovn", raw, reference, api, tag)
+}
+
+func siteOVNValuesForNetwork(network string, raw []byte, reference, api, tag string) (map[string]any, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return nil, err
+	}
 	image, err := name.NewDigest(reference, name.Insecure, name.StrictValidation)
 	if err != nil || !canonical.IsDigest(image.DigestStr()) {
 		return nil, errors.New("site OVN requires an exact accepted image reference")
@@ -170,7 +260,7 @@ func siteOVNValues(raw []byte, reference, api, tag string) (map[string]any, erro
 	if err != nil || !address.Is4() || !address.IsPrivate() || endpoint.Scheme != "https" || endpoint.Port() != "6443" || endpoint.User != nil || endpoint.Path != "" || endpoint.RawQuery != "" || endpoint.Fragment != "" {
 		return nil, errors.New("site OVN requires the owned IPv4 API endpoint")
 	}
-	defaults, err := siteOVNDefaults(raw, image.DigestStr())
+	defaults, err := siteOVNDefaultsForNetwork(mode, raw, image.DigestStr())
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +270,13 @@ func siteOVNValues(raw []byte, reference, api, tag string) (map[string]any, erro
 		"mtu": 1400,
 		"global": map[string]any{"skipCallToK8s": true, "enableNgnExtension": false,
 			"imagePullSecretName": "", "imageRepositoryPrefix": "", "useImageDigest": true},
+	}
+	if mode == "upstream-ovn" {
+		values["tags"] = upstreamSiteOVNTags()
+		values["skipCallToK8s"] = true
+		values["global"] = map[string]any{"enableOvnKubeIdentity": false, "imagePullSecretName": "",
+			"image": map[string]any{"repository": image.Repository.Name() + "@sha256", "tag": strings.TrimPrefix(image.DigestStr(), "sha256:"), "pullPolicy": "IfNotPresent"}}
+		return values, nil
 	}
 	for _, slot := range siteOVNSlots {
 		chart, _ := defaults[slot[0]].(map[string]any)
@@ -233,12 +330,23 @@ func siteOVSBootstrap(reference, owner string) map[string]any {
 }
 
 func validateSiteOVNPods(rows podList, reference, owner string) (observedRuntime, error) {
+	return validateSiteOVNPodsForNetwork("ovn", rows, reference, owner)
+}
+
+func validateSiteOVNPodsForNetwork(network string, rows podList, reference, owner string) (observedRuntime, error) {
 	var observed observedRuntime
+	version, _, _, err := selectedOVNOutputs(network)
+	if err != nil {
+		return observed, err
+	}
 	image, err := name.NewDigest(reference, name.Insecure, name.StrictValidation)
 	if err != nil || !canonical.IsDigest(image.DigestStr()) {
 		return observed, errors.New("site OVN observation requires the accepted image")
 	}
 	chartReference := image.Repository.Name() + ":" + owner + "@" + image.DigestStr()
+	if version == upstreamSiteOVNVersion {
+		chartReference = reference
+	}
 	seen := make(map[string]bool)
 	for _, pod := range rows.Items {
 		role, specification := "", chartReference
@@ -253,6 +361,9 @@ func validateSiteOVNPods(rows podList, reference, owner string) (observedRuntime
 			role, containers = "control-plane", []string{"ovnkube-cluster-manager"}
 		case pod.Metadata.Namespace == "ovn-kubernetes" && pod.Metadata.Labels["app"] == "ovnkube-node":
 			role, containers = "node", []string{"nb-ovsdb", "sb-ovsdb", "ovn-northd", "ovnkube-controller", "ovn-controller"}
+			if version == upstreamSiteOVNVersion {
+				containers = append(containers, "ovs-metrics-exporter")
+			}
 		case pod.Metadata.Namespace == "ovn-kubernetes":
 			return observedRuntime{}, errors.New("unexpected OVN component or disabled image role")
 		default:
@@ -301,8 +412,8 @@ func installSelectedSiteNetwork(ctx context.Context, selected string, session Ma
 	if err != nil {
 		return err
 	}
-	if mode == "ovn" {
-		return installSiteNetwork(ctx, session, tool, outputs, reference, api, capture)
+	if mode != "kind-calico" {
+		return installSiteNetworkForNetwork(ctx, mode, session, tool, outputs, reference, api, capture)
 	}
 	if err = requireContext(ctx); err != nil {
 		return err
@@ -317,8 +428,12 @@ func installSelectedSiteNetwork(ctx context.Context, selected string, session Ma
 	return installManagementAPI(ctx, session, capture)
 }
 
-func installSiteNetwork(ctx context.Context, session ManagementSession, tool string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
+func installSiteNetworkForNetwork(ctx context.Context, network string, session ManagementSession, tool string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
 	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	version, imageName, chartName, err := selectedOVNOutputs(network)
+	if err != nil {
 		return err
 	}
 	kube := environmentValue(session.Runner.Env, "SITE_KUBECONFIG")
@@ -327,7 +442,7 @@ func installSiteNetwork(ctx context.Context, session ManagementSession, tool str
 	}
 	chart, ok := outputs["ovn-chart"]
 	image, hasImage := outputs["ovn"]
-	if !ok || !hasImage || chart.Observation.Name != "ovn-chart-arm64" || chart.Observation.Kind != "helm-oci" || image.Observation.Name != "ovn-image-arm64" || image.Observation.Kind != "oci" || chart.Observation.Validate() != nil || image.Observation.Validate() != nil {
+	if !ok || !hasImage || chart.Observation.Name != chartName || chart.Observation.Kind != "helm-oci" || image.Observation.Name != imageName || image.Observation.Kind != "oci" || chart.Observation.Validate() != nil || image.Observation.Validate() != nil {
 		return errors.New("site OVN requires both exact completed OVN outputs")
 	}
 	selected, err := name.NewDigest(reference, name.Insecure, name.StrictValidation)
@@ -335,12 +450,12 @@ func installSiteNetwork(ctx context.Context, session ManagementSession, tool str
 		return errors.New("site OVN registry reference differs from the accepted image")
 	}
 	archive := filepath.Join(session.Work, "site-ovn.tgz")
-	raw, err := capture(ctx, session.Runner, []string{tool, "publish", "chart", "--layout", chart.Layout, "--manifest", chart.Observation.Digest, "--name", "ovn-kubernetes", "--version", siteOVNVersion, "--out", archive}, "site-ovn-chart", 120*time.Second)
+	raw, err := capture(ctx, session.Runner, []string{tool, "publish", "chart", "--layout", chart.Layout, "--manifest", chart.Observation.Digest, "--name", "ovn-kubernetes", "--version", version, "--out", archive}, "site-ovn-chart", 120*time.Second)
 	if err != nil {
 		return err
 	}
 	var exported delivery.HelmChartExport
-	if err = json.Unmarshal(raw, &exported); err != nil || exported.ManifestDigest != chart.Observation.Digest || exported.Name != "ovn-kubernetes" || exported.Version != siteOVNVersion {
+	if err = json.Unmarshal(raw, &exported); err != nil || exported.ManifestDigest != chart.Observation.Digest || exported.Name != "ovn-kubernetes" || exported.Version != version {
 		return errors.New("site OVN chart extraction observation differs")
 	}
 	digest, err := DigestFile(ctx, archive)
@@ -355,7 +470,7 @@ func installSiteNetwork(ctx context.Context, session ManagementSession, tool str
 	if err != nil {
 		return err
 	}
-	values, err := siteOVNValues(defaults, reference, api, session.Name)
+	values, err := siteOVNValuesForNetwork(network, defaults, reference, api, session.Name)
 	if err != nil {
 		return err
 	}
@@ -393,7 +508,7 @@ func installSiteNetwork(ctx context.Context, session ManagementSession, tool str
 	if err = json.Unmarshal(raw, &pods); err != nil {
 		return errors.New("site OVN pod observation cannot be decoded")
 	}
-	observed, err := validateSiteOVNPods(pods, reference, session.Name)
+	observed, err := validateSiteOVNPodsForNetwork(network, pods, reference, session.Name)
 	if err != nil {
 		return err
 	}

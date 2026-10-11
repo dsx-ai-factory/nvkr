@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
@@ -31,6 +32,7 @@ type vmDriverRunConfig struct {
 	Stdout      io.Writer
 	Stderr      io.Writer
 	Diagnostics *pipeline.PackerDiagnosticSink
+	Activity    *buildactivity.Sink
 }
 
 // vmDriverExecutor is deliberately private and run-owned. Its methods are

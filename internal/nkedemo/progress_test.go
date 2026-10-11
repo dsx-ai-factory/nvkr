@@ -292,15 +292,30 @@ func TestProgressOwnedStartStopObservedSynchronously(t *testing.T) {
 }
 
 func TestProgressCombinedBuildOrdering(t *testing.T) {
-	for _, failLane := range []string{"", "all"} {
+	for _, failLane := range []string{"", "all", "prepare"} {
 		t.Run("failure-"+failLane, func(t *testing.T) {
 			writer := &recordedProgress{}
-			script := filepath.Join(privateTestDir(t), "launcher.sh")
-			if err := os.WriteFile(script, []byte("#!/bin/sh\nset -eu\n[ \"$3\" != \""+failLane+"\" ] || exit 7\n"), 0o700); err != nil {
+			dir := privateTestDir(t)
+			cfg := BuildConfig{Repository: dir, AttemptPrefix: "fixture", Jobs: 4}
+			bootstrap := filepath.Join(dir, ".nkd/laptop-bootstrap/fixture")
+			if err := os.MkdirAll(bootstrap, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			runner := Runner{Env: []string{"PATH=/usr/bin:/bin"}, Progress: writer}
-			err := buildLocalArtifacts(t.Context(), runner, script, BuildConfig{AttemptPrefix: "fixture", Jobs: 4})
+			args, err := json.Marshal(preparedInvocationFixture(cfg))
+			if err != nil {
+				t.Fatal(err)
+			}
+			script := filepath.Join(dir, "launcher.sh")
+			body := "#!/bin/sh\nset -eu\n[ \"$1\" = --prepare-only ]\n[ \"$4\" = all ]\n[ \"$FAIL_LANE\" != prepare ] || exit 7\numask 077\nprintf '%s' \"$BUILD_INVOCATION_JSON\" >\"$BUILD_INVOCATION\"\n"
+			if err := os.WriteFile(script, []byte(body), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(bootstrap, "nkdctl"), []byte("#!/bin/sh\n[ \"$FAIL_LANE\" != all ] || exit 7\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			runner := Runner{Env: []string{"PATH=/usr/bin:/bin", "FAIL_LANE=" + failLane,
+				"BUILD_INVOCATION_JSON=" + string(args), "BUILD_INVOCATION=" + filepath.Join(bootstrap, "build-invocation.json")}, Progress: writer}
+			err = buildLocalArtifacts(t.Context(), runner, script, cfg)
 			phaseLast, laneLast, status := PhaseFinished, LaneFinished, "finished"
 			if failLane != "" {
 				phaseLast, laneLast, status = PhaseFailed, LaneFailed, "failed"
@@ -311,7 +326,14 @@ func TestProgressCombinedBuildOrdering(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := []ProgressEvent{{Kind: LaneStarted, Name: "artifacts", Status: "started"}}
-			want = append(want, phaseEvents("build-all", phaseLast)...)
+			if failLane == "prepare" {
+				want = append(want, phaseEvents("build-prepare", PhaseFailed)...)
+			} else {
+				want = append(want, phaseEvents("build-prepare", PhaseFinished)...)
+				phases := phaseEvents("build-all", phaseLast)
+				want = append(want, phases[0], ProgressEvent{Kind: ProcessStarted, Name: "build-all", Status: "started"},
+					ProgressEvent{Kind: ProcessExited, Name: "build-all", Status: "exited"}, phases[1])
+			}
 			want = append(want, ProgressEvent{Kind: laneLast, Name: "artifacts", Status: status})
 			if !reflect.DeepEqual(writer.events, want) {
 				t.Fatalf("events=%+v want=%+v", writer.events, want)

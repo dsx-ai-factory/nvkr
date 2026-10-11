@@ -33,7 +33,7 @@ func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (resul
 	}
 	runner := Runner{Env: environment, Progress: run.Progress}
 	admitHost := func() error {
-		if run.Network == "ovn" {
+		if run.Network != "kind-calico" {
 			if err := admitSiteOVNKernel(); err != nil {
 				return err
 			}

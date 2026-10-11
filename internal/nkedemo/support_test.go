@@ -413,12 +413,139 @@ func TestUnjoinedIdentityAndExitClassification(t *testing.T) {
 		}
 	}
 	p := &OwnedProcess{cmd: &exec.Cmd{Process: &os.Process{Pid: 123}}, phase: "fixture", done: make(chan struct{}), groupSignal: func(int, unix.Signal) error { return unix.EPERM }}
-	if err := p.Stop(t.Context()); !errors.Is(err, ErrUnjoined) {
+	stopCtx, stopCancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+	defer stopCancel()
+	if err := p.Stop(stopCtx); !errors.Is(err, ErrUnjoined) {
 		t.Fatalf("permission failure lost: %v", err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if err := p.waitOwned(ctx); !errors.Is(err, ErrUnjoined) || !errors.Is(err, context.Canceled) {
 		t.Fatalf("unsafe authentication join lost: %v", err)
+	}
+}
+
+func TestStopSignalErrorRechecksCompletedJoin(t *testing.T) {
+	for _, signal := range []unix.Signal{unix.SIGTERM, unix.SIGKILL} {
+		for _, scenario := range []string{
+			"joined", "failed-exit", "failed-join", "delayed-joined", "delayed-failed-exit", "delayed-failed-join", "live-permission-error",
+			"signal-success-joined", "signal-success-failed-exit", "signal-success-failed-join",
+			"signal-success-delayed-joined", "signal-success-delayed-failed-exit", "signal-success-delayed-failed-join",
+		} {
+			t.Run(fmt.Sprintf("%s/%s", signal, scenario), func(t *testing.T) {
+				timeout := 2 * time.Second
+				if scenario == "live-permission-error" {
+					timeout = 20 * time.Millisecond
+				}
+				ctx, cancel := context.WithTimeout(t.Context(), timeout)
+				defer cancel()
+				if signal == unix.SIGKILL {
+					// Exercise escalation immediately, without a wall-clock wait.
+					cancel()
+				}
+				writer := &recordedProgress{}
+				p := &OwnedProcess{
+					cmd:      &exec.Cmd{Process: &os.Process{Pid: 123}},
+					phase:    "fixture",
+					done:     make(chan struct{}),
+					progress: beginProgress(writer, "fixture", PhaseStarted, PhaseFinished, PhaseFailed),
+				}
+				waitErr := errors.New("direct child failed")
+				joinErr := fmt.Errorf("%w: finalizer failed", ErrUnjoined)
+				outcome := strings.TrimPrefix(scenario, "signal-success-")
+				delayed := strings.HasPrefix(outcome, "delayed-")
+				outcome = strings.TrimPrefix(outcome, "delayed-")
+				complete := func() {
+					p.mu.Lock()
+					if outcome == "failed-exit" {
+						p.waitErr = waitErr
+					}
+					if outcome == "failed-join" {
+						p.joinErr = joinErr
+					}
+					p.mu.Unlock()
+					close(p.done)
+				}
+				var signals []unix.Signal
+				p.groupSignal = func(pid int, got unix.Signal) error {
+					if pid != 123 {
+						t.Fatalf("signaled a different owner: %d", pid)
+					}
+					signals = append(signals, got)
+					if got != signal {
+						return nil
+					}
+					if scenario != "live-permission-error" {
+						// Deterministically complete the finalizer between Stop's
+						// pre-signal check and the signal error, or after the error.
+						if delayed {
+							timer := time.AfterFunc(time.Millisecond, complete)
+							t.Cleanup(func() {
+								if timer.Stop() {
+									complete()
+								}
+								select {
+								case <-p.done:
+								case <-time.After(time.Second):
+									t.Fatal("fixture finalizer did not join")
+								}
+							})
+						} else {
+							complete()
+						}
+					}
+					if strings.HasPrefix(scenario, "signal-success-") {
+						return nil
+					}
+					return unix.EPERM
+				}
+				err := p.Stop(ctx)
+				wantSignals := []unix.Signal{unix.SIGTERM}
+				if signal == unix.SIGKILL {
+					wantSignals = append(wantSignals, unix.SIGKILL)
+				}
+				if len(signals) != len(wantSignals) {
+					t.Fatalf("signal sequence: %v", signals)
+				}
+				for i, want := range wantSignals {
+					if signals[i] != want {
+						t.Fatalf("signal sequence: %v", signals)
+					}
+				}
+				switch outcome {
+				case "joined", "failed-exit":
+					if err != nil {
+						t.Fatalf("completed join replaced by signal failure: %v", err)
+					}
+				case "failed-join":
+					if err != joinErr {
+						t.Fatalf("exact finalizer failure lost: %v", err)
+					}
+				case "live-permission-error":
+					if !errors.Is(err, ErrUnjoined) || !errors.Is(err, unix.EPERM) {
+						t.Fatalf("live owner's permission failure lost: %v", err)
+					}
+				}
+				wantLast := PhaseFailed
+				if outcome == "joined" {
+					wantLast = PhaseFinished
+				}
+				if len(writer.events) != 2 || writer.events[1].Kind != wantLast {
+					t.Fatalf("failed direct exit or join presented as success: %v", writer.events)
+				}
+			})
+		}
+	}
+}
+
+func TestStopSignalErrorCanceledDeadlineRetainsOwnership(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	p := &OwnedProcess{
+		cmd: &exec.Cmd{Process: &os.Process{Pid: 123}}, done: make(chan struct{}),
+		groupSignal: func(int, unix.Signal) error { return unix.EPERM },
+	}
+	if err := p.Stop(ctx); !errors.Is(err, ErrUnjoined) || !errors.Is(err, unix.EPERM) {
+		t.Fatalf("unjoined canceled owner lost signal error: %v", err)
 	}
 }

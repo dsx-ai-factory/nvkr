@@ -156,6 +156,185 @@ func ovnBoundValues(t *testing.T, digest string) map[string]any {
 	return values
 }
 
+func upstreamOVNBoundValues(digest string) map[string]any {
+	return map[string]any{"tags": upstreamSiteOVNTags(), "global": map[string]any{
+		"image": map[string]any{"repository": "localhost/nke/ovn-kubernetes@sha256", "tag": digest}}}
+}
+
+func upstreamOVNPodsFixture(reference, owner string) podList {
+	rows := ovnPodsFixture(reference, owner)
+	for i := 1; i < len(rows.Items); i++ {
+		for j := range rows.Items[i].Spec.Containers {
+			rows.Items[i].Spec.Containers[j].Image = reference
+		}
+	}
+	rows.Items[2].Spec.Containers = append(rows.Items[2].Spec.Containers, podContainer{Name: "ovs-metrics-exporter", Image: reference})
+	running := json.RawMessage("{}")
+	status := podContainerState{Name: "ovs-metrics-exporter", ImageID: reference, Ready: true}
+	status.State.Running = &running
+	rows.Items[2].Status.ContainerStatuses = append(rows.Items[2].Status.ContainerStatuses, status)
+	return rows
+}
+
+func TestUpstreamOVNProfilesRejectOppositeModeRun(t *testing.T) {
+	for _, network := range []string{"ovn", "kind-calico", "upstream-ovn", "unknown"} {
+		t.Run(network, func(t *testing.T) {
+			selected, err := selectedProfilesOutput(network)
+			if network == "unknown" {
+				assertConfigUsage(t, err)
+				return
+			}
+			if err != nil || (selected == "controller-profiles-upstream-ovn") != (network == "upstream-ovn") {
+				t.Fatal("profiles selection differs from the network", selected, err)
+			}
+			root := privateTestDir(t)
+			record := fixtureRun()
+			expected, observed := record["expected"].([]map[string]any), record["observed"].([]map[string]any)
+			expected[1]["name"], expected[1]["kind"] = selected, "oci"
+			observed[1]["name"], observed[1]["kind"] = selected, "oci"
+			raw, err := json.Marshal(record)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.WriteFile(filepath.Join(root, "lifecycle.json"), raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = CompleteOutput(t.Context(), root, selected, "oci"); err != nil {
+				t.Fatal("selected profiles output rejected", err)
+			}
+			foreign := "controller-profiles-upstream-ovn"
+			if network == "upstream-ovn" {
+				foreign = "controller-profiles"
+			}
+			if _, err = CompleteOutput(t.Context(), root, foreign, "oci"); err == nil {
+				t.Fatal("opposite-mode profiles replay accepted")
+			}
+		})
+	}
+}
+
+func TestUpstreamOVNRequiresDistinctCompletedOutputSlots(t *testing.T) {
+	for _, network := range []string{"ovn", "upstream-ovn", "kind-calico", "unknown"} {
+		t.Run(network, func(t *testing.T) {
+			version, imageName, chartName, err := selectedOVNOutputs(network)
+			if network == "kind-calico" || network == "unknown" {
+				assertConfigUsage(t, err)
+				return
+			}
+			disk, err := selectedDiskOutput(network)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if network == "upstream-ovn" && (version != "1.4.0" || imageName != "upstream-ovn-image-arm64" || chartName != "upstream-ovn-chart-arm64" || disk != "nke-node-image-upstream-ovn-arm64") {
+				t.Fatal("upstream selection reused baseline outputs")
+			}
+			if network == "ovn" && (version != "1.5.18" || imageName != "ovn-image-arm64" || chartName != "ovn-chart-arm64" || disk != DiskOutputName) {
+				t.Fatal("maintained output selection changed")
+			}
+			foreign := "ovn"
+			if network == "ovn" {
+				foreign = "upstream-ovn"
+			}
+			_, wrongImage, wrongChart, _ := selectedOVNOutputs(foreign)
+			chart := SelectedOutput{Layout: "/must-not-read", Observation: lifecycle.Artifact{Name: wrongChart, Kind: "helm-oci", Digest: "sha256:" + strings.Repeat("a", 64)}}
+			image := SelectedOutput{Observation: lifecycle.Artifact{Name: wrongImage, Kind: "oci", Digest: "sha256:" + strings.Repeat("b", 64)}}
+			if err := admitSiteOVNChartForNetwork(t.Context(), network, chart, image); err == nil || !strings.Contains(err.Error(), "output identities") {
+				t.Fatal("opposite-mode replay was not rejected before payload reads", err)
+			}
+			commands := 0
+			capture := func(context.Context, Runner, []string, string, time.Duration) ([]byte, error) {
+				commands++
+				return nil, nil
+			}
+			session := ManagementSession{Runner: Runner{Env: []string{"SITE_KUBECONFIG=owned"}}}
+			outputs := map[string]SelectedOutput{"ovn-chart": chart, "ovn": image}
+			if err := installSelectedSiteNetwork(t.Context(), network, session, "", outputs, "", "", capture); err == nil || commands != 0 {
+				t.Fatal("opposite-mode replay started deployment", commands, err)
+			}
+		})
+	}
+}
+
+func TestUpstreamOVNArchiveBindingAndRelocation(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	for _, scenario := range []string{"exact", "foreign-digest", "tag-only", "foreign-repository", "identity-enabled", "foreign-chart-version", "nvidia-values"} {
+		t.Run(scenario, func(t *testing.T) {
+			defaults := upstreamOVNBoundValues(strings.TrimPrefix(digest, "sha256:"))
+			image := defaults["global"].(map[string]any)["image"].(map[string]any)
+			version := upstreamSiteOVNVersion
+			switch scenario {
+			case "foreign-digest":
+				image["tag"] = strings.Repeat("b", 64)
+			case "tag-only":
+				image["tag"] = "latest"
+			case "foreign-repository":
+				image["repository"] = "foreign@sha256"
+			case "identity-enabled":
+				defaults["tags"].(map[string]any)["ovnkube-identity"] = true
+			case "foreign-chart-version":
+				version = siteOVNVersion
+			case "nvidia-values":
+				defaults = ovnBoundValues(t, strings.TrimPrefix(digest, "sha256:"))
+			}
+			raw, err := json.Marshal(defaults)
+			if err != nil {
+				t.Fatal(err)
+			}
+			archive := ovnChartArchive(t, map[string][]byte{
+				"ovn-kubernetes/Chart.yaml":  []byte("apiVersion: v2\nname: ovn-kubernetes\nversion: " + version + "\n"),
+				"ovn-kubernetes/values.yaml": raw,
+			})
+			err = admitSiteOVNArchiveForNetwork(t.Context(), "upstream-ovn", archive, digest)
+			if scenario != "exact" {
+				if err == nil {
+					t.Fatal("unbound or opposite-mode chart was accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			reference := "172.18.0.2:5000/nkd-local/ovn@" + digest
+			values, err := siteOVNValuesForNetwork("upstream-ovn", raw, reference, "https://172.18.0.3:6443", "owned")
+			if err != nil {
+				t.Fatal(err)
+			}
+			global := values["global"].(map[string]any)
+			projected := global["image"].(map[string]any)
+			// Exact upstream getImage concatenation, not an invented digest field.
+			if projected["repository"].(string)+":"+projected["tag"].(string) != reference || global["enableOvnKubeIdentity"] != false || values["skipCallToK8s"] != true {
+				t.Fatal("upstream projection lost the exact image or enabled foreign components")
+			}
+			if err := admitSiteOVNArchive(t.Context(), archive, digest); err == nil {
+				t.Fatal("upstream archive was accepted as the NVIDIA chart")
+			}
+		})
+	}
+}
+
+func TestUpstreamOVNObservationRequiresItsMetricsContainer(t *testing.T) {
+	reference := "172.18.0.2:5000/nkd-local/ovn@sha256:" + strings.Repeat("a", 64)
+	for _, scenario := range []string{"exact", "nvidia-shape", "foreign-image", "unready-metrics"} {
+		t.Run(scenario, func(t *testing.T) {
+			rows := upstreamOVNPodsFixture(reference, "owned")
+			if scenario == "nvidia-shape" {
+				rows.Items[2].Spec.Containers = rows.Items[2].Spec.Containers[:5]
+				rows.Items[2].Status.ContainerStatuses = rows.Items[2].Status.ContainerStatuses[:5]
+			}
+			switch scenario {
+			case "foreign-image":
+				rows.Items[2].Spec.Containers[5].Image = "foreign:latest"
+			case "unready-metrics":
+				rows.Items[2].Status.ContainerStatuses[5].Ready = false
+			}
+			observed, err := validateSiteOVNPodsForNetwork("upstream-ovn", rows, reference, "owned")
+			if (err == nil) != (scenario == "exact") || scenario == "exact" && len(observed.Containers) != 8 {
+				t.Fatalf("upstream role observation differs: %+v %v", observed, err)
+			}
+		})
+	}
+}
+
 func TestSiteOVNValuesPreserveEveryBoundImageAndDisableForeignComponents(t *testing.T) {
 	digest := strings.Repeat("a", 64)
 	for _, scenario := range []string{"exact", "missing-role", "wrong-binding", "enabled-ovs", "enabled-dpu", "extra-tag", "malformed", "tag-only", "secret-reference", "wrong-api", "secret-api"} {
@@ -354,80 +533,92 @@ func TestSiteOVNBootstrapUsesNodeLocalPaths(t *testing.T) {
 }
 
 func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testing.T) {
-	for _, failed := range []string{"", "binding", "site-ovs-ready", "site-ovn-node-ready", "site-ovn-observation"} {
-		t.Run(failed, func(t *testing.T) {
-			work := privateTestDir(t)
-			digest := "sha256:" + strings.Repeat("a", 64)
-			reference := "172.18.0.2:5000/nkd-local/ovn@" + digest
-			outputs := map[string]SelectedOutput{
-				"ovn":       {Observation: lifecycle.Artifact{Name: "ovn-image-arm64", Kind: "oci", Digest: digest}},
-				"ovn-chart": {Layout: "selected-chart", Observation: lifecycle.Artifact{Name: "ovn-chart-arm64", Kind: "helm-oci", Digest: "sha256:" + strings.Repeat("b", 64)}},
-			}
-			session := ManagementSession{Name: "owned", Work: work, Tools: "selected-tools", Runner: Runner{Env: []string{"SITE_KUBECONFIG=owned-kubeconfig", "STAGE_NEEDS_RELEASE=1"}}}
-			var phases []string
-			capture := func(ctx context.Context, runner Runner, args []string, phase string, timeout time.Duration) ([]byte, error) {
-				if ctx != t.Context() || timeout <= 0 || timeout > 20*time.Minute {
-					t.Fatal("unbounded or substituted command context")
+	for _, network := range []string{"ovn", "upstream-ovn"} {
+		version, imageName, chartName, err := selectedOVNOutputs(network)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, failed := range []string{"", "binding", "site-ovs-ready", "site-ovn-node-ready", "site-ovn-observation"} {
+			t.Run(network+"/"+failed, func(t *testing.T) {
+				work := privateTestDir(t)
+				digest := "sha256:" + strings.Repeat("a", 64)
+				reference := "172.18.0.2:5000/nkd-local/ovn@" + digest
+				outputs := map[string]SelectedOutput{
+					"ovn":       {Observation: lifecycle.Artifact{Name: imageName, Kind: "oci", Digest: digest}},
+					"ovn-chart": {Layout: "selected-chart", Observation: lifecycle.Artifact{Name: chartName, Kind: "helm-oci", Digest: "sha256:" + strings.Repeat("b", 64)}},
 				}
-				wantRelease := "1"
-				if phase == "install-capi" || phase == "check-capi" {
-					wantRelease = "0"
-				}
-				if environmentValue(runner.Env, "STAGE_NEEDS_RELEASE") != wantRelease || environmentValue(runner.Env, "RELEASE_FILE") != "" || environmentValue(runner.Env, "SITE_KUBECONFIG") != "owned-kubeconfig" {
-					t.Fatal("network/CAPI child environment violates the source stage contract")
-				}
-				phases = append(phases, phase)
-				if phase == failed {
-					return nil, &CommandError{Phase: phase, ExitCode: 1, Cause: errors.New("failed")}
-				}
-				switch phase {
-				case "site-ovn-chart":
-					path := filepath.Join(work, "site-ovn.tgz")
-					if !slices.Contains(args, outputs["ovn-chart"].Observation.Digest) || !slices.Contains(args, siteOVNVersion) || !slices.Contains(args, "ovn-kubernetes") {
-						t.Fatal("extraction did not select exact chart identity")
+				session := ManagementSession{Name: "owned", Work: work, Tools: "selected-tools", Runner: Runner{Env: []string{"SITE_KUBECONFIG=owned-kubeconfig", "STAGE_NEEDS_RELEASE=1"}}}
+				var phases []string
+				capture := func(ctx context.Context, runner Runner, args []string, phase string, timeout time.Duration) ([]byte, error) {
+					if ctx != t.Context() || timeout <= 0 || timeout > 20*time.Minute {
+						t.Fatal("unbounded or substituted command context")
 					}
-					if err := os.WriteFile(path, []byte("controlled chart archive; not an external Helm runtime"), 0o600); err != nil {
-						t.Fatal(err)
+					wantRelease := "1"
+					if phase == "install-capi" || phase == "check-capi" {
+						wantRelease = "0"
 					}
-					sum, err := DigestFile(ctx, path)
-					if err != nil {
-						t.Fatal(err)
+					if environmentValue(runner.Env, "STAGE_NEEDS_RELEASE") != wantRelease || environmentValue(runner.Env, "RELEASE_FILE") != "" || environmentValue(runner.Env, "SITE_KUBECONFIG") != "owned-kubeconfig" {
+						t.Fatal("network/CAPI child environment violates the source stage contract")
 					}
-					return json.Marshal(delivery.HelmChartExport{ManifestDigest: outputs["ovn-chart"].Observation.Digest, ArchiveDigest: sum, Name: "ovn-kubernetes", Version: siteOVNVersion})
-				case "site-ovn-defaults":
-					binding := strings.TrimPrefix(digest, "sha256:")
-					if failed == "binding" {
-						binding = strings.Repeat("c", 64)
+					phases = append(phases, phase)
+					if phase == failed {
+						return nil, &CommandError{Phase: phase, ExitCode: 1, Cause: errors.New("failed")}
 					}
-					return json.Marshal(ovnBoundValues(t, binding))
-				case "site-ovn-observation":
-					return json.Marshal(ovnPodsFixture(reference, "owned"))
-				case "site-ovn-install":
-					if !slices.Contains(args, "--create-namespace") {
-						t.Fatal("fresh Helm release namespace must exist before Secret storage")
+					switch phase {
+					case "site-ovn-chart":
+						path := filepath.Join(work, "site-ovn.tgz")
+						if !slices.Contains(args, outputs["ovn-chart"].Observation.Digest) || !slices.Contains(args, version) || !slices.Contains(args, "ovn-kubernetes") {
+							t.Fatal("extraction did not select exact chart identity")
+						}
+						if err := os.WriteFile(path, []byte("controlled chart archive; not an external Helm runtime"), 0o600); err != nil {
+							t.Fatal(err)
+						}
+						sum, err := DigestFile(ctx, path)
+						if err != nil {
+							t.Fatal(err)
+						}
+						return json.Marshal(delivery.HelmChartExport{ManifestDigest: outputs["ovn-chart"].Observation.Digest, ArchiveDigest: sum, Name: "ovn-kubernetes", Version: version})
+					case "site-ovn-defaults":
+						binding := strings.TrimPrefix(digest, "sha256:")
+						if failed == "binding" {
+							binding = strings.Repeat("c", 64)
+						}
+						if network == "upstream-ovn" {
+							return json.Marshal(upstreamOVNBoundValues(binding))
+						}
+						return json.Marshal(ovnBoundValues(t, binding))
+					case "site-ovn-observation":
+						if network == "upstream-ovn" {
+							return json.Marshal(upstreamOVNPodsFixture(reference, "owned"))
+						}
+						return json.Marshal(ovnPodsFixture(reference, "owned"))
+					case "site-ovn-install":
+						if !slices.Contains(args, "--create-namespace") {
+							t.Fatal("fresh Helm release namespace must exist before Secret storage")
+						}
+						return nil, nil
+					default:
+						return nil, nil
 					}
-					return nil, nil
-				default:
-					return nil, nil
 				}
-			}
-			err := installSiteNetwork(t.Context(), session, "selected-nkdctl", outputs, reference, "https://172.18.0.3:6443", capture)
-			if environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "1" {
-				t.Fatal("CAPI override escaped its scoped child runner")
-			}
-			if failed != "" {
-				if err == nil || slices.Contains(phases, "install-capi") || failed == "binding" && slices.Contains(phases, "site-ovs-create") {
-					t.Fatalf("failed network reached CAPI/deployment: %v %v", phases, err)
+				err := installSelectedSiteNetwork(t.Context(), network, session, "selected-nkdctl", outputs, reference, "https://172.18.0.3:6443", capture)
+				if environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "1" {
+					t.Fatal("CAPI override escaped its scoped child runner")
 				}
-				return
-			}
-			want := []string{"site-ovn-chart", "site-ovn-defaults", "site-ovs-fresh", "site-ovs-create", "site-ovs-ready", "site-ovn-install", "site-ovn-control-plane-ready", "site-ovn-node-ready", "management-ready", "site-ovn-observation", "install-capi", "check-capi"}
-			if err != nil || !slices.Equal(phases, want) {
-				t.Fatalf("network/CAPI ordering: %v %v", phases, err)
-			}
-			if _, err := os.Stat(filepath.Join(work, "site-ovn-inputs.json")); err != nil {
-				t.Fatal("missing exact runtime image observation", err)
-			}
-		})
+				if failed != "" {
+					if err == nil || slices.Contains(phases, "install-capi") || failed == "binding" && slices.Contains(phases, "site-ovs-create") {
+						t.Fatalf("failed network reached CAPI/deployment: %v %v", phases, err)
+					}
+					return
+				}
+				want := []string{"site-ovn-chart", "site-ovn-defaults", "site-ovs-fresh", "site-ovs-create", "site-ovs-ready", "site-ovn-install", "site-ovn-control-plane-ready", "site-ovn-node-ready", "management-ready", "site-ovn-observation", "install-capi", "check-capi"}
+				if err != nil || !slices.Equal(phases, want) {
+					t.Fatalf("network/CAPI ordering: %v %v", phases, err)
+				}
+				if _, err := os.Stat(filepath.Join(work, "site-ovn-inputs.json")); err != nil {
+					t.Fatal("missing exact runtime image observation", err)
+				}
+			})
+		}
 	}
 }

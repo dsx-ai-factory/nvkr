@@ -238,7 +238,12 @@ func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packer
 	if err := createPackerContainer(ctx, request.runtime, build); err != nil {
 		return nil, err
 	}
+	activity := startPackerActivity(ctx, request, resources, workVolume, "nkd-packer-"+attempt+"-activity",
+		[]string{nodeLabel, attemptLabel, "nkd.dev/role=log-activity"})
 	buildErr := startPackerBuildContainer(ctx, request.runtime, buildName, request.stdout, request.stderr, kvmProjection != nil)
+	if err := activity.stop(ctx); err != nil {
+		return nil, errors.Join(buildErr, err)
+	}
 	var diagnosticErr error
 	if request.bindings.buildLogDirectoryVariable != "" {
 		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), diagnosticTimeout)
@@ -560,12 +565,14 @@ func packerAttemptID() (string, error) {
 }
 
 type packerContainerResources struct {
-	runtime    packerContainerRuntime
-	mu         sync.Mutex
-	containers []string
-	volumes    []string
-	held       []*heldfile.File
-	workspace  *packerContainerWorkspace
+	runtime          packerContainerRuntime
+	mu               sync.Mutex
+	containers       []string
+	privateObservers map[string]struct{}
+	retainedObserver bool
+	volumes          []string
+	held             []*heldfile.File
+	workspace        *packerContainerWorkspace
 }
 
 func (resources *packerContainerResources) removeContainer(ctx context.Context, name string) error {
@@ -589,11 +596,17 @@ func (resources *packerContainerResources) cleanup() error {
 
 func (resources *packerContainerResources) cleanupWithTimeout(timeout time.Duration) error {
 	resources.mu.Lock()
+	if resources.retainedObserver {
+		resources.mu.Unlock()
+		return e.New(e.CodeTimeout, "owned Packer log observer did not join; dependent resources retained")
+	}
 	containers := append([]string(nil), resources.containers...)
+	privateObservers := resources.privateObservers
 	volumes := append([]string(nil), resources.volumes...)
 	held := append([]*heldfile.File(nil), resources.held...)
 	workspace := resources.workspace
 	resources.containers, resources.volumes = nil, nil
+	resources.privateObservers = nil
 	resources.held, resources.workspace = nil, nil
 	resources.mu.Unlock()
 	var cleanupErrors []error
@@ -601,7 +614,11 @@ func (resources *packerContainerResources) cleanupWithTimeout(timeout time.Durat
 	for index := len(containers) - 1; index >= 0; index-- {
 		if err := resources.runtime.Cleanup(containerCtx, packerContainerTerminationGrace, io.Discard, io.Discard,
 			"rm", "-fv", containers[index]); err != nil {
-			cleanupErrors = append(cleanupErrors, err)
+			if _, private := privateObservers[containers[index]]; private {
+				cleanupErrors = append(cleanupErrors, e.New(e.CodeInternal, "owned Packer log observer cleanup failed"))
+			} else {
+				cleanupErrors = append(cleanupErrors, err)
+			}
 		}
 	}
 	cancelContainers()

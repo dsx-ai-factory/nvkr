@@ -44,6 +44,9 @@ type Config struct {
 // BuildConfig selects the existing local launcher, which bootstraps and invokes
 // nkdctl. It does not introduce a second build engine or in-process SDK path.
 type BuildConfig struct {
+	// Network selects a closed authored artifact set for E2E. It does not
+	// substitute source pins or confer deployment/readiness authority.
+	Network       string
 	Repository    string
 	NKEClone      string
 	AttemptPrefix string

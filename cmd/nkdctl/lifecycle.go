@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -93,12 +94,25 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "attempt", Required: true, Usage: "new immutable attempt name"},
 			&cli.StringFlag{Name: "attempts-root", Value: ".nkd/runs"}, &cli.StringFlag{Name: "runner-source", Value: "."},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
-			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"}), Action: func(c *cli.Context) error {
+			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
+			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1}), Action: func(c *cli.Context) error {
+			var activity *buildactivity.Sink
+			if c.IsSet("build-activity-fd") {
+				if c.Bool("dry-run") || c.Bool("publish") {
+					return e.New(e.CodeUsage, "build activity is available only for local execution")
+				}
+				var err error
+				activity, err = buildactivity.AdoptFD(c.Context, c.Int("build-activity-fd"))
+				if err != nil {
+					return err
+				}
+				defer func() { _ = activity.Close() }()
+			}
 			prepared, err := lifecycle.PrepareFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
 			if err != nil {
 				return err
 			}
-			result, err := executeLocal(c.Context, prepared, lifecycle.LocalOptions{AttemptsRoot: c.String("attempts-root"), RunnerSource: c.String("runner-source"), Jobs: c.Int("jobs"), Runtime: c.String("runtime"), Go: c.String("go"), Publish: c.Bool("publish"), DryRun: c.Bool("dry-run"), Stdout: os.Stdout, Stderr: os.Stderr})
+			result, err := executeLocal(c.Context, prepared, lifecycle.LocalOptions{AttemptsRoot: c.String("attempts-root"), RunnerSource: c.String("runner-source"), Jobs: c.Int("jobs"), Runtime: c.String("runtime"), Go: c.String("go"), Publish: c.Bool("publish"), DryRun: c.Bool("dry-run"), Stdout: os.Stdout, Stderr: os.Stderr, Activity: activity})
 			if err != nil {
 				if result != nil && result.Status == lifecycle.RunComplete {
 					if reportErr := printLocalRunResult(c, result); reportErr != nil {

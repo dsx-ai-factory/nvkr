@@ -31,6 +31,46 @@ func linkLauncherTestTimeout(t *testing.T, tools string) {
 	}
 }
 
+func TestBuildNetworkSelectionFailsBeforeProducerWork(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"missing mode", []string{"--network"}, "Usage:"},
+		{"unknown mode", []string{"--network", "guessed", "--check", "all"}, "Build network must"},
+		{"Calico is not an artifact selection", []string{"--network", "kind-calico", "--check", "all"}, "Build network must"},
+		{"upstream subset", []string{"--network", "upstream-ovn", "--check", "profiles"}, "requires the complete all selection"},
+		{"upstream implicit subset", []string{"--network", "upstream-ovn", "fresh"}, "requires the complete all selection"},
+		{"private upstream subset", []string{"--prepare-only", "--network", "upstream-ovn", "fresh", "1", "os"}, "requires the complete all selection"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.Mkdir(filepath.Join(dir, "scripts"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			body, err := os.ReadFile("nke-full-arm64-local.sh")
+			if err != nil {
+				t.Fatal(err)
+			}
+			launcher := filepath.Join(dir, "scripts", "nke-full-arm64-local.sh")
+			if err := os.WriteFile(launcher, body, 0600); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", append([]string{launcher}, tc.args...)...)
+			out, err := cmd.CombinedOutput()
+			if err == nil || !strings.Contains(string(out), tc.want) {
+				t.Fatalf("error=%v output=%s, want %s", err, out, tc.want)
+			}
+			if _, err := os.Stat(filepath.Join(dir, ".nkd")); !os.IsNotExist(err) {
+				t.Fatalf("rejected mode created attempt: %v", err)
+			}
+		})
+	}
+}
+
 func TestLocalDeveloperPreflight(t *testing.T) {
 	for _, tc := range []struct {
 		name, system, arch, runtime, lane, state, disk, daemon, want string
@@ -465,6 +505,7 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 		{"selected graph failure prevents execution", validated, "0", true, false, "", false},
 		{"overlong display record omitted", validated, "0", false, false, "", false},
 		{"preserve OVN redirect with NKE clone", validated, "0", false, false, "", false},
+		{"private preparation excludes final execution", validated, "0", false, false, "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -556,7 +597,11 @@ esac
 			if tc.name == "overlong display record omitted" {
 				displayGraph = strings.Replace(displayGraph, "build (build)", strings.Repeat("x", 513), 1)
 			}
-			cmd := exec.CommandContext(ctx, "bash", filepath.Join(dir, "scripts/nke-full-arm64-local.sh"), "id-probe", "1", "simulator")
+			args := []string{filepath.Join(dir, "scripts/nke-full-arm64-local.sh"), "id-probe", "1", "simulator"}
+			if tc.name == "private preparation excludes final execution" {
+				args = append(args[:1], append([]string{"--prepare-only"}, args[1:]...)...)
+			}
+			cmd := exec.CommandContext(ctx, "bash", args...)
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
@@ -634,6 +679,30 @@ esac
 				}
 			}
 			wantCount := 6 // Baseline and selected Plans/graphs, dry-run preview, and final exec.
+			if tc.name == "private preparation excludes final execution" {
+				wantCount = 5
+				path := filepath.Join(dir, ".nkd/laptop-bootstrap/id-probe/build-invocation.json")
+				info, err := os.Lstat(path)
+				if err != nil || info.Mode().Perm() != 0600 {
+					t.Fatalf("not private invocation: %v", err)
+				}
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var args []string
+				if err := json.Unmarshal(raw, &args); err != nil || len(args) != 17 || args[0] != ".nkd/laptop-bootstrap/id-probe/nkdctl" || args[8] != "id-probe" || args[14] != "1" || args[16] != "docker" {
+					t.Fatalf("bad private invocation: %v %q", err, raw)
+				}
+				for _, arg := range args {
+					if strings.Contains(arg, "build-activity") {
+						t.Fatal("bootstrap adopted activity descriptor")
+					}
+				}
+				if strings.Contains(string(calls), "--attempt id-probe --attempts-root") {
+					t.Fatal("prepare-only executed final Run")
+				}
+			}
 			if tc.wantError {
 				wantCount = 2 // Graph or toolchain rejection prevents execution.
 			}

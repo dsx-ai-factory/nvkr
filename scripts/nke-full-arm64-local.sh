@@ -15,6 +15,8 @@ usage() {
   printf '%s\n' \
     'Usage: bash scripts/nke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers|simulator|site|tools|profiles]' \
     '       bash scripts/nke-full-arm64-local.sh --check [all|components|os|providers|simulator|site|tools|profiles]' \
+    'Explicit upstream alternative: add --network upstream-ovn before ATTEMPT (all selection only).' \
+    'NVIDIA OVN remains the default. This alternative does not validate the NVIDIA fork.' \
     'all: one Run with 29 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
     'simulator bootstraps the same pinned Go/GCC Docker toolchain.' \
@@ -34,7 +36,23 @@ usage() {
 }
 if [[ $# == 1 && ( "$1" == --help || "$1" == -h ) ]]; then usage; exit 0; fi
 check_only=0
+prepare_only=0
+network=ovn
+# Private Go-demo handoff: no activity descriptor is inherited by this shell.
+# It prepares the same selected inputs, but the Go process launches the final
+# unchanged run-local vector directly so only that child receives telemetry.
+if [[ "${1:-}" == --prepare-only ]]; then
+  prepare_only=1
+  shift
+fi
+if [[ "${1:-}" == --network ]]; then
+  [[ $# -ge 2 ]] || { usage >&2; exit 2; }
+  network="$2"
+  case "${network}" in ovn|upstream-ovn) ;; *) echo 'Build network must be ovn or upstream-ovn.' >&2; exit 2 ;; esac
+  shift 2
+fi
 if [[ "${1:-}" == --check ]]; then
+  [[ "${prepare_only}" == 0 ]] || { usage >&2; exit 2; }
   [[ $# -le 2 ]] || { usage >&2; exit 2; }
   check_only=1
   attempt=prerequisites-only
@@ -50,6 +68,9 @@ if [[ ! "${attempt}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ || ! "${jobs}" =~ ^[1
   echo 'Supply a fresh attempt name and positive job count.' >&2; exit 2
 fi
 case "${lane}" in all|components|os|providers|simulator|site|tools|profiles) ;; *) echo 'Select all, components, os, providers, simulator, site, tools or profiles.' >&2; exit 2 ;; esac
+if [[ "${network}" == upstream-ovn && "${lane}" != all ]]; then
+  echo 'Upstream OVN requires the complete all selection so chart, image and QCOW2 inputs stay aligned.' >&2; exit 2
+fi
 # Keep invocation-local redirects when a second local repository is selected.
 # Bound the scalar before arithmetic, host diagnostics or any producer work.
 git_config_count="${GIT_CONFIG_COUNT-0}"
@@ -69,6 +90,7 @@ if [[ "${host_system}" != Darwin ]] && ! command -v docker >/dev/null; then
   exit 1
 fi
 if [[ "${host_system}" == Darwin ]]; then
+  [[ "${prepare_only}" == 0 ]] || { echo 'Private preparation requires native Linux execution.' >&2; exit 1; }
   [[ "$(uname -m)" == arm64 ]] || { echo 'The macOS ARM64 launcher requires Apple Silicon.' >&2; exit 1; }
   profile="${COLIMA_PROFILE:-}"
   if [[ -z "${profile}" ]]; then
@@ -197,6 +219,7 @@ fi
 runner="${tools}/nkdctl"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }
 definition="definitions/nke-local-dev-arm64/definition.json"
+if [[ "${network}" == upstream-ovn ]]; then definition="definitions/nke-local-dev-arm64/definition-upstream-ovn.json"; fi
 if [[ "${lane}" != all ]]; then definition="definitions/nke-local-dev-arm64/definition-${lane}.json"; fi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
   # Admit the compiled selection before building/loading/probing a replacement
@@ -287,5 +310,11 @@ print_nkdctl_command "${preview_command[@]}"
 "${preview_command[@]}"
 build_command=("${runner}" run local --definition "${definition}" --environment "${environment}" \
   --attempt "${attempt}" --attempts-root .nkd/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}")
+if [[ "${prepare_only}" == 1 ]]; then
+  # This is a private description, not executable authority or source evidence.
+  # Preserve the exact final argv selected above; never pass it through eval.
+  (umask 077; set -o noclobber; jq -cn --args '$ARGS.positional' -- "${build_command[@]}" >"${bootstrap}/build-invocation.json")
+  exit 0
+fi
 print_nkdctl_command "${build_command[@]}"
 exec "${build_command[@]}"

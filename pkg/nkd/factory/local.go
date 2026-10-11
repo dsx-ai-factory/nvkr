@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -49,6 +50,7 @@ type LocalRunOptions struct {
 	DryRun       bool
 	Stdout       io.Writer
 	Stderr       io.Writer
+	Activity     *buildactivity.Sink // Optional descriptive log metadata only.
 	// Diagnostics is an opaque lifecycle-issued attempt-directory capability.
 	// A path or serialized description cannot substitute for it.
 	Diagnostics   *pipeline.PackerDiagnosticSink
@@ -271,7 +273,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}
 		options.vmDrivers, err = options.vmResolver.Admit(ctx, relocated, options.producers, vmDriverRunConfig{
 			Runtime: options.Runtime, Stdout: options.Stdout, Stderr: options.Stderr,
-			Diagnostics: options.Diagnostics,
+			Diagnostics: options.Diagnostics, Activity: options.Activity,
 		})
 		if err != nil {
 			return nil, err

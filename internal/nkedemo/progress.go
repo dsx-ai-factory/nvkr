@@ -7,6 +7,8 @@ import (
 	"io"
 	"sync"
 	"time"
+
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 )
 
 const (
@@ -21,6 +23,7 @@ const (
 	DeploymentFailed   = "deployment-failed"
 	TenantWaiting      = "tenant-waiting"
 	TenantGuests       = "tenant-guests"
+	OSBuildLogs        = "os-build-logs"
 )
 
 // Guest observations describe infrastructure and console activity only. They
@@ -96,6 +99,7 @@ type ProgressEvent struct {
 	Elapsed         time.Duration
 	Remaining       time.Duration
 	Guests          [2]TenantGuestObservation
+	BuildLogs       buildactivity.Record
 }
 
 // Tenant polling reports interpreted observations, not successful subprocess

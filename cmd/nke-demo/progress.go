@@ -200,6 +200,14 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
+	if event.Kind == nkedemo.OSBuildLogs {
+		if event.BuildLogs.Validate() == nil && w.observer != nil {
+			w.observer.Report(event)
+		}
+		// No additional wall of periodic metadata in plain output. The private
+		// typed channel is presentation-only, never producer stdout or evidence.
+		return
+	}
 	if event.Kind == nkedemo.TenantGuests {
 		if !dashboardValidGuests(event.Guests) {
 			return

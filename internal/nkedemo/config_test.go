@@ -92,6 +92,7 @@ func TestDemoNetworkSelection(t *testing.T) {
 	}{
 		{"default", "", "ovn"},
 		{"maintained", "ovn", "ovn"},
+		{"upstream diagnostic", "upstream-ovn", "upstream-ovn"},
 		{"temporary diagnostic", "kind-calico", "kind-calico"},
 		{"unknown", "calico", ""},
 		{"case alias", "OVN", ""},
@@ -99,12 +100,12 @@ func TestDemoNetworkSelection(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			file := DemoFile{Version: 1, Build: BuildFile{Repo: "/native/repo", Attempt: "fresh", Jobs: 1}, Run: RunFile{Network: tc.network, Out: "/native/output", TimeoutSeconds: 3600}}
-			_, run, err := file.E2EConfig(nil)
+			build, run, err := file.E2EConfig(nil)
 			if tc.expected == "" {
 				assertConfigUsage(t, err)
 				return
 			}
-			if err != nil || run.Network != tc.expected {
+			if err != nil || run.Network != tc.expected || build.Network != tc.expected {
 				t.Fatalf("network=%q error=%v", run.Network, err)
 			}
 			contents := strings.Replace(fullDemoYAML, "run:\n", "run:\n  network: "+tc.expected+"\n", 1)

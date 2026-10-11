@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/definition"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -37,12 +38,13 @@ type nodeSessionPackerRuntime struct {
 // local execution results only; it is not provider allocation, pipeline
 // attestation, or qualification evidence.
 type VMImagePackerExecutor struct {
-	mu      sync.Mutex
-	active  sync.WaitGroup
-	closed  bool
-	session *nodeSessionState
-	runtime packerContainerRuntime
-	nodes   map[string][]byte
+	mu                 sync.Mutex
+	active             sync.WaitGroup
+	closed             bool
+	session            *nodeSessionState
+	runtime            packerContainerRuntime
+	nodes              map[string][]byte
+	activityOperations map[string]string
 }
 
 // VMImagePackerSelection binds one exact pipeline node to its validated
@@ -51,6 +53,9 @@ type VMImagePackerExecutor struct {
 type VMImagePackerSelection struct {
 	Subject string
 	Node    ir.Node
+	// Descriptive operation label frozen with the exact selected subject. It
+	// does not change producer identity or authorize execution.
+	ActivityOperation string
 }
 
 // VMImagePackerRun carries process-local capabilities and ordinary log/source
@@ -63,8 +68,10 @@ type VMImagePackerRun struct {
 	Materials   []PackerMaterialInput
 	Runtime     *execution.LocalVMRuntime
 	Diagnostics *PackerDiagnosticSink
-	Stdout      io.Writer
-	Stderr      io.Writer
+	// Activity is optional metadata-only presentation, not execution evidence.
+	Activity *buildactivity.Sink
+	Stdout   io.Writer
+	Stderr   io.Writer
 }
 
 // AdmitVMImagePacker performs the runtime and toolchain-image admission phase.
@@ -94,6 +101,7 @@ func (handle *NodeSession) AdmitVMImagePacker(
 	ordered := append([]VMImagePackerSelection(nil), selections...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Subject < ordered[j].Subject })
 	bound := make(map[string][]byte, len(ordered))
+	activityOperations := make(map[string]string, len(ordered))
 	for index, selection := range ordered {
 		if !safetext.Valid(selection.Subject, 4096, false) || strings.TrimSpace(selection.Subject) != selection.Subject {
 			return nil, e.New(e.CodeInvalidCatalog, "VM-image Packer admission has an unsafe Plan subject")
@@ -121,6 +129,12 @@ func (handle *NodeSession) AdmitVMImagePacker(
 			return nil, err
 		}
 		bound[selection.Subject] = raw
+		if selection.ActivityOperation != "" {
+			if (buildactivity.Record{Version: buildactivity.Version, Operation: selection.ActivityOperation}).Validate() != nil {
+				return nil, e.New(e.CodeUsage, "unsupported descriptive Packer operation label")
+			}
+			activityOperations[selection.Subject] = selection.ActivityOperation
+		}
 	}
 
 	session := handle.state
@@ -162,7 +176,8 @@ func (handle *NodeSession) AdmitVMImagePacker(
 		}
 	}
 	return &VMImagePackerExecutor{
-		session: session, runtime: heldPackerContainerRuntime{runtime: admitted}, nodes: bound,
+		activityOperations: activityOperations,
+		session:            session, runtime: heldPackerContainerRuntime{runtime: admitted}, nodes: bound,
 	}, nil
 }
 
@@ -352,6 +367,7 @@ func (executor *VMImagePackerExecutor) Run(
 		runtime: executor.runtime, source: source,
 		node: node, subject: subject, manifest: manifest, digest: input.Manifest.Digest(), materials: input.Materials,
 		workspace: workspace, kvm: kvm, diagnostics: input.Diagnostics, bindings: bindings,
+		activity: input.Activity, activityOperation: executor.activityOperations[subject],
 		stdout: options.Stdout, stderr: options.Stderr,
 	})
 	if err != nil {

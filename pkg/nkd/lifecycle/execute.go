@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
@@ -28,6 +29,8 @@ type LocalOptions struct {
 	DryRun       bool
 	Stdout       io.Writer
 	Stderr       io.Writer
+	// Activity is optional descriptive telemetry, never an execution receipt.
+	Activity *buildactivity.Sink
 	// DiskInspection opts into diagnostic installed-package inspection. The
 	// caller owns this already-admitted runtime and keeps it open for execution.
 	// Omitting it preserves the existing build-only path, not an inspection claim.
@@ -113,7 +116,7 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	recordPath := filepath.Join(workspace, "lifecycle.json")
 	factoryOptions := factory.LocalRunOptions{Workspace: workspace, RunnerSource: options.RunnerSource,
 		Jobs: options.Jobs, Runtime: options.Runtime, Go: options.Go, Publish: options.Publish,
-		DryRun: options.DryRun, Stdout: options.Stdout, Stderr: options.Stderr}
+		DryRun: options.DryRun, Stdout: options.Stdout, Stderr: options.Stderr, Activity: options.Activity}
 	// Workspace-independent admission always precedes immutable attempt
 	// reservation. RunLocal owns only the later held-workspace, capacity, and
 	// KVM admission for disk plans.

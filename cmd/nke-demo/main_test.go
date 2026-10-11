@@ -110,6 +110,8 @@ func TestDeploymentNetworkConfigAndFlagSelection(t *testing.T) {
 	}{
 		{"default", "", "", "ovn"},
 		{"configured diagnostic", "kind-calico", "", "kind-calico"},
+		{"configured upstream", "upstream-ovn", "", "upstream-ovn"},
+		{"flag upstream", "ovn", "upstream-ovn", "upstream-ovn"},
 		{"flag diagnostic", "ovn", "kind-calico", "kind-calico"},
 		{"explicit maintained override", "kind-calico", "ovn", "ovn"},
 		{"invalid configured", "unknown", "", ""},

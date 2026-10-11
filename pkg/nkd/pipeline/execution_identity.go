@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
@@ -80,6 +81,11 @@ type heldRuntimeExecutable struct {
 	configurationRoot string
 	closeOnce         sync.Once
 	closeErr          error
+	// Only the Packer activity stop owner sets this, before its producer call
+	// returns. A client that has not joined may still own heldfile's launch
+	// lock, so even closing the executable could block indefinitely. Retention
+	// is permanent for this process; a late join does not authorize cleanup.
+	unjoinedPackerActivity atomic.Bool
 }
 
 // hostedIDMap is the runtime's observed native identity-mapping description.
@@ -95,6 +101,9 @@ type hostedIDMap struct {
 func (runtime *heldRuntimeExecutable) close() error {
 	if runtime == nil {
 		return nil
+	}
+	if runtime.unjoinedPackerActivity.Load() {
+		return e.New(e.CodeTimeout, "owned Packer log observer runtime did not join; executable retained")
 	}
 	runtime.closeOnce.Do(func() {
 		if runtime.capability != nil {

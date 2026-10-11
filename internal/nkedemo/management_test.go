@@ -143,6 +143,21 @@ func TestManagementTemporaryKindProjection(t *testing.T) {
 	}
 }
 
+func TestManagementUpstreamOVNDisablesKindCNI(t *testing.T) {
+	source, err := os.ReadFile("testdata/pinned-kind.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstream, err := projectManagementConfigForNetwork(source, "upstream-ovn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	maintained, err := projectManagementConfig(source)
+	if err != nil || string(upstream) != string(maintained) {
+		t.Fatal("explicit OVN options must preserve the admitted topology", err)
+	}
+}
+
 func TestManagementRejectsUnsupportedHostBeforeOutput(t *testing.T) {
 	if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
 		t.Skip("unsupported-platform case does not apply")

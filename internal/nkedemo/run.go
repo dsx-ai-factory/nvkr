@@ -221,7 +221,8 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 	if cfg.Timeout < MinTenantTimeoutSeconds*time.Second || cfg.Timeout > MaxTenantTimeoutSeconds*time.Second {
 		return admitted, fmt.Errorf("tenant budget must be %d..%d seconds", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	if _, err := normalizeNetwork(cfg.Network); err != nil {
+	diskOutput, err := selectedDiskOutput(cfg.Network)
+	if err != nil {
 		return admitted, err
 	}
 	if err := admitSimulatorEndpoint(ctx, Runner{Env: NativeEnvironment(), Progress: cfg.Progress}); err != nil {
@@ -258,14 +259,14 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 	if err != nil {
 		return admitted, err
 	}
-	image, err := CompleteOutput(ctx, osRoot, DiskOutputName, "disk-image")
+	image, err := CompleteOutput(ctx, osRoot, diskOutput, "disk-image")
 	if err != nil {
 		return admitted, err
 	}
 	if image.Disk == nil || image.Disk.Format != "qcow2" || image.Disk.Encryption != "none" || image.Disk.Outcome != "succeeded" || image.Disk.PayloadDigest != image.Digest || image.Disk.Size <= 0 {
 		return admitted, errors.New("require successful observed plain QCOW2")
 	}
-	disk := filepath.Join(osRoot, "outputs", DiskOutputName+".qcow2")
+	disk := filepath.Join(osRoot, "outputs", diskOutput+".qcow2")
 	if err = verifyDiskBytes(ctx, disk, image); err != nil {
 		return admitted, err
 	}
@@ -408,7 +409,7 @@ func run(ctx context.Context, cfg Config) (result error) {
 	if err = os.Mkdir(serve, 0o700); err != nil {
 		return err
 	}
-	privateDisk = filepath.Join(serve, DiskOutputName+".qcow2")
+	privateDisk = filepath.Join(serve, admitted.image.Name+".qcow2")
 	if err = copyPrivate(ctx, admitted.disk, privateDisk, 0o444); err != nil {
 		return err
 	}

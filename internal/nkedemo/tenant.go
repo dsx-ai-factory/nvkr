@@ -115,8 +115,11 @@ func newTenantRequest(name, network string) (TenantRequest, error) {
 		return TenantRequest{}, err
 	}
 	request := NewTenantRequest(name)
-	if mode == "kind-calico" {
+	switch mode {
+	case "kind-calico":
 		request.CNI, request.CNIVersion = "calico", "3.30.1"
+	case "upstream-ovn":
+		request.CNIVersion = upstreamSiteOVNVersion
 	}
 	return request, nil
 }
@@ -398,6 +401,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	if err != nil {
 		return err
 	}
+	if err = t.waitCNI(provision, kubeconfig); err != nil {
+		return err
+	}
 	if err = t.waitDNS(provision, kubeconfig); err != nil {
 		return err
 	}
@@ -448,6 +454,28 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 		Domains               []domainEvidence
 		Workload              json.RawMessage
 	}{"unqualified-local-demo", t.name, t.id, nodes.Items, domains, raw})
+}
+
+// Calico can report Node Ready before its node agents finish their own rollout.
+// The diagnostic mode must admit that datapath before the unchanged smoke test;
+// rollout readiness is not functional DNS or workload acceptance.
+func (t *tenant) waitCNI(ctx context.Context, kubeconfig string) (result error) {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	mode, err := normalizeNetwork(t.network)
+	if err != nil {
+		return err
+	}
+	if mode != "kind-calico" {
+		return nil
+	}
+	boundary := beginProgress(t.session.Runner.Progress, "tenant-cni-readiness", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { boundary.finish(result) }()
+	ready, cancel := context.WithTimeout(ctx, 4*time.Minute)
+	defer cancel()
+	_, result = t.capture(ready, t.kubectl(kubeconfig, "-n", "calico-system", "rollout", "status", "daemonset/calico-node", "--timeout=240s"), "cni-calico-rollout", 4*time.Minute)
+	return result
 }
 
 // Node Ready does not mean the pinned NKE DNS workloads have finished rolling

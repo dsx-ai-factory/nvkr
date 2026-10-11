@@ -263,7 +263,7 @@ func projectManagementConfigForNetwork(source []byte, selected string) ([]byte, 
 	}
 	text = strings.Replace(text, socketMount, "", 1)
 	network := "  ipFamily: ipv4\n"
-	if mode == "ovn" {
+	if mode != "kind-calico" {
 		network += "  disableDefaultCNI: true\n  kubeProxyMode: none\n"
 	}
 	network += "  podSubnet: " + managementPodCIDR + "\n  serviceSubnet: " + managementServiceCIDR + "\n"
@@ -279,7 +279,7 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
 		return admitted, errors.New("require native Linux ARM64 inside the dedicated VM")
 	}
-	if mode == "ovn" {
+	if mode != "kind-calico" {
 		if err := admitSiteOVNKernel(); err != nil {
 			return admitted, err
 		}

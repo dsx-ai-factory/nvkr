@@ -186,16 +186,16 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 		Runs: RunInputs{OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 
-// normalizeNetwork keeps the maintained OVN path as the default. The alternate
-// mode is explicitly diagnostic: Kind's default CNI on site, Calico on tenant.
+// normalizeNetwork keeps NVIDIA OVN as the default. Alternatives are explicit
+// local diagnostics; none is a fallback for an unavailable selected network.
 func normalizeNetwork(network string) (string, error) {
 	switch network {
 	case "", "ovn":
 		return "ovn", nil
-	case "kind-calico":
+	case "kind-calico", "upstream-ovn":
 		return network, nil
 	default:
-		return "", configUsage("network must be ovn or kind-calico (temporary diagnostic)")
+		return "", configUsage("network must be ovn, upstream-ovn or kind-calico (explicit diagnostics)")
 	}
 }
 
@@ -233,5 +233,6 @@ func (file DemoFile) E2EConfig(progress io.Writer) (BuildConfig, Config, error) 
 	if file.Run.NKDCTL != "" || file.Run.Runs != (RunFileInputs{}) {
 		return BuildConfig{}, Config{}, configUsage("e2e cannot configure nkdctl or existing Runs")
 	}
+	build.Network = run.Network
 	return build, run, nil
 }

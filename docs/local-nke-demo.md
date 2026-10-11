@@ -11,6 +11,9 @@ Kind site cluster and the QCOW2 tenant. See [OVN issue #1](https://github.com/ds
 Wait for the source-owner fix and a reviewed pin update before expecting a
 successful complete E2E with this selection. No local catalog workaround is
 applied. The build-only development loops remain separate from tenant acceptance.
+An explicit `--network upstream-ovn` alternative selects upstream OVN for both
+site and tenant; it does not fix or validate the NVIDIA fork. Its complete fresh
+E2E acceptance remains unverified. See the selection below.
 
 Run everything on a dedicated Ubuntu ARM64 host with Docker. On an Apple Silicon
 Mac, first create that Linux host with Colima below. This is **not a native macOS
@@ -180,7 +183,7 @@ setup and cleanup, without accepting a temporary `sudo -v` cache. Success admits
 this probe only: command-specific policy can still deny later operations, and
 administrator policy changes cannot be predicted by preflight.
 
-In the default OVN mode, the site uses Open vSwitch's kernel datapath inside
+In either OVN mode, the site uses Open vSwitch's kernel datapath inside
 the owned Kind node. On this dedicated Linux execution host, have the
 administrator load its kernel modules before E2E; these are host prerequisites,
 not artifacts NKD builds:
@@ -317,6 +320,8 @@ chart and image. Open vSwitch starts in an owned Kind DaemonSet using the same
 selected image's existing entrypoint. Management-node readiness and Cluster API
 installation follow site-network readiness; the tenant remains a separate
 QCOW2-backed cluster.
+The explicit upstream mode uses the same CNI-disabled Kind topology and kernel
+prerequisites, with its separately selected upstream image and chart.
 
 Cache the explicit runtime acquisitions:
 
@@ -358,12 +363,60 @@ Do not add retained `run.runs` or `run.nkdctl` references to E2E configuration.
   --jobs 2
 ```
 
+### Explicit upstream OVN alternative
+
+`--network upstream-ovn` selects upstream OVN-Kubernetes `v1.4.0` at
+[`d6a3812d`](https://github.com/ovn-kubernetes/ovn-kubernetes/commit/d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d)
+for both the site and QCOW2 tenant. NVIDIA OVN remains the default; neither OVN
+mode falls back to Calico. This is a separate unqualified diagnostic selection,
+not NVIDIA-fork validation or proof of a supported NKE release combination.
+
+```sh
+"$NKE_DEMO" e2e \
+  --config demos/local-nke.yaml \
+  --repo "$PWD" \
+  --attempt demo-upstream-ovn-01 \
+  --out "$PWD/.nkd/demo-upstream-ovn-01-demo" \
+  --jobs 2 \
+  --network upstream-ovn
+```
+
+This chooses the authored [upstream Definition](../definitions/nke-local-dev-arm64/definition-upstream-ovn.json),
+not a replacement of the NVIDIA catalog's pins. Image, chart, disk and profiles
+have distinct upstream output names. The complete selection still contains 29
+outputs in one fresh Run. The disk embeds the matching upstream image/chart
+packages; its profiles image installs stream `1.4.0`, and the tenant requests
+that same stream. Deployment replay with `nke-demo run --network upstream-ovn`
+requires those distinct outputs and rejects opposite-mode inputs.
+
+For an artifact-only complete build, use
+`bash scripts/nke-full-arm64-local.sh --network upstream-ovn ATTEMPT JOBS all`.
+The launcher rejects upstream subset selections so the required inputs cannot
+be mixed by that route. Bootstrap the CLI with the ordinary tools command first.
+Source acquisition and Docker pulls still require their configured endpoints;
+this option is not an offline mode. A local upstream Git redirect must name
+`https://github.com/ovn-kubernetes/ovn-kubernetes`, not the NVIDIA fork.
+
+The explicit source and package bindings are contract checks. Complete site
+networking, tenant readiness, workload/DNS and owned cleanup must still pass in
+a fresh real E2E before this option can be called operationally validated.
+
+### Temporary Calico diagnostic
+
 For a **temporary diagnostic** while the NVIDIA OVN runtime issue is unresolved,
 use this alternative command. `--network kind-calico` keeps Kind's default site
 networking and selects Calico `3.30.1` for the QCOW2 tenant; the default remains
 OVN. It does not rewrite catalogs or remove OVN build outputs. A passing run in
 this mode does **not** validate NVIDIA OVN or establish M2 acceptance. The selected
 mode is retained in `demo-inputs.json`; `nke-demo run` accepts the same flag.
+
+In this diagnostic mode, both tenant nodes must be Ready and the tenant's
+`calico-system/daemonset/calico-node` rollout must pass before the DNS rollouts
+and the unchanged zero-retry workload test. Node Ready and ready DNS pods alone
+do not establish a working CNI datapath. The Calico check has a four-minute
+ceiling within the remaining tenant deadline; a failed rollout stops deployment.
+This additional admission is contract-tested, not proof that a fresh complete
+E2E or functional DNS test succeeds.
 
 ```sh
 "$NKE_DEMO" e2e \
@@ -431,8 +484,19 @@ recognized Packer report and its age: boot-console preparation, SSH connection,
 file transfer, shell provisioning, shutdown or final QCOW2 post-processing.
 Concise output uses fixed summaries; private script paths and console addresses
 are not copied into those summaries. These messages are not live Ubuntu
-installer telemetry or a guest-health probe. The guest serial log is collected
-after Packer exits; the dashboard does not yet expose its live activity.
+installer telemetry or a guest-health probe. During an opted-in OS build, a
+read-only observer of that admitted attempt's work volume samples the existing
+build-log directory. The dashboard shows available log-file count, aggregate
+size, sample age and age of observed growth separately from Packer stdout.
+A first sample is a baseline, not growth; replacement, truncation, disappearance
+or unsafe entries reset the observation. Unavailable metadata is shown explicitly.
+Names, console text and private paths are never sent to the dashboard.
+The observer is stopped and joined before terminal log collection and resource
+cleanup. If its stop or attachment cannot be joined within the bounded shutdown
+window, the build fails and retains dependent resources, including the exact
+runtime executable capability; cleanup is not reported
+as complete. Full private logs are collected after Packer exits. Metadata-only
+activity does not prove guest health, installation progress or an ETA.
 Launcher start/exit observations do not establish
 the health of every Docker, Packer or QEMU descendant; silence is not classified
 as a stall.

@@ -240,7 +240,7 @@ func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 	}
 	flags.StringVar(&cfg.NKECheckout, "nke-checkout", "", checkoutHelp)
 	flags.StringVar(&cfg.Out, "out", "", "fresh private demo output directory")
-	flags.StringVar(&cfg.Network, "network", "ovn", "deployment networking: ovn, or kind-calico for a temporary diagnostic")
+	flags.StringVar(&cfg.Network, "network", "ovn", "networking: ovn (NVIDIA default), upstream-ovn, or kind-calico (explicit diagnostics)")
 	flags.IntVar(&cfg.TimeoutSeconds, "timeout", nkedemo.DefaultTenantTimeoutSeconds, fmt.Sprintf("tenant provisioning budget in seconds (%d..%d)", nkedemo.MinTenantTimeoutSeconds, nkedemo.MaxTenantTimeoutSeconds))
 	if !existing {
 		return

@@ -212,6 +212,10 @@ func dashboardBuildDetail(s dashboardSnapshot, now time.Time) string {
 	if step.state == "running" && !step.started.IsZero() {
 		fmt.Fprintf(&text, " · %s elapsed", max(time.Duration(0), now.Sub(step.started)).Truncate(time.Second))
 	}
+	if logs, ok := s.buildLogs[step.id]; ok {
+		text.WriteString("\n" + dashboardOSLogText(logs, now))
+		text.WriteString("\nLog activity only; not guest health or readiness.")
+	}
 	key := "operation/" + step.id
 	for _, direction := range []struct {
 		incoming bool
@@ -345,6 +349,16 @@ func dashboardBuildRibbon(s dashboardSnapshot, now time.Time) string {
 	if s.buildGuestStage != "" {
 		fmt.Fprintf(&text, "[lightcyan::b]Last OS guest report: %s[-::-] (%s ago)\n", tview.Escape(s.buildGuestStage), dashboardBuildAge(now, s.buildGuestAt))
 	}
+	// Only show telemetry beside an exact reported running build operation.
+	// An out-of-order or unknown diagnostic cannot invent a running operation.
+	for _, step := range s.buildSteps {
+		if step.kind == "build" && step.state == "running" {
+			if logs, ok := s.buildLogs[step.id]; ok {
+				text.WriteString(dashboardOSLogText(logs, now) + "\n")
+				break
+			}
+		}
+	}
 	if len(s.buildOutputs) > 0 && !s.buildTruncated {
 		fmt.Fprintf(&text, "[lightcyan::b]Artifacts[-::-] %d planned   [lightcyan::b]Steps[-::-] ", len(s.buildOutputs))
 	} else {
@@ -366,6 +380,20 @@ func dashboardBuildRibbon(s dashboardSnapshot, now time.Time) string {
 	}
 	text.WriteString("\nLog reports only; artifact verification still required.")
 	return text.String()
+}
+
+func dashboardOSLogText(logs dashboardOSLogs, now time.Time) string {
+	age := dashboardBuildAge(now, logs.received) + time.Duration(logs.record.SampleAgeMillis)*time.Millisecond
+	if !logs.record.Available {
+		return fmt.Sprintf("OS build logs: metadata unavailable; report received %s ago", age.Truncate(time.Second))
+	}
+	growth := "growth not yet observed"
+	if logs.record.GrowthObserved {
+		growthAge := age + time.Duration(logs.record.GrowthAgeMillis)*time.Millisecond
+		growth = "observed growth " + growthAge.Truncate(time.Second).String() + " ago"
+	}
+	return fmt.Sprintf("OS build logs: %d files, %d KiB; %s\nMetadata report received %s ago (not a health check)",
+		logs.record.Files, logs.record.Bytes/1024, growth, age.Truncate(time.Second))
 }
 
 func dashboardSelectedEvents(s dashboardSnapshot) []string {

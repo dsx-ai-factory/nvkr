@@ -265,6 +265,27 @@ requires `/host`, whereas the selected
 mounts `/host/run/dbus`, not that root. This is a source-level compatibility
 gap, not an observed subsequent runtime failure or a local workaround.
 
+The explicit `upstream-ovn` demo option is additive; NVIDIA OVN remains the
+default and no mode silently falls back. Its authored local Definition replaces
+four output names (disk, image, chart and profiles), preserving a 29-output
+combined Run. Upstream `v1.4.0` resolves to commit
+`d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d` and tree
+`ce0cb49cd14f2fc260457e61a5a222c027a07f79`. Whole-producer overlays bind the
+upstream image, chart and offline CNI packages; a separate authenticated profile
+patch installs stream `1.4.0` and names its distinct served disk. Tenant requests
+select that same stream. Opposite-mode outputs are rejected before deployment.
+The source-owned image Dockerfile still acquires OVS/OVN and kubectl through APT;
+this does not claim hermetic, FIPS/STIG, qualification or Kubernetes compatibility.
+
+The complete alternate Plan compiled locally. Rendering the exact pinned
+upstream Helm templates produced seven image references, each bound to the
+selected digest through the existing repository/tag helper, without a template
+patch. Controlled tests cover mode propagation, four distinct output names,
+profile package/disk alignment, image binding, six-container node observations
+and site-network readiness before Cluster API. These checks do not establish
+real upstream startup, a fresh two-node E2E, workload/DNS or owned cleanup.
+This option neither fixes nor validates the NVIDIA fork's open startup issue.
+
 Fresh profiles selections produce a native OCI image through the existing
 rootless BuildKit lane and pinned NKE profiles Dockerfile. A named build context
 selects the existing exact Alpine image digest instead of the Dockerfile's tag;
@@ -332,8 +353,19 @@ Controlled observer and simulation tests cover binding substitutions, unsafe
 files, unavailable observations, cancellation, privacy and 80×24 layout; this
 observer has not yet been exercised in a fresh live E2E. Fixed Packer summaries
 expose selected boot, transfer, provisioning and post-processing reports without
-copying variable paths or addresses; live OS-build guest serial activity remains
-unimplemented. While the dashboard owns input, q and Ctrl+C ask for confirmation;
+copying variable paths or addresses. An opted-in, attempt-bound read-only observer
+now samples bounded OS build-log metadata into a separate private descriptor
+channel. The dashboard accepts it only for the exact reported running build
+operation and distinguishes sample age, aggregate bytes and same-file growth
+from execution health. Baselines, replacements, truncation and rejected entries
+do not establish activity. Names, console text and paths remain private; this is
+not a live console viewer, progress receipt or ETA. Controlled tests cover bounded
+frames, pipe backpressure, descriptor isolation, collector stop/join, unsafe file
+entries and compact layouts. An unjoined stop or attachment fails the build and
+retains dependent resources and its exact runtime executable rather than claiming
+successful cleanup or blocking session close on an unjoined launch. Fresh live
+build acceptance remains unexercised.
+While the dashboard owns input, q and Ctrl+C ask for confirmation;
 only y/Y requests cancellation. Escape closes details or dismisses confirmation,
 never canceling work. Plain/verbose output and the initial sudo prompt retain
 signal-driven cancellation without a dialog. Normal cancellation waits for owned
@@ -368,7 +400,13 @@ The downstream tenant smoke now waits for the pinned CoreDNS Deployment and
 node-local DNS DaemonSet rollouts, within four minutes and the remaining tenant
 deadline. Node Ready alone does not establish DNS rollout readiness. The
 unchanged zero-retry workload still has to prove real cluster DNS and ARM64
-execution. Controlled failure/cancellation tests cover this gate. The retained
+execution. The explicit Kind/Calico diagnostic additionally requires the tenant
+Calico node DaemonSet rollout before those DNS checks, within four minutes and
+the remaining tenant deadline. A deployment-only replay observed both nodes
+Ready and DNS rollouts passing while Calico was still unready; its unchanged
+smoke then failed on DNS timeout. The added CNI admission is not proof that the
+underlying datapath is fixed. Controlled failure/cancellation tests cover these
+gates. The retained
 continuous `arm-clean-20261010-183945` invocation at `bda67f0` subsequently
 observed both ARM64 tenant nodes Ready, both DNS rollouts and the unchanged
 workload/DNS smoke passing, but exited 17 at `tenant-deletion-wait`. Its original
@@ -387,8 +425,10 @@ two-minute delete request and two-minute guest-route withdrawal. The subsequent
 owned host-runtime cleanup retains its independent eight-minute bound. This finite
 downstream policy gives room for the pinned worker-then-control-plane teardown;
 it is not an upstream maximum because retries and other activities can extend it.
-Controlled deadline tests cover timeout/cancellation and exact ownership; a fresh
-successful live teardown and complete E2E remain unproven.
+Controlled deadline tests cover timeout/cancellation and exact ownership. The
+later deployment-only replay naturally completed NKE deletion and owned cleanup
+with the longer budgets, while preserving its failed smoke result. This does
+not establish a fresh successful E2E; that acceptance remains unproven.
 
 [Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise
