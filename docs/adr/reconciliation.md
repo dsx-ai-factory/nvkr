@@ -236,7 +236,7 @@ The selected fork's Ubuntu runtime omits `firewall-cmd`, while its non-DPU
 executable initialization requires it even when firewalld is disabled.
 [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1)
 records the source paths and observed startup failure: artifact builds can
-succeed without a Ready tenant. The latest completed continuous attempt above
+succeed without a Ready tenant. The retained continuous attempt above
 used the explicitly selected `kind-calico` diagnostic and ended with a two-node
 readiness timeout, not a successful E2E video or an OVN startup test. A canonical
 source-owner fix and reviewed pin update are required; no local catalog patch
@@ -297,9 +297,20 @@ address on the admitted Kind network and probes `/v2/` from the actual managemen
 node before uploads. Scoped proxy bypass applies only to that private endpoint.
 Contract tests cover ownership, network/address substitutions and probe failures;
 the isolated native registry test exercised the direct route, but does not prove
-the previously failing Ubuntu host's deployment. Network progress now groups
+deployment across all supported host configurations. Network progress now groups
 private commands into preflight/setup/cleanup; expected absence probes no longer
 emit misleading failures.
+
+The local network owner now admits a single temporary Kind-to-simulator INPUT
+rule, scoped to the admitted Kind subnet, its exact gateway and TCP port 18089.
+Its version-2 journal records that optional gateway and the exact owner-commented
+rule before insertion; existing version-2 journals without this grant remain
+recoverable. Site admission probes health from the owned Kind node using its real
+proxy environment before installing the site. Host-side health alone cannot
+admit this route. Controlled tests cover bounded response checks, cancellation,
+private diagnostics, rule substitutions and recovery. Hosts with an INPUT-drop
+policy require this scoped route even when host-side health succeeds; live
+acceptance of the new route remains unexercised.
 
 The demo CLI automatically selects a terminal dashboard for interactive standard
 input/output. Its phase map, observed state and bounded public activity use typed
@@ -308,9 +319,20 @@ pipes and redirected output retain scrolling progress; `--verbose` builds use pl
 public-log streaming. Tab changes focus, PgUp/PgDn scroll activity and End returns
 to live activity. Tenant stage, count and closed condition changes add activity
 immediately; unchanged reported waits add a heartbeat at most once per 30 seconds.
-These reports do not prove successful API polls or guest progress. Fixed Packer
-summaries expose selected boot, transfer, provisioning and post-processing reports
-without copying variable paths or addresses; live guest serial activity remains
+These reports do not prove successful API polls or guest progress. The tenant pane
+now prioritizes its blocker, four observed checkpoints, role-bound VM/console
+metadata, node counts and independently aged observations. Bounded polling joins
+the exact tenant Machine/NicoMachine pair to an owned libvirt domain before
+describing its state or console-file size. Only positive growth of the same held
+file counts as activity; baseline, replacement and truncation do not. A closed
+role-bound `InstanceCreateFailed` report remains visible before a domain exists.
+Unknown bindings, states and reasons cannot advance readiness. No private console
+text, instance identifiers or provider messages are projected into public output.
+Controlled observer and simulation tests cover binding substitutions, unsafe
+files, unavailable observations, cancellation, privacy and 80×24 layout; this
+observer has not yet been exercised in a fresh live E2E. Fixed Packer summaries
+expose selected boot, transfer, provisioning and post-processing reports without
+copying variable paths or addresses; live OS-build guest serial activity remains
 unimplemented. While the dashboard owns input, q and Ctrl+C ask for confirmation;
 only y/Y requests cancellation. Escape closes details or dismisses confirmation,
 never canceling work. Plain/verbose output and the initial sudo prompt retain
@@ -346,8 +368,27 @@ The downstream tenant smoke now waits for the pinned CoreDNS Deployment and
 node-local DNS DaemonSet rollouts, within four minutes and the remaining tenant
 deadline. Node Ready alone does not establish DNS rollout readiness. The
 unchanged zero-retry workload still has to prove real cluster DNS and ARM64
-execution. Controlled failure/cancellation tests cover this gate; its addition
-has not yet passed a fresh complete E2E.
+execution. Controlled failure/cancellation tests cover this gate. The retained
+continuous `arm-clean-20261010-183945` invocation at `bda67f0` subsequently
+observed both ARM64 tenant nodes Ready, both DNS rollouts and the unchanged
+workload/DNS smoke passing, but exited 17 at `tenant-deletion-wait`. Its original
+recording remains failed, not a successful E2E video. The downstream three-minute
+deletion wait is shorter than the selected NKE teardown's worker/control-plane
+waits; the last actual teardown phase was not retained, so a timeout-budget
+mismatch does not by itself establish the runtime cause. Complete fresh E2E
+acceptance, including successful NKE deletion and owned cleanup, remains open.
+Cleanup now best-effort retains three bounded private command-output slots and
+the final command status in one exclusive private observation file. A canceled
+empty poll preserves the last useful inventory. Controlled tests show that
+storage failure neither prevents deletion nor changes its result, and no raw
+cleanup response reaches public progress. Tenant cleanup now has an explicit
+one-hour ceiling with a 45-minute disappearance wait, six-minute diagnostics,
+two-minute delete request and two-minute guest-route withdrawal. The subsequent
+owned host-runtime cleanup retains its independent eight-minute bound. This finite
+downstream policy gives room for the pinned worker-then-control-plane teardown;
+it is not an upstream maximum because retries and other activities can extend it.
+Controlled deadline tests cover timeout/cancellation and exact ownership; a fresh
+successful live teardown and complete E2E remain unproven.
 
 [Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise

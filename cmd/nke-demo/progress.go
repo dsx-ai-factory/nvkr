@@ -200,6 +200,30 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
+	if event.Kind == nkedemo.TenantGuests {
+		if !dashboardValidGuests(event.Guests) {
+			return
+		}
+		if w.observer != nil {
+			w.observer.Report(event)
+			return
+		}
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		for index, role := range [...]string{"Control plane", "Worker"} {
+			guest := event.Guests[index]
+			if guest.ProvisioningFailure == nkedemo.TenantInstanceCreateFailed {
+				w.emit(role + ": instance lookup/create failed (provider report; not a Kubernetes readiness result)\n")
+				continue
+			}
+			if !guest.Available {
+				w.emit(role + ": guest observation unavailable\n")
+				continue
+			}
+			w.emit(fmt.Sprintf("%s: VM %s; infrastructure Ready=%s (not Kubernetes Ready); console observed=%t\n", role, guest.Domain, guest.ProviderReady, guest.ConsoleKnown))
+		}
+		return
+	}
 	if event.Kind == nkedemo.ProcessStarted || event.Kind == nkedemo.ProcessExited {
 		if w.observer != nil {
 			w.observer.Report(event)

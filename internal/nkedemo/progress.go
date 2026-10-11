@@ -20,7 +20,41 @@ const (
 	DeploymentFinished = "deployment-finished"
 	DeploymentFailed   = "deployment-failed"
 	TenantWaiting      = "tenant-waiting"
+	TenantGuests       = "tenant-guests"
 )
+
+// Guest observations describe infrastructure and console activity only. They
+// never establish guest installation, Kubernetes readiness or artifact proof.
+type TenantGuestRole string
+type TenantDomainState string
+type TenantProvisioningFailure string
+
+const (
+	TenantGuestControlPlane    TenantGuestRole           = "control-plane"
+	TenantGuestWorker          TenantGuestRole           = "worker"
+	TenantDomainUnknown        TenantDomainState         = "unknown"
+	TenantDomainRunning        TenantDomainState         = "running"
+	TenantDomainPaused         TenantDomainState         = "paused"
+	TenantDomainShutOff        TenantDomainState         = "shut-off"
+	TenantDomainCrashed        TenantDomainState         = "crashed"
+	TenantInstanceCreateFailed TenantProvisioningFailure = "instance-create-failed"
+)
+
+type TenantGuestObservation struct {
+	Role          TenantGuestRole
+	Available     bool
+	Domain        TenantDomainState
+	ProviderReady TenantConditionStatus
+	// A source-owned provider failure can precede creation of an owned domain.
+	// Empty means no mapped failure observation, never provisioning success.
+	ProvisioningFailure TenantProvisioningFailure
+	ConsoleKnown        bool
+	ConsoleBytes        int64
+	ConsoleChanged      bool
+	// Age since this observer saw positive growth of the same console inode,
+	// not a guest timestamp. Baseline, replacement and truncation are not growth.
+	ConsoleLastChange time.Duration
+}
 
 // Process observations apply only to the opted-in public build launcher.
 // Started proves cmd.Start returned; exited proves the owner joined the
@@ -61,6 +95,7 @@ type ProgressEvent struct {
 	Provisioned     TenantConditionStatus
 	Elapsed         time.Duration
 	Remaining       time.Duration
+	Guests          [2]TenantGuestObservation
 }
 
 // Tenant polling reports interpreted observations, not successful subprocess

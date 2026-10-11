@@ -57,7 +57,7 @@ func TestDashboardLayout(t *testing.T) {
 			}
 			d.draw(screen, time.Now(), false)
 			text := dashboardText(screen)
-			for _, wanted := range []string{"UNQUALIFIED", "not a signed Release", "Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup", "Observed state", "Observe tenant provisioning", "Activity", "2/2 registered", "1/2 Ready", "Provisioning=True", "Provisioned=False", "State unchanged", "last observation", "20m", "remaining", "/tmp/private-build.log", "PgUp/PgDn"} {
+			for _, wanted := range []string{"UNQUALIFIED", "not a signed Release", "Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup", "Observed state", "Waiting for both tenant nodes Ready", "Activity", "2/2 registered", "1/2 Ready", "Provisioning=True", "Provisioned=False", "State unchanged", "last wait report", "20m", "remaining", "/tmp/private-build.log", "PgUp/PgDn"} {
 				if !strings.Contains(text, wanted) {
 					t.Fatalf("missing %q in %d-column layout:\n%s", wanted, width, text)
 				}
@@ -80,7 +80,7 @@ func TestDashboardShortLayoutPreservesLiveStatus(t *testing.T) {
 			screen.SetSize(80, height)
 			d.draw(screen, time.Now(), false)
 			text := dashboardText(screen)
-			for _, wanted := range []string{"Observed state", "Observe tenant provisioning", "Waiting for control plane", "worker.", "1/2 registered", "0/2 Ready", "Provisioning=True", "Provisioned=False", "State unchanged", "last observation", "20m", "Timeout remaining", "not an ETA", "latest public activity"} {
+			for _, wanted := range []string{"Observed state", "Waiting for both tenant nodes Ready", "Control plane", "Worker", "1/2 registered", "0/2 Ready", "Provisioning=True", "Provisioned=False", "State unchanged", "last wait report", "20m", "Timeout remaining", "not an ETA", "latest public activity", "Workload/DNS", "Cleanup"} {
 				if !strings.Contains(text, wanted) {
 					t.Fatalf("missing %q in 80x%d layout:\n%s", wanted, height, text)
 				}
@@ -240,7 +240,7 @@ func TestDashboardStaleObservationIsNotFailure(t *testing.T) {
 			screen.SetSize(width, 42)
 			d.draw(screen, now, false)
 			text := dashboardText(screen)
-			for _, wanted := range []string{"State unchanged: 10m0s", "last observation: 5m0s ago", "Tenant budget", "remaining", "1/2 registered", "0/2 Ready", "Activity"} {
+			for _, wanted := range []string{"State unchanged: 10m0s", "last wait report: 5m0s ago", "Tenant budget", "remaining", "1/2 registered", "0/2 Ready", "Activity"} {
 				if !strings.Contains(text, wanted) {
 					t.Fatalf("missing %q at width %d:\n%s", wanted, width, text)
 				}
@@ -533,6 +533,7 @@ func TestDashboardConcurrentReportsAndDraw(t *testing.T) {
 			for range 100 {
 				_, _ = io.WriteString(d, "public activity\n")
 				d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-nodes", RegisteredNodes: 1, ReadyNodes: 0})
+				d.Report(dashboardGuestFixture())
 			}
 		})
 	}
@@ -541,6 +542,214 @@ func TestDashboardConcurrentReportsAndDraw(t *testing.T) {
 		_ = d.snapshot()
 	}
 	joined.Wait()
+}
+
+func dashboardGuestFixture() nkedemo.ProgressEvent {
+	return nkedemo.ProgressEvent{Kind: nkedemo.TenantGuests, Guests: [2]nkedemo.TenantGuestObservation{
+		{Role: nkedemo.TenantGuestControlPlane, Available: true, Domain: nkedemo.TenantDomainRunning, ProviderReady: nkedemo.TenantConditionTrue, ConsoleKnown: true, ConsoleBytes: 12 * 1024, ConsoleChanged: true, ConsoleLastChange: 2 * time.Minute},
+		{Role: nkedemo.TenantGuestWorker, Available: true, Domain: nkedemo.TenantDomainPaused, ProviderReady: nkedemo.TenantConditionFalse, ConsoleKnown: true, ConsoleBytes: 8 * 1024},
+	}}
+}
+
+func TestDashboardTenantGuestsDoNotAdvanceReadiness(t *testing.T) {
+	d := newDashboard()
+	d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
+	d.tenantChangedAt = d.tenantChangedAt.Add(-10 * time.Minute)
+	before := d.snapshot()
+	d.Report(dashboardGuestFixture())
+	after := d.snapshot()
+	if after.guestsObservedAt.IsZero() || after.guests != dashboardGuestFixture().Guests {
+		t.Fatal("valid guest observations not retained")
+	}
+	if after.phases != before.phases || after.tenantStages != before.tenantStages || !after.observedAt.Equal(before.observedAt) || !after.tenantChangedAt.Equal(before.tenantChangedAt) || after.nodesObserved || after.registered != 0 || after.ready != 0 {
+		t.Fatal("guest activity advanced tenant/node readiness or progress clocks")
+	}
+	copy := after
+	copy.guests[0].Domain = nkedemo.TenantDomainCrashed
+	if d.snapshot().guests[0].Domain != nkedemo.TenantDomainRunning {
+		t.Fatal("snapshot shares guest telemetry state")
+	}
+}
+
+func TestDashboardTenantGuestLayout(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {91, 24}, {100, 24}, {111, 24}, {112, 24}, {120, 24}, {80, 42}, {140, 42}} {
+		t.Run(fmt.Sprint(size), func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-api", Remaining: time.Hour})
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-nodes", RegisteredNodes: 1, ReadyNodes: 0, Provisioning: nkedemo.TenantConditionTrue, Provisioned: nkedemo.TenantConditionFalse, Remaining: time.Hour})
+			d.Report(dashboardGuestFixture())
+			_, _ = io.WriteString(d, "latest public activity\n")
+			s := d.snapshot()
+			screen := dashboardScreen(t, size[0])
+			screen.SetSize(size[0], size[1])
+			d.draw(screen, s.guestsObservedAt.Add(time.Minute), false)
+			text := dashboardText(screen)
+			for _, want := range []string{"Waiting for both tenant nodes Ready", "Checks [##--] 2/4", "Control plane", "VM running", "Infra True", "console 12 KiB; grew 3m0s ago", "Worker", "VM paused", "Infra False", "console 8 KiB; baseline", "not Kubernetes readiness", "1/2 registered", "0/2 Ready", "Guest snapshot received: 1m0s ago", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("missing %q at %v:\n%s", want, size, text)
+				}
+			}
+			if strings.Contains(text, "guest healthy") || strings.Contains(text, "stuck") || strings.Contains(text, "2/2 Ready") {
+				t.Fatal("infrastructure or observation age fabricated tenant health")
+			}
+		})
+	}
+}
+
+func TestDashboardTenantGuestUnknownAndStale(t *testing.T) {
+	d := newDashboard()
+	d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
+	event := nkedemo.ProgressEvent{Kind: nkedemo.TenantGuests, Guests: [2]nkedemo.TenantGuestObservation{{Role: nkedemo.TenantGuestControlPlane}, {Role: nkedemo.TenantGuestWorker}}}
+	d.Report(event)
+	s := d.snapshot()
+	now := s.guestsObservedAt.Add(5 * time.Minute)
+	screen := dashboardScreen(t, 140)
+	d.draw(screen, now, false)
+	text := dashboardText(screen)
+	for _, want := range []string{"Waiting for tenant kubeconfig", "Checks [----] 0/4", "Control plane", "Worker", "VM unavailable", "guest observation unknown", "Ready unknown", "Guest snapshot received: 5m0s ago"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing truthful unknown/freshness %q: %s", want, text)
+		}
+	}
+	if strings.Contains(text, "stuck") || strings.Contains(text, "failed") {
+		t.Fatal("unavailable metadata fabricated failure")
+	}
+}
+
+func TestDashboardTenantGuestRejectsPrivateOrInvalidValues(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*nkedemo.ProgressEvent)
+	}{
+		{"role", func(e *nkedemo.ProgressEvent) { e.Guests[0].Role = "private-id" }},
+		{"swapped roles", func(e *nkedemo.ProgressEvent) { e.Guests[0], e.Guests[1] = e.Guests[1], e.Guests[0] }},
+		{"domain", func(e *nkedemo.ProgressEvent) { e.Guests[0].Domain = "private-status\x1b[2J" }},
+		{"provider", func(e *nkedemo.ProgressEvent) { e.Guests[0].ProviderReady = "private-condition" }},
+		{"failure", func(e *nkedemo.ProgressEvent) { e.Guests[0].ProvisioningFailure = "private-reason\x1b[2J" }},
+		{"negative size", func(e *nkedemo.ProgressEvent) { e.Guests[0].ConsoleBytes = -1 }},
+		{"negative age", func(e *nkedemo.ProgressEvent) { e.Guests[0].ConsoleLastChange = -time.Second }},
+		{"unavailable has evidence", func(e *nkedemo.ProgressEvent) { e.Guests[0].Available = false }},
+		{"unknown console has evidence", func(e *nkedemo.ProgressEvent) { e.Guests[0].ConsoleKnown = false }},
+		{"baseline has change age", func(e *nkedemo.ProgressEvent) { e.Guests[0].ConsoleChanged = false }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(dashboardGuestFixture())
+			before := d.snapshot()
+			event := dashboardGuestFixture()
+			tc.change(&event)
+			d.Report(event)
+			after := d.snapshot()
+			if after.guests != before.guests || !after.guestsObservedAt.Equal(before.guestsObservedAt) || after.phases != before.phases {
+				t.Fatal("invalid guest description modified model")
+			}
+			if text := dashboardTenantSummary(after, time.Now()); strings.Contains(text, "private-") || strings.ContainsRune(text, '\x1b') {
+				t.Fatal("private guest descriptions reached output")
+			}
+		})
+	}
+}
+
+func TestDashboardTenantGuestClosedStates(t *testing.T) {
+	for _, state := range []nkedemo.TenantDomainState{nkedemo.TenantDomainUnknown, nkedemo.TenantDomainRunning, nkedemo.TenantDomainPaused, nkedemo.TenantDomainShutOff, nkedemo.TenantDomainCrashed} {
+		t.Run(string(state), func(t *testing.T) {
+			event := dashboardGuestFixture()
+			event.Guests[0].Domain = state
+			d := newDashboard()
+			d.Report(event)
+			if got := d.snapshot().guests[0].Domain; got != state || d.snapshot().phases[3].state != "pending" {
+				t.Fatal("closed infrastructure state was lost or changed readiness")
+			}
+		})
+	}
+}
+
+func TestDashboardTenantInstanceFailureIsVisibleWithoutVM(t *testing.T) {
+	for index, role := range [...]string{"Control plane", "Worker"} {
+		t.Run(role, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
+			before := d.snapshot()
+			event := nkedemo.ProgressEvent{Kind: nkedemo.TenantGuests, Guests: [2]nkedemo.TenantGuestObservation{{Role: nkedemo.TenantGuestControlPlane, Domain: nkedemo.TenantDomainUnknown}, {Role: nkedemo.TenantGuestWorker, Domain: nkedemo.TenantDomainUnknown}}}
+			event.Guests[index].ProvisioningFailure = nkedemo.TenantInstanceCreateFailed
+			d.Report(event)
+			screen := dashboardScreen(t, 80)
+			screen.SetSize(80, 24)
+			d.draw(screen, time.Now(), false)
+			text := dashboardText(screen)
+			for _, want := range []string{role + ": instance lookup/create failed (provider report)", "instance lookup/create failed; VM observation unknown", "Checks [----] 0/4", "Ready unknown", "not Kubernetes readiness"} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("missing provider failure %q:\n%s", want, text)
+				}
+			}
+			after := d.snapshot()
+			if after.phases != before.phases || after.tenantStages != before.tenantStages || !after.tenantChangedAt.Equal(before.tenantChangedAt) {
+				t.Fatal("descriptive provider failure changed owning lifecycle")
+			}
+		})
+	}
+}
+
+func TestDashboardGuestActivityDistinguishesGrowthFromSnapshot(t *testing.T) {
+	d := newDashboard()
+	event := dashboardGuestFixture()
+	d.Report(event)
+	before := d.snapshot()
+	event.Guests[0].ConsoleLastChange += time.Minute
+	d.Report(event)
+	if len(d.snapshot().activity) != len(before.activity) {
+		t.Fatal("an aging snapshot was presented as guest activity")
+	}
+	event.Guests[0].ConsoleBytes += 1024
+	event.Guests[0].ConsoleLastChange = 0
+	d.Report(event)
+	after := d.snapshot()
+	if len(after.activity) != len(before.activity)+1 || after.activity[len(after.activity)-1] != "Control plane: console bytes grew; metadata activity is not guest health" {
+		t.Fatal("positive console growth was not separately described")
+	}
+	if after.phases != before.phases || !after.tenantChangedAt.Equal(before.tenantChangedAt) || !after.observedAt.Equal(before.observedAt) {
+		t.Fatal("console growth changed readiness or owner progress clocks")
+	}
+	event.Guests[0].ConsoleBytes, event.Guests[0].ConsoleChanged, event.Guests[0].ConsoleLastChange = 0, false, 0
+	d.Report(event)
+	if len(d.snapshot().activity) != len(after.activity) {
+		t.Fatal("console reset was presented as progress")
+	}
+}
+
+func TestDashboardGuestPresentationBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name, want string
+		bytes      int64
+	}{
+		{"empty", "0 KiB", 0},
+		{"kilobytes", "12 KiB", 12 * 1024},
+		{"megabytes", "1 MiB", 1 << 20},
+		{"gigabytes", "1 GiB", 1 << 30},
+		{"maximum", "8589934591 GiB", 1<<63 - 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := dashboardConsoleSize(tc.bytes); got != tc.want {
+				t.Fatalf("console size=%q want %q", got, tc.want)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name, want string
+		age        time.Duration
+	}{
+		{"now", "0s", 0},
+		{"seconds", "2m1s", 121 * time.Second},
+		{"long", "over 24h", 24 * time.Hour},
+		{"maximum age", "over 24h", 1<<63 - 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := dashboardGuestAge(tc.age); got != tc.want {
+				t.Fatalf("console age=%q want %q", got, tc.want)
+			}
+		})
+	}
 }
 
 func TestDashboardBuildLogSummary(t *testing.T) {

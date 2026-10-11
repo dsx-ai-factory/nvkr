@@ -22,6 +22,22 @@ import (
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
 
+// Explicit downstream policy, not an upstream completion guarantee. The pinned
+// NKE workflow waits for worker pools then control-plane nodes (20 minutes each)
+// and may retry longer. Keep a finite wait and independent diagnostic/withdrawal
+// headroom instead of truncating deletion with the former three-minute window.
+const (
+	tenantDeletionWaitTimeout = 45 * time.Minute
+	tenantDiagnosticsTimeout  = 6 * time.Minute
+	tenantDeleteTimeout       = 2 * time.Minute
+	tenantWithdrawalTimeout   = 2 * time.Minute
+	tenantCleanupTimeout      = time.Hour
+)
+
+func tenantCleanupContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), tenantCleanupTimeout)
+}
+
 // TenantRequest is deployment intent consumed and validated by the pinned NKE
 // CLI. It is not an NKD Definition or an authenticated provider identity.
 type TenantRequest struct {
@@ -214,6 +230,7 @@ type tenant struct {
 	intent        bool
 	sequence      int
 	cleaning      bool
+	cleanup       tenantCleanupObservations
 }
 
 func (t *tenant) capture(ctx context.Context, args []string, phase string, budget time.Duration) ([]byte, error) {
@@ -223,7 +240,7 @@ func (t *tenant) capture(ctx context.Context, args []string, phase string, budge
 	// provisioning success; report interpreted state from the owning wait loop.
 	runner.Progress = nil
 	if t.cleaning {
-		runner.Work = ""
+		return t.cleanup.capture(ctx, runner, args, phase, t.sequence, budget)
 	}
 	return runner.Capture(ctx, args, fmt.Sprintf("tenant-%03d-%s", t.sequence, phase), budget)
 }
@@ -298,6 +315,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	defer cancel()
 	deadline, _ := provision.Deadline()
 	progress := tenantProgress{writer: t.session.Runner.Progress, started: time.Now(), deadline: deadline, conditions: row.Conditions}
+	guestObserver := tenantGuestObserver{}
 	progress.update(time.Now(), "tenant-kubeconfig", nil)
 	kubeconfig := filepath.Join(t.session.Work, "tenant-kubeconfig")
 	for {
@@ -305,6 +323,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 			return err
 		}
 		progress.conditions = row.Conditions
+		if err = guestObserver.update(provision, t, time.Now()); err != nil {
+			return err
+		}
 		progress.update(time.Now(), "tenant-kubeconfig", nil)
 		raw, readErr := t.capture(provision, t.kubectl(environmentValue(t.session.Runner.Env, "SITE_KUBECONFIG"), "-n", "nke-system", "get", "secret", t.name+"-admin-kubeconfig", "--ignore-not-found", "-o", "json"), "kubeconfig-secret", 30*time.Second)
 		if readErr != nil {
@@ -347,6 +368,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 			return err
 		}
 		progress.conditions = row.Conditions
+		if err = guestObserver.update(provision, t, time.Now()); err != nil {
+			return err
+		}
 		raw, err = t.capture(provision, t.kubectl(kubeconfig, "--request-timeout=10s", "get", "nodes", "-o", "json"), "nodes", 30*time.Second)
 		if err != nil {
 			if CommandExitCode(err) != 1 {
@@ -618,6 +642,12 @@ func (t *tenant) preserve(ctx context.Context) error {
 }
 func (t *tenant) restore(ctx context.Context) (result error) {
 	t.cleaning = true
+	defer func() {
+		// Observation loss must not prevent owned deletion or hide its result.
+		if err := t.cleanup.preserve(context.WithoutCancel(ctx), t.session.Work); err != nil && t.session.Runner.Progress != nil {
+			fmt.Fprintln(t.session.Runner.Progress, "Some private tenant cleanup observations unavailable; owned cleanup result is unchanged")
+		}
+	}()
 	if !t.intent {
 		return nil
 	}
@@ -630,19 +660,26 @@ func (t *tenant) restore(ctx context.Context) (result error) {
 	}
 	t.id = row.ID
 	deleteProgress := beginProgress(t.session.Runner.Progress, "tenant-delete", PhaseStarted, PhaseFinished, PhaseFailed)
-	_, err = t.capture(ctx, []string{t.cli(), "delete", "cluster", t.name}, "delete", 120*time.Second)
+	_, err = t.capture(ctx, []string{t.cli(), "delete", "cluster", t.name}, "delete", tenantDeleteTimeout)
 	deleteProgress.finish(err)
 	if err != nil {
 		return err
 	}
 	waitProgress := beginProgress(t.session.Runner.Progress, "tenant-deletion-wait", PhaseStarted, PhaseFinished, PhaseFailed)
 	defer func() { waitProgress.finish(result) }()
-	deadline, cancel := context.WithTimeout(ctx, 180*time.Second)
+	return t.waitDeleted(ctx, tenantDeletionWaitTimeout)
+}
+
+func (t *tenant) waitDeleted(ctx context.Context, budget time.Duration) error {
+	if budget <= 0 {
+		return errors.New("positive tenant deletion wait budget required")
+	}
+	deadline, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	for {
-		row, err = t.row(deadline)
+		row, err := t.row(deadline)
 		if err != nil {
-			return err
+			return fmt.Errorf("NKE tenant deletion did not finish: %w", err)
 		}
 		if row == nil {
 			return nil
@@ -656,7 +693,9 @@ func (t *tenant) close(ctx context.Context) (result error) {
 	cleanupProgress := beginProgress(t.session.Runner.Progress, "tenant-cleanup", PhaseStarted, PhaseFinished, PhaseFailed)
 	defer func() { cleanupProgress.finish(result) }()
 	diagnosticProgress := beginProgress(t.session.Runner.Progress, "tenant-diagnostics", PhaseStarted, PhaseFinished, PhaseFailed)
-	diagnosticErr := t.preserve(ctx)
+	diagnostics, cancel := context.WithTimeout(ctx, tenantDiagnosticsTimeout)
+	diagnosticErr := t.preserve(diagnostics)
+	cancel()
 	diagnosticProgress.finish(diagnosticErr)
 	if errors.Is(diagnosticErr, ErrUnjoined) {
 		return diagnosticErr
@@ -695,14 +734,16 @@ func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session
 		if errors.Is(result, ErrUnjoined) {
 			return
 		}
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 6*time.Minute)
+		cleanup, cancel := tenantCleanupContext(ctx)
 		defer cancel()
 		closeErr := t.close(cleanup)
 		result = errors.Join(result, closeErr)
 		if errors.Is(closeErr, ErrUnjoined) {
 			return
 		}
-		if withdrawErr := guard.RevokeGuestTCP(cleanup); withdrawErr != nil {
+		withdrawal, stopWithdrawal := context.WithTimeout(cleanup, tenantWithdrawalTimeout)
+		defer stopWithdrawal()
+		if withdrawErr := guard.RevokeGuestTCP(withdrawal); withdrawErr != nil {
 			result = errors.Join(result, ErrRetainedControls, withdrawErr)
 		}
 	}()

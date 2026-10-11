@@ -209,6 +209,16 @@ unprivileged: keep the host's default privileged-port threshold and do not grant
 file capabilities to the demo executable. DNS/DHCP capabilities are granted only
 to the private dnsmasq copy and journaled for restoration.
 
+Hosts with an INPUT-drop firewall also need the management node to reach the
+host simulator. The demo journals a temporary rule allowing only the admitted
+Kind subnet to its exact gateway on TCP port 18089. Cleanup removes that exact
+owned rule; it does not disable UFW or change the host's default policy. Before
+installing the site, the demo probes simulator health from the owned Kind node
+with that node's real proxy environment. Host-side health alone is insufficient.
+A failed node probe stops deployment before tenant provisioning and retains
+`site/node-simulator-connectivity.log` for diagnosis. A passing probe establishes
+that node path only, not controller health or tenant readiness.
+
 Initial interactive authentication has a two-minute deadline; type your password
 at sudo's prompt (typing is hidden) and press Enter. Ctrl+C cancels it. The session
 refresher is stopped and joined when the command exits. It does not change sudoers
@@ -434,8 +444,10 @@ output is shared, so the selected view does not mislabel it as that step's log.
 Press `a` to return to shared activity and automatic running-step selection.
 
 During deployment, the phases are Prepare, Artifacts, Site, Tenant, Workload/DNS
-and Cleanup. The state pane shows the current wait, observed tenant node counts
-and remaining readiness budget. Narrow terminals stack the panes.
+and Cleanup. The state pane puts the current blocker first, followed by the four
+tenant checkpoints and separate control-plane/worker observations. Each guest
+row distinguishes an owned VM's state, infrastructure readiness and console-file
+activity from Kubernetes readiness. Narrow terminals stack the panes.
 The phase map keeps the Site and Tenant checklists visible together when the
 terminal has room; compact terminals prioritize the live wait and timeout.
 The Site checklist retains individual Cluster API and NKE installation stages;
@@ -454,6 +466,24 @@ count or reported NKE condition changed from the age of the latest observation.
 Repeated polling is not proof that provisioning is advancing. Only the pinned
 API's `True`, `False` and `Unknown` provisioning condition statuses are shown;
 neither `Provisioning=True` nor `Provisioned=True` means tenant nodes are Ready.
+
+Guest observations use the selected tenant's exact Machine/NicoMachine binding,
+then the owned libvirt domain and its private console files. A first file-size
+sample is a baseline, not activity. Only positive growth of the same console
+file counts as observed activity; replacement or truncation resets that baseline.
+The dashboard shows the size and age of observed growth, never console text,
+instance identifiers or provider error messages. Missing or rejected bindings
+remain unavailable. A role-bound `InstanceCreateFailed` condition is shown as
+an instance lookup/create failure even when no VM exists yet; this provider
+report does not diagnose the underlying network or API error.
+
+Guest snapshots run at most once per 30 seconds, with a separate bounded query
+window. Their age is independent of the latest wait report and the last tenant
+state change. A running VM or growing console file does not prove successful
+boot, guest health or Ready nodes. The four-checkpoint bar counts observed
+checks, not elapsed-time progress or an ETA. During tenant provisioning at
+80×24, the phase strip moves into the header so the blocker, guest rows and
+activity remain visible.
 
 | Key | Action |
 | --- | --- |
@@ -486,12 +516,12 @@ expected absence checks do not print failures. Numbered command logs remain
 available for diagnosis. Tenant polling likewise keeps individual inventory,
 kubeconfig and node commands in private logs. The console shows the current
 wait, elapsed/remaining readiness budget, and observed registered/Ready counts.
-Changes appear immediately; in plain output an unchanged wait repeats at most
-every 30 seconds. The dashboard updates the wait in place instead of adding
-duplicate activity lines.
-Before the tenant API is available, guest boot and node readiness are explicitly
-unobserved: a successful inventory or secret query does not mean provisioning
-succeeded. Two Ready nodes still require workload/DNS checks and owned cleanup.
+Changes appear immediately; an unchanged wait adds a short heartbeat at most
+every 30 seconds. Guest observation changes add fixed, public activity summaries;
+fresh snapshots alone do not count as state changes. Before a successful tenant
+node query, registered/Ready counts remain unknown. Available VM/console metadata
+can explain activity before the tenant API exists, but does not establish boot
+completion. Two Ready nodes still require workload/DNS checks and owned cleanup.
 
 An observed substep is not completion of its entire phase. The dashboard and
 graph are diagnostics, not artifact verification receipts or a signed Release;
@@ -501,9 +531,18 @@ This does not claim that every unfinished check failed. Cancellation
 waits for bounded subprocess joining and owned cleanup before restoring the
 terminal. The state pane names diagnostics collection, tenant deletion and the
 deletion wait as their owners report them; it does not keep counting the canceled
-tenant readiness budget. Tenant cleanup has its own six-minute budget; the delete
-command allows up to two minutes and its subsequent deletion wait up to three.
-These are bounds, not completion estimates or one global cleanup deadline.
+tenant readiness budget. Tenant cleanup has its own one-hour ceiling, independent
+of canceled work: up to six minutes for diagnostics, two minutes for the delete
+request, 45 minutes for the owned tenant to disappear, and two minutes for guest
+route withdrawal, with additional joining/headroom inside that hour. The following
+host-runtime cleanup has its own eight-minute bound. These are separate ceilings,
+not completion estimates. The [selected NKE teardown workflow](https://github.com/dsx-ai-factory/nke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/controller/internal/temporal/workflows/teardown_cluster.go)
+tears down worker pools before control-plane nodes and permits 20-minute waits
+for each; retries and other steps
+can extend teardown. The 45-minute wait is a finite local policy, not an upstream
+maximum or a guarantee that deletion succeeds. A timeout still fails E2E and
+retains private cleanup observations; removing owned local VMs cannot substitute
+for successful NKE deletion.
 During cancellation, the state pane displays **FORCE EXIT [f]** with a warning
 that resources may remain; this is a keyboard action, not a mouse control.
 If you confirm force exit with `f` then `y`, the terminal is restored and the
@@ -528,6 +567,7 @@ alone does not show a stall. The limits apply to different scopes:
 | Six hours | OS VM execution request, admitted by the Environment's `maxTimeoutSeconds: 21600`; [OS overlay](../definitions/nke-local-dev-arm64/os-tcg.json) and [Docker Environment](../definitions/nke-local-dev-arm64/environment-local-docker.json) |
 | 180 minutes | Packer's wait for SSH, not the whole OS build; `ssh_timeout` in the OS overlay ([Packer SSH documentation](https://developer.hashicorp.com/packer/docs/communicators/ssh)) |
 | 60 minutes by default; configurable from 5 to 120 minutes | Tenant kubeconfig / two-node readiness wait after tenant creation; `run.timeoutSeconds: 3600` or `--timeout`, owned by [tenant deployment](../internal/nkedemo/tenant.go) |
+| 45 minutes inside a separate one-hour tenant-cleanup ceiling | Wait for NKE to delete the exact owned tenant after the two-minute delete request; this is independent of tenant readiness and is not an upstream teardown maximum |
 
 **The earliest active deadline wins.** For example, if artifact preparation has
 already used four hours, the six-hour build deadline leaves only two hours for
@@ -624,6 +664,13 @@ The adapter requires both nodes Ready, workload/DNS success, artifact/disk
 correspondence and owned cleanup. The private output directory retains
 `demo-inputs.json`, `site/site-inputs.json`, `site/tenant-result.json` and
 logs. They are diagnostics, not signed receipts.
+
+Tenant deletion also retains `site/tenant-cleanup-observations.json` when private
+storage is available. It contains bounded initial/delete/latest command output
+and the final command status, not a deletion receipt. Its output fields are
+base64-encoded private bytes; a canceled empty poll does not erase the last useful
+inventory. Failure to retain this diagnostic never prevents owned deletion or
+changes its result.
 
 The command removes owned tenant/VMs, management node/volume, registry, bridge,
 temporary firewall rules and grants. It retains accepted Runs, logs, shared

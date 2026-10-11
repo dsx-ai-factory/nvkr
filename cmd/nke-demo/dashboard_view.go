@@ -71,6 +71,8 @@ type dashboardSnapshot struct {
 	tenantChangedAt               time.Time
 	tenantStage                   string
 	provisioning, provisioned     nkedemo.TenantConditionStatus
+	guests                        [2]nkedemo.TenantGuestObservation
+	guestsObservedAt              time.Time
 	siteStages                    [len(dashboardSiteStages)]dashboardStage
 	tenantStages                  [len(dashboardTenantStages)]dashboardStage
 	buildSteps                    []dashboardBuildStep
@@ -329,6 +331,8 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Create and check Kind management cluster"
 	case "start-registry", "node-registry-connectivity":
 		return 2, "Admit registry access from the actual node"
+	case "node-simulator-connectivity":
+		return 2, "Check Kind-to-simulator connectivity before site installation"
 	case "site-ovn-chart", "site-ovn-defaults":
 		return 2, "Verify the built NVIDIA OVN chart and image bindings"
 	case "site-ovs-fresh", "site-ovs-create", "site-ovs-ready":
@@ -439,6 +443,10 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 	}
 	if event.Kind == nkedemo.TenantWaiting {
 		d.tenantObservation(event)
+		return
+	}
+	if event.Kind == nkedemo.TenantGuests {
+		d.tenantGuestObservation(event)
 		return
 	}
 	state := ""
@@ -611,6 +619,174 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 	d.current = "Observe tenant provisioning and readiness"
 	d.currentStarted = time.Time{}
 	d.phases[3] = dashboardPhase{"running", "Observe the real tenant API and nodes"}
+}
+
+// Guest telemetry is descriptive infrastructure activity, independently timed.
+// It cannot advance a tenant checkpoint, refresh a node query or complete work.
+func (d *dashboard) tenantGuestObservation(event nkedemo.ProgressEvent) {
+	if !dashboardValidGuests(event.Guests) {
+		return
+	}
+	for index, role := range [...]string{"Control plane", "Worker"} {
+		guest, previous := event.Guests[index], d.guests[index]
+		if guest.Available != previous.Available || guest.Domain != previous.Domain || guest.ProviderReady != previous.ProviderReady || guest.ProvisioningFailure != previous.ProvisioningFailure {
+			message := role + ": guest observation unavailable"
+			if guest.Available {
+				message = fmt.Sprintf("%s: VM %s; infrastructure Ready=%s (not Kubernetes Ready)", role, guest.Domain, guest.ProviderReady)
+			}
+			if guest.ProvisioningFailure == nkedemo.TenantInstanceCreateFailed {
+				message = role + ": provider reports instance lookup/create failure"
+			}
+			d.appendActivity(message)
+		} else if guest.Available && previous.Available && guest.ConsoleChanged && guest.ConsoleBytes > previous.ConsoleBytes {
+			d.appendActivity(role + ": console bytes grew; metadata activity is not guest health")
+		}
+	}
+	d.guests, d.guestsObservedAt = event.Guests, time.Now()
+}
+
+func dashboardValidGuests(guests [2]nkedemo.TenantGuestObservation) bool {
+	roles := [2]nkedemo.TenantGuestRole{nkedemo.TenantGuestControlPlane, nkedemo.TenantGuestWorker}
+	for index, guest := range guests {
+		if guest.Role != roles[index] || guest.ConsoleBytes < 0 || guest.ConsoleLastChange < 0 {
+			return false
+		}
+		switch guest.ProvisioningFailure {
+		case "", nkedemo.TenantInstanceCreateFailed:
+		default:
+			return false
+		}
+		if !guest.Available {
+			if guest.Domain != "" && guest.Domain != nkedemo.TenantDomainUnknown || guest.ProviderReady != "" && guest.ProviderReady != nkedemo.TenantConditionUnknown || guest.ConsoleKnown || guest.ConsoleBytes != 0 || guest.ConsoleChanged || guest.ConsoleLastChange != 0 {
+				return false
+			}
+			continue
+		}
+		switch guest.Domain {
+		case nkedemo.TenantDomainUnknown, nkedemo.TenantDomainRunning, nkedemo.TenantDomainPaused, nkedemo.TenantDomainShutOff, nkedemo.TenantDomainCrashed:
+		default:
+			return false
+		}
+		switch guest.ProviderReady {
+		case nkedemo.TenantConditionTrue, nkedemo.TenantConditionFalse, nkedemo.TenantConditionUnknown:
+		default:
+			return false
+		}
+		if !guest.ConsoleKnown && (guest.ConsoleBytes != 0 || guest.ConsoleChanged || guest.ConsoleLastChange != 0) || !guest.ConsoleChanged && guest.ConsoleLastChange != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
+	blocker := "Waiting for tenant kubeconfig"
+	switch s.tenantStage {
+	case "tenant-api":
+		blocker = "Waiting for a successful tenant API query"
+	case "tenant-nodes":
+		blocker = "Waiting for both tenant nodes Ready"
+		if s.registered == 2 && s.ready == 2 {
+			blocker = "Both nodes Ready; workload and DNS checks pending"
+		}
+	case "tenant-workload":
+		blocker = "Running workload and DNS checks"
+	}
+	if s.tenantStage == "tenant-kubeconfig" || s.tenantStage == "tenant-api" || s.tenantStage == "tenant-nodes" {
+		for index, role := range [...]string{"Control plane", "Worker"} {
+			if s.guests[index].ProvisioningFailure == nkedemo.TenantInstanceCreateFailed {
+				blocker = role + ": instance lookup/create failed (provider report)"
+				break
+			}
+		}
+	}
+	var checkpoints strings.Builder
+	completed := 0
+	for index, label := range [...]string{"Kubeconfig", "API", "Nodes", "DNS"} {
+		state, _, _ := s.tenantStages[index].status(1)
+		color, marker := "goldenrod", "○"
+		switch state {
+		case "observed":
+			color, marker = "lightgreen", "✓"
+			completed++
+		case "running":
+			color, marker = "lightcyan", "▶"
+		case "failed":
+			color, marker = "lightcoral", "✗"
+		}
+		fmt.Fprintf(&checkpoints, " [%s]%s %s[-]", color, marker, label)
+	}
+	lines := []string{fmt.Sprintf("[lightcyan::b]%s[-::-]", blocker), fmt.Sprintf("Checks %s %d/4%s", tview.Escape("["+strings.Repeat("#", completed)+strings.Repeat("-", 4-completed)+"]"), completed, checkpoints.String())}
+	for index, role := range [...]string{"Control plane", "Worker"} {
+		guest := s.guests[index]
+		row := fmt.Sprintf("%-13s  VM unavailable; guest observation unknown", role)
+		if guest.Available {
+			console := "console unavailable"
+			if guest.ConsoleKnown {
+				console = fmt.Sprintf("console %s; baseline", dashboardConsoleSize(guest.ConsoleBytes))
+				if guest.ConsoleChanged {
+					age := guest.ConsoleLastChange
+					idle := max(time.Duration(0), now.Sub(s.guestsObservedAt))
+					age += min(idle, time.Duration(1<<63-1)-age)
+					console = fmt.Sprintf("console %s; grew %s ago", dashboardConsoleSize(guest.ConsoleBytes), dashboardGuestAge(age))
+				}
+			}
+			row = fmt.Sprintf("%-13s  VM %-8s Infra %s; %s", role, guest.Domain, guest.ProviderReady, console)
+		}
+		if guest.ProvisioningFailure == nkedemo.TenantInstanceCreateFailed {
+			domain := guest.Domain
+			if domain == "" {
+				domain = nkedemo.TenantDomainUnknown
+			}
+			row = fmt.Sprintf("[lightcoral]%-13s  instance lookup/create failed; VM observation %s[-]", role, domain)
+		}
+		lines = append(lines, row)
+	}
+	lines = append(lines, "VM/console activity and Infra status are not Kubernetes readiness.")
+	nodes := "Kubernetes: registered unknown; Ready unknown (no node query yet)"
+	if s.nodesObserved {
+		nodes = fmt.Sprintf("Kubernetes: %d/2 registered · %d/2 Ready", s.registered, s.ready)
+	}
+	lines = append(lines, nodes)
+	conditions := "NKE: Provisioning unknown; Provisioned unknown"
+	if s.provisioning != "" || s.provisioned != "" {
+		conditions = fmt.Sprintf("NKE: Provisioning=%s · Provisioned=%s", dashboardConditionLabel(s.provisioning), dashboardConditionLabel(s.provisioned))
+	}
+	lines = append(lines, conditions)
+	lines = append(lines, fmt.Sprintf("State unchanged: %s · last wait report: %s ago", max(time.Duration(0), now.Sub(s.tenantChangedAt)).Truncate(time.Second), max(time.Duration(0), now.Sub(s.observedAt)).Truncate(time.Second)))
+	guests := "Guest snapshot: not observed; guest progress unknown"
+	if !s.guestsObservedAt.IsZero() {
+		guests = fmt.Sprintf("Guest snapshot received: %s ago (not a health check)", max(time.Duration(0), now.Sub(s.guestsObservedAt)).Truncate(time.Second))
+	}
+	lines = append(lines, guests)
+	lines = append(lines, fmt.Sprintf("Tenant budget: %s elapsed · Timeout remaining: %s (not an ETA)", (s.elapsed+max(time.Duration(0), now.Sub(s.observedAt))).Truncate(time.Second), max(time.Duration(0), s.deadline.Sub(now)).Truncate(time.Second)))
+	return strings.Join(lines, "\n")
+}
+
+func dashboardConsoleSize(bytes int64) string {
+	if bytes >= 1<<30 {
+		return fmt.Sprintf("%d GiB", bytes/(1<<30))
+	}
+	if bytes >= 1<<20 {
+		return fmt.Sprintf("%d MiB", bytes/(1<<20))
+	}
+	return fmt.Sprintf("%d KiB", bytes/1024)
+}
+
+func dashboardGuestAge(age time.Duration) string {
+	if age >= 24*time.Hour {
+		return "over 24h"
+	}
+	return age.Truncate(time.Second).String()
+}
+
+func dashboardConditionLabel(condition nkedemo.TenantConditionStatus) string {
+	switch condition {
+	case nkedemo.TenantConditionTrue, nkedemo.TenantConditionFalse, nkedemo.TenantConditionUnknown:
+		return string(condition)
+	default:
+		return "Unknown"
+	}
 }
 
 func (d *dashboard) snapshot() dashboardSnapshot {
@@ -842,6 +1018,29 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		state += "\nETA unknown; no completion estimate reported"
 	}
 	d.stateView.SetText(state)
+	tenantActive := !canceling && !s.observedAt.IsZero() && s.phases[3].state == "running"
+	// Keep enough inner width for the role rows and observation clocks. A narrow
+	// side-by-side pane wraps these rows and can hide the timeout at 24 lines.
+	tenantStacked := tenantActive && width < 112
+	if tenantActive {
+		d.stateView.SetText(dashboardTenantSummary(s, now))
+		if tenantStacked {
+			var strip strings.Builder
+			for index, name := range names {
+				marker := "○"
+				switch s.phases[index].state {
+				case "complete", "observed":
+					marker = "✓"
+				case "running":
+					marker = "▶"
+				case "failed":
+					marker = "✗"
+				}
+				fmt.Fprintf(&strip, "[%s]%s%s[-] ", colors[s.phases[index].state], name, marker)
+			}
+			d.header.SetText(d.header.GetText(false) + "\n " + strip.String())
+		}
+	}
 	activity := s.activity
 	d.activityView.SetTitle(" Activity · public diagnostics ")
 	d.activityView.SetText(tview.Escape(strings.Join(activity, "\n")))
@@ -859,8 +1058,11 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		}
 	}
 	d.footer.SetText("[lightcyan]" + help + "[-]\n Details: retained private build and deployment logs")
-	if width > 90 {
+	if width > 90 && !tenantStacked {
 		left, upper := width*3/10, min(12, content)
+		if tenantActive {
+			upper = min(14, content)
+		}
 		d.phasesView.SetRect(0, 3, left, content)
 		d.stateView.SetRect(left, 3, width-left, upper)
 		d.activityView.SetRect(left, 3+upper, width-left, content-upper)
@@ -869,9 +1071,20 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		// checklist. On short terminals, pending rows may clip; the current wait,
 		// observation clocks and timeout must remain visible.
 		stateHeight := min(10, max(0, content-4))
+		if tenantActive {
+			stateHeight = min(12, max(0, content-4))
+		}
 		phaseHeight := min(stageRows+5, max(0, content-stateHeight-4))
-		d.phasesView.SetRect(0, 3, width, phaseHeight)
-		d.stateView.SetRect(0, 3+phaseHeight, width, stateHeight)
+		if tenantActive && height <= 24 {
+			phaseHeight = 0 // The complete phase strip is already in the header.
+		}
+		if tenantActive {
+			d.stateView.SetRect(0, 3, width, stateHeight)
+			d.phasesView.SetRect(0, 3+stateHeight, width, phaseHeight)
+		} else {
+			d.phasesView.SetRect(0, 3, width, phaseHeight)
+			d.stateView.SetRect(0, 3+phaseHeight, width, stateHeight)
+		}
 		d.activityView.SetRect(0, 3+phaseHeight+stateHeight, width, content-phaseHeight-stateHeight)
 	}
 	d.header.SetRect(0, 0, width, min(3, height))

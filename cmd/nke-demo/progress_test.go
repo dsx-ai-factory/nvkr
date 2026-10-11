@@ -258,3 +258,56 @@ func TestDashboardProgressOmitsMechanicalTraceButKeepsFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestProgressGuestDescriptionsUseClosedPublicFieldsOnly(t *testing.T) {
+	for _, dashboardMode := range []bool{false, true} {
+		t.Run(map[bool]string{false: "plain", true: "dashboard"}[dashboardMode], func(t *testing.T) {
+			var out bytes.Buffer
+			_, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			writer := &checkedWriter{out: &out, started: time.Now(), cancel: cancel}
+			view := newDashboard()
+			if dashboardMode {
+				writer.observer = view
+			}
+			event := dashboardGuestFixture()
+			event.Name, event.Status = "private-id", "private-status\x1b[2J"
+			writer.Report(event)
+			if dashboardMode {
+				if out.Len() != 0 || view.snapshot().guestsObservedAt.IsZero() {
+					t.Fatal("guest event was not routed directly to dashboard")
+				}
+			} else {
+				for _, want := range []string{"Control plane: VM running", "Worker: VM paused", "infrastructure Ready=True (not Kubernetes Ready)", "console observed=true"} {
+					if !strings.Contains(out.String(), want) {
+						t.Fatalf("missing closed public description %q: %s", want, out.String())
+					}
+				}
+			}
+			if strings.Contains(out.String(), "private-") || strings.ContainsRune(out.String(), '\x1b') {
+				t.Fatal("private or terminal control fields exposed")
+			}
+			before := out.String()
+			observed := view.snapshot().guestsObservedAt
+			event.Guests[1].Domain = "private-invalid-domain"
+			writer.Report(event)
+			if out.String() != before || !view.snapshot().guestsObservedAt.Equal(observed) {
+				t.Fatal("invalid guest descriptions reached the presentation boundary")
+			}
+		})
+	}
+}
+
+func TestProgressGuestProviderFailureWithoutInstance(t *testing.T) {
+	var out bytes.Buffer
+	_, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	writer := &checkedWriter{out: &out, started: time.Now(), cancel: cancel}
+	writer.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantGuests, Name: "private-id", Status: "private-error", Guests: [2]nkedemo.TenantGuestObservation{
+		{Role: nkedemo.TenantGuestControlPlane},
+		{Role: nkedemo.TenantGuestWorker, ProvisioningFailure: nkedemo.TenantInstanceCreateFailed},
+	}})
+	if !strings.Contains(out.String(), "Worker: instance lookup/create failed (provider report; not a Kubernetes readiness result)") || strings.Contains(out.String(), "private-") {
+		t.Fatalf("provider failure hidden or private data exposed: %q", out.String())
+	}
+}
