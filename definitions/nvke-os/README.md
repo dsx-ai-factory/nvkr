@@ -6,6 +6,10 @@ source-owned Packer project. Architecture-dependent build and vendor argv use th
 substitution. The AMD64 disk root and ARM64 execution overlay are explicit producer declarations, not one
 architecture-neutral root.
 
+The bootstrap lock retains Git describe-derived source selections such as
+`os-image/v0.1.0-rc.4-51-g726f7694`; these describe an exact commit, not a published
+release tag. Do not infer coordinated release acceptance from those names.
+
 Local development and CI are parallel supported paths sharing material producers, not substitutes for one another.
 Their Definitions select explicit execution behavior:
 
@@ -84,7 +88,7 @@ must match the selected catalog lock and every source node in the trusted compil
 This is a consistency check; the input is not itself source-owner approval.
 
 The selector and source fetch use trusted main code. The fetch job alone receives the read-only
-`NVKE_SOURCE_TOKEN`; it verifies the exact source commit/tree, removes persistent credentials, and
+`NKE_SOURCE_TOKEN`; it verifies the exact source commit/tree, removes persistent credentials, and
 transports bytes to the candidate job. Candidate execution receives private source content and declared
 build network, but no source token. The process-local Git transport override keeps canonical source pins.
 

@@ -4,7 +4,7 @@ Candidate, selectable CNI producer catalog for the
 [`dsx-ai-factory/ovn-kubernetes`](https://github.com/dsx-ai-factory/ovn-kubernetes) fork.
 It does not remove Calico or change the maintained
 OS/M2 Definitions. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
-and `nvke-cni-ovn` deliberately preserve the existing producer names. A maintained
+and `nvke-cni-ovn` are authored component names; packaged Debian names remain source-owned. A maintained
 replacement must use the predecessor-digest-bound catalog overlay contract and
 regenerate its dependent inputs.
 
@@ -53,8 +53,8 @@ Pinned DSX OVN Git source
   └─ checked-in chart → ovn-kubernetes-chart.tar
        + authenticated image material
        → nvke-cni-ovn.tar
-           ├─ nvke-cni-ovn-charts-1.5.18_1+git.26cc199de8e8_<arch>.deb
-           └─ nvke-cni-ovn-images-1.5.18_1+git.26cc199de8e8_<arch>.deb
+           ├─ nke-cni-ovn-charts-1.5.18_1+git.26cc199de8e8_<arch>.deb
+           └─ nke-cni-ovn-images-1.5.18_1+git.26cc199de8e8_<arch>.deb
 ```
 
 The chart package installs under `/etc/dgx/ovn-kubernetes`. Its `values-nke.yaml`
@@ -65,7 +65,7 @@ inputs. Optional OVS-node, identity and DPU subcharts remain disabled; enabling
 them requires separately binding and testing their image/configuration inputs.
 
 The image package installs a deterministic gzip archive and SHA-256 sidecar under
-`/usr/lib/nvke/cni-ovn/1.5.18`. Its configuration hook checks the sidecar, bounds
+`/usr/lib/nke/cni-ovn/1.5.18`. Its configuration hook checks the sidecar, bounds
 containerd readiness and import, then imports the archive into the `k8s.io`
 namespace. Import failures fail package configuration.
 
@@ -131,8 +131,8 @@ go run ./cmd/nvkr run generate \
 Production execution requires installing that generated bundle in an admitted
 consumer checkout. The generator owns one `nvkr-run.yml` per root; this candidate does
 not replace the maintained M2 bundle. Dispatch remains default-branch-only,
-with the existing protected `nvkr-release` environment and main signer policy.
-`NVKE_SOURCE_TOKEN` must separately have read access to the internal OVN fork;
+with the existing protected `nkd-release` environment and main signer policy.
+`NKE_SOURCE_TOKEN` must separately have read access to the internal OVN fork;
 secret existence does not prove that access. Registry write and OIDC tokens stay
 out of producer containers. Ordinary PR tests compile and regenerate without them.
 

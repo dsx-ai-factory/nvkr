@@ -73,7 +73,7 @@ _Avoid_: Authored selection group, artifact, release
 The typed identity of a generated build graph's transport-independent logical content under `nvkr.build`.
 Output names and execution settings are bound by their
 owning records and excluded from this identity. Equal Build Digests do not merge required output uses or their evidence.
-The historical `nvkr.recipe` identity family remains reserved; its signed bytes are not renamed or converted.
+`nvkr.recipe` is reserved and never minted. Historical `nkd.recipe` signed bytes are not renamed or converted.
 _Avoid_: Artifact digest, graph-file hash
 
 **Target platform**:

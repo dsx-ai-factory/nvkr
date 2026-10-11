@@ -152,7 +152,7 @@ func TestOSPlanSourceClosureRejectsAliasAndPinDrift(t *testing.T) {
 		{name: "scp URL", repo: "git@github.com:dsx-ai-factory/nvke.git", drift: true},
 		{name: "git URL", repo: "git://github.com/dsx-ai-factory/nvke.git", drift: true},
 		{name: "unrelated source", repo: "https://github.com/ovn-kubernetes/ovn-kubernetes", drift: true, want: true},
-		{name: "sibling repository", repo: "https://github.com/dsx-ai-factory/nvkr.git", drift: true, want: true},
+		{name: "prefix sibling repository", repo: "https://github.com/dsx-ai-factory/nvke-mirror.git", drift: true, want: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			graph := *plan.Builds[0].Graph

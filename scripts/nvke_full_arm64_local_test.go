@@ -632,7 +632,7 @@ esac
 			}
 			if tc.name == "preserve OVN redirect with NVKE clone" {
 				redirects, err := os.ReadFile(filepath.Join(dir, "redirects"))
-				const want = "3\nhttps://github.com/dsx-ai-factory/ovn-kubernetes.git\nhttps://github.com/dsx-ai-factory/nke.git\nhttps://github.com/dsx-ai-factory/nke\n"
+				const want = "3\nhttps://github.com/dsx-ai-factory/ovn-kubernetes.git\nhttps://github.com/dsx-ai-factory/nvke.git\nhttps://github.com/dsx-ai-factory/nvke\n"
 				if err != nil || string(redirects) != want {
 					t.Fatalf("Git did not observe preserved OVN and appended NVKE redirects: %v %q", err, redirects)
 				}

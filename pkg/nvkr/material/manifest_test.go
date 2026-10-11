@@ -225,6 +225,7 @@ func TestManifestValidationFailsClosed(t *testing.T) {
 		want   e.Code
 	}{
 		{name: "schema", mutate: func(manifest *Manifest) { manifest.SchemaVersion = "unknown" }, want: e.CodeInvalidCatalog},
+		{name: "pre-rename namespace", mutate: func(manifest *Manifest) { manifest.SchemaVersion = "nkd.dev/build-material-manifest/v2" }, want: e.CodeInvalidCatalog},
 		{name: "nil materials", mutate: func(manifest *Manifest) { manifest.Materials = nil }, want: e.CodeInvalidCatalog},
 		{name: "binding metadata", mutate: func(manifest *Manifest) { manifest.Materials[0].Binding = " agent" }, want: e.CodeInvalidCatalog},
 		{name: "binding display control", mutate: func(manifest *Manifest) { manifest.Materials[0].Binding = "agent\u202e" }, want: e.CodeInvalidCatalog},

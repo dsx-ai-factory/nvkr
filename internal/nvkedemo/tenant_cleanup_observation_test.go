@@ -113,7 +113,7 @@ func TestTenantCleanupUnavailableStorageDoesNotPreventDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := "#!/bin/sh\ncase \"$1:$2\" in\nget:clusters) if [ -f \"$STATE\" ]; then printf '[]'; else printf '%s' \"$ROW\"; fi;;\ndelete:cluster) touch \"$STATE\"; printf private-delete-response >&2;;\n*) exit 42;;\nesac\n"
-	if err = os.WriteFile(filepath.Join(tools, "cli", "nvkectl"), []byte(script), 0o700); err != nil {
+	if err = os.WriteFile(filepath.Join(tools, "cli", installerCLIName), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	writer := &recordedProgress{}
@@ -194,7 +194,7 @@ func TestTenantDeletionWaitHonorsDeadlineCancellationAndOwnership(t *testing.T) 
 				encoded = []byte("[]")
 			}
 			script := "#!/bin/sh\n[ \"$1:$2\" = get:clusters ] || exit 42\nprintf '%s' \"$ROW\"\n"
-			if err = os.WriteFile(filepath.Join(work, "cli", "nvkectl"), []byte(script), 0o700); err != nil {
+			if err = os.WriteFile(filepath.Join(work, "cli", installerCLIName), []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			selected := tenant{name: row.Name, id: "owned", cleaning: true, session: ManagementSession{Work: work, Runner: Runner{Env: []string{"PATH=/usr/bin:/bin", "ROW=" + string(encoded)}}}}

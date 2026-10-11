@@ -389,7 +389,7 @@ func TestPreparedBuildPreservesExactFetchRedirects(t *testing.T) {
 	if environmentValue(got, "GIT_CONFIG_COUNT") != "3" || environmentValue(got, "GIT_CONFIG_KEY_0") != environmentValue(env, "GIT_CONFIG_KEY_0") || environmentValue(got, "TMPDIR") != "/local/recipes/.nvkr/laptop-bootstrap/fresh/tmp" {
 		t.Fatalf("redirect or temporary directory lost: %v", got)
 	}
-	for i, upstream := range []string{"https://github.com/dsx-ai-factory/nke.git", "https://github.com/dsx-ai-factory/nke"} {
+	for i, upstream := range []string{"https://github.com/dsx-ai-factory/nvke.git", "https://github.com/dsx-ai-factory/nvke"} {
 		suffix := strconv.Itoa(i + 1)
 		if environmentValue(got, "GIT_CONFIG_KEY_"+suffix) != "url./local/nke.git.insteadOf" || environmentValue(got, "GIT_CONFIG_VALUE_"+suffix) != upstream {
 			t.Fatal("NVKE redirect changed")

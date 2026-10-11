@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nvke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:5ddfe5330ba8299a6e02d125cf8dbb6c7ca4adfbd311745606f43a74ffd3d5b7
+requiresCatalogDigest: sha256:11a2743c530af5e0e6183393ed1a3aac7c7a2655744c3d94b67fecaed7f32ac1
 components:
   nvke-node-image:
     component:
@@ -17,7 +17,7 @@ components:
       commit: 726f76944404e1106626b8333d3576bdf67b575b
       treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
       toolchainImages:
-        arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+        arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
       vendorCommand:
         - bash
         - -ec

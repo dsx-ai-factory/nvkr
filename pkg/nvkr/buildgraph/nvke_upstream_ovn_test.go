@@ -43,7 +43,7 @@ func loadUpstreamOVN(t *testing.T) *catalog.Catalog {
 
 // These contracts compile both native producer routes without acquiring source,
 // launching a daemon, or claiming image/runtime compatibility.
-func TestNKEUpstreamOVNGraphs(t *testing.T) {
+func TestNVKEUpstreamOVNGraphs(t *testing.T) {
 	cat := loadUpstreamOVN(t)
 	if len(cat.Components) != 3 {
 		t.Fatal("upstream closure must contain exactly image, chart and CNI packaging")
@@ -61,7 +61,7 @@ func TestNKEUpstreamOVNGraphs(t *testing.T) {
 		}
 	}
 	image := strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n")
-	for _, fragment := range []string{"build-arg:BUILDER_IMAGE=" + ovnGoBuilder, "build-arg:KUBECTL_MINOR=1.34", "name=localhost/nke/ovn-kubernetes:git-" + upstreamOVNCommit} {
+	for _, fragment := range []string{"build-arg:BUILDER_IMAGE=" + ovnGoBuilder, "build-arg:KUBECTL_MINOR=1.34", "name=localhost/nvke/ovn-kubernetes:git-" + upstreamOVNCommit} {
 		if !strings.Contains(image, fragment) {
 			t.Fatalf("source image lost %q", fragment)
 		}
@@ -72,7 +72,7 @@ func TestNKEUpstreamOVNGraphs(t *testing.T) {
 	}
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
-			selected, err := buildgraph.Resolve(cat, buildgraph.Selection{Components: []string{"nke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"}, Platform: "linux/" + arch})
+			selected, err := buildgraph.Resolve(cat, buildgraph.Selection{Components: []string{"nvke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"}, Platform: "linux/" + arch})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -96,7 +96,7 @@ func TestNKEUpstreamOVNGraphs(t *testing.T) {
 				} else if node.Network != ir.NetworkNone {
 					t.Fatal("chart and CNI packaging must remain offline")
 				}
-				if node.Component == "nke-cni-ovn" && (len(node.Materials) != 2 || node.Materials[0].Binding != "ovn-chart" || node.Materials[1].Binding != "ovn-image") {
+				if node.Component == "nvke-cni-ovn" && (len(node.Materials) != 2 || node.Materials[0].Binding != "ovn-chart" || node.Materials[1].Binding != "ovn-image") {
 					t.Fatal("CNI bundle lost exact chart/image inputs")
 				}
 			}
@@ -108,7 +108,7 @@ func TestNKEUpstreamOVNGraphs(t *testing.T) {
 	}
 }
 
-func TestNKEUpstreamOVNDiskSelection(t *testing.T) {
+func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-m2/os-catalog"))
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +134,7 @@ func TestNKEUpstreamOVNDiskSelection(t *testing.T) {
 			t.Fatalf("disk %s differs from standalone producer", name)
 		}
 	}
-	if stack.Catalog.Components["nvke-image-inputs"].Materials["ovn"] != "nke-cni-ovn" {
+	if stack.Catalog.Components["nvke-image-inputs"].Materials["ovn"] != "nvke-cni-ovn" {
 		t.Fatal("OS lost authenticated CNI material binding")
 	}
 	_, err = catalog.ApplyStack(base, upstream)
@@ -233,7 +233,7 @@ func TestNKEUpstreamOVNDiskSelection(t *testing.T) {
 
 // Loading the complete Definition rederives the existing controller pin set from
 // private pinned Git source. Keep that external admission out of ordinary CI.
-func TestNKEUpstreamOVNFullPlan(t *testing.T) {
+func TestNVKEUpstreamOVNFullPlan(t *testing.T) {
 	if os.Getenv("NVKR_TEST_UPSTREAM_OVN_PLAN") != "1" {
 		t.Skip("requires authenticated access to the existing NVKE controller pin set")
 	}
@@ -262,7 +262,7 @@ func TestNKEUpstreamOVNFullPlan(t *testing.T) {
 // Opt-in immutable source fixture. This performs the real source-owned Helm
 // render after the catalog's actual preparation command, without a container,
 // image bake, package publication or compatibility claim.
-func TestNKEUpstreamOVNSourceRender(t *testing.T) {
+func TestNVKEUpstreamOVNSourceRender(t *testing.T) {
 	source := os.Getenv("NVKR_UPSTREAM_OVN_CHECKOUT")
 	if source == "" {
 		t.Skip("requires a clean exact v1.4.0 source checkout")
@@ -289,7 +289,7 @@ func TestNKEUpstreamOVNSourceRender(t *testing.T) {
 		t.Fatalf("catalog chart preparation: %v\n%s", err, output)
 	}
 	const hex = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	want := "localhost/nke/ovn-kubernetes@sha256:" + hex
+	want := "localhost/nvke/ovn-kubernetes@sha256:" + hex
 	rendered, err := exec.CommandContext(ctx, "helm", "template", "ovn-kubernetes", chart, "--namespace", "ovn-kubernetes", "--set", "skipCallToK8s=true", "--set-string", "global.image.tag="+hex).CombinedOutput()
 	if err != nil {
 		t.Fatalf("source-owned chart render: %v\n%s", err, rendered)

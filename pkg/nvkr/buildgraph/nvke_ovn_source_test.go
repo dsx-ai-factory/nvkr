@@ -229,9 +229,9 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 			"readonly stream=" + ovnForkStream,
 			"readonly revision=1+git." + pin.Commit[:12],
 			"tag: git-" + pin.Commit,
-			"readonly image_dir=/usr/lib/nvke/cni-ovn/" + ovnForkStream,
+			"readonly image_dir=/usr/lib/nke/cni-ovn/" + ovnForkStream,
 			"readonly image_name=ovn-images_" + ovnForkStream + "_linux_{{.Arch}}.tgz",
-			"Maintainer: NVKE <nvke-dev@exchange.nvidia.com>",
+			"Maintainer: NVKE <nke-dev@exchange.nvidia.com>",
 		}},
 	} {
 		t.Run(tc.component, func(t *testing.T) {
@@ -436,14 +436,14 @@ for kind in charts images; do
   test "$(dpkg-deb -f "$package" Architecture)" = "$GOARCH"
   test "$(dpkg-deb -f "$package" Package)" = "nvke-cni-ovn-$kind-1.5.18"
   test "$(dpkg-deb -f "$package" Version)" = "1+git.26cc199de8e8"
-  test "$(dpkg-deb -f "$package" Maintainer)" = 'NVKE <nvke-dev@exchange.nvidia.com>'
+  test "$(dpkg-deb -f "$package" Maintainer)" = 'NVKE <nke-dev@exchange.nvidia.com>'
   dpkg-deb -x "$package" /tmp/root
   dpkg-deb -e "$package" "/tmp/control-$kind"
 done
 test -f /tmp/root/etc/dgx/ovn-kubernetes/Chart.yaml
 test -f /tmp/root/etc/dgx/ovn-kubernetes/values-nke.yaml
 bash -n /tmp/control-images/postinst
-cd /tmp/root/usr/lib/nvke/cni-ovn/1.5.18
+cd /tmp/root/usr/lib/nke/cni-ovn/1.5.18
 sha256sum --strict --quiet -c ovn-images_1.5.18_linux_$GOARCH.tgz.sha256
 gzip -t ovn-images_1.5.18_linux_$GOARCH.tgz
 test "$(gzip -dc ovn-images_1.5.18_linux_$GOARCH.tgz | sha256sum | cut -d' ' -f1)" = "$OVN_IMAGE_SHA256"
@@ -670,8 +670,8 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 					}
 					// Relocate only host paths into test-owned scratch. External commands
 					// are controlled fixtures; the actual pipeline and failure handler run.
-					script := strings.ReplaceAll(hook, "/usr/lib/nvke/cni-ovn/1.5.18", root)
-					script = strings.ReplaceAll(script, "/var/log/nvke-cni-ovn-postinst.log", logPath)
+					script := strings.ReplaceAll(hook, "/usr/lib/nke/cni-ovn/1.5.18", root)
+					script = strings.ReplaceAll(script, "/var/log/nke-cni-ovn-postinst.log", logPath)
 					script = strings.ReplaceAll(script, "/usr/local/bin/ctr", filepath.Join(root, "local-ctr"))
 					// Allow subprocess scheduling under the concurrent full-package gate;
 					// this test bound does not change the hook's production timeouts.
@@ -686,7 +686,7 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 						if tc.override == "ctr" {
 							override = "ctr"
 						}
-						cmd.Env = append(cmd.Env, "NVKE_CTR_BIN="+override)
+						cmd.Env = append(cmd.Env, "NKE_CTR_BIN="+override)
 					}
 					cmd.WaitDelay = 5 * time.Second
 					output, err := cmd.CombinedOutput()

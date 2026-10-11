@@ -11,8 +11,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
 

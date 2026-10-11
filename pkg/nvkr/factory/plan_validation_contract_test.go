@@ -69,6 +69,7 @@ func TestPlanRejectsSubstitutedInputsAndBuildBindings(t *testing.T) {
 		message string
 	}{
 		{"missing generator", func(p *Plan) { p.GeneratorVersion = " " }, e.CodeInvalidCatalog, "generator"},
+		{"pre-rename namespace", func(p *Plan) { p.SchemaVersion = "nkd.dev/run-plan/v5" }, e.CodeInvalidCatalog, "schema"},
 		{"missing environment path", func(p *Plan) { p.EnvironmentPath = "" }, e.CodeInvalidCatalog, "source paths"},
 		{"escaping definition path", func(p *Plan) { p.DefinitionPath = "../definition.yaml" }, e.CodeInvalidCatalog, "source paths"},
 

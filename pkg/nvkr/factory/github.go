@@ -19,10 +19,11 @@ import (
 )
 
 const (
-	GitHubWorkflowPath               = ".github/workflows/nvkr-run.yml"
-	FactoryPlanPath                  = ".github/nvkr-run/plan.json"
-	githubReleaseEnvironment         = "nvkr-release"
-	githubARCEnvironment             = "nvkr-arc"
+	GitHubWorkflowPath = ".github/workflows/nvkr-run.yml"
+	FactoryPlanPath    = ".github/nvkr-run/plan.json"
+	// Existing protected provider objects are not renamed by a repository change.
+	githubReleaseEnvironment         = "nkd-release"
+	githubARCEnvironment             = "nkd-arc"
 	githubExecutionCondition         = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
 	githubSupportJobTimeoutMinutes   = 15
 	githubDefaultStageTimeoutMinutes = 60

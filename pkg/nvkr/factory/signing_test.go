@@ -363,7 +363,7 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 			old: []byte("    permissions:\n      contents: read\n      packages: write\n    env:\n      NVKR_CREDENTIAL"),
 			new: []byte("    permissions:\n      contents: read\n      id-token: write\n      packages: write\n    env:\n      NVKR_CREDENTIAL")},
 		{name: "deployment-environment-removed",
-			old: []byte("    environment: 'nvkr-release'\n"), new: []byte("")},
+			old: []byte("    environment: 'nkd-release'\n"), new: []byte("")},
 		{name: "verify-grabs-id-token",
 			old: []byte("      contents: read\n      packages: read\n"),
 			new: []byte("      contents: read\n      id-token: write\n      packages: read\n")},

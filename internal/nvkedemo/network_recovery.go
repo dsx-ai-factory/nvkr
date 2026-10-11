@@ -24,7 +24,7 @@ import (
 )
 
 const legacyNetworkRecoveryRevision = "3b24beb5cb04df352e74a8d5405bd593871412b5"
-const legacyNetworkRecoveryHelper = "scripts/nvke-local-demo.py"
+const legacyNetworkRecoveryHelper = "scripts/nke-local-demo.py"
 
 func legacyNetworkRecoveryError() error {
 	return nvkrerr.New(nvkrerr.CodePreflightFailed,
@@ -85,9 +85,9 @@ func validateNetworkState(s networkState, work string) error {
 	if s.Version != 2 || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
 		return fmt.Errorf("recovery journal version/work/owner differs")
 	}
-	owner := strings.TrimPrefix(s.Owner, "nvkr-demo-")
+	owner := strings.TrimPrefix(s.Owner, "nkd-demo-")
 	raw, err := hex.DecodeString(owner)
-	if err != nil || len(raw) != 16 || s.Owner != "nvkr-demo-"+hex.EncodeToString(raw) {
+	if err != nil || len(raw) != 16 || s.Owner != "nkd-demo-"+hex.EncodeToString(raw) {
 		return fmt.Errorf("invalid firewall owner")
 	}
 	boot := strings.Split(s.Boot, "-")
@@ -124,7 +124,7 @@ func validateNetworkState(s networkState, work string) error {
 		return fmt.Errorf("unsupported bridge policy identity")
 	}
 	if s.Staging != nil {
-		if s.Staging.Path != filepath.Join(filepath.Dir(qemuPolicy), ".nvkr-policy-"+owner) {
+		if s.Staging.Path != filepath.Join(filepath.Dir(qemuPolicy), ".nkd-policy-"+owner) {
 			return fmt.Errorf("unsupported root staging path")
 		}
 		if id := s.Staging.Binding; id != nil && (!validNetworkID(*id) || id.Mode != 0o600 || id.UID != 0 || id.GID != 0) {

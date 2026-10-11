@@ -139,7 +139,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	}
 	for _, test := range []struct{ name, before, after string }{
 		{"write scope", "packages: read", "packages: write"},
-		{"wrong credential", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ github.token }}'", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKE_SOURCE_TOKEN }}'"},
+		{"wrong credential", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ github.token }}'", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'"},
 		{"wrong helper", "factory github prepare-images --plan", "factory github run-node --plan"},
 	} {
 		t.Run(test.name, func(t *testing.T) {

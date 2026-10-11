@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 const maxOperations = 64

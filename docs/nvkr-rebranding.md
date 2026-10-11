@@ -3,7 +3,7 @@
 This repository is now **NVKR**, targeting `dsx-ai-factory/nvkr`. Its downstream
 product is **NVKE**, targeting `dsx-ai-factory/nvke`. The change is a breaking
 namespace migration, not a compatibility alias or a claim that the future
-repositories, registries and hosted configuration are already provisioned.
+registries and renamed hosted configuration are already provisioned.
 
 | Surface | New name |
 |---|---|
@@ -49,25 +49,40 @@ provides a changed commit and the catalog is deliberately repinned:
   `nke-base-config` item, and the upstream controller chart filename.
 - Installed packages, services, deployment selectors and helper files supplied
   by the pinned upstream tree. These describe producer bytes, not NVKR aliases.
+- Guest acquisition envelope `nkd.dev/package-acquisitions/v1`, OVN's
+  `NKE_CTR_BIN`, `/usr/lib/nke/cni-ovn/` and post-install log, and the producer's
+  existing maintainer email. None is rewritten by the consuming repository.
+- Pinned runtime ABI `/nkd/toolchain/packer/plugins` and
+  `/usr/local/bin/nkd-disk-inspect`, including its `NKD_INSPECTION ` diagnostic
+  wire prefix. New runtime builders retain these interfaces until
+  a deliberately versioned ABI and new measured pins are admitted together.
+- Version-2 host-network bridge, owner/staging prefixes and shared per-user lock.
+  Keeping the complete durable namespace allows existing journal recovery and
+  coordination without silently reinterpreting recovery state.
 
 Public component names, caller-owned output paths and documentation use NVKE.
 Captured upstream test fixtures retain the actual upstream bytes.
 
 ## Deployment cutover
 
-The rename patch alone does not establish a working hosted deployment. Before
-using the new namespaces operationally:
+Existing provider identities remain in use, rather than silently creating
+unprotected replacements: `nkd-arc`, `nkd-release`, `NKE_SOURCE_TOKEN` and
+`@dsx-ai-factory/nke-write`. Published immutable Packer/inspector references
+remain under `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/`;
+a Git repository rename does not move GHCR packages.
+
+Before migrating those external names:
 
 1. Provision or rename the two repositories, preserving Git history, tags and
-   access. Update external repository permissions, the renamed CODEOWNERS team,
-   and consumers of the Go module. A repository rename does not rename an org team.
+   access. Verify external repository permissions and consumers of the Go module.
+   Verify replacement CODEOWNERS write access before changing the existing team.
 2. Build and publish the renamed helper, Packer and disk-inspector closures from
    their renamed sources. Measure the new binaries and replace the applicable
    OCI/executable pins. Relocating an old image cannot rename its embedded paths
    or `/usr/local/bin/nkd-disk-inspect` executable.
-3. Coordinate the NVKE acquisition writer with the new
-   `nvkr.dev/package-acquisitions/v1` envelope and repin its source. An older
-   capture envelope is not converted into authenticated new-namespace evidence.
+3. If a producer-owned format or runtime ABI changes, repin the producer/closure
+   together with its consumer. This PR preserves the existing acquisition format;
+   it does not require an upstream schema migration or convert captured evidence.
 4. Migrate hosted environments, source-secret names, branch restrictions,
    package access, signing identities and external documentation domains to the
    authored new names. This PR does not change provider settings or secrets.
@@ -76,5 +91,17 @@ using the new namespaces operationally:
    actual new repository and registry identities.
 
 Local compilation and contract tests validate the rename, not those external
-cutover steps. Existing blob SHA-256 pins are retained, never replaced with
-invented values to imply that rebuilt images or renamed producer bytes exist.
+cutover steps. Upstream material and published Packer/inspector SHA-256 pins are
+retained. The standalone renamed execution helper was rebuilt and measured on both
+architectures; its executable pins changed while its image pins remain unpublished.
+No pin is invented to imply that a renamed registry subject or rebuilt image exists.
+
+## Developer migration
+
+Use `NVKE_LOCAL_CLONE` instead of `NKE_LOCAL_CLONE`, and `NVKR_BIN` instead of
+`NKDCTL_BIN` for the local demo. Other framework `NKD_*` variables become `NVKR_*`;
+product `NKE_*` variables become `NVKE_*` except documented producer/provider
+contracts. Existing `.nkd` state, root `nkdctl` and helper build output remain
+ignored. Preserve required Run/recovery data before deleting legacy local files.
+The M1 launcher refuses an existing `nkd-m1-registry` with migration instructions;
+it never removes that container automatically.

@@ -215,8 +215,8 @@ func siteOVNDefaultsForNetwork(network string, raw []byte, imageDigest string) (
 		global, _ := defaults["global"].(map[string]any)
 		image, _ := global["image"].(map[string]any)
 		// The source-owned getImage helper joins these fields with ':'. Its
-		// exact output is localhost/nke/ovn-kubernetes@sha256:<bound hex>.
-		if image["repository"] != "localhost/nke/ovn-kubernetes@sha256" || image["tag"] != strings.TrimPrefix(imageDigest, "sha256:") {
+		// exact output is localhost/nvke/ovn-kubernetes@sha256:<bound hex>.
+		if image["repository"] != "localhost/nvke/ovn-kubernetes@sha256" || image["tag"] != strings.TrimPrefix(imageDigest, "sha256:") {
 			return nil, errors.New("selected upstream OVN chart image binding differs from the accepted image")
 		}
 		return defaults, nil

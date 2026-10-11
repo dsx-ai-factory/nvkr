@@ -95,7 +95,7 @@ components:
         readonly out=/src/nvkr-output
         readonly charts="$out/charts"
         readonly images="$out/images"
-        readonly image_dir="$images/usr/lib/nvke/cni-ovn/$stream"
+        readonly image_dir="$images/usr/lib/nke/cni-ovn/$stream"
         readonly image_name="ovn-images_${stream}_linux_{{.Arch}}.tgz"
         mkdir -p "$charts/DEBIAN" "$charts/etc/dgx/ovn-kubernetes" "$images/DEBIAN" "$image_dir" "$out/debs"
         tar -xf /nvkr/inputs/materials/ovn-chart -C "$charts/etc/dgx"
@@ -132,7 +132,7 @@ components:
         Package: nke-cni-ovn-$kind-$stream
         Version: $revision
         Architecture: {{.Arch}}
-        Maintainer: NVKE <nvke-dev@exchange.nvidia.com>
+        Maintainer: NVKE <nke-dev@exchange.nvidia.com>
         Provides: nke-cni-ovn-$kind
         Conflicts: nke-cni-ovn-$kind
         Description: NVKE OVN $kind from pinned DSX source
@@ -148,10 +148,10 @@ components:
         # SPDX-License-Identifier: Apache-2.0
         set -euo pipefail
         [ "${1:-}" = configure ] || exit 0
-        readonly image_dir=/usr/lib/nvke/cni-ovn/1.5.18
+        readonly image_dir=/usr/lib/nke/cni-ovn/1.5.18
         readonly image_name=ovn-images_1.5.18_linux_{{.Arch}}.tgz
-        if [ -n "${NVKE_CTR_BIN:-}" ]; then
-          ctr="$(command -v "$NVKE_CTR_BIN")" || { echo "OVN import: ctr is not executable: $NVKE_CTR_BIN" >&2; exit 1; }
+        if [ -n "${NKE_CTR_BIN:-}" ]; then
+          ctr="$(command -v "$NKE_CTR_BIN")" || { echo "OVN import: ctr is not executable: $NKE_CTR_BIN" >&2; exit 1; }
         elif [ -x /usr/local/bin/ctr ]; then
           ctr=/usr/local/bin/ctr
         else
@@ -159,7 +159,7 @@ components:
         fi
         [ -f "$ctr" ] && [ -x "$ctr" ] || { echo "OVN import: ctr is not executable: $ctr" >&2; exit 1; }
         readonly ctr
-        readonly log=/var/log/nvke-cni-ovn-postinst.log
+        readonly log=/var/log/nke-cni-ovn-postinst.log
         cd "$image_dir"
         sha256sum --strict -c "$image_name.sha256"
         ready=false

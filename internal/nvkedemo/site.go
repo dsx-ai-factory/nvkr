@@ -914,7 +914,7 @@ func deployedSiteImages(ctx context.Context, session ManagementSession, refs map
 	kube := environmentValue(session.Runner.Env, "SITE_KUBECONFIG")
 	for _, item := range []struct {
 		key, namespace, selector, container string
-	}{{"cwe", "nke-controller", "app.kubernetes.io/name=nvke-controller", "nke-controller"}, {"provider", "capnico-system", "control-plane=controller-manager", "manager"}} {
+	}{{"cwe", "nke-controller", "app.kubernetes.io/name=nke-controller", "nke-controller"}, {"provider", "capnico-system", "control-plane=controller-manager", "manager"}} {
 		rows, err := captureJSON[podList](ctx, session.Runner, []string{kubectl, "--kubeconfig", kube, "-n", item.namespace, "get", "pods", "-l", item.selector, "-o", "json"}, "deployed-"+item.key)
 		if err != nil {
 			return nil, err
@@ -1094,6 +1094,21 @@ func checkoutSiteInstaller(ctx context.Context, runner Runner, source, checkout,
 	return runner.Run(ctx, []string{"git", "-C", checkout, "checkout", "--detach", commit}, "checkout-installer", 60*time.Second)
 }
 
+// stageInstallerCLI copies verified NVKR output bytes to the filename required
+// by InstallerCommit. It is a private upstream handoff, not a public CLI alias.
+func stageInstallerCLI(ctx context.Context, bundle, tools string) error {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	if err := verifyToolMembers(bundle, []string{"nvkectl"}); err != nil {
+		return err
+	}
+	if err := os.Mkdir(tools, 0o700); err != nil {
+		return err
+	}
+	return copyPrivate(ctx, filepath.Join(bundle, "nvkectl"), filepath.Join(tools, installerCLIName), 0o700)
+}
+
 // ConsumeSite installs a site from exact selected outputs, retaining its private
 // registry through the callback. No success is emitted before owned cleanup.
 func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, connection SiteConnection, session ManagementSession, consumer func(context.Context, ManagementSession) error) (result error) {
@@ -1158,14 +1173,14 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	}{"unqualified-local-site-diagnostic", selected}); err != nil {
 		return err
 	}
-	cliRoot, cliTools := filepath.Join(session.Work, "cli-publication"), filepath.Join(session.Work, "cli")
+	cliRoot, cliBundle, cliTools := filepath.Join(session.Work, "cli-publication"), filepath.Join(session.Work, "cli-bundle"), filepath.Join(session.Work, "cli")
 	if err = session.Runner.Run(ctx, []string{tool, "publish", "root", "--bundle", "nvkectl=" + materials.Outputs["nvkectl"].Layout, "--out", cliRoot}, "verify-site-cli", 120*time.Second); err != nil {
 		return err
 	}
-	if err = session.Runner.Run(ctx, []string{tool, "publish", "extract", "--layout", cliRoot, "--bundle", "nvkectl", "--out", cliTools}, "extract-site-cli", 120*time.Second); err != nil {
+	if err = session.Runner.Run(ctx, []string{tool, "publish", "extract", "--layout", cliRoot, "--bundle", "nvkectl", "--out", cliBundle}, "extract-site-cli", 120*time.Second); err != nil {
 		return err
 	}
-	if err = verifyToolMembers(cliTools, []string{"nvkectl"}); err != nil {
+	if err = stageInstallerCLI(ctx, cliBundle, cliTools); err != nil {
 		return err
 	}
 	session.Runner.Env = SetEnv(session.Runner.Env, map[string]string{"PATH": cliTools + string(os.PathListSeparator) + environmentValue(session.Runner.Env, "PATH")})
@@ -1271,7 +1286,7 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 		return err
 	}
 	manifest := filepath.Join(session.Work, "local-assembly.yaml")
-	manifestBytes := "apiVersion: nke.nvidia.com/release/v1\nrelease: local-assembly\nlane: local-assembly\nscope: none\nsource:\n  repo: https://github.com/dsx-ai-factory/nke\n  tag: local-assembly\n  commit: " + InstallerCommit + "\nitems:\n  - {name: controller, type: image, ref: " + refs["cwe"] + "}\n"
+	manifestBytes := "apiVersion: nke.nvidia.com/release/v1\nrelease: local-assembly\nlane: local-assembly\nscope: none\nsource:\n  repo: https://github.com/dsx-ai-factory/nvke\n  tag: local-assembly\n  commit: " + InstallerCommit + "\nitems:\n  - {name: controller, type: image, ref: " + refs["cwe"] + "}\n"
 	if err = privateWrite(manifest, []byte(manifestBytes)); err != nil {
 		return err
 	}

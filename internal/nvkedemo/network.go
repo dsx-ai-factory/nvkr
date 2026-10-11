@@ -33,7 +33,10 @@ import (
 )
 
 const (
-	BridgeName     = "nvkrvm0"
+	// This durable host namespace is shared with pre-rename version-2 journals.
+	// Keep bridge, firewall owner, staging paths and the coordination lock stable
+	// together; renaming only one would strand grants or allow concurrent owners.
+	BridgeName     = "nkdvm0"
 	GuestCIDR      = "172.30.0.0/24"
 	GuestGateway   = "172.30.0.1"
 	VIPCIDR        = "172.31.0.0/24"
@@ -192,7 +195,7 @@ func newNetworkGuard(runner Runner, kindCIDR string) (*NetworkGuard, error) {
 	}
 	marker := append([]byte(nil), token[:6]...)
 	marker[0] = (marker[0] | 2) & 0xfe
-	return &NetworkGuard{Work: work, Owner: "nvkr-demo-" + hex.EncodeToString(token[:]), BridgeMAC: net.HardwareAddr(marker).String(), KindCIDR: kindCIDR, runner: runner, directory: directory, pid: os.Getpid(), sysctls: map[string]string{}, helperPath: qemuHelper, policyPath: qemuPolicy}, nil
+	return &NetworkGuard{Work: work, Owner: "nkd-demo-" + hex.EncodeToString(token[:]), BridgeMAC: net.HardwareAddr(marker).String(), KindCIDR: kindCIDR, runner: runner, directory: directory, pid: os.Getpid(), sysctls: map[string]string{}, helperPath: qemuHelper, policyPath: qemuPolicy}, nil
 }
 func validateNetworkKind(kindCIDR string) error {
 	kind, err := netip.ParsePrefix(kindCIDR)
@@ -371,7 +374,7 @@ func (g *NetworkGuard) probePrivilegedPorts(ctx context.Context) error {
 }
 
 func (g *NetworkGuard) acquireLock() error {
-	path := fmt.Sprintf("/tmp/nvkr-local-network-%d.lock", os.Getuid())
+	path := fmt.Sprintf("/tmp/nkd-local-network-%d.lock", os.Getuid())
 	if g.lockPath != "" {
 		path = g.lockPath
 	}
@@ -786,7 +789,7 @@ func (g *NetworkGuard) Start(ctx context.Context) (resultErr error) {
 	if _, err = os.Lstat(g.policyPath); !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("bridge policy appeared; refusing replacement")
 	}
-	stage := filepath.Join(filepath.Dir(g.policyPath), ".nvkr-policy-"+strings.TrimPrefix(g.Owner, "nvkr-demo-"))
+	stage := filepath.Join(filepath.Dir(g.policyPath), ".nkd-policy-"+strings.TrimPrefix(g.Owner, "nkd-demo-"))
 	if _, err = os.Lstat(stage); !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("root staging exists or cannot be inspected")
 	}

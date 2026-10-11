@@ -33,7 +33,7 @@ components:
           --opt build-arg:KUBECTL_MINOR=1.34 \
           --opt build-arg:UBUNTU_BASE_IMAGE=docker.io/library/ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
-          --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nke/ovn-kubernetes:git-d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
+          --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
     writeDir: nvkr-output
     artifactPath: nvkr-output/ovn-kube-ubuntu.oci.tar
   ovn-kubernetes-chart:
@@ -65,7 +65,7 @@ components:
         # exact digest reference without changing upstream Helm templates.
         test "$(grep -c '^    repository: ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu$' "$chart/values-single-node-zone.yaml")" = 1
         test "$(grep -c '^    tag: master$' "$chart/values-single-node-zone.yaml")" = 1
-        sed -e 's|^    repository: ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu$|    repository: localhost/nke/ovn-kubernetes@sha256|' \
+        sed -e 's|^    repository: ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu$|    repository: localhost/nvke/ovn-kubernetes@sha256|' \
           -e 's|^    tag: master$|    tag: ""|' \
           -e 's|^  enableOvnKubeIdentity: true$|  enableOvnKubeIdentity: false|' \
           -e '/^tags:$/a\
@@ -78,7 +78,7 @@ components:
           --numeric-owner -C /src/nvkr-output -cf /src/nvkr-output/ovn-kubernetes-chart.tar ovn-kubernetes
     writeDir: nvkr-output
     artifactPath: nvkr-output/ovn-kubernetes-chart.tar
-  nke-cni-ovn:
+  nvke-cni-ovn:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
@@ -108,7 +108,7 @@ components:
         global:
           enableOvnKubeIdentity: false
           image:
-            repository: localhost/nke/ovn-kubernetes
+            repository: localhost/nvke/ovn-kubernetes
             tag: git-d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
             pullPolicy: IfNotPresent
         EOF
@@ -167,6 +167,6 @@ components:
             "$out/debs/nke-cni-ovn-${kind}-${stream}_${revision}_{{.Arch}}.deb"
         done
         tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
-          --numeric-owner -C "$out/debs" -cf "$out/nke-cni-ovn.tar" .
+          --numeric-owner -C "$out/debs" -cf "$out/nvke-cni-ovn.tar" .
     writeDir: nvkr-output
-    artifactPath: nvkr-output/nke-cni-ovn.tar
+    artifactPath: nvkr-output/nvke-cni-ovn.tar

@@ -87,6 +87,16 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+for legacy_variable in NKE_LOCAL_CLONE NKDCTL_BIN; do
+  if [ -n "${!legacy_variable:-}" ]; then
+    case "$legacy_variable" in
+      NKE_LOCAL_CLONE) replacement=NVKE_LOCAL_CLONE ;;
+      NKDCTL_BIN) replacement=NVKR_BIN ;;
+    esac
+    demo_die "$legacy_variable was renamed to $replacement; unset the legacy variable before running"
+  fi
+done
+
 case "$ATTEMPTS_ROOT" in .nvkr/?*) ;; *) demo_die "--attempts-root must be a repository-relative child of .nvkr" ;; esac
 case "$ATTEMPT" in ""|*/*|*..*) demo_die "--attempt must be one clean name" ;; esac
 WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
@@ -97,6 +107,9 @@ demo_need_command docker
 demo_need_command git
 demo_need_command curl
 docker info >/dev/null 2>&1 || demo_die "Docker daemon is not reachable"
+if docker container inspect nkd-m1-registry >/dev/null 2>&1; then
+  demo_die "legacy nkd-m1-registry container exists; inspect and stop/remove it explicitly before starting nvkr-m1-registry"
+fi
 
 # Pretty-print a small canonical JSON record. python3 is a convenience for reading, never
 # a correctness dependency: without it the raw canonical bytes are shown instead.

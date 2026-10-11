@@ -14,13 +14,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
 
 func validRecord() Record {
-	return Record{Version: Version, Operation: "nke-node-image-arm64/build-nke-node-image", Available: true,
+	return Record{Version: Version, Operation: "nvke-node-image-arm64/build-nvke-node-image", Available: true,
 		Files: 1, Bytes: 1024, GrowthObserved: true, GrowthAgeMillis: 100, SampleAgeMillis: 2}
 }
 
@@ -130,14 +130,14 @@ func TestSinkClosedReaderDoesNotTerminateProcess(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, program, "-test.run=TestActivityClosedReaderHelper")
-	cmd.Env = []string{"NKD_ACTIVITY_CLOSED_READER_HELPER=1"}
+	cmd.Env = []string{"NVKR_ACTIVITY_CLOSED_READER_HELPER=1"}
 	if raw, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("closed metadata reader terminated producer: %v %s", err, raw)
 	}
 }
 
 func TestActivityClosedReaderHelper(t *testing.T) {
-	if os.Getenv("NKD_ACTIVITY_CLOSED_READER_HELPER") != "1" {
+	if os.Getenv("NVKR_ACTIVITY_CLOSED_READER_HELPER") != "1" {
 		return
 	}
 	reader, sink := pipeSink(t)
@@ -253,7 +253,7 @@ func TestSinkDoesNotLeakDescriptorToChild(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd := exec.CommandContext(t.Context(), program, "-test.run=TestActivityDescriptorHelper")
-	cmd.Env = []string{"NKD_ACTIVITY_DESCRIPTOR_HELPER=1"}
+	cmd.Env = []string{"NVKR_ACTIVITY_DESCRIPTOR_HELPER=1"}
 	if raw, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("child descriptor leak: %v %s", err, raw)
 	}
@@ -296,7 +296,7 @@ func TestSinkAdoptionClosesOriginalAndIsolatesRejectedDescriptor(t *testing.T) {
 }
 
 func TestActivityDescriptorHelper(t *testing.T) {
-	if os.Getenv("NKD_ACTIVITY_DESCRIPTOR_HELPER") != "1" {
+	if os.Getenv("NVKR_ACTIVITY_DESCRIPTOR_HELPER") != "1" {
 		return
 	}
 	for fd := 3; fd < 64; fd++ {

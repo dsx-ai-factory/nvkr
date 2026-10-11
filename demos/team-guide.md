@@ -178,8 +178,8 @@ an accepted policy; private access can use an inline-auth Docker config via `--r
 See the [release quickstart](../docs/release-quickstart.md#verify-against-an-accepted-policy) for exact flags.
 Keep this optional operation separate from the short metadata-browsing stop.
 
-The macOS Docker route was exercised successfully against this run’s single-output `nvkectl` publication:
-`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/releases-nvkectl@sha256:768b0ef67a09649465a66ff360eb44e74237a22c66da34bcee961247f06bd4d9`.
+The macOS Docker route was exercised successfully against this run’s pre-rebrand single-output `nkectl` publication:
+`ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases-nkectl@sha256:768b0ef67a09649465a66ff360eb44e74237a22c66da34bcee961247f06bd4d9`.
 It accepted the exact `main` workflow identity and GitHub OIDC issuer under the scope above. This check
 covers that CLI publication; it does not extend to the combined release or disk payloads.
 

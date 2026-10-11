@@ -8,7 +8,7 @@ metadata:
   description: Native diagnostic profiles image from the pinned NVKE Dockerfile/config/runbooks and an authenticated additive local profile overlay. Installs upstream OVN 1.4.0 matching the explicit upstream disk. Not fleet configuration or compatibility proof.
 sources:
   nvke-profiles:
-    repo: https://github.com/dsx-ai-factory/nke.git
+    repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: 0.21.x
     toolchainImage: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
 components:
@@ -19,7 +19,7 @@ components:
     toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
     patches:
       - name: patches/local-profile.patch
-        sha256: sha256:a106affdea1d2ae5a916c28bc2bad93ca59f1cdb9a9684d106fc26aba03c433d
+        sha256: sha256:91fa4b94ddda5deead52ed82ac5d272e81e239e3393947a1bd93925b28563f69
     artifactPath: bin/nvke-local-profiles-{{.Arch}}.oci.tar
     writeDir: bin
     outputType: oci-image

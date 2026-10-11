@@ -126,12 +126,12 @@ The generated workflow path is `.github/workflows/nvkr-run.yml`, with exact inpu
 at the selected ref and does not choose a different Definition. This alternative's GitHub Environment targets
 the `nvkectl`, `cwe` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/nvkr` and uses the
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
-environment `nvkr-release` with a deployment branch policy admitting only `main`. Registry access and NVKE source
+environment `nkd-release` with a deployment branch policy admitting only `main`. Registry access and NVKE source
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
 [implementation/evidence record](../../docs/adr/reconciliation.md).
 
 The GitHub Environment fetches pinned source directly from the internal `dsx-ai-factory/nvke` repository.
-Its `sourceAccess` entry references the repository Actions secret `NVKE_SOURCE_TOKEN`, which must grant
+Its `sourceAccess` entry references the repository Actions secret `NKE_SOURCE_TOKEN`, which must grant
 read-only Contents access to `dsx-ai-factory/nvke`. Only admitted source retrieval and pinned-source revalidation
 steps receive the token; Git configuration
 is process-local, and the pinned commit/tree checks remain mandatory. The local Environment continues to

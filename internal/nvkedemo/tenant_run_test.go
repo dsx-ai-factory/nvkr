@@ -42,7 +42,7 @@ func tenantRunFixture(t *testing.T, network, fail, block string) (tenant, string
 			t.Fatal(err)
 		}
 	}
-	writeTenantFixture(t, filepath.Join(work, "cli", "nvkectl"), []byte(`#!/bin/sh
+	writeTenantFixture(t, filepath.Join(work, "cli", installerCLIName), []byte(`#!/bin/sh
 set -eu
 case "$1 $2" in
   'get clusters') if test -f "$FIXTURE/created"; then cat "$FIXTURE/rows.json"; else printf '[]\n'; fi ;;

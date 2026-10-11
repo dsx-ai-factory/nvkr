@@ -678,8 +678,33 @@ that cancelled test; dispatch and signer policy select `main` only again.
 The external policy read-back retained `codex/m2-arc-validation` and `main` for `nkd-arc`, and
 `codex/m2-arc-validation`, `feat/nke-deploy-pipeline` and `main` for `nkd-release`; it did not admit the exact
 PR #97 branch. Removing an authored exception neither changes those provider policies nor bypasses them.
-The source secret name exists. Package Actions read access, native pool capacity and successful exact-head
+The existing provider secret is `NKE_SOURCE_TOKEN`; the rename retains that exact
+credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Package Actions read access, native pool capacity and successful exact-head
 execution remain external acceptance requirements.
+
+## Framework and product naming cutover
+
+The NVKR namespace migration renames authored inputs, Go packages, public commands,
+schema/media types and structured identity families. These contracts do not convert
+historical signed bytes or imply external deployment acceptance. Generated records
+must be regenerated from the renamed authored inputs.
+
+The current hosted path retains the existing provider-owned `nkd-arc` and
+`nkd-release` protected environments, `NKE_SOURCE_TOKEN`, and the `nke-write`
+CODEOWNERS team. Published Packer/inspector subjects stay at their exact
+`ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/` addresses with the
+existing digests. Their plugin path and inspector executable remain the pinned
+in-image ABI. The external package-capture envelope remains
+`nkd.dev/package-acquisitions/v1`, emitted by the selected NVKE producer; internal
+NVKR evidence identities remain distinct. Go network recovery preserves its complete
+version-2 durable host namespace and shared coordination lock. These are explicit
+external/durable contract exceptions, not public namespace aliases.
+
+The standalone renamed execution helper has measured AMD64/ARM64 executable pins;
+its image pins remain unpublished. New provider names and republished runtime
+subjects are deferred until provisioning, permissions, digest measurements and
+operational read-back are verified. Contract tests do not establish that external
+cutover, hosted publication, independent consumer acceptance or qualification.
 
 
 ## Maintained input and schema boundaries

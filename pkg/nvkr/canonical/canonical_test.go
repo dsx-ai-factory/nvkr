@@ -69,8 +69,14 @@ func TestDigestDomainSeparation(t *testing.T) {
 }
 
 func TestDigestRejectsUnregisteredDomain(t *testing.T) {
-	if _, err := Digest("nvkr.recipe-typo", map[string]string{"value": "same"}); err == nil {
-		t.Fatal("an unregistered digest domain must fail instead of minting a new identity family")
+	for _, domain := range []string{"nvkr.recipe-typo", "nkd.build", "nkd.recipe"} {
+		t.Run(domain, func(t *testing.T) {
+			digest, err := Digest(domain, map[string]string{"value": "same"})
+			var coded *e.Error
+			if digest != "" || !errors.As(err, &coded) || coded.Code != e.CodeInternal {
+				t.Fatalf("unregistered domain minted identity %q or returned wrong error: %v", digest, err)
+			}
+		})
 	}
 }
 

@@ -54,6 +54,9 @@ records source availability and remaining gaps.
 
 ## Engineering and maintenance
 
+[NVKR/NVKE naming cutover](nvkr-rebranding.md) lists renamed public surfaces,
+preserved external contracts and the remaining provider migration steps.
+
 [CONTEXT](../CONTEXT.md) owns formal vocabulary; the [SADD](sadd.md) explains architecture and failure behavior.
 The [ADRs](adr) own engineering contracts, and [reconciliation](adr/reconciliation.md) is the current
 implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to the detailed

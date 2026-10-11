@@ -502,7 +502,7 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 			if !slices.Contains(args, "--log-driver=none") {
 				t.Fatal("daemon log persistence was not disabled")
 			}
-			for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65534:65534", "--init", "--pids-limit=256", "--pull=never", "--no-healthcheck", "--memory=16384m", "--memory-swap=16384m", "/tmp:rw,nosuid,nodev,size=16384m,mode=1777", selection.Platform, "--entrypoint=/usr/local/bin/nvkr-disk-inspect", subject.Digest()} {
+			for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65534:65534", "--init", "--pids-limit=256", "--pull=never", "--no-healthcheck", "--memory=16384m", "--memory-swap=16384m", "/tmp:rw,nosuid,nodev,size=16384m,mode=1777", selection.Platform, "--entrypoint=/usr/local/bin/nkd-disk-inspect", subject.Digest()} {
 				if !slices.Contains(args, required) {
 					t.Fatalf("missing containment argument %q", required)
 				}

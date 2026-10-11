@@ -728,7 +728,7 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 	}
 	args = append(args,
 		"--env", "PATH=/usr/bin:/bin", "--env", "HOME=/tmp", "--env", "LC_ALL=C", "--env", "TZ=UTC",
-		"--entrypoint=/usr/local/bin/nvkr-disk-inspect", image,
+		"--entrypoint=/usr/local/bin/nkd-disk-inspect", image,
 		selection.InspectorDigest, selection.CodecDigest, subject.Digest(), strconv.FormatInt(subject.Size(), 10))
 	if selection.compositionKind != "" {
 		args = append(args, "composition", selection.compositionKind, selection.GuestfishDigest, selection.ScannerDigest, selection.PackageReaderDigest, strconv.FormatUint(selection.MaxFilesystemBytes, 10), selection.consumerPlatform)

@@ -32,7 +32,7 @@ const (
 	LocalRunSchemaVersion = "nvkr.dev/factory-local-run/v1"
 	localWorkspaceMarker  = ".nvkr-factory-workspace.json"
 	localPlanPath         = ".runner/plan.json"
-	nkdRunnerPackage      = "github.com/dsx-ai-factory/nvkr/cmd/nvkr"
+	nvkrRunnerPackage     = "github.com/dsx-ai-factory/nvkr/cmd/nvkr"
 )
 
 // LocalRunOptions configures one local execution of a compiled factory plan.
@@ -634,20 +634,20 @@ func admitLocalRuntime(ctx context.Context, options LocalRunOptions) error {
 
 func requiresLocalRunnerCompilation(platforms []string) bool {
 	for _, platform := range platforms {
-		if runtime.GOOS != "linux" || platform != "linux/"+runtime.GOARCH || !currentProcessIsNKDRunner() {
+		if runtime.GOOS != "linux" || platform != "linux/"+runtime.GOARCH || !currentProcessIsNVKRRunner() {
 			return true
 		}
 	}
 	return false
 }
 
-func currentProcessIsNKDRunner() bool {
+func currentProcessIsNVKRRunner() bool {
 	info, ok := debug.ReadBuildInfo()
-	return isNKDRunnerBuild(info, ok)
+	return isNVKRRunnerBuild(info, ok)
 }
 
-func isNKDRunnerBuild(info *debug.BuildInfo, ok bool) bool {
-	if !ok || info == nil || info.Path != nkdRunnerPackage {
+func isNVKRRunnerBuild(info *debug.BuildInfo, ok bool) bool {
+	if !ok || info == nil || info.Path != nvkrRunnerPackage {
 		return false
 	}
 	for _, setting := range info.Settings {
@@ -687,7 +687,7 @@ func prepareLocalRunners(ctx context.Context, plan *Plan, options LocalRunOption
 		if err != nil {
 			return nil, err
 		}
-		if runtime.GOOS == "linux" && platform == "linux/"+runtime.GOARCH && currentProcessIsNKDRunner() {
+		if runtime.GOOS == "linux" && platform == "linux/"+runtime.GOARCH && currentProcessIsNVKRRunner() {
 			if err := copyCurrentRunner(ctx, absoluteOutput); err != nil {
 				return nil, err
 			}

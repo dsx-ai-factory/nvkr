@@ -58,16 +58,16 @@ run=(timeout --signal=TERM --kill-after=10s 5m docker run --rm --pull=never
   --security-opt no-new-privileges --user 65534:65534)
 "${run[@]}" --entrypoint sha256sum "${inspector_id}" \
   /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish \
-  /usr/local/bin/syft /usr/bin/dpkg-deb /usr/local/bin/nvkr-disk-inspect \
+  /usr/local/bin/syft /usr/bin/dpkg-deb /usr/local/bin/nkd-disk-inspect \
   >"${output}/executables.sha256"
 "${run[@]}" --entrypoint cat "${inspector_id}" /usr/share/nvkr-disk-inspect/packages.tsv \
   >"${output}/packages.tsv"
-[[ "$(sha256sum "bin/nvkr-disk-inspect-${arch}" | cut -d' ' -f1)" == "$(awk '$2 == "/usr/local/bin/nvkr-disk-inspect" {print $1}' "${output}/executables.sha256")" ]]
+[[ "$(sha256sum "bin/nvkr-disk-inspect-${arch}" | cut -d' ' -f1)" == "$(awk '$2 == "/usr/local/bin/nkd-disk-inspect" {print $1}' "${output}/executables.sha256")" ]]
 "${run[@]}" --entrypoint /bin/sh "${inspector_id}" -ec \
   'virt-inspector --version; qemu-img --version; guestfish --version; syft version; dpkg-deb --version' \
   >"${output}/inspector-versions.log"
 helper_status=0
-"${run[@]}" --entrypoint /usr/local/bin/nvkr-disk-inspect "${inspector_id}" \
+"${run[@]}" --entrypoint /usr/local/bin/nkd-disk-inspect "${inspector_id}" \
   >"${output}/helper.stdout" 2>"${output}/helper-admission.log" || helper_status=$?
 [[ "${helper_status}" == 2 && ! -s "${output}/helper.stdout" ]]
 grep -F '[NVKR-E-USAGE]' "${output}/helper-admission.log" >/dev/null

@@ -37,7 +37,7 @@
 # Default — all trusted contributors
 # ---------------------------------------------------------------------------
 
-*                                       @dsx-ai-factory/nvke-write
+*                                       @dsx-ai-factory/nke-write
 
 # ---------------------------------------------------------------------------
 # Trust roots — same owner as the default today; tighten here when a
@@ -46,42 +46,42 @@
 
 # The lock contract (ADR-22). A lock entry is the exact content identity of
 # something that will be built and published; changing one changes what ships.
-/definitions/**/catalog/pins.lock.yaml  @dsx-ai-factory/nvke-write
+/definitions/**/catalog/pins.lock.yaml  @dsx-ai-factory/nke-write
 
 # The registry: which components exist and their constraints. Paired with the
 # lock above under ADR-22's registry/lockfile split.
-/definitions/**/catalog/registry.yaml   @dsx-ai-factory/nvke-write
+/definitions/**/catalog/registry.yaml   @dsx-ai-factory/nke-write
 
 # Definition and Environment are Tier-1 inputs bound into `recipeDigest`
 # (ADR-11, ADR-12). A change here changes recipe identity.
-/definitions/**/definition.yaml         @dsx-ai-factory/nvke-write
-/definitions/**/environment-*.yaml      @dsx-ai-factory/nvke-write
+/definitions/**/definition.yaml         @dsx-ai-factory/nke-write
+/definitions/**/environment-*.yaml      @dsx-ai-factory/nke-write
 
 # Toolchain pins. A toolchain digest is a build-semantic input (ADR-10 §5) and
 # contaminates every artifact built with it.
-/toolchains/**/*.lock.json              @dsx-ai-factory/nvke-write
+/toolchains/**/*.lock.json              @dsx-ai-factory/nke-write
 
 # The design record. ADRs govern design and are what a change is reviewed
 # against; amending one is amending the contract.
-/docs/adr/                              @dsx-ai-factory/nvke-write
+/docs/adr/                              @dsx-ai-factory/nke-write
 
 # CI, workflows, and repository automation. This is the code that decides what
 # "passing" means, plus the generated Run pipeline and its plan.
-/.github/                               @dsx-ai-factory/nvke-write
+/.github/                               @dsx-ai-factory/nke-write
 
 # The CI contract: `make check` is what CI runs, so a Makefile change changes
 # the gate.
-/Makefile                               @dsx-ai-factory/nvke-write
+/Makefile                               @dsx-ai-factory/nke-write
 
 # Dependency surface. CONTRIBUTING names Apache-cleanliness a load-bearing
 # invariant, and it is enforced here by review until a license gate exists.
-/go.mod                                 @dsx-ai-factory/nvke-write
-/go.sum                                 @dsx-ai-factory/nvke-write
+/go.mod                                 @dsx-ai-factory/nke-write
+/go.sum                                 @dsx-ai-factory/nke-write
 
 # Licensing, security policy, governance, and this file.
-/LICENSE                                @dsx-ai-factory/nvke-write
-/SECURITY.md                            @dsx-ai-factory/nvke-write
-/GOVERNANCE.md                          @dsx-ai-factory/nvke-write
-/MAINTAINERS.md                         @dsx-ai-factory/nvke-write
-/CODE_OF_CONDUCT.md                     @dsx-ai-factory/nvke-write
-/.github/CODEOWNERS                     @dsx-ai-factory/nvke-write
+/LICENSE                                @dsx-ai-factory/nke-write
+/SECURITY.md                            @dsx-ai-factory/nke-write
+/GOVERNANCE.md                          @dsx-ai-factory/nke-write
+/MAINTAINERS.md                         @dsx-ai-factory/nke-write
+/CODE_OF_CONDUCT.md                     @dsx-ai-factory/nke-write
+/.github/CODEOWNERS                     @dsx-ai-factory/nke-write

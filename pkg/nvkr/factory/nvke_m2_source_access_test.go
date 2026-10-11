@@ -22,7 +22,7 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if access, ok := environment.SourceAccess[mirror]; !ok || access.Mirror != mirror || access.CredentialRef != "github:NVKE_SOURCE_TOKEN" {
+	if access, ok := environment.SourceAccess[mirror]; !ok || access.Mirror != mirror || access.CredentialRef != "github:NKE_SOURCE_TOKEN" {
 		t.Fatal("existing CLI/controller source access was changed")
 	}
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
@@ -69,7 +69,7 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 					continue
 				}
 				privateFetches++
-				if projected[sourceTokenEnv] != "${{ secrets.NVKE_SOURCE_TOKEN }}" || projected["GIT_CONFIG_VALUE_0"] != repository || projected["GIT_CONFIG_KEY_0"] != "url."+mirror+".insteadOf" || projected["GIT_CONFIG_KEY_2"] != "credential."+mirror+".helper" {
+				if projected[sourceTokenEnv] != "${{ secrets.NKE_SOURCE_TOKEN }}" || projected["GIT_CONFIG_VALUE_0"] != repository || projected["GIT_CONFIG_KEY_0"] != "url."+mirror+".insteadOf" || projected["GIT_CONFIG_KEY_2"] != "credential."+mirror+".helper" {
 					t.Errorf("private source fetch %s has no exact approved credential/mirror projection", source.ID)
 				}
 			}

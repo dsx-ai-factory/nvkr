@@ -10,19 +10,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
+	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 )
 
 func TestCatalogChangeScriptEmitsAdmittedAbsoluteSourceRedirect(t *testing.T) {
 	temp := t.TempDir()
 	captured := filepath.Join(temp, "redirect")
-	recorder := filepath.Join(temp, "nkdctl")
+	recorder := filepath.Join(temp, "nvkr")
 	if err := os.WriteFile(recorder, []byte("#!/bin/sh\nprintf '%s\\n' \"GIT_CONFIG_COUNT=$GIT_CONFIG_COUNT\" \"GIT_CONFIG_KEY_0=$GIT_CONFIG_KEY_0\" \"GIT_CONFIG_VALUE_0=$GIT_CONFIG_VALUE_0\" > \"$CAPTURE_REDIRECT\"\nexit 42\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	work := filepath.Join(temp, "work")
 	cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-catalog-change.sh"), "--work", work)
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "NKDCTL_BIN=" + recorder, "CAPTURE_REDIRECT=" + captured,
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "NVKR_BIN=" + recorder, "CAPTURE_REDIRECT=" + captured,
 		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
 	output, err := cmd.CombinedOutput()
 	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 42 {
@@ -63,6 +63,43 @@ func TestMaintainedDemoScriptsAdvertiseRunnableHonestJourneys(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestM1DemoRejectsLegacyConfigurationBeforeExecution(t *testing.T) {
+	for _, variable := range []struct{ old, replacement string }{
+		{"NKE_LOCAL_CLONE", "NVKE_LOCAL_CLONE"},
+		{"NKDCTL_BIN", "NVKR_BIN"},
+	} {
+		t.Run(variable.old, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-m1-local.sh"))
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), variable.old + "=/legacy"}
+			output, err := cmd.CombinedOutput()
+			if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 ||
+				!strings.Contains(string(output), variable.old+" was renamed to "+variable.replacement) {
+				t.Fatalf("legacy variable was not rejected with migration guidance: %v\n%s", err, output)
+			}
+		})
+	}
+}
+
+func TestM1DemoRejectsLegacyRegistryWithoutMutatingIt(t *testing.T) {
+	temp := t.TempDir()
+	calls := filepath.Join(temp, "calls")
+	docker := filepath.Join(temp, "docker")
+	if err := os.WriteFile(docker, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CAPTURE_CALLS\"\ncase \"$*\" in\n  info|'container inspect nkd-m1-registry') exit 0 ;;\n  *) exit 99 ;;\nesac\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-m1-local.sh"))
+	cmd.Env = []string{"PATH=" + temp + string(os.PathListSeparator) + os.Getenv("PATH"), "CAPTURE_CALLS=" + calls}
+	output, err := cmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 ||
+		!strings.Contains(string(output), "legacy nkd-m1-registry container exists; inspect and stop/remove it explicitly") {
+		t.Fatalf("legacy registry was not rejected with migration guidance: %v\n%s", err, output)
+	}
+	raw, err := os.ReadFile(calls)
+	if err != nil || string(raw) != "info\ncontainer inspect nkd-m1-registry\n" {
+		t.Fatalf("launcher performed unexpected Docker operations: %q %v", raw, err)
 	}
 }
 

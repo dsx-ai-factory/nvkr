@@ -26,7 +26,7 @@ func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 		t.Fatal("test plan has no fetch source")
 	}
 	plan.Environment.SourceAccess = map[string]authored.SourceAccess{source: {
-		Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NVKE_SOURCE_TOKEN",
+		Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
 	}}
 	digest, err := plan.Environment.Digest()
 	if err != nil {
@@ -43,7 +43,7 @@ func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 		assertSourceAccessCode(t, err, nvkrerr.CodeEngineCapability)
 	}
 	plan.Environment.SourceAccess = map[string]authored.SourceAccess{"https://github.com/unknown/source": {
-		Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NVKE_SOURCE_TOKEN",
+		Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN",
 	}}
 	digest, err = plan.Environment.Digest()
 	if err != nil {

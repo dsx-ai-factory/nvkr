@@ -143,12 +143,12 @@ unencrypted direct-Packer QCOW2 outputs with required KVM. Their execution class
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
 The operator must provision ephemeral single-job runners and restrict pool access to the reviewed workflow on the default branch and any exact
-branches explicitly admitted by `githubDispatchBranches`. The generated disk jobs use the `nvkr-arc` protected Environment. Provider configuration and fresh
+branches explicitly admitted by `githubDispatchBranches`. The generated disk jobs use the `nkd-arc` protected Environment. Provider configuration and fresh
 native interoperability are external acceptance requirements; emitting a label or naming an Environment does
 not establish those facts.
 
 The route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
-`nvkr-arc` and `nvkr-release` deployment policies and the signing identity must admit each selected ref.
+`nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
 Docker is the initial admitted runtime. Bootstrap, source fetch, registry publication, signing and finalization remain
 on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
@@ -665,7 +665,7 @@ rejects this GitHub-only option. Omitting it preserves default-branch-only execu
 Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
 or outputs change. Default-branch push
 publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
-`nvkr-release` GitHub deployment environment; operators must configure its deployment policy to admit only
+`nkd-release` GitHub deployment environment; operators must configure its deployment policy to admit only
 the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
 recognize those exact workflow refs. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
 The SBOM job receives no registry credentials or package permissions. The verifier needs registry read

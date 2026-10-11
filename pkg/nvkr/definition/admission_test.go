@@ -26,6 +26,7 @@ func TestAdmissionPreservesAuthoredIdentityAndRejectsUnknownInputs(t *testing.T)
 		code e.Code
 	}{
 		{"exact document", raw, ""},
+		{"pre-rename namespace", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "nkd.dev/definition/v5", 1)), e.CodeInvalidCatalog},
 		{"old version", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "nvkr.dev/definition/v3", 1)), e.CodeInvalidCatalog},
 		{"unknown field", []byte(strings.Replace(string(raw), `"outputs":`, `"clusters":[],"outputs":`, 1)), e.CodeInvalidCatalog},
 	} {

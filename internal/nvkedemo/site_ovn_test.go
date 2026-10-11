@@ -158,7 +158,7 @@ func ovnBoundValues(t *testing.T, digest string) map[string]any {
 
 func upstreamOVNBoundValues(digest string) map[string]any {
 	return map[string]any{"tags": upstreamSiteOVNTags(), "global": map[string]any{
-		"image": map[string]any{"repository": "localhost/nke/ovn-kubernetes@sha256", "tag": digest}}}
+		"image": map[string]any{"repository": "localhost/nvke/ovn-kubernetes@sha256", "tag": digest}}}
 }
 
 func upstreamOVNPodsFixture(reference, owner string) podList {

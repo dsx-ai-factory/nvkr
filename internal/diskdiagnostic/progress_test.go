@@ -25,6 +25,8 @@ func TestReceiverOnlyAcceptsAllowlistedRecords(t *testing.T) {
 		rejected    bool
 	}{
 		{"valid", valid, false},
+		{"pinned image literal", "NKD_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", false},
+		{"unpublished renamed protocol", "NVKR_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", true},
 		{"warning", "scanner warning token=secret\n", true},
 		{"unknown phase", strings.Replace(valid, "root-scan", "password=secret", 1), true},
 		{"unknown event", strings.Replace(valid, "start", "secret", 1), true},

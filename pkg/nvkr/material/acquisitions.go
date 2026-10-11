@@ -19,7 +19,9 @@ import (
 )
 
 const (
-	AcquisitionSchemaVersion               = "nvkr.dev/package-acquisitions/v1"
+	// External capture envelope emitted by the pinned NVKE producer. Repository
+	// branding does not rewrite producer-owned bytes; internal identities use NVKR.
+	AcquisitionSchemaVersion               = "nkd.dev/package-acquisitions/v1"
 	MaxAcquisitionArchiveBytes       int64 = 8 << 30
 	maxAcquisitionManifestBytes      int64 = 8 << 20
 	maxAcquisitionPackageBytes       int64 = 1 << 30

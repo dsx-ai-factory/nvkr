@@ -61,6 +61,7 @@ func TestLockSchemaDispatchIsExact(t *testing.T) {
 func TestCatalogSchemaDispatchIsExact(t *testing.T) {
 	validLock := lockYAML("  s: {tag: v1.0.0, commit: " + strings.Repeat("a", 40) + ", treeHash: " + strings.Repeat("f", 40) + ", sourceDateEpoch: 1}\n")
 	for _, reg := range [][]byte{
+		bytes.Replace([]byte(lockTestRegistry), []byte("nvkr.dev/catalog/v3"), []byte("nkd.dev/catalog/v3"), 1),
 		bytes.Replace([]byte(lockTestRegistry), []byte("nvkr.dev/catalog/v3"), []byte("nvkr.dev/catalog/v4"), 1),
 		bytes.Replace([]byte(lockTestRegistry), []byte("SourceBuildRegistry"), []byte("FutureRegistry"), 1),
 	} {

@@ -47,10 +47,10 @@ func TestEnvironmentRejectsInvalidSourceAccess(t *testing.T) {
 		source string
 		access SourceAccess
 	}{
-		{name: "source scheme", source: "http://github.com/dsx-ai-factory/nvke", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NVKE_SOURCE_TOKEN"}},
-		{name: "source userinfo", source: "https://token@github.com/dsx-ai-factory/nvke", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NVKE_SOURCE_TOKEN"}},
-		{name: "source empty query", source: "https://github.com/dsx-ai-factory/nvke?", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NVKE_SOURCE_TOKEN"}},
-		{name: "mirror fragment", source: "https://github.com/dsx-ai-factory/nvke", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror#main", CredentialRef: "github:NVKE_SOURCE_TOKEN"}},
+		{name: "source scheme", source: "http://github.com/dsx-ai-factory/nvke", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
+		{name: "source userinfo", source: "https://token@github.com/dsx-ai-factory/nvke", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
+		{name: "source empty query", source: "https://github.com/dsx-ai-factory/nvke?", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
+		{name: "mirror fragment", source: "https://github.com/dsx-ai-factory/nvke", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror#main", CredentialRef: "github:NKE_SOURCE_TOKEN"}},
 		{name: "credential", source: "https://github.com/dsx-ai-factory/nvke", access: SourceAccess{Mirror: "https://github.com/example/nvke-mirror", CredentialRef: "github:NVKE-SOURCE-TOKEN"}},
 	}
 	for _, test := range tests {

@@ -330,7 +330,7 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		"--workdir", "/nvkr/input/source/os-image/packer",
 		"--env", "CHECKPOINT_DISABLE=1", "--env", "HOME=/nvkr/work/home", "--env", "PACKER_CACHE_DIR=/nvkr/work/cache",
 		"--env", "PACKER_CONFIG=/nvkr/input/config/packer.json", "--env", "PACKER_NO_COLOR=1",
-		"--env", "PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins",
+		"--env", "PACKER_PLUGIN_PATH=/nkd/toolchain/packer/plugins",
 		"--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"--env", "TMPDIR=/nvkr/work/tmp", "--entrypoint=packer",
 		"registry.example/packer@sha256:" + repeatHex("a"), "build", "-only=build.qemu.node", ".",

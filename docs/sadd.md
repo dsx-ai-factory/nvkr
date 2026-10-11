@@ -314,8 +314,8 @@ hosted execution, registry services, signing or operational release acceptance (
 All structured identities use ADR-01's canonical codec and named digest families. The codec uses its specified
 integer-only numeric profile; an arbitrary JSON serialization is not an identity implementation. Raw SHA-256
 remains appropriate for exact blob integrity. These distinctions explain why one build can produce different
-run evidence without changing Build Digest. The retired `nvkr.recipe` family remains reserved for historical
-identities. Definition v5, catalog v3, IR v4 and Run plan/artifact graph v5 readers reject old shapes; signed bytes are not converted.
+run evidence without changing Build Digest. `nvkr.recipe` is reserved and never minted;
+historical `nkd.recipe` identities remain unsupported and unchanged. Definition v5, catalog v3, IR v4 and Run plan/artifact graph v5 readers reject old shapes; signed bytes are not converted.
 Compiler-handoff and execution-settings digest families remain reserved after removal. Production SLSA
 build-type `/v2` parameters bind the original Definition and Environment identities directly.
 

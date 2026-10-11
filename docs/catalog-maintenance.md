@@ -92,7 +92,7 @@ catalog action commits; the lint action has a reviewed immutable renderer pin. E
 same-policy runs do not cancel one another. The maintenance CLI is rebuilt with the exact validated
 generator version/commit label supplied during rendering, preserving the Plan's drift-check inputs.
 
-For private NVKE inputs, a fixed checkout action receives `NVKE_SOURCE_TOKEN`, fetches the pinned source
+For private NVKE inputs, a fixed checkout action receives `NKE_SOURCE_TOKEN`, fetches the pinned source
 commit plus its available refs, and does not persist credentials. Only later maintenance/build steps get
 a Git URL override pointing the canonical source at that local repository. They receive source bytes
 without the source token. Changing the source checkout requires an exact commit, repository and dedicated

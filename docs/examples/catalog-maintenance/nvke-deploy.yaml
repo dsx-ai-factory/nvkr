@@ -13,4 +13,4 @@ validation: static
 sourceCheckout:
   repository: dsx-ai-factory/nvke
   ref: 33fb71b2f4224b470ebc628a9165fc4b92870406
-  secret: NVKE_SOURCE_TOKEN
+  secret: NKE_SOURCE_TOKEN

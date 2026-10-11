@@ -224,7 +224,7 @@ func preparedBuildEnvironment(environment []string, cfg BuildConfig) ([]string, 
 				return nil, errors.New("local NVKE redirect requires two free Git entries")
 			}
 		}
-		for _, upstream := range []string{"https://github.com/dsx-ai-factory/nke.git", "https://github.com/dsx-ai-factory/nke"} {
+		for _, upstream := range []string{"https://github.com/dsx-ai-factory/nvke.git", "https://github.com/dsx-ai-factory/nvke"} {
 			suffix := strconv.Itoa(count)
 			env = SetEnv(env, map[string]string{"GIT_CONFIG_KEY_" + suffix: "url." + clone + ".insteadOf", "GIT_CONFIG_VALUE_" + suffix: upstream})
 			count++

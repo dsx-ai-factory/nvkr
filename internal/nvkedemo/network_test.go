@@ -106,7 +106,7 @@ func TestNetworkCheckpointRefusesAnotherValidJournalOwner(t *testing.T) {
 			state := g.snapshot()
 			switch field {
 			case "owner":
-				state.Owner = "nvkr-demo-" + strings.Repeat("b", 32)
+				state.Owner = "nkd-demo-" + strings.Repeat("b", 32)
 			case "boot":
 				state.Boot = "a14e7158-1737-451e-abd5-3bc3f61955e4"
 			case "pid":
@@ -139,6 +139,18 @@ func TestNetworkCheckpointRefusesAnotherValidJournalOwner(t *testing.T) {
 				t.Fatal("refusal changed foreign journal", err)
 			}
 		})
+	}
+}
+
+func TestNetworkJournalRetainsPreRenameHostNamespace(t *testing.T) {
+	g := networkFixture(t)
+	state := g.snapshot()
+	if state.Version != 2 || BridgeName != "nkdvm0" || !strings.HasPrefix(state.Owner, "nkd-demo-") {
+		t.Fatal("rename changed the durable journal/bridge/owner contract")
+	}
+	state.Staging = &networkStaging{Path: filepath.Join(filepath.Dir(qemuPolicy), ".nkd-policy-"+strings.TrimPrefix(state.Owner, "nkd-demo-"))}
+	if err := validateNetworkState(state, g.Work); err != nil {
+		t.Fatalf("pre-rename version-2 journal rejected: %v", err)
 	}
 }
 
@@ -243,6 +255,7 @@ func TestNetworkLegacyJournalRefusesBeforeActions(t *testing.T) {
 	if !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed ||
 		!strings.Contains(err.Error(), legacyNetworkRecoveryRevision) ||
 		!strings.Contains(err.Error(), legacyNetworkRecoveryHelper) ||
+		!strings.Contains(err.Error(), "scripts/nke-local-demo.py") ||
 		!strings.Contains(err.Error(), "version 1") {
 		t.Fatalf("legacy refusal=%v", err)
 	}
@@ -325,7 +338,7 @@ func TestNetworkCheckpointRejectsInvalidSnapshotWithoutReplacingJournal(t *testi
 				}
 			}
 			g.staging = &networkStaging{
-				Path:    filepath.Join(filepath.Dir(qemuPolicy), ".nvkr-policy-"+strings.TrimPrefix(g.Owner, "nvkr-demo-")),
+				Path:    filepath.Join(filepath.Dir(qemuPolicy), ".nkd-policy-"+strings.TrimPrefix(g.Owner, "nkd-demo-")),
 				Binding: &networkFileID{Device: 1, Inode: 3, Mode: 0o644},
 			}
 			if err := g.Checkpoint(t.Context()); err == nil || !strings.Contains(err.Error(), "unsupported root staging binding") {
@@ -355,7 +368,7 @@ func TestNetworkStartPreservesStagingIdentityThroughPolicyModeTransition(t *test
 	for _, boundary := range []string{"after-chmod", "before-rename"} {
 		t.Run(boundary, func(t *testing.T) {
 			g := networkFixture(t)
-			stage := filepath.Join(filepath.Dir(qemuPolicy), ".nvkr-policy-"+strings.TrimPrefix(g.Owner, "nvkr-demo-"))
+			stage := filepath.Join(filepath.Dir(qemuPolicy), ".nkd-policy-"+strings.TrimPrefix(g.Owner, "nkd-demo-"))
 			for _, path := range []string{qemuPolicy, stage} {
 				if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
 					t.Skipf("fixture refuses existing or uninspectable host control %s: %v", path, err)
@@ -422,7 +435,7 @@ func TestNetworkBridgeBindingContracts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			g := networkFixture(t)
 			g.BridgeID = "42"
-			raw := fmt.Sprintf(`[{"ifname":"nvkrvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)
+			raw := fmt.Sprintf(`[{"ifname":"nkdvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)
 			switch name {
 			case "ambiguous-created":
 				g.BridgeID = ""
@@ -669,7 +682,7 @@ func TestNetworkGuestTCPAmbiguousInsertRetainsIntent(t *testing.T) {
 	fail := true
 	g.capture = func(_ context.Context, args []string, _ bool) ([]byte, error) {
 		if args[0] == "ip" {
-			return []byte(fmt.Sprintf(`[{"ifname":"nvkrvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
+			return []byte(fmt.Sprintf(`[{"ifname":"nkdvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
 		}
 		if args[0] == "iptables" {
 			switch args[5] {
@@ -916,7 +929,7 @@ func TestNetworkAmbiguousBridgeCreationCleanup(t *testing.T) {
 				if foreign {
 					mac = "02:00:00:00:00:00"
 				}
-				return []byte(fmt.Sprintf(`[{"ifname":"nvkrvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, mac)), nil
+				return []byte(fmt.Sprintf(`[{"ifname":"nkdvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, mac)), nil
 			}
 			err := g.Close(t.Context())
 			if foreign {

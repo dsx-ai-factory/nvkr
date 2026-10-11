@@ -368,14 +368,14 @@ fi
   --env CHECKPOINT_DISABLE=1 \
   --env HOME=/nvkr/work/home \
   --env "EXPECTED_GO_VERSION=${go_version}" \
-  --env PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins \
+  --env PACKER_PLUGIN_PATH=/nkd/toolchain/packer/plugins \
   --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --env TMPDIR=/nvkr/work/tmp \
   --entrypoint sh \
   "${image_id}" -ec '
   mkdir -p "${HOME}" "${TMPDIR}"
   test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.15.4"
-  plugin=/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.6_x5.0_linux_'"${arch}"'
+  plugin=/nkd/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.6_x5.0_linux_'"${arch}"'
   test -x "${plugin}"
   test "$(cat "${plugin}_SHA256SUM")" = "$(sha256sum "${plugin}" | cut -d" " -f1)"
   test "$(packer plugins installed)" = "${plugin}"

@@ -92,7 +92,7 @@ failure to persist outcomes stops recovery. The finalizer still authenticates co
 
 ## Historical six-output workflow comparison
 
-The October 4 compact-helper review used the six-output `nvke-deploy` Definition and identical canonical Plan bytes.
+The October 4 compact-helper review used the six-output `nke-deploy` Definition (now `nvke-deploy`) and identical canonical Plan bytes.
 These measurements describe that review, rather than the current M2 workflow:
 
 | Item | Initial PR #90 (`582ab01`) | Compact helper |

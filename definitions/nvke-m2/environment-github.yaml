@@ -37,7 +37,7 @@ executionClasses:
 # includes the additional held subject snapshot. Candidate exception in evidence.
 diskInspectionProfiles:
   linux/amd64:
-    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector@sha256:ff2a9dc76c7e6452c5b19416370f30a250b952b92af6296637978ec7abcebbc8
+    image: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/inspector@sha256:ff2a9dc76c7e6452c5b19416370f30a250b952b92af6296637978ec7abcebbc8
     inspectorDigest: sha256:31f25fbb70ef79d8c5487c0d8a41613b6db5c93eb391b73f990ddaa04e6ba052
     codecDigest: sha256:634320b91165669917123e8e79cce1c4d00cee0a4aa4d662d7c0a8186479b3fb
     guestfishDigest: sha256:65739abd86dbf919cbdff5ef9bb144079bd0e97dc4c9023c9455d6b8538add8c
@@ -51,7 +51,7 @@ diskInspectionProfiles:
     maxFilesystemBytes: 17179869184
     scratchStorage: private-volume
   linux/arm64:
-    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector@sha256:3aed46be99e43aa273533808f3604e384e8c7f80c33ba7716bb382316ebf343e
+    image: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/inspector@sha256:3aed46be99e43aa273533808f3604e384e8c7f80c33ba7716bb382316ebf343e
     inspectorDigest: sha256:e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b
     codecDigest: sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e
     guestfishDigest: sha256:db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb
@@ -77,10 +77,10 @@ signing:
   mode: cosign
 sourceAccess:
   https://github.com/dsx-ai-factory/nvke:
-    credentialRef: github:NVKE_SOURCE_TOKEN
+    credentialRef: github:NKE_SOURCE_TOKEN
     mirror: https://github.com/dsx-ai-factory/nvke
   https://github.com/dsx-ai-factory/nvke.git:
-    credentialRef: github:NVKE_SOURCE_TOKEN
+    credentialRef: github:NKE_SOURCE_TOKEN
     mirror: https://github.com/dsx-ai-factory/nvke
 utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
 utilityPlatform: linux/amd64

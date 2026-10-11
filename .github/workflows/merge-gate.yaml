@@ -412,7 +412,7 @@ jobs:
           ref: 33fb71b2f4224b470ebc628a9165fc4b92870406 # v0.21.0
           fetch-depth: 0
           path: .nvkr-inputs/nvke
-          token: ${{ secrets.NVKE_SOURCE_TOKEN }}
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
           persist-credentials: false
 
       - name: Verify committed Run generation is current

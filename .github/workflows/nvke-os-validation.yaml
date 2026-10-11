@@ -433,7 +433,7 @@ jobs:
         with:
           repository: dsx-ai-factory/nvke
           ref: ${{ needs.select.outputs.nvke_commit }}
-          token: ${{ secrets.NVKE_SOURCE_TOKEN }}
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
           path: .trusted/nvke
           fetch-depth: 1
           persist-credentials: false

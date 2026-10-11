@@ -149,10 +149,10 @@ Assembly authenticates same-Plan, same-workflow metadata and evidence; it does n
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities, but
 hosted mixed-attempt reuse remains unexercised.
 
-Only admitted source retrieval and pinned-source revalidation steps receive `NVKE_SOURCE_TOKEN`; native build jobs receive source bytes without that
+Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN`; native build jobs receive source bytes without that
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
 before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
-package. Restrict `nvkr-arc`, `nvkr-release` and the signing identity to the selected refs. Maintained inputs
+package. Restrict `nkd-arc`, `nkd-release` and the signing identity to the selected refs. Maintained inputs
 admit `main` only and contain no validation-branch dispatch exception. Ephemeral runner isolation and
 provider access restrictions remain operator obligations.
 

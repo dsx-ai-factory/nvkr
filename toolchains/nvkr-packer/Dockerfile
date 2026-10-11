@@ -248,7 +248,7 @@ RUN --mount=type=secret,id=nvkr_ca_bundle,mode=0444 set -eux; \
 	&& rm -rf /var/lib/apt/lists/* /etc/apt/apt.conf.d/99bootstrap-ca /etc/apt/sources.list.d/ubuntu.sources
 
 COPY --from=fetch /out/packer/packer.bin /usr/local/bin/packer
-COPY --from=fetch /out/plugins/ /nvkr/toolchain/packer/plugins/
+COPY --from=fetch /out/plugins/ /nkd/toolchain/packer/plugins/
 COPY --from=fetch /out/go/ /usr/local/go/
 COPY --from=fetch /out/tools/crane /usr/local/bin/crane
 COPY --from=fetch /out/tools/nfpm /usr/local/bin/nfpm
@@ -260,8 +260,8 @@ RUN set -eux; \
     ln -s /usr/local/go/bin/go /usr/local/bin/go; \
     ln -s /usr/local/go/bin/gofmt /usr/local/bin/gofmt; \
     test -x /usr/local/bin/packer; \
-	test -x "/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v${QEMU_PLUGIN_VERSION}_x5.0_linux_${TARGETARCH}"; \
-	test -f "/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v${QEMU_PLUGIN_VERSION}_x5.0_linux_${TARGETARCH}_SHA256SUM"; \
+	test -x "/nkd/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v${QEMU_PLUGIN_VERSION}_x5.0_linux_${TARGETARCH}"; \
+	test -f "/nkd/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v${QEMU_PLUGIN_VERSION}_x5.0_linux_${TARGETARCH}_SHA256SUM"; \
 	command -v qemu-img; \
 	command -v qemu-system-aarch64; \
 	command -v qemu-system-x86_64; \

@@ -231,12 +231,14 @@ func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 		name     string
 		document string
 		valid    bool
+		message  string
 	}{
 		{name: "canonical complete capture", document: document, valid: true},
-		{name: "duplicate field", document: strings.Replace(document, `"schemaVersion":`, `"schemaVersion":"`+AcquisitionSchemaVersion+`","schemaVersion":`, 1)},
-		{name: "unknown field", document: strings.TrimSuffix(document, "}") + `,"unknown":true}`},
-		{name: "leading whitespace", document: " " + document},
-		{name: "malformed JSON", document: strings.Repeat("x", 100)},
+		{name: "unpublished renamed producer schema", document: strings.Replace(document, AcquisitionSchemaVersion, "nvkr.dev/package-acquisitions/v1", 1), message: "unsupported package acquisition schema"},
+		{name: "duplicate field", document: strings.Replace(document, `"schemaVersion":`, `"schemaVersion":"`+AcquisitionSchemaVersion+`","schemaVersion":`, 1), message: "decoding package acquisition manifest"},
+		{name: "unknown field", document: strings.TrimSuffix(document, "}") + `,"unknown":true}`, message: "decoding package acquisition manifest"},
+		{name: "leading whitespace", document: " " + document, message: "decoding package acquisition manifest"},
+		{name: "malformed JSON", document: strings.Repeat("x", 100), message: "decoding package acquisition manifest"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			capture := acquisitionTarWithManifestJSON(t, manifest, []byte(test.document), payload, nil, false)
@@ -246,7 +248,7 @@ func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 					t.Fatalf("canonical complete capture rejected: observation=%v error=%v", observation, err)
 				}
 			} else {
-				assertAcquisitionFailure(t, observation, err, "decoding package acquisition manifest")
+				assertAcquisitionFailure(t, observation, err, test.message)
 			}
 		})
 	}
@@ -417,7 +419,7 @@ func TestObservePythonTarfileCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	archive, size, manifest := observation.Binding()
-	if archive != "sha256:a5e6923cb20e8ce240bb4d95e1762c675a374046f01d6a5f22a1e99523f0dbd9" || size != 10240 || manifest != "sha256:0b32af5d57f7a0a4a929bacaa1433f471bf81e4f911d3f679406a0d4bd7de5f5" {
+	if archive != "sha256:100cbc4b0354f184c7d0e81f3bf67805870074d272fccf63778a8f8669667f03" || size != 10240 || manifest != "sha256:e05865caa150eff0441b9f78f60e5195ad9928ada62c841dce993546b11dc118" {
 		t.Fatalf("Python producer format changed: %s %d %s", archive, size, manifest)
 	}
 	if description := observation.Description(); description.Architecture != "arm64" || len(description.Packages) != 1 || description.Packages[0].Architecture != "all" {

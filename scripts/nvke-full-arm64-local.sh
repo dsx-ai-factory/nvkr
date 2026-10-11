@@ -161,9 +161,9 @@ if [[ -n "${NVKE_LOCAL_CLONE:-}" ]]; then
   [[ "${NVKE_LOCAL_CLONE}" == /* ]] || { echo 'NVKE_LOCAL_CLONE must be an absolute path.' >&2; exit 2; }
   git -C "${NVKE_LOCAL_CLONE}" rev-parse --git-dir >/dev/null || { echo 'NVKE_LOCAL_CLONE must be an accessible Git checkout.' >&2; exit 1; }
   nvke_clone="$(cd "${NVKE_LOCAL_CLONE}" && pwd -P)"
-  export "GIT_CONFIG_KEY_${git_config_count}=url.${nvke_clone}.insteadOf" "GIT_CONFIG_VALUE_${git_config_count}=https://github.com/dsx-ai-factory/nke.git"
+  export "GIT_CONFIG_KEY_${git_config_count}=url.${nvke_clone}.insteadOf" "GIT_CONFIG_VALUE_${git_config_count}=https://github.com/dsx-ai-factory/nvke.git"
   git_config_count=$((git_config_count + 1))
-  export "GIT_CONFIG_KEY_${git_config_count}=url.${nvke_clone}.insteadOf" "GIT_CONFIG_VALUE_${git_config_count}=https://github.com/dsx-ai-factory/nke"
+  export "GIT_CONFIG_KEY_${git_config_count}=url.${nvke_clone}.insteadOf" "GIT_CONFIG_VALUE_${git_config_count}=https://github.com/dsx-ai-factory/nvke"
   export GIT_CONFIG_COUNT=$((git_config_count + 1))
   # Git insteadOf is prefix-based; pinned commit/tree verification still owns
   # source identity. The bare NVKE form also prefix-matches sibling repository

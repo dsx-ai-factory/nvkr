@@ -171,11 +171,11 @@ A hash column means the SBOM declares a hash; it does not assert upstream signat
 | kubelet | v1.35.3 | amd64, arm64 | 2 | Yes |
 | kubelet | v1.36.3 | amd64, arm64 | 2 | Yes |
 | lvm2 | Not declared | Not declared | 1 | No |
-| nvke-cni-calico source bundle | v3.30.1 | amd64, arm64 | 2 | No |
-| nvke-cni-ovn source bundle | 1.4.0 | amd64, arm64 | 2 | No |
-| nvke-kubeadm-distro source bundle | v1.34.2 | amd64, arm64 | 2 | No |
-| nvke-kubeadm-distro source bundle | v1.35.3 | amd64, arm64 | 2 | No |
-| nvke-kubeadm-distro source bundle | v1.36.3 | amd64, arm64 | 2 | No |
+| nke-cni-calico source bundle | v3.30.1 | amd64, arm64 | 2 | No |
+| nke-cni-ovn source bundle | 1.4.0 | amd64, arm64 | 2 | No |
+| nke-kubeadm-distro source bundle | v1.34.2 | amd64, arm64 | 2 | No |
+| nke-kubeadm-distro source bundle | v1.35.3 | amd64, arm64 | 2 | No |
+| nke-kubeadm-distro source bundle | v1.36.3 | amd64, arm64 | 2 | No |
 | openssh-server | Not declared | Not declared | 1 | No |
 | openvswitch-switch | Not declared | Not declared | 1 | No |
 | operator-crds.yaml | v3.30.1 | amd64, arm64 | 2 | Yes |

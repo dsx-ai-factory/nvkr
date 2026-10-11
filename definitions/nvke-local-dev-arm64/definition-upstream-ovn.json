@@ -74,7 +74,7 @@
         "base": "./site-catalog"
       },
       "components": [
-        "nke-controller"
+        "nvke-controller"
       ],
       "format": "oci",
       "name": "cwe",
@@ -110,6 +110,17 @@
     },
     {
       "catalog": {
+        "base": "./site-catalog"
+      },
+      "components": [
+        "nktp-chart"
+      ],
+      "format": "helm-oci",
+      "name": "nktp",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
         "base": "../nvke-m2/os-catalog",
         "overlays": [
           "./os-tcg.json",
@@ -119,9 +130,9 @@
       "components": [
         "nvke-agent",
         "nvke-cni-calico",
-        "nke-cni-ovn",
+        "nvke-cni-ovn",
         "nvke-image-inputs",
-        "nke-kubeadm-distro",
+        "nvke-kubeadm-distro",
         "nvke-node-image",
         "nvke-patched-installer-iso",
         "nvke-spire-agent",
@@ -142,17 +153,6 @@
       ],
       "format": "executable",
       "name": "nvkectl",
-      "platform": "linux/arm64"
-    },
-    {
-      "catalog": {
-        "base": "./site-catalog"
-      },
-      "components": [
-        "nktp-chart"
-      ],
-      "format": "helm-oci",
-      "name": "nktp",
       "platform": "linux/arm64"
     },
     {

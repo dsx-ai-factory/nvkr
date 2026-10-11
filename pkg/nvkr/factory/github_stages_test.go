@@ -297,13 +297,13 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 		{
 			name: "protected environment on bootstrap",
 			mutate: func(raw []byte) []byte {
-				return bytes.Replace(raw, []byte("    timeout-minutes: 15\n    steps:\n"), []byte("    timeout-minutes: 15\n    environment: 'nvkr-release'\n    steps:\n"), 1)
+				return bytes.Replace(raw, []byte("    timeout-minutes: 15\n    steps:\n"), []byte("    timeout-minutes: 15\n    environment: 'nkd-release'\n    steps:\n"), 1)
 			},
 		},
 		{
 			name: "protected environment on finalizer",
 			mutate: func(raw []byte) []byte {
-				return bytes.Replace(raw, []byte("    timeout-minutes: 15\n    needs: ["), []byte("    timeout-minutes: 15\n    environment: 'nvkr-release'\n    needs: ["), 1)
+				return bytes.Replace(raw, []byte("    timeout-minutes: 15\n    needs: ["), []byte("    timeout-minutes: 15\n    environment: 'nkd-release'\n    needs: ["), 1)
 			},
 		},
 	}

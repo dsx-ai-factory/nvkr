@@ -69,6 +69,6 @@ RUN --mount=type=secret,id=nvkr_ca_bundle,mode=0444 set -eux; \
 
 # Build this static helper from the exact NVKR source with its pinned Go version
 # before image assembly. Its bytes become part of the selected OCI closure.
-COPY --chmod=0755 bin/nvkr-disk-inspect-${TARGETARCH} /usr/local/bin/nvkr-disk-inspect
+COPY --chmod=0755 bin/nvkr-disk-inspect-${TARGETARCH} /usr/local/bin/nkd-disk-inspect
 USER 65534:65534
 WORKDIR /tmp

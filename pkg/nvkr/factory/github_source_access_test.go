@@ -36,7 +36,7 @@ func authenticatedSourcePlan(t *testing.T) (*Plan, Node, string) {
 					continue
 				}
 				plan.Environment.SourceAccess = map[string]authored.SourceAccess{
-					source.Repo: {Mirror: "https://github.com/test-owner/private-source", CredentialRef: "github:NVKE_SOURCE_TOKEN"},
+					source.Repo: {Mirror: "https://github.com/test-owner/private-source", CredentialRef: "github:NKE_SOURCE_TOKEN"},
 				}
 				digest, err := plan.Environment.Digest()
 				if err != nil {
@@ -80,7 +80,7 @@ func TestGitHubSourceCredentialIsFetchStepOnly(t *testing.T) {
 		t.Fatalf("expected one credential-bearing step, got %d", found)
 	}
 	for _, test := range []struct{ name, old, replacement string }{
-		{"wrong-secret", "secrets.NVKE_SOURCE_TOKEN", "secrets.OTHER_TOKEN"},
+		{"wrong-secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER_TOKEN"},
 		{"bypassed-token-check", "factory github run-node --plan", "factory execute-node --plan"},
 		{"wrong-mirror", "url.https://github.com/test-owner/private-source.insteadOf", "url.https://github.com/other/source.insteadOf"},
 	} {
@@ -211,7 +211,7 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 		t.Fatalf("catalog revalidation credentials missing: %v", found)
 	}
 	for _, tc := range []struct{ name, old, replacement string }{
-		{"wrong secret", "secrets.NVKE_SOURCE_TOKEN", "secrets.OTHER"},
+		{"wrong secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER"},
 		{"wrong mirror", "credential.https://github.com/dsx-ai-factory/nvke.helper", "credential.https://github.com/other/repo.helper"},
 		{"missing presence check", strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0"), "true"},
 	} {
