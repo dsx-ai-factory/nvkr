@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
@@ -349,14 +350,22 @@ func (p *OwnedProcess) Stop(ctx context.Context) (result error) {
 	if ctx == nil {
 		return fmt.Errorf("%w: stop requires a context", ErrUnjoined)
 	}
+	var requestedTerm, requestedKill bool
 	joined := func() (bool, error) {
 		select {
 		case <-p.done:
 			p.mu.Lock()
 			defer p.mu.Unlock()
-			// Cleanup succeeds when the group joined, but a failed direct
-			// child must not become successful presentation.
+			// Preserve failures that preceded Stop or exited normally with a
+			// failure code. Only a matching, successfully requested stop signal
+			// is expected cleanup, and this never changes the recorded waitErr.
 			observedExit = p.waitErr
+			if exit, ok := p.waitErr.(*exec.ExitError); ok && exit.ProcessState != nil {
+				if status, ok := exit.Sys().(syscall.WaitStatus); ok && status.Signaled() &&
+					(requestedTerm && status.Signal() == syscall.SIGTERM || requestedKill && status.Signal() == syscall.SIGKILL) {
+					observedExit = nil
+				}
+			}
 			return true, p.joinErr
 		default:
 			return false, nil
@@ -389,6 +398,7 @@ func (p *OwnedProcess) Stop(ctx context.Context) (result error) {
 	if err := p.groupSignal(p.PID(), unix.SIGTERM); err != nil {
 		return signalFailure(err, false)
 	}
+	requestedTerm = true
 	timer := time.NewTimer(40 * time.Second)
 	defer timer.Stop()
 	select {
@@ -401,6 +411,7 @@ func (p *OwnedProcess) Stop(ctx context.Context) (result error) {
 	if err := p.groupSignal(p.PID(), unix.SIGKILL); err != nil {
 		return signalFailure(err, true)
 	}
+	requestedKill = true
 	grace := time.NewTimer(5 * time.Second)
 	defer grace.Stop()
 	select {

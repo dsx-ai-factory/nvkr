@@ -549,3 +549,86 @@ func TestStopSignalErrorCanceledDeadlineRetainsOwnership(t *testing.T) {
 		t.Fatalf("unjoined canceled owner lost signal error: %v", err)
 	}
 }
+
+func TestStopRequestedSignalPresentation(t *testing.T) {
+	exits := make(map[unix.Signal]error)
+	var failedExit error
+	for _, fixture := range []struct {
+		signal  unix.Signal
+		command string
+	}{
+		{unix.SIGTERM, "kill -TERM $$"},
+		{unix.SIGKILL, "kill -KILL $$"},
+		{unix.SIGUSR1, "kill -USR1 $$"},
+		{0, "exit 7"},
+	} {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		cmd := exec.CommandContext(ctx, "/bin/sh", "-c", fixture.command)
+		cmd.Env = []string{"PATH=/usr/bin:/bin"}
+		err := cmd.Run()
+		cancel()
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) {
+			t.Fatalf("fixture did not return an authoritative child exit: %v", err)
+		}
+		if fixture.signal == 0 {
+			failedExit = err
+		} else {
+			exits[fixture.signal] = err
+		}
+	}
+	for _, signal := range []unix.Signal{unix.SIGTERM, unix.SIGKILL} {
+		for _, scenario := range []string{"matching", "exit-code", "different-signal", "precompleted-matching", "matching-denied", "matching-failed-join"} {
+			t.Run(fmt.Sprintf("%s/%s", signal, scenario), func(t *testing.T) {
+				writer := &recordedProgress{}
+				p := &OwnedProcess{
+					cmd: &exec.Cmd{Process: &os.Process{Pid: 123}}, phase: "fixture", done: make(chan struct{}),
+					progress: beginProgress(writer, "fixture", PhaseStarted, PhaseFinished, PhaseFailed), waitErr: exits[signal],
+				}
+				switch scenario {
+				case "exit-code":
+					p.waitErr = failedExit
+				case "different-signal":
+					p.waitErr = exits[unix.SIGUSR1]
+				}
+				originalExit := p.waitErr
+				if scenario == "matching-failed-join" {
+					p.joinErr = fmt.Errorf("%w: finalizer failed", ErrUnjoined)
+				}
+				if scenario == "precompleted-matching" {
+					close(p.done)
+				}
+				p.groupSignal = func(_ int, got unix.Signal) error {
+					if scenario == "precompleted-matching" {
+						t.Fatal("completed owner was signaled")
+					}
+					if got == signal {
+						close(p.done)
+						if scenario == "matching-denied" {
+							return unix.EPERM
+						}
+					}
+					return nil
+				}
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				if signal == unix.SIGKILL {
+					cancel()
+				}
+				if err := p.Stop(ctx); err != p.joinErr {
+					t.Fatalf("cleanup changed exact join result: %v", err)
+				}
+				if p.waitErr != originalExit {
+					t.Fatal("presentation changed the recorded child exit")
+				}
+				wantLast := PhaseFailed
+				if scenario == "matching" {
+					wantLast = PhaseFinished
+				}
+				if len(writer.events) != 2 || writer.events[1].Kind != wantLast {
+					t.Fatalf("unexpected requested-signal presentation: %v", writer.events)
+				}
+			})
+		}
+	}
+}
