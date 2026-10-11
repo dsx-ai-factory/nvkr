@@ -229,21 +229,20 @@ jobs:
             def valid_ids:
               type == "object" and
               (keys | sort) == ["amd64", "arm64"] and
-              all(.[]; . == null or (type == "string" and test("^sha256:[0-9a-f]{64}$")));
+              all(.[]; . == null or
+                (type == "string" and test("^sha256:[0-9a-f]{64}$")));
             ($candidate | length) == 1 and ($reviewed | length) == 1 and
             ($candidate[0] as $input |
-              ($reviewed[0] | del(.localImages, .localPodmanImages, .localDockerImages)) as $trusted |
-              ($input | del(.localImages, .localPodmanImages, .localDockerImages)) == $trusted and
-              if $input | has("localImages") then
-                ($input | has("localPodmanImages") | not) and
-                ($input | has("localDockerImages") | not) and
-                ($input.localImages | valid_ids)
-              else
-                ($input | has("localPodmanImages")) and
-                ($input | has("localDockerImages")) and
-                ($input.localPodmanImages | valid_ids) and
-                ($input.localDockerImages | valid_ids)
-              end)
+              ($reviewed[0] |
+                del(.localImages, .localPodmanImages, .localDockerImages))
+                as $trusted |
+              ($input |
+                del(.localImages, .localPodmanImages, .localDockerImages))
+                == $trusted and
+              ($input | has("localImages") | not) and
+              ($input | has("localPodmanImages") | not) and
+              ($input | has("localDockerImages")) and
+              ($input.localDockerImages | valid_ids))
           ' >/dev/null || {
             jq -n -r --slurpfile candidate "${candidate_lock}" \
               --slurpfile reviewed toolchains/nkd-packer/toolchain.lock.json '
@@ -257,7 +256,10 @@ jobs:
                 "mismatched locked fields: " + join(", ")
               end
             ' >&2 || true
-            echo "candidate toolchain pins or local image IDs are invalid; use toolchain mode or land reviewed pins first" >&2
+            printf '%s\n' \
+              'invalid candidate toolchain pins or local Docker image IDs;' \
+              'legacy localImages and localPodmanImages are unsupported;' \
+              'use toolchain mode or land reviewed pins first' >&2
             exit 1
           }
           pin="$(bin/nkdctl catalog source-pin \
