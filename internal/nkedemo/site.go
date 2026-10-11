@@ -726,8 +726,8 @@ func copySiteImages(ctx context.Context, session ManagementSession, host string,
 }
 
 type podMetadata struct {
-	UID, Namespace string
-	Labels         map[string]string
+	UID, Namespace, Name string
+	Labels               map[string]string
 }
 type profileMount struct {
 	Name, MountPath string
@@ -858,7 +858,7 @@ func validateRuntimePods(rows podList, refs map[string]string) (map[string]obser
 						ready = (state.Ready && state.State.Running != nil) || (completed && pod.Status.Phase == "Succeeded")
 					}
 					if !ready {
-						return nil, errors.New("deployed dependency not ready or completed: " + key)
+						return nil, &runtimeReadinessError{dependency: key, pod: pod.Metadata, container: container.Name, state: state}
 					}
 					if pod.Metadata.UID == "" {
 						return nil, errors.New("missing deployed pod UID")
@@ -924,7 +924,7 @@ func deployedSiteImages(ctx context.Context, session ManagementSession, refs map
 	}
 	runtime, err := validateRuntimePods(rows, refs)
 	if err != nil {
-		return nil, err
+		return nil, retainRuntimeFailure(ctx, session, err)
 	}
 	for key, value := range runtime {
 		observed[key] = value

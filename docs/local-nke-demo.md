@@ -797,6 +797,20 @@ For failures, inspect the last phase and private logs. Do not delete unknown
 resources to force a rerun. See [network recovery](nkd-to-nke-demo.md#recover-network-controls-after-a-crash).
 For focused rebuilds see [local development](local-development.md).
 
+A failed post-deployment runtime readiness check names the container and its
+observed exit code, when available. Before management cleanup, the adapter
+rechecks the failed pod's UID and attempts to retain its current and previous
+container logs in `site/runtime-failure-current.log` and
+`site/runtime-failure-previous.log`, plus the private identity snapshot
+`site/runtime-failure-identity.log`. Collection has a separate 20-second budget;
+each log request has a five-second deadline and asks for at most 100 lines and
+256 KiB. Raw logs stay private and never enter the dashboard. Collection failures
+do not erase the original readiness failure or prevent joined cleanup; an
+unjoined diagnostic child still blocks resource removal. These observations are
+diagnostics, not acceptance, and collecting them never retries or bypasses the
+readiness check. The focused tests exercise controlled subprocesses, not an
+Ubuntu Temporal deployment or the cause of a real container crash.
+
 ## Repeat the real build and demo as a Go test
 
 This opt-in test performs real builds and host mutations on the same dedicated
