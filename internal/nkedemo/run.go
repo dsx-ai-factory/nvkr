@@ -429,6 +429,9 @@ func run(ctx context.Context, cfg Config) (result error) {
 	if err = guard.Start(ctx); err != nil {
 		return err
 	}
+	if err = guard.AllowKindSimulator(ctx, admitted.materials.Gateway); err != nil {
+		return err
+	}
 	if err = guard.Grant(ctx, binary, "cap_net_admin=ep"); err != nil {
 		return err
 	}

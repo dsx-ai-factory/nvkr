@@ -679,6 +679,79 @@ func TestNodeRegistryProbeUsesBoundedDirectRoute(t *testing.T) {
 	}
 }
 
+func TestNodeSimulatorProbeRequiresBoundedHealthFromOwnedNode(t *testing.T) {
+	for _, scenario := range []string{"exact", "whitespace", "not-ready", "unknown-field", "duplicate", "trailing", "oversized", "curl-failure", "canceled", "invalid-endpoint"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := privateTestDir(t)
+			trace := filepath.Join(work, "commands")
+			script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$TRACE\"\nprintf '%s' \"$RESPONSE\"\nexit \"$STATUS\"\n"
+			if err := os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			response, status, endpoint := `{"status":"ok"}`, "0", "http://172.19.0.1:18089"
+			switch scenario {
+			case "whitespace":
+				response = " {\"status\": \"ok\"} \n"
+			case "not-ready":
+				response = `{"status":"starting"}`
+			case "unknown-field":
+				response = `{"status":"ok","private":"secret-marker"}`
+			case "duplicate":
+				response = `{"status":"starting","status":"ok"}`
+			case "trailing":
+				response += `{}`
+			case "oversized":
+				response = strings.Repeat(" ", 4097) + response
+			case "curl-failure":
+				status = "28"
+				response = "private-connectivity-detail"
+			case "invalid-endpoint":
+				endpoint = "http://public.example:18089"
+			}
+			writer := &recordedProgress{}
+			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "RESPONSE=" + response, "STATUS=" + status}, Progress: writer}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			err := probeNodeSimulator(ctx, runner, "owned-node", endpoint)
+			if (err == nil) != (scenario == "exact" || scenario == "whitespace") {
+				t.Fatalf("node simulator response: %v", err)
+			}
+			if err != nil {
+				var coded *nkderr.Error
+				if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed {
+					t.Fatalf("lost preflight code: %v", err)
+				}
+			}
+			if strings.Contains(writer.String(), "private-connectivity-detail") || strings.Contains(writer.String(), "secret-marker") {
+				t.Fatal("private simulator response reached public output")
+			}
+			if scenario == "canceled" || scenario == "invalid-endpoint" {
+				if scenario == "canceled" && !errors.Is(err, context.Canceled) {
+					t.Fatalf("lost cancellation: %v", err)
+				}
+				if _, readErr := os.Stat(trace); !errors.Is(readErr, os.ErrNotExist) {
+					t.Fatal("failed admission launched node probe")
+				}
+				return
+			}
+			if scenario == "curl-failure" && CommandExitCode(err) != 28 {
+				t.Fatalf("lost node connection failure: %v", err)
+			}
+			raw, readErr := os.ReadFile(trace)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			want := "exec\nowned-node\ncurl\n-q\n--fail\n--silent\n--show-error\n--connect-timeout\n3\n--max-time\n10\n--max-filesize\n4096\nhttp://172.19.0.1:18089/healthz\n"
+			if string(raw) != want {
+				t.Fatalf("unexpected simulator probe %q", raw)
+			}
+		})
+	}
+}
+
 func TestRegistryCapacityIsMeasuredAndBounded(t *testing.T) {
 	for _, name := range []string{"exact", "oversized", "combined", "symlink", "sizeMismatch", "missingInput"} {
 		t.Run(name, func(t *testing.T) {

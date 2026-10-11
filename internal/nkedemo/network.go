@@ -90,6 +90,7 @@ type networkState struct {
 	PID           int                 `json:"pid"`
 	Owner         string              `json:"owner"`
 	KindCIDR      string              `json:"kindCIDR"`
+	KindGateway   string              `json:"kindGateway,omitempty"`
 	BridgeMAC     string              `json:"bridgeMAC"`
 	BridgeID      string              `json:"bridgeID"`
 	BridgeIntent  bool                `json:"bridgeIntent"`
@@ -127,6 +128,7 @@ type NetworkGuard struct {
 	sysctls                                    map[string]string
 	sysctlIntents                              []string
 	rules                                      []networkRule
+	kindGateway                                string
 	caps                                       []networkCapability
 	dns                                        *OwnedProcess
 	cleaning, journal, finished                bool
@@ -527,7 +529,7 @@ func networkFile(ctx context.Context, path string, private bool) (networkFileID,
 }
 
 func (g *NetworkGuard) snapshot() networkState {
-	return networkState{Version: 2, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
+	return networkState{Version: 2, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, KindGateway: g.kindGateway, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
 }
 
 func (g *NetworkGuard) Checkpoint(ctx context.Context) error {
@@ -554,7 +556,7 @@ func (g *NetworkGuard) checkpoint(ctx context.Context) error {
 		if readErr != nil {
 			return readErr
 		}
-		if old.Owner != g.Owner || old.Boot != g.boot || old.PID != g.pid || old.KindCIDR != g.KindCIDR || old.BridgeMAC != g.BridgeMAC || old.HelperID != g.helperID || old.HelperHash != g.helperHash || !maps.Equal(old.Sysctls, g.sysctls) {
+		if old.Owner != g.Owner || old.Boot != g.boot || old.PID != g.pid || old.KindCIDR != g.KindCIDR || old.KindGateway != "" && old.KindGateway != g.kindGateway || old.BridgeMAC != g.BridgeMAC || old.HelperID != g.helperID || old.HelperHash != g.helperHash || !maps.Equal(old.Sysctls, g.sysctls) {
 			return fmt.Errorf("network journal ownership or original host binding changed")
 		}
 		if err = g.checkDirectory(); err != nil {
@@ -880,6 +882,71 @@ func (g *NetworkGuard) grant(ctx context.Context, path, capabilities string) err
 func guestTCPRule(owner, address string, port int) networkRule {
 	return networkRule{"raw", "PREROUTING", []string{"-m", "comment", "--comment", owner, "-i", BridgeName, "-s", GuestCIDR, "-d", address, "-p", "tcp", "--dport", strconv.Itoa(port), "-j", "ACCEPT"}}
 }
+
+func kindSimulatorRule(owner, kind, gateway string) networkRule {
+	return networkRule{"filter", "INPUT", []string{"-m", "comment", "--comment", owner, "-s", kind, "-d", gateway + "/32", "-p", "tcp", "--dport", "18089", "-j", "ACCEPT"}}
+}
+
+func admittedKindGateway(kind, gateway string) error {
+	if err := validateNetworkKind(kind); err != nil {
+		return err
+	}
+	prefix := netip.MustParsePrefix(kind)
+	target, err := netip.ParseAddr(gateway)
+	if err != nil || !target.Is4() || target.String() != gateway || !prefix.Contains(target) || target == prefix.Addr() || target == networkLast(prefix) {
+		return fmt.Errorf("simulator grant requires the exact admitted Kind IPv4 gateway")
+	}
+	return nil
+}
+
+// AllowKindSimulator grants only the admitted Kind subnet's access to the
+// simulator on its admitted host gateway. The caller supplies the gateway from
+// the same Docker network admission as KindCIDR; no host-wide INPUT policy changes.
+func (g *NetworkGuard) AllowKindSimulator(ctx context.Context, gateway string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	if err := admittedKindGateway(g.KindCIDR, gateway); err != nil {
+		return err
+	}
+	if g.cleaning || g.finished || !g.BridgeIntent || g.kindGateway != "" {
+		return fmt.Errorf("simulator grant requires a fresh active owned bridge")
+	}
+	binding, err := g.BridgeBinding(ctx)
+	if err != nil {
+		return err
+	}
+	if binding == "" {
+		return fmt.Errorf("owned bridge absent")
+	}
+	row := kindSimulatorRule(g.Owner, g.KindCIDR, gateway)
+	exists, err := g.ruleExists(ctx, row)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("fresh simulator rule exists")
+	}
+	g.kindGateway = gateway
+	g.rules = append(g.rules, row)
+	if err = g.checkpoint(ctx); err != nil {
+		return err
+	}
+	if err = g.ruleCommand(ctx, row, "-I"); err != nil {
+		return err
+	}
+	exists, err = g.ruleExists(ctx, row)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("simulator insert did not survive readback")
+	}
+	return nil
+}
+
 func admittedGuestTCP(kind, address string, ports []int) error {
 	prefix, err := netip.ParsePrefix(kind)
 	if err != nil {

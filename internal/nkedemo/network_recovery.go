@@ -150,10 +150,18 @@ func validateNetworkState(s networkState, work string) error {
 	if err := validateNetworkKind(s.KindCIDR); err != nil {
 		return err
 	}
-	if len(s.Rules) > 14 {
+	allowed := networkRules(s.Owner, s.KindCIDR)
+	maxRules := 14
+	if s.KindGateway != "" {
+		if err := admittedKindGateway(s.KindCIDR, s.KindGateway); err != nil {
+			return err
+		}
+		allowed = append(allowed, kindSimulatorRule(s.Owner, s.KindCIDR, s.KindGateway))
+		maxRules++
+	}
+	if len(s.Rules) > maxRules {
 		return fmt.Errorf("recovery firewall closure exceeds bound")
 	}
-	allowed := networkRules(s.Owner, s.KindCIDR)
 	for i, row := range s.Rules {
 		for _, old := range s.Rules[:i] {
 			if row.Table == old.Table && row.Chain == old.Chain && slices.Equal(row.Args, old.Args) {
@@ -221,6 +229,7 @@ func RecoverNetworkGuard(ctx context.Context, runner Runner) (*NetworkGuard, err
 		return nil, err
 	}
 	g := &NetworkGuard{Work: work, Owner: s.Owner, BridgeMAC: s.BridgeMAC, BridgeID: s.BridgeID, KindCIDR: s.KindCIDR, BridgeIntent: s.BridgeIntent, BGPIntent: s.BGPIntent, runner: runner, directory: directory, boot: s.Boot, pid: s.PID, helperID: s.HelperID, helperHash: s.HelperHash, helperGranted: s.HelperGranted, policyID: s.PolicyID, staging: s.Staging, sysctls: s.Sysctls, sysctlIntents: s.SysctlIntents, rules: s.Rules, caps: s.Caps, finished: s.Finished, helperPath: qemuHelper, policyPath: qemuPolicy, cleaning: true, journal: true}
+	g.kindGateway = s.KindGateway
 	if err = g.acquireLock(); err != nil {
 		g.releaseHandles()
 		return nil, err

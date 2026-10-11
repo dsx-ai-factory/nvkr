@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 	"go.yaml.in/yaml/v3"
@@ -441,6 +442,30 @@ func probeNodeRegistry(ctx context.Context, runner Runner, node, host string) er
 	}
 	if !bytes.Equal(bytes.TrimSpace(raw), []byte("{}")) {
 		return errors.New("owned Kind node registry probe did not return the exact empty v2 response")
+	}
+	return nil
+}
+
+// The host-side health response does not establish the controller's network
+// path. Probe from the already admitted Kind node before installing the site.
+func probeNodeSimulator(ctx context.Context, runner Runner, node, endpoint string) error {
+	endpoint, err := validateEndpoint(endpoint)
+	if err != nil {
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "Kind-to-simulator endpoint admission")
+	}
+	// Keep the node's real proxy environment. A forced proxy bypass here could
+	// admit a route that the subsequent controller deployment cannot use.
+	raw, err := runner.Capture(ctx, []string{"docker", "exec", node, "curl", "-q", "--fail", "--silent", "--show-error", "--connect-timeout", "3", "--max-time", "10", "--max-filesize", "4096", endpoint + "/healthz"}, "node-simulator-connectivity", 15*time.Second)
+	if err != nil {
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "owned Kind node cannot reach the simulator; host health alone is insufficient; check host firewall and proxy routing; private node-simulator-connectivity diagnostics retained")
+	}
+	var health struct {
+		Status string `json:"status"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if len(raw) > 4096 || canonical.ValidateJSONDocument(raw) != nil || decoder.Decode(&health) != nil || health.Status != "ok" {
+		return nkderr.New(nkderr.CodePreflightFailed, "owned Kind node simulator probe did not return the required health response; private node-simulator-connectivity diagnostics retained")
 	}
 	return nil
 }
@@ -1071,6 +1096,9 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	address, err := netip.ParseAddr(vip)
 	if err != nil || !address.Is4() {
 		return errors.New("invalid site node address")
+	}
+	if err = probeNodeSimulator(ctx, session.Runner, node, endpoint); err != nil {
+		return err
 	}
 	session.Runner.Env = SetEnv(session.Runner.Env, map[string]string{"STAGE_NEEDS_RELEASE": "1", "NODE_EXEC": "docker exec {node}", "PREPULL_EXTERNAL": "0"})
 	selected := make(map[string]lifecycle.Artifact)

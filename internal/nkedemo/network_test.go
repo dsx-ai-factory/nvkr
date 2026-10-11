@@ -518,6 +518,150 @@ func TestNetworkGuestTCPInvalidBeforeWork(t *testing.T) {
 	}
 }
 
+func TestNetworkKindSimulatorInvalidBeforeWork(t *testing.T) {
+	for _, gateway := range []string{"", "8.8.8.8", "172.19.0.1", "172.18.0.0", "172.18.255.255", "172.18.0.1/32", "::ffff:172.18.0.1"} {
+		t.Run(gateway, func(t *testing.T) {
+			g := networkFixture(t)
+			g.BridgeIntent = true
+			calls := 0
+			g.capture = func(context.Context, []string, bool) ([]byte, error) { calls++; return nil, nil }
+			if err := g.AllowKindSimulator(t.Context(), gateway); err == nil {
+				t.Fatal("invalid simulator gateway accepted")
+			}
+			if calls != 0 || len(g.rules) != 0 || g.kindGateway != "" {
+				t.Fatal("invalid grant performed work")
+			}
+		})
+	}
+}
+
+func TestNetworkKindSimulatorJournalExactClosure(t *testing.T) {
+	for _, name := range []string{"legacy", "valid", "gateway-outside", "unbound-rule", "wrong-source", "wrong-target", "wrong-port", "foreign-owner", "duplicate", "arbitrary-interface"} {
+		t.Run(name, func(t *testing.T) {
+			g := networkFixture(t)
+			state := g.snapshot()
+			state.Rules = networkRules(state.Owner, state.KindCIDR)
+			state.Rules = append(state.Rules, guestTCPRule(state.Owner, "172.18.0.2", 30440), guestTCPRule(state.Owner, "172.18.0.2", 30443))
+			if name != "legacy" {
+				state.KindGateway = "172.18.0.1"
+				state.Rules = append(state.Rules, kindSimulatorRule(state.Owner, state.KindCIDR, state.KindGateway))
+			}
+			switch name {
+			case "gateway-outside":
+				state.KindGateway = "172.19.0.1"
+			case "unbound-rule":
+				state.KindGateway = ""
+			case "wrong-source":
+				state.Rules[14].Args[5] = "0.0.0.0/0"
+			case "wrong-target":
+				state.Rules[14].Args[7] = "172.18.0.0/16"
+			case "wrong-port":
+				state.Rules[14].Args[11] = "18080"
+			case "foreign-owner":
+				state.Rules[14].Args[3] = "foreign"
+			case "duplicate":
+				state.Rules = append(state.Rules[:14], state.Rules[13])
+			case "arbitrary-interface":
+				state.Rules[14].Args = append(state.Rules[14].Args, "-i", "eth0")
+			}
+			raw, err := canonical.Marshal(state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name == "legacy" && strings.Contains(string(raw), "kindGateway") {
+				t.Fatal("legacy v2 bytes gained an empty field")
+			}
+			if err = networkWriteExclusive(filepath.Join(g.Work, networkJournal), raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			_, err = readNetworkState(g.Work)
+			if (err == nil) != (name == "legacy" || name == "valid") {
+				t.Fatalf("journal accepted=%v: %v", err == nil, err)
+			}
+		})
+	}
+}
+
+func TestNetworkKindSimulatorIntentAndWithdrawal(t *testing.T) {
+	for _, name := range []string{"success", "ambiguous-insert", "lost-readback", "cancel", "unjoined", "checkpoint-failure"} {
+		t.Run(name, func(t *testing.T) {
+			g := networkFixture(t)
+			g.BridgeIntent = true
+			inserted, inserts, checks := false, 0, 0
+			row := kindSimulatorRule(g.Owner, g.KindCIDR, "172.18.0.1")
+			g.capture = func(_ context.Context, args []string, privileged bool) ([]byte, error) {
+				if args[0] == "ip" {
+					return []byte(fmt.Sprintf(`[{"ifname":"nkdvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
+				}
+				if !privileged || args[0] != "iptables" || args[4] != row.Table || args[6] != row.Chain || !slices.Equal(args[7:], row.Args) {
+					t.Fatalf("unscoped firewall command: %v", args)
+				}
+				switch args[5] {
+				case "-C":
+					checks++
+					if name == "unjoined" {
+						return nil, ErrUnjoined
+					}
+					if inserted && !(name == "lost-readback" && checks == 2) {
+						return nil, nil
+					}
+					return nil, &CommandError{ExitCode: 1, Cause: errors.New("absent")}
+				case "-I":
+					state, err := readNetworkState(g.Work)
+					if err != nil || state.KindGateway != "172.18.0.1" || len(state.Rules) != 1 || !slices.Equal(state.Rules[0].Args, row.Args) {
+						t.Fatal("firewall mutation preceded durable intent", err)
+					}
+					inserts++
+					inserted = true
+					if name == "ambiguous-insert" {
+						return nil, errors.New("ambiguous joined insertion")
+					}
+				case "-D":
+					inserted = false
+				default:
+					t.Fatalf("unexpected firewall verb: %v", args)
+				}
+				return nil, nil
+			}
+			ctx := t.Context()
+			if name == "cancel" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			if name == "checkpoint-failure" {
+				g.checkpointHook = func() error { return errors.New("checkpoint failed") }
+			}
+			err := g.AllowKindSimulator(ctx, "172.18.0.1")
+			if (err == nil) != (name == "success") {
+				t.Fatalf("grant=%v", err)
+			}
+			if name == "cancel" || name == "unjoined" || name == "checkpoint-failure" {
+				if inserts != 0 {
+					t.Fatal("failed admission/checkpoint inserted rule")
+				}
+				if name == "unjoined" && !errors.Is(err, ErrUnjoined) {
+					t.Fatal("lost unjoined error")
+				}
+				return
+			}
+			if len(g.rules) != 1 || !inserted {
+				t.Fatal("lost grant intent")
+			}
+			if err = g.AllowKindSimulator(t.Context(), "172.18.0.1"); err == nil || inserts != 1 {
+				t.Fatal("duplicate grant accepted")
+			}
+			if err = g.withdrawRule(t.Context(), g.rules[0]); err != nil || inserted {
+				t.Fatal("exact recovery withdrawal failed", err)
+			}
+			g.kindGateway = "172.18.0.2"
+			if err = g.Checkpoint(t.Context()); err == nil {
+				t.Fatal("gateway binding rewritten")
+			}
+		})
+	}
+}
+
 func TestNetworkGuestTCPAmbiguousInsertRetainsIntent(t *testing.T) {
 	g := networkFixture(t)
 	g.BridgeIntent = true
