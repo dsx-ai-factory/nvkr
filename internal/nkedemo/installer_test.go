@@ -85,7 +85,7 @@ if [ "$1" = config ]; then exit 1; fi
 printf '%s\n' "$*" >>"$CALLS"
 if [ "$1" = init ]; then mkdir "$3"; exit 0; fi
 case "$1" in
-fetch) if [ "${FAIL:-}" = cancel-fetch ]; then touch "$FETCH_STARTED"; exec sleep 60; fi; [ "${FAIL:-}" != fetch ] ;;
+fetch) if [ "${FAIL:-}" = cancel-fetch ]; then : > "$FETCH_STARTED"; exec sleep 60; fi; [ "${FAIL:-}" != fetch ] ;;
 checkout) : ;;
 rev-parse) if [ "${FAIL:-}" = wrong-pin ]; then printf foreign; else printf '%s' "$PIN"; fi ;;
 status) if [ "${FAIL:-}" = dirty ]; then printf '?? unexpected'; fi ;;
@@ -175,8 +175,11 @@ esac
 			if name == "cancel-fetch" {
 				// Cancel only once the owned command has actually started. The
 				// deadline bounds the fixture even if the command never starts.
+				// The marker uses a shell builtin so readiness itself cannot leave
+				// an unrelated orphan child in the owned process group. Allow the
+				// preceding admission commands to run under full-suite load.
 				var deadlineCancel context.CancelFunc
-				ctx, deadlineCancel = context.WithTimeout(ctx, 5*time.Second)
+				ctx, deadlineCancel = context.WithTimeout(ctx, 30*time.Second)
 				defer deadlineCancel()
 				done := make(chan struct{})
 				defer func() { cancel(); <-done }()
@@ -224,6 +227,11 @@ esac
 			success := name == "remote" || name == "local" || name == "sibling" || name == "override" || name == "diagnostic" || name == "interactive" || name == "budget-minimum" || name == "budget-maximum"
 			if (err == nil) != success {
 				t.Fatalf("result=%+v error=%v", actual, err)
+			}
+			if name == "cancel-fetch" {
+				if _, startedErr := os.Stat(started); startedErr != nil {
+					t.Fatalf("fetch cancellation fixture never reached the owned fetch: %v; acquisition error: %v", startedErr, err)
+				}
 			}
 			if strings.HasPrefix(name, "interactive") && authCalls != 1 {
 				t.Fatalf("authentication calls=%d, want exactly one", authCalls)
@@ -294,7 +302,7 @@ esac
 						t.Fatal("retained attempt modified")
 					}
 				} else if _, e := os.Lstat(work); !errors.Is(e, os.ErrNotExist) {
-					t.Fatalf("failed acquisition left workspace: %v", e)
+					t.Fatalf("failed acquisition left workspace: %v; acquisition error: %v", e, err)
 				}
 				if (name == "canceled" || name == "cancel-fetch") && !errors.Is(err, context.Canceled) {
 					t.Fatalf("lost cancellation: %v", err)
