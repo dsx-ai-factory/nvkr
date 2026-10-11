@@ -203,8 +203,8 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 		// identity projections prepared before any consumer container is created.
 		if runtimeName == "podman" {
 			args = append(args,
-				fmt.Sprintf("--passwd-entry=nkd:x:%d:%d:NVKR Builder:%s/home:/bin/sh", uid, gid, packerContainerWorkRoot),
-				fmt.Sprintf("--group-entry=nkd:x:%d:", gid),
+				fmt.Sprintf("--passwd-entry=nvkr:x:%d:%d:NVKR Builder:%s/home:/bin/sh", uid, gid, packerContainerWorkRoot),
+				fmt.Sprintf("--group-entry=nvkr:x:%d:", gid),
 			)
 		} else {
 			args = append(args,

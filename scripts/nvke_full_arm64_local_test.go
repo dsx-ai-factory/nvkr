@@ -351,7 +351,7 @@ func TestSiteHelmToolchainScope(t *testing.T) {
 			if err := json.Unmarshal(out, &overlay); err != nil {
 				t.Fatal(err)
 			}
-			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || !slices.Equal(overlay.Subs[0].Components, []string{"nvke-controller-chart", "nktp-chart"}) {
+			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || !slices.Equal(overlay.Subs[0].Components, []string{"nktp-chart", "nvke-controller-chart"}) {
 				t.Fatalf("unexpected site substitution: %+v", overlay)
 			}
 		})

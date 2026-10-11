@@ -107,6 +107,31 @@ func TestPrivateImagePullRejectsCredentialAndCancellationBeforeWork(t *testing.T
 	}
 }
 
+func TestPrivateToolchainRebrandingBoundary(t *testing.T) {
+	plan := arcTestPlan(t, "linux/amd64")
+	for _, test := range []struct {
+		name, publication, image string
+		want                     bool
+	}{
+		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true},
+		{"published legacy subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true},
+		{"different publication owner", "ghcr.io/example/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false},
+		{"sibling repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes-mirror/m2-candidate/toolchains/packer", false},
+		{"non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/other/packer", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan.Environment.Publication.RepositoryPrefix = test.publication
+			image := test.image + "@sha256:" + strings.Repeat("a", 64)
+			if got := githubPrivateToolchain(plan, image); got != test.want {
+				t.Fatalf("private preparation = %t, want %t", got, test.want)
+			}
+			if githubPrivateToolchain(plan, test.image+":latest") {
+				t.Fatal("unpinned image admitted")
+			}
+		})
+	}
+}
+
 func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
 	if err != nil {

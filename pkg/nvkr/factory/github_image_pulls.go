@@ -23,10 +23,19 @@ import (
 const githubImageToken = "NVKR_TOOLCHAIN_READ_TOKEN"
 
 func githubPrivateToolchain(plan *Plan, image string) bool {
-	return plan.Environment.GitHubARC == "native-kvm-v1" &&
-		plan.Environment.Publication != nil &&
-		strings.HasPrefix(plan.Environment.Publication.RepositoryPrefix, "ghcr.io/") &&
-		strings.HasPrefix(image, plan.Environment.Publication.RepositoryPrefix+"/toolchains/") && strings.Contains(image, "@sha256:")
+	if plan.Environment.GitHubARC != "native-kvm-v1" || plan.Environment.Publication == nil ||
+		!strings.HasPrefix(plan.Environment.Publication.RepositoryPrefix, "ghcr.io/") || !strings.Contains(image, "@sha256:") {
+		return false
+	}
+	prefix := plan.Environment.Publication.RepositoryPrefix
+	if strings.HasPrefix(image, prefix+"/toolchains/") {
+		return true
+	}
+	// Rebranding publication does not relocate the already-published, pinned
+	// candidate toolchains. Preserve their separate credential preparation only
+	// for the matching maintained namespace, not for arbitrary third-party images.
+	return prefix == "ghcr.io/dsx-ai-factory/nvkr/m2-candidate" &&
+		strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
 }
 
 func githubStagePrivateImages(plan *Plan, stage githubStage) []string {

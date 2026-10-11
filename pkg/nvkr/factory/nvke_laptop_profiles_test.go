@@ -202,15 +202,15 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 	}
 	packages := []string{
 		"teleport-ent=18.6.4",
-		"nvke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
-		"nvke-cni-calico-images-3.30.1 nvke-cni-calico-manifests-3.30.1",
+		"nke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
+		"nke-cni-calico-images-3.30.1 nke-cni-calico-manifests-3.30.1",
 		"nke-cni-ovn-images-1.5.18 nke-cni-ovn-charts-1.5.18",
 	}
 	if len(commands) != len(packages) {
 		t.Fatal("source-owned package selection changed")
 	}
 	for index, name := range packages {
-		want := "DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nvke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 " + name + " || exit 1"
+		want := "DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 " + name + " || exit 1"
 		if commands[index] != want {
 			t.Fatalf("unexpected install command %q; want %q", commands[index], want)
 		}
@@ -547,12 +547,12 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 						}
 					}
 					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
-						node.Patches[0].SHA256 != "sha256:54b73a11668fc0aafb7b36ccae740db4cddab7c0bce990aec22685d1cc69e133" {
+						node.Patches[0].SHA256 != "sha256:9cde5f449ddb3be36cc0b42b26a4e8c499c9ea366f650c95463eebd81e8775a7" {
 						t.Fatal("Plan must retain the exact authenticated source patch")
 					}
 					command := node.Patches[0].Content
 					for _, required := range []string{
-						"package_update: false", "Dir::Etc::sourcelist=/etc/apt/sources.list.d/nvke-local.list", "Dir::Etc::sourceparts=-", " || exit 1", "net.ifnames=1", "update-grub", "bootcmd:",
+						"package_update: false", "Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list", "Dir::Etc::sourceparts=-", " || exit 1", "net.ifnames=1", "update-grub", "bootcmd:",
 						"/etc/default/grub.d/zz-nvkr-local-network.cfg", "${GRUB_CMDLINE_LINUX} net.ifnames=1",
 						"set -eu", "test ! -L", "test -f", "= \"$expected\"",
 						"nvke-local-26-04-arm64-plain", "ubuntu_version: \"26.04\"", "variant: local-plain-tpm",
