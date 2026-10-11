@@ -84,7 +84,9 @@ type checkedWriter struct {
 	sudoAuth    func(context.Context) error
 	// One bounded latest line per public result category, independent of the
 	// dashboard's activity ring. Success statements replay only after success.
-	results [6]string
+	results        [6]string
+	guests         [2]nkedemo.TenantGuestObservation
+	guestsReported bool
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.
@@ -268,17 +270,28 @@ func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
 		w.mu.Lock()
 		defer w.mu.Unlock()
 		for index, role := range [...]string{"Control plane", "Worker"} {
-			guest := event.Guests[index]
+			guest, previous := event.Guests[index], w.guests[index]
+			changed := !w.guestsReported || guest.Available != previous.Available || guest.Domain != previous.Domain || guest.ProviderReady != previous.ProviderReady || guest.ProvisioningFailure != previous.ProvisioningFailure || guest.ConsoleKnown != previous.ConsoleKnown
+			growth := guest.Available && previous.Available && guest.ConsoleKnown && previous.ConsoleKnown && guest.ConsoleChanged && guest.ConsoleBytes > previous.ConsoleBytes
+			if !changed && !growth {
+				continue
+			}
+			prefix := fmt.Sprintf("  Tenant guest +%s · %s: ", max(time.Duration(0), time.Since(w.started)).Truncate(time.Second), role)
 			if guest.ProvisioningFailure == nkedemo.TenantInstanceCreateFailed {
-				w.emit(role + ": instance lookup/create failed (provider report; not a Kubernetes readiness result)\n")
+				w.emit(prefix + "instance lookup/create failed (provider report; not a Kubernetes readiness result)\n")
 				continue
 			}
 			if !guest.Available {
-				w.emit(role + ": guest observation unavailable\n")
+				w.emit(prefix + "guest observation unavailable\n")
 				continue
 			}
-			w.emit(fmt.Sprintf("%s: VM %s; infrastructure Ready=%s (not Kubernetes Ready); console observed=%t\n", role, guest.Domain, guest.ProviderReady, guest.ConsoleKnown))
+			w.emit(fmt.Sprintf("%sVM %s; infrastructure Ready=%s (not Kubernetes Ready); console observed=%t", prefix, guest.Domain, guest.ProviderReady, guest.ConsoleKnown))
+			if growth {
+				w.emit(fmt.Sprintf("; console bytes grew to %d KiB; growth age %s at snapshot (not guest health)", guest.ConsoleBytes/1024, guest.ConsoleLastChange.Truncate(time.Second)))
+			}
+			w.emit("\n")
 		}
+		w.guests, w.guestsReported = event.Guests, true
 		return
 	}
 	if event.Kind == nkedemo.ProcessStarted || event.Kind == nkedemo.ProcessExited {

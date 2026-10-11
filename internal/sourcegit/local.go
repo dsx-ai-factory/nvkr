@@ -68,7 +68,37 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 				return nil, err
 			}
 			if len(data) != 0 {
-				return nil, e.New(e.CodeEngineCapability, "local source Git configuration contains unsupported callbacks, includes or object sources")
+				return nil, e.New(e.CodeEngineCapability, "selected source repository contains unsupported Git configuration families: %s", localConfigurationFamilies(data))
+			}
+			// Do not ask status to inspect nested repositories: their callbacks
+			// have not passed this admission. Refuse submodule sources instead of
+			// treating ignoreSubmodules=all as evidence of a clean source.
+			if _, err := os.Lstat(filepath.Join(dir, ".gitmodules")); err == nil {
+				return nil, e.New(e.CodeEngineCapability, "selected source repository .gitmodules is unsupported; submodule sources are not admitted")
+			} else if !os.IsNotExist(err) {
+				return nil, e.New(e.CodeEngineCapability, "cannot inspect selected source repository submodule descriptor")
+			}
+			query = append(append([]string{}, prefix...), "ls-files", "--cached", "-z", "--", ".gitmodules")
+			data, err = localGitQuery(ctx, executable, baseline, query, "submodule descriptor", 64<<10, false)
+			if err != nil {
+				return nil, err
+			}
+			if len(data) != 0 {
+				return nil, e.New(e.CodeEngineCapability, "selected source repository indexed .gitmodules is unsupported; submodule sources are not admitted")
+			}
+			// Git reads its own index and emits only its documented objectmode
+			// field, one per line. No paths, objects or nested configuration are
+			// read by this adapter. The separate 1 MiB bound accommodates the
+			// pipeline's 100,000-entry source-closure limit (seven bytes each).
+			query = append(append([]string{}, prefix...), "ls-files", "--cached", "--format=%(objectmode)")
+			data, err = localGitQuery(ctx, executable, baseline, query, "index modes", 1<<20, false)
+			if err != nil {
+				return nil, err
+			}
+			for _, mode := range bytes.Split(data, []byte{'\n'}) {
+				if bytes.Equal(mode, []byte("160000")) {
+					return nil, e.New(e.CodeEngineCapability, "selected source repository gitlinks are unsupported; submodule sources are not admitted")
+				}
 			}
 		} else if !os.IsNotExist(err) {
 			return nil, e.Wrap(e.CodeEngineCapability, err, "inspecting local source Git metadata")
@@ -113,6 +143,14 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 			// an empty string (which would mean false when projected).
 			if !ok && strings.HasSuffix(key, ".usehttppath") {
 				value, ok = "true", true
+			}
+			if !ok && strings.HasPrefix(key, "credential.") {
+				switch {
+				case strings.HasSuffix(key, ".helper"):
+					return nil, e.New(e.CodeEngineCapability, "global credential.helper requires an explicit value; an explicit empty value resets helpers")
+				case strings.HasSuffix(key, ".username"):
+					return nil, e.New(e.CodeEngineCapability, "global credential.username requires an explicit value")
+				}
 			}
 			if !ok || !strings.HasPrefix(key, "credential.") {
 				return nil, e.New(e.CodeEngineCapability, "Git returned invalid credential configuration framing")
@@ -180,15 +218,18 @@ func LocalRedirectEnvironment(environment []string) ([]string, error) {
 		value := localEnvironmentValue(environment, "GIT_CONFIG_VALUE_"+suffix)
 		const variable = ".insteadOf"
 		if !strings.HasPrefix(key, "url.") || len(key) <= len("url.")+len(variable) || !strings.EqualFold(key[len(key)-len(variable):], variable) {
-			return nil, e.New(e.CodeEngineCapability, "local source Git accepts only explicit absolute local repository redirects")
+			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_KEY_%d must select an explicit absolute local repository redirect", index)
 		}
 		local := key[len("url.") : len(key)-len(variable)]
 		clean := filepath.Clean(local)
 		// Maintained workflow templates emit one trailing separator. Preserve
 		// Git's exact rewrite base, while still refusing embedded dot segments,
 		// repeated separators and URI forms outside the local path contract.
-		if !filepath.IsAbs(local) || (local != clean && local != clean+string(filepath.Separator)) || value == "" {
-			return nil, e.New(e.CodeEngineCapability, "local source Git accepts only explicit absolute local repository redirects")
+		if !filepath.IsAbs(local) || (local != clean && local != clean+string(filepath.Separator)) {
+			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_KEY_%d must use a canonical absolute local repository path", index)
+		}
+		if value == "" {
+			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_VALUE_%d must provide a nonempty repository redirect source", index)
 		}
 		result = append(result, "GIT_CONFIG_KEY_"+suffix+"="+key, "GIT_CONFIG_VALUE_"+suffix+"="+value)
 	}
@@ -198,6 +239,26 @@ func LocalRedirectEnvironment(environment []string) ([]string, error) {
 // UnsupportedConfiguration is the shared Git-owned query used at both local
 // and held source boundaries. Hooks/fsmonitor are forcibly disabled separately.
 const UnsupportedConfiguration = `^(filter|include|includeif|hook|url|http)\.|^extensions\.(worktreeconfig|partialclone)$|^remote\..*\.promisor$|^core\.(alternaterefscommand|sshcommand|gitproxy|askpass|worktree)$`
+
+// localConfigurationFamilies labels Git's already-refused name-only NUL output,
+// not configuration syntax or admission policy. Emit only these static section
+// labels: key subsections can contain private URLs, paths or arbitrary text.
+func localConfigurationFamilies(data []byte) string {
+	records := bytes.Split(data, []byte{0})
+	var families []string
+	for _, family := range []string{"core", "extensions", "filter", "hook", "http", "include", "includeif", "remote", "url"} {
+		for _, record := range records {
+			if bytes.HasPrefix(record, []byte(family+".")) {
+				families = append(families, family+".*")
+				break
+			}
+		}
+	}
+	if len(families) == 0 {
+		return "unrecognized"
+	}
+	return strings.Join(families, ", ")
+}
 
 func localEnvironmentValue(environment []string, selected string) string {
 	for _, field := range environment {
@@ -209,11 +270,14 @@ func localEnvironmentValue(environment []string, selected string) string {
 	return ""
 }
 
-type localQueryBuffer struct{ data bytes.Buffer }
+type localQueryBuffer struct {
+	data  bytes.Buffer
+	limit int
+}
 
 func (buffer *localQueryBuffer) Write(data []byte) (int, error) {
-	if len(data) > (64<<10)-buffer.Len() {
-		return 0, e.New(e.CodeEngineCapability, "source Git configuration query exceeds its bound")
+	if len(data) > buffer.limit-buffer.Len() {
+		return 0, e.New(e.CodeEngineCapability, "source Git query exceeds its bound")
 	}
 	return buffer.data.Write(data)
 }
@@ -222,22 +286,26 @@ func (buffer *localQueryBuffer) Len() int      { return buffer.data.Len() }
 func (buffer *localQueryBuffer) Bytes() []byte { return buffer.data.Bytes() }
 
 func localConfigQuery(ctx context.Context, executable string, environment, args []string) ([]byte, error) {
+	return localGitQuery(ctx, executable, environment, args, "configuration", 64<<10, true)
+}
+
+func localGitQuery(ctx context.Context, executable string, environment, args []string, description string, stdoutLimit int, allowNoMatch bool) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Env = environment
-	var stdout, stderr localQueryBuffer
+	stdout, stderr := localQueryBuffer{limit: stdoutLimit}, localQueryBuffer{limit: 64 << 10}
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := ownedcmd.Run(ctx, cmd)
 	if ctx.Err() != nil {
-		return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "source Git configuration query canceled")
+		return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "source Git %s query canceled", description)
 	}
 	var exit *exec.ExitError
-	if errors.As(err, &exit) && exit.ExitCode() == 1 && stdout.Len() == 0 && stderr.Len() == 0 {
+	if allowNoMatch && errors.As(err, &exit) && exit.ExitCode() == 1 && stdout.Len() == 0 && stderr.Len() == 0 {
 		return nil, nil
 	}
 	if err != nil || stderr.Len() != 0 {
-		return nil, e.Wrap(e.CodeEngineCapability, err, "source Git configuration query failed")
+		return nil, e.Wrap(e.CodeEngineCapability, err, "source Git %s query failed", description)
 	}
 	return stdout.Bytes(), nil
 }

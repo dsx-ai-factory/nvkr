@@ -27,6 +27,7 @@ type testDashboardScreen struct {
 	joined                         atomic.Bool
 	lastFrame                      string
 	onFini                         func()
+	onPumpExit                     func()
 }
 
 func (s *testDashboardScreen) Init() error {
@@ -148,6 +149,9 @@ func TestDashboardResultsSurviveTerminalHandover(t *testing.T) {
 }
 
 func (s *testDashboardScreen) ChannelEvents(events chan<- tcell.Event, quit <-chan struct{}) {
+	if s.onPumpExit != nil {
+		defer s.onPumpExit()
+	}
 	if s.closed {
 		close(events)
 		return
@@ -236,6 +240,9 @@ func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
 			case <-result:
 				t.Fatal("presenter returned before cleanup joined")
 			default:
+			}
+			if (mode == "context" || mode == "ctrl-c" || mode == "quit") && screen.joined.Load() {
+				t.Fatal("ordinary cancellation dropped its live cleanup display")
 			}
 			close(release)
 			select {
@@ -366,14 +373,14 @@ func TestDashboardForceExitRequiresCancellationAndJoinsReturningCallback(t *test
 func TestDashboardForcedExitProcess(t *testing.T) {
 	const marker = "NKE_TEST_CONFIRMED_FORCE_EXIT"
 	if os.Getenv(marker) == "1" {
-		forceDashboardExit()
+		forceDashboardExit("/tmp/owned-demo")
 		return
 	}
 	command := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestDashboardForcedExitProcess$")
 	command.Env = append(os.Environ(), marker+"=1")
 	output, err := command.CombinedOutput()
 	var exit *exec.ExitError
-	if !errors.As(err, &exit) || exit.ExitCode() != 130 || !strings.Contains(string(output), "FORCED EXIT") || !strings.Contains(string(output), "may remain") || !strings.Contains(string(output), "cleanup is not confirmed") || strings.Contains(string(output), "PASS") {
+	if !errors.As(err, &exit) || exit.ExitCode() != 130 || !strings.Contains(string(output), "FORCED EXIT") || !strings.Contains(string(output), "Owned processes") || !strings.Contains(string(output), " restore --work '/tmp/owned-demo'") || !strings.Contains(string(output), "not tenant, VM or container deletion") || !strings.Contains(string(output), "cleanup is not confirmed") || strings.Contains(string(output), "PASS") {
 		t.Fatalf("forced exit must warn and return 130, never PASS: %v %q", err, output)
 	}
 }

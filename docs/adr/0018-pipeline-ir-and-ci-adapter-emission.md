@@ -613,6 +613,9 @@ system helpers, GH/GCM/keyring environment, arbitrary SSH commands and global SS
 not inherited. This is bounded helper compatibility, not a claim that every developer login works.
 Explicit redirects admit canonical absolute filesystem paths (including one terminal slash), not file URIs.
 Repository-local filters, includes, HTTP/SSH callbacks, delegated worktrees and object sources fail admission.
+Ordinary local source roots also refuse `.gitmodules` descriptors (including indexed descriptors missing
+from the worktree) and indexed gitlinks, using Git's bounded nonrecursive index-mode query. Disabling
+submodule recursion or ignoring submodules during status does not authenticate nested source cleanliness.
 Real Git fixtures exercise exact checkout bytes, callback exclusion, authenticated fetch and local redirects;
 they do not establish current private-source access or a held workspace receipt.
 

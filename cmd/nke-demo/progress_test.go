@@ -311,3 +311,60 @@ func TestProgressGuestProviderFailureWithoutInstance(t *testing.T) {
 		t.Fatalf("provider failure hidden or private data exposed: %q", out.String())
 	}
 }
+
+func TestProgressGuestsEmitOnlyChangesOrObservedGrowth(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*nkedemo.ProgressEvent)
+		rows   int
+		growth bool
+	}{
+		{"identical snapshot", func(*nkedemo.ProgressEvent) {}, 0, false},
+		{"age only", func(e *nkedemo.ProgressEvent) { e.Guests[0].ConsoleLastChange += time.Minute }, 0, false},
+		{"changed marker without growth", func(e *nkedemo.ProgressEvent) { e.Guests[1].ConsoleChanged = true }, 0, false},
+		{"domain change", func(e *nkedemo.ProgressEvent) { e.Guests[1].Domain = nkedemo.TenantDomainRunning }, 1, false},
+		{"provider change", func(e *nkedemo.ProgressEvent) { e.Guests[1].ProviderReady = nkedemo.TenantConditionTrue }, 1, false},
+		{"provider failure", func(e *nkedemo.ProgressEvent) { e.Guests[1].ProvisioningFailure = nkedemo.TenantInstanceCreateFailed }, 1, false},
+		{"observation lost", func(e *nkedemo.ProgressEvent) {
+			e.Guests[1] = nkedemo.TenantGuestObservation{Role: nkedemo.TenantGuestWorker}
+		}, 1, false},
+		{"console observation lost", func(e *nkedemo.ProgressEvent) {
+			e.Guests[0].ConsoleKnown, e.Guests[0].ConsoleChanged = false, false
+			e.Guests[0].ConsoleBytes, e.Guests[0].ConsoleLastChange = 0, 0
+		}, 1, false},
+		{"console grew", func(e *nkedemo.ProgressEvent) {
+			e.Guests[0].ConsoleBytes += 1024
+			e.Guests[0].ConsoleLastChange = 3 * time.Second
+		}, 1, true},
+		{"console reset baseline", func(e *nkedemo.ProgressEvent) { e.Guests[0].ConsoleBytes = 0 }, 0, false},
+		{"invalid observation", func(e *nkedemo.ProgressEvent) { e.Guests[0].Domain = "private-invalid" }, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			writer := &checkedWriter{out: &out, started: time.Now()}
+			event := dashboardGuestFixture()
+			writer.Report(event)
+			if strings.Count(out.String(), "\n") != 2 || strings.Contains(out.String(), "bytes grew") {
+				t.Fatalf("first snapshot must be descriptive, not growth: %q", out.String())
+			}
+			out.Reset()
+			tc.change(&event)
+			writer.Report(event)
+			text := out.String()
+			if strings.Count(text, "\n") != tc.rows || strings.Contains(text, "bytes grew") != tc.growth {
+				t.Fatalf("rows/growth mismatch: %q", text)
+			}
+			if tc.rows > 0 && !strings.HasPrefix(text, "  Tenant guest +") {
+				t.Fatal("changed observation omitted elapsed tenant context")
+			}
+			if tc.growth && !strings.Contains(text, "growth age 3s at snapshot (not guest health)") {
+				t.Fatal("growth omitted snapshot-relative descriptive scope")
+			}
+			out.Reset()
+			writer.Report(event)
+			if out.Len() != 0 {
+				t.Fatal("unchanged snapshot repeated its role rows")
+			}
+		})
+	}
+}

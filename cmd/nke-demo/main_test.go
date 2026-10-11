@@ -47,6 +47,7 @@ func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 		{"probe-address", []string{"network-port-probe", "--address", "127.0.0.1"}, nkderr.CodeUsage},
 		{"probe-config", []string{"network-port-probe", "--config", "/must-not-read"}, nkderr.CodeUsage},
 		{"probe-verbose", []string{"network-port-probe", "--verbose"}, nkderr.CodeUsage},
+		{"probe-plain", []string{"network-port-probe", "--plain"}, nkderr.CodeUsage},
 		{"probe-help", []string{"network-port-probe", "--help"}, ""},
 		{"e2e-retained-input-flag", []string{"e2e", "--os-run", "retained"}, nkderr.CodeUsage},
 		{"config-empty", []string{"run", "--config="}, nkderr.CodeUsage},

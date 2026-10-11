@@ -175,7 +175,24 @@ type packerActivityObserver struct {
 	runtime   packerContainerRuntime
 	resources *packerContainerResources
 	name      string
+	work      string
+	retained  bool
 	err       error
+}
+
+// Issued only by the stop owner after an observer client fails to join. The
+// observer also binds identity files from the private workspace, so that tree
+// remains held. Runtime executable/configuration retention belongs to its owner.
+type packerActivityRetention struct {
+	container, work string
+}
+
+func (*packerActivityRetention) err() error {
+	return e.New(e.CodeTimeout, "owned Packer log observer did not join; dependent resources retained")
+}
+
+func (observer *packerActivityObserver) unjoined() bool {
+	return observer != nil && observer.retained
 }
 
 func startPackerActivity(ctx context.Context, request packerContainerRunRequest, resources *packerContainerResources,
@@ -202,7 +219,7 @@ func startPackerActivity(ctx context.Context, request packerContainerRunRequest,
 		return nil
 	}
 	observeCtx, cancel := context.WithCancel(ctx)
-	observer := &packerActivityObserver{cancel: cancel, done: make(chan struct{}), runtime: request.runtime, resources: resources, name: name}
+	observer := &packerActivityObserver{cancel: cancel, done: make(chan struct{}), runtime: request.runtime, resources: resources, name: name, work: work}
 	go func() {
 		defer close(observer.done)
 		// Command/metadata loss is descriptive only. stderr is never a public log.
@@ -251,10 +268,11 @@ func (observer *packerActivityObserver) stopWithTimeout(ctx context.Context, joi
 				if owner, ok := observer.runtime.(interface{ retainUnjoinedPackerActivity() }); ok {
 					owner.retainUnjoinedPackerActivity()
 				}
+				retained := &packerActivityRetention{container: observer.name, work: observer.work}
 				observer.resources.mu.Lock()
-				observer.resources.retainedObserver = true
+				observer.resources.retainedObserver = retained
 				observer.resources.mu.Unlock()
-				observer.err = e.New(e.CodeTimeout, "owned Packer log observer did not join; dependent resources retained")
+				observer.retained, observer.err = true, retained.err()
 				return
 			}
 		}

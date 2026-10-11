@@ -199,7 +199,13 @@ Ordinary local source Git and installer preparation now use the existing
 `internal/sourcegit` owner to exclude ambient global hooks, fsmonitor, filters,
 templates and line-ending conversion. Developer credential and selected proxy/TLS
 trust settings are projected only into network fetch; explicit absolute local-repository redirects remain
-available. Real Git fixtures cover exact checkout bytes, callback exclusion,
+available. Ordinary local sources with a root `.gitmodules` descriptor (including
+indexed-but-deleted descriptors) or indexed gitlinks fail admission without
+recursing into nested repositories. Git owns the bounded index-mode query;
+ignoring submodules during status is not evidence of clean nested sources.
+Privacy-safe refusal diagnostics name only static configuration families or
+redirect indices, never configuration values, paths or URLs.
+Real Git fixtures cover exact checkout bytes, callback exclusion,
 local redirects and authenticated fetch. The E2E build adapter preserves these
 bounded, owner-validated redirects, and the NKE clone launcher appends its two
 redirects instead of discarding other local source inputs. These fixtures are not proof of current
@@ -370,17 +376,30 @@ from execution health. Baselines, replacements, truncation and rejected entries
 do not establish activity. Names, console text and paths remain private; this is
 not a live console viewer, progress receipt or ETA. Controlled tests cover bounded
 frames, pipe backpressure, descriptor isolation, collector stop/join, unsafe file
-entries and compact layouts. An unjoined stop or attachment fails the build and
-retains dependent resources and its exact runtime executable rather than claiming
-successful cleanup or blocking session close on an unjoined launch. Fresh live
-build acceptance remains unexercised.
+entries and compact layouts. An unjoined stop or attachment fails the build;
+bounded diagnostic collection is still attempted. Retention keeps the exact
+observer, its work volume, identity workspace and runtime executable/configuration.
+Cleanup still attempts independent containers and the input volume and closes
+completed staging descriptors. A joined observer's failed removal is retried by
+the final reaper; persistent cleanup failure rejects any collected artifact.
+Controlled native Linux race tests exercise these cases, not termination of
+kernel-blocked runtime launches or successful cleanup under every daemon failure.
+Fresh live build acceptance remains unexercised.
 While the dashboard owns input, q and Ctrl+C ask for confirmation;
 only y/Y requests cancellation. Escape closes details or dismisses confirmation,
 never canceling work. Plain/verbose output and the initial sudo prompt retain
 signal-driven cancellation without a dialog. Normal cancellation waits for owned
 work and cleanup before terminal restoration. During cancellation, f then y
 restores the terminal and exits 130 without joining cleanup; resources may remain
-and no success is claimed.
+and no success is claimed. The exit warning includes the configured workspace
+and actual executable as recovery guidance only; it does not prove admission,
+journal existence or producer ownership. Recovery requires the original journal
+and stopped owned producers and restores only recorded network controls. Renderer
+panic, output/input failure and a closed event stream restore the terminal before
+waiting for cleanup, while preserving the mandatory owner join and failure.
+Normal confirmed cancellation retains its cleanup screen.
+Plain guest summaries suppress unchanged
+snapshots and independently advancing ages.
 Failed deployment stops unfinished active panes without
 claiming that their individual checks failed. [CLI contracts](../../cmd/nke-demo/dashboard_test.go)
 and [simulation-screen tests](../../cmd/nke-demo/dashboard_view_test.go) exercise

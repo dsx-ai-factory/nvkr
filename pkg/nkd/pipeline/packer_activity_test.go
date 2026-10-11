@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 	"golang.org/x/sys/unix"
 )
@@ -149,6 +151,7 @@ type activityPackerRuntime struct {
 	joined      chan struct{}
 	release     chan struct{}
 	cleanups    int
+	cleanupArgs [][]string
 	stopRelease chan struct{}
 	stopJoined  chan struct{}
 	stopFailure bool
@@ -174,11 +177,12 @@ func (r *activityPackerRuntime) Run(ctx context.Context, _ io.Reader, out, _ io.
 	close(r.joined)
 	return ctx.Err()
 }
-func (r *activityPackerRuntime) Cleanup(context.Context, time.Duration, io.Writer, io.Writer, ...string) error {
+func (r *activityPackerRuntime) Cleanup(_ context.Context, _ time.Duration, _, _ io.Writer, args ...string) error {
 	r.mu.Lock()
 	r.cleanups++
+	r.cleanupArgs = append(r.cleanupArgs, append([]string(nil), args...))
 	r.mu.Unlock()
-	if r.stopRelease != nil {
+	if r.stopRelease != nil && strings.HasSuffix(args[len(args)-1], "observer") {
 		<-r.stopRelease
 		defer close(r.stopJoined)
 	}
@@ -208,7 +212,13 @@ func TestPackerActivityUnjoinedRetainsDependentResources(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = workspace.cleanup() })
-			resources := &packerContainerResources{runtime: runtime, volumes: []string{"input", "work"}, workspace: workspace}
+			staged, err := heldfile.FromBytesContext(t.Context(), []byte("staged inputs"), heldfile.Options{Label: "activity-staging", MaxBytes: 64})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = staged.Close() })
+			resources := &packerContainerResources{runtime: runtime, containers: []string{"owned-build", "owned-validate"},
+				volumes: []string{"owned-input", "owned-work"}, held: []*heldfile.File{staged}, workspace: workspace}
 			request := packerContainerRunRequest{runtime: runtime, activity: sink, activityOperation: "os/build-disk", bindings: packerContainerBindings{buildLogDirectoryVariable: "logs"}, identity: packerContainerIdentity{passwdPath: "private-passwd", groupPath: "private-group"}}
 			observer := startPackerActivity(t.Context(), request, resources, "owned-work", "owned-observer", nil)
 			if observer == nil {
@@ -238,8 +248,17 @@ func TestPackerActivityUnjoinedRetainsDependentResources(t *testing.T) {
 			runtime.mu.Lock()
 			cleanups := runtime.cleanups
 			runtime.mu.Unlock()
-			if len(resources.containers) != 1 || len(resources.volumes) != 2 || resources.workspace != workspace || cleanups > 1 {
+			if !reflect.DeepEqual(resources.containers, []string{"owned-observer"}) ||
+				!reflect.DeepEqual(resources.volumes, []string{"owned-work"}) || resources.workspace != workspace || cleanups != 4 {
 				t.Fatal("live observer's dependent controls were released")
+			}
+			if staged.OSFile() != nil || len(resources.held) != 0 {
+				t.Fatal("completed staging inputs unnecessarily retained")
+			}
+			wantCleanup := [][]string{{"rm", "-fv", "owned-observer"}, {"rm", "-fv", "owned-validate"},
+				{"rm", "-fv", "owned-build"}, {"volume", "rm", "-f", "owned-input"}}
+			if !reflect.DeepEqual(runtime.cleanupArgs, wantCleanup) {
+				t.Fatalf("unrelated attempt cleanup=%v, want %v", runtime.cleanupArgs, wantCleanup)
 			}
 			if _, err := workspace.root.Stat(); err != nil {
 				t.Fatal("native workspace closed before observer join", err)

@@ -41,6 +41,12 @@ func runPackerContainer(ctx context.Context, request packerContainerRunRequest) 
 func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packerContainerRunRequest,
 	diagnosticTimeout time.Duration,
 ) (artifact *PackerArtifact, returnErr error) {
+	return runPackerContainerWithTimeouts(ctx, request, diagnosticTimeout, packerContainerCleanupTimeout)
+}
+
+func runPackerContainerWithTimeouts(ctx context.Context, request packerContainerRunRequest,
+	diagnosticTimeout, observerTimeout time.Duration,
+) (artifact *PackerArtifact, returnErr error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "running containerized Packer requires a non-nil context")
 	}
@@ -241,9 +247,7 @@ func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packer
 	activity := startPackerActivity(ctx, request, resources, workVolume, "nkd-packer-"+attempt+"-activity",
 		[]string{nodeLabel, attemptLabel, "nkd.dev/role=log-activity"})
 	buildErr := startPackerBuildContainer(ctx, request.runtime, buildName, request.stdout, request.stderr, kvmProjection != nil)
-	if err := activity.stop(ctx); err != nil {
-		return nil, errors.Join(buildErr, err)
-	}
+	observerErr := activity.stopWithTimeout(ctx, observerTimeout)
 	var diagnosticErr error
 	if request.bindings.buildLogDirectoryVariable != "" {
 		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), diagnosticTimeout)
@@ -263,6 +267,14 @@ func runPackerContainerWithDiagnosticTimeout(ctx context.Context, request packer
 			diagnosticErr = errors.Join(diagnosticErr, markerErr)
 		}
 	}
+	if activity.unjoined() {
+		// A live observer never authorizes artifact collection, but its stop
+		// failure must not suppress bounded diagnostics from the build.
+		return nil, errors.Join(buildErr, observerErr, diagnosticErr)
+	}
+	// A joined observer's failed removal remains registered with resources.
+	// The final reaper owns its retry and rejects the artifact if removal
+	// still fails; a transient metadata cleanup error is not a build failure.
 	if buildErr != nil {
 		return nil, errors.Join(buildErr, diagnosticErr)
 	}
@@ -569,7 +581,7 @@ type packerContainerResources struct {
 	mu               sync.Mutex
 	containers       []string
 	privateObservers map[string]struct{}
-	retainedObserver bool
+	retainedObserver *packerActivityRetention
 	volumes          []string
 	held             []*heldfile.File
 	workspace        *packerContainerWorkspace
@@ -596,10 +608,7 @@ func (resources *packerContainerResources) cleanup() error {
 
 func (resources *packerContainerResources) cleanupWithTimeout(timeout time.Duration) error {
 	resources.mu.Lock()
-	if resources.retainedObserver {
-		resources.mu.Unlock()
-		return e.New(e.CodeTimeout, "owned Packer log observer did not join; dependent resources retained")
-	}
+	retained := resources.retainedObserver
 	containers := append([]string(nil), resources.containers...)
 	privateObservers := resources.privateObservers
 	volumes := append([]string(nil), resources.volumes...)
@@ -608,10 +617,25 @@ func (resources *packerContainerResources) cleanupWithTimeout(timeout time.Durat
 	resources.containers, resources.volumes = nil, nil
 	resources.privateObservers = nil
 	resources.held, resources.workspace = nil, nil
+	if retained != nil {
+		// Only the observer's exact dependency closure must remain. Other
+		// containers and the input volume still receive bounded reaping; the
+		// completed staging archives are not inputs to either observer client.
+		resources.containers = []string{retained.container}
+		resources.privateObservers = map[string]struct{}{retained.container: {}}
+		resources.volumes = []string{retained.work}
+		resources.workspace = workspace
+	}
 	resources.mu.Unlock()
 	var cleanupErrors []error
+	if retained != nil {
+		cleanupErrors = append(cleanupErrors, retained.err())
+	}
 	containerCtx, cancelContainers := context.WithTimeout(context.Background(), timeout)
 	for index := len(containers) - 1; index >= 0; index-- {
+		if retained != nil && containers[index] == retained.container {
+			continue
+		}
 		if err := resources.runtime.Cleanup(containerCtx, packerContainerTerminationGrace, io.Discard, io.Discard,
 			"rm", "-fv", containers[index]); err != nil {
 			if _, private := privateObservers[containers[index]]; private {
@@ -626,6 +650,9 @@ func (resources *packerContainerResources) cleanupWithTimeout(timeout time.Durat
 	// teardown cannot consume the entire cleanup budget and strand volumes.
 	volumeCtx, cancelVolumes := context.WithTimeout(context.Background(), timeout)
 	for index := len(volumes) - 1; index >= 0; index-- {
+		if retained != nil && volumes[index] == retained.work {
+			continue
+		}
 		if err := resources.runtime.Cleanup(volumeCtx, packerContainerTerminationGrace, io.Discard, io.Discard,
 			"volume", "rm", "-f", volumes[index]); err != nil {
 			cleanupErrors = append(cleanupErrors, err)
@@ -637,8 +664,10 @@ func (resources *packerContainerResources) cleanupWithTimeout(timeout time.Durat
 			cleanupErrors = append(cleanupErrors, err)
 		}
 	}
-	if err := workspace.cleanup(); err != nil {
-		cleanupErrors = append(cleanupErrors, err)
+	if retained == nil {
+		if err := workspace.cleanup(); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
 	}
 	return errors.Join(cleanupErrors...)
 }

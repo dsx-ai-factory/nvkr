@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -112,6 +113,266 @@ func TestLocalGitRejectsRepositoryCallbacks(t *testing.T) {
 				t.Fatalf("repository callback configuration admitted: %v", err)
 			}
 		})
+	}
+}
+
+func TestLocalGitRejectsHiddenSubmoduleDriftWithoutNestedCallbacks(t *testing.T) {
+	source, _ := localFixtureRepository(t)
+	nested := filepath.Join(source, "synthetic-private-submodule")
+	if err := os.Mkdir(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	localFixtureGit(t, nested, "init", "-q")
+	input := filepath.Join(nested, "input.txt")
+	if err := os.WriteFile(input, []byte("pinned\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	localFixtureGit(t, nested, "add", "input.txt")
+	localFixtureGit(t, nested, "-c", "commit.gpgsign=false", "commit", "-qm", "nested fixture")
+	commit := localFixtureGit(t, nested, "rev-parse", "HEAD")
+	// A gitlink need not have a .gitmodules descriptor. Git owns its index
+	// framing; the admission must reject this form too.
+	localFixtureGit(t, source, "update-index", "--add", "--cacheinfo", "160000,"+commit+",synthetic-private-submodule")
+	localFixtureGit(t, source, "-c", "commit.gpgsign=false", "commit", "-qm", "gitlink fixture")
+	if err := os.WriteFile(input, []byte("drift\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := localFixtureGit(t, source, "-c", "diff.ignoreSubmodules=all", "status", "--porcelain", "--untracked-files=all"); got != "" {
+		t.Fatalf("fixture did not reproduce hidden drift: %q", got)
+	}
+	if got := localFixtureGit(t, source, "-c", "diff.ignoreSubmodules=none", "status", "--porcelain"); got == "" {
+		t.Fatal("fixture has no actual submodule drift")
+	}
+	marker := filepath.Join(t.TempDir(), "executed")
+	if err := os.WriteFile(filepath.Join(nested, ".gitattributes"), []byte("input.txt filter=poison\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	localFixtureGit(t, nested, "config", "filter.poison.clean", "printf executed > '"+marker+"'; cat")
+	localFixtureGit(t, nested, "add", "input.txt")
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("nested fixture callback did not execute without isolation: %v", err)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	for _, operation := range [][]string{{"status", "--porcelain"}, {"rev-parse", "HEAD"}, {"checkout", "--detach", "HEAD"}} {
+		cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH")}, source, operation...)
+		if cmd != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "gitlinks are unsupported") {
+			t.Fatalf("hidden nested source admitted for %s: %v", operation[0], err)
+		}
+		if strings.Contains(err.Error(), source) || strings.Contains(err.Error(), "synthetic-private-submodule") {
+			t.Fatal("submodule refusal exposed private source identity")
+		}
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("nested Git callback executed during admission: %v", err)
+	}
+}
+
+func TestLocalGitRejectsSubmoduleDescriptors(t *testing.T) {
+	for _, kind := range []string{"untracked", "tracked", "indexed but deleted", "ignored", "symlink"} {
+		t.Run(kind, func(t *testing.T) {
+			source, _ := localFixtureRepository(t)
+			descriptor := filepath.Join(source, ".gitmodules")
+			if kind == "symlink" {
+				if err := os.Symlink("synthetic-private-missing-target", descriptor); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := os.WriteFile(descriptor, []byte("[submodule \"synthetic-private-subsection\"]\n url = https://synthetic-private-url.test\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			switch kind {
+			case "tracked", "indexed but deleted":
+				localFixtureGit(t, source, "add", ".gitmodules")
+				if kind == "indexed but deleted" {
+					if err := os.Remove(descriptor); err != nil {
+						t.Fatal(err)
+					}
+				}
+			case "ignored":
+				if err := os.WriteFile(filepath.Join(source, ".gitignore"), []byte(".gitmodules\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH")}, source, "status", "--porcelain")
+			if cmd != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), ".gitmodules is unsupported") {
+				t.Fatalf("submodule descriptor admitted: %v", err)
+			}
+			for _, secret := range []string{source, "synthetic-private-subsection", "synthetic-private-url.test", "synthetic-private-missing-target"} {
+				if strings.Contains(err.Error(), secret) {
+					t.Fatal("descriptor refusal exposed private identity")
+				}
+			}
+		})
+	}
+}
+
+func TestLocalGitIndexModesHaveASeparateBound(t *testing.T) {
+	source, _ := localFixtureRepository(t)
+	blob := localFixtureGit(t, source, "rev-parse", "HEAD:input.txt")
+	var entries strings.Builder
+	for index := 0; index < 10_000; index++ {
+		entries.WriteString("100644 " + blob + "\tfixture-" + strconv.Itoa(index) + "\n")
+	}
+	cmd := exec.CommandContext(t.Context(), "git", "-C", source, "update-index", "--index-info")
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
+	cmd.Stdin = strings.NewReader(entries.String())
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("large index fixture failed: %v: %s", err, output)
+	}
+	// 10,002 modes exceed the configuration query's 64 KiB limit, but not
+	// the explicitly separate index query bound. No worktree files are read.
+	runLocalFixture(t, []string{"PATH=" + os.Getenv("PATH")}, source, "rev-parse", "HEAD")
+}
+
+func TestLocalGitIndexQueryFailsClosed(t *testing.T) {
+	source, _ := localFixtureRepository(t)
+	path := os.Getenv("PATH")
+	baseline, err := Baseline(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	git, err := executable(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name  string
+		args  []string
+		limit int
+	}{
+		{"output bound", []string{"ls-files", "--format=%(objectmode)"}, 1},
+		// Git config's documented no-match exit 1 is tolerated only by the
+		// config adapter, never by the mandatory index-admission query.
+		{"empty nonzero exit", []string{"config", "--get", "nkd.synthetic-private-absent"}, 64 << 10},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			args := append([]string{"-C", source}, test.args...)
+			data, err := localGitQuery(t.Context(), git, baseline, args, "index modes", test.limit, false)
+			if data != nil || errorCode(err) != e.CodeEngineCapability {
+				t.Fatalf("failed index query admitted: %v", err)
+			}
+			if strings.Contains(err.Error(), source) || strings.Contains(err.Error(), "synthetic-private-absent") {
+				t.Fatal("failed query exposed private source identity")
+			}
+		})
+	}
+}
+
+func TestLocalGitRefusalNamesOnlyStaticConfigurationFamilies(t *testing.T) {
+	for _, test := range []struct {
+		name, family string
+		keys         []string
+	}{
+		{"callbacks", "core.*", []string{"core.sshCommand"}},
+		{"delegation", "extensions.*", []string{"extensions.worktreeConfig"}},
+		{"filters", "filter.*", []string{"filter.synthetic-private-subsection.clean"}},
+		{"hooks", "hook.*", []string{"hook.synthetic-private-subsection.command"}},
+		{"HTTP", "http.*", []string{"http.https://synthetic-private-url.test.proxy"}},
+		{"includes", "include.*", []string{"include.path"}},
+		{"conditional includes", "includeif.*", []string{"includeIf.gitdir:/synthetic-private-path.path"}},
+		{"object sources", "remote.*", []string{"remote.synthetic-private-subsection.promisor"}},
+		{"URL rewrites", "url.*", []string{"url.https://synthetic-private-url.test.insteadOf"}},
+		{"sorted distinct families", "filter.*, http.*, url.*", []string{"url.https://synthetic-private-url.test.insteadOf", "filter.synthetic-private-subsection.clean", "http.https://synthetic-private-url.test.proxy", "filter.second-private-subsection.smudge"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source, _ := localFixtureRepository(t)
+			for _, key := range test.keys {
+				value := "synthetic-private-value"
+				if key == "extensions.worktreeConfig" {
+					value = "true" // Git validates this boolean before its config query.
+				}
+				localFixtureGit(t, source, "config", key, value)
+			}
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH")}, source, "status", "--porcelain=v1")
+			if cmd != nil || errorCode(err) != e.CodeEngineCapability {
+				t.Fatalf("unsupported configuration admitted: %v", err)
+			}
+			want := "selected source repository contains unsupported Git configuration families: " + test.family
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("refusal omits static families: %v", err)
+			}
+			for _, private := range append([]string{source, "synthetic-private-subsection", "second-private-subsection", "synthetic-private-url.test", "/synthetic-private-path", "synthetic-private-value"}, test.keys...) {
+				if strings.Contains(err.Error(), private) {
+					t.Fatal("refusal exposed private configuration or source identity")
+				}
+			}
+		})
+	}
+}
+
+func TestLocalRedirectRefusalNamesIndexWithoutPrivateConfiguration(t *testing.T) {
+	for _, test := range []struct {
+		name, key, value, want string
+	}{
+		{"unselected variable", "credential.synthetic-private-subsection.helper", "synthetic-private-value", "GIT_CONFIG_KEY_1 must select an explicit absolute local repository redirect"},
+		{"private URI", "url.file:///synthetic-private-path/.insteadOf", "https://synthetic-private-url.test/source", "GIT_CONFIG_KEY_1 must use a canonical absolute local repository path"},
+		{"noncanonical path", "url./synthetic-private-path/../source.insteadOf", "synthetic-private-value", "GIT_CONFIG_KEY_1 must use a canonical absolute local repository path"},
+		{"missing value", "url./synthetic-private-path.insteadOf", "", "GIT_CONFIG_VALUE_1 must provide a nonempty repository redirect source"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			environment := []string{"GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_0=url./absolute/source/.insteadOf", "GIT_CONFIG_VALUE_0=https://example.test/source",
+				"GIT_CONFIG_KEY_1=" + test.key, "GIT_CONFIG_VALUE_1=" + test.value}
+			got, err := LocalRedirectEnvironment(environment)
+			if got != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("refusal omits failed selector index: %v", err)
+			}
+			for _, private := range []string{test.key, "synthetic-private-subsection", "synthetic-private-path", "synthetic-private-url.test", "synthetic-private-value"} {
+				if strings.Contains(err.Error(), private) {
+					t.Fatal("redirect refusal exposed private configuration")
+				}
+			}
+		})
+	}
+}
+
+func TestLocalGitValuelessCredentialDiagnosticIsPrivate(t *testing.T) {
+	for _, test := range []struct {
+		name, section, variable, want string
+	}{
+		{"helper", "credential", "helper", "credential.helper requires an explicit value"},
+		{"scoped helper", `credential "https://synthetic-private-url.test/source"`, "helper", "credential.helper requires an explicit value"},
+		{"username", `credential "https://synthetic-private-url.test/source"`, "username", "credential.username requires an explicit value"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			home := t.TempDir()
+			if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("["+test.section+"]\n"+test.variable+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home}, "", "fetch")
+			if cmd != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("valueless credential refusal omits its static family: %v", err)
+			}
+			if strings.Contains(err.Error(), "synthetic-private-url.test") || strings.Contains(err.Error(), home) {
+				t.Fatal("credential refusal exposed account or repository identity")
+			}
+		})
+	}
+}
+
+func TestLocalGitPreservesExplicitEmptyHelperReset(t *testing.T) {
+	for _, section := range []string{"credential", `credential "https://synthetic-private-url.test/source"`} {
+		t.Run(section, func(t *testing.T) {
+			home := t.TempDir()
+			if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("["+section+"]\nhelper =\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home}, "", "fetch")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if localEnvironmentValue(cmd.Env, "GIT_CONFIG_COUNT") != "2" || !strings.HasSuffix(localEnvironmentValue(cmd.Env, "GIT_CONFIG_KEY_1"), ".helper") || localEnvironmentValue(cmd.Env, "GIT_CONFIG_VALUE_1") != "" {
+				t.Fatal("explicit empty helper reset changed during projection")
+			}
+		})
+	}
+}
+
+func TestLocalConfigurationDiagnosticDoesNotEchoUnexpectedRecords(t *testing.T) {
+	for _, data := range []string{"", "synthetic-private-value\x00", "unknown.synthetic-private-value\x00", "unknown.https://synthetic-private-url.test\n/synthetic-private-path\x00"} {
+		if got := localConfigurationFamilies([]byte(data)); got != "unrecognized" {
+			t.Fatal("unexpected diagnostic record escaped its static label")
+		}
 	}
 }
 

@@ -8,6 +8,8 @@ package pipeline
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -79,7 +81,12 @@ func TestPackerActivityUnjoinedRuntimeDoesNotBlockSessionClose(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = capability.Close() })
-			held := &heldRuntimeExecutable{capability: capability, name: "docker", endpoint: qualifiedRuntimeEndpoint}
+			configuration := t.TempDir()
+			marker := filepath.Join(configuration, "retained-config")
+			if err := os.WriteFile(marker, []byte("private runtime config"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			held := &heldRuntimeExecutable{capability: capability, name: "docker", endpoint: qualifiedRuntimeEndpoint, configurationRoot: configuration}
 			runtime := &activityLaunchLockRuntime{heldPackerContainerRuntime: heldPackerContainerRuntime{runtime: held}, blocked: blocked,
 				writer: &activityLockWriter{started: make(chan struct{}), release: make(chan struct{})},
 				attach: make(chan struct{}), cleanup: make(chan struct{})}
@@ -145,11 +152,14 @@ func TestPackerActivityUnjoinedRuntimeDoesNotBlockSessionClose(t *testing.T) {
 			if capability.OSFile() == nil || code(held.close()) != e.CodeTimeout || code(resources.cleanup()) != e.CodeTimeout {
 				t.Fatal("session or standalone cleanup released retained dependencies")
 			}
+			if _, err := os.Stat(marker); err != nil {
+				t.Fatal("unjoined runtime configuration was released", err)
+			}
 			close(runtime.writer.release)
 			released = true
 			<-runtime.attach
 			<-runtime.cleanup
-			if code(held.close()) != e.CodeTimeout || capability.OSFile() == nil {
+			if code(held.close()) != e.CodeTimeout || capability.OSFile() == nil || code(resources.cleanup()) != e.CodeTimeout {
 				t.Fatal("late join silently authorized runtime release")
 			}
 		})

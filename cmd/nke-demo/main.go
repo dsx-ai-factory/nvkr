@@ -113,7 +113,11 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 				return err
 			}
 			plain, _ := cmd.Flags().GetBool("plain")
-			return withTerminalSudo(cmd.Context(), out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+			recoveryCtx, err := progressRecoveryContext(cmd.Context(), cfg.Out)
+			if err != nil {
+				return err
+			}
+			return withTerminalSudo(recoveryCtx, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
 				return runProgress(session, out, plain, func(ctx context.Context, progress io.Writer) error {
 					cfg.Progress = progress
 					return actions.run(ctx, cfg)
@@ -166,7 +170,11 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 			if err != nil {
 				return err
 			}
-			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Minute)
+			recoveryCtx, err := progressRecoveryContext(cmd.Context(), work)
+			if err != nil {
+				return err
+			}
+			budget, cancel := context.WithTimeout(recoveryCtx, 8*time.Minute)
 			defer cancel()
 			plain, _ := cmd.Flags().GetBool("plain")
 			return withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
@@ -199,7 +207,11 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			budget, cancel := context.WithTimeout(cmd.Context(), 8*time.Hour)
+			recoveryCtx, err := progressRecoveryContext(cmd.Context(), run.Out)
+			if err != nil {
+				return err
+			}
+			budget, cancel := context.WithTimeout(recoveryCtx, 8*time.Hour)
 			defer cancel()
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			plain, _ := cmd.Flags().GetBool("plain")

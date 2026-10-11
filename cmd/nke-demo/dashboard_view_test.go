@@ -148,6 +148,7 @@ func TestDashboardForceConfirmationFooter(t *testing.T) {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
 			d := newDashboard()
 			d.forceAvailable = true
+			d.recoveryWork = "/tmp/owned-demo"
 			screen := dashboardScreen(t, width)
 			screen.SetSize(width, 24)
 			d.draw(screen, time.Now(), false)
@@ -155,7 +156,7 @@ func TestDashboardForceConfirmationFooter(t *testing.T) {
 				t.Fatal("force exit offered before cancellation")
 			}
 			d.draw(screen, time.Now(), true)
-			for _, wanted := range []string{"CANCELING", "[ f ] FORCE EXIT", "confirmation required", "VMs, containers and network changes may remain."} {
+			for _, wanted := range []string{"CANCELING", "[ f ] FORCE EXIT", "confirmation required", "Owned processes, VMs, containers and network changes may remain.", "Recovery workspace: /tmp/owned-demo"} {
 				if !strings.Contains(dashboardText(screen), wanted) {
 					t.Fatalf("cancellation omitted prominent action %q", wanted)
 				}

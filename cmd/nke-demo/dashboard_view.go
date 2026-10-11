@@ -96,6 +96,7 @@ type dashboardSnapshot struct {
 	buildSelected                 int
 	buildDetails                  bool
 	buildLogPath                  string
+	recoveryWork                  string
 }
 
 // Only the presentation loop touches widgets. Worker callbacks update bounded
@@ -1031,7 +1032,10 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 			} else {
 				state += "\n\n[lightcoral::b][ f ] FORCE EXIT[-::-] · confirmation required"
 			}
-			state += "\nVMs, containers and network changes may remain."
+			state += "\nOwned processes, VMs, containers and network changes may remain."
+			if s.recoveryWork != "" {
+				state += "\nRecovery workspace: " + tview.Escape(terminalText(s.recoveryWork))
+			}
 		} else {
 			state += "\nCancellation requested; waiting for owned cleanup to return."
 		}

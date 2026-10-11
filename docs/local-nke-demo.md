@@ -510,11 +510,12 @@ size, sample age and age of observed growth separately from Packer stdout.
 A first sample is a baseline, not growth; replacement, truncation, disappearance
 or unsafe entries reset the observation. Unavailable metadata is shown explicitly.
 Names, console text and private paths are never sent to the dashboard.
-The observer is stopped and joined before terminal log collection and resource
+Observer stop/join is attempted before terminal log collection and resource
 cleanup. If its stop or attachment cannot be joined within the bounded shutdown
 window, the build fails and retains dependent resources, including the exact
 runtime executable capability; cleanup is not reported
-as complete. Full private logs are collected after Packer exits. Metadata-only
+as complete. Bounded private log collection and independent resource cleanup are
+still attempted after Packer exits. Metadata-only
 activity does not prove guest health, installation progress or an ETA.
 Launcher start/exit observations do not establish
 the health of every Docker, Packer or QEMU descendant; silence is not classified
@@ -602,7 +603,9 @@ available for diagnosis. Tenant polling likewise keeps individual inventory,
 kubeconfig and node commands in private logs. The console shows the current
 wait, elapsed/remaining readiness budget, and observed registered/Ready counts.
 Changes appear immediately; an unchanged wait adds a short heartbeat at most
-every 30 seconds. Guest observation changes add fixed, public activity summaries;
+every 30 seconds. Plain guest observations add fixed, public activity summaries on the
+first snapshot, a semantic change or observed positive console growth. Plain
+output does not repeat unchanged role rows merely because their ages advance;
 fresh snapshots alone do not count as state changes. Before a successful tenant
 node query, registered/Ready counts remain unknown. Available VM/console metadata
 can explain activity before the tenant API exists, but does not establish boot
@@ -612,7 +615,7 @@ An observed substep is not completion of its entire phase. The dashboard and
 graph are diagnostics, not artifact verification receipts or a signed Release;
 the final command result and owned checks still determine success. After deployment
 fails, unfinished active panes show `stopped`; explicit failures remain `failed`.
-This does not claim that every unfinished check failed. Cancellation
+This does not claim that every unfinished check failed. Normal confirmed cancellation
 waits for bounded subprocess joining and owned cleanup before restoring the
 terminal. The state pane names diagnostics collection, tenant deletion and the
 deletion wait as their owners report them; it does not keep counting the canceled
@@ -634,6 +637,22 @@ If you confirm force exit with `f` then `y`, the terminal is restored and the
 process exits with status 130 **without waiting for cleanup**. Processes,
 containers, VMs and network controls may remain. Inspect and recover the exact
 attempt before restarting; force exit never reports success or completed cleanup.
+The exit warning prints the configured recovery workspace and, for printable
+paths, a quoted command using the actual executable. This locator does not prove
+that admission completed or a journal exists. Use it only if the original
+`network-state.json` exists, after inspecting and stopping surviving owned
+producers. `restore` repairs recorded network controls, not tenants, VMs or
+containers. Renderer panics, terminal output/input failures and a closed event
+stream restore the terminal before waiting for the workflow's cleanup to join;
+they still return failure and preserve the owner's error rather than reporting
+successful cleanup. Normal confirmed cancellation keeps its cleanup screen.
+If an OS-build log observer cannot join, the build fails and retains that
+observer's container, work volume and private identity workspace rather than
+deleting inputs that it may still use. Those Packer resources are separate from
+the deployment network journal: `restore` does not reap them. Do not prune them
+while their owning build or observer remains live. Inspect the exact stopped
+attempt and its owned resources before arranging recovery; automated
+cross-process Packer orphan recovery is not implemented.
 If cleanup refuses, inspect retained resources and recovery instructions
 before rerunning. [Dashboard tests](../cmd/nke-demo/dashboard_test.go) and
 [simulation-screen tests](../cmd/nke-demo/dashboard_view_test.go) cover presentation,
