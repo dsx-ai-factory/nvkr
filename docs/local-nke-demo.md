@@ -417,8 +417,13 @@ an unknown total. Only the owning artifact operation completes the phase.
 
 The ribbon separates the age of raw build output from the age of the last step
 change, even when concise mode hides compiler output. It also shows the last
-recognized OS guest report, such as waiting for SSH, with its age. These reports
-are not a guest-health probe. Launcher start/exit observations do not establish
+recognized Packer report and its age: boot-console preparation, SSH connection,
+file transfer, shell provisioning, shutdown or final QCOW2 post-processing.
+Concise output uses fixed summaries; private script paths and console addresses
+are not copied into those summaries. These messages are not live Ubuntu
+installer telemetry or a guest-health probe. The guest serial log is collected
+after Packer exits; the dashboard does not yet expose its live activity.
+Launcher start/exit observations do not establish
 the health of every Docker, Packer or QEMU descendant; silence is not classified
 as a stall.
 
@@ -438,9 +443,12 @@ an NKE stage is checked off only after both its run and verification succeed.
 The Tenant checklist shows kubeconfig, API, two-node readiness and workload/DNS
 observations. Active steps show their own elapsed time. Pending steps have not
 been observed; the display does not estimate an overall completion percentage.
-Routine command START/DONE traces and repeated wait messages stay out of the
-dashboard activity pane; failures remain visible. Use `--plain` for the full
-command-boundary trace. ETA remains unknown: a readiness budget is a timeout,
+Routine command START/DONE traces stay out of the dashboard activity pane;
+failures remain visible. Tenant stage, node-count or reported condition changes
+add an activity entry immediately. Unchanged tenant reports add a short wait
+heartbeat at most once per 30 seconds. A heartbeat does not prove a successful
+API query, guest activity or forward provisioning progress. Use `--plain` for
+the full command-boundary trace. ETA remains unknown: a readiness budget is a timeout,
 not an estimated finish. The state pane distinguishes time since a stage, node
 count or reported NKE condition changed from the age of the latest observation.
 Repeated polling is not proof that provisioning is advancing. Only the pinned

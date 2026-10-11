@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -112,10 +113,21 @@ func TestDashboardGraphDisplayBounds(t *testing.T) {
 
 func TestDashboardLastGuestReport(t *testing.T) {
 	for _, tc := range []struct{ message, want string }{
+		{"Starting VM, booting from CD-ROM", "Launching OS-image VM from installer ISO"},
+		{"Waiting 30s for boot...", "Waiting for the OS-image boot console"},
+		{"Connecting to VM via VNC (127.0.0.1:5908)", "Connecting to the OS-image boot console"},
+		{"Typing the boot commands over VNC...", "Sending installer boot commands"},
 		{"Waiting for SSH to become available...", "Waiting for SSH from the OS-image guest"},
 		{"Connected to SSH!", "SSH connected to the OS-image guest"},
+		{"Running local shell script: /private/preparation.sh", "Running a source-owned local shell step"},
+		{"Uploading /private/image-inputs => /tmp/image-inputs", "Transferring files to the OS-image guest"},
+		{"Provisioning with shell script: /private/provision.sh", "Running guest shell provisioning"},
 		{"Gracefully halting virtual machine...", "Shutting down the OS-image guest"},
+		{"Waiting for shutdown...", "Waiting for OS-image guest shutdown"},
+		{"Running post-processor: shell-local", "Starting final QCOW2 post-processing"},
 		{"private guest output", ""},
+		{"Provisioning with shell script: ", ""},
+		{"Provisioning with shell script: /private/\x1b[2J", ""},
 	} {
 		t.Run(tc.message, func(t *testing.T) {
 			d := newDashboard()
@@ -132,6 +144,49 @@ func TestDashboardLastGuestReport(t *testing.T) {
 				if !d.snapshot().buildGuestAt.Equal(s.buildGuestAt) {
 					t.Fatal("unrelated output refreshed the guest report")
 				}
+			}
+		})
+	}
+}
+
+func TestDashboardGuestReportRejectsUnknownAndControls(t *testing.T) {
+	for _, line := range []string{
+		"==> other-builder: Connected to SSH!",
+		"==> nke-node-non-fde.qemu.nke-non-fde: Provisioning with shell script: /private/\nsecret",
+		"==> nke-node-non-fde.qemu.nke-non-fde: Uploading /private/\x7f => /tmp/input",
+		"==> nke-node-non-fde.qemu.nke-non-fde: Uploading " + strings.Repeat("x", dashboardRunes),
+		dashboardGuestReportPrefix + "Guest is healthy; artifacts complete",
+		dashboardGuestReportPrefix + "Running guest shell provisioning\r",
+	} {
+		if got := dashboardGuestReport(line); got != "" {
+			t.Fatalf("accepted private or unsupported report %q as %q", line, got)
+		}
+	}
+}
+
+func TestDashboardGuestReportKeepsVariableSuffixPrivate(t *testing.T) {
+	for _, message := range []string{
+		"Connecting to VM via VNC (10.20.30.40:5908)",
+		"Running local shell script: /private/secret-preparation.sh",
+		"Uploading /private/secret-input => /tmp/secret-destination",
+		"Provisioning with shell script: /private/secret-provision.sh",
+	} {
+		t.Run(message, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+			var public, private bytes.Buffer
+			w := &checkedWriter{out: io.MultiWriter(&public, d), raw: &private, remaining: 8192, observer: d, started: time.Now()}
+			line := "==> nke-node-non-fde.qemu.nke-non-fde: " + message + "\n"
+			if _, err := io.WriteString(w, line); err != nil {
+				t.Fatal(err)
+			}
+			if private.String() != line || strings.Contains(public.String(), message) ||
+				strings.Contains(public.String(), "/private/") || strings.Contains(public.String(), "10.20.30.40") {
+				t.Fatal("variable Packer suffix escaped the retained private log")
+			}
+			s := d.snapshot()
+			if s.buildGuestStage == "" || s.phases[1].state != "running" || len(s.buildSteps) != 0 {
+				t.Fatal("fixed report was lost or promoted artifact completion")
 			}
 		})
 	}

@@ -93,6 +93,7 @@ type dashboardSnapshot struct {
 type dashboard struct {
 	mu sync.Mutex
 	dashboardSnapshot
+	tenantActivityAt                                    time.Time
 	partial                                             []byte
 	dropped                                             bool
 	header, phasesView, stateView, activityView, footer *tview.TextView
@@ -243,21 +244,56 @@ func (d *dashboard) observeBuildLog(line string) {
 	step.state = state
 }
 
+const dashboardGuestReportPrefix = "OS image report: "
+
+// These are descriptive reports from the selected Packer build, not guest
+// health, installer telemetry or artifact completion. Variable suffixes can
+// contain private paths and addresses, so only fixed summaries leave the log.
+var dashboardPackerReports = [...]struct {
+	message, summary string
+	prefix           bool
+}{
+	{"Starting VM, booting from CD-ROM", "Launching OS-image VM from installer ISO", false},
+	{"Waiting 30s for boot...", "Waiting for the OS-image boot console", false},
+	{"Connecting to VM via VNC (", "Connecting to the OS-image boot console", true},
+	{"Typing the boot commands over VNC...", "Sending installer boot commands", false},
+	{"Waiting for SSH to become available...", "Waiting for SSH from the OS-image guest", false},
+	{"Connected to SSH!", "SSH connected to the OS-image guest", false},
+	{"Running local shell script: ", "Running a source-owned local shell step", true},
+	{"Uploading ", "Transferring files to the OS-image guest", true},
+	{"Provisioning with shell script: ", "Running guest shell provisioning", true},
+	{"Gracefully halting virtual machine...", "Shutting down the OS-image guest", false},
+	{"Waiting for shutdown...", "Waiting for OS-image guest shutdown", false},
+	{"Running post-processor: shell-local", "Starting final QCOW2 post-processing", false},
+}
+
 func dashboardGuestReport(line string) string {
+	if len(line) > dashboardRunes {
+		return ""
+	}
+	for _, value := range line {
+		if value < ' ' || value > '~' {
+			return ""
+		}
+	}
+	if summary, ok := strings.CutPrefix(line, dashboardGuestReportPrefix); ok {
+		for _, report := range dashboardPackerReports {
+			if summary == report.summary {
+				return summary
+			}
+		}
+		return ""
+	}
 	message, ok := strings.CutPrefix(line, "==> nke-node-non-fde.qemu.nke-non-fde: ")
 	if !ok {
 		return ""
 	}
-	switch message {
-	case "Waiting for SSH to become available...":
-		return "Waiting for SSH from the OS-image guest"
-	case "Connected to SSH!":
-		return "SSH connected to the OS-image guest"
-	case "Gracefully halting virtual machine...":
-		return "Shutting down the OS-image guest"
-	default:
-		return ""
+	for _, report := range dashboardPackerReports {
+		if message == report.message && !report.prefix || report.prefix && len(message) > len(report.message) && strings.HasPrefix(message, report.message) {
+			return report.summary
+		}
 	}
+	return ""
 }
 
 // Restrict descriptive labels to bounded printable IDs, not terminal markup.
@@ -492,6 +528,7 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 		return
 	}
 	message := ""
+	stage := 0
 	now := time.Now()
 	previousRegistered, previousReady := d.registered, d.ready
 	switch event.Name {
@@ -499,12 +536,14 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 		d.tenantStages[0].observe(0, "running", now)
 		message = "Waiting for NKE to publish tenant kubeconfig. Guest boot and node readiness are not yet observed."
 	case "tenant-api":
+		stage = 1
 		if d.tenantStages[0].states[0] == "running" {
 			d.tenantStages[0].observe(0, "observed", now)
 		}
 		d.tenantStages[1].observe(0, "running", now)
 		message = "Kubeconfig available. Waiting for a successful tenant API node query; readiness is not yet observed."
 	case "tenant-nodes":
+		stage = 2
 		if d.tenantStages[1].states[0] == "running" {
 			d.tenantStages[1].observe(0, "observed", now)
 		}
@@ -516,6 +555,7 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 			message = "QCOW2 tenant: 2/2 registered · 2/2 Ready. Workload and DNS checks still required."
 		}
 	case "tenant-workload":
+		stage = 3
 		d.tenantStages[3].observe(0, "running", now)
 		message = "Running workload and cluster DNS checks. Successful completion is still required."
 		d.phases[4] = dashboardPhase{"running", "Check workload execution and cluster DNS"}
@@ -535,7 +575,8 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 	}
 	// A repeated wait is an observation heartbeat, not evidence of forward
 	// progress. Only a fixed stage, count or whitelisted condition change resets this.
-	if d.tenantStage != event.Name || conditionChanged || event.Name == "tenant-nodes" && (previousRegistered != event.RegisteredNodes || previousReady != event.ReadyNodes) {
+	changed := d.tenantStage != event.Name || conditionChanged || event.Name == "tenant-nodes" && (previousRegistered != event.RegisteredNodes || previousReady != event.ReadyNodes)
+	if changed {
 		d.tenantChangedAt = now
 	}
 	d.tenantStage = event.Name
@@ -548,6 +589,25 @@ func (d *dashboard) tenantObservation(event nkedemo.ProgressEvent) {
 		d.elapsed = max(event.Elapsed, d.elapsed+max(time.Duration(0), now.Sub(d.observedAt)))
 	}
 	d.observedAt, d.tenant = now, message
+	if changed || d.tenantActivityAt.IsZero() || now.Sub(d.tenantActivityAt) >= 30*time.Second {
+		// Waiting reports also occur after a pause or an unsuccessful tenant API
+		// query. They describe reported state, not a freshly successful API poll.
+		activity := "latest reported conditions remain unchanged."
+		if changed {
+			activity = "reported state changed · " + dashboardTenantStages[stage]
+			if event.Name == "tenant-nodes" {
+				activity += fmt.Sprintf(" · %d/2 registered · %d/2 Ready", d.registered, d.ready)
+			}
+			if d.provisioning != "" {
+				activity += " · Provisioning=" + string(d.provisioning)
+			}
+			if d.provisioned != "" {
+				activity += " · Provisioned=" + string(d.provisioned)
+			}
+		}
+		d.appendActivity(fmt.Sprintf("Tenant wait +%s: %s", d.elapsed.Truncate(time.Second), activity))
+		d.tenantActivityAt = now
+	}
 	d.current = "Observe tenant provisioning and readiness"
 	d.currentStarted = time.Time{}
 	d.phases[3] = dashboardPhase{"running", "Observe the real tenant API and nodes"}

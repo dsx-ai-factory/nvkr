@@ -306,7 +306,12 @@ input/output. Its phase map, observed state and bounded public activity use type
 owner events, not log-derived authority; narrow terminals stack the panes. `--plain`,
 pipes and redirected output retain scrolling progress; `--verbose` builds use plain
 public-log streaming. Tab changes focus, PgUp/PgDn scroll activity and End returns
-to live activity. While the dashboard owns input, q and Ctrl+C ask for confirmation;
+to live activity. Tenant stage, count and closed condition changes add activity
+immediately; unchanged reported waits add a heartbeat at most once per 30 seconds.
+These reports do not prove successful API polls or guest progress. Fixed Packer
+summaries expose selected boot, transfer, provisioning and post-processing reports
+without copying variable paths or addresses; live guest serial activity remains
+unimplemented. While the dashboard owns input, q and Ctrl+C ask for confirmation;
 only y/Y requests cancellation. Escape closes details or dismisses confirmation,
 never canceling work. Plain/verbose output and the initial sudo prompt retain
 signal-driven cancellation without a dialog. Normal cancellation waits for owned

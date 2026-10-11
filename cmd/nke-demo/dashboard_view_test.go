@@ -185,7 +185,47 @@ func TestDashboardTenantHeartbeatAndChanges(t *testing.T) {
 			if after.tenantChangedAt.After(before.tenantChangedAt) != tc.changed || after.observedAt.After(before.observedAt) != tc.valid {
 				t.Fatalf("stage/count change=%v latest observation=%v", after.tenantChangedAt.After(before.tenantChangedAt), after.observedAt.After(before.observedAt))
 			}
+			wantLines := 0
+			if tc.changed {
+				wantLines = 1
+			}
+			if got := len(after.activity) - len(before.activity); got != wantLines {
+				t.Fatalf("activity added %d lines for state change=%v", got, tc.changed)
+			}
 		})
+	}
+}
+
+func TestDashboardTenantActivityHeartbeat(t *testing.T) {
+	for _, stage := range []string{"tenant-kubeconfig", "tenant-api", "tenant-nodes", "tenant-workload"} {
+		for _, gap := range []time.Duration{29 * time.Second, 31 * time.Second} {
+			t.Run(fmt.Sprintf("%s/%s", stage, gap), func(t *testing.T) {
+				d := newDashboard()
+				event := nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: stage, RegisteredNodes: 1, Provisioning: nkedemo.TenantConditionTrue, Elapsed: 9 * time.Minute, Remaining: time.Hour}
+				d.Report(event)
+				d.tenantChangedAt = d.tenantChangedAt.Add(-2 * time.Minute)
+				d.observedAt = d.observedAt.Add(-12 * time.Second)
+				d.tenantActivityAt = d.tenantActivityAt.Add(-gap)
+				before, lastActivity := d.snapshot(), d.tenantActivityAt
+				event.Elapsed = 9*time.Minute + 21*time.Second
+				event.Status = "private-secret\x1b[2J"
+				d.Report(event)
+				after := d.snapshot()
+				wantLines := 0
+				if gap >= 30*time.Second {
+					wantLines = 1
+					if got := after.activity[len(after.activity)-1]; got != "Tenant wait +9m21s: latest reported conditions remain unchanged." {
+						t.Fatalf("unexpected heartbeat: %q", got)
+					}
+				}
+				if len(after.activity)-len(before.activity) != wantLines || d.tenantActivityAt.After(lastActivity) != (wantLines == 1) {
+					t.Fatal("unchanged reports did not respect the activity throttle")
+				}
+				if !after.tenantChangedAt.Equal(before.tenantChangedAt) || !after.observedAt.After(before.observedAt) || after.phases != before.phases || after.tenantStages != before.tenantStages {
+					t.Fatal("activity heartbeat changed reported state or completion")
+				}
+			})
+		}
 	}
 }
 

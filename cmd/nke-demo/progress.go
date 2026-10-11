@@ -173,7 +173,11 @@ func (w *checkedWriter) lineOutput() {
 			return
 		}
 	}
-	if dashboardGuestReport(line) != "" || strings.HasPrefix(line, "==> ") && strings.HasSuffix(line, ": Waiting for SSH to become available...") {
+	if summary := dashboardGuestReport(line); summary != "" {
+		w.emit(fmt.Sprintf("[build +%s] %s%s\n", time.Since(w.started).Truncate(time.Second), dashboardGuestReportPrefix, summary))
+		return
+	}
+	if strings.HasPrefix(line, "==> ") && strings.HasSuffix(line, ": Waiting for SSH to become available...") {
 		w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), terminalText(line)))
 		return
 	}
