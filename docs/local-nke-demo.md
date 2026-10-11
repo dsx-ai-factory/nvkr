@@ -12,9 +12,11 @@ Wait for the source-owner fix and a reviewed pin update before expecting a
 successful complete E2E with this selection. No local catalog workaround is
 applied. The build-only development loops remain separate from tenant acceptance.
 An explicit `--network upstream-ovn` alternative selects upstream OVN for both
-site and tenant; it does not fix or validate the NVIDIA fork. Its complete fresh
-E2E acceptance remains unverified. Neither this source fix nor a different CNI
-alone guarantees tenant provisioning, workload/DNS or cleanup. The temporary
+site and tenant; it does not fix or validate the NVIDIA fork. A fresh E2E at
+`71b356f5899efb759571f0ea51781ead3f7c466a` passed on 2026-10-11; see the
+[exact-revision runtime evidence](evidence/local-upstream-ovn-2026-10-11.md).
+This does not establish live acceptance of later changes. Neither this source
+fix nor a different CNI alone guarantees tenant provisioning, workload/DNS or cleanup. The temporary
 Calico diagnostic has separate readiness and datapath checks, not an OVN pass.
 See the selections below.
 
@@ -416,9 +418,13 @@ Source acquisition and Docker pulls still require their configured endpoints;
 this option is not an offline mode. A local upstream Git redirect must name
 `https://github.com/ovn-kubernetes/ovn-kubernetes`, not the NVIDIA fork.
 
-The explicit source and package bindings are contract checks. Complete site
-networking, tenant readiness, workload/DNS and owned cleanup must still pass in
-a fresh real E2E before this option can be called operationally validated.
+The explicit source and package bindings are contract checks. A separate fresh
+real E2E at `71b356f5899efb759571f0ea51781ead3f7c466a` passed matched upstream
+site networking, two Ready ARM64 QCOW2 nodes, the unchanged zero-retry
+workload/DNS check and natural owned cleanup. The
+[dated evidence](evidence/local-upstream-ovn-2026-10-11.md) records its exact
+scope and retained observations. It is an unqualified local diagnostic, not a
+supported NKE combination or live acceptance of subsequent changes.
 
 ### Temporary Calico diagnostic
 

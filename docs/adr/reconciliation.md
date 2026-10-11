@@ -290,9 +290,16 @@ selected digest through the existing repository/tag helper, without a template
 patch; no retrievable external rendering artifact is cited for that local exercise.
 Controlled tests cover mode propagation, four distinct output names,
 profile package/disk alignment, image binding, six-container node observations
-and site-network readiness before Cluster API. These checks do not establish
-real upstream startup, a fresh two-node E2E, workload/DNS or owned cleanup.
-This option neither fixes nor validates the NVIDIA fork's open startup issue.
+and site-network readiness before Cluster API. These checks alone do not
+establish real startup or tenant acceptance. Separately, a fresh complete E2E
+on `71b356f5899efb759571f0ea51781ead3f7c466a` passed on 2026-10-11: one
+29-output Run, matched upstream site/tenant inputs, two Ready ARM64 QCOW2 nodes,
+unchanged zero-retry workload/DNS and natural deletion plus joined owned cleanup.
+The [exact-revision evidence](../evidence/local-upstream-ovn-2026-10-11.md)
+retains the bindings, runtime checks and recording integrity. This is an
+unqualified local diagnostic, not live acceptance of later changes, a supported
+release combination, M2 or qualification. This option neither fixes nor
+validates the NVIDIA fork's open startup issue.
 
 Fresh profiles selections produce a native OCI image through the existing
 rootless BuildKit lane and pinned NKE profiles Dockerfile. A named build context

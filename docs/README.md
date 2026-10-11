@@ -47,6 +47,7 @@ records source availability and remaining gaps.
 | Task | Guide |
 |---|---|
 | Build artifacts, install a local site, and validate a real QCOW2-backed tenant plus workload | [Integrated Ubuntu ARM64 guide](local-nke-demo.md) |
+| Review exact-revision evidence from the successful fresh upstream OVN diagnostic | [2026-10-11 runtime evidence](evidence/local-upstream-ovn-2026-10-11.md) |
 | Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
 | Understand the NKD-to-installer artifact handoff | [Staged-installer handoff](nkd-to-nke-demo.md) |
 | Determine what remains for a full source-built local NKE distribution | [Full-source gap map](full-nke-source-build.md) |
