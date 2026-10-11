@@ -344,6 +344,12 @@ Kind network, discovers its IPv4 address and checks `/v2/` from the actual
 management node before uploading anything. It does not use a host-published
 registry port. Local transfers bypass proxies only for this registry address;
 external source and registry traffic retains your proxy settings.
+The registry uses temporary storage capped at 2 GiB. Admission deduplicates the
+selected image blobs and requires room for their total size, the largest
+in-flight upload, and 64 MiB of metadata headroom before creating resources.
+Tmpfs allocates memory as content is written; this ceiling is neither reserved
+RAM nor proof of available memory. The deployment host must still meet the
+complete-demo capacity checks above.
 
 Run the checked-in example directly from the repository root. The flags below
 replace its placeholder repository and output paths; no YAML copy or editing

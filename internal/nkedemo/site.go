@@ -29,7 +29,11 @@ import (
 )
 
 const registryImage = "docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
-const registryBytes int64 = 1 << 30
+
+// The full site image closure can exceed 1 GiB once the largest in-flight
+// upload and metadata headroom are included. Keep admission and the ephemeral
+// registry's tmpfs on the same bounded 2 GiB ceiling.
+const registryBytes int64 = 2 << 30
 
 var chartOutputs = map[string]string{"controller": "controller-chart", "nktp": "nktp", "postgresql": "postgresql", "spire": "spire", "spire-crds": "spire-crds", "temporal": "temporal"}
 var runtimeImages = []string{"csi-node-driver-registrar", "postgresql", "spiffe-csi", "spire-agent", "spire-bash", "spire-controller-manager", "spire-oidc", "spire-server", "spire-tpm-server", "temporal-admin-tools", "temporal-server", "temporal-ui"}

@@ -316,6 +316,11 @@ E2E now admits cached ARM64 Kind and registry images before installer acquisitio
 or artifact builds. Deployment authenticates its owned registry's direct IPv4
 address on the admitted Kind network and probes `/v2/` from the actual management
 node before uploads. Scoped proxy bypass applies only to that private endpoint.
+Registry admission measures deduplicated image bytes, the largest serial upload
+and 64 MiB headroom against the same 2 GiB ceiling used by its ephemeral tmpfs.
+Tests cover the measured 1,122,458,894-byte closure, the exact ceiling and one
+byte over, blob-count bounds and the launch argument. This is a capacity
+correction, not fresh deployment or workload/DNS acceptance.
 Contract tests cover ownership, network/address substitutions and probe failures;
 the isolated native registry test exercised the direct route, but does not prove
 deployment across all supported host configurations. Network progress now groups

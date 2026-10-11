@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -530,7 +531,7 @@ func TestRegistryStartRejectsIdentityBeforeNodeProbe(t *testing.T) {
 			if strings.Contains(commands, "--publish") || strings.Contains(commands, "exec\n") || strings.Contains(commands, "15501") {
 				t.Fatal("registry start published a host port or probed an unadmitted node route")
 			}
-			for _, expected := range []string{"--network\nkind\n", "--read-only\n", "--cap-drop=ALL\n", registryImage} {
+			for _, expected := range []string{"--network\nkind\n", "--read-only\n", "--cap-drop=ALL\n", "--tmpfs\n/var/lib/registry:rw,size=2147483648\n", registryImage} {
 				if !strings.Contains(commands, expected) {
 					t.Fatalf("registry start lost %q", expected)
 				}
@@ -753,7 +754,7 @@ func TestNodeSimulatorProbeRequiresBoundedHealthFromOwnedNode(t *testing.T) {
 }
 
 func TestRegistryCapacityIsMeasuredAndBounded(t *testing.T) {
-	for _, name := range []string{"exact", "oversized", "combined", "symlink", "sizeMismatch", "missingInput"} {
+	for _, name := range []string{"exact", "freshUpstream", "atLimit", "overLimit", "blobLimit", "tooManyBlobs", "oversized", "combined", "symlink", "sizeMismatch", "missingInput"} {
 		t.Run(name, func(t *testing.T) {
 			base := t.TempDir()
 			outputs := make(map[string]SelectedOutput)
@@ -785,6 +786,26 @@ func TestRegistryCapacityIsMeasuredAndBounded(t *testing.T) {
 				}
 			}
 			switch name {
+			case "freshUpstream":
+				// Reproduce the exact measured reservation that stopped the fresh
+				// upstream OVN run before deployment at the former 1 GiB ceiling.
+				const required int64 = 1_122_458_894
+				small := int64(6 * (len(imageKeys()) + 1))
+				truncate(filepath.Join(outputs["cwe"].Layout, "blobs/sha256/fresh-layer"), (required-(64<<20)-small)/2)
+			case "atLimit", "overLimit":
+				small := int64(6 * (len(imageKeys()) + 1))
+				truncate(filepath.Join(outputs["cwe"].Layout, "blobs/sha256/large"), (registryBytes-(64<<20)-small)/2)
+				if name == "overLimit" {
+					truncate(filepath.Join(outputs["cwe"].Layout, "blobs/sha256/one-more-byte"), 1)
+				}
+			case "blobLimit", "tooManyBlobs":
+				count := 4096
+				if name == "tooManyBlobs" {
+					count++
+				}
+				for i := len(imageKeys()) + 1; i < count; i++ {
+					truncate(filepath.Join(outputs["cwe"].Layout, "blobs/sha256", fmt.Sprintf("extra-%04d", i)), 0)
+				}
 			case "oversized":
 				truncate(blob, registryBytes+1)
 			case "combined":
@@ -803,11 +824,17 @@ func TestRegistryCapacityIsMeasuredAndBounded(t *testing.T) {
 				delete(outputs, "provider")
 			}
 			bytes, err := registryCapacity(outputs)
-			if name == "exact" {
+			if name == "exact" || name == "freshUpstream" || name == "atLimit" || name == "blobLimit" {
 				if err != nil {
 					t.Fatal(err)
 				}
 				expected := int64(64<<20) + 6*int64(len(imageKeys())+2)
+				switch name {
+				case "freshUpstream":
+					expected = 1_122_458_894
+				case "atLimit":
+					expected = registryBytes
+				}
 				if bytes != expected {
 					t.Fatalf("capacity:%d != %d", bytes, expected)
 				}
