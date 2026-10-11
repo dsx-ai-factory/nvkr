@@ -165,9 +165,6 @@ esac
 			if string(raw) != want {
 				t.Fatalf("unexpected CNI readiness commands: %q", raw)
 			}
-			if _, statErr := os.Stat(filepath.Join(work, "workload.json")); !os.IsNotExist(statErr) {
-				t.Fatal("Calico rollout must not create or retry the smoke workload")
-			}
 		})
 	}
 }
@@ -237,9 +234,6 @@ esac
 			}
 			if string(raw) != want {
 				t.Fatalf("unexpected readiness commands: %q", raw)
-			}
-			if _, statErr := os.Stat(filepath.Join(work, "workload.json")); !os.IsNotExist(statErr) {
-				t.Fatal("DNS rollout must not create or retry the smoke workload")
 			}
 		})
 	}
@@ -351,8 +345,15 @@ func TestTenantRequiresTwoDistinctReadyNativeNodes(t *testing.T) {
 }
 
 func tenantVMFixture(t *testing.T) (Runner, string, lifecycle.Artifact, string, []string) {
+	return tenantVMFixtureAt(t, "")
+}
+
+func tenantVMFixtureAt(t *testing.T, simulatorWork string) (Runner, string, lifecycle.Artifact, string, []string) {
 	t.Helper()
 	runner, root, work, first := domainFixture(t)
+	if simulatorWork != "" {
+		work = simulatorWork
+	}
 	second := strings.Replace(first, "000000000001", "000000000002", 1)
 	names := []string{first, second}
 	for _, name := range names {

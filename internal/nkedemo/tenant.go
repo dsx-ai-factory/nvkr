@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
 )
 
@@ -283,7 +284,13 @@ func (t *tenant) kubectl(config string, args ...string) []string {
 
 func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	boundary := beginProgress(t.session.Runner.Progress, "tenant-provisioning", DeploymentStarted, DeploymentFinished, DeploymentFailed)
-	defer func() { boundary.finish(result) }()
+	waitStage := ""
+	defer func() {
+		if waitStage != "" {
+			result = t.waitError(result, waitStage)
+		}
+		boundary.finish(result)
+	}()
 	mode, err := normalizeNetwork(t.network)
 	if err != nil {
 		return err
@@ -326,6 +333,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	guestObserver := tenantGuestObserver{}
 	progress.update(time.Now(), "tenant-kubeconfig", nil)
 	kubeconfig := filepath.Join(t.session.Work, "tenant-kubeconfig")
+	waitStage = "waiting for NKE to publish tenant kubeconfig"
 	for {
 		if row, err = t.alive(provision); err != nil {
 			return err
@@ -352,7 +360,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 			break
 		}
 		if err = pause(provision, 10*time.Second); err != nil {
-			return fmt.Errorf("waiting for NKE to publish tenant kubeconfig (private diagnostics: %s): %w", t.session.Work, err)
+			return err
 		}
 		progress.update(time.Now(), "tenant-kubeconfig", nil)
 	}
@@ -370,6 +378,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 		return errors.New("tenant kubeconfig does not select the admitted VM VIP")
 	}
 	var nodes struct{ Items []tenantNode }
+	waitStage = "waiting for two Ready tenant nodes"
 	progress.update(time.Now(), "tenant-api", nil)
 	for {
 		if row, err = t.alive(provision); err != nil {
@@ -399,9 +408,10 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 			}
 		}
 		if err = pause(provision, 10*time.Second); err != nil {
-			return fmt.Errorf("waiting for two Ready tenant nodes (private diagnostics: %s): %w", t.session.Work, err)
+			return err
 		}
 	}
+	waitStage = ""
 	domains, err := vmEvidence(ctx, filepath.Join(filepath.Dir(t.session.Work), "simulator"), t.image, t.domains)
 	if err != nil {
 		return err
@@ -467,12 +477,27 @@ type tenantResult struct {
 	Workload                       json.RawMessage
 }
 
+func (t *tenant) waitError(err error, stage string) error {
+	if err == nil {
+		return nil
+	}
+	code := nkderr.CodePreflightFailed
+	var coded *nkderr.Error
+	switch {
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		code = nkderr.CodeTimeout
+	case errors.As(err, &coded):
+		code = coded.Code
+	}
+	return nkderr.Wrap(code, err, "%s (private diagnostics: %s)", stage, t.session.Work)
+}
+
 // Calico can report Node Ready before its node agents finish their own rollout.
 // The diagnostic mode must admit that datapath before the unchanged smoke test;
 // rollout readiness is not functional DNS or workload acceptance.
 func (t *tenant) waitCNI(ctx context.Context, kubeconfig string) (result error) {
 	if err := requireContext(ctx); err != nil {
-		return err
+		return t.waitError(err, "waiting for tenant CNI readiness")
 	}
 	mode, err := normalizeNetwork(t.network)
 	if err != nil {
@@ -482,7 +507,10 @@ func (t *tenant) waitCNI(ctx context.Context, kubeconfig string) (result error) 
 		return nil
 	}
 	boundary := beginProgress(t.session.Runner.Progress, "tenant-cni-readiness", PhaseStarted, PhaseFinished, PhaseFailed)
-	defer func() { boundary.finish(result) }()
+	defer func() {
+		result = t.waitError(result, "waiting for tenant Calico daemonset/calico-node rollout")
+		boundary.finish(result)
+	}()
 	ready, cancel := context.WithTimeout(ctx, 4*time.Minute)
 	defer cancel()
 	_, result = t.capture(ready, t.kubectl(kubeconfig, "-n", "calico-system", "rollout", "status", "daemonset/calico-node", "--timeout=240s"), "cni-calico-rollout", 4*time.Minute)
@@ -494,16 +522,21 @@ func (t *tenant) waitCNI(ctx context.Context, kubeconfig string) (result error) 
 // smoke test; rollout completion alone is not functional DNS acceptance.
 func (t *tenant) waitDNS(ctx context.Context, kubeconfig string) (result error) {
 	if err := requireContext(ctx); err != nil {
-		return err
+		return t.waitError(err, "waiting for tenant DNS readiness")
 	}
 	boundary := beginProgress(t.session.Runner.Progress, "tenant-dns-readiness", PhaseStarted, PhaseFinished, PhaseFailed)
-	defer func() { boundary.finish(result) }()
+	stage := "waiting for tenant DNS readiness"
+	defer func() {
+		result = t.waitError(result, stage)
+		boundary.finish(result)
+	}()
 	ready, cancel := context.WithTimeout(ctx, 4*time.Minute)
 	defer cancel()
 	for _, resource := range []struct{ name, phase string }{
 		{"deployment/coredns", "dns-coredns-rollout"},
 		{"daemonset/node-local-dns", "dns-node-local-rollout"},
 	} {
+		stage = "waiting for tenant DNS " + resource.name + " rollout"
 		if _, err := t.capture(ready, t.kubectl(kubeconfig, "-n", "kube-system", "rollout", "status", resource.name, "--timeout=240s"), resource.phase, 4*time.Minute); err != nil {
 			return err
 		}

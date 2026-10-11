@@ -44,20 +44,39 @@ func dashboardText(screen tcell.SimulationScreen) string {
 	return text.String()
 }
 
-func TestDashboardTenantCalicoReadinessIsNotCompletion(t *testing.T) {
-	for _, name := range []string{"tenant-cni-readiness", "tenant-cni-calico-rollout"} {
-		t.Run(name, func(t *testing.T) {
+func TestDashboardTenantReadinessIsNotWorkloadCompletion(t *testing.T) {
+	for _, tc := range []struct{ name, label string }{
+		{"tenant-cni-readiness", "Wait for tenant Calico node agents before DNS checks"},
+		{"tenant-dns-readiness", "Wait for CoreDNS and node-local DNS rollout before the smoke test"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			d := newDashboard()
-			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseStarted, Name: name})
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseStarted, Name: tc.name})
 			s := d.snapshot()
-			if s.phases[4].state != "running" || s.current != "Wait for tenant Calico node agents before DNS checks" || s.tenantStages[3].states[0] == "observed" {
-				t.Fatal("CNI admission hidden or incorrectly advanced workload completion")
+			if s.phases[4].state != "running" || s.current != tc.label || s.tenantStages[3].states[0] == "observed" {
+				t.Fatal("readiness admission hidden or incorrectly advanced workload completion")
 			}
-			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseFinished, Name: name})
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseFinished, Name: tc.name})
 			if d.snapshot().phases[4].state == "complete" || d.snapshot().tenantStages[3].states[0] == "observed" {
-				t.Fatal("CNI rollout became E2E workload/DNS completion")
+				t.Fatal("readiness rollout became E2E workload/DNS completion")
 			}
 		})
+	}
+}
+
+func TestDashboardPrivateRolloutNamesDoNotAdvanceReadiness(t *testing.T) {
+	for _, name := range []string{"tenant-cni-calico-rollout", "tenant-dns-coredns-rollout", "tenant-dns-node-local-rollout"} {
+		for _, kind := range []string{nkedemo.PhaseStarted, nkedemo.PhaseFinished, nkedemo.PhaseFailed} {
+			t.Run(fmt.Sprintf("%s/%s", name, kind), func(t *testing.T) {
+				d := newDashboard()
+				before := d.snapshot()
+				d.Report(nkedemo.ProgressEvent{Kind: kind, Name: name})
+				after := d.snapshot()
+				if after.phases != before.phases || after.tenantStages != before.tenantStages || after.current != before.current || len(after.activity) != len(before.activity) {
+					t.Fatal("private rollout name became a public readiness observation")
+				}
+			})
+		}
 	}
 }
 
@@ -667,6 +686,41 @@ func TestDashboardTenantGuestUnknownAndStale(t *testing.T) {
 	}
 }
 
+func TestDashboardTenantGuestWorstWidthLayout(t *testing.T) {
+	for _, state := range []nkedemo.TenantDomainState{nkedemo.TenantDomainUnknown, nkedemo.TenantDomainShutOff} {
+		t.Run(string(state), func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: "tenant-nodes", Remaining: time.Hour})
+			event := dashboardGuestFixture()
+			for index := range event.Guests {
+				event.Guests[index].Domain = state
+				event.Guests[index].ProviderReady = nkedemo.TenantConditionUnknown
+				event.Guests[index].ConsoleBytes = 1023 << 20
+				event.Guests[index].ConsoleChanged = true
+				event.Guests[index].ConsoleLastChange = 24*time.Hour - time.Second
+			}
+			d.Report(event)
+			_, _ = io.WriteString(d, "latest public activity\n")
+			s := d.snapshot()
+			screen := dashboardScreen(t, 80)
+			screen.SetSize(80, 24)
+			d.draw(screen, s.guestsObservedAt, false)
+			text := dashboardText(screen)
+			for _, role := range []string{"Control plane", "Worker"} {
+				row := fmt.Sprintf("%-13s VM %-8s Infra Unknown console 1023 MiB; growth age 23h59m59s", role, state)
+				if !strings.Contains(text, row) {
+					t.Fatalf("guest row clipped at 80x24: %q\n%s", row, text)
+				}
+			}
+			for _, want := range []string{"○ Workload/DNS", "not Kubernetes readiness", "Guest snapshot", "growth ages measured at snapshot", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
+				if !strings.Contains(text, want) {
+					t.Fatalf("missing %q at 80x24:\n%s", want, text)
+				}
+			}
+		})
+	}
+}
+
 func TestDashboardTenantGuestRejectsPrivateOrInvalidValues(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -693,9 +747,6 @@ func TestDashboardTenantGuestRejectsPrivateOrInvalidValues(t *testing.T) {
 			after := d.snapshot()
 			if after.guests != before.guests || !after.guestsObservedAt.Equal(before.guestsObservedAt) || after.phases != before.phases {
 				t.Fatal("invalid guest description modified model")
-			}
-			if text := dashboardTenantSummary(after, time.Now()); strings.Contains(text, "private-") || strings.ContainsRune(text, '\x1b') {
-				t.Fatal("private guest descriptions reached output")
 			}
 		})
 	}

@@ -315,7 +315,20 @@ func Run(ctx context.Context, cfg Config) (result error) {
 		}
 		return nil
 	}
-	return nkderr.Wrap(nkderr.CodePreflightFailed, err, "local NKE demo")
+	return localDemoError(err)
+}
+
+func localDemoError(err error) error {
+	if err == nil {
+		return nil
+	}
+	code := nkderr.CodePreflightFailed
+	var coded *nkderr.Error
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+		(errors.As(err, &coded) && coded.Code == nkderr.CodeTimeout) {
+		code = nkderr.CodeTimeout
+	}
+	return nkderr.Wrap(code, err, "local NKE demo")
 }
 
 // This is emitted only after the deployment owner has joined cleanup. Naming

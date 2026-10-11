@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
+	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
@@ -123,10 +124,10 @@ func TestPackerActivityMetadataSampler(t *testing.T) {
 			if err := os.Mkdir(root, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			harness := "\nimport sys\nROOT=sys.argv[1]\nopen(ROOT+'/private.log','wb').write(b'a')\no=Observer()\na=o.sample()\n" + test.action + "\nb=o.sample()\nprint(json.dumps([a,b]))\n"
+			harness := "\nopen(ROOT+'/private.log','wb').write(b'a')\no=Observer()\na=o.sample()\n" + test.action + "\nb=o.sample()\nprint(json.dumps([a,b]))\n"
 			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 			defer cancel()
-			raw, err := exec.CommandContext(ctx, python, "-c", prefix+harness, root).CombinedOutput()
+			raw, err := exec.CommandContext(ctx, python, "-I", "-u", "-c", prefix+harness, root).CombinedOutput()
 			if err != nil {
 				t.Fatal(err, string(raw))
 			}
@@ -139,6 +140,66 @@ func TestPackerActivityMetadataSampler(t *testing.T) {
 			}
 			if strings.Contains(string(raw), "private") || strings.Contains(string(raw), root) {
 				t.Fatal("observer exported a filename/path")
+			}
+		})
+	}
+}
+
+func TestPackerActivityProductionScriptCollector(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 is needed for the fixed toolchain-script contract")
+	}
+	for _, test := range []struct {
+		name      string
+		available bool
+	}{
+		{"baseline", true},
+		{"missing root", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir() + "/private logs '"
+			const content = "private source text is never exported"
+			want := buildactivity.Record{Version: 1, Operation: "os/build-disk"}
+			if test.available {
+				if err := os.Mkdir(root, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(root+"/private.log", []byte(content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				want.Available, want.Files, want.Bytes = true, 1, int64(len(content))
+			}
+			sink, reader := activityTestSink(t)
+			writer := &packerActivityWriter{sink: sink, operation: want.Operation}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			cmd := exec.CommandContext(ctx, python, "-I", "-u", "-c", packerActivityScript, root)
+			cmd.Stdout, cmd.Stderr = writer, io.Discard
+			joined := make(chan error, 1)
+			go func() { joined <- ownedcmd.Run(ctx, cmd) }()
+			defer func() {
+				cancel()
+				select {
+				case err := <-joined:
+					if !errors.Is(err, context.Canceled) {
+						t.Errorf("production sampler cancellation = %v", err)
+					}
+				case <-time.After(3 * time.Second):
+					t.Error("production sampler did not join after cancellation")
+				}
+			}()
+			// Exercise the complete, unmodified script and its production encoding,
+			// not a sampler harness or a handwritten canonical collector frame.
+			raw, err := reader.ReadString('\n')
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := buildactivity.Decode([]byte(strings.TrimSuffix(raw, "\n")))
+			if err != nil || record != want {
+				t.Fatalf("production metadata = %+v, want %+v: %v", record, want, err)
+			}
+			if strings.Contains(raw, root) || strings.Contains(raw, "private.log") || strings.Contains(raw, content) {
+				t.Fatal("production sampler exported private source details")
 			}
 		})
 	}
@@ -307,6 +368,10 @@ func TestPackerActivityOwnedReadOnlyLifecycle(t *testing.T) {
 				t.Fatal("stop returned before joining attach")
 			}
 			args := strings.Join(runtime.created, " ")
+			wantCommand := []string{"pinned-image", "-I", "-u", "-c", packerActivityScript, packerContainerBuildLogPath}
+			if len(runtime.created) < len(wantCommand) || !reflect.DeepEqual(runtime.created[len(runtime.created)-len(wantCommand):], wantCommand) {
+				t.Fatal("observer command did not use the exact production script and bound log root")
+			}
 			for _, want := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "src=owned-work,dst=/nkd/work,volume-nocopy,readonly", "--entrypoint=python3", "pinned-image -I -u -c"} {
 				if !strings.Contains(args, want) {
 					t.Fatalf("missing %s", want)

@@ -434,7 +434,12 @@ the remaining tenant deadline. A deployment-only replay observed both nodes
 Ready and DNS rollouts passing while Calico was still unready; its unchanged
 smoke then failed on DNS timeout. The added CNI admission is not proof that the
 underlying datapath is fixed. Controlled failure/cancellation tests cover these
-gates. The retained
+gates. An owned-subprocess fixture exercises the actual tenant orchestration:
+CNI/DNS rollout failures and canceled waits prevent the single smoke submission.
+Kubeconfig, Ready-node, CNI and DNS waits retain their named stage and private
+diagnostic location; cancellation or a tenant deadline retains the timeout code
+at the public demo boundary. These fixtures do not start real guests or establish
+functional DNS. The retained
 continuous `arm-clean-20261010-183945` invocation at `bda67f0` subsequently
 observed both ARM64 tenant nodes Ready, both DNS rollouts and the unchanged
 workload/DNS smoke passing, but exited 17 at `tenant-deletion-wait`. Its original

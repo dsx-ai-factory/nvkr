@@ -356,9 +356,9 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Install and check the NKE site stack"
 	case "tenant-provisioning":
 		return 3, "Provision QCOW2 control plane and worker"
-	case "tenant-cni-readiness", "tenant-cni-calico-rollout":
+	case "tenant-cni-readiness":
 		return 4, "Wait for tenant Calico node agents before DNS checks"
-	case "tenant-dns-readiness", "tenant-dns-coredns-rollout", "tenant-dns-node-local-rollout":
+	case "tenant-dns-readiness":
 		return 4, "Wait for CoreDNS and node-local DNS rollout before the smoke test"
 	case "tenant-cleanup":
 		return 5, "Clean up the owned tenant"
@@ -734,7 +734,7 @@ func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
 	}
 	var checkpoints strings.Builder
 	completed := 0
-	for index, label := range [...]string{"Kubeconfig", "API", "Nodes", "DNS"} {
+	for index, label := range [...]string{"Kubeconfig", "API", "Nodes", "Workload/DNS"} {
 		state, _, _ := s.tenantStages[index].status(1)
 		color, marker := "goldenrod", "○"
 		switch state {
@@ -760,7 +760,7 @@ func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
 					console = fmt.Sprintf("console %s; growth age %s", dashboardConsoleSize(guest.ConsoleBytes), dashboardGuestAge(guest.ConsoleLastChange))
 				}
 			}
-			row = fmt.Sprintf("%-13s  VM %-8s Infra %s; %s", role, guest.Domain, guest.ProviderReady, console)
+			row = fmt.Sprintf("%-13s VM %-8s Infra %s %s", role, guest.Domain, guest.ProviderReady, console)
 		}
 		if guest.ProvisioningFailure == nkedemo.TenantInstanceCreateFailed {
 			domain := guest.Domain

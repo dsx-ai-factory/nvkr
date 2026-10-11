@@ -18,8 +18,8 @@ import (
 // the attempt's work volume mounted read-only. Names, inodes and directory paths
 // stay inside the observer; no file contents are read or sent. The directory is
 // the existing Plan-bound log destination, not an inferred serial-console path.
-const packerActivityScript = `import os, stat, time, json
-ROOT = "/nkd/work/build-logs"
+const packerActivityScript = `import os, stat, time, json, sys
+ROOT = sys.argv[1]
 PERIOD = 5.0
 NOFOLLOW = os.O_NOFOLLOW | os.O_NONBLOCK
 
@@ -208,7 +208,7 @@ func startPackerActivity(ctx context.Context, request packerContainerRunRequest,
 		work: work, workReadOnly: true, project: packerContainerWorkRoot, entrypoint: "python3",
 		// Isolated mode excludes the source-writable workdir and ambient Python
 		// paths from imports. Only the pinned toolchain's stdlib may execute.
-		packerArgs: []string{"-I", "-u", "-c", packerActivityScript}, labels: labels, identity: request.identity}
+		packerArgs: []string{"-I", "-u", "-c", packerActivityScript, packerContainerBuildLogPath}, labels: labels, identity: request.identity}
 	// Register before create: a runtime failure may leave its exact object alive.
 	resources.containers = append(resources.containers, name)
 	if resources.privateObservers == nil {

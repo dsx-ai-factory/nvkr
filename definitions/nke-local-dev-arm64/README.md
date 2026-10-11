@@ -30,6 +30,19 @@ The upstream selection stacks `os-upstream-ovn.json` after `os-tcg.json`;
 its `requiresCatalogDigest` binds that exact predecessor, not the base catalog
 alone. Regenerate and review both bindings after changing either predecessor.
 
+`definition-upstream-ovn.json` substitutes these four outputs as one matched
+diagnostic selection; the other 25 output names remain unchanged:
+
+| Output | Format | Role |
+| --- | --- | --- |
+| `nke-node-image-upstream-ovn-arm64` | `disk-image` | QCOW2 with the selected upstream OVN packages |
+| `upstream-ovn-image-arm64` | `oci` | Standalone upstream OVN image |
+| `upstream-ovn-chart-arm64` | `helm-oci` | Chart bound to the standalone image |
+| `controller-profiles-upstream-ovn` | `oci` | Profiles selecting the matching upstream chart stream |
+
+Select all four together for the upstream demo. These output bindings do not
+establish NVIDIA-fork compatibility or completed tenant acceptance.
+
 ```sh
 bin/nkdctl definition validate --definition definitions/nke-local-dev-arm64/definition.json
 bin/nkdctl run local \
