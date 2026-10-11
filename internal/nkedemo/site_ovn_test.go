@@ -634,3 +634,62 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 		}
 	}
 }
+
+func TestSiteOVNAdmissionRejectsSuccessfulCommandWithInvalidBody(t *testing.T) {
+	for _, network := range []string{"ovn", "upstream-ovn"} {
+		for _, failure := range []string{"", "malformed", "wrong image", "missing pods", "persistence"} {
+			t.Run(network+"/"+failure, func(t *testing.T) {
+				work := privateTestDir(t)
+				ref := "172.18.0.2:5000/nkd-local/ovn@sha256:" + strings.Repeat("a", 64)
+				fixtureRef := ref
+				if failure == "wrong image" {
+					fixtureRef = "172.18.0.2:5000/nkd-local/ovn@sha256:" + strings.Repeat("b", 64)
+				}
+				pods := ovnPodsFixture(fixtureRef, "owned")
+				if network == "upstream-ovn" {
+					pods = upstreamOVNPodsFixture(fixtureRef, "owned")
+				}
+				raw, err := json.Marshal(pods)
+				if err != nil {
+					t.Fatal(err)
+				}
+				switch failure {
+				case "malformed":
+					raw = []byte("not JSON")
+				case "missing pods":
+					raw = []byte(`{"items":[]}`)
+				}
+				if failure == "persistence" {
+					if err := os.WriteFile(filepath.Join(work, "site-ovn-inputs.json"), []byte("existing evidence must not be overwritten"), 0o600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := os.WriteFile(filepath.Join(work, "kubectl"), []byte("#!/bin/sh\nprintf '%s\\n' \"$PODS_FIXTURE\"\n"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				progress := &recordedProgress{}
+				session := ManagementSession{Name: "owned", Work: work, Tools: work, Runner: Runner{Work: work, Progress: progress, Env: []string{"PATH=/usr/bin:/bin", "SITE_KUBECONFIG=fixture", "PODS_FIXTURE=" + string(raw)}}}
+				err = observeSelectedSiteNetwork(t.Context(), network, session, ref, delivery.HelmChartExport{}, captureSiteNetwork)
+				want := PhaseFinished
+				if failure != "" {
+					want = PhaseFailed
+				}
+				var commandComplete, ownerComplete bool
+				for _, event := range progress.events {
+					if event.Name == "site-ovn-observation" && event.Kind == PhaseFinished {
+						commandComplete = true
+					}
+					if event.Name == "site-ovn-admission" && event.Kind == want {
+						ownerComplete = true
+					}
+					if failure != "" && event.Name == "site-ovn-admission" && event.Kind == PhaseFinished {
+						t.Fatal("rejected successful command body fabricated owner admission")
+					}
+				}
+				if !commandComplete || !ownerComplete || (err != nil) != (failure != "") {
+					t.Fatalf("command/owner distinction lost: events=%+v err=%v", progress.events, err)
+				}
+			})
+		}
+	}
+}

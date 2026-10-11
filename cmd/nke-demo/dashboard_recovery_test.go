@@ -84,7 +84,7 @@ func TestDashboardRendererPanicRestoresBeforeCleanupJoin(t *testing.T) {
 			release <- struct{}{}
 			select {
 			case err := <-result:
-				assertCode(t, err, nkderr.CodePreflightFailed)
+				assertCode(t, err, nkderr.CodeInternal)
 				if ownerErr != nil && !errors.Is(err, ownerErr) {
 					t.Fatalf("renderer panic discarded owner's exact coded error: %v", err)
 				}

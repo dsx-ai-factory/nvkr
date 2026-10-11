@@ -652,6 +652,16 @@ containers. Renderer panics, terminal output/input failures and a closed event
 stream restore the terminal before waiting for the workflow's cleanup to join;
 they still return failure and preserve the owner's error rather than reporting
 successful cleanup. Normal confirmed cancellation keeps its cleanup screen.
+Recovered workflow or renderer panics report `NKD-E-INTERNAL`, not a host
+preflight error. A value description and stack are retained in a separate, bounded
+mode-0600 `nke-demo-panic-*.log` file; only its escaped locator is printed.
+Primitive payloads are bounded before formatting. Composite or custom payloads
+retain a type label and explicit omission, not a traversal or user-defined
+formatter that could block shutdown. Their original stack is still recorded.
+Plain and dashboard workflow presentation use the same recovery boundary.
+Keep these diagnostics private: panic values and stacks can contain sensitive
+configuration or implementation details. If storage fails, the internal error
+states that diagnostic retention failed rather than claiming a complete log.
 If an OS-build log observer cannot join, the build fails and retains that
 observer's container, work volume and private identity workspace rather than
 deleting inputs that it may still use. Those Packer resources are separate from

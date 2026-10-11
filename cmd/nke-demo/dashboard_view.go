@@ -48,7 +48,8 @@ var dashboardSiteStages = [...]struct {
 	operations [2]string
 }{
 	{"Create Kind cluster", [2]string{"create-management"}},
-	{"Registry reachable", [2]string{"start-registry", "node-registry-connectivity"}},
+	{"Registry reachable", [2]string{"start-registry", "registry-admission"}},
+	{"Site networking (OVN)", [2]string{"site-ovs-ready", "site-ovn-admission"}},
 	{"Site nodes Ready", [2]string{"management-ready"}},
 	{"Install Cluster API", [2]string{"install-capi"}},
 	{"Check Cluster API", [2]string{"check-capi"}},
@@ -80,6 +81,7 @@ type dashboardSnapshot struct {
 	guests                        [2]nkedemo.TenantGuestObservation
 	guestsObservedAt              time.Time
 	siteStages                    [len(dashboardSiteStages)]dashboardStage
+	siteOVN                       bool
 	tenantStages                  [len(dashboardTenantStages)]dashboardStage
 	buildSteps                    []dashboardBuildStep
 	buildPreview, buildTruncated  bool
@@ -328,6 +330,8 @@ func dashboardOperation(name string) (index int, label string) {
 		return 0, "Prepare and admit the pinned installer"
 	case "installer-build-preflight":
 		return 0, "Check build prerequisites"
+	case "installer-docker-preflight":
+		return 0, "Check deployment Docker daemon before image admission"
 	case "installer-sudo-preflight":
 		return 0, "Admit unattended deployment access"
 	case "installer-init", "installer-fetch", "installer-checkout", "installer-pin", "clean-installer":
@@ -338,17 +342,17 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Prepare isolated demo networking"
 	case "create-management", "management-ready":
 		return 2, "Create and check Kind management cluster"
-	case "start-registry", "node-registry-connectivity":
+	case "start-registry", "node-registry-connectivity", "registry-admission":
 		return 2, "Admit registry access from the actual node"
 	case "node-simulator-connectivity":
 		return 2, "Check Kind-to-simulator connectivity before site installation"
 	case "site-ovn-chart", "site-ovn-defaults":
-		return 2, "Verify the built NVIDIA OVN chart and image bindings"
+		return 2, "Verify the selected OVN chart and image bindings"
 	case "site-ovs-fresh", "site-ovs-create", "site-ovs-ready":
 		return 2, "Start and check Open vSwitch for the owned Kind node"
 	case "site-ovn-install", "site-ovn-control-plane-ready", "site-ovn-node-ready":
-		return 2, "Install NVIDIA OVN and wait for its site controllers"
-	case "site-ovn-observation":
+		return 2, "Install selected OVN and wait for its site controllers"
+	case "site-ovn-observation", "site-ovn-admission":
 		return 2, "Check live site OVN images against the selected output"
 	case "install-capi", "check-capi":
 		return 2, "Install and check Cluster API after site networking"
@@ -412,6 +416,17 @@ func (stage dashboardStage) status(required int) (state string, observed int, st
 }
 
 func (d *dashboard) observeSiteStage(event nkedemo.ProgressEvent, state string) string {
+	if strings.HasPrefix(event.Name, "site-ovs-") || strings.HasPrefix(event.Name, "site-ovn-") {
+		d.siteOVN = true
+		part := 1
+		if strings.HasPrefix(event.Name, "site-ovs-") || event.Name == "site-ovn-chart" || event.Name == "site-ovn-defaults" {
+			part = 0
+		}
+		if state != "observed" || event.Name == dashboardSiteStages[2].operations[part] {
+			d.siteStages[2].observe(part, state, time.Now())
+		}
+		return dashboardSiteStages[2].label
+	}
 	for index, stage := range dashboardSiteStages {
 		for part, operation := range stage.operations {
 			if operation != "" && event.Name == operation {
@@ -968,21 +983,26 @@ func dashboardChecklist(s dashboardSnapshot, now time.Time) (string, int) {
 		}
 		fmt.Fprintf(&rows, "[%s]%s[-] %-23s %s\n", color, marker, label, detail)
 	}
+	siteTotal := 0
 	for index, stage := range dashboardSiteStages {
+		if index == 2 && !s.siteOVN {
+			continue
+		}
+		siteTotal++
 		required := 1
 		if stage.operations[1] != "" {
 			required = 2
 		}
 		write(stage.label, s.siteStages[index], required)
 	}
-	site := fmt.Sprintf("[lightcyan::b]Site stages · %d/%d checked[-::-]\n", checked, len(dashboardSiteStages)) + rows.String()
+	site := fmt.Sprintf("[lightcyan::b]Site stages · %d/%d checked[-::-]\n", checked, siteTotal) + rows.String()
 	rows.Reset()
 	checked = 0
 	for index, label := range dashboardTenantStages {
 		write(label, s.tenantStages[index], 1)
 	}
 	tenant := fmt.Sprintf("[lightcyan::b]Tenant stages · %d/%d checked[-::-]\n", checked, len(dashboardTenantStages)) + rows.String()
-	return site + "\n" + tenant, len(dashboardSiteStages) + len(dashboardTenantStages) + 3
+	return site + "\n" + tenant, siteTotal + len(dashboardTenantStages) + 3
 }
 
 func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {

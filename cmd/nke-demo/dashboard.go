@@ -271,22 +271,19 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 	go func() {
 		var err error
 		defer func() {
-			if recover() != nil {
-				err = nkderr.New(nkderr.CodePreflightFailed, "demo worker panicked; owned deferred cleanup returned")
-			}
 			done <- err
 		}()
-		err = work(ctx, writer)
+		err = runProgressWork(ctx, writer, work)
 	}()
 	joined := false
 	defer func() {
-		if recover() != nil {
-			result = errors.Join(result, nkderr.New(nkderr.CodePreflightFailed, "terminal rendering failed; work canceled"))
+		if value := recover(); value != nil {
 			// A broken renderer cannot keep the terminal raw for the entire
 			// owner's cleanup budget. Stop readers before restoring the screen,
 			// then retain the normal mandatory worker join below.
 			cancel()
 			restoreTerminal()
+			result = errors.Join(result, recoveredPanic(ctx, "terminal renderer", value))
 		}
 		cancel()
 		if !joined {

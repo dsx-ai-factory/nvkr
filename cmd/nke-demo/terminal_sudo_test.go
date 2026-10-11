@@ -203,7 +203,7 @@ func TestSudoSessionRefreshOwnership(t *testing.T) {
 					t.Fatalf("cancellation lost: %v", err)
 				}
 			case "panic":
-				assertCode(t, err, nkderr.CodePreflightFailed)
+				assertCode(t, err, nkderr.CodeInternal)
 			case "refresh-fails":
 				if !errors.Is(err, cause) {
 					t.Fatalf("refresh failure lost: %v", err)

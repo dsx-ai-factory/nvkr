@@ -55,7 +55,7 @@ func progressOutput(ctx context.Context, out, raw io.Writer, verbose bool, logPa
 			return err
 		}
 	}
-	err := work(workCtx, writer)
+	err := runProgressWork(workCtx, writer, work)
 	writer.mu.Lock()
 	writer.lineOutput()
 	if err != nil && writer.failedPhase != "" {

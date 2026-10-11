@@ -426,7 +426,9 @@ func registryAddress(rows []dockerContainer, id, name, owner string, materials *
 	return net.JoinHostPort(address.String(), "5000"), nil
 }
 
-func startSiteRegistry(ctx context.Context, runner Runner, name, owner, node string, materials *SiteMaterials) (string, error) {
+func startSiteRegistry(ctx context.Context, runner Runner, name, owner, node string, materials *SiteMaterials) (host string, err error) {
+	boundary := beginProgress(runner.Progress, "registry-admission", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { boundary.finish(err) }()
 	raw, err := runner.Capture(ctx, []string{"docker", "run", "-d", "--name", name, "--label", "dev.nkd.demo.owner=" + owner, "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--network", "kind", "--tmpfs", fmt.Sprintf("/var/lib/registry:rw,size=%d", registryBytes), registryImage}, "start-registry", 60*time.Second)
 	if err != nil {
 		return "", err
@@ -435,7 +437,7 @@ func startSiteRegistry(ctx context.Context, runner Runner, name, owner, node str
 	if len(ids) != 1 {
 		return "", errors.New("registry start did not return one container identity")
 	}
-	host, err := waitRegistry(ctx, runner, ids[0], name, owner, materials)
+	host, err = waitRegistry(ctx, runner, ids[0], name, owner, materials)
 	if err != nil {
 		return "", err
 	}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -23,9 +24,25 @@ import (
 // An explicit checkout remains read-only. Without one, Git prepares the pinned
 // commit in a new private attempt-local directory before the expensive build.
 func PrepareInstaller(ctx context.Context, build BuildConfig, run Config) (result Config, err error) {
+	return prepareInstallerOnPlatform(ctx, build, run, runtime.GOOS, runtime.GOARCH)
+}
+
+// The private platform parameters let command fixtures exercise the Linux
+// boundary without misrepresenting the machine running the contract suite.
+func prepareInstallerOnPlatform(ctx context.Context, build BuildConfig, run Config, system, arch string) (result Config, err error) {
 	run.Network, err = normalizeNetwork(run.Network)
 	if err != nil {
 		return Config{}, err
+	}
+	if err = requireContext(ctx); err != nil {
+		code := nkderr.CodeUsage
+		if ctx != nil {
+			code = nkderr.CodeTimeout
+		}
+		return Config{}, nkderr.Wrap(code, err, "prepare pinned NKE installer")
+	}
+	if system != "linux" || arch != "arm64" {
+		return Config{}, nkderr.New(nkderr.CodeEngineCapability, "installer preparation requires a native Linux ARM64 execution host")
 	}
 	environment, err := localBuildEnvironment()
 	if err != nil {
@@ -177,6 +194,12 @@ func prepareInstaller(ctx context.Context, build BuildConfig, run Config, runner
 // E2E checks deployment-only image prerequisites before preparing sources or
 // building artifacts. BuildArtifacts deliberately does not require these images.
 func admitInstallerImages(ctx context.Context, runner Runner) error {
+	if _, err := commandPath("docker", runner.Env); err != nil {
+		return fmt.Errorf("deployment requires the Docker CLI before image admission; install Docker on the native Linux execution host; see docs/local-nke-demo.md: %w", err)
+	}
+	if _, err := runner.Capture(ctx, []string{"docker", "version", "--format", "{{.Server.Version}}"}, "installer-docker-preflight", 30*time.Second); err != nil {
+		return fmt.Errorf("deployment Docker daemon is unavailable; start it or restore this user's access before image admission; see docs/local-nke-demo.md: %w", err)
+	}
 	guidance := func(image string, cause error) error {
 		return fmt.Errorf("deployment requires a cached ARM64 image before building; run `docker pull %s` against the same native Linux Docker daemon (DOCKER_HOST=%q, DOCKER_CONTEXT=%q); see docs/local-nke-demo.md: %w", image, environmentValue(runner.Env, "DOCKER_HOST"), environmentValue(runner.Env, "DOCKER_CONTEXT"), cause)
 	}

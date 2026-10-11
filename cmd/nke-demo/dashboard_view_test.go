@@ -323,7 +323,7 @@ func TestDashboardSiteStageObservations(t *testing.T) {
 			for _, event := range tc.events {
 				d.Report(event)
 			}
-			state, done, _ := d.snapshot().siteStages[9].status(2)
+			state, done, _ := d.snapshot().siteStages[10].status(2)
 			if state != tc.state || done != tc.done {
 				t.Fatalf("state=%q observed=%d want %q/%d", state, done, tc.state, tc.done)
 			}
@@ -338,7 +338,7 @@ func TestDashboardFillingSiteChecklist(t *testing.T) {
 	for _, width := range []int{80, 160} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
 			d := newDashboard()
-			for _, index := range []int{3, 4, 5, 6, 7, 8} {
+			for _, index := range []int{4, 5, 6, 7, 8, 9} {
 				for _, name := range dashboardSiteStages[index].operations {
 					if name != "" {
 						d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseFinished, Name: name})
@@ -347,7 +347,7 @@ func TestDashboardFillingSiteChecklist(t *testing.T) {
 			}
 			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.PhaseStarted, Name: "site-05-install-site-controller"})
 			s := d.snapshot()
-			now := s.siteStages[9].started[0].Add(75 * time.Second)
+			now := s.siteStages[10].started[0].Add(75 * time.Second)
 			if checklist, _ := dashboardChecklist(s, now); !strings.Contains(checklist, "0/2 · 1m15s") {
 				t.Fatalf("active substep elapsed missing: %s", checklist)
 			}

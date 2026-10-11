@@ -511,7 +511,8 @@ func TestRegistryStartRejectsIdentityBeforeNodeProbe(t *testing.T) {
 			case "multiple-ids":
 				id = "one two"
 			}
-			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "START_ID=" + id}}
+			progress := &recordedProgress{}
+			runner := Runner{Work: work, Progress: progress, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "START_ID=" + id}}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 			if scenario == "canceled" {
@@ -520,6 +521,15 @@ func TestRegistryStartRejectsIdentityBeforeNodeProbe(t *testing.T) {
 			host, err := startSiteRegistry(ctx, runner, "private-registry", "private-owner", "owned-node", &SiteMaterials{RegistryID: "accepted", KindNetworkID: "kind-id", KindCIDR: "172.18.0.0/16"})
 			if err == nil || host != "" {
 				t.Fatal("unadmitted registry can reach image upload")
+			}
+			var admission []ProgressEvent
+			for _, event := range progress.events {
+				if event.Name == "registry-admission" {
+					admission = append(admission, event)
+				}
+			}
+			if len(admission) != 2 || admission[0].Kind != PhaseStarted || admission[1].Kind != PhaseFailed {
+				t.Fatalf("registry owner reported admission before validation: %+v", admission)
 			}
 			if scenario == "canceled" {
 				if !errors.Is(err, context.Canceled) {

@@ -79,7 +79,7 @@ func TestDashboardFinalDrawPanicPreservesJoinedWorkerError(t *testing.T) {
 		code nkderr.Code
 	}{
 		{"failed worker", nkderr.New(nkderr.CodeFetchFailed, "worker fetch failed"), nkderr.CodeFetchFailed},
-		{"successful worker", nil, nkderr.CodePreflightFailed},
+		{"successful worker", nil, nkderr.CodeInternal},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
@@ -94,7 +94,7 @@ func TestDashboardFinalDrawPanicPreservesJoinedWorkerError(t *testing.T) {
 			if tc.err != nil && !errors.Is(err, tc.err) {
 				t.Fatalf("final rendering panic discarded joined owner failure: %v", err)
 			}
-			if !screen.joined.Load() || !strings.Contains(err.Error(), "terminal rendering failed") {
+			if !screen.joined.Load() || !strings.Contains(err.Error(), string(nkderr.CodeInternal)) || !strings.Contains(err.Error(), "terminal renderer panicked") {
 				t.Fatalf("rendering failure missing or terminal not restored: %v", err)
 			}
 		})
@@ -457,7 +457,11 @@ func TestDashboardWorkerPanicFinalFrameAndTeardown(t *testing.T) {
 					t.Fatalf("final observation not rendered: %v\n%s", err, screen.lastFrame)
 				}
 			} else {
-				assertCode(t, err, nkderr.CodePreflightFailed)
+				code := nkderr.CodePreflightFailed
+				if mode == "worker-panic" {
+					code = nkderr.CodeInternal
+				}
+				assertCode(t, err, code)
 				if strings.Contains(err.Error(), "private") {
 					t.Fatal("private panic escaped presentation boundary")
 				}

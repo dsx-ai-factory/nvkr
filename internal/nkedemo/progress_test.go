@@ -395,14 +395,16 @@ func TestProgressInstallerAdmissionFailure(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			code := nkderr.CodePreflightFailed
+			want := phaseEvents("installer-preparation", PhaseFailed)
 			if canceled {
 				cancel()
 				code = nkderr.CodeTimeout
+				want = nil // canceled before platform/environment/work admission
 			}
 			writer := &recordedProgress{}
-			_, err := PrepareInstaller(ctx, BuildConfig{}, Config{Progress: writer})
+			_, err := prepareInstallerOnPlatform(ctx, BuildConfig{}, Config{Progress: writer}, "linux", "arm64")
 			var coded *nkderr.Error
-			if !errors.As(err, &coded) || coded.Code != code || !reflect.DeepEqual(writer.events, phaseEvents("installer-preparation", PhaseFailed)) {
+			if !errors.As(err, &coded) || coded.Code != code || !reflect.DeepEqual(writer.events, want) || canceled && !errors.Is(err, context.Canceled) {
 				t.Fatalf("installer admission lost owner failure: events=%+v err=%v", writer.events, err)
 			}
 		})

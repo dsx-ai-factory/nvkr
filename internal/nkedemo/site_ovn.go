@@ -500,7 +500,19 @@ func installSiteNetworkForNetwork(ctx context.Context, network string, session M
 			return err
 		}
 	}
-	raw, err = capture(ctx, session.Runner, []string{kubectl, "--kubeconfig", kube, "get", "pods", "-A", "-o", "json"}, "site-ovn-observation", 30*time.Second)
+	if err = observeSelectedSiteNetwork(ctx, network, session, reference, exported, capture); err != nil {
+		return err
+	}
+	return installManagementAPI(ctx, session, capture)
+}
+
+// A successful kubectl exit is not admission of its body or live image IDs.
+// Keep this owner boundary around decoding, exact validation and persistence.
+func observeSelectedSiteNetwork(ctx context.Context, network string, session ManagementSession, reference string, exported delivery.HelmChartExport, capture siteNetworkCapture) (result error) {
+	boundary := beginProgress(session.Runner.Progress, "site-ovn-admission", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { boundary.finish(result) }()
+	kubectl, kube := filepath.Join(session.Tools, "kubectl"), environmentValue(session.Runner.Env, "SITE_KUBECONFIG")
+	raw, err := capture(ctx, session.Runner, []string{kubectl, "--kubeconfig", kube, "get", "pods", "-A", "-o", "json"}, "site-ovn-observation", 30*time.Second)
 	if err != nil {
 		return err
 	}
@@ -519,7 +531,7 @@ func installSiteNetworkForNetwork(ctx context.Context, network string, session M
 	}{"unqualified-local-site-network-diagnostic", exported, observed}); err != nil {
 		return err
 	}
-	return installManagementAPI(ctx, session, capture)
+	return nil
 }
 
 func installManagementAPI(ctx context.Context, session ManagementSession, capture siteNetworkCapture) error {

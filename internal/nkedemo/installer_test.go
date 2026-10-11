@@ -49,6 +49,7 @@ if [ "$1:$2:$3" = network:inspect:kind ]; then
   printf '[{"Id":"kind-network","Driver":"bridge","IPAM":{"Config":[{"Gateway":"invalid","Subnet":"172.19.0.0/16"}]}}]'
   exit 0
 fi
+if [ "$1:$2" = version:--format ]; then printf 'fixture-version'; exit 0; fi
 [ "$1:$2" = image:inspect ] || exit 99
 printf '%s\n' "$3" >>"$IMAGE_CALLS"
 if [ "$3" = "$KIND" ]; then
@@ -206,7 +207,7 @@ esac
 			var err error
 			if imageFailure || networkFailure {
 				t.Setenv("PATH", tools+":/usr/bin:/bin")
-				actual, err = PrepareInstaller(ctx, build, run)
+				actual, err = prepareInstallerOnPlatform(ctx, build, run, "linux", "arm64")
 			} else {
 				admission := func() error { return nil }
 				switch name {
@@ -394,7 +395,7 @@ func TestPrepareInstallerAttemptDiagnostics(t *testing.T) {
 				if err := os.WriteFile(keep, []byte("original"), 0600); err != nil {
 					t.Fatal(err)
 				}
-				result, err := PrepareInstaller(t.Context(), BuildConfig{Repository: repo, AttemptPrefix: "retained", Jobs: 2}, Config{Out: filepath.Join(repo, "out"), Timeout: time.Hour})
+				result, err := prepareInstallerOnPlatform(t.Context(), BuildConfig{Repository: repo, AttemptPrefix: "retained", Jobs: 2}, Config{Out: filepath.Join(repo, "out"), Timeout: time.Hour}, "linux", "arm64")
 				var coded *nkderr.Error
 				if result != (Config{}) || !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !strings.Contains(err.Error(), owned) {
 					t.Fatalf("result=%+v error=%v", result, err)

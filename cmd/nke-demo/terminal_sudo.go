@@ -128,8 +128,8 @@ func withSudoSession(ctx context.Context, authenticate, refresh func(context.Con
 		return err
 	}
 	defer func() {
-		if recover() != nil {
-			result = errors.Join(result, nkderr.New(nkderr.CodePreflightFailed, "sudo session workflow panicked; owned refresh stopped and joined"))
+		if value := recover(); value != nil {
+			result = errors.Join(result, recoveredPanic(ctx, "sudo session workflow", value))
 		}
 		stop()
 		result = errors.Join(result, group.Wait())
