@@ -11,12 +11,14 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 )
@@ -32,18 +34,44 @@ func terminalSudoAuthenticator(out, diagnostics io.Writer) func(context.Context)
 	return authenticateTerminalSudo
 }
 
-// Authenticate before terminal presentation, then maintain the existing sudo
-// cache only for this workflow. No credential is read by Go and no policy is
-// changed. Every later check is non-interactive, including cleanup checks.
+// Prefer the approved unattended wrapper. Otherwise authenticate before terminal
+// presentation and maintain the existing cache only for this workflow. No
+// credential is read by Go and no policy is changed. Later checks never prompt.
 func withTerminalSudo(ctx context.Context, out, diagnostics io.Writer, work func(context.Context, func(context.Context) error) error) error {
 	authenticate := terminalSudoAuthenticator(out, diagnostics)
 	if authenticate == nil {
 		return work(ctx, nil)
 	}
-	if _, err := fmt.Fprintln(diagnostics, "This demo keeps your existing sudo session valid while it runs. Authenticate now; the dashboard will not ask for passwords mid-run."); err != nil {
+	return selectSudoSession(ctx, diagnostics, probeUnattendedSudo, authenticate, refreshTerminalSudo, work)
+}
+
+func probeUnattendedSudo(ctx context.Context) error {
+	return runUnattendedSudoProbe(ctx, nkedemo.RunAuthenticationCommand)
+}
+
+func runUnattendedSudoProbe(ctx context.Context, run func(context.Context, *exec.Cmd) error) error {
+	bounded, cancel := context.WithTimeout(ctx, 35*time.Second)
+	defer cancel()
+	// Match the network owner's exact unattended wrapper. This ignores cached
+	// authentication; approval of sudo -v alone is neither needed nor sufficient.
+	cmd := exec.CommandContext(bounded, "sudo", "-n", "-k", "timeout", "--signal=TERM", "--kill-after=5", "25", "true")
+	cmd.Env = nkedemo.NativeEnvironment()
+	return run(bounded, cmd)
+}
+
+func selectSudoSession(ctx context.Context, diagnostics io.Writer, probe, authenticate, refresh func(context.Context) error, work func(context.Context, func(context.Context) error) error) error {
+	if err := probe(ctx); err == nil {
+		return work(ctx, nil)
+	} else if errors.Is(err, nkedemo.ErrUnjoined) {
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "unattended sudo probe could not join; no authentication or workflow started")
+	}
+	if err := ctx.Err(); err != nil {
+		return nkderr.Wrap(nkderr.CodeTimeout, err, "networking authentication canceled before workflow admission")
+	}
+	if _, err := fmt.Fprintln(diagnostics, "Preparing administrator authentication before the demo. Later checks are non-interactive; the dashboard will not ask for passwords mid-run."); err != nil {
 		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "show networking authentication notice")
 	}
-	return withSudoSession(ctx, authenticate, refreshTerminalSudo, 30*time.Second, work)
+	return withSudoSession(ctx, authenticate, refresh, 30*time.Second, work)
 }
 
 func refreshTerminalSudo(ctx context.Context) error {
@@ -52,7 +80,7 @@ func refreshTerminalSudo(ctx context.Context) error {
 	cmd := exec.CommandContext(bounded, "sudo", "-n", "-v")
 	cmd.Env = nkedemo.NativeEnvironment()
 	if err := nkedemo.RunAuthenticationCommand(bounded, cmd); err != nil {
-		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "sudo session is no longer usable; no password prompt was opened; retained artifacts remain available; restore any remaining network controls from their original workspace")
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "non-interactive sudo session check failed; no password prompt or networking command was started by this check")
 	}
 	return nil
 }
@@ -66,43 +94,78 @@ func withSudoSession(ctx context.Context, authenticate, refresh func(context.Con
 	if err := refresh(ctx); err != nil {
 		return err
 	}
-	session, stop := context.WithCancel(ctx)
-	group, active := errgroup.WithContext(session)
+	// Cleanup runs inside work with its own bounded context after work is
+	// canceled. Keep refreshing until that cleanup returns, then stop and join.
+	session, stop := context.WithCancel(context.WithoutCancel(ctx))
+	active, cancelWork := context.WithCancel(ctx)
+	defer cancelWork()
+	var group errgroup.Group
+	serial := semaphore.NewWeighted(1)
+	var mu sync.Mutex
+	var latest, unjoined error
+	check := func(checkCtx context.Context) error {
+		if err := serial.Acquire(checkCtx, 1); err != nil {
+			return nkderr.Wrap(nkderr.CodeTimeout, err, "non-interactive sudo check canceled while waiting for the previous check")
+		}
+		defer serial.Release(1)
+		mu.Lock()
+		fatal := unjoined
+		mu.Unlock()
+		if fatal != nil {
+			return fatal
+		}
+		err := refresh(checkCtx)
+		mu.Lock()
+		if errors.Is(err, nkedemo.ErrUnjoined) {
+			unjoined, latest = err, err
+			cancelWork()
+		} else if checkCtx.Err() == nil || !errors.Is(err, checkCtx.Err()) {
+			// A joined transient failure is retried, not permission to cancel a
+			// long build. Success clears it; actual root commands remain gated.
+			latest = err
+		}
+		mu.Unlock()
+		return err
+	}
 	defer func() {
 		if recover() != nil {
 			result = errors.Join(result, nkderr.New(nkderr.CodePreflightFailed, "sudo session workflow panicked; owned refresh stopped and joined"))
 		}
 		stop()
 		result = errors.Join(result, group.Wait())
+		mu.Lock()
+		result = errors.Join(result, latest)
+		mu.Unlock()
 	}()
 	group.Go(func() error {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-active.Done():
+			case <-session.Done():
 				return nil
 			case <-ticker.C:
-				if err := refresh(active); err != nil {
-					if active.Err() != nil && !errors.Is(err, nkedemo.ErrUnjoined) {
-						return nil
-					}
-					return err
+				if err := check(session); errors.Is(err, nkedemo.ErrUnjoined) {
+					return nil
 				}
 			}
 		}
 	})
-	return work(active, refresh)
+	return work(active, check)
 }
 
 func authenticateTerminalSudo(ctx context.Context) error {
+	return authenticateSudo(ctx, nkedemo.RunAuthenticationCommand, runForegroundAuthentication, os.Stdin, os.Stdout, os.Stderr, int(os.Stdin.Fd()))
+}
+
+func authenticateSudo(ctx context.Context, run func(context.Context, *exec.Cmd) error, foreground func(context.Context, *exec.Cmd, int) error, input io.Reader, output, diagnostics io.Writer, fd int) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	// This read-only validation may succeed without a prompt. The actual root
 	// command still decides its own policy; validation does not authorize it.
 	probe := exec.CommandContext(ctx, "sudo", "-n", "-v")
 	probe.Env = nkedemo.NativeEnvironment()
-	if err := nkedemo.RunAuthenticationCommand(ctx, probe); err == nil {
+	if err := run(ctx, probe); err == nil {
 		return nil
 	} else if errors.Is(err, nkedemo.ErrUnjoined) {
 		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "administrator authentication probe could not join; no prompt started")
@@ -110,13 +173,13 @@ func authenticateTerminalSudo(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return nkderr.Wrap(nkderr.CodeTimeout, err, "administrator authentication canceled")
 	}
-	if _, err := fmt.Fprintln(os.Stderr, "Administrator authentication is needed before starting the demo. At sudo's prompt, type your password (typing is hidden) and press Enter. Authentication has a two-minute deadline; Ctrl+C cancels."); err != nil {
+	if _, err := fmt.Fprintln(diagnostics, "Administrator authentication is needed before starting the demo. At sudo's prompt, type your password (typing is hidden) and press Enter. Authentication has a two-minute deadline; Ctrl+C cancels."); err != nil {
 		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "show administrator authentication prompt")
 	}
 	cmd := exec.CommandContext(ctx, "sudo", "-v")
 	cmd.Env = nkedemo.NativeEnvironment()
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	return runForegroundAuthentication(ctx, cmd, int(os.Stdin.Fd()))
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = input, output, diagnostics
+	return foreground(ctx, cmd, fd)
 }
 
 // Go's existing Foreground process option and x/sys ioctl helpers own terminal
@@ -128,8 +191,12 @@ func runForegroundAuthentication(ctx context.Context, cmd *exec.Cmd, fd int) (re
 	if err != nil || foreground != unix.Getpgrp() {
 		return nkderr.New(nkderr.CodePreflightFailed, "administrator authentication requires the foreground terminal")
 	}
+	state, err := term.GetState(fd)
+	if err != nil {
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "save terminal before administrator authentication")
+	}
 	defer func() {
-		if err := restoreTerminalForeground(fd, foreground); err != nil {
+		if err := restoreAuthenticationTerminal(fd, foreground, state); err != nil {
 			result = errors.Join(result, errTerminalNotRestored, nkderr.Wrap(nkderr.CodePreflightFailed, err, "restore terminal after administrator authentication"))
 		}
 	}()
@@ -141,11 +208,17 @@ func runForegroundAuthentication(ctx context.Context, cmd *exec.Cmd, fd int) (re
 }
 
 func terminalAuthenticationFailure(ctx context.Context, err error) error {
+	var exit *exec.ExitError
+	interrupted := errors.As(err, &exit)
+	if interrupted {
+		status, ok := exit.Sys().(syscall.WaitStatus)
+		interrupted = ok && status.Signaled() && status.Signal() == syscall.SIGINT
+	}
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		return nkderr.Wrap(nkderr.CodeTimeout, err, "sudo password authentication deadline expired; retry from an interactive terminal and respond to sudo's prompt; no privileged command was retried")
-	case errors.Is(ctx.Err(), context.Canceled):
-		return nkderr.Wrap(nkderr.CodeTimeout, err, "sudo password authentication canceled; no privileged command was retried")
+	case errors.Is(ctx.Err(), context.Canceled) || interrupted:
+		return nkderr.Wrap(nkderr.CodeTimeout, errors.Join(err, context.Canceled), "sudo password authentication canceled; no privileged command was retried")
 	default:
 		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "sudo password authentication failed; no privileged command was retried")
 	}

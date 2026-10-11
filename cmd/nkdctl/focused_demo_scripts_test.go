@@ -9,7 +9,38 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 )
+
+func TestCatalogChangeScriptEmitsAdmittedAbsoluteSourceRedirect(t *testing.T) {
+	temp := t.TempDir()
+	captured := filepath.Join(temp, "redirect")
+	recorder := filepath.Join(temp, "nkdctl")
+	if err := os.WriteFile(recorder, []byte("#!/bin/sh\nprintf '%s\\n' \"GIT_CONFIG_COUNT=$GIT_CONFIG_COUNT\" \"GIT_CONFIG_KEY_0=$GIT_CONFIG_KEY_0\" \"GIT_CONFIG_VALUE_0=$GIT_CONFIG_VALUE_0\" > \"$CAPTURE_REDIRECT\"\nexit 42\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	work := filepath.Join(temp, "work")
+	cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-catalog-change.sh"), "--work", work)
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "NKDCTL_BIN=" + recorder, "CAPTURE_REDIRECT=" + captured,
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
+	output, err := cmd.CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 42 {
+		t.Fatalf("catalog fixture failed before captured invocation: %v %s", err, output)
+	}
+	raw, err := os.ReadFile(captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	environment := strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n")
+	projected, err := sourcegit.LocalRedirectEnvironment(environment)
+	if err != nil || strings.Join(projected, "\n") != strings.Join(environment, "\n") {
+		t.Fatalf("actual catalog script emitted an unsupported redirect: %v", err)
+	}
+	if environment[1] != "GIT_CONFIG_KEY_0=url."+filepath.Join(work, "cri-tools.git")+".insteadOf" {
+		t.Fatal("catalog script did not preserve its exact absolute fixture repository")
+	}
+}
 
 func TestMaintainedDemoScriptsAdvertiseRunnableHonestJourneys(t *testing.T) {
 	tests := []struct {

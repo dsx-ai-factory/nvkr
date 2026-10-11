@@ -29,6 +29,9 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "local source Git canceled")
 	}
+	if dir != "" && !filepath.IsAbs(dir) {
+		return nil, e.New(e.CodeEngineCapability, "local source Git requires an absolute explicit repository directory")
+	}
 	path, err := SearchPath(environment)
 	if err != nil {
 		return nil, err
@@ -36,6 +39,12 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 	baseline, err := Baseline(path)
 	if err != nil {
 		return nil, err
+	}
+	if dir != "" {
+		// An explicit source root is not an invitation to discover an enclosing
+		// repository. Fresh init is allowed; commands on non-repository child
+		// directories fail in Git instead of running ancestor callbacks.
+		baseline = append(baseline, "GIT_CEILING_DIRECTORIES="+filepath.Dir(dir))
 	}
 	executable, err := executable(path)
 	if err != nil {
@@ -80,8 +89,14 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 		}
 		var data []byte
 		if localEnvironmentValue(environment, "HOME") != "" || localEnvironmentValue(environment, "XDG_CONFIG_HOME") != "" {
-			data, err = localConfigQuery(ctx, executable, queryEnvironment,
-				[]string{"config", "--global", "--includes", "--null", "--get-regexp", `^credential\.(.*\.)?(helper|username|usehttppath)$`})
+			query := []string{"config", "--global", "--includes", "--null", "--get-regexp", `^credential\.(.*\.)?(helper|username|usehttppath)$`}
+			if dir != "" {
+				// Conditional credential includes must refer to the selected source,
+				// not the launcher's unrelated working directory.
+				query = append([]string{"-C", dir}, query...)
+				queryEnvironment = append(queryEnvironment, "GIT_CEILING_DIRECTORIES="+filepath.Dir(dir))
+			}
+			data, err = localConfigQuery(ctx, executable, queryEnvironment, query)
 			if err != nil {
 				return nil, err
 			}
@@ -162,9 +177,17 @@ func LocalRedirectEnvironment(environment []string) ([]string, error) {
 	for index := 0; index < count; index++ {
 		suffix := strconv.Itoa(index)
 		key := localEnvironmentValue(environment, "GIT_CONFIG_KEY_"+suffix)
-		local := strings.TrimSuffix(strings.TrimPrefix(key, "url."), ".insteadOf")
 		value := localEnvironmentValue(environment, "GIT_CONFIG_VALUE_"+suffix)
-		if !strings.HasPrefix(key, "url.") || !strings.HasSuffix(key, ".insteadOf") || !filepath.IsAbs(local) || filepath.Clean(local) != local || value == "" {
+		const variable = ".insteadOf"
+		if !strings.HasPrefix(key, "url.") || len(key) <= len("url.")+len(variable) || !strings.EqualFold(key[len(key)-len(variable):], variable) {
+			return nil, e.New(e.CodeEngineCapability, "local source Git accepts only explicit absolute local repository redirects")
+		}
+		local := key[len("url.") : len(key)-len(variable)]
+		clean := filepath.Clean(local)
+		// Maintained workflow templates emit one trailing separator. Preserve
+		// Git's exact rewrite base, while still refusing embedded dot segments,
+		// repeated separators and URI forms outside the local path contract.
+		if !filepath.IsAbs(local) || (local != clean && local != clean+string(filepath.Separator)) || value == "" {
 			return nil, e.New(e.CodeEngineCapability, "local source Git accepts only explicit absolute local repository redirects")
 		}
 		result = append(result, "GIT_CONFIG_KEY_"+suffix+"="+key, "GIT_CONFIG_VALUE_"+suffix+"="+value)
@@ -174,7 +197,7 @@ func LocalRedirectEnvironment(environment []string) ([]string, error) {
 
 // UnsupportedConfiguration is the shared Git-owned query used at both local
 // and held source boundaries. Hooks/fsmonitor are forcibly disabled separately.
-const UnsupportedConfiguration = `^(filter|include|includeif|hook|url)\.|^extensions\.(worktreeconfig|partialclone)$|^remote\..*\.promisor$|^core\.alternaterefscommand$`
+const UnsupportedConfiguration = `^(filter|include|includeif|hook|url|http)\.|^extensions\.(worktreeconfig|partialclone)$|^remote\..*\.promisor$|^core\.(alternaterefscommand|sshcommand|gitproxy|askpass|worktree)$`
 
 func localEnvironmentValue(environment []string, selected string) string {
 	for _, field := range environment {

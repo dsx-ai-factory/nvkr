@@ -8,6 +8,7 @@ They do not publish, sign or build a complete source-only NKE distribution.
 | Selection | Definition | Outputs |
 | --- | --- | --- |
 | Complete demo artifact set | `definition.json` | 29: disk, images, installer-aligned charts/CLI, tools, profiles and simulator in one Run |
+| Explicit upstream OVN diagnostic | `definition-upstream-ovn.json` | 29: replaces the disk, OVN image/chart and profiles outputs together; not NVIDIA-fork validation |
 | Faster component loop | `definition-components.json` | 22: historical components without the disk; not the complete demo selection |
 | OS-only loop | `definition-os.json` | One disk with its complete material closure |
 | Source-built provider loop | `definition-providers.json` | Two native provider images, no disk |
@@ -25,6 +26,9 @@ digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper imag
 The combined selection creates one immutable Run. Catalog
 overlays remain bound to each exact predecessor digest. `os-tcg.json` depends on the M2
 OS catalog's digest: repinning that catalog requires reviewing this binding.
+The upstream selection stacks `os-upstream-ovn.json` after `os-tcg.json`;
+its `requiresCatalogDigest` binds that exact predecessor, not the base catalog
+alone. Regenerate and review both bindings after changing either predecessor.
 
 ```sh
 bin/nkdctl definition validate --definition definitions/nke-local-dev-arm64/definition.json
@@ -86,5 +90,5 @@ selected disk or establish tenant compatibility. Local image construction is
 a networked wrapped build, not qualified execution or publication authorization.
 
 See [reconciliation](../../docs/adr/reconciliation.md) for implementation and
-test boundaries. Ordinary tests do not execute the full demo; this PR supplies
-no durable fresh-build/deploy acceptance record.
+test boundaries. Ordinary tests do not execute the full demo; a fresh complete
+build/deploy/cleanup acceptance record remains required.

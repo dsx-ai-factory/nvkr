@@ -91,9 +91,7 @@ func (localVMPackerResolver) Admit(
 		}
 		sourceRoots[request.Subject] = sourceRoot
 		selection := pipeline.VMImagePackerSelection{Subject: request.Subject, Node: instruction}
-		if config.Activity != nil {
-			selection.ActivityOperation = selected.ID
-		}
+		selection.ActivityOperation = packerActivityOperation(selected.ID, config.Activity != nil)
 		selections = append(selections, selection)
 	}
 	if len(selections) == 0 {
@@ -119,6 +117,16 @@ func (localVMPackerResolver) Admit(
 		stdout: config.Stdout, stderr: config.Stderr, diagnostics: config.Diagnostics,
 		activity: config.Activity,
 	}, nil
+}
+
+// Descriptive labels must not narrow executable Plan admission. A producer can
+// have a valid node ID outside the finite telemetry vocabulary; in that case
+// omit its optional observer without changing its execution selection.
+func packerActivityOperation(nodeID string, enabled bool) string {
+	if enabled && (buildactivity.Record{Version: buildactivity.Version, Operation: nodeID}).Validate() == nil {
+		return nodeID
+	}
+	return ""
 }
 
 // plannedPackerSourceRoot resolves the source route already authored into the

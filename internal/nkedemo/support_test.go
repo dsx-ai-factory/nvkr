@@ -51,6 +51,49 @@ func TestRunnerGitAdmissionNamesFailingPhase(t *testing.T) {
 	}
 }
 
+func TestRunnerGitAdmitsEffectiveCommandDirectory(t *testing.T) {
+	for _, test := range []string{"work cwd", "independent cwd", "relative source", "ambient cwd"} {
+		t.Run(test, func(t *testing.T) {
+			root := privateTestDir(t)
+			checkout := filepath.Join(root, "source")
+			fixture := Runner{directory: root, Env: []string{"PATH=" + os.Getenv("PATH")}}
+			if err := fixture.Run(t.Context(), []string{"git", "init", "-q", checkout}, "init", 10*time.Second); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.CommandContext(t.Context(), "git", "-C", checkout, "config", "core.sshCommand", "unsupported")
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
+			if raw, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("fixture: %v %s", err, raw)
+			}
+			runner := Runner{Env: fixture.Env}
+			args := []string{"git", "status", "--porcelain"}
+			switch test {
+			case "work cwd":
+				runner.Work = checkout
+			case "independent cwd":
+				runner.Work, runner.directory = root, checkout
+			case "relative source":
+				runner.Work, runner.directory = privateTestDir(t), root
+				args = []string{"git", "-C", "source", "status", "--porcelain"}
+			case "ambient cwd":
+				t.Chdir(checkout)
+			}
+			_, err := runner.Capture(t.Context(), args, "admit-effective-source", 10*time.Second)
+			var command *CommandError
+			var coded *nkderrors.Error
+			if !errors.As(err, &command) || command.Phase != "admit-effective-source" ||
+				!errors.As(err, &coded) || coded.Code != nkderrors.CodeEngineCapability {
+				t.Fatalf("effective cwd was not admitted: %v", err)
+			}
+			if runner.Work != "" {
+				if _, statErr := os.Stat(filepath.Join(runner.Work, "admit-effective-source.log")); !os.IsNotExist(statErr) {
+					t.Fatal("source configuration refusal created diagnostics before admission")
+				}
+			}
+		})
+	}
+}
+
 func privateTestDir(t *testing.T) string {
 	t.Helper()
 	dir, err := filepath.EvalSymlinks(t.TempDir())

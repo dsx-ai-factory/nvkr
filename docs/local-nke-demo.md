@@ -4,7 +4,7 @@ This guide builds the selected artifacts with NKD, deploys their exact outputs
 using NKE's installer, and provisions a real QCOW2 control-plane and worker
 through CAPNICo/NICoSim. Kind hosts management services, not tenant nodes.
 
-**Current E2E blocker:** the selected NVIDIA OVN image lacks `firewall-cmd`,
+**Known NVIDIA OVN startup blocker:** the selected NVIDIA OVN image lacks `firewall-cmd`,
 which its startup code requires even with firewalld disabled. Artifact builds
 can succeed while OVN startup fails. The demo selects NVIDIA OVN for both the
 Kind site cluster and the QCOW2 tenant. See [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1).
@@ -13,7 +13,10 @@ successful complete E2E with this selection. No local catalog workaround is
 applied. The build-only development loops remain separate from tenant acceptance.
 An explicit `--network upstream-ovn` alternative selects upstream OVN for both
 site and tenant; it does not fix or validate the NVIDIA fork. Its complete fresh
-E2E acceptance remains unverified. See the selection below.
+E2E acceptance remains unverified. Neither this source fix nor a different CNI
+alone guarantees tenant provisioning, workload/DNS or cleanup. The temporary
+Calico diagnostic has separate readiness and datapath checks, not an OVN pass.
+See the selections below.
 
 Run everything on a dedicated Ubuntu ARM64 host with Docker. On an Apple Silicon
 Mac, first create that Linux host with Colima below. This is **not a native macOS
@@ -162,9 +165,11 @@ The libvirt session must be empty. The demo refuses occupied resources and
 overlapping networks. Python 3.12+ is an upstream NKE installer prerequisite;
 the demo itself is Go. No host Go, Packer or Helm is required.
 
-Run the demo from an interactive Linux terminal. It authenticates before opening
-the dashboard or starting the build, then refreshes that sudo session
-non-interactively every 30 seconds while the command runs. Deployment and cleanup
+Run the demo from an interactive Linux terminal. It first checks the exact
+unattended networking wrapper. If that is approved without cached credentials,
+no password authentication or session refresh is needed. Otherwise it authenticates
+before opening the dashboard or starting the build, then refreshes that sudo session
+non-interactively every 30 seconds through deployment and cleanup. Deployment and cleanup
 do not open password prompts. The main demo remains unprivileged; passwords go
 directly to the initial sudo prompt, not through the demo's logs.
 Do not add a separate `sudo -v` before the demo: it manages authentication itself.
@@ -215,7 +220,11 @@ to the private dnsmasq copy and journaled for restoration.
 Hosts with an INPUT-drop firewall also need the management node to reach the
 host simulator. The demo journals a temporary rule allowing only the admitted
 Kind subnet to its exact gateway on TCP port 18089. Cleanup removes that exact
-owned rule; it does not disable UFW or change the host's default policy. Before
+owned rule; it does not disable UFW or change the host's default policy. An
+iptables accept does not override a separate nftables/firewalld input-hook drop
+([nftables verdict semantics](https://netfilter.org/projects/nftables/manpage.html)).
+If that policy rejects the admitted path, arrange its equally scoped allowance
+with the administrator; the demo's real node probe still decides admission. Before
 installing the site, the demo probes simulator health from the owned Kind node
 with that node's real proxy environment. Host-side health alone is insufficient.
 A failed node probe stops deployment before tenant provisioning and retains
@@ -238,9 +247,13 @@ sudoers to bypass a failure. See the upstream
 for `-v` session refresh and `-n` non-interactive behavior.
 
 Git authorization must work **inside Linux**. The example fetches pinned remote
-sources. Configure Git's credential helper there. Source fetch projects that
-credential configuration only; checkout and status ignore global hooks, filters
-and line-ending settings. Deployment does not inherit source credentials. For a
+sources. Ordinary source fetch projects global `credential.helper`,
+`credential.username` and `credential.useHttpPath`, plus fetch-only HOME/XDG,
+SSH-agent, proxy and TLS-trust paths. It does not inherit system helpers,
+GH/GCM/keyring environment, arbitrary SSH commands or other global URL rewrites.
+Use a compatible configured helper or an explicit local repository containing
+the pinned objects. Checkout and status ignore global hooks, filters and
+line-ending settings; deployment does not inherit source credentials. For a
 local NKE Git clone, use its absolute Linux path in
 `NKE_LOCAL_CLONE` and `build.nkeClone`; only committed pinned objects are used.
 
@@ -478,7 +491,7 @@ from a guessed sequence of fetch/build/package stages.
 In an interactive terminal, the demo automatically opens a dashboard. During
 artifact builds, the workspace focuses on the build pipeline: a progress and
 health ribbon, a selectable operation board, and details for the selected step.
-It lists planned artifacts separately from reported done/cached, running and
+It lists required outputs separately from reported done/cached, running and
 queued operations. Rows show the producer/step, stage and running duration.
 The progress bar counts only dry-run-listed steps; it is not verified artifact
 completion, overall E2E progress or an ETA. Missing or truncated listings show
@@ -540,8 +553,10 @@ neither `Provisioning=True` nor `Provisioned=True` means tenant nodes are Ready.
 Guest observations use the selected tenant's exact Machine/NicoMachine binding,
 then the owned libvirt domain and its private console files. A first file-size
 sample is a baseline, not activity. Only positive growth of the same console
-file counts as observed activity; replacement or truncation resets that baseline.
-The dashboard shows the size and age of observed growth, never console text,
+file identity counts as observed activity; replacement or truncation resets that baseline.
+The dashboard shows the size and age of observed growth at the guest snapshot,
+and separately shows how old that snapshot is. It does not extrapolate the
+growth clock when polling stops. It never displays console text,
 instance identifiers or provider error messages. Missing or rejected bindings
 remain unavailable. A role-bound `InstanceCreateFailed` condition is shown as
 an instance lookup/create failure even when no VM exists yet; this provider
@@ -613,7 +628,7 @@ can extend teardown. The 45-minute wait is a finite local policy, not an upstrea
 maximum or a guarantee that deletion succeeds. A timeout still fails E2E and
 retains private cleanup observations; removing owned local VMs cannot substitute
 for successful NKE deletion.
-During cancellation, the state pane displays **FORCE EXIT [f]** with a warning
+During cancellation, the state pane displays **[ f ] FORCE EXIT** with a warning
 that resources may remain; this is a keyboard action, not a mouse control.
 If you confirm force exit with `f` then `y`, the terminal is restored and the
 process exits with status 130 **without waiting for cleanup**. Processes,
@@ -724,16 +739,23 @@ The attempt name does not select acceleration; the JSON input changes do.
 
 ## 5. Recognize success
 
-Require exit zero and this exact final message:
+Require exit zero and the final message for the selected network. For the default:
 
 ```text
-PASS: real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.
+PASS (NVIDIA OVN): real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.
 ```
+
+The explicit upstream mode instead begins
+`PASS (upstream OVN diagnostic; NVIDIA OVN not validated):`; the temporary
+Calico mode begins `PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):`.
+Neither alternative is NVIDIA-fork acceptance. All modes remain unqualified
+local diagnostics, not signed Releases.
 
 The adapter requires both nodes Ready, workload/DNS success, artifact/disk
 correspondence and owned cleanup. The private output directory retains
 `demo-inputs.json`, `site/site-inputs.json`, `site/tenant-result.json` and
-logs. They are diagnostics, not signed receipts.
+logs. The successful `tenant-result.json` also names the normalized `Network`
+selection. They are diagnostics, not signed receipts.
 
 Tenant deletion also retains `site/tenant-cleanup-observations.json` when private
 storage is available. It contains bounded initial/delete/latest command output

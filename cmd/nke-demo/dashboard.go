@@ -51,20 +51,27 @@ func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logP
 		return nkderr.New(nkderr.CodePreflightFailed, "terminal capabilities unavailable; retry with --plain")
 	}
 	view := newDashboard()
+	view.buildLogPath = logPath
 	writer := &checkedWriter{out: view, observer: view, raw: raw, remaining: 8 << 20, started: time.Now(), phases: make(map[string]time.Time), cancel: cancel}
 	if len(auth) > 0 {
 		writer.sudoAuth = auth[0]
 	}
-	if logPath != "" {
-		writer.emit(fmt.Sprintf("Build log (private, retained; maximum 8 MiB): %q\n", logPath))
-	}
+	// The admitted locator is durable presentation state, not an escaped,
+	// evictable activity line. Plain output retains its startup notice.
 	err = dashboardLoopWithForceExit(workCtx, cancel, screen, monitored.failure, writer, view, work, forceDashboardExit)
 	err = errors.Join(err, monitored.failure())
 	// The terminal and worker have both joined before returning to scrolling
 	// output. A failed renderer cannot skip workflow cleanup or fabricate PASS.
+	finishDashboardProgress(writer, out, logPath, err)
+	return errors.Join(err, writer.failure(), monitored.failure())
+}
+
+func finishDashboardProgress(writer *checkedWriter, out io.Writer, logPath string, err error) {
 	writer.mu.Lock()
-	writer.out = out
+	defer writer.mu.Unlock()
 	writer.lineOutput()
+	writer.out = out
+	writer.replayResults(err == nil)
 	if writer.failedPhase != "" {
 		writer.emit(fmt.Sprintf("Stopped at: %s\n", terminalText(writer.failedPhase)))
 	}
@@ -74,8 +81,6 @@ func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logP
 	if err == nil {
 		writer.emit("Demo command completed; its owned checks and cleanup returned successfully.\nUnqualified local diagnostic, not a signed Release.\n")
 	}
-	writer.mu.Unlock()
-	return errors.Join(err, writer.failure(), monitored.failure())
 }
 
 // This callback is installed only at the real interactive CLI boundary. A
@@ -243,7 +248,9 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 			}
 		}
 		select {
-		case result := <-done:
+		case workErr := <-done:
+			// Preserve the joined owner's result even if the final draw panics.
+			result = workErr
 			joined = true
 			// Completion events can arrive after the last refresh. Render the
 			// owner's final observation before restoring the terminal.

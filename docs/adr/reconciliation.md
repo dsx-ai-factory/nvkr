@@ -225,7 +225,8 @@ select its `1.5.18` chart stream. The combined Definition also declares standalo
 OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
 are independently produced; this does not close original-owner cross-output
 reuse or establish equal bytes. Fork graph/profile tests and actual pinned-chart
-Helm rendering with loopback OCI push/pull passed. Retained attempt
+Helm rendering with loopback OCI push/pull were reported locally, without a
+retrievable CI/Release evidence attachment for these exercises. Retained local attempt
 `kind-calico-e2e-20261010-09` at `de31a87` completed the combined artifact Run,
 including the fork OS bake, with 29 expected and 29 observed outputs in the
 `unqualified-local-execution` lane. Its lifecycle content subject is
@@ -277,10 +278,11 @@ select that same stream. Opposite-mode outputs are rejected before deployment.
 The source-owned image Dockerfile still acquires OVS/OVN and kubectl through APT;
 this does not claim hermetic, FIPS/STIG, qualification or Kubernetes compatibility.
 
-The complete alternate Plan compiled locally. Rendering the exact pinned
-upstream Helm templates produced seven image references, each bound to the
+The complete alternate Plan compiled locally. Local rendering of the exact pinned
+upstream Helm templates was reported to produce seven image references, each bound to the
 selected digest through the existing repository/tag helper, without a template
-patch. Controlled tests cover mode propagation, four distinct output names,
+patch; no retrievable external rendering artifact is cited for that local exercise.
+Controlled tests cover mode propagation, four distinct output names,
 profile package/disk alignment, image binding, six-container node observations
 and site-network readiness before Cluster API. These checks do not establish
 real upstream startup, a fresh two-node E2E, workload/DNS or owned cleanup.
@@ -299,7 +301,9 @@ explicit profile choices, not a general NKE offline boot contract.
 cover additive patch authentication, native-image compilation, exact staging
 bytes and modeled APT/uplink cases. [Consumer tests](../../internal/nkedemo/site_test.go)
 reject substituted images, incomplete/failed init states and alternate volumes.
-The opt-in exact pinned source-chart rendering check passed locally. An isolated
+The opt-in exact pinned source-chart rendering check and the following native
+exercises were reported locally; their private attempt paths are not a
+retrievable external acceptance record. An isolated
 native ARM64 rootless BuildKit test produced manifest
 `sha256:197fe058d0fbcff5d7841abfee58067aa05f7cdd21040642fe7e327096b574a0`.
 ORAS transport/readback, manifest retrieval from the Kind network and the image's
@@ -349,8 +353,8 @@ These reports do not prove successful API polls or guest progress. The tenant pa
 now prioritizes its blocker, four observed checkpoints, role-bound VM/console
 metadata, node counts and independently aged observations. Bounded polling joins
 the exact tenant Machine/NicoMachine pair to an owned libvirt domain before
-describing its state or console-file size. Only positive growth of the same held
-file counts as activity; baseline, replacement and truncation do not. A closed
+describing its state or console-file size. Only positive growth of the same
+file identity counts as activity; baseline, replacement and truncation do not. A closed
 role-bound `InstanceCreateFailed` report remains visible before a domain exists.
 Unknown bindings, states and reasons cannot advance readiness. No private console
 text, instance identifiers or provider messages are projected into public output.

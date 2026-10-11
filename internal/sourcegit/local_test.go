@@ -102,13 +102,177 @@ func TestLocalGitNeutralizesGlobalCallbacksAndConversions(t *testing.T) {
 }
 
 func TestLocalGitRejectsRepositoryCallbacks(t *testing.T) {
-	for _, key := range []string{"filter.poison.smudge", "include.path", "url.https://foreign.test.insteadOf", "core.alternateRefsCommand", "remote.origin.promisor", "extensions.worktreeConfig"} {
+	for _, key := range []string{"filter.poison.smudge", "include.path", "url.https://foreign.test.insteadOf", "core.alternateRefsCommand", "remote.origin.promisor", "extensions.worktreeConfig",
+		"core.sshCommand", "core.gitProxy", "core.askPass", "core.worktree", "http.proxy", "http.sslVerify"} {
 		t.Run(key, func(t *testing.T) {
 			source, _ := localFixtureRepository(t)
 			localFixtureGit(t, source, "config", key, "true")
 			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH")}, source, "status", "--porcelain=v1")
 			if cmd != nil || errorCode(err) != e.CodeEngineCapability {
 				t.Fatalf("repository callback configuration admitted: %v", err)
+			}
+		})
+	}
+}
+
+func TestLocalRedirectEnvironmentAdmitsMaintainedPathBases(t *testing.T) {
+	for _, test := range []struct {
+		name, key string
+		valid     bool
+	}{
+		{"canonical", "url./absolute/source.insteadOf", true},
+		{"workflow terminal separator", "url./absolute/source/.insteadOf", true},
+		{"Git variable case", "url./absolute/source/.insteadof", true},
+		{"embedded dot", "url./absolute/./source/.insteadOf", false},
+		{"embedded parent", "url./absolute/other/../source/.insteadOf", false},
+		{"repeated separator", "url./absolute/source//.insteadOf", false},
+		{"relative", "url.relative/source/.insteadOf", false},
+		{"unselected URI", "url.file:///absolute/source/.insteadOf", false},
+		{"unselected config", "safe.directory", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			environment := []string{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=" + test.key, "GIT_CONFIG_VALUE_0=https://example.test/source"}
+			got, err := LocalRedirectEnvironment(environment)
+			if test.valid {
+				if err != nil || strings.Join(got, "\n") != strings.Join(environment, "\n") {
+					t.Fatalf("maintained exact rewrite was not preserved: %v %q", err, got)
+				}
+			} else if got != nil || errorCode(err) != e.CodeEngineCapability {
+				t.Fatalf("unselected rewrite admitted: %v %q", err, got)
+			}
+		})
+	}
+}
+
+func TestLocalGitTrailingSeparatorRewriteUsesExactRepository(t *testing.T) {
+	source, commit := localFixtureRepository(t)
+	checkout := t.TempDir()
+	environment := []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url." + source + "/.insteadOf", "GIT_CONFIG_VALUE_0=https://example.test/source"}
+	runLocalFixture(t, environment, checkout, "init", "-q")
+	runLocalFixture(t, environment, checkout, "fetch", "-q", "--depth=1", "https://example.test/source", commit)
+	runLocalFixture(t, environment, checkout, "checkout", "-q", "--detach", "FETCH_HEAD")
+	if head := strings.TrimSpace(string(runLocalFixture(t, environment, checkout, "rev-parse", "HEAD"))); head != commit {
+		t.Fatal("workflow rewrite did not fetch the selected repository commit")
+	}
+}
+
+func TestLocalGitExplicitChildDoesNotDiscoverAncestorRepository(t *testing.T) {
+	for _, callback := range []bool{false, true} {
+		t.Run(map[bool]string{false: "harmless ancestor", true: "callback ancestor"}[callback], func(t *testing.T) {
+			source, _ := localFixtureRepository(t)
+			marker := filepath.Join(t.TempDir(), "callback-ran")
+			if callback {
+				localFixtureGit(t, source, "config", "filter.poison.clean", "touch '"+marker+"'; cat")
+				if err := os.WriteFile(filepath.Join(source, "input.txt"), []byte("edited source\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				// Verify the fixture is capable of executing the forbidden callback
+				// before testing that the isolated child command cannot reach it.
+				localFixtureGit(t, source, "status", "--porcelain=v1")
+				if _, err := os.Stat(marker); err != nil {
+					t.Fatalf("ancestor callback fixture was not exercised: %v", err)
+				}
+				if err := os.Remove(marker); err != nil {
+					t.Fatal(err)
+				}
+			}
+			child := filepath.Join(source, "child")
+			if err := os.Mkdir(child, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH")}, child, "status", "--porcelain=v1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Explicit child paths are intentionally not treated as the enclosing
+			// source repository, even when that enclosing repository is harmless.
+			if output, err := cmd.CombinedOutput(); err == nil || !strings.Contains(string(output), "not a git repository") {
+				t.Fatalf("explicit child discovered ancestor: %v %q", err, output)
+			}
+			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+				t.Fatalf("ancestor filter executed: %v", err)
+			}
+			// A fresh source may still initialize its own repository at this exact
+			// path. The ceiling excludes only discovery of the enclosing checkout.
+			runLocalFixture(t, []string{"PATH=" + os.Getenv("PATH")}, child, "init", "-q")
+			runLocalFixture(t, []string{"PATH=" + os.Getenv("PATH")}, child, "status", "--porcelain=v1")
+		})
+	}
+}
+
+func TestLocalGitRequiresAbsoluteExplicitDirectory(t *testing.T) {
+	for _, dir := range []string{".", "relative/source", "../source"} {
+		t.Run(dir, func(t *testing.T) {
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH")}, dir, "status")
+			if cmd != nil || errorCode(err) != e.CodeEngineCapability {
+				t.Fatalf("relative repository admitted: %v", err)
+			}
+		})
+	}
+}
+
+func TestLocalGitCredentialSupportRemainsExplicitAndFetchOnly(t *testing.T) {
+	home := t.TempDir()
+	for key, value := range map[string]string{"credential.helper": "synthetic-helper", "credential.username": "synthetic-user", "credential.useHttpPath": "true", "credential.credentialStore": "unselected-store", "credential.namespace": "unselected-namespace"} {
+		localFixtureGit(t, home, "config", "--file", filepath.Join(home, ".gitconfig"), key, value)
+	}
+	environment := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home,
+		"GH_TOKEN=unselected-token", "GH_CONFIG_DIR=unselected-location", "GCM_CREDENTIAL_STORE=unselected-store", "DBUS_SESSION_BUS_ADDRESS=unselected-session"}
+	for _, operation := range []string{"fetch", "status"} {
+		t.Run(operation, func(t *testing.T) {
+			cmd, err := LocalCommand(t.Context(), environment, "", operation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range []string{"GH_TOKEN", "GH_CONFIG_DIR", "GCM_CREDENTIAL_STORE", "DBUS_SESSION_BUS_ADDRESS"} {
+				if localEnvironmentValue(cmd.Env, key) != "" {
+					t.Fatalf("%s inherited unselected %s", operation, key)
+				}
+			}
+			joined := strings.Join(cmd.Env, "\n")
+			if strings.Contains(joined, "unselected-store") || strings.Contains(joined, "unselected-namespace") {
+				t.Fatal("unselected credential configuration was forwarded")
+			}
+			for _, key := range []string{"credential.helper", "credential.username", "credential.usehttppath"} {
+				present := strings.Contains(joined, "="+key+"\n")
+				if key == "credential.helper" && operation == "status" {
+					continue // The public baseline resets helpers to empty.
+				}
+				if present != (operation == "fetch") {
+					t.Fatalf("%s projected %s incorrectly", operation, key)
+				}
+			}
+		})
+	}
+}
+
+func TestLocalGitConditionalCredentialsUseSelectedSourceDirectory(t *testing.T) {
+	source, _ := localFixtureRepository(t)
+	source, err := filepath.EvalSymlinks(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, _ := localFixtureRepository(t)
+	home := t.TempDir()
+	credentials := filepath.Join(home, "selected-credentials")
+	localFixtureGit(t, home, "config", "--file", credentials, "credential.helper", "selected-synthetic-helper")
+	localFixtureGit(t, home, "config", "--file", filepath.Join(home, ".gitconfig"), "includeIf.gitdir:"+filepath.Join(source, ".git")+".path", credentials)
+	for _, test := range []struct {
+		name, directory, operation string
+		selected                   bool
+	}{
+		{"selected fetch", source, "fetch", true},
+		{"other fetch", other, "fetch", false},
+		{"selected status", source, "status", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home}, test.directory, test.operation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := localEnvironmentValue(cmd.Env, "GIT_CONFIG_VALUE_1") == "selected-synthetic-helper"
+			if got != test.selected {
+				t.Fatalf("conditional credential selection=%t want=%t", got, test.selected)
 			}
 		})
 	}

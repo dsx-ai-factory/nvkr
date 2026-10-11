@@ -303,15 +303,35 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 func Run(ctx context.Context, cfg Config) (result error) {
 	boundary := beginProgress(cfg.Progress, "local-demo", DeploymentStarted, DeploymentFinished, DeploymentFailed)
 	defer func() { boundary.finish(result) }()
-	err := run(ctx, cfg)
+	mode, err := normalizeNetwork(cfg.Network)
+	if err != nil {
+		return err
+	}
+	cfg.Network = mode
+	err = run(ctx, cfg)
 	if err == nil {
 		if cfg.Progress != nil {
-			fmt.Fprintln(cfg.Progress, "PASS: real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.\nUnqualified local diagnostic, not a signed Release or complete source-built distribution.")
+			fmt.Fprintln(cfg.Progress, demoSuccessSummary(mode))
 		}
 		return nil
 	}
 	return nkderr.Wrap(nkderr.CodePreflightFailed, err, "local NKE demo")
 }
+
+// This is emitted only after the deployment owner has joined cleanup. Naming
+// the selected network prevents an alternate diagnostic from claiming the
+// default NVIDIA OVN path was exercised.
+func demoSuccessSummary(mode string) string {
+	selection := "NVIDIA OVN"
+	switch mode {
+	case "upstream-ovn":
+		selection = "upstream OVN diagnostic; NVIDIA OVN not validated"
+	case "kind-calico":
+		selection = "Kind/Calico diagnostic; NVIDIA OVN not deployed"
+	}
+	return "PASS (" + selection + "): real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.\nUnqualified local diagnostic, not a signed Release or complete source-built distribution."
+}
+
 func run(ctx context.Context, cfg Config) (result error) {
 	if err := requireContext(ctx); err != nil {
 		return err

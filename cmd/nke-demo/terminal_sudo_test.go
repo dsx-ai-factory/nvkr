@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -20,6 +21,7 @@ import (
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/gdamore/tcell/v2"
 	"golang.org/x/sys/unix"
+	"golang.org/x/term"
 )
 
 type authenticationScreen struct {
@@ -146,8 +148,13 @@ func TestSudoSessionRefreshOwnership(t *testing.T) {
 			cause := nkderr.New(nkderr.CodePreflightFailed, "session revoked")
 			var calls atomic.Int32
 			err := withSudoSession(ctx, func(context.Context) error { return nil }, func(refreshCtx context.Context) error {
-				if calls.Add(1) == 1 {
+				n := calls.Add(1)
+				if n == 1 {
 					return nil
+				}
+				if n > 2 {
+					<-refreshCtx.Done()
+					return refreshCtx.Err()
 				}
 				close(started)
 				defer close(joined)
@@ -172,8 +179,11 @@ func TestSudoSessionRefreshOwnership(t *testing.T) {
 					cancel()
 					return workCtx.Err()
 				case "refresh-fails":
-					<-workCtx.Done()
-					return workCtx.Err()
+					<-joined
+					if workCtx.Err() != nil {
+						t.Fatal("joined refresh failure canceled workflow")
+					}
+					return nil
 				default:
 					return nil
 				}
@@ -204,6 +214,225 @@ func TestSudoSessionRefreshOwnership(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUnattendedSudoWrapperAdmission(t *testing.T) {
+	err := runUnattendedSudoProbe(t.Context(), func(ctx context.Context, cmd *exec.Cmd) error {
+		want := []string{"sudo", "-n", "-k", "timeout", "--signal=TERM", "--kill-after=5", "25", "true"}
+		if !reflect.DeepEqual(cmd.Args, want) || cmd.Cancel == nil {
+			t.Fatalf("unexpected unattended wrapper: %v", cmd.Args)
+		}
+		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > 35*time.Second {
+			t.Fatal("unattended admission is not bounded")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"unattended", "cached", "unjoined", "canceled"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var diagnostics bytes.Buffer
+			var order []string
+			err := selectSudoSession(ctx, &diagnostics, func(context.Context) error {
+				order = append(order, "probe")
+				switch mode {
+				case "unattended":
+					return nil
+				case "unjoined":
+					return nkedemo.ErrUnjoined
+				case "canceled":
+					cancel()
+				}
+				return errors.New("wrapper authentication needed")
+			}, func(context.Context) error {
+				order = append(order, "authenticate")
+				return nil
+			}, func(context.Context) error {
+				order = append(order, "refresh")
+				return nil
+			}, func(_ context.Context, check func(context.Context) error) error {
+				order = append(order, "work")
+				if (check == nil) != (mode == "unattended") {
+					t.Fatal("wrong unattended versus cached callback")
+				}
+				return nil
+			})
+			want := "probe"
+			switch mode {
+			case "unattended":
+				want = "probe,work"
+				if diagnostics.Len() != 0 {
+					t.Fatal("unattended wrapper approval requested cached authentication")
+				}
+			case "cached":
+				want = "probe,authenticate,refresh,work"
+			case "unjoined":
+				assertCode(t, err, nkderr.CodePreflightFailed)
+				if !errors.Is(err, nkedemo.ErrUnjoined) {
+					t.Fatal("unjoined probe lost")
+				}
+			case "canceled":
+				assertCode(t, err, nkderr.CodeTimeout)
+			}
+			if strings.Join(order, ",") != want {
+				t.Fatalf("order=%v want=%s", order, want)
+			}
+			if (mode == "cached" || mode == "unattended") && err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestSudoSessionRefreshThroughCanceledCleanup(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var calls atomic.Int32
+	refreshed := make(chan struct{})
+	err := withSudoSession(ctx, func(context.Context) error { return nil }, func(refreshCtx context.Context) error {
+		if refreshCtx.Err() != nil {
+			t.Fatal("cleanup refresher inherited work cancellation")
+		}
+		if calls.Add(1) == 2 {
+			close(refreshed)
+		}
+		return nil
+	}, time.Millisecond, func(workCtx context.Context, refresh func(context.Context) error) error {
+		cancel()
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(workCtx), time.Second)
+		defer stop()
+		select {
+		case <-refreshed:
+		case <-cleanup.Done():
+			t.Fatal("refresher stopped before canceled work's cleanup returned")
+		}
+		return errors.Join(workCtx.Err(), refresh(cleanup))
+	})
+	if !errors.Is(err, context.Canceled) || calls.Load() < 3 {
+		t.Fatalf("cleanup refresh failed: calls=%d error=%v", calls.Load(), err)
+	}
+}
+
+func TestSudoSessionJoinedRefreshRecovery(t *testing.T) {
+	var calls atomic.Int32
+	recovered := make(chan struct{})
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	err := withSudoSession(ctx, func(context.Context) error { return nil }, func(context.Context) error {
+		switch calls.Add(1) {
+		case 2:
+			return nkderr.New(nkderr.CodePreflightFailed, "joined transient refresh failure")
+		case 3:
+			close(recovered)
+		}
+		return nil
+	}, time.Millisecond, func(workCtx context.Context, _ func(context.Context) error) error {
+		select {
+		case <-recovered:
+			return workCtx.Err()
+		case <-workCtx.Done():
+			return workCtx.Err()
+		}
+	})
+	if err != nil || calls.Load() < 3 {
+		t.Fatalf("joined transient failure did not recover: calls=%d error=%v", calls.Load(), err)
+	}
+}
+
+func TestSudoSessionUnjoinedRefreshStopsFurtherProducers(t *testing.T) {
+	var calls atomic.Int32
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	err := withSudoSession(ctx, func(context.Context) error { return nil }, func(context.Context) error {
+		if calls.Add(1) > 1 {
+			return nkderr.Wrap(nkderr.CodePreflightFailed, nkedemo.ErrUnjoined, "refresh producer could not join")
+		}
+		return nil
+	}, time.Millisecond, func(workCtx context.Context, refresh func(context.Context) error) error {
+		<-workCtx.Done()
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(workCtx), time.Second)
+		defer stop()
+		if err := refresh(cleanup); !errors.Is(err, nkedemo.ErrUnjoined) {
+			t.Fatalf("cleanup launched another producer after unjoined refresh: %v", err)
+		}
+		return workCtx.Err()
+	})
+	assertCode(t, err, nkderr.CodePreflightFailed)
+	if !errors.Is(err, nkedemo.ErrUnjoined) || calls.Load() != 2 {
+		t.Fatalf("unjoined producer retention failed: calls=%d error=%v", calls.Load(), err)
+	}
+}
+
+func TestTerminalSudoProbeAndPromptAdmission(t *testing.T) {
+	for _, mode := range []string{"cached", "prompt", "rejected", "unjoined", "canceled"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var output, diagnostics bytes.Buffer
+			input := strings.NewReader("")
+			prompts := 0
+			err := authenticateSudo(ctx, func(_ context.Context, cmd *exec.Cmd) error {
+				if !reflect.DeepEqual(cmd.Args, []string{"sudo", "-n", "-v"}) || cmd.Stdin != nil {
+					t.Fatalf("invalid cache probe: %v", cmd.Args)
+				}
+				if mode == "cached" {
+					return nil
+				}
+				if mode == "unjoined" {
+					return nkedemo.ErrUnjoined
+				}
+				if mode == "canceled" {
+					cancel()
+				}
+				return errors.New("cache unavailable")
+			}, func(promptCtx context.Context, cmd *exec.Cmd, fd int) error {
+				prompts++
+				if !reflect.DeepEqual(cmd.Args, []string{"sudo", "-v"}) || cmd.Stdin != input || cmd.Stdout != &output || cmd.Stderr != &diagnostics || fd != 17 {
+					t.Fatal("prompt did not retain direct terminal streams")
+				}
+				if deadline, ok := promptCtx.Deadline(); !ok || time.Until(deadline) > 2*time.Minute {
+					t.Fatal("prompt is not bounded")
+				}
+				if mode == "rejected" {
+					return terminalAuthenticationFailure(promptCtx, errors.New("authentication rejected"))
+				}
+				return nil
+			}, input, &output, &diagnostics, 17)
+			want := 0
+			if mode == "prompt" || mode == "rejected" {
+				want = 1
+			}
+			if prompts != want || ((want == 0) != (diagnostics.Len() == 0)) {
+				t.Fatalf("prompts=%d diagnostics=%q", prompts, diagnostics.String())
+			}
+			switch mode {
+			case "cached", "prompt":
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "canceled":
+				assertCode(t, err, nkderr.CodeTimeout)
+			default:
+				assertCode(t, err, nkderr.CodePreflightFailed)
+			}
+		})
+	}
+}
+
+func TestTerminalAuthenticationChildInterruptIsCancellation(t *testing.T) {
+	cmd := exec.CommandContext(t.Context(), "sh", "-c", "kill -INT $$")
+	cause := cmd.Run()
+	if cause == nil || t.Context().Err() != nil {
+		t.Fatal("fixture must interrupt only its child")
+	}
+	err := terminalAuthenticationFailure(t.Context(), cause)
+	assertCode(t, err, nkderr.CodeTimeout)
+	if !errors.Is(err, context.Canceled) || !errors.Is(err, cause) {
+		t.Fatalf("foreground child interrupt was not cancellation: %v", err)
 	}
 }
 
@@ -267,7 +496,11 @@ func TestForegroundAuthenticationTerminalContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"success", "canceled"} {
+	initial, err := term.GetState(fd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"success", "canceled", "echo-off-success", "echo-off-canceled", "echo-off-interrupted"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
@@ -275,14 +508,29 @@ func TestForegroundAuthenticationTerminalContract(t *testing.T) {
 			if mode == "canceled" {
 				command = "sleep 30"
 			}
+			switch mode {
+			case "echo-off-success":
+				command = "stty -echo; exit 0"
+			case "echo-off-canceled":
+				command = "stty -echo; sleep 30"
+			case "echo-off-interrupted":
+				command = "stty -echo; kill -INT $$"
+			}
 			cmd := exec.CommandContext(ctx, "sh", "-c", command)
 			cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 			err := runForegroundAuthentication(ctx, cmd, fd)
-			if mode == "success" && err != nil {
+			if (mode == "success" || mode == "echo-off-success") && err != nil {
 				t.Fatal(err)
 			}
-			if mode == "canceled" && !errors.Is(err, context.DeadlineExceeded) {
+			if (mode == "canceled" || mode == "echo-off-canceled") && !errors.Is(err, context.DeadlineExceeded) {
 				t.Fatalf("cancellation lost: %v", err)
+			}
+			if mode == "echo-off-interrupted" && !errors.Is(err, context.Canceled) {
+				t.Fatalf("foreground interrupt lost: %v", err)
+			}
+			afterState, stateErr := term.GetState(fd)
+			if stateErr != nil || !reflect.DeepEqual(initial, afterState) {
+				t.Fatalf("terminal modes were not restored: %v", stateErr)
 			}
 			after, readErr := unix.IoctlGetInt(fd, unix.TIOCGPGRP)
 			if readErr != nil || before != after {

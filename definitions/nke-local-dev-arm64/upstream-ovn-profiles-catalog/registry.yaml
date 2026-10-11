@@ -29,6 +29,12 @@ components:
       - -ec
       - |
         : "${SOURCE_DATE_EPOCH:?}"
+        # Exact pinned source bytes keep the named Alpine context exhaustive.
+        # This is blob integrity, not Dockerfile parsing or Release authority.
+        test -f controller/profiles/example/Dockerfile
+        test ! -L controller/profiles/example/Dockerfile
+        printf '%s\n' '789f7ad1e406b82f0f55a52152eff7b08846b4122582145fade588c7d931cc3e  controller/profiles/example/Dockerfile' \
+          | sha256sum -c -
         mkdir -p bin/profiles-context/profiles/configProfiles
         cp -R nkd-local-profiles/osProfiles bin/profiles-context/profiles/
         cp -R controller/test/fixtures/runbooks bin/profiles-context/

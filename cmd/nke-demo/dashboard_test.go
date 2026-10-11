@@ -23,6 +23,7 @@ import (
 type testDashboardScreen struct {
 	tcell.SimulationScreen
 	closed, initFailure, panicDraw bool
+	panicDrawAfter, draws          int
 	joined                         atomic.Bool
 	lastFrame                      string
 	onFini                         func()
@@ -63,10 +64,87 @@ func (s *testDashboardScreen) Show() {
 }
 
 func (s *testDashboardScreen) Clear() {
-	if s.panicDraw {
+	s.draws++
+	if s.panicDraw || s.panicDrawAfter > 0 && s.draws >= s.panicDrawAfter {
 		panic("private renderer panic")
 	}
 	s.SimulationScreen.Clear()
+}
+
+func TestDashboardFinalDrawPanicPreservesJoinedWorkerError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		code nkderr.Code
+	}{
+		{"failed worker", nkderr.New(nkderr.CodeFetchFailed, "worker fetch failed"), nkderr.CodeFetchFailed},
+		{"successful worker", nil, nkderr.CodePreflightFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8"), panicDrawAfter: 2}
+			view := newDashboard()
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			err := dashboardLoop(ctx, cancel, screen, func() error { return nil }, writer, view, func(context.Context, io.Writer) error {
+				return tc.err
+			})
+			assertCode(t, err, tc.code)
+			if tc.err != nil && !errors.Is(err, tc.err) {
+				t.Fatalf("final rendering panic discarded joined owner failure: %v", err)
+			}
+			if !screen.joined.Load() || !strings.Contains(err.Error(), "terminal rendering failed") {
+				t.Fatalf("rendering failure missing or terminal not restored: %v", err)
+			}
+		})
+	}
+}
+
+func TestDashboardResultsSurviveTerminalHandover(t *testing.T) {
+	for _, tc := range []struct {
+		name, result string
+		fail         bool
+	}{
+		{"build", "Artifact builds complete; nkdctl: /tmp/demo/nkdctl", false},
+		{"default OVN", "PASS (NVIDIA OVN): owner result", false},
+		{"upstream diagnostic", "PASS (upstream OVN diagnostic; NVIDIA OVN not validated): owner result", false},
+		{"Calico diagnostic", "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed): owner result", false},
+		{"restore", "PASS: recorded controls restored", false},
+		{"no PASS on error", "PASS: must not replay", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8")}
+			view := newDashboard()
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			err := dashboardLoop(ctx, cancel, screen, func() error { return nil }, writer, view, func(_ context.Context, output io.Writer) error {
+				_, _ = io.WriteString(output, tc.result+"\nWarning: latest public warning\n")
+				for range dashboardLines + 1 {
+					_, _ = io.WriteString(output, "[done] image/build\n")
+				}
+				_, _ = io.WriteString(output, "private raw compiler noise\n")
+				if tc.fail {
+					return nkderr.New(nkderr.CodeBuildFailed, "owner failed")
+				}
+				return nil
+			})
+			if tc.fail {
+				assertCode(t, err, nkderr.CodeBuildFailed)
+			} else if err != nil {
+				t.Fatalf("successful worker failed: %v", err)
+			}
+			if !screen.joined.Load() {
+				t.Fatal("summary handover preceded terminal restoration")
+			}
+			var out bytes.Buffer
+			finishDashboardProgress(writer, &out, "", err)
+			text := out.String()
+			if strings.Contains(text, tc.result) == tc.fail || !strings.Contains(text, "Warning: latest public warning") || strings.Contains(text, "private raw compiler") || strings.ContainsRune(text, '\x1b') {
+				t.Fatalf("result handover lost public result or leaked raw output: %q", text)
+			}
+		})
+	}
 }
 
 func (s *testDashboardScreen) ChannelEvents(events chan<- tcell.Event, quit <-chan struct{}) {

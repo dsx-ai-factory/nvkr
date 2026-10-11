@@ -484,9 +484,25 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
 	if args[0] == "git" {
-		gitArgs, dir := args[1:], ""
+		// Admit the same effective directory Git will execute in. Diagnostic
+		// storage and command cwd are independent, and a relative -C is relative
+		// to command cwd, not this process's cwd.
+		directory := r.Work
+		if r.directory != "" {
+			directory = r.directory
+		}
+		dir, directoryErr := filepath.Abs(directory)
+		if directoryErr != nil {
+			return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: directoryErr}
+		}
+		gitArgs := args[1:]
 		if len(gitArgs) >= 2 && gitArgs[0] == "-C" {
-			dir, gitArgs = gitArgs[1], gitArgs[2:]
+			if filepath.IsAbs(gitArgs[1]) {
+				dir = gitArgs[1]
+			} else {
+				dir = filepath.Join(dir, gitArgs[1])
+			}
+			gitArgs = gitArgs[2:]
 		}
 		cmd, err = sourcegit.LocalCommand(commandCtx, r.Env, dir, gitArgs...)
 		if err != nil {

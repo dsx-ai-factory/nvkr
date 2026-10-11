@@ -78,6 +78,118 @@ func TestDashboardOSLogsSmallTerminalAndSafeKeys(t *testing.T) {
 	}
 }
 
+func TestDashboardOSLogsOnlyWhileSelectedBuildRuns(t *testing.T) {
+	for _, state := range []string{"running", "done", "queued", "stopped"} {
+		t.Run(state, func(t *testing.T) {
+			s := dashboardSnapshot{buildSelected: 0, buildSteps: []dashboardBuildStep{{id: "os/build-disk", kind: "build", state: state}}, buildLogs: map[string]dashboardOSLogs{
+				"os/build-disk": {record: buildactivity.Record{Version: 1, Operation: "os/build-disk", Available: true, Files: 1}, received: time.Now()},
+			}}
+			if got := strings.Contains(dashboardBuildDetail(s, time.Now()), "OS build logs:"); got != (state == "running") {
+				t.Fatalf("state %s rendered live OS telemetry=%t", state, got)
+			}
+		})
+	}
+}
+
+func TestDashboardProjectionFailureDoesNotInventCapReason(t *testing.T) {
+	for _, truncated := range []bool{false, true} {
+		t.Run(fmt.Sprint(truncated), func(t *testing.T) {
+			s := dashboardSnapshot{buildTruncated: truncated, buildSteps: []dashboardBuildStep{{id: "os/build-disk", kind: "build", state: "running"}}}
+			text := dashboardBuildRibbon(s, time.Now())
+			if !strings.Contains(text, "Required output total unknown") || strings.Contains(text, "listing cap reached") {
+				t.Fatal(text)
+			}
+			if strings.Contains(text, "projection unavailable, rejected or capped") != truncated {
+				t.Fatal(text)
+			}
+		})
+	}
+}
+
+func TestDashboardBuildElapsedIsNeverTruncated(t *testing.T) {
+	for _, elapsed := range []time.Duration{75 * time.Second, time.Hour + 10*time.Second, time.Hour + 12*time.Minute + 34*time.Second, 10 * time.Hour} {
+		t.Run(elapsed.String(), func(t *testing.T) {
+			started := time.Now()
+			s := dashboardSnapshot{buildSelected: 0, buildSteps: []dashboardBuildStep{{id: "os/build-disk", kind: "build", state: "running", started: started}}}
+			for _, text := range []string{dashboardBuildList(s, 5, started.Add(elapsed)), dashboardBuildDetail(s, started.Add(elapsed))} {
+				if !strings.Contains(text, elapsed.String()) {
+					t.Fatalf("lost complete elapsed duration %s: %s", elapsed, text)
+				}
+			}
+		})
+	}
+}
+
+func TestDashboardBuildScrollModeTransitionsResetOffset(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		key         tcell.Key
+		fromDetails bool
+		wantDetails bool
+	}{
+		{"enter details", tcell.KeyEnter, false, true},
+		{"enter activity", tcell.KeyEnter, true, false},
+		{"escape activity", tcell.KeyEscape, true, false},
+		{"end live activity", tcell.KeyEnd, true, false},
+		{"end resets activity", tcell.KeyEnd, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newDashboard()
+			d.phases[1].state = "running"
+			d.buildDetails, d.offset = tc.fromDetails, 20
+			if d.input(tcell.NewEventKey(tc.key, 0, tcell.ModNone)) {
+				t.Fatal("navigation canceled work")
+			}
+			s := d.snapshot()
+			if s.offset != 0 || s.buildDetails != tc.wantDetails {
+				t.Fatalf("details=%t offset=%d", s.buildDetails, s.offset)
+			}
+		})
+	}
+}
+
+func TestDashboardCheckedWriterEscapesExactlyOnce(t *testing.T) {
+	for _, line := range []string{
+		`Warning: quoted path "/tmp/example" and slash \`,
+		"Warning: controls\t\x1b[2J and [red]markup",
+	} {
+		t.Run(line, func(t *testing.T) {
+			d := newDashboard()
+			_, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			writer := &checkedWriter{out: d, observer: d, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			_, err := io.WriteString(writer, line+"\n")
+			activity := d.snapshot().activity
+			if err != nil || len(activity) != 1 || !strings.HasSuffix(activity[0], terminalText(line)) || strings.ContainsRune(activity[0], '\x1b') {
+				t.Fatalf("activity not once escaped: %q error=%v", activity, err)
+			}
+			if strings.HasSuffix(activity[0], terminalText(terminalText(line))) {
+				t.Fatalf("activity escaped twice: %q", activity)
+			}
+		})
+	}
+}
+
+func TestDashboardBuildLogLocatorSurvivesActivityEviction(t *testing.T) {
+	for _, building := range []bool{false, true} {
+		t.Run(fmt.Sprint(building), func(t *testing.T) {
+			d := newDashboard()
+			d.buildLogPath = "/tmp/nke-demo-build-example.log"
+			if building {
+				d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+			}
+			for range dashboardLines + 1 {
+				_, _ = io.WriteString(d, "routine activity\n")
+			}
+			screen := dashboardScreen(t, 160)
+			d.draw(screen, time.Now(), false)
+			if !strings.Contains(dashboardText(screen), "Private build log: "+d.buildLogPath) {
+				t.Fatal("durable locator absent after ring eviction")
+			}
+		})
+	}
+}
+
 func graphRecord(t *testing.T, out io.Writer, prefix string, value any) {
 	t.Helper()
 	raw, err := json.Marshal(value)

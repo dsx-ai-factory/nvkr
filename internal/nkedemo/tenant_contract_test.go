@@ -68,9 +68,40 @@ func TestTenantRejectsUnknownNetworkBeforeInventory(t *testing.T) {
 	}
 }
 
+func TestDemoNetworkDiagnosticScopeIsExplicit(t *testing.T) {
+	for _, test := range []struct{ input, mode, label string }{
+		{"", "ovn", "NVIDIA OVN"},
+		{"ovn", "ovn", "NVIDIA OVN"},
+		{"upstream-ovn", "upstream-ovn", "upstream OVN diagnostic; NVIDIA OVN not validated"},
+		{"kind-calico", "kind-calico", "Kind/Calico diagnostic; NVIDIA OVN not deployed"},
+	} {
+		t.Run(test.mode+"/"+test.input, func(t *testing.T) {
+			mode, err := normalizeNetwork(test.input)
+			if err != nil || mode != test.mode {
+				t.Fatalf("network normalization: %q %v", mode, err)
+			}
+			if summary := demoSuccessSummary(mode); !strings.HasPrefix(summary, "PASS ("+test.label+"):") || !strings.Contains(summary, "not a signed Release") {
+				t.Fatalf("ambiguous diagnostic summary: %q", summary)
+			}
+			path := filepath.Join(privateTestDir(t), "tenant-result.json")
+			if err := privateJSON(path, tenantResult{Scope: "unqualified-local-demo", Network: mode}); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var result tenantResult
+			if err := json.Unmarshal(raw, &result); err != nil || result.Network != test.mode || result.Scope != "unqualified-local-demo" {
+				t.Fatalf("retained diagnostic lost network/scope: %+v %v", result, err)
+			}
+		})
+	}
+}
+
 func TestTenantCalicoRolloutIsExplicitBoundedAndFailClosed(t *testing.T) {
 	for _, test := range []struct{ name, network string }{
-		{"default", ""}, {"ovn", "ovn"}, {"ready", "kind-calico"},
+		{"default", ""}, {"ovn", "ovn"}, {"upstream-ovn", "upstream-ovn"}, {"ready", "kind-calico"},
 		{"failed", "kind-calico"}, {"canceled", "kind-calico"},
 		{"deadline", "kind-calico"}, {"unknown", "calico"},
 	} {
@@ -121,7 +152,7 @@ esac
 			if test.name == "deadline" && os.IsNotExist(readErr) {
 				return // The parent may expire before command admission.
 			}
-			if test.name == "default" || test.name == "ovn" || test.name == "unknown" || test.name == "canceled" {
+			if test.name == "default" || test.name == "ovn" || test.name == "upstream-ovn" || test.name == "unknown" || test.name == "canceled" {
 				if !os.IsNotExist(readErr) {
 					t.Fatalf("unselected or rejected CNI readiness started work: %v", readErr)
 				}

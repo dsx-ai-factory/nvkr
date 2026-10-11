@@ -5,6 +5,8 @@ package pipeline
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -18,6 +20,98 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
+
+func TestSourceFetchPreservesGitAdmissionFailures(t *testing.T) {
+	for _, boundary := range []string{"fetch probe", "exec-node probe", "verify tree", "closure cleanliness"} {
+		t.Run(boundary, func(t *testing.T) {
+			node, dir, opts := pristineClosureFixture(t)
+			cmd := exec.CommandContext(t.Context(), "git", "-C", dir, "config", "core.sshCommand", "unsupported")
+			if raw, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("fixture: %v %s", err, raw)
+			}
+			var err error
+			switch boundary {
+			case "fetch probe":
+				err = (Local{}).fetch(node, withDefaults(opts))
+			case "exec-node probe":
+				err = (Local{}).execFetch(node, withDefaults(opts))
+			case "verify tree":
+				err = (Local{}).verifyTree(dir, node, opts)
+			case "closure cleanliness":
+				err = ensureSourceClosure(node, dir, opts, nil)
+			}
+			if code(err) != e.CodeEngineCapability || e.ExitCode(err) != 29 {
+				t.Fatalf("source boundary lost admission code: %v", err)
+			}
+		})
+	}
+}
+
+func TestSourceGitBoundaryFailureClassification(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"capability", e.New(e.CodeEngineCapability, "fixture"), true},
+		{"bounded query timeout", e.New(e.CodeTimeout, "fixture"), true},
+		{"wrapped capability", fmt.Errorf("fixture: %w", e.New(e.CodeEngineCapability, "fixture")), true},
+		{"ordinary fetch", e.New(e.CodeFetchFailed, "fixture"), false},
+		{"ordinary tool exit", errors.New("fixture"), false},
+		{"success", nil, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := sourceGitBoundaryError(test.err); got != test.want {
+				t.Fatalf("boundary failure=%t want=%t", got, test.want)
+			}
+		})
+	}
+}
+
+func TestSourceFetchDoesNotTolerateRemoteAddPolicyRefusal(t *testing.T) {
+	for _, boundary := range []string{"local", "exec-node"} {
+		t.Run(boundary, func(t *testing.T) {
+			realGit, err := exec.LookPath("git")
+			if err != nil {
+				t.Fatal(err)
+			}
+			toolDir := t.TempDir()
+			root := t.TempDir()
+			dir := filepath.Join(root, "source")
+			marker := filepath.Join(toolDir, "initialized")
+			// Model repository configuration appearing after init. Git remains
+			// the real config parser; the wrapper changes only this fixture.
+			body := fmt.Sprintf(`#!/bin/sh
+case " $* " in
+  *" init "*)
+    %q "$@" || exit $?
+    %q -C %q config core.sshCommand unsupported || exit $?
+    : > %q
+    exit 0
+    ;;
+esac
+exec %q "$@"
+`, realGit, realGit, dir, marker, realGit)
+			if err := os.WriteFile(filepath.Join(toolDir, "git"), []byte(body), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", toolDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			node := ir.Node{ID: "fetch-source", Dest: "source", Repo: "https://example.test/source", Commit: strings.Repeat("a", 40)}
+			opts := withDefaults(RunOptions{Ctx: t.Context(), SourceRoot: root, Stdout: io.Discard, Stderr: io.Discard})
+			if boundary == "local" {
+				err = (Local{}).fetch(node, opts)
+			} else {
+				err = (Local{}).execFetch(node, opts)
+			}
+			if code(err) != e.CodeEngineCapability || e.ExitCode(err) != 29 {
+				t.Fatalf("remote-add admission was ignored or recoded: %v", err)
+			}
+			if _, err := os.Stat(marker); err != nil {
+				t.Fatalf("fixture did not reach init before remote-add admission: %v", err)
+			}
+		})
+	}
+}
 
 func holdSourceFetchDirectory(ctx context.Context, path string) (*os.File, error) {
 	if err := ctx.Err(); err != nil {

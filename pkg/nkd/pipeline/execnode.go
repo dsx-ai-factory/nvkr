@@ -200,6 +200,9 @@ func (l Local) execFetch(n ir.Node, opts RunOptions) error {
 		return nil
 	}
 	if head, err := gitOut(opts.ctx(), dir, "rev-parse", "HEAD"); err != nil || head != n.Commit {
+		if sourceGitBoundaryError(err) {
+			return err
+		}
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return e.Wrap(e.CodeFetchFailed, err, "creating source dir %s", dir)
 		}
@@ -209,7 +212,7 @@ func (l Local) execFetch(n ir.Node, opts RunOptions) error {
 			{"checkout", "-q", "--detach", "FETCH_HEAD"},
 		} {
 			if _, err := gitOut(opts.ctx(), dir, s...); err != nil {
-				if opts.ctx().Err() != nil {
+				if opts.ctx().Err() != nil || sourceGitBoundaryError(err) {
 					return err
 				}
 				if s[0] != "remote" {

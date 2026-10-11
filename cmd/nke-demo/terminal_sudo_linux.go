@@ -8,9 +8,10 @@ import (
 	"runtime"
 
 	"golang.org/x/sys/unix"
+	"golang.org/x/term"
 )
 
-func restoreTerminalForeground(fd, foreground int) (result error) {
+func restoreAuthenticationTerminal(fd, foreground int, state *term.State) (result error) {
 	runtime.LockOSThread()
 	var block, previous unix.Sigset_t
 	// SIGTTOU fits the first word on all supported Linux architectures.
@@ -27,5 +28,7 @@ func restoreTerminalForeground(fd, foreground int) (result error) {
 		}
 		runtime.UnlockOSThread()
 	}()
-	return unix.IoctlSetPointerInt(fd, unix.TIOCSPGRP, foreground)
+	// Restore modes while SIGTTOU is blocked, including when sudo was killed
+	// with echo disabled. Always attempt foreground restoration as well.
+	return errors.Join(term.Restore(fd, state), unix.IoctlSetPointerInt(fd, unix.TIOCSPGRP, foreground))
 }

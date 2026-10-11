@@ -303,7 +303,7 @@ func TestProfilesImageSourceChart(t *testing.T) {
 		t.Fatalf("source-owned chart rejected profiles image: %v\n%s", err, rendered)
 	}
 	value := string(rendered)
-	for _, required := range []string{"name: materialize-profiles", "cp -a /profiles/. /profiles-out/", "emptyDir: {}", "mountPath: \"/profiles\"", "readOnly: true", "name: PROFILES_DIR"} {
+	for _, required := range []string{"name: materialize-profiles", "image: \"" + reference + "\"", "cp -a /profiles/. /profiles-out/", "emptyDir: {}", "mountPath: \"/profiles\"", "readOnly: true", "name: PROFILES_DIR"} {
 		if !strings.Contains(value, required) {
 			t.Fatalf("missing source-owned profiles image field %q", required)
 		}
@@ -314,7 +314,7 @@ func TestProfilesImageSourceChart(t *testing.T) {
 }
 
 func TestDeployedProfilesImageRejectsSubstitution(t *testing.T) {
-	for _, scenario := range []string{"exact", "api-token", "image", "image-id", "failed-init", "missing-exit", "running-init", "missing-init", "duplicate-init", "missing-status", "duplicate-status", "init-mount", "duplicate-init-mount", "masked-source", "masked-destination", "masked-root", "masked-controller", "path", "writable", "host-path", "missing-volume", "duplicate-mount"} {
+	for _, scenario := range []string{"exact", "api-token", "unrelated-container", "other-init-writable", "other-init-readonly", "other-app-writable", "other-app-readonly", "image", "image-id", "failed-init", "missing-exit", "running-init", "missing-init", "duplicate-init", "missing-status", "duplicate-status", "init-mount", "duplicate-init-mount", "masked-source", "masked-destination", "masked-root", "masked-controller", "path", "writable", "host-path", "missing-volume", "duplicate-mount"} {
 		t.Run(scenario, func(t *testing.T) {
 			reference := "example.invalid/profiles@sha256:" + strings.Repeat("a", 64)
 			emptyDir := json.RawMessage("{}")
@@ -327,6 +327,13 @@ func TestDeployedProfilesImageRejectsSubstitution(t *testing.T) {
 			pod.Status.InitContainerStatuses = []podContainerState{{Name: "materialize-profiles", ImageID: reference}}
 			pod.Status.InitContainerStatuses[0].State.Terminated = &struct{ ExitCode *int }{&exit}
 			switch scenario {
+			case "unrelated-container":
+				pod.Spec.InitContainers = append(pod.Spec.InitContainers, podContainer{Name: "unrelated-init"})
+				pod.Spec.Containers = append(pod.Spec.Containers, podContainer{Name: "unrelated-app"})
+			case "other-init-writable", "other-init-readonly":
+				pod.Spec.InitContainers = append(pod.Spec.InitContainers, podContainer{Name: "other-init", VolumeMounts: []profileMount{{"profiles", "/shared", scenario == "other-init-readonly"}}})
+			case "other-app-writable", "other-app-readonly":
+				pod.Spec.Containers = append(pod.Spec.Containers, podContainer{Name: "other-app", VolumeMounts: []profileMount{{"profiles", "/shared", scenario == "other-app-readonly"}}})
 			case "api-token":
 				pod.Spec.InitContainers[0].VolumeMounts = append(pod.Spec.InitContainers[0].VolumeMounts,
 					profileMount{"kube-api-access-test", "/var/run/secrets/kubernetes.io/serviceaccount", true})
@@ -371,7 +378,7 @@ func TestDeployedProfilesImageRejectsSubstitution(t *testing.T) {
 			case "duplicate-mount":
 				pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, pod.Spec.Containers[0].VolumeMounts[0])
 			}
-			if err := validateProfilesImage(pod, "controller", reference); (err == nil) != (scenario == "exact" || scenario == "api-token") {
+			if err := validateProfilesImage(pod, "controller", reference); (err == nil) != (scenario == "exact" || scenario == "api-token" || scenario == "unrelated-container") {
 				t.Fatalf("profiles image acceptance: %v", err)
 			}
 		})

@@ -358,7 +358,7 @@ func TestDashboardTenantStagesDoNotInventObservations(t *testing.T) {
 		{"ready only", []nkedemo.ProgressEvent{{Kind: nkedemo.TenantWaiting, Name: "tenant-nodes", RegisteredNodes: 2, ReadyNodes: 2}}, [4]string{"pending", "pending", "observed", "pending"}},
 		{"provisioned is not node readiness", []nkedemo.ProgressEvent{{Kind: nkedemo.TenantWaiting, Name: "tenant-nodes", Provisioned: nkedemo.TenantConditionTrue}}, [4]string{"pending", "pending", "running", "pending"}},
 		{"workload owner", []nkedemo.ProgressEvent{{Kind: nkedemo.TenantWaiting, Name: "tenant-workload", RegisteredNodes: 2, ReadyNodes: 2}, {Kind: nkedemo.DeploymentFinished, Name: "tenant-provisioning"}}, [4]string{"pending", "pending", "pending", "observed"}},
-		{"failure", []nkedemo.ProgressEvent{{Kind: nkedemo.TenantWaiting, Name: "tenant-api"}, {Kind: nkedemo.DeploymentFailed, Name: "tenant-provisioning"}}, [4]string{"pending", "failed", "pending", "pending"}},
+		{"owner termination is not readiness failure", []nkedemo.ProgressEvent{{Kind: nkedemo.TenantWaiting, Name: "tenant-api"}, {Kind: nkedemo.DeploymentFailed, Name: "tenant-provisioning"}}, [4]string{"pending", "stopped", "pending", "pending"}},
 		{"missing owner observations", []nkedemo.ProgressEvent{{Kind: nkedemo.DeploymentFinished, Name: "tenant-provisioning"}}, [4]string{"pending", "pending", "pending", "pending"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -436,6 +436,14 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 				{Kind: nkedemo.DeploymentFailed, Name: "local-demo"},
 			},
 			states: [6]string{"pending", "pending", "stopped", "pending", "pending", "stopped"},
+		},
+		{
+			name: "observed substep is not owning site completion",
+			events: []nkedemo.ProgressEvent{
+				{Kind: nkedemo.PhaseFinished, Name: "create-management"},
+				{Kind: nkedemo.DeploymentFailed, Name: "local-demo"},
+			},
+			states: [6]string{"pending", "pending", "stopped", "pending", "pending", "pending"},
 		},
 		{
 			name: "completed artifacts and failed cleanup remain explicit",
@@ -523,6 +531,30 @@ func TestDashboardCancellationDoesNotShowRunningTenantBudget(t *testing.T) {
 	}
 }
 
+func TestDashboardTenantTerminationStopsUnfinishedChecks(t *testing.T) {
+	for _, name := range []string{"tenant-kubeconfig", "tenant-api", "tenant-nodes", "tenant-workload"} {
+		t.Run(name, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.TenantWaiting, Name: name})
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.DeploymentFailed, Name: "tenant-provisioning"})
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.DeploymentFailed, Name: "local-demo"})
+			stopped := 0
+			for _, stage := range d.snapshot().tenantStages {
+				state, _, _ := stage.status(1)
+				if state == "failed" || state == "running" {
+					t.Fatalf("owner termination falsely attributed check state %s", state)
+				}
+				if state == "stopped" {
+					stopped++
+				}
+			}
+			if stopped != 1 {
+				t.Fatalf("stopped checks=%d want=1", stopped)
+			}
+		})
+	}
+}
+
 func TestDashboardCleanupShowsOwningStep(t *testing.T) {
 	for _, name := range []string{"tenant-cleanup", "tenant-diagnostics", "tenant-delete", "tenant-deletion-wait"} {
 		t.Run(name, func(t *testing.T) {
@@ -602,7 +634,7 @@ func TestDashboardTenantGuestLayout(t *testing.T) {
 			screen.SetSize(size[0], size[1])
 			d.draw(screen, s.guestsObservedAt.Add(time.Minute), false)
 			text := dashboardText(screen)
-			for _, want := range []string{"Waiting for both tenant nodes Ready", "Checks [##--] 2/4", "Control plane", "VM running", "Infra True", "console 12 KiB; grew 3m0s ago", "Worker", "VM paused", "Infra False", "console 8 KiB; baseline", "not Kubernetes readiness", "1/2 registered", "0/2 Ready", "Guest snapshot received: 1m0s ago", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
+			for _, want := range []string{"Waiting for both tenant nodes Ready", "Checks [##--] 2/4", "Control plane", "VM running", "Infra True", "console 12 KiB; growth age 2m0s", "Worker", "VM paused", "Infra False", "console 8 KiB; baseline", "not Kubernetes readiness", "1/2 registered", "0/2 Ready", "Guest snapshot: 1m0s old", "growth ages measured at snapshot", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q at %v:\n%s", want, size, text)
 				}
@@ -624,7 +656,7 @@ func TestDashboardTenantGuestUnknownAndStale(t *testing.T) {
 	screen := dashboardScreen(t, 140)
 	d.draw(screen, now, false)
 	text := dashboardText(screen)
-	for _, want := range []string{"Waiting for tenant kubeconfig", "Checks [----] 0/4", "Control plane", "Worker", "VM unavailable", "guest observation unknown", "Ready unknown", "Guest snapshot received: 5m0s ago"} {
+	for _, want := range []string{"Waiting for tenant kubeconfig", "Checks [----] 0/4", "Control plane", "Worker", "VM unavailable", "guest observation unknown", "Ready unknown", "Guest snapshot: 5m0s old"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing truthful unknown/freshness %q: %s", want, text)
 		}
@@ -788,7 +820,7 @@ func TestDashboardBuildLogSummary(t *testing.T) {
 			screen.SetSize(width, height)
 			d.draw(screen, before.buildSteps[0].started.Add(75*time.Second), false)
 			text := dashboardText(screen)
-			for _, want := range []string{"Artifacts 2 planned", "1 done", "4 running", "1 queued", "Preview [######--------------]", "1/3 reported done/cached", "os/build-disk", "1m15s", "Last step change", "artifact verification still required", "ETA unknown"} {
+			for _, want := range []string{"Required outputs 2", "1 done", "4 running", "1 queued", "Preview [######--------------]", "1/3 reported done/cached", "os/build-disk", "1m15s", "Last step change", "artifact verification still required", "ETA unknown"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q at width %d:\n%s", want, width, text)
 				}

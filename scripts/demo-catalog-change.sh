@@ -76,7 +76,7 @@ git -C "$SEED" push -q origin HEAD:refs/heads/main --tags
 # Redirect only the cri-tools URL declared by the copied catalog. Every git process
 # spawned by nkdctl sees the deterministic local upstream; no network is contacted.
 export GIT_CONFIG_COUNT=1
-export GIT_CONFIG_KEY_0="url.file://$UPSTREAM.insteadOf"
+export GIT_CONFIG_KEY_0="url.$UPSTREAM.insteadOf"
 export GIT_CONFIG_VALUE_0='https://github.com/kubernetes-sigs/cri-tools'
 
 "$NKD" catalog validate --data "$CATALOG"

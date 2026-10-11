@@ -207,7 +207,7 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	// though ordinary `git status` hides them.
 	status, err := sourceFetchGitOut(opts, dir, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching")
 	if err != nil {
-		if opts.ctx().Err() != nil {
+		if opts.ctx().Err() != nil || sourceGitBoundaryError(err) {
 			return err
 		}
 		return e.Wrap(e.CodeFetchFailed, err, "checking source cleanliness in %s", logicalDir)

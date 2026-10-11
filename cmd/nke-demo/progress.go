@@ -82,12 +82,60 @@ type checkedWriter struct {
 	tenantStage string
 	observer    nkedemo.ProgressReporter
 	sudoAuth    func(context.Context) error
+	// One bounded latest line per public result category, independent of the
+	// dashboard's activity ring. Success statements replay only after success.
+	results [6]string
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.
 func terminalText(value string) string {
 	quoted := strconv.Quote(value)
 	return quoted[1 : len(quoted)-1]
+}
+
+func (w *checkedWriter) displayText(value string) string {
+	if _, dashboardOutput := w.out.(*dashboard); dashboardOutput {
+		// The dashboard's bounded activity boundary escapes raw text exactly
+		// once, including direct writes and partial lines.
+		return value
+	}
+	return terminalText(value)
+}
+
+func (w *checkedWriter) retainResult(line string) {
+	index := -1
+	switch {
+	case strings.HasPrefix(line, "Artifact builds complete;"):
+		index = 0
+	case strings.HasPrefix(line, "Deployment is separate:"):
+		index = 1
+	case strings.HasPrefix(line, "PASS:"), strings.HasPrefix(line, "PASS (NVIDIA OVN):"),
+		strings.HasPrefix(line, "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):"),
+		strings.HasPrefix(line, "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):"):
+		index = 2
+	case strings.HasPrefix(line, "Unqualified local diagnostic"):
+		index = 3
+	case strings.HasPrefix(line, "Warning:"):
+		index = 4
+	case strings.HasPrefix(line, "OS advisory"):
+		index = 5
+	}
+	if index >= 0 {
+		text := []rune(terminalText(line))
+		if len(text) > dashboardRunes {
+			text = append(text[:dashboardRunes-1], '…')
+		}
+		w.results[index] = string(text)
+	}
+}
+
+// Called with w.mu held, after the screen has restored scrolling output.
+func (w *checkedWriter) replayResults(success bool) {
+	for index, line := range w.results {
+		if line != "" && (success || index >= 4) {
+			w.emit(line + "\n")
+		}
+	}
 }
 
 func (w *checkedWriter) Write(data []byte) (int, error) {
@@ -178,13 +226,14 @@ func (w *checkedWriter) lineOutput() {
 		return
 	}
 	if strings.HasPrefix(line, "==> ") && strings.HasSuffix(line, ": Waiting for SSH to become available...") {
-		w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), terminalText(line)))
+		w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))
 		return
 	}
 	// Human subprocess markers are labeled logs, not authenticated Run events.
-	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nkdctl command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Deployment is separate:", "Tenant created;", "PASS:", "Unqualified local diagnostic"} {
+	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nkdctl command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Deployment is separate:", "Tenant created;", "PASS:", "PASS (NVIDIA OVN):", "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):", "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):", "Unqualified local diagnostic"} {
 		if strings.HasPrefix(line, prefix) {
-			w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), terminalText(line)))
+			w.retainResult(line)
+			w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))
 			return
 		}
 	}
@@ -273,7 +322,7 @@ func (w *checkedWriter) Report(event nkedemo.ProgressEvent) {
 	// private mechanical step in its activity pane hides meaningful changes.
 	// Plain output retains the full trace; failures remain visible in both modes.
 	if w.observer == nil || status == "FAIL" {
-		w.emit(fmt.Sprintf("[%s %s] %s\n", status, elapsed, terminalText(event.Name)))
+		w.emit(fmt.Sprintf("[%s %s] %s\n", status, elapsed, w.displayText(event.Name)))
 	}
 }
 

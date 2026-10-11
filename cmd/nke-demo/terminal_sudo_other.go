@@ -5,8 +5,11 @@
 
 package main
 
-import nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+import (
+	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"golang.org/x/term"
+)
 
-func restoreTerminalForeground(_, _ int) error {
+func restoreAuthenticationTerminal(_, _ int, _ *term.State) error {
 	return nkderr.New(nkderr.CodeEngineCapability, "interactive deployment authentication requires Linux")
 }

@@ -284,6 +284,11 @@ func (t *tenant) kubectl(config string, args ...string) []string {
 func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	boundary := beginProgress(t.session.Runner.Progress, "tenant-provisioning", DeploymentStarted, DeploymentFinished, DeploymentFailed)
 	defer func() { boundary.finish(result) }()
+	mode, err := normalizeNetwork(t.network)
+	if err != nil {
+		return err
+	}
+	t.network = mode
 	intent, err := newTenantRequest(t.name, t.network)
 	if err != nil {
 		return err
@@ -448,12 +453,18 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	if len(ids) != 1 || strings.Split(ids[0], "@")[len(strings.Split(ids[0], "@"))-1] != strings.Split(WorkloadImage, "@")[1] {
 		return errors.New("workload image ID differs from pinned diagnostic acquisition")
 	}
-	return privateJSON(filepath.Join(t.session.Work, "tenant-result.json"), struct {
-		Scope, Name, TenantID string
-		Nodes                 []tenantNode
-		Domains               []domainEvidence
-		Workload              json.RawMessage
-	}{"unqualified-local-demo", t.name, t.id, nodes.Items, domains, raw})
+	return privateJSON(filepath.Join(t.session.Work, "tenant-result.json"), tenantResult{
+		Scope: "unqualified-local-demo", Network: t.network, Name: t.name, TenantID: t.id,
+		Nodes: nodes.Items, Domains: domains, Workload: raw,
+	})
+}
+
+// A retained local diagnostic, not an NKD Release or network compatibility proof.
+type tenantResult struct {
+	Scope, Network, Name, TenantID string
+	Nodes                          []tenantNode
+	Domains                        []domainEvidence
+	Workload                       json.RawMessage
 }
 
 // Calico can report Node Ready before its node agents finish their own rollout.

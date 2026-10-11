@@ -95,6 +95,7 @@ type dashboardSnapshot struct {
 	buildEdges                    []planview.Edge
 	buildSelected                 int
 	buildDetails                  bool
+	buildLogPath                  string
 }
 
 // Only the presentation loop touches widgets. Worker callbacks update bounded
@@ -505,7 +506,7 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 			stopDashboardStages(d.siteStages[:], "stopped")
 			stopDashboardStages(d.tenantStages[:], "stopped")
 			for index := range d.phases {
-				if d.phases[index].state == "running" {
+				if d.phases[index].state == "running" || d.phases[index].state == "observed" {
 					d.phases[index] = dashboardPhase{"stopped", "Stopped without owning phase completion"}
 				}
 			}
@@ -552,7 +553,9 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 		d.phases[4] = dashboardPhase{"complete", "Workload and DNS checks completed"}
 	}
 	if event.Name == "tenant-provisioning" && event.Kind == nkedemo.DeploymentFailed {
-		stopDashboardStages(d.tenantStages[:], "failed")
+		// The owner reports every termination here, including cancellation.
+		// It does not establish that an unfinished readiness check failed.
+		stopDashboardStages(d.tenantStages[:], "stopped")
 	}
 	if event.Name == "tenant-provisioning" && event.Kind == nkedemo.DeploymentFailed && d.phases[4].state == "running" {
 		d.phases[4] = dashboardPhase{"stopped", "Tenant operation ended; workload/DNS completion unconfirmed"}
@@ -753,10 +756,7 @@ func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
 			if guest.ConsoleKnown {
 				console = fmt.Sprintf("console %s; baseline", dashboardConsoleSize(guest.ConsoleBytes))
 				if guest.ConsoleChanged {
-					age := guest.ConsoleLastChange
-					idle := max(time.Duration(0), now.Sub(s.guestsObservedAt))
-					age += min(idle, time.Duration(1<<63-1)-age)
-					console = fmt.Sprintf("console %s; grew %s ago", dashboardConsoleSize(guest.ConsoleBytes), dashboardGuestAge(age))
+					console = fmt.Sprintf("console %s; growth age %s", dashboardConsoleSize(guest.ConsoleBytes), dashboardGuestAge(guest.ConsoleLastChange))
 				}
 			}
 			row = fmt.Sprintf("%-13s  VM %-8s Infra %s; %s", role, guest.Domain, guest.ProviderReady, console)
@@ -784,7 +784,7 @@ func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
 	lines = append(lines, fmt.Sprintf("State unchanged: %s · last wait report: %s ago", max(time.Duration(0), now.Sub(s.tenantChangedAt)).Truncate(time.Second), max(time.Duration(0), now.Sub(s.observedAt)).Truncate(time.Second)))
 	guests := "Guest snapshot: not observed; guest progress unknown"
 	if !s.guestsObservedAt.IsZero() {
-		guests = fmt.Sprintf("Guest snapshot received: %s ago (not a health check)", max(time.Duration(0), now.Sub(s.guestsObservedAt)).Truncate(time.Second))
+		guests = fmt.Sprintf("Guest snapshot: %s old; growth ages measured at snapshot", max(time.Duration(0), now.Sub(s.guestsObservedAt)).Truncate(time.Second))
 	}
 	lines = append(lines, guests)
 	lines = append(lines, fmt.Sprintf("Tenant budget: %s elapsed · Timeout remaining: %s (not an ETA)", (s.elapsed+max(time.Duration(0), now.Sub(s.observedAt))).Truncate(time.Second), max(time.Duration(0), s.deadline.Sub(now)).Truncate(time.Second)))
@@ -840,6 +840,13 @@ func (d *dashboard) snapshot() dashboardSnapshot {
 	return copy
 }
 
+func dashboardLogLocator(s dashboardSnapshot) string {
+	if s.buildLogPath == "" {
+		return "Details: retained private build and deployment logs"
+	}
+	return "Private build log: " + tview.Escape(terminalText(s.buildLogPath))
+}
+
 func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -873,11 +880,13 @@ func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 	case tcell.KeyEnter:
 		if dashboardBuildActive(d.dashboardSnapshot) {
 			d.buildDetails = !d.buildDetails
+			d.offset = 0
 		}
 	case tcell.KeyEscape:
 		// Escape is navigation, never consent to cancel owned work. Repeated
 		// Escape after closing details must be as harmless as the first press.
 		d.buildDetails = false
+		d.offset = 0
 	case tcell.KeyTab:
 		d.focus = (d.focus + 1) % 3
 	case tcell.KeyPgUp:
@@ -895,6 +904,7 @@ func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 			d.offset = max(0, d.offset-10)
 		}
 	case tcell.KeyEnd:
+		d.buildDetails = false
 		d.offset = 0
 	}
 	if event.Key() == tcell.KeyRune && event.Rune() == 'a' {
@@ -1089,7 +1099,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 			help = " FORCE EXIT? Cleanup may be incomplete; resources may remain. y/N"
 		}
 	}
-	d.footer.SetText("[lightcyan]" + help + "[-]\n Details: retained private build and deployment logs")
+	d.footer.SetText("[lightcyan]" + help + "[-]\n " + dashboardLogLocator(s))
 	if width > 90 && !tenantStacked {
 		left, upper := width*3/10, min(12, content)
 		if tenantActive {

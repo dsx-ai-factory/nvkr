@@ -39,7 +39,7 @@ QCOW2 guests**, not CAPD containers. Node readiness, exact backing disk,
 workload/DNS and cleanup are separate acceptance checks from artifact creation.
 See [full-source gaps](full-nke-source-build.md) for acquired/omitted inputs.
 
-Both clusters select NVIDIA OVN. The site consumes the completed standalone
+By default, both clusters select NVIDIA OVN. The site consumes the completed standalone
 `ovn-chart-arm64` and `ovn-image-arm64` outputs through the owned registry;
 the tenant uses its disk's separately produced OVN packages. Those paths do not
 establish equal bytes. Kind's default CNI and kube-proxy are disabled. Its OVS
@@ -48,7 +48,13 @@ readiness precedes management-node readiness and Cluster API installation.
 The source-owner startup fix remains required before this selection can pass
 fresh E2E acceptance. Validate actual OVN-node startup and its iptables calls,
 not merely the presence of `firewall-cmd`; the selected image's host wrappers
-and chart mounts also need to agree. See [current validation status](adr/reconciliation.md).
+and chart mounts also need to agree. The explicit `upstream-ovn` selection uses
+its distinct image, chart, disk and profiles outputs for both clusters. The
+temporary `kind-calico` diagnostic keeps Kind networking and uses tenant Calico;
+neither mode validates the NVIDIA fork, and neither is an automatic fallback.
+The final PASS and retained tenant result name the selection. See the
+[network alternatives](local-nke-demo.md#explicit-upstream-ovn-alternative) and
+[current validation status](adr/reconciliation.md).
 
 ## Prepare charts without rebuilding them
 

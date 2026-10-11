@@ -608,7 +608,11 @@ developer Git/SSH transport without the held workspace guarantees. Its shared Gi
 ambient global callbacks, templates and line-ending conversion, projects selected developer credential and
 proxy/TLS trust settings into network fetch, and admits explicit absolute local-repository redirects. Arbitrary
 SSH command overrides remain excluded. Checkout/status receive no
-developer HOME or helper. Repository-local filters, includes and delegated object sources fail admission.
+developer HOME or helper. The projected global credential keys are helper, username and useHttpPath;
+system helpers, GH/GCM/keyring environment, arbitrary SSH commands and global SSH/URL configuration are
+not inherited. This is bounded helper compatibility, not a claim that every developer login works.
+Explicit redirects admit canonical absolute filesystem paths (including one terminal slash), not file URIs.
+Repository-local filters, includes, HTTP/SSH callbacks, delegated worktrees and object sources fail admission.
 Real Git fixtures exercise exact checkout bytes, callback exclusion, authenticated fetch and local redirects;
 they do not establish current private-source access or a held workspace receipt.
 

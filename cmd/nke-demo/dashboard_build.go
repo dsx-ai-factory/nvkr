@@ -186,7 +186,7 @@ func dashboardBuildList(s dashboardSnapshot, rows int, now time.Time) string {
 		if step.state == "running" && !step.started.IsZero() {
 			elapsed = dashboardBuildAge(now, step.started).String()
 		}
-		fmt.Fprintf(&text, "%s[%s]%s %-7.7s %6.6s[-] %s\n", cursor, color, marker, step.kind, elapsed, tview.Escape(step.id))
+		fmt.Fprintf(&text, "%s[%s]%s %-7.7s %8s[-] %s\n", cursor, color, marker, step.kind, elapsed, tview.Escape(step.id))
 	}
 	if first > 0 || first+rows < len(s.buildSteps) {
 		text.WriteString("[slategray]More operations above/below[-]\n")
@@ -212,7 +212,7 @@ func dashboardBuildDetail(s dashboardSnapshot, now time.Time) string {
 	if step.state == "running" && !step.started.IsZero() {
 		fmt.Fprintf(&text, " · %s elapsed", max(time.Duration(0), now.Sub(step.started)).Truncate(time.Second))
 	}
-	if logs, ok := s.buildLogs[step.id]; ok {
+	if logs, ok := s.buildLogs[step.id]; ok && step.kind == "build" && step.state == "running" {
 		text.WriteString("\n" + dashboardOSLogText(logs, now))
 		text.WriteString("\nLog activity only; not guest health or readiness.")
 	}
@@ -306,7 +306,7 @@ func (d *dashboard) drawBuild(screen tcell.Screen, s dashboardSnapshot, now time
 	if s.confirmCancel {
 		help = " Cancel this demo and clean up its resources? y/N"
 	}
-	d.footer.SetText("[lightcyan]" + help + "[-]\n Reports are not verification. Full graph and private build logs are retained.")
+	d.footer.SetText("[lightcyan]" + help + "[-]\n " + dashboardLogLocator(s))
 	d.header.SetRect(0, 0, width, min(3, height))
 	d.footer.SetRect(0, max(0, height-2), width, min(2, height))
 	_, _, _, activityHeight := d.activityView.GetInnerRect()
@@ -360,9 +360,9 @@ func dashboardBuildRibbon(s dashboardSnapshot, now time.Time) string {
 		}
 	}
 	if len(s.buildOutputs) > 0 && !s.buildTruncated {
-		fmt.Fprintf(&text, "[lightcyan::b]Artifacts[-::-] %d planned   [lightcyan::b]Steps[-::-] ", len(s.buildOutputs))
+		fmt.Fprintf(&text, "[lightcyan::b]Required outputs[-::-] %d   [lightcyan::b]Steps[-::-] ", len(s.buildOutputs))
 	} else {
-		text.WriteString("Planned artifact total unknown   ")
+		text.WriteString("Required output total unknown   ")
 	}
 	fmt.Fprintf(&text, "[lightgreen]%d done[-]  [lightcyan]%d running[-]  [goldenrod]%d queued[-]\n", done, running, queued)
 	if s.buildPreview && !s.buildTruncated && previewed > 0 {
@@ -371,7 +371,7 @@ func dashboardBuildRibbon(s dashboardSnapshot, now time.Time) string {
 	} else {
 		text.WriteString("Preview total unavailable/incomplete; no percentage inferred.\n")
 		if s.buildTruncated {
-			text.WriteString("Step counts incomplete; listing cap reached.\n")
+			text.WriteString("Step counts incomplete; projection unavailable, rejected or capped.\n")
 		}
 	}
 	text.WriteString(dashboardBuildHealth(s, now))

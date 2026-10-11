@@ -940,6 +940,11 @@ func validateProfilesImage(pod sitePod, controller, reference string) error {
 	}
 	for _, init := range pod.Spec.InitContainers {
 		if init.Name != "materialize-profiles" {
+			for _, mount := range init.VolumeMounts {
+				if mount.Name == "profiles" {
+					return errors.New("profiles volume must not be mounted by another init container")
+				}
+			}
 			continue
 		}
 		inits++
@@ -981,6 +986,11 @@ func validateProfilesImage(pod sitePod, controller, reference string) error {
 	}
 	for _, container := range pod.Spec.Containers {
 		if container.Name != controller {
+			for _, mount := range container.VolumeMounts {
+				if mount.Name == "profiles" {
+					return errors.New("profiles volume must not be mounted by another app container")
+				}
+			}
 			continue
 		}
 		for _, mount := range container.VolumeMounts {
