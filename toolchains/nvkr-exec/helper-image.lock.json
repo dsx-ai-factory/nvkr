@@ -2,12 +2,12 @@
   "schemaVersion": "nvkr.dev/helper-image/v1",
   "goToolchain": "go1.27.2",
   "canonicalToolchain": "go1.27.2",
-  "sourceRef": "c0697bf651493eb189aaa63a2241f3d1df778b35",
+  "sourceRef": "30b2f481c4faa9641f46185451c9feebff0c882d",
   "runtimeBase": "quay.io/podman/stable@sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "imageRepo": "ghcr.io/dsx-ai-factory/nvkr-exec",
   "helper": {
-    "amd64": { "binarySHA256": "sha256:e7e8f88b29b239e4477938a7dd28ccc570bb02b4fe7ce4c8d13c9583650b22f2", "imageDigest": null },
-    "arm64": { "binarySHA256": "sha256:6ef539734c5c04e9f3925a1a3ad0bdab97d7262bc03af5100eb02c3c9f1808e1", "imageDigest": null }
+    "amd64": { "binarySHA256": "sha256:4f12f7a87be0a7e16549e7983bc39ebbae1d898414960af1a65e8be3c71083e3", "imageDigest": null },
+    "arm64": { "binarySHA256": "sha256:bc18d1cb65f3cde704fc894104d93a7520bae1222f3cb080d0ea247b19cf2d68", "imageDigest": null }
   },
   "note": "binarySHA256 is the ADR-07 RunnerDigest (profile pin); imageDigest is the ADR-18 HelperImage. This lock is UNSIGNED and NOT pushed. Pin runtimeBase and publish+sign before use."
 }
