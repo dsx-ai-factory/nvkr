@@ -131,19 +131,27 @@ An opted-in run fails on inadequate capacity rather than skipping its positive c
 owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NVKE image.
 Actual native disk build/inspection evidence remains separately scoped in the evidence index.
 
-The independent Debian archive scanner regression requires native Linux amd64 or arm64 and the existing
-`/usr/bin/dpkg-deb`. Export `NVKR_SBOM_SCANNER` with the selected Syft executable path, and
-`NVKR_SBOM_SCANNER_DIGEST` and `NVKR_SBOM_PACKAGE_READER_DIGEST` with their exact `sha256:` executable
-digests from your selected toolchain. Opting in with missing or mismatched pins fails rather than skipping:
+The independent Debian inspector API regression requires native Linux amd64 or arm64. Use the Syft
+v1.51.1 archive pins and executable measurement procedure in
+[`toolchains/nvkr-disk-inspect`](toolchains/nvkr-disk-inspect/README.md) as the source for the selected tools.
+Export `NVKR_SBOM_SCANNER` with the selected Syft executable path and `NVKR_SBOM_SCANNER_DIGEST` with
+its measured `sha256:` executable digest. `NVKR_SBOM_PACKAGE_READER_DIGEST` must match the actual
+`/usr/bin/dpkg-deb` executable in the test runtime, not a compressed archive hash. The diagnostic toolchain
+source is not an approved production runtime. Opting in with missing or mismatched pins fails rather than skipping:
 
 ```sh
 NVKR_SBOM_DEBIAN_INTEGRATION=1 \
 go test ./pkg/nvkr/sbom -run '^TestRealDebianArtifactDependencies$' -count=1 -v
 ```
 
-It builds controlled gzip/xz packages, inspects their final bytes through the ordinary scanner owner and
-checks exact package metadata, digest/length read-back and malformed-package rejection. This covers Debian
-archive package/control metadata, not all embedded application dependencies, installation, signing or publication.
+It builds controlled gzip/xz fixture packages and inspects them through the path-based API. It checks exact
+package metadata, same-byte scanning without a filename hint, pre-scan digest binding, original-fixture size
+stability, and rejection of non-archive bytes under a `.deb` hint. It does not test corrupted payload members.
+The metadata-only result is rejected by dependency SBOM attachment. No maintained output selects this path;
+this is not delivered-package inspection, payload dependency coverage, installation, signing or publication.
+See [the dependency SBOM reference](docs/dependency-sboms.md) and the
+[dated local fixture observation](docs/adr/reconciliation.md#external-run-references). Native amd64 execution
+has not been recorded. Rerun the opt-in regression on Syft pin changes.
 
 ## Repository layout
 

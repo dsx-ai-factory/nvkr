@@ -230,6 +230,8 @@ func TestDependencyInspectionBindsArtifactBytes(t *testing.T) {
 	assertDependencyCode(t, err, e.CodeTimeout)
 }
 
+// TestPinnedScannerProtocol checks executable pins, isolated scanner inputs,
+// report validation, and rejection of a mutated subject with a controlled scanner.
 func TestPinnedScannerProtocol(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("held scanner execution is Linux-only")
@@ -278,22 +280,25 @@ func TestPinnedScannerProtocol(t *testing.T) {
 	}
 }
 
+// TestPinnedScannerDiscoveryHint verifies that only terminal lowercase .deb
+// paths select the fixed archive snapshot name, while byte checks still apply.
 func TestPinnedScannerDiscoveryHint(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("held scanner execution is Linux-only")
 	}
 	const inventory = `{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"type":"library","name":"dependency","version":"1.0.0","purl":"pkg:generic/dependency@1.0.0"}]}`
 	for _, tc := range []struct {
-		name, filename, snapshot string
-		held, mutate             bool
+		name, filename, snapshot, kind string
+		held, mutate                   bool
 	}{
-		{"generic binary", "tool", "subject", false, false},
-		{"Debian archive", "source-package.deb", "subject.deb", false, false},
-		{"uppercase is not a hint", "package.DEB", "subject", false, false},
-		{"nonterminal extension", "package.deb.tmp", "subject", false, false},
-		{"other extension", "package.rpm", "subject", false, false},
-		{"held input has no filename hint", "package.deb", "subject", true, false},
-		{"Debian snapshot mutation", "package.deb", "subject.deb", false, true},
+		{"generic binary", "tool", "subject", "host-package", false, false},
+		{"Debian archive", "source-package.deb", "subject.deb", "host-package", false, false},
+		{"uppercase is not a hint", "package.DEB", "subject", "host-package", false, false},
+		{"nonterminal extension", "package.deb.tmp", "subject", "host-package", false, false},
+		{"other extension", "package.rpm", "subject", "host-package", false, false},
+		{"held input has no filename hint", "package.deb", "subject", "host-package", true, false},
+		{"Debian snapshot mutation", "package.deb", "subject.deb", "host-package", false, true},
+		{"OCI path ignores Debian hint", "image.deb", "", "oci-image", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -302,7 +307,10 @@ func TestPinnedScannerDiscoveryHint(t *testing.T) {
 			if err := os.WriteFile(file, raw, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			body := "file=${2#file:}\n[ \"${file##*/}\" = " + tc.snapshot + " ] || exit 29\n"
+			body := "file=${2#file:}\n[ \"${file##*/}\" = " + tc.snapshot + " ] || { printf 'unexpected basename: %s\\n' \"${file##*/}\" >&2; exit 29; }\n"
+			if tc.kind == "oci-image" {
+				body = "case \"$2\" in oci-archive:*) ;; *) printf 'unexpected source: %s\\n' \"$2\" >&2; exit 29 ;; esac\n"
+			}
 			if tc.mutate {
 				body += "chmod u+w \"$file\"\nprintf changed > \"$file\"\n"
 			}
@@ -314,6 +322,7 @@ func TestPinnedScannerDiscoveryHint(t *testing.T) {
 			scanner := Scanner{Path: scannerPath, Digest: fmt.Sprintf("sha256:%x", sha256.Sum256(script))}
 			digest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
 			var err error
+			var inventory DependencyInventory
 			if tc.held {
 				subject, openErr := heldfile.OpenContext(t.Context(), file, heldfile.Options{Label: "hint-test-subject", MaxBytes: 1024, ExpectedDigest: digest})
 				if openErr != nil {
@@ -323,21 +332,71 @@ func TestPinnedScannerDiscoveryHint(t *testing.T) {
 				var receipt *DependencyScanReceipt
 				receipt, err = InspectHeldDependencies(t.Context(), subject, "host-package", scanner)
 				if err == nil {
+					inventory = receipt.Inventory()
 					observed, size, kind := receipt.Binding()
 					if observed != digest || size != int64(len(raw)) || kind != "host-package" {
 						t.Fatalf("held scan binding = %s/%d/%s", observed, size, kind)
 					}
 				}
 			} else {
-				_, err = InspectDependencies(t.Context(), file, digest, "host-package", scanner)
+				inventory, err = InspectDependencies(t.Context(), file, digest, tc.kind, scanner)
 			}
 			if tc.mutate {
 				assertDependencyCode(t, err, e.CodeVerifyFailed)
 			} else if err != nil {
 				t.Fatal(err)
+			} else {
+				wantMethod := "syft-cyclonedx/v1"
+				if tc.snapshot == "subject.deb" {
+					wantMethod = debianArchiveMetadataMethod
+				}
+				if inventory.Method != wantMethod {
+					t.Fatalf("inspection method = %q, want %q", inventory.Method, wantMethod)
+				}
 			}
 		})
 	}
+}
+
+// TestDebianArchiveHintPredicate checks filename selection on every platform.
+func TestDebianArchiveHintPredicate(t *testing.T) {
+	for _, tc := range []struct {
+		path string
+		want bool
+	}{
+		{"package.deb", true},
+		{"nested/source-package.deb", true},
+		{"package.DEB", false},
+		{"package.deb.tmp", false},
+		{"package.rpm", false},
+		{"package", false},
+		{"", false},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			if got := hasDebianArchiveHint(tc.path); got != tc.want {
+				t.Fatalf("Debian archive hint = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDebianArchiveMetadataCannotBecomeDependencies keeps diagnostic package
+// identity outside both dependency attachment and serialized BOM validation.
+func TestDebianArchiveMetadataCannotBecomeDependencies(t *testing.T) {
+	components := []Component{{Type: "library", Name: "package", Version: "1", PURL: "pkg:deb/package@1?arch=arm64"}}
+	pin := "sha256:" + strings.Repeat("b", 64)
+	_, err := WithDependencies(dependencySubject(t), components, debianArchiveMetadataMethod, pin)
+	assertDependencyCode(t, err, e.CodeUnsupported)
+	bom, err := WithDependencies(dependencySubject(t), components, "syft-cyclonedx/v1", pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range bom.Metadata.Props {
+		if bom.Metadata.Props[i].Name == "nvkr:dependencyInspection" {
+			bom.Metadata.Props[i].Value = debianArchiveMetadataMethod
+		}
+	}
+	assertDependencyCode(t, bom.Validate(), e.CodeProvenanceMissing)
 }
 
 func assertDependencyCode(t *testing.T, err error, code e.Code) {

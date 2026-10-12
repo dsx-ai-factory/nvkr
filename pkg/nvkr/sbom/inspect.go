@@ -23,6 +23,10 @@ import (
 const maxInspectionBytes int64 = 2 << 30
 const maxScannerOutput = 32 << 20
 
+// debianArchiveMetadataMethod describes diagnostic control metadata only. It is
+// deliberately excluded from the dependency SBOM owner's admitted methods.
+const debianArchiveMetadataMethod = "syft-debian-archive-metadata/v1"
+
 type Scanner struct{ Path, Digest string }
 
 type DependencyInventory struct {
@@ -98,7 +102,12 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 	}
 	// Syft selects its Debian archive reader by extension. Keep only this
 	// discovery hint; the scanner still owns parsing the exact held bytes.
-	return inspectHeldDependencies(ctx, subject, kind, scanner, filepath.Ext(artifactPath) == ".deb")
+	return inspectHeldDependencies(ctx, subject, kind, scanner, hasDebianArchiveHint(artifactPath))
+}
+
+// hasDebianArchiveHint selects discovery by filename, without validating format.
+func hasDebianArchiveHint(path string) bool {
+	return filepath.Ext(path) == ".deb"
 }
 
 // InspectHeldDependencies consumes the existing held capability without opening
@@ -135,6 +144,9 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	return &DependencyScanReceipt{subject: subject.Digest(), size: subject.Size(), kind: kind, inventory: inventory}, nil
 }
 
+// inspectHeldDependencies scans the held bytes with the pinned scanner and
+// authenticates any private snapshot before returning its inventory. The
+// Debian filename hint selects archive discovery; it supplies no byte authority.
 func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, debianArchiveHint bool) (DependencyInventory, error) {
 	artifactDigest := subject.Digest()
 	if kind == "tarball" {
@@ -227,6 +239,9 @@ func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 		return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "scanner returned unsupported inventory schema")
 	}
 	result := DependencyInventory{Method: "syft-cyclonedx/v1", ScannerDigest: scanner.Digest}
+	if kind == "host-package" && debianArchiveHint {
+		result.Method = debianArchiveMetadataMethod
+	}
 	for _, component := range scanned.Components {
 		// CycloneDX file entries are scanner evidence locations, not package
 		// dependencies. Their temporary paths must not enter artifact identity.

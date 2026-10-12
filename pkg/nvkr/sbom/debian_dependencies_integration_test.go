@@ -17,9 +17,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
-// This independent opt-in test proves final Debian archive identity discovery
-// through the ordinary scanner owner. It does not prove embedded application
-// dependency coverage, installation, signing or repository publication.
+// TestRealDebianArtifactDependencies exercises final Debian archive identity
+// discovery through the ordinary scanner owner with independently pinned tools.
+// It does not prove embedded application dependency coverage, installation,
+// signing or repository publication.
 func TestRealDebianArtifactDependencies(t *testing.T) {
 	optIn := os.Getenv("NVKR_SBOM_DEBIAN_INTEGRATION")
 	if optIn == "" {
@@ -76,16 +77,35 @@ func TestRealDebianArtifactDependencies(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if inventory.Method != "syft-cyclonedx/v1" || inventory.ScannerDigest != scanner.Digest || len(inventory.Components) != 1 {
+			// Exact component count and PURL form record the Syft v1.51.1
+			// fixture contract; revalidate them when changing its pin.
+			if inventory.Method != debianArchiveMetadataMethod || inventory.ScannerDigest != scanner.Digest || len(inventory.Components) != 1 {
 				t.Fatalf("unexpected Debian archive inventory: %+v", inventory)
 			}
 			component := inventory.Components[0]
 			wantPURL := "pkg:deb/" + packageName + "@" + version + "?arch=" + runtime.GOARCH
-			if component.Name != packageName || component.Version != version || component.PURL != wantPURL {
+			if component.Type != "library" || component.Name != packageName || component.Version != version || component.PURL != wantPURL {
 				t.Fatalf("Debian archive metadata differs from fixture: %+v", component)
 			}
-			// The exact final bytes supplied to scanning remain the subject. A
-			// declaration naming another digest cannot reuse this observation.
+			// Diagnostic package identity is not payload dependency evidence.
+			_, err = WithDependencies(dependencySubject(t), inventory.Components, inventory.Method, inventory.ScannerDigest)
+			assertDependencyCode(t, err, e.CodeUnsupported)
+			// The same fixture bytes without the hint must not yield an
+			// accepted inventory under this selected Syft version.
+			unhinted := filepath.Join(t.TempDir(), "package")
+			copy, err := os.OpenFile(unhinted, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, copyErr := subject.WriteToContext(ctx, copy)
+			closeErr := copy.Close()
+			if copyErr != nil || closeErr != nil {
+				t.Fatalf("copying unhinted fixture: %v, %v", copyErr, closeErr)
+			}
+			_, err = InspectDependencies(ctx, unhinted, subject.Digest(), "host-package", scanner)
+			assertDependencyCode(t, err, e.CodeProvenanceMissing)
+			// These are pre-scan binding and original-fixture stability checks,
+			// not a separate observation of Syft's private snapshot.
 			_, err = InspectDependencies(ctx, filename, "sha256:"+strings.Repeat("0", 64), "host-package", scanner)
 			assertDependencyCode(t, err, e.CodeVerifyFailed)
 			checked, err := heldfile.OpenContext(ctx, filename, heldfile.Options{
@@ -101,7 +121,7 @@ func TestRealDebianArtifactDependencies(t *testing.T) {
 			t.Logf("scanner=%s dpkg-deb=%s final-deb=%s bytes=%d package=%s", scanner.Digest, readerDigest, subject.Digest(), subject.Size(), wantPURL)
 		})
 	}
-	t.Run("invalid archive", func(t *testing.T) {
+	t.Run("non-archive bytes", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 		defer cancel()
 		filename := filepath.Join(t.TempDir(), "invalid.deb")

@@ -58,7 +58,7 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
 | 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected unencrypted local execution; exact component/material bindings and acquisition-carrier retention | Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation, fused general wrapped-job phase isolation and embedded-version consistency remain closed |
 | 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
-| 13 Evidence | Exact offline binary/image dependency scanning, path-based Debian archive package/control metadata scanning and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Debian archive scanning does not discover every embedded application dependency or establish native Debian build/publication acceptance. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
+| 13 Evidence | Exact offline binary/image dependency scanning, inspector API Debian archive metadata diagnostics and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | No maintained output selects the Debian metadata diagnostic; dependency SBOM attachment rejects its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted/object-store delivery is unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics | Qualified receipt/clearance assembly, release-specific trusted time, M3 qualification and M4 manifests/revocation remain unimplemented |
@@ -68,12 +68,6 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays and exact toolchain substitutions | Pin-set loading needs pinned Git access. Curated graph/SBOM edges and embedded-version observation remain deferred. Exact pin identity is not external acquisition or production acceptance |
-
-The [standalone Debian scanner regression](../../pkg/nvkr/sbom/debian_dependencies_integration_test.go)
-builds controlled gzip/xz packages through digest-pinned `dpkg-deb` and scans their final bytes through the
-ordinary pinned Syft owner. Native Linux ARM64 execution checked package/version/architecture, final-byte
-digest/length and malformed-package rejection. This is archive metadata discovery, not embedded application
-dependency coverage or an NVSentinel package build, signing, direct APT publication or installation acceptance.
 
 ## Native disk execution and inspection
 
@@ -804,6 +798,33 @@ Run `37533806963` at `625980e` records the 34-output candidate, including both d
 finalization. Its branch exception and `build-provenance-v1` mode do not establish independent full-payload
 disk consumption, strict inspection, qualification, or organizational acceptance. Historical layout or
 source success never establishes a current source, policy, full inventory, or qualified result.
+
+On 2026-10-12, a local controlled Debian inspector API fixture run used the implementation at
+[source commit `28443004ad73ac6c69df60e10e032f6ca0cb209c`](https://github.com/dsx-ai-factory/nvkr/blob/28443004ad73ac6c69df60e10e032f6ca0cb209c/pkg/nvkr/sbom/debian_dependencies_integration_test.go).
+This is a local diagnostic observation, not an authenticated factory Run or approved toolchain. The native
+Linux ARM64 test executable was built with Go 1.27.2. The container used
+`ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3`,
+UID/GID `65534:65534`, `--read-only --network none --cap-drop ALL --security-opt no-new-privileges`,
+a read-only tool/test mount, and `--tmpfs /tmp:rw,nosuid,nodev,exec,size=256m`.
+Syft v1.51.1 ARM64 archive integrity matched the repository disk-inspector source pin
+`sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f`;
+its measured executable was `sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573`.
+The runtime's `dpkg-deb` 1.22.6 executable was
+`sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6`.
+These native diagnostic measurements are separate from the factory's scanner pin.
+
+| Controlled fixture | SHA-256 of archive bytes | Length |
+|---|---|---|
+| gzip | `ebf6ec1ed3830fe24ffdc9bd2339d8f427a5dc597ad4295224ac9da8586ef49a` | 612 bytes |
+| xz | `ee9bc9e457951f3510c72a564ff09e31095ac187b10e3e935dc5380d8a6f2563` | 748 bytes |
+
+Both fixtures yielded `pkg:deb/nvkr-debian-artifact-fixture@1.0.0?arch=arm64`. Pre-scan digest binding,
+original-fixture size stability, and non-archive bytes under a `.deb` hint were checked. This does not
+establish corrupt-payload rejection, complete embedded dependencies, source-created package delivery,
+signing, publication or installation. No maintained output selects this API path; native amd64 execution
+has not been recorded. The current diagnostic metadata method is rejected by dependency SBOM attachment
+and serialized BOM validation. The [opt-in regression](../../pkg/nvkr/sbom/debian_dependencies_integration_test.go)
+must be rerun when its selected Syft pin changes.
 
 ## Remaining decisions
 

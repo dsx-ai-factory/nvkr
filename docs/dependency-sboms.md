@@ -10,6 +10,12 @@ payloads plus their producer records. The implementation is selected by artifact
 | OCI image export | Syft reads the final image filesystem | Installed OS packages and recognizable application dependencies |
 | Helm source archive | NVKR reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
 | Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
+| Debian archive inspector API diagnostic | Syft v1.51.1 discovers control metadata from a fixed private `.deb` snapshot name | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and validation; no maintained output selects this path |
+
+The Debian filename hint supplies no format, target-architecture or payload-coverage authority. The existing
+digest-pinned `dpkg-deb` material reader owns authoritative Debian expansion and platform checks for disks.
+Standalone Debian delivery and declared-format propagation remain deferred; this diagnostic does not admit
+source-created packages through the executable/APT wrapper routes.
 
 The scanner executable is authenticated before use. Subject bytes must match the producer digest. Its output
 is normalized into CycloneDX 1.5: deterministic identities/order, package URLs, versions and artifact dependency
@@ -49,6 +55,13 @@ The opt-in `TestRealArtifactsThroughSBOMExecutor` test reads `NVKR_SBOM_ARTIFACT
 `NVKR_SBOM_SCANNER`; `NVKR_SBOM_OUTPUT_DIR` optionally retains the resulting documents. It exercises graph
 admission, real scanning, deterministic document validation and index digests for all three outputs. The
 scanner bytes must match the generated plan's executable pin. Run on Linux with networking disabled.
+
+The separate opt-in `TestRealDebianArtifactDependencies` exercises the inspector API on controlled gzip/xz
+fixtures, not a compiled factory output. [Development prerequisites](../DEVELOPMENT.md) identify its tool
+pins and command. Revalidate the discovery premise when changing the Syft pin. The
+[dated local observation](adr/reconciliation.md#external-run-references) records native ARM64 tool and
+fixture identities; native amd64 execution has not been recorded. Non-archive bytes named `.deb` produce no
+accepted inventory; corrupt payload members and complete embedded dependency discovery are not established.
 
 Contract tests also cover stable ordering/version identities, detached dependency graphs, malformed/empty
 reports, scanner substitution, changed subject bytes, unsafe archive members and missing payload/tool edges.
