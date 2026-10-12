@@ -6,6 +6,7 @@ package sourcegit
 import (
 	"bytes"
 	"context"
+	"encoding/pem"
 	"net/http"
 	"net/http/cgi"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
@@ -613,7 +615,7 @@ func TestLocalGitPreservesDeveloperHelperOnlyForFetch(t *testing.T) {
 	}
 	backend := &cgi.Handler{Path: git, Args: []string{"http-backend"}, Dir: root,
 		Env: []string{"GIT_PROJECT_ROOT=" + root, "GIT_HTTP_EXPORT_ALL=1", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username, password, ok := r.BasicAuth()
 		if !ok || username != "fixture" || password != "synthetic-password" {
 			w.Header().Set("WWW-Authenticate", `Basic realm="fixture"`)
@@ -623,9 +625,13 @@ func TestLocalGitPreservesDeveloperHelperOnlyForFetch(t *testing.T) {
 		backend.ServeHTTP(w, r)
 	}))
 	defer server.Close()
+	certificate := filepath.Join(home, "fixture-ca.pem")
+	if err := os.WriteFile(certificate, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	helper := `!f() { if [ "$1" = get ]; then printf '%s\n' username=fixture password=synthetic-password; fi; }; f`
 	localFixtureGit(t, home, "config", "--file", filepath.Join(home, ".gitconfig"), "credential."+server.URL+".helper", helper)
-	environment := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "UNRELATED_SECRET=not-admitted"}
+	environment := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "GIT_SSL_CAINFO=" + certificate, "UNRELATED_SECRET=not-admitted"}
 	runLocalFixture(t, environment, checkout, "init", "-q")
 	runLocalFixture(t, environment, checkout, "fetch", "-q", "--depth=1", server.URL+"/source.git", commit)
 	runLocalFixture(t, environment, checkout, "checkout", "-q", "--detach", "FETCH_HEAD")
@@ -643,6 +649,61 @@ func TestLocalGitPreservesDeveloperHelperOnlyForFetch(t *testing.T) {
 		if operation == "status" && (localEnvironmentValue(cmd.Env, "HOME") != "" || localEnvironmentValue(cmd.Env, "GIT_CONFIG_COUNT") != "1") {
 			t.Fatal("credential configuration escaped fetch-only scope")
 		}
+	}
+}
+
+func TestLocalGitNetworkOperationsKeepClosedTransport(t *testing.T) {
+	home := t.TempDir()
+	environment := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home}
+	for _, operation := range []string{"fetch", "clone", "ls-remote", "status"} {
+		t.Run(operation, func(t *testing.T) {
+			cmd, err := LocalCommand(t.Context(), environment, "", operation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if localEnvironmentValue(cmd.Env, "GIT_ALLOW_PROTOCOL") != "https:ssh:file" {
+				t.Fatal("cleartext or external transports admitted")
+			}
+			arguments := strings.Join(cmd.Args, "\n")
+			if (strings.Contains(arguments, "--upload-pack=git-upload-pack")) != (operation != "status") ||
+				strings.Contains(arguments, "fetch.fsckObjects=true") != (operation == "fetch" || operation == "clone") ||
+				strings.Contains(arguments, "transfer.fsckObjects=true") != (operation == "clone") ||
+				strings.Contains(arguments, "--no-recurse-submodules") != (operation == "fetch" || operation == "clone") {
+				t.Fatal("network operation lost its fixed transport/object policy")
+			}
+			if operation != "fetch" && (localEnvironmentValue(cmd.Env, "HOME") != "" || localEnvironmentValue(cmd.Env, "GIT_CONFIG_COUNT") != "1") {
+				t.Fatal("network hardening expanded credential projection beyond fetch")
+			}
+		})
+	}
+	source, commit := localFixtureRepository(t)
+	checkout := filepath.Join(t.TempDir(), "installer")
+	runLocalFixture(t, environment, "", "clone", "--no-hardlinks", "--no-checkout", source, checkout)
+	runLocalFixture(t, environment, checkout, "checkout", "--detach", commit)
+	if head := strings.TrimSpace(string(runLocalFixture(t, environment, checkout, "rev-parse", "HEAD"))); head != commit {
+		t.Fatal("hardened installer clone changed selected bytes")
+	}
+	if refs := string(runLocalFixture(t, environment, "", "ls-remote", source, "HEAD")); !strings.HasPrefix(refs, commit+"\t") {
+		t.Fatal("hardened ref discovery changed selected identity")
+	}
+}
+
+func TestLocalGitRejectsCleartextBeforeNetworkAcquisition(t *testing.T) {
+	for _, protocol := range []string{"http", "git"} {
+		t.Run(protocol, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd, err := LocalCommand(ctx, []string{"PATH=" + os.Getenv("PATH")}, "", "ls-remote", protocol+"://127.0.0.1:9/fixture.git")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var output bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &output, &output
+			err = ownedcmd.Run(ctx, cmd)
+			if err == nil || ctx.Err() != nil || cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 128 || !strings.Contains(output.String(), "transport '"+protocol+"' not allowed") {
+				t.Fatal("Git did not refuse the selected cleartext transport before connecting", err)
+			}
+		})
 	}
 }
 

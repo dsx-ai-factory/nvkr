@@ -219,7 +219,13 @@ Ordinary local source Git and installer preparation now use the existing
 `internal/sourcegit` owner to exclude ambient global hooks, fsmonitor, filters,
 templates and line-ending conversion. Developer credential and selected proxy/TLS
 trust settings are projected only into network fetch; explicit absolute local-repository redirects remain
-available. Ordinary local sources with a root `.gitmodules` descriptor (including
+available. Its transport override admits HTTPS, SSH and local files, not cleartext
+HTTP/Git or external helpers. Clone fixes upload-pack, enables transferred-object
+checks and disables recursive submodules; ref discovery also fixes upload-pack.
+Neither expands developer credential projection beyond fetch. Real Git fixtures
+exercise TLS-verified helper fetch, plaintext refusal and exact local clone/ref
+results; these are not current private-source access or held receipt evidence.
+Ordinary local sources with a root `.gitmodules` descriptor (including
 indexed-but-deleted descriptors) or indexed gitlinks fail admission without
 recursing into nested repositories. Git owns the bounded index-mode query;
 ignoring submodules during status is not evidence of clean nested sources.

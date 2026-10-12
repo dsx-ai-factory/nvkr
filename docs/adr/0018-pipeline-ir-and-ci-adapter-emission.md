@@ -600,12 +600,14 @@ retained origin. Before operational Git work, Git's own bounded local-configurat
 include/includeIf, local URL rewriting and delegated worktree/promisor/callback configuration. The query has no
 source token, reads no included configuration, and cancellation remains a timeout. Directory identity rechecks
 do not claim immutable configuration bytes against a concurrent hostile host writer. Unsupported held Git/SSH transports fail capability
-admission before work. Ordinary Local retains Git/SSH transport under the closed configuration
+admission before work. Ordinary Local retains HTTPS/SSH and local/file transport under the closed configuration
 and bounded credential projection described below, not unrestricted ambient Git behavior.
 Original checkout and receipt directories are rechecked
 through the held workspace before receipt reuse or commit. This capability grants filesystem access only, not
 producer observation, installed-content, publication or qualification authority. Ordinary Local fetch retains
-developer Git/SSH transport without the held workspace guarantees. Its shared Git-command owner excludes
+developer HTTPS/SSH transport without the held workspace guarantees. Cleartext HTTP and Git transports are
+not admitted. Clone and ref discovery fix the upload-pack program, clone checks transferred objects and
+disables recursive submodules; neither receives developer credentials. Its shared Git-command owner excludes
 ambient global callbacks, templates and line-ending conversion, projects selected developer credential and
 proxy/TLS trust settings into network fetch, and admits explicit absolute local-repository redirects. Arbitrary
 SSH command overrides remain excluded. Checkout/status receive no

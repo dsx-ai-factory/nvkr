@@ -197,7 +197,18 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 		prefix = append(prefix, "-c", "fetch.fsckObjects=true")
 		args = append([]string{"fetch", "--upload-pack=git-upload-pack", "--no-recurse-submodules"}, args[1:]...)
 	}
-	child = append(child, "GIT_ALLOW_PROTOCOL=https:http:ssh:git:file", "GIT_ATTR_NOSYSTEM=1", "GIT_TEMPLATE_DIR=")
+	switch args[0] {
+	case "clone":
+		// Installer copies receive no developer helper or HOME. Keep their
+		// object transport and submodule policy as explicit as fetch's.
+		prefix = append(prefix, "-c", "transfer.fsckObjects=true", "-c", "fetch.fsckObjects=true")
+		args = append([]string{"clone", "--upload-pack=git-upload-pack", "--no-recurse-submodules"}, args[1:]...)
+	case "ls-remote":
+		args = append([]string{"ls-remote", "--upload-pack=git-upload-pack"}, args[1:]...)
+	}
+	// Git owns URL/protocol parsing. Neither authenticated network acquisition
+	// nor local installer copying needs unauthenticated cleartext transports.
+	child = append(child, "GIT_ALLOW_PROTOCOL=https:ssh:file", "GIT_ATTR_NOSYSTEM=1", "GIT_TEMPLATE_DIR=")
 	cmd := exec.CommandContext(ctx, executable, append(prefix, args...)...)
 	cmd.Env = child
 	return cmd, nil
