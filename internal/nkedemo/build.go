@@ -105,9 +105,10 @@ func builtInputs(repo, attempt string) BuiltInputs {
 	return BuiltInputs{RunInputs{OS: path, Components: path, Providers: path, Site: path, Tools: path, Profiles: path, Simulator: path}, filepath.Join(repo, ".nkd/laptop-bootstrap", attempt, "nkdctl")}
 }
 
-// HOME selects the developer's source credentials. The sourcegit owner projects
-// only credential configuration into network fetches; other Git operations use
-// its closed baseline. Deployment excludes ambient source credentials.
+// The native build launcher receives these developer transport settings. The
+// sourcegit owner narrows its own Git children to fetch-only credentials; this
+// does not isolate every launcher subprocess from the launcher environment.
+// Deployment uses a separate environment without ambient source credentials.
 func localBuildEnvironment() ([]string, error) {
 	redirects, err := sourcegit.LocalRedirectEnvironment(os.Environ())
 	if err != nil {

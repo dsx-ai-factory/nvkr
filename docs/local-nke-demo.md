@@ -179,6 +179,13 @@ do not open password prompts. The main demo remains unprivileged; passwords go
 directly to the initial sudo prompt, not through the demo's logs.
 Do not add a separate `sudo -v` before the demo: it manages authentication itself.
 
+Interactive refresh is not a command-scoped credential. With terminal-scoped
+sudo timestamps, other processes in that terminal session may reuse authentication
+for commands already allowed by your full sudoers policy. Timestamp scope depends
+on administrator policy; the demo does not change it. Use a trusted dedicated
+execution host. See the upstream
+[sudoers timestamp contract](https://github.com/sudo-project/sudo/blob/main/docs/sudoers.man.in).
+
 For a redirected or unattended run, check non-interactive administrator access:
 
 ```sh
@@ -252,14 +259,16 @@ sudoers to bypass a failure. See the upstream
 for `-v` session refresh and `-n` non-interactive behavior.
 
 Git authorization must work **inside Linux**. The example fetches pinned remote
-sources. Ordinary source fetch projects global `credential.helper`,
+sources. Within Git children, ordinary source fetch projects global `credential.helper`,
 `credential.username` and `credential.useHttpPath`, plus fetch-only HOME/XDG,
 SSH-agent, proxy and TLS-trust paths. It does not inherit system helpers,
 GH/GCM/keyring environment, arbitrary SSH commands or other global URL rewrites.
 Use a compatible configured helper or an explicit local repository containing
 the pinned objects. Checkout and status ignore global hooks, filters and
-line-ending settings; deployment does not inherit source credentials. For a
-local NKE Git clone, use its absolute Linux path in
+line-ending settings; deployment does not inherit source credentials. The native
+build launcher itself still receives developer HOME/XDG, SSH-agent and transport
+settings; fetch-only projection does not isolate every launcher subprocess.
+For a local NKE Git clone, use its absolute Linux path in
 `NKE_LOCAL_CLONE` and `build.nkeClone`; only committed pinned objects are used.
 
 Other repositories can use explicit local Git fetch redirects too. For example,

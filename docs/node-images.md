@@ -99,7 +99,7 @@ Native Docker/KVM execution requires matching Linux architecture, a running Dock
 [maintained wrapper instructions](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-os/README.md) for source-locked toolchain bootstrap
 and a fresh immutable attempt. There is no maintained macOS/Podman disk-build route.
 For the ARM64 local demo's Docker/Colima Linux execution setup, see the
-[local demo guide](local-nke-demo.md); a macOS CLI build does not admit native macOS deployment.
+[local demo guide](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/local-nke-demo.md); a macOS CLI build does not admit native macOS deployment.
 
 A successful local Run retains its disk and record under `.nkd/runs/<attempt>/`; it remains unqualified.
 Material tracing and published `build-provenance-v1` evidence do not establish a complete installed-software

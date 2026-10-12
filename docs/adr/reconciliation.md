@@ -215,6 +215,10 @@ available. Ordinary local sources with a root `.gitmodules` descriptor (includin
 indexed-but-deleted descriptors) or indexed gitlinks fail admission without
 recursing into nested repositories. Git owns the bounded index-mode query;
 ignoring submodules during status is not evidence of clean nested sources.
+The ordinary adapter accepts operation-first arguments only; its explicit
+directory owns repository selection. The demo may consume one leading `-C`
+before that admission; additional global options are refused before repository
+queries or command-log creation. Git still owns operation argument syntax.
 Privacy-safe refusal diagnostics name only static configuration families or
 redirect indices, never configuration values, paths or URLs.
 Real Git fixtures cover exact checkout bytes, callback exclusion,
@@ -373,8 +377,11 @@ recoverable. Site admission probes health from the owned Kind node using its rea
 proxy environment before installing the site. Host-side health alone cannot
 admit this route. Controlled tests cover bounded response checks, cancellation,
 private diagnostics, rule substitutions and recovery. Hosts with an INPUT-drop
-policy require this scoped route even when host-side health succeeds; live
-acceptance of the new route remains unexercised.
+policy require this scoped route even when host-side health succeeds. A separate
+nftables/firewalld input-hook drop can still reject it; the owned-node probe,
+not an iptables accept alone, decides admission. The demo does not override that
+administrator policy; see the [operator firewall guidance](../local-nke-demo.md).
+Live acceptance of the new route remains unexercised.
 
 The demo CLI automatically selects a terminal dashboard for interactive standard
 input/output. Its phase map, observed state and bounded public activity use typed
@@ -448,9 +455,13 @@ accepted. Controlled tests and targeted race checks cover authentication before
 work, periodic refresh failure, cancellation and refresher joining, including
 preservation of unjoined-child errors. Isolated Linux ARM64 PTY tests exercised
 foreground ownership/restoration, dashboard checks without suspension and actual
-same-terminal sudo validation/refresh. The cache test passed on a non-interactive
-sudo-policy host; it does not prove a real password policy, hour-long credential
+same-terminal sudo validation/refresh. Validation/refresh wiring passed on a non-interactive
+sudo-policy host; it does not prove timestamp-cache use, a real password policy, hour-long credential
 retention or a complete fresh deployment with this change.
+Interactive refresh uses ordinary sudo timestamps rather than a helper-scoped
+credential: policy may allow other terminal-session processes to reuse it for
+their full sudoers command scope. The host policy is unchanged; this route
+requires a trusted execution host, not an untrusted launcher sandbox.
 
 The downstream tenant smoke now waits for the pinned CoreDNS Deployment and
 node-local DNS DaemonSet rollouts, within four minutes and the remaining tenant
