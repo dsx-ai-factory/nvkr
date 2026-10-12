@@ -391,16 +391,27 @@ reach the build phase. Registry/OIDC credentials appear only after build exit an
 Prefer a pinned privileged container to an unpinned host build. The renderer must reject undeclared privilege,
 network, or credentials during build before output. An external reusable workflow is not a pinned entrypoint.
 
-`embeds` declares components inside the external artifact that NVKR neither builds nor separately delivers.
-Names, versions and known source pins feed production dependencies, the aggregate SBOM dependency graph, and a
-qualification cross-check against the upstream version manifest **at the pinned commit**. Missing or disagreeing
-members fail that check. This declaration does not prove the image's observed contents. ADR-13 separately
+`embeds` declares the upstream producer's embedded-component metadata for a qualification cross-check against
+its version manifest **at the pinned commit and tree**. The declaration has `manifest` (a repository-relative
+YAML/JSON path), `path` (a bounded document selector), and an explicit `members` map. Each authored member has
+an exact string `version` and optional paired `repo`/full-commit source identity. The selected upstream map
+must contain exactly those names, with each value either a string version or a closed object containing
+`version` and optional paired `repo`/`commit`; missing, extra, duplicate, unknown or disagreeing fields fail.
+An explicit empty declaration passes only against an empty selected upstream map. The existing bounded
+pinned-Git adapter reads those exact source bytes; a current working checkout or mutable branch is not evidence.
+
+Qualification requires a declaration for source producers using `vm-image`, BuildKit or default build networking.
+Other source producers may opt in; acquired bytes and hermetic producers without a declaration are not applicable.
+The catalog owner issues a receipt bound to the catalog snapshot and exact selected producers, without
+artifact, execution, inspection or signing authority. Lifecycle joins that receipt to the complete candidate.
+Existing candidate catalogs that lack required declarations fail qualification; adapting the real upstream
+manifest profile and authored declarations is an acceptance prerequisite, not permission to substitute pins.
+This declaration does not prove the image's observed contents. ADR-13 separately
 requires traced materials and read-only final-disk inspection for the strict evidence route. Its explicit
-M2 `build-provenance-v1` mode instead binds live producer/material evidence and records inspection as
-deferred to M3; it makes no inspected-inventory claim. Current implementation and evidence remain in
+M2 and M3 MVP `build-provenance-v1` mode instead binds live producer/material evidence and records inspection as
+not performed; strict inspection is deferred hardening. It makes no inspected-inventory claim. Current implementation and evidence remain in
 [reconciliation](reconciliation.md). Embedded-software correctness and runtime validation remain the upstream build
-owner's duty. Where ADR-22's curated set exists, derive `embeds` from it and re-derive at validation. Both
-`embeds` and the curated-set machinery remain deferred.
+owner's duty. ADR-22's future curated-set derivation remains deferred; it cannot replace pinned-manifest authentication.
 
 ## Consequences
 

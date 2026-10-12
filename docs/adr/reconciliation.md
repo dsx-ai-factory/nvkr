@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-10-09. ADR-01–22 own the lane-specific engineering contracts pending named-decider
+Reviewed 2026-10-12. ADR-01–22 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -41,10 +41,61 @@ This is scoped candidate pipeline-attested delivery, not a claim of main-only wo
 independent full-payload disk consumption, strict full-disk inspection, organizational toolchain approval
 or completed M1–M4 acceptance.
 
-Strict disk inspection and reconciliation remain the M3 requirement. Controlled receipt/export/transport
+Strict disk inspection and reconciliation are deferred hardening outside the approved M3 MVP. Controlled receipt/export/transport
 contracts and retained-disk diagnostics exist, but a successful real native NVKE live-Run full-content join
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, encrypted VM execution and air-gap operation remain unavailable.
+
+## M3 MVP scope and acceptance boundary
+
+The [approved October 12 scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+and [implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930)
+replace the earlier M3 disk-inspection, waiver, offline-PR and verify-only expectations. This is approved
+task scope, not organizational ADR ratification or operational qualification evidence. The product
+specification and ADR-13/16/18/20 retain producer-only disk scope while preserving the authored embedded-component
+declaration check against the upstream version manifest at the pinned commit. Full inspection and material
+reconciliation remain [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052).
+
+[M3-A](https://nvidia.atlassian.net/browse/NKX-18043) authenticates the complete selected publication against
+its exact producing Run, attempt, commit and input identities, and returns subject-bound results without
+qualification signing authority. The Linux `run check-artifacts` command delegates to lifecycle file
+orchestration: bounded canonical `qualification-candidate/v1` transport loading, exact input recompilation,
+fixed-origin GitHub authentication and checked publication/evidence joins. The source owner authenticates a
+completed successful Run attempt, exact commit, repository, expected workflow and actual default branch;
+the candidate's supplied source fields are only expectations. The command returns diagnostics, not a
+serialized signing capability. Contract fixtures cover source refusal/receipt lifetime, candidate decoding,
+Plan/provenance substitution and per-output evidence failures; they do not establish provider acceptance.
+
+All root/output production predicates must name the exact authenticated source attempt. If output metadata
+carries publication origin, its preparation and signing invocations must both match. Earlier-attempt output
+reuse under the existing publication retry protocol cannot satisfy this MVP gate. That publication behavior
+is unchanged; the gate never relabels earlier bytes as current-attempt production. A qualifying M2 handoff
+therefore also needs one complete exact-attempt set and its original production predicates.
+
+[M3-B](https://nvidia.atlassian.net/browse/NKX-18044) owns network-disabled
+version smoke against delivered CLI/operator payloads. [M3-C](https://nvidia.atlassian.net/browse/NKX-18045)
+consumes authenticated A/B results, authenticates the successful default-branch source build separately from
+its own invocation, and signs only after the complete verdict set passes. Missing required smoke results
+block signing; no authenticated M3-B smoke receipt implementation is available. Operational signing/attachment failures can leave earlier attachments but never count as
+successful qualification. M4's release consumer remains outside this stack.
+
+External suites such as NVKE's are a future authenticated, exact-subject integration point. Suites outside
+the MVP are explicitly not evaluated; once required, missing or failing results block qualification. An
+upstream test adapter, process exit status or caller-supplied pass boolean alone is not qualifying evidence.
+
+No real hosted qualification Run, qualification-identity signing/attachment transcript or independent
+complete-set consumer verification is recorded here. Contract tests cannot establish those external
+boundaries. [M3-D](https://nvidia.atlassian.net/browse/NKX-18046) retains positive/negative external acceptance
+and independent review; the earlier M2 candidate cannot satisfy it.
+
+The M3-A catalog check uses an authored `embeds` declaration selecting an exact component map from a bounded
+YAML/JSON manifest read at the producer's pinned commit/tree. `pkg/nvkr/catalog/embedded_test.go` supplies
+positive and corruption fixtures for complete membership, exact versions/source pins, strict shapes, pinned
+source selection and defensive receipts. VM-image, BuildKit and default-network source producers require
+the declaration; an explicit empty map is accepted only against an empty upstream map. This is metadata
+consistency, not disk inspection. Existing M2 candidate catalogs lack the required declarations and therefore
+cannot pass this qualification check. Adapting the actual pinned upstream manifest and candidate declarations
+remains unmet acceptance work; no source or artifact pins are changed to manufacture a passing candidate.
 
 ## Support by owner
 
@@ -56,18 +107,18 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 06 Status | Diagnostic document/checkpoint authentication, protected high-water reads and receipt-derived byte-CAS before withdrawal interpretation | Caller epoch is diagnostic. Production discovery, trusted-time/clearance integration, rotation, immutable v1 tags, revocation and channel concurrency are unimplemented |
 | 07–08 Reproduction | Linux stage-two helper/runtime/image and terminal-byte receipts, deterministic comparisons and profile matching | Provider receipts, other-platform authority, qualified helper images, independent two-machine bake-off and profile graduation |
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
-| 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected unencrypted local execution; exact component/material bindings and acquisition-carrier retention | Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation, fused general wrapped-job phase isolation and embedded-version consistency remain closed |
+| 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected unencrypted local execution; exact component/material bindings and acquisition-carrier retention; M3-A pinned embedded-declaration checker and contract fixtures | Actual upstream declaration/profile integration remains unexercised. Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation and fused general wrapped-job phase isolation remain closed |
 | 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
 | 13 Evidence | Exact offline binary/image dependency scanning and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted/object-store delivery is unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
-| 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics | Qualified receipt/clearance assembly, release-specific trusted time, M3 qualification and M4 manifests/revocation remain unimplemented |
-| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention and SDK/CLI delegation | No general resume protocol or authority restored by serialization; strict local publication, encrypted disks and qualified lifecycle remain unavailable |
+| 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A complete-set authenticated check receipts and per-output diagnostics | M3-B smoke receipt, hosted qualification signing/attachment and independent M3 consumer acceptance remain unavailable or unexercised. Qualified clearance, release-specific trusted time and M4 manifests/revocation remain unimplemented |
+| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention and SDK/CLI delegation; Linux M3-A file/CLI check orchestration | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, encrypted disks and qualified lifecycle remain unavailable |
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
-| 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays and exact toolchain substitutions | Pin-set loading needs pinned Git access. Curated graph/SBOM edges and embedded-version observation remain deferred. Exact pin identity is not external acquisition or production acceptance |
+| 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred; real M2 embedded declarations remain unprovided. Metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 
 ## Native disk execution and inspection
 
@@ -645,16 +696,15 @@ manifest/config read-back. This is not completed organizational license/security
 Private pulls use a separate packages:read step whose temporary credentials are removed before
 execution; cached exact image identities are revalidated by the held runtime.
 Both native builds and terminal checks completed in run `37445475840`; both deep disk inspections timed out.
-The user earlier moved deep disk/content inspection and dependent reconciliation to M3. The narrower candidate
+The user earlier moved deep disk/content inspection and dependent reconciliation out of M2. The narrower candidate
 `diskEvidence: build-provenance-v1` selects live producer/material evidence with signed uninspected scope,
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
 The [inspection deferral record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
-The strict inspection path remains available. The October 7, 2026 PR #97 task chat contains Ilya Kislenko's
-instruction: "Preserve main/#106: producer provenance for M2, inspection for M3". This is a task-chat instruction,
-not an independently published decider approval; no such approval record is supplied here.
-It supersedes the task's October 6 proposed strict M2 target while retaining main/#106's AMD64-only product
-acceptance floor. M2 accepts producer provenance with its remaining delivery/consumer gates; M3 requires full
-inspection, material reconciliation and strict evidence. The native ARM64 route and this candidate Definition's
+The strict inspection path remains available. M2 retains its AMD64-only product acceptance floor and accepts
+producer provenance with its remaining delivery/consumer gates. The approved October 12 M3 MVP scope also
+retains producer-only disk evidence and defers inspection/material reconciliation to hardening. This task
+scope supersedes the earlier M3 assignment without changing any historical signed bytes or establishing
+organizational ADR ratification. The native ARM64 route and this candidate Definition's
 additional ARM64 outputs are an implementation extension. Both native jobs and every declared output remain
 required for this candidate's complete Run and Release; the product floor waives none of those requirements.
 Organizational ADR ratification remains separate.
@@ -762,8 +812,9 @@ source success never establishes a current source, policy, full inventory, or qu
 Named-decider ratification and organizational toolchain/source/identity approval remain separate from candidate
 execution. Owners must supply registry retention, release-tag concurrency/collision and interrupted-publication
 protocols, source access and protected-environment policy, native runner-pool isolation, transparency approval,
-main-only execution and independent consumer evidence. M3/M4 need the separate qualification identity,
-signed verdicts/waivers, immutable manifest/tag/channel and revocation behavior.
+main-only execution and independent consumer evidence. The M3 MVP needs the separate qualification identity,
+complete authenticated pass/fail verdicts, delivered-tool smoke and external signing/consumer evidence.
+M4's manifest/tag protocol remains separate; waivers, channels and revocation are deferred hardening.
 
 Qualified owners must supply authenticated runtime/provider observations, discovery/trusted time, measured
 loader/runtime closure, independent signed evidence, exact reproduction and any newly admitted offline lifecycle.

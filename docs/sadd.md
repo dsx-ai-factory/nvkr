@@ -262,9 +262,9 @@ for exact delivery bytes and producer/Plan bindings; it grants no execution auth
 verdict. Production VM execution and held-result population use the separately admitted native ARC route;
 direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
 live producer/material evidence and reports inspection as not performed, satisfying the M2 disk-evidence floor.
-M2 still requires the remaining delivery and consumer gates. ADR-13's strict mode requires a full inventory
-reconciling traced materials with read-only inspection of each native AMD64 and ARM64 disk; these are M3
-qualification requirements under Ilya Kislenko's October 7 scope decision. That composition claim does not
+M2 still requires the remaining delivery and consumer gates. The approved M3 MVP retains producer-only disk
+evidence and source-metadata consistency. ADR-13's strict mode requires a full inventory reconciling traced
+materials with read-only inspection of each selected disk; this is deferred hardening. That composition claim does not
 establish NVKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
@@ -407,7 +407,7 @@ main-only execution, independent full-payload disk consumption, strict inventory
 organizational approval or complete M1–M4 acceptance.
 
 Full v1 release qualification/tag automation, qualified release authorization and air-gap execution
-remain unavailable. M3 owns full disk inventory and material-to-filesystem reconciliation. Subject-bound
+remain unavailable. Full disk inventory and material-to-filesystem reconciliation are outside the M3 MVP. Subject-bound
 producer evidence, diagnostic installed-package inspection and full inspected evidence retain separate
 contracts. Passing tests or historical operational success cannot be transferred to another source,
 schema, policy or output.
@@ -546,8 +546,18 @@ need not traverse job storage repeatedly. Fetching precedes the build; publicati
 after the build exits and the run record is written. The mechanism enforcing this phase separation is part of
 wrapped-job acceptance, not implied by putting steps in sequence.
 
-M3 is a build/evidence gate covering schema, pins, evidence and a tooling smoke test. Its separate workflow
-signs qualification evidence; it does not supply runtime conformance or cluster qualification. M4 lists
+M3 authenticates the complete selected set against its exact producing Run, attempt, commit and inputs. It
+checks schemas, applicable pins and sources, build signatures/provenance and delivered-tool smoke. The
+lifecycle owner issues an opaque check receipt with no signing authority. The independent qualification
+publisher requires every applicable result before signing; missing smoke results fail closed. It authenticates
+the successful default-branch build separately from its own invocation and signs for every selected subject.
+Any failed verdict prevents all attestations; later signing/attachment failure marks qualification unsuccessful
+even if earlier attachments remain. Smoke execution has no qualification credentials.
+
+The MVP keeps disk evidence producer-only and checks embedded declarations against pinned upstream metadata.
+External suites outside scope are explicitly not evaluated. Future required suites must supply authenticated
+subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
+conformance or cluster qualification. M4 lists
 artifacts with passing qualification in a canonical release manifest, under an immutable definition/commit tag
 and one mutable channel tag. A failing verdict prevents manifest issuance. These gates remain proposed.
 
@@ -892,8 +902,8 @@ Incremental equality identifies candidates for reuse. Required named outputs rem
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
 rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
-when selected by the Definition. M2 requires producer provenance; M3 adds strict inspection and material
-reconciliation (ADR-13 §6). Organizational ratification remains separate.
+when selected by the Definition. M2 and the M3 MVP retain producer-only disk evidence; strict inspection and
+material reconciliation are deferred hardening (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios
 

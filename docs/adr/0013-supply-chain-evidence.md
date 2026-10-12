@@ -152,16 +152,17 @@ closure. These documents have no inspected dependency inventory and explicitly b
 to `build-provenance-v1` and `nvkr:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
-The October 7, 2026 PR #97 task chat contains Ilya Kislenko's instruction:
-"Preserve main/#106: producer provenance for M2, inspection for M3". This records the task-chat instruction,
-not an independently published decider approval; no such approval record is supplied here.
-It supersedes the task's October 6 proposed strict M2 target while retaining main/#106's AMD64-only product
-acceptance floor. Deep disk/content inspection and material-to-filesystem reconciliation belong to M3.
+The [approved October 12 M3 MVP scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+retains this producer-only disk evidence. Deep disk/content inspection and material-to-filesystem reconciliation
+are deferred hardening under [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052), outside MVP completion.
+Qualification still checks authored embedded-component declarations against the upstream version manifest at
+the pinned commit; this is source-metadata consistency and does not inspect installed disk contents.
 The native ARM64 route and authored outputs are an implementation extension, not a milestone-scope approval.
 Every disk actually selected by a Definition retains exact producer/material, delivery and evidence obligations;
 the AMD64 product floor cannot waive ARM64 completeness. Organizational ratification of the ADR set remains separate.
 Historical signed documents may retain the earlier `deferred-m3` scope token; do not rewrite those bytes or
-interpret that token as inspection evidence. M3 qualification requires the strict inspected evidence below.
+interpret that token as inspection evidence. The strict inspected-evidence contract below remains available
+only under its separately admitted capability and evidence policy; M3 success cannot imply it was exercised.
 Unknown modes fail closed; an omitted producer mode retains the strict contract. Document validators check the
 declared mode and reject invented inspection claims. Consumer acceptance is separately controlled by
 `VerificationPolicy.minimumDiskEvidence`, included in the policy digest. For `pipeline-attested`, an omitted

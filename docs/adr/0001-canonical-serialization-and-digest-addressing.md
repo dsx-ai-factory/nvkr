@@ -161,8 +161,25 @@ frozen even where their names contain a version; the schema inside the canonical
 major versions within a family. Run presentation and Release reference views do not acquire redundant identities
 without a canonical subject.
 
-The deferred v1 qualification-evidence and release-manifest documents (ADR-16) require strict schema dispatch
-and registered, domain-separated identities before implementation. Pretty-printed JSON hashes are insufficient.
+M3 qualification evidence (ADR-16) registers the following distinct schema and family. This is
+pipeline-attested build/evidence qualification; it does not reuse a reserved qualified-clearance family.
+
+| Object | Canonical schema | Frozen family kind | Attestation predicate type |
+|---|---|---|---|
+| Qualification evidence | `nvkr.dev/qualification-evidence/v1` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v1` |
+
+The document binds the authenticated originating repository, Run, attempt, commit, workflow/ref and build
+invocation; the separately authenticated qualification invocation; gate version; Definition, Environment,
+Plan and relevant input identities; and complete exact output/subject membership with per-check results.
+Object-owned output, subject and check collections have deterministic ordering. Overall output verdicts are
+pass/fail only. Applicable checks must pass before publication; non-applicable checks carry the explicit
+applicability result. External suites outside this MVP use `not-evaluated` with reason `outside MVP scope`;
+this is never interpreted as passed. Disk scope states producer-only evidence and no content inspection.
+Unknown fields, versions or verdicts, duplicate members, noncanonical bytes and inexact bindings fail closed.
+
+The M4 release-manifest document remains deferred and requires its own registered canonical schema and
+domain-separated identity before implementation. Pretty-printed JSON hashes are insufficient for either
+document. Reconciliation records implementation and external acceptance independently of schema registration.
 
 ## Consequences
 

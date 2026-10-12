@@ -143,10 +143,19 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 accepts producer
-provenance with its remaining delivery gates; M3 requires strict inspection and material reconciliation.
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
+retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening;
+authored embedded-component declarations still require consistency with the pinned upstream version manifest.
 Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
+
+**Build/evidence qualification**:
+Checks for the complete selected artifact set against its exact producing Run, attempt, commit and inputs,
+including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
+has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
+the authenticated check receipt itself grants no signing authority. External suites outside the MVP are
+reported as not evaluated, never passed; a required suite needs authenticated subject-bound evidence.
+_Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.

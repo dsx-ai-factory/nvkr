@@ -236,6 +236,66 @@ release acceptance still requires its deferred qualification, membership, and re
 result cannot substitute for them. The ADR-04 stock-cosign consumer contract remains independent of the
 convenience NVKR reader.
 
+## Authenticate an M3 candidate
+
+On Linux, `nvkr run check-artifacts` checks the already-published M2 bytes against the producing Run's
+saved inputs and evidence. Supply the original Definition, Environment, Plan and canonical candidate
+transport record, plus the independently expected source identity:
+
+```sh
+nvkr run check-artifacts \
+  --definition "$DEFINITION" --environment "$ENVIRONMENT" \
+  --plan "$ORIGINAL_PLAN" --candidate "$CANDIDATE" \
+  --source-repository "$SOURCE_REPOSITORY" --source-run "$SOURCE_RUN" \
+  --source-attempt "$SOURCE_ATTEMPT" --source-commit "$SOURCE_COMMIT" \
+  --source-workflow "$SOURCE_WORKFLOW" --default-branch main \
+  --cosign "$COSIGN_BINARY" --cosign-digest "$COSIGN_DIGEST"
+```
+
+`SOURCE_WORKFLOW` is the approved repository-relative workflow path. `COSIGN_DIGEST` pins exact executable
+bytes. Optional `NVKR_GITHUB_TOKEN` supplies read access to GitHub; private registry reads use
+`NVKR_REGISTRY`, `NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`. No qualification signing credentials
+or identity token are required by this check. macOS rejects the operation before input or network work.
+
+The candidate transport uses `schemaVersion: nvkr.dev/qualification-candidate/v1`, a digest-pinned root
+`reference`, and `predicates`, each containing its exact subject `reference` and original canonical predicate
+bytes in the JSON base64 `predicate` field. It includes one predicate for the root and every named output.
+It is a bounded internal handoff, not an independently authored lifecycle input or proof of success.
+Unknown fields, duplicate JSON keys, unsupported versions and noncanonical encodings are rejected. The
+current command consumes this saved handoff; it does not manufacture missing build evidence.
+
+The lifecycle file owner recompiles the exact supplied inputs and requires the original Plan identity to
+match. `qualificationorigin.GitHub.AuthenticateSource` separately authenticates a completed successful
+GitHub Run attempt, exact commit, expected workflow, intended repository and its actual default branch.
+The module-level `lifecycle.Consumer.CheckQualification` then authenticates the publication and original
+predicates. Descriptions and candidate files remain untrusted until their exact bytes, subjects, signatures,
+provenance and Plan bindings verify.
+
+Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
+signature/provenance, applicable payload pins and embedded declarations. Failed checks return coded
+diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
+defensive data and grants no authority. Callers close the receipt after use; closure revokes all shallow
+copies. The direct consumer method borrows the caller's source Run receipt, whose closure also revokes the
+check receipt. The file adapter creates and transfers its source owner to the returned check receipt, so
+closing that receipt also closes its internally created source.
+Payload digests remain distinct from OCI delivery-container subjects, and disk results explicitly retain
+producer-only scope without content inspection.
+
+Qualification requires the root and every output predicate to name that exact source attempt. When output
+metadata records publication origin, both preparation and signing invocations must also match. Earlier-attempt
+publication reuse remains available to the existing publication retry protocol, but cannot satisfy this MVP
+qualification gate. Earlier bytes are never relabeled as produced by the current attempt. The CLI writes
+check diagnostics and returns the stable failure code; its serialized output cannot restore a live receipt
+or grant qualification signing authority.
+
+Wrapped source producers require the [pinned embedded declaration](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md)
+profile. Current M2 candidate catalogs have not supplied those declarations and therefore cannot pass
+the gate. M3-B's authenticated smoke receipt is not available, so required delivered-tool smoke blocks
+qualification signing. An A receipt alone cannot sign evidence or authorize release. The C publisher's
+contract and local tests do not establish real hosted signing or complete-set consumer acceptance.
+[Reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary) records contract coverage and
+the outstanding hosted signing, exact-input candidate and consumer acceptance evidence.
+
 ## Use the SDK
 
 Configure the client with tool and registry settings once, then pass a reference and policy for each Release.

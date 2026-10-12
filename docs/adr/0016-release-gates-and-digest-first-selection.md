@@ -171,23 +171,60 @@ aggregate or the Release lane. A content-validated rebuild proves neither exact-
 construction. Qualified promotion under §1–§4 remains all-or-nothing for its exact required release members;
 there is no mixed-evidence shortcut around a missing reproduction receipt.
 
-V1 full-release acceptance is a **deferred** build/evidence qualification gate and versioned release manifest.
-Qualification checks schema, pins (including embedded-component consistency), signatures, production attestations,
-and a tooling smoke test in a network-disabled container. Every subject receives one pass/fail/waived verdict;
-a waiver binds component, reason and approver. Failing evidence is never attested. This gate is neither runtime
-conformance nor deployment qualification.
+The [approved M3 MVP](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826) is a
+build/evidence qualification gate over the exact complete M2 publication. It authenticates every named
+output against its producing Run, attempt, commit, Definition and relevant input identities. Strict input and
+evidence schemas, exact output membership, applicable pins/digests and source consistency, and cryptographically
+verified build signatures and provenance are mandatory. Missing, duplicate, extra, substituted or mismatched
+members/evidence fail with stable coded errors. Acquired payload identity and OCI delivery-container identity
+are checked through their respective bindings; equality between those distinct digest domains is not required.
+Authored embedded-component declarations must agree with the upstream version manifest at the pinned commit.
+This metadata check supplies no disk-content inspection. Disk evidence explicitly remains producer-only.
 
-The separate qualification workflow signs `nvkr.qualification-evidence/v1`; the build workflow cannot sign in
-that role. A versioned `nvkr.release-manifest/v1` lists every selected artifact from one default-branch Run with
-its source lane, digest, signature, provenance, qualification evidence, and explicit deferred members. A fail
-verdict makes the Run fail and prevents manifest issuance. Both documents require ADR-01 canonical schema and
-family registration before implementation. The public Release view does not turn them into caller-authored
-objects and is not itself proof that these gates passed.
+The owning lifecycle module issues an opaque, subject-bound check receipt after authenticating its exact
+inputs and build evidence. A decoded report, caller-supplied digest or passed boolean cannot restore the
+receipt, and the receipt itself grants no qualification signing authority. M3-B supplies applicable
+delivered CLI/operator version smoke results from those exact payload bytes with networking disabled.
+Smoke startup failure, unsuccessful execution or a conflicting version fails the output; non-tool outputs
+use an explicit not-applicable rule. The publisher must reject missing required smoke results. No placeholder
+or absent implementation may mint passing smoke evidence.
+
+The MVP requires each root/output production predicate's invocation to equal the authenticated source Run
+attempt exactly. Where an output carries a publication-origin record, both its preparation and signing
+invocations must equal that source attempt. ADR-20's existing publication retry/reuse behavior is unchanged,
+but an earlier-attempt publication cannot satisfy this qualification gate. Reusing bytes never permits
+relabelling their producing attempt; authenticated qualification reuse remains deferred.
+
+Every output has exactly one overall pass/fail verdict and every applicable check has a result. All required
+gate and smoke results are collected before qualification signing begins. Any failed verdict prevents all
+qualification attestations for that invocation. Only a complete passing set can receive evidence for every
+selected subject under a qualification workflow identity distinct from the builder and an explicit issuer
+policy. The source build's successful default-branch invocation is authenticated separately from the
+qualification invocation (ADR-18); a green build or the publisher's own identity alone is insufficient.
+Smoke execution receives no qualification signing authority.
+
+Qualification evidence binds its schema and gate version, exact subject membership, producing Run/attempt/commit,
+Definition and relevant input identities, source build identity, qualification invocation and per-check results.
+Its canonical schema and family are registered in ADR-01 before use. Signing and attachment use the admitted
+signing machinery. All-verdicts-before-signing is a preflight guarantee, not a transaction across registry
+attachments: an operational failure marks the invocation unsuccessful and blocks release even when earlier
+attachments remain. The release consumer must authenticate complete successful qualification publication;
+presence of one attachment cannot prove success for the set. M4's release manifest remains a separate deferred
+consumer and grants no qualified-lane clearance.
+
+Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated
+verify-only dispatch and incremental reuse are deferred hardening. External qualification suites such as
+NVKE's have a reserved integration boundary: results must be independently authenticated and bound to exact
+artifact subjects, invocation and policy before inclusion. A suite outside this MVP is explicitly
+`not evaluated—outside MVP scope`, never passed. Once policy requires a suite, absent or failing authenticated
+results block qualification. NVKR does not build cluster test infrastructure for this MVP. This gate grants
+neither runtime conformance, deployment qualification nor exact-byte reproduction.
 
 Merge of the reviewed bump/regeneration change to the default branch is the v1 release decision; it is not
 gated on reproduction. Unattended merge requires separate security authorization. ADR-06 owns immutable tags,
 rerun behavior and revocation; ADR-04 owns explicit consumer scopes. An artifact-publication verification result
-does not establish full-release acceptance. M3/M4 remain unimplemented.
+does not establish full-release acceptance. Reconciliation owns implementation and external-acceptance status;
+the approved scope and these contracts do not establish milestone completion or organizational ratification.
 
 ### 6. Passive external qualification handoff — deferred producer protocol
 

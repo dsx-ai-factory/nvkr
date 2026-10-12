@@ -331,6 +331,11 @@ func newExactInputFixture(t *testing.T) exactInputFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return exactInputFixtureForPlan(t, definition, environment, plan)
+}
+
+func exactInputFixtureForPlan(t *testing.T, definition Definition, environment Environment, plan *factory.Plan) exactInputFixture {
+	t.Helper()
 	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
 	for _, build := range plan.Builds {
 		builds[build.Name] = build
@@ -365,6 +370,7 @@ func newExactInputFixture(t *testing.T) exactInputFixture {
 		subjects[component] = pipeline.FileDigest(payload)
 	}
 	request := testReleaseRequest(t, artifacts, objects, subjects)
+	var err error
 	request.Release.DefinitionDigest, err = definition.Digest()
 	if err != nil {
 		t.Fatal(err)

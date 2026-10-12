@@ -55,7 +55,7 @@ M2 candidate exercised that pipeline-attested publication route with `build-prov
 deferring inspection, under a validation-branch exception. General hosted VM adapters, FDE and qualified
 execution remain capability-gated. The strict live full-disk evidence/publication path has guarded APIs
 without a successful real NVKE join; main-only execution, independent full-payload disk consumption,
-M3 inventory/qualification and organizational acceptance remain separate gaps in
+strict inventory hardening, M3 qualification acceptance and organizational acceptance remain separate gaps in
 [reconciliation](reconciliation.md).
 
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
@@ -90,6 +90,18 @@ do not reconstruct bindings from caller-provided digests or publication fields. 
 canonical, trust, evidence, status and release invariants. `client/v1` is a context-first facade,
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
+
+For M3-A, `qualificationorigin` authenticates the exact successful GitHub source Run/attempt against fixed
+provider facts and issues a closeable receipt. `lifecycle.Consumer.CheckQualification` joins that receipt to
+the verified publication, exact Definition/Environment/Plan, every named output and authenticated build
+evidence. Catalog owns pinned upstream embedded-declaration checks; factory owns production-predicate
+semantics; signing owns cryptographic verification. The resulting immutable artifact-check receipt has
+idempotent closure shared by shallow copies and grants no smoke-execution or signing authority. The direct
+consumer operation borrows the caller's source receipt; source closure also revokes the check receipt.
+The file adapter creates and transfers its source owner to the returned check receipt, whose closure then
+closes that source too. Its defensive diagnostics cannot restore authority after closure. The independent `qualification` publisher contract consumes authenticated
+check and smoke receipts; its public descriptions are not receipt constructors. ADR-16 owns verdict and
+publication rules, and reconciliation records the separate A/B/C implementation and acceptance boundaries.
 
 `status.AcceptDiagnosticCheckpoint` owns protected minimum reads, exact document authentication, checkpoint
 verification and receipt-derived byte-CAS persistence before interpreting withdrawal. Its caller-supplied epoch
@@ -180,7 +192,8 @@ future qualified publication needs an authenticated commit protocol before expos
 ### 4. Package topology and single-owner rule
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
-  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, and `trust`.
+  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
+  `qualificationorigin`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not

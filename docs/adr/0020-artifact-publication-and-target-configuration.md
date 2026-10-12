@@ -112,8 +112,8 @@ and rejects producer-only acceptance. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. Producer provenance is the M2 acceptance scope; full inspection
-and material reconciliation belong to M3 (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
+the original producer/material owners instead. Producer provenance is the M2 and M3 MVP disk acceptance scope;
+full inspection and material reconciliation are deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;

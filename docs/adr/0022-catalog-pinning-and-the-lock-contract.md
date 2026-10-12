@@ -11,7 +11,7 @@
   the lock feeds resolution), ADR-12 (the output/composition shape a curated set takes), ADR-13 (the aggregate
   SBOM dependency graph a curated set induces), ADR-15 (mirrorable pinned inputs), ADR-16 (digest-first
   selection), ADR-07 (the profile boundary the lock must NOT cross), ADR-21 (bump → regen), ADR-10 (a wrapped
-  build's `embeds` are derived from a curated set), ADR-01 (canonical codec).
+  build's `embeds` authenticate pinned upstream metadata; curated-set derivation is deferred), ADR-01 (canonical codec).
 - **Satisfies:** FR-01/FR-02 (digest-pinned, fail-closed inputs). Supports the `buildDigest` determinism of
   ADR-02.
 
@@ -411,7 +411,8 @@ remain follow-ups owned by ADR-11/13; this pinning contract does not implement t
 - **ADR-12 §3:** a future curated set can inform explicit output membership; it must not introduce a selector
   axis, deployment topology or reusable recipe group.
 - **ADR-13 (deferred):** define aggregate SBOM curation edges from an umbrella to its members.
-- **ADR-10 (deferred):** bind a wrapped build's `embeds` to its pinned upstream declaration.
+- **ADR-10:** bind a wrapped build's authored `embeds` to its exact pinned upstream declaration;
+  automatic curated-set derivation remains deferred.
 
 ## Acceptance evidence
 
