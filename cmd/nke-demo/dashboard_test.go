@@ -139,10 +139,105 @@ func TestDashboardResultsSurviveTerminalHandover(t *testing.T) {
 				t.Fatal("summary handover preceded terminal restoration")
 			}
 			var out bytes.Buffer
-			finishDashboardProgress(writer, &out, "", err)
+			if got := finishDashboardProgress(writer, &out, "", err, nil); !errors.Is(got, err) {
+				t.Fatalf("handover lost worker result: %v", got)
+			}
 			text := out.String()
 			if strings.Contains(text, tc.result) == tc.fail || !strings.Contains(text, "Warning: latest public warning") || strings.Contains(text, "private raw compiler") || strings.ContainsRune(text, '\x1b') {
 				t.Fatalf("result handover lost public result or leaked raw output: %q", text)
+			}
+		})
+	}
+}
+
+func TestDashboardTerminalFailureAppearsOnceAfterTeardown(t *testing.T) {
+	for _, mode := range []string{"initial", "output", "teardown"} {
+		for _, ownerErr := range []error{nil, nkderr.New(nkderr.CodeFetchFailed, "owner fetch failed")} {
+			t.Run(mode+map[bool]string{false: "/success", true: "/owner failure"}[ownerErr != nil], func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				failure := nkderr.New(nkderr.CodePreflightFailed, "terminal sentinel failed")
+				var failed atomic.Bool
+				failed.Store(mode == "initial")
+				screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8"), onFini: func() { failed.Store(true) }}
+				terminalFailure := func() error {
+					if failed.Load() {
+						return failure
+					}
+					return nil
+				}
+				view := newDashboard()
+				writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+				started := false
+				err := dashboardLoop(ctx, cancel, screen, terminalFailure, writer, view, func(workCtx context.Context, _ io.Writer) error {
+					started = true
+					if mode == "output" {
+						failed.Store(true)
+						<-workCtx.Done()
+					}
+					return ownerErr
+				})
+				var out bytes.Buffer
+				err = finishDashboardProgress(writer, &out, "", err, terminalFailure)
+				want := nkderr.CodePreflightFailed
+				if started && ownerErr != nil {
+					want = nkderr.CodeFetchFailed
+				}
+				assertCode(t, err, want)
+				if !screen.joined.Load() || !errors.Is(err, failure) || started && ownerErr != nil && !errors.Is(err, ownerErr) || strings.Count(err.Error(), "terminal sentinel failed") != 1 {
+					t.Fatalf("terminal identity repeated/lost, owner lost or teardown unjoined: %v", err)
+				}
+				if strings.Contains(out.String(), "returned successfully") {
+					t.Fatal("known terminal failure printed successful completion")
+				}
+			})
+		}
+	}
+}
+
+func TestDashboardHandoverKeepsLateFailures(t *testing.T) {
+	for _, mode := range []string{"writer", "terminal after replay", "terminal after completion", "same message distinct error"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			first := nkderr.New(nkderr.CodeFetchFailed, "same public failure")
+			late := nkderr.New(nkderr.CodePreflightFailed, "same public failure")
+			var ownerErr error
+			var out bytes.Buffer
+			var output io.Writer = &out
+			if mode == "writer" {
+				output = failedProgressWriter{}
+			}
+			if mode == "same message distinct error" {
+				ownerErr = first
+			}
+			writer := &checkedWriter{out: &out, cancel: cancel, started: time.Now(), results: [6]string{4: "Warning: result replay"}}
+			calls := 0
+			terminalFailure := func() error {
+				calls++
+				if mode == "same message distinct error" || mode == "terminal after replay" && calls >= 2 || mode == "terminal after completion" && calls >= 3 {
+					return late
+				}
+				return nil
+			}
+			err := finishDashboardProgress(writer, output, "", ownerErr, terminalFailure)
+			want := nkderr.CodePreflightFailed
+			if ownerErr != nil {
+				want = nkderr.CodeFetchFailed
+			}
+			assertCode(t, err, want)
+			if mode == "writer" {
+				if !errors.Is(err, writer.failure()) || ctx.Err() == nil || strings.Contains(err.Error(), "private") {
+					t.Fatalf("late writer failure lost or leaked: %v", err)
+				}
+			} else if !errors.Is(err, late) || ownerErr != nil && !errors.Is(err, ownerErr) {
+				t.Fatalf("distinct late terminal/owner failure lost: %v", err)
+			}
+			if mode != "terminal after completion" && strings.Contains(out.String(), "returned successfully") {
+				t.Fatal("known replay failure printed successful completion")
+			}
+			if mode == "same message distinct error" && strings.Count(err.Error(), "same public failure") != 2 {
+				t.Fatalf("text/code matching collapsed distinct errors: %v", err)
 			}
 		})
 	}

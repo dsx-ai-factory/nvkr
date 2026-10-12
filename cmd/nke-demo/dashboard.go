@@ -105,14 +105,17 @@ func presentProgress(ctx context.Context, out, raw io.Writer, verbose bool, logP
 	// The admitted locator is durable presentation state, not an escaped,
 	// evictable activity line. Plain output retains its startup notice.
 	err = dashboardLoopWithForceExit(workCtx, cancel, screen, monitored.failure, writer, view, work, func() { forceDashboardExit(view.recoveryWork) })
-	err = errors.Join(err, monitored.failure())
 	// The terminal and worker have both joined before returning to scrolling
 	// output. A failed renderer cannot skip workflow cleanup or fabricate PASS.
-	finishDashboardProgress(writer, out, logPath, err)
-	return errors.Join(err, writer.failure(), monitored.failure())
+	return finishDashboardProgress(writer, out, logPath, err, monitored.failure)
 }
 
-func finishDashboardProgress(writer *checkedWriter, out io.Writer, logPath string, err error) {
+func finishDashboardProgress(writer *checkedWriter, out io.Writer, logPath string, err error, terminalFailure func() error) error {
+	if terminalFailure != nil {
+		if failure := terminalFailure(); failure != nil && !errors.Is(err, failure) {
+			err = errors.Join(err, failure)
+		}
+	}
 	writer.mu.Lock()
 	defer writer.mu.Unlock()
 	writer.lineOutput()
@@ -124,9 +127,29 @@ func finishDashboardProgress(writer *checkedWriter, out io.Writer, logPath strin
 	if logPath != "" {
 		writer.emit(fmt.Sprintf("Retained build log: %q\n", logPath))
 	}
+	if failure := writer.err; failure != nil && !errors.Is(err, failure) {
+		err = errors.Join(err, failure)
+	}
+	if terminalFailure != nil {
+		if failure := terminalFailure(); failure != nil && !errors.Is(err, failure) {
+			err = errors.Join(err, failure)
+		}
+	}
 	if err == nil {
 		writer.emit("Demo command returned successfully. See its result and access/cleanup instructions below.\nUnqualified local diagnostic, not a signed Release.\n")
 	}
+	// Teardown and scrollback writes can fail after the owner has returned.
+	// Retain distinct failures, but do not repeat a terminal sentinel already
+	// joined by the loop or its final teardown. Never deduplicate by text/code.
+	if failure := writer.err; failure != nil && !errors.Is(err, failure) {
+		err = errors.Join(err, failure)
+	}
+	if terminalFailure != nil {
+		if failure := terminalFailure(); failure != nil && !errors.Is(err, failure) {
+			err = errors.Join(err, failure)
+		}
+	}
+	return err
 }
 
 // This callback is installed only at the real interactive CLI boundary. A
@@ -231,7 +254,9 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 		if !terminalRestored {
 			screen.Fini()
 		}
-		result = errors.Join(result, outputFailure())
+		if failure := outputFailure(); failure != nil && !errors.Is(result, failure) {
+			result = errors.Join(result, failure)
+		}
 	}()
 	if err := outputFailure(); err != nil {
 		return err
