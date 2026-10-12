@@ -297,7 +297,7 @@ func holdNetworkProbeExecutable(ctx context.Context, path string) (*os.File, os.
 		if err := unix.Fstat(int(current.Fd()), &stat); err != nil {
 			return nil, nil, err
 		}
-		if err := networkProbeDirectoryProtection(stat.Uid, uint32(stat.Mode)); err != nil {
+		if err := networkProbeDirectoryProtection(stat.Uid, stat.Mode); err != nil {
 			return nil, nil, err
 		}
 		directory := index != len(parts)-1
@@ -318,7 +318,9 @@ func holdNetworkProbeExecutable(ctx context.Context, path string) (*os.File, os.
 	return nil, nil, errors.New("network probe path has no executable member")
 }
 
-func networkProbeDirectoryProtection(uid, mode uint32) error {
+// Native Stat_t mode is uint16 on Darwin and uint32 on Linux. Keep that
+// existing representation; the permission predicate is identical on both.
+func networkProbeDirectoryProtection[T ~uint16 | ~uint32](uid uint32, mode T) error {
 	trustedOwner := uid == 0 || uid == uint32(os.Getuid())
 	// Root-owned sticky temporary directories protect each accepted root/user
 	// child against other users' rename/unlink. Non-sticky writable ancestors

@@ -812,6 +812,8 @@ architecture and Kubernetes version. The Site table is the Kind management
 cluster; the Tenant table is the separate QCOW2 cluster. These are live bounded
 observations, not inferred status from an elapsed timer or old dashboard events.
 Names, addresses, private responses and kubeconfigs are not copied into that table.
+Explicit `--cleanup` runs also show these live checks before tenant deletion;
+the display does not replace workload/DNS, disk-binding or joined-cleanup acceptance.
 
 Copy the exact `DEMO`, `SESSION`, `KUBECTL`, `SITE_CONFIG` and `TENANT_CONFIG`
 assignments printed by your invocation. These are private local locators, not

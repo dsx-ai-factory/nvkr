@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -68,6 +69,32 @@ func TestOperatorLiveStatusExecutesBothClustersAndDoesNotLeakPrivateResponses(t 
 			if err != nil || info.Mode().Perm() != 0o600 || info.Size() == 0 {
 				t.Fatal("actual kubectl observation not retained privately", phase, err)
 			}
+		}
+	}
+}
+
+func TestTenantResultPresentationIncludesCleanupRuns(t *testing.T) {
+	for _, cleanup := range []bool{false, true} {
+		for _, ready := range []bool{false, true} {
+			t.Run(fmt.Sprintf("cleanup=%t/ready=%t", cleanup, ready), func(t *testing.T) {
+				access, runner := operatorStatusFixture(t)
+				if !ready {
+					runner.Env = SetEnv(runner.Env, map[string]string{"READY_REPLY": "not ready"})
+				}
+				var out bytes.Buffer
+				session := ManagementSession{Work: filepath.Dir(access.site), Tools: filepath.Dir(access.kubectl), Runner: runner}
+				err := presentTenantResult(t.Context(), Config{Cleanup: cleanup, Progress: &out}, session)
+				if ready {
+					if err != nil || !strings.Contains(out.String(), "Site / Kind management") || !strings.Contains(out.String(), "Tenant / QCOW2") || strings.Count(out.String(), "Nodes: 2/2 Ready") != 2 {
+						t.Fatal("deployment result omitted actual cluster observations", &out, err)
+					}
+				} else {
+					var coded *nkderr.Error
+					if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !strings.Contains(out.String(), "readiness not confirmed") {
+						t.Fatal("failed result observation was hidden", &out, err)
+					}
+				}
+			})
 		}
 	}
 }

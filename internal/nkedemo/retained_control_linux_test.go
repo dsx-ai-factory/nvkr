@@ -422,7 +422,8 @@ func TestRetainedControlDescriptionsDoNotSupplyCapabilities(t *testing.T) {
 	if err := control.detachOwner(ctx); err == nil {
 		t.Fatal("unheld owner was detached")
 	}
-	if _, err := control.snapshot(nil); err == nil {
+	var missingContext context.Context
+	if _, err := control.snapshot(missingContext); err == nil {
 		t.Fatal("missing context supplied a state")
 	}
 	if err := owner.requestCleanup(ctx); err != nil {

@@ -837,18 +837,23 @@ func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session
 	if err = t.run(ctx, cfg.Timeout); err != nil {
 		return err
 	}
+	return presentTenantResult(ctx, cfg, session)
+}
+
+// Show the cluster result before either retention or explicit teardown. The
+// display is a fresh read-only observation, not a replacement for t.run's
+// artifact, disk, workload and DNS acceptance checks.
+func presentTenantResult(ctx context.Context, cfg Config, session ManagementSession) error {
+	if cfg.Progress != nil {
+		access := OperatorAccess{kubectl: filepath.Join(session.Tools, "kubectl"), site: filepath.Join(session.Work, "kubeconfig"), tenant: filepath.Join(session.Work, "tenant-kubeconfig")}
+		if err := access.WriteLiveStatus(ctx, session.Runner, cfg.Progress); err != nil {
+			return err
+		}
+	}
 	if owner := runtimeRetention(ctx); owner != nil {
 		access, accessErr := InspectOperatorAccess(ctx, session)
 		if accessErr != nil {
 			return accessErr
-		}
-		if cfg.Progress != nil {
-			// Show actual bounded kubectl observations in the dashboard activity
-			// before the handoff, not only its old readiness events. This extra
-			// read-only display does not replace the tenant acceptance checks.
-			if err := access.WriteLiveStatus(ctx, session.Runner, cfg.Progress); err != nil {
-				return err
-			}
 		}
 		return owner.markReady(ctx, access)
 	}
