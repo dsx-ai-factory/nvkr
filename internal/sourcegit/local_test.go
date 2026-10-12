@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -280,6 +281,81 @@ func TestLocalGitAdmitsOnlyAuthenticatedEmptyDescriptor(t *testing.T) {
 			}
 		})
 	}
+}
+
+// This opt-in regression exercises the maintained NVIDIA fork pin, not a
+// synthetic empty-descriptor fixture. The supplied local repository is read
+// only; Git fetches its objects into a fresh checkout without network access.
+// It does not claim coverage of unrelated maintained sources or an image build.
+func TestLocalGitMaintainedOVNForkPin(t *testing.T) {
+	source := os.Getenv("NKD_OVN_SOURCE_REPOSITORY")
+	if source == "" {
+		t.Skip("set NKD_OVN_SOURCE_REPOSITORY to a local repository containing the maintained NVIDIA OVN pin")
+	}
+	if !filepath.IsAbs(source) || filepath.Clean(source) != source {
+		t.Fatal("NKD_OVN_SOURCE_REPOSITORY must be a canonical absolute local repository path")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	overlay, err := catalog.LoadOverlayContext(ctx, "../../definitions/nke-local-dev-arm64/os-tcg.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pin *catalog.Component
+	for _, name := range []string{"nke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"} {
+		component := overlay.Components[name].Component
+		if component == nil || !component.FromSource || component.Repo != "https://github.com/dsx-ai-factory/ovn-kubernetes" ||
+			component.Commit == "" || component.TreeHash == "" {
+			t.Fatalf("maintained %s does not select the pinned NVIDIA fork", name)
+		}
+		if pin != nil && (component.Repo != pin.Repo || component.Commit != pin.Commit || component.TreeHash != pin.TreeHash) {
+			t.Fatal("maintained OVN producers select different source pins")
+		}
+		pin = component
+	}
+	environment := []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=url." + source + ".insteadOf", "GIT_CONFIG_VALUE_0=" + pin.Repo}
+	checkout := t.TempDir()
+	run := func(args ...string) []byte {
+		t.Helper()
+		cmd, err := LocalCommand(ctx, environment, checkout, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		output, err := localGitQuery(ctx, cmd.Path, cmd.Env, cmd.Args[1:], "maintained OVN pin", 1<<20, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return output
+	}
+	run("init", "-q")
+	run("fetch", "-q", "--depth=1", pin.Repo, pin.Commit)
+	run("checkout", "-q", "--detach", "FETCH_HEAD")
+	for _, check := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"rev-parse", "HEAD"}, pin.Commit + "\n"},
+		{[]string{"rev-parse", "HEAD^{tree}"}, pin.TreeHash + "\n"},
+		{[]string{"ls-tree", "--format=%(objectmode)", "HEAD", "--", ".gitmodules"}, "100644\n"},
+		{[]string{"cat-file", "-t", "HEAD:.gitmodules"}, "blob\n"},
+		{[]string{"cat-file", "-s", "HEAD:.gitmodules"}, "0\n"},
+		{[]string{"status", "--porcelain=v1", "--untracked-files=all"}, ""},
+	} {
+		if got := string(run(check.args...)); got != check.want {
+			t.Fatalf("maintained fork %s does not match its declared pin or empty descriptor", check.args[0])
+		}
+	}
+	modes := run("ls-tree", "-r", "--format=%(objectmode)", pin.TreeHash)
+	if len(modes) == 0 {
+		t.Fatal("maintained fork tree listing is empty")
+	}
+	for _, mode := range bytes.Split(modes, []byte{'\n'}) {
+		if bytes.Equal(mode, []byte("160000")) {
+			t.Fatal("maintained fork tree contains an unsupported gitlink")
+		}
+	}
+	t.Logf("maintained NVIDIA OVN commit %s tree %s: %d entries, empty tracked descriptor, no gitlinks, clean admitted checkout", pin.Commit, pin.TreeHash, bytes.Count(modes, []byte{'\n'}))
 }
 
 func TestLocalGitIndexModesHaveASeparateBound(t *testing.T) {
