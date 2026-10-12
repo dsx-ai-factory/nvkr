@@ -10,7 +10,7 @@ For the current roster and maintainer responsibilities, see
 
 NKE Recipes uses three roles. Code-owner review routing is declared in
 [`.github/CODEOWNERS`](.github/CODEOWNERS), which currently resolves every path to the
-org-wide `@dsx-ai-factory/nke-write` team pending a repository-scoped one.
+org-wide `@dsx-ai-factory/nvke-write` team pending a repository-scoped one.
 
 ### Contributors
 
@@ -21,7 +21,7 @@ contribute.
 
 ### Code Owners
 
-Trusted contributors (the `@dsx-ai-factory/nke-write` team) who review and approve pull
+Trusted contributors (the `@dsx-ai-factory/nvke-write` team) who review and approve pull
 requests for the paths they own. Code ownership is declared per path in
 [`.github/CODEOWNERS`](.github/CODEOWNERS), which GitHub uses to request reviews
 automatically. Code owners keep their areas healthy and mentor contributors.
@@ -33,7 +33,7 @@ ratify project decisions, manage releases, and own this governance process —
 including adding and removing maintainers. Maintainers exercise this authority
 through merge rights and the governance vote below, not through a distinct
 [`.github/CODEOWNERS`](.github/CODEOWNERS) entry: code-owner review currently routes
-to the org-wide `@dsx-ai-factory/nke-write` team, which is broader than the maintainer
+to the org-wide `@dsx-ai-factory/nvke-write` team, which is broader than the maintainer
 roster (see [MAINTAINERS.md](MAINTAINERS.md#current-maintainers)).
 
 ## Areas of Ownership
