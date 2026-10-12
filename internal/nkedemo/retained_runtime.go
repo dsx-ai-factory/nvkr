@@ -6,6 +6,8 @@ package nkedemo
 import (
 	"context"
 	"errors"
+	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -49,6 +51,8 @@ type retainedRuntime struct {
 	failureRecorder func(error) error
 	failureOnce     sync.Once
 	failureErr      error
+	failureCode     nkderr.Code
+	panicRecorder   func([]byte) error
 }
 
 func noteRetainedNetworkStart(ctx context.Context) {
@@ -211,10 +215,25 @@ func (owner *retainedRuntime) observe(ctx context.Context) (retainedRuntimeSnaps
 }
 
 func (owner *retainedRuntime) retainFailure(primary error) error {
-	if primary == nil || owner.failureRecorder == nil {
+	if primary == nil {
 		return nil
 	}
-	owner.failureOnce.Do(func() { owner.failureErr = owner.failureRecorder(primary) })
+	owner.failureOnce.Do(func() {
+		code := nkderr.CodePreflightFailed
+		var coded *nkderr.Error
+		if errors.As(primary, &coded) {
+			code = coded.Code
+		}
+		if errors.Is(primary, context.Canceled) || errors.Is(primary, context.DeadlineExceeded) {
+			code = nkderr.CodeTimeout
+		}
+		owner.mu.Lock()
+		owner.failureCode = code
+		owner.mu.Unlock()
+		if owner.failureRecorder != nil {
+			owner.failureErr = owner.failureRecorder(primary)
+		}
+	})
 	return owner.failureErr
 }
 
@@ -227,6 +246,26 @@ func waitRetainedCleanup(ctx context.Context, primary ...error) error {
 		return owner.hold()
 	}
 	return nil
+}
+
+// Register directly after a dependent hold's defer. Retained panic diagnostics
+// must exist before that hold blocks unwinding. Foreground recovery is unchanged;
+// Custom payload methods are never invoked; no value enters the public channel.
+func recoverRetainedPanic(ctx context.Context, result *error) {
+	owner := runtimeRetention(ctx)
+	if owner == nil {
+		return
+	}
+	if value := recover(); value != nil {
+		stack := debug.Stack()
+		stack = stack[:min(len(stack), 1<<20)]
+		var storeErr error
+		if owner.panicRecorder != nil {
+			storeErr = owner.panicRecorder(fmt.Appendf(nil, "Panic: %s\n\n%s", PrivatePanicValueDescription(value), stack))
+		}
+		*result = errors.Join(*result, ErrRetainedControls, nkderr.Wrap(nkderr.CodeInternal, storeErr, "retained service owner panic; ownership is unknown, inspect private diagnostics"))
+		_ = owner.retainFailure(*result)
+	}
 }
 
 // Only the actual teardown stack records these errors. An operation failure is

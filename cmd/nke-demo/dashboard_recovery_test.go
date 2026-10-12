@@ -164,11 +164,9 @@ func TestDashboardPresentationFailureRestoresBeforeCleanupJoin(t *testing.T) {
 				release <- struct{}{}
 				select {
 				case err := <-result:
-					want := nkderr.CodePreflightFailed
-					if ownerErr != nil {
-						want = nkderr.CodeFetchFailed
-					}
-					assertCode(t, err, want)
+					// Presentation caused cancellation; preserve the owner's exact
+					// joined failure without replacing the terminal exit category.
+					assertCode(t, err, nkderr.CodePreflightFailed)
 					if ownerErr != nil && !errors.Is(err, ownerErr) || mode == "output failure" && !errors.Is(err, presentationErr) {
 						t.Fatalf("exact owner or presentation failure lost: %v", err)
 					}

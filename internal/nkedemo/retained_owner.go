@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -68,7 +69,9 @@ func readRetainedJSON[T any](ctx context.Context, path string) (T, error) {
 // ServeRetained is the CLI's fixed hidden child entry, not a command accepting
 // arbitrary argv or PID adoption. It starts no service until the parent has
 // authenticated this new endpoint and explicitly requested start. Its one Run
-// stack owns every service through explicit cleanup and joins before finish.
+// stack owns every service through explicit cleanup. Finish requires joined
+// cleanup, or returned failed teardown with known-joined producers; the latter
+// never claims successful cleanup or admits host-network restoration.
 func ServeRetained(ctx context.Context, session string) error {
 	if err := networkPlatform(); err != nil {
 		return err
@@ -112,6 +115,7 @@ func serveRetained(ctx context.Context, root string, launch retainedLaunch, work
 		}
 		return nil
 	}
+	owner.panicRecorder = func(stack []byte) error { return privateWrite(filepath.Join(root, "owner-panic.log"), stack) }
 	operation = context.WithValue(operation, retainedRuntimeKey{}, owner)
 	stopAttached := context.AfterFunc(ctx, stopWork)
 	defer stopAttached()
@@ -165,7 +169,7 @@ func serveRetained(ctx context.Context, root string, launch retainedLaunch, work
 		}
 		_ = control.recordJoined(lifetime, owner.joinedCleanup())
 	}()
-	<-control.finish // Only a joined actual service stack can admit this request.
+	<-control.finish // Joined cleanup, or explicit exit after safely returned failed teardown.
 	<-workerDone     // Sole owner joins its Run goroutine, including finalizers.
 	for {
 		closeContext, cancel := context.WithTimeout(lifetime, 10*time.Second)
@@ -185,7 +189,7 @@ func retainedWork(ctx context.Context, root string, cfg Config, work func(contex
 			// Do not call a panic value's formatter or print provider payloads.
 			stack := debug.Stack()
 			stack = stack[:min(len(stack), 1<<20)]
-			storeErr := privateWrite(filepath.Join(root, "owner-panic.log"), stack)
+			storeErr := privateWrite(filepath.Join(root, "owner-panic.log"), fmt.Appendf(nil, "Panic: %s\n\n%s", PrivatePanicValueDescription(value), stack))
 			result = errors.Join(ErrRetainedControls, nkderr.Wrap(nkderr.CodeInternal, storeErr, "retained service owner panic; ownership is unknown, inspect private diagnostics"))
 		}
 	}()

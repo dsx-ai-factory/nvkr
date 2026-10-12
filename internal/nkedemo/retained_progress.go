@@ -117,7 +117,16 @@ func relayRetainedProgress(out io.Writer, cursor *uint64, frames []retainedProgr
 			continue
 		}
 		if frame.Sequence != *cursor+1 {
-			return nkderr.New(nkderr.CodePreflightFailed, "foreground missed bounded progress; services remain owned, not silently restarted")
+			// The authenticated owner's bounded ring may evict old frames. This
+			// is missing presentation, never permission to abort its deployment.
+			if out != nil {
+				const notice = "Warning: foreground missed bounded progress; resynchronized to available observations. Deployment remains owned; no restart or cleanup requested.\n"
+				written, err := io.WriteString(out, notice)
+				if err != nil || written != len(notice) {
+					return nkderr.Wrap(nkderr.CodePreflightFailed, errors.Join(err, io.ErrShortWrite), "present retained progress gap")
+				}
+			}
+			*cursor = frame.Sequence - 1
 		}
 		if frame.Status != "" {
 			if frame.Text != "" || frame.Event != nil || len(frame.Status) > retainedProgressLimit {

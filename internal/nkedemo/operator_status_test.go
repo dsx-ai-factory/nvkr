@@ -89,13 +89,62 @@ func TestTenantResultPresentationIncludesCleanupRuns(t *testing.T) {
 						t.Fatal("deployment result omitted actual cluster observations", &out, err)
 					}
 				} else {
-					var coded *nkderr.Error
-					if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !strings.Contains(out.String(), "readiness not confirmed") {
-						t.Fatal("failed result observation was hidden", &out, err)
+					if err != nil || !strings.Contains(out.String(), "readiness not confirmed") {
+						t.Fatal("diagnostic observation changed accepted deployment or hid its result", &out, err)
 					}
 				}
 			})
 		}
+	}
+}
+
+func TestTenantResultPresentationDoesNotGateAcceptedHealth(t *testing.T) {
+	for _, row := range []struct{ name, ready, nodes, message string }{
+		{"API unavailable", "not ready", operatorNodesFixture, "API: readiness not confirmed"},
+		{"nodes unavailable", "ok", `{"items":[]}`, "Nodes: not confirmed"},
+		{"nodes NotReady", "ok", strings.ReplaceAll(operatorNodesFixture, `"True"`, `"False"`), "Nodes: 0/2 Ready"},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			access, runner := operatorStatusFixture(t)
+			runner.Env = SetEnv(runner.Env, map[string]string{"READY_REPLY": row.ready, "NODES_JSON": row.nodes})
+			session := ManagementSession{Work: filepath.Dir(access.site), Tools: filepath.Dir(access.kubectl), Runner: runner}
+			for _, cleanup := range []bool{false, true} {
+				var out bytes.Buffer
+				if err := presentTenantResult(t.Context(), Config{Cleanup: cleanup, Progress: &out}, session); err != nil || !strings.Contains(out.String(), row.message) {
+					t.Fatal("presenter changed accepted health or hid observation", err, &out)
+				}
+				if err := presentTenantResult(t.Context(), Config{Cleanup: cleanup}, session); err != nil {
+					t.Fatal("absence of presenter changed acceptance", err)
+				}
+			}
+		})
+	}
+}
+
+func TestTenantResultPresentationKeepsOutputAndCancellationFailures(t *testing.T) {
+	for _, row := range []struct {
+		name     string
+		output   io.Writer
+		canceled bool
+		code     nkderr.Code
+	}{
+		{"output failure", operatorShortWriter{}, false, nkderr.CodePreflightFailed},
+		{"canceled", io.Discard, true, nkderr.CodeTimeout},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			access, runner := operatorStatusFixture(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if row.canceled {
+				cancel()
+			}
+			session := ManagementSession{Work: filepath.Dir(access.site), Tools: filepath.Dir(access.kubectl), Runner: runner}
+			err := presentTenantResult(ctx, Config{Progress: row.output}, session)
+			var coded *nkderr.Error
+			if !errors.As(err, &coded) || coded.Code != row.code || row.canceled && !errors.Is(err, context.Canceled) {
+				t.Fatal("lost presentation or cancellation failure", err)
+			}
+		})
 	}
 }
 

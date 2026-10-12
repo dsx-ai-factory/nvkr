@@ -112,6 +112,48 @@ func TestRetainedBackgroundFixture(t *testing.T) {
 	}
 }
 
+func TestRetainedCleanupReturnsFailedOutcomeBeforeBudgetAndRelaysProgress(t *testing.T) {
+	owner, ctx, _ := retainedTestOwner(t)
+	root := privateTestDir(t)
+	progress := &retainedProgress{}
+	_, _ = progress.Write([]byte("public owner cleanup observation\n"))
+	control, err := newRetainedControlWithProgress(t.Context(), owner, root, root, func() error { return nil }, progress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Second)
+		defer cancel()
+		if err := control.close(closeCtx); err != nil {
+			t.Error(err)
+		}
+	}()
+	if err := privateJSON(filepath.Join(root, retainedDescriptionFile), control.description); err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.requestCleanup(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	recordRetainedCleanup(ctx, errors.Join(ErrUnjoined, errors.New("private-cleanup-cause")))
+	owner.recordTeardownReturn(nil)
+	bounded, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	var output strings.Builder
+	err = CleanupRetained(bounded, root, &output)
+	var coded *nkderr.Error
+	if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !errors.Is(err, ErrRetainedControls) || bounded.Err() != nil {
+		t.Fatal("terminal teardown waited out its budget", err)
+	}
+	if !strings.Contains(output.String(), "public owner cleanup observation") || strings.Contains(err.Error()+output.String(), "private-cleanup-cause") {
+		t.Fatal("cleanup relay lost public activity or exposed cause", err)
+	}
+	select {
+	case <-control.finish:
+		t.Fatal("unjoined producer authorized owner exit")
+	default:
+	}
+}
+
 func readControlFixture(ctx context.Context, root string) (retainedControlDescription, string, error) {
 	for {
 		raw, err := os.ReadFile(filepath.Join(root, "fixture-control.json"))

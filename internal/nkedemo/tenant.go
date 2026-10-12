@@ -831,6 +831,7 @@ func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session
 			result = errors.Join(result, ErrRetainedControls, withdrawErr)
 		}
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	if err = guard.AllowGuestTCP(ctx, rows[0].NetworkSettings.Networks["kind"].IPAddress, []int{30440, 30443}); err != nil {
 		return err
 	}
@@ -846,7 +847,12 @@ func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session
 func presentTenantResult(ctx context.Context, cfg Config, session ManagementSession) error {
 	if cfg.Progress != nil {
 		access := OperatorAccess{kubectl: filepath.Join(session.Tools, "kubectl"), site: filepath.Join(session.Work, "kubeconfig"), tenant: filepath.Join(session.Work, "tenant-kubeconfig")}
-		if err := access.WriteLiveStatus(ctx, session.Runner, cfg.Progress); err != nil {
+		if err := access.WriteLiveStatus(ctx, session.Runner, cfg.Progress); err != nil &&
+			(!errors.Is(err, errOperatorHealthUnconfirmed) || errors.Is(err, ErrUnjoined) || ctx.Err() != nil) {
+			// A health observation may differ after t.run's unchanged acceptance
+			// checks. It stays visible, but cannot become a presenter-only gate.
+			// Writer/admission failures, cancellation and unjoined children still
+			// return their owning error; none grant retention or cleanup success.
 			return err
 		}
 	}

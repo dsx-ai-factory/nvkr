@@ -28,6 +28,7 @@ type testDashboardScreen struct {
 	lastFrame                      string
 	onFini                         func()
 	onPumpExit                     func()
+	onShow                         func()
 }
 
 func (s *testDashboardScreen) Init() error {
@@ -62,6 +63,9 @@ func (s *testDashboardScreen) Show() {
 		}
 	}
 	s.lastFrame = frame.String()
+	if s.onShow != nil {
+		s.onShow()
+	}
 }
 
 func (s *testDashboardScreen) Clear() {
@@ -180,7 +184,7 @@ func TestDashboardTerminalFailureAppearsOnceAfterTeardown(t *testing.T) {
 				var out bytes.Buffer
 				err = finishDashboardProgress(writer, &out, "", err, terminalFailure)
 				want := nkderr.CodePreflightFailed
-				if started && ownerErr != nil {
+				if started && ownerErr != nil && mode != "output" {
 					want = nkderr.CodeFetchFailed
 				}
 				assertCode(t, err, want)
@@ -192,6 +196,165 @@ func TestDashboardTerminalFailureAppearsOnceAfterTeardown(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestDashboardCompletionBannerDoesNotPromiseAbsentInstructions(t *testing.T) {
+	var out bytes.Buffer
+	writer := &checkedWriter{out: &out, started: time.Now()}
+	if err := finishDashboardProgress(writer, &out, "", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "returned successfully") || strings.Contains(out.String(), "instructions below") {
+		t.Fatal("generic command banner promised an absent retained handoff")
+	}
+}
+
+func TestDashboardFinalShowFailurePreservesJoinedOwnerFailure(t *testing.T) {
+	for _, ownerErr := range []error{nil, nkderr.New(nkderr.CodeFetchFailed, "owner fetch failed before final draw")} {
+		t.Run(map[bool]string{true: "failed owner", false: "successful owner"}[ownerErr != nil], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var failed atomic.Bool
+			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8")}
+			screen.onShow = func() {
+				if screen.draws >= 2 {
+					failed.Store(true)
+				}
+			}
+			failure := nkderr.New(nkderr.CodePreflightFailed, "final terminal show failed")
+			view := newDashboard()
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			err := dashboardLoop(ctx, cancel, screen, func() error {
+				if failed.Load() {
+					return failure
+				}
+				return nil
+			}, writer, view, func(context.Context, io.Writer) error { return ownerErr })
+			assertCode(t, err, nkderr.CodePreflightFailed)
+			if !screen.joined.Load() || !errors.Is(err, failure) || ownerErr != nil && !errors.Is(err, ownerErr) {
+				t.Fatal("final output failure lost its joined owner result or terminal failure")
+			}
+		})
+	}
+}
+
+func TestDashboardCleanupNoticeFailureRemainsCheckedAndJoined(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		writer io.Writer
+	}{
+		{"short write", shortTTY{}},
+		{"write error", failedProgressWriter{}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8"), closed: true}
+			view := newDashboard()
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			var cleaned atomic.Bool
+			err := dashboardLoopWithCleanupNotice(ctx, cancel, screen, func() error { return nil }, writer, view, func(workCtx context.Context, _ io.Writer) error {
+				defer cleaned.Store(true)
+				<-workCtx.Done()
+				return nkderr.Wrap(nkderr.CodeTimeout, workCtx.Err(), "worker canceled")
+			}, nil, test.writer)
+			assertCode(t, err, nkderr.CodePreflightFailed)
+			if !cleaned.Load() || !screen.joined.Load() || !strings.Contains(err.Error(), "cannot display owned-cleanup wait notice") || strings.Contains(err.Error(), "private") {
+				t.Fatal("notice failure was lost, leaked or skipped worker cleanup")
+			}
+		})
+	}
+}
+
+type dashboardNoticeWriterFunc func([]byte) (int, error)
+
+func (write dashboardNoticeWriterFunc) Write(data []byte) (int, error) { return write(data) }
+
+func TestDashboardPresentationFailurePrecedesWorkerCancellation(t *testing.T) {
+	for _, mode := range []string{"input", "closed", "renderer", "output"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var outputFailed atomic.Bool
+			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8"), closed: mode == "closed", panicDraw: mode == "renderer"}
+			view := newDashboard()
+			view.recoveryWork = "/tmp/owned\x1bworkspace"
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			started, cleaning, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			var notice bytes.Buffer
+			noticeSeen := make(chan struct{}, 1)
+			noticeWriter := dashboardNoticeWriterFunc(func(data []byte) (int, error) {
+				if !screen.joined.Load() {
+					t.Error("cleanup notice preceded terminal restoration")
+				}
+				n, err := notice.Write(data)
+				select {
+				case noticeSeen <- struct{}{}:
+				default:
+				}
+				return n, err
+			})
+			result := make(chan error, 1)
+			go func() {
+				result <- dashboardLoopWithCleanupNotice(ctx, cancel, screen, func() error {
+					if outputFailed.Load() {
+						return nkderr.New(nkderr.CodePreflightFailed, "terminal output failed")
+					}
+					return nil
+				}, writer, view, func(workCtx context.Context, _ io.Writer) error {
+					close(started)
+					<-workCtx.Done()
+					close(cleaning)
+					<-release
+					return nkderr.Wrap(nkderr.CodeTimeout, workCtx.Err(), "worker canceled")
+				}, nil, noticeWriter)
+			}()
+			select {
+			case <-started:
+			case <-time.After(3 * time.Second):
+				t.Fatal("worker did not start")
+			}
+			switch mode {
+			case "input":
+				if err := screen.PostEvent(tcell.NewEventError(errors.New("private input error"))); err != nil {
+					t.Fatal(err)
+				}
+			case "output":
+				outputFailed.Store(true)
+			}
+			select {
+			case <-cleaning:
+			case <-time.After(3 * time.Second):
+				t.Fatal("worker did not start cleanup")
+			}
+			if mode != "output" {
+				select {
+				case <-noticeSeen:
+				case <-time.After(3 * time.Second):
+					t.Fatal("restored terminal did not explain ongoing cleanup")
+				}
+			}
+			select {
+			case <-result:
+				t.Fatal("presentation failure bypassed worker join")
+			default:
+			}
+			close(release)
+			select {
+			case err := <-result:
+				want := nkderr.CodePreflightFailed
+				if mode == "renderer" {
+					want = nkderr.CodeInternal
+				}
+				assertCode(t, err, want)
+				if mode == "output" && notice.Len() != 0 || mode != "output" && (strings.Count(notice.String(), "waiting for owned cleanup") != 1 || strings.ContainsRune(notice.String(), '\x1b')) {
+					t.Fatal("cleanup wait notice repeated, retried failed output or leaked terminal controls")
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("worker cleanup did not join")
+			}
+		})
 	}
 }
 

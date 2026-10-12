@@ -209,6 +209,79 @@ func TestLocalGitRejectsSubmoduleDescriptors(t *testing.T) {
 	}
 }
 
+func TestLocalGitAdmitsOnlyAuthenticatedEmptyDescriptor(t *testing.T) {
+	for _, state := range []string{"matching", "untracked", "ignored", "deleted", "worktree changed", "index changed", "HEAD changed", "executable changed", "symlink", "gitlink"} {
+		t.Run(state, func(t *testing.T) {
+			source, commit := localFixtureRepository(t)
+			descriptor := filepath.Join(source, ".gitmodules")
+			callbackMarker := filepath.Join(t.TempDir(), "external-diff-executed")
+			body := []byte{}
+			if state == "HEAD changed" {
+				body = []byte("[submodule]\n")
+			}
+			if err := os.WriteFile(descriptor, body, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if state != "untracked" && state != "ignored" {
+				localFixtureGit(t, source, "add", ".gitmodules")
+				localFixtureGit(t, source, "-c", "commit.gpgsign=false", "commit", "-qm", "empty descriptor")
+			}
+			switch state {
+			case "ignored":
+				if err := os.WriteFile(filepath.Join(source, ".gitignore"), []byte(".gitmodules\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "deleted":
+				if err := os.Remove(descriptor); err != nil {
+					t.Fatal(err)
+				}
+			case "worktree changed", "index changed":
+				if err := os.WriteFile(descriptor, []byte("[submodule]\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if state == "index changed" {
+					localFixtureGit(t, source, "add", ".gitmodules")
+					if err := os.WriteFile(descriptor, nil, 0o600); err != nil {
+						t.Fatal(err)
+					}
+					localFixtureGit(t, source, "config", "diff.external", "printf executed > '"+callbackMarker+"'")
+					localFixtureGit(t, source, "config", "diff.trustExitCode", "true")
+				}
+			case "executable changed":
+				localFixtureGit(t, source, "config", "core.fileMode", "false")
+				if err := os.Chmod(descriptor, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			case "HEAD changed":
+				if err := os.WriteFile(descriptor, nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				localFixtureGit(t, source, "add", ".gitmodules")
+			case "symlink":
+				if err := os.Remove(descriptor); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink("synthetic-private-target", descriptor); err != nil {
+					t.Fatal(err)
+				}
+			case "gitlink":
+				localFixtureGit(t, source, "update-index", "--add", "--cacheinfo", "160000,"+commit+",synthetic-private-submodule")
+			}
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH")}, source, "rev-parse", "HEAD")
+			if state == "matching" {
+				if err != nil || cmd == nil {
+					t.Fatalf("authenticated empty descriptor rejected: %v", err)
+				}
+			} else if cmd != nil || errorCode(err) != e.CodeEngineCapability {
+				t.Fatalf("unverified or nested descriptor admitted: %v", err)
+			}
+			if _, err := os.Stat(callbackMarker); !os.IsNotExist(err) {
+				t.Fatal("descriptor correspondence query executed an external diff callback")
+			}
+		})
+	}
+}
+
 func TestLocalGitIndexModesHaveASeparateBound(t *testing.T) {
 	source, _ := localFixtureRepository(t)
 	blob := localFixtureGit(t, source, "rev-parse", "HEAD:input.txt")
@@ -253,6 +326,9 @@ func TestLocalGitIndexQueryFailsClosed(t *testing.T) {
 			data, err := localGitQuery(t.Context(), git, baseline, args, "index modes", test.limit, false)
 			if data != nil || errorCode(err) != e.CodeEngineCapability {
 				t.Fatalf("failed index query admitted: %v", err)
+			}
+			if !strings.Contains(err.Error(), "requires Git 2.38+ with ls-files --format support") {
+				t.Fatal("failed index capability query omits its Git floor")
 			}
 			if strings.Contains(err.Error(), source) || strings.Contains(err.Error(), "synthetic-private-absent") {
 				t.Fatal("failed query exposed private source identity")
@@ -307,10 +383,12 @@ func TestLocalRedirectRefusalNamesIndexWithoutPrivateConfiguration(t *testing.T)
 	for _, test := range []struct {
 		name, key, value, want string
 	}{
-		{"unselected variable", "credential.synthetic-private-subsection.helper", "synthetic-private-value", "GIT_CONFIG_KEY_1 must select an explicit absolute local repository redirect"},
-		{"private URI", "url.file:///synthetic-private-path/.insteadOf", "https://synthetic-private-url.test/source", "GIT_CONFIG_KEY_1 must use a canonical absolute local repository path"},
-		{"noncanonical path", "url./synthetic-private-path/../source.insteadOf", "synthetic-private-value", "GIT_CONFIG_KEY_1 must use a canonical absolute local repository path"},
-		{"missing value", "url./synthetic-private-path.insteadOf", "", "GIT_CONFIG_VALUE_1 must provide a nonempty repository redirect source"},
+		{"unselected variable", "credential.synthetic-private-subsection.helper", "synthetic-private-value", "GIT_CONFIG_KEY_1 (credential.*) must select an explicit absolute local repository redirect"},
+		{"safe directory", "safe.directory", "synthetic-private-value", "GIT_CONFIG_KEY_1 (safe.*) must select an explicit absolute local repository redirect"},
+		{"unrecognized family", "unknown.synthetic-private-subsection.key", "synthetic-private-value", "GIT_CONFIG_KEY_1 (unrecognized) must select an explicit absolute local repository redirect"},
+		{"private URI", "url.file:///synthetic-private-path/.insteadOf", "https://synthetic-private-url.test/source", "GIT_CONFIG_KEY_1 (url.*) must use a canonical absolute local repository path"},
+		{"noncanonical path", "url./synthetic-private-path/../source.insteadOf", "synthetic-private-value", "GIT_CONFIG_KEY_1 (url.*) must use a canonical absolute local repository path"},
+		{"missing value", "url./synthetic-private-path.insteadOf", "", "GIT_CONFIG_VALUE_1 (GIT_CONFIG_KEY_1, url.*) must provide a nonempty repository redirect source"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			environment := []string{"GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_0=url./absolute/source/.insteadOf", "GIT_CONFIG_VALUE_0=https://example.test/source",
@@ -426,6 +504,9 @@ func TestLocalGitConfigurationQueryFailuresAreClosedAndPrivate(t *testing.T) {
 			if cmd != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "configuration query failed") {
 				t.Fatalf("failed configuration query produced an executable fetch: %v", err)
 			}
+			if !strings.Contains(err.Error(), "local credential policy:") {
+				t.Fatal("configuration failure omits supported credential policy")
+			}
 			if strings.Contains(err.Error(), home) || strings.Contains(err.Error(), "synthetic-private-value") {
 				t.Fatal("configuration query refusal exposed private details")
 			}
@@ -522,6 +603,48 @@ func TestLocalGitExplicitChildDoesNotDiscoverAncestorRepository(t *testing.T) {
 			// path. The ceiling excludes only discovery of the enclosing checkout.
 			runLocalFixture(t, []string{"PATH=" + os.Getenv("PATH")}, child, "init", "-q")
 			runLocalFixture(t, []string{"PATH=" + os.Getenv("PATH")}, child, "status", "--porcelain=v1")
+		})
+	}
+}
+
+func TestLocalGitRejectsUncleanOrAmbiguousExplicitDirectory(t *testing.T) {
+	for _, dir := range []string{"/synthetic-private-source/", "/synthetic-private-source/.", "/synthetic-private:source"} {
+		t.Run(dir, func(t *testing.T) {
+			cmd, err := LocalCommand(t.Context(), nil, dir, "status")
+			if cmd != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "canonical absolute explicit repository directory") {
+				t.Fatalf("unclean directory reached configuration discovery: %v", err)
+			}
+			if strings.Contains(err.Error(), "synthetic-private") {
+				t.Fatal("directory refusal exposed private selection")
+			}
+		})
+	}
+}
+
+func TestLocalCloneChecksLocalObjects(t *testing.T) {
+	for _, malformed := range []bool{false, true} {
+		t.Run(strconv.FormatBool(malformed), func(t *testing.T) {
+			source, _ := localFixtureRepository(t)
+			if malformed {
+				tree := localFixtureGit(t, source, "rev-parse", "HEAD^{tree}")
+				cmd := exec.CommandContext(t.Context(), "git", "-C", source, "hash-object", "--literally", "-t", "commit", "-w", "--stdin")
+				cmd.Stdin = strings.NewReader("tree " + tree + "\nauthor Fixture <nkd@example.test> invalid +0000\ncommitter Fixture <nkd@example.test> 0 +0000\n\nfixture\n")
+				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Fatalf("malformed object fixture: %v", err)
+				}
+				localFixtureGit(t, source, "update-ref", "HEAD", strings.TrimSpace(string(out)))
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			cmd, err := LocalCommand(ctx, []string{"PATH=" + os.Getenv("PATH")}, "", "clone", "--no-hardlinks", "--no-checkout", source, filepath.Join(t.TempDir(), "installer"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ownedcmd.Run(ctx, cmd); (err != nil) != malformed || ctx.Err() != nil {
+				t.Fatalf("local clone object checks differed: malformed=%t error=%v", malformed, err)
+			}
 		})
 	}
 }

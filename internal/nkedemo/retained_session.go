@@ -146,7 +146,11 @@ func Retain(ctx context.Context, cfg Config) (*RetainedSession, error) {
 				continue
 			}
 			if state.State == retainedPartial {
-				return session, localDemoError(errors.Join(primary, nkderr.New(nkderr.CodePreflightFailed, "deployment stopped before Ready; partial environment is retained for inspection and explicit cleanup")))
+				code := state.FailureCode
+				if code == "" {
+					code = nkderr.CodePreflightFailed
+				}
+				return session, errors.Join(nkderr.New(code, "deployment stopped before Ready; partial environment retained; inspect private owner-error.log and owner-panic.log in the session directory"), primary)
 			}
 			reportProgress(cfg.Progress, ProgressEvent{Kind: DeploymentFinished, Name: "local-demo", Status: "retained"})
 			return session, localDemoError(primary)
@@ -234,7 +238,7 @@ func (session *RetainedSession) WriteInstructions(ctx context.Context, executabl
 	if !state.Detached || !operatorArgument(executable) || !filepath.IsAbs(executable) || out == nil {
 		return nkderr.New(nkderr.CodePreflightFailed, "usable handoff requires a live detached owner and actual executable")
 	}
-	if err := writeOperatorText(out, fmt.Sprintf("\nEnvironment retained; it has NOT been cleaned up.\nState: %s. Last completed Ready check: %s.\nPrivate owner diagnostics: %s\n", state.State, retainedReadyTime(state.CheckedAt), operatorQuote(filepath.Join(session.root, "owner.log")))); err != nil {
+	if err := writeOperatorText(out, fmt.Sprintf("\nEnvironment retained; it has NOT been cleaned up.\nState: %s. Last completed Ready check: %s.\nPrivate owner diagnostics: %s\nFailure diagnostics: %s\nPanic stack (if present): %s\n", state.State, retainedReadyTime(state.CheckedAt), operatorQuote(filepath.Join(session.root, "owner.log")), operatorQuote(filepath.Join(session.root, "owner-error.log")), operatorQuote(filepath.Join(session.root, "owner-panic.log")))); err != nil {
 		return err
 	}
 	if state.State != retainedReady {
@@ -297,12 +301,19 @@ func CleanupRetained(ctx context.Context, root string, progress io.Writer) (resu
 	if _, err := session.request(ctx, http.MethodPost, "/cleanup"); err != nil {
 		return err
 	}
+	var cursor uint64
 	for {
 		state, err := session.request(ctx, http.MethodGet, "/state")
 		if err != nil {
 			return err
 		}
-		if state.Joined {
+		if err := relayRetainedProgress(progress, &cursor, state.Progress); err != nil {
+			return err
+		}
+		if state.TeardownReturned && state.CleanupFailed && !state.OwnerExitSafe {
+			return retainedTeardownFailure(session.root)
+		}
+		if state.Joined || state.TeardownReturned && state.CleanupFailed && state.OwnerExitSafe {
 			client, err := connectRetained(ctx, session.description)
 			if err != nil {
 				return err
@@ -314,13 +325,20 @@ func CleanupRetained(ctx context.Context, root string, progress io.Writer) (resu
 			if err := client.peer.WaitExit(ctx); err != nil {
 				return err
 			}
+			if state.CleanupFailed {
+				return retainedTeardownFailure(session.root)
+			}
 			if state.NetworkStarted {
 				return Restore(ctx, session.description.Work, progress)
 			}
 			return nil // Actual owner never admitted a host-network guard.
 		}
 		if err := pause(ctx, 200*time.Millisecond); err != nil {
-			return nkderr.Wrap(nkderr.CodeTimeout, err, "retained services have not joined; host controls remain for recovery")
+			return nkderr.Wrap(nkderr.CodeTimeout, err, "retained cleanup continues in its owner; rerun cleanup --session with the same session; host controls remain, do not restore while producers are active")
 		}
 	}
+}
+
+func retainedTeardownFailure(root string) error {
+	return nkderr.Wrap(nkderr.CodePreflightFailed, ErrRetainedControls, "retained teardown returned with failure; cleanup and restored controls are NOT confirmed; inspect private diagnostics %s and %s; do not restore while producers remain", operatorQuote(filepath.Join(root, "owner-return.log")), operatorQuote(filepath.Join(root, "owner-error.log")))
 }

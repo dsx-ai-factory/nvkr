@@ -15,11 +15,58 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
 )
+
+func TestOrdinaryFetchFailureExplainsCredentialPolicy(t *testing.T) {
+	for _, operation := range []string{"fetch", "status", "canceled"} {
+		t.Run(operation, func(t *testing.T) {
+			tools := t.TempDir()
+			if err := os.WriteFile(filepath.Join(tools, "git"), []byte("#!/bin/sh\nprintf synthetic-private-credential >&2\nexit 128\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", tools+string(os.PathListSeparator)+os.Getenv("PATH"))
+			t.Setenv("HOME", "")
+			t.Setenv("XDG_CONFIG_HOME", "")
+			t.Setenv("GIT_CONFIG_COUNT", "")
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			selected := operation
+			if operation == "canceled" {
+				cancel()
+				selected = "fetch"
+			}
+			_, err := gitOut(ctx, t.TempDir(), selected)
+			wantCode := e.Code("")
+			switch operation {
+			case "fetch":
+				wantCode = e.CodeFetchFailed
+			case "canceled":
+				wantCode = e.CodeTimeout
+			}
+			if err == nil || code(err) != wantCode || strings.Contains(err.Error(), "local credential policy:") != (operation == "fetch") {
+				t.Fatalf("fetch diagnosis or cancellation code changed: %v", err)
+			}
+			if operation == "canceled" {
+				if !errors.Is(err, context.Canceled) {
+					t.Fatal("cancellation cause lost")
+				}
+			} else {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || exit.ExitCode() != 128 {
+					t.Fatal("Git exit status lost")
+				}
+			}
+			if strings.Contains(err.Error(), "synthetic-private-credential") {
+				t.Fatal("fetch diagnosis exposed private child output")
+			}
+		})
+	}
+}
 
 func TestSourceFetchPreservesGitAdmissionFailures(t *testing.T) {
 	for _, boundary := range []string{"fetch probe", "exec-node probe", "verify tree", "closure cleanliness"} {

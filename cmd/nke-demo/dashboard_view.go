@@ -520,10 +520,16 @@ func (d *dashboard) Report(event nkedemo.ProgressEvent) {
 			d.current = "Prepare management cluster and local delivery"
 			d.currentStarted = time.Now()
 		case nkedemo.DeploymentFinished:
-			d.current = "Deployment, tenant checks and owned cleanup completed"
 			d.currentStarted = time.Time{}
-			for _, index := range []int{2, 3, 4, 5} {
+			for _, index := range []int{2, 3, 4} {
 				d.phases[index] = dashboardPhase{"complete", "Owning demo operation completed"}
+			}
+			if event.Status == "retained" {
+				d.current = "Environment retained; not cleaned up"
+				d.phases[5] = dashboardPhase{"pending", "Retained; explicit cleanup required"}
+			} else {
+				d.current = "Deployment, tenant checks and owned cleanup completed"
+				d.phases[5] = dashboardPhase{"complete", "Owning demo operation completed"}
 			}
 		case nkedemo.DeploymentFailed:
 			d.current = "Demo stopped; inspect retained private diagnostics"

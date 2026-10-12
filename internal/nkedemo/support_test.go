@@ -20,6 +20,45 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func TestRunnerGitFetchFailureExplainsCredentialPolicy(t *testing.T) {
+	for _, operation := range []string{"fetch", "status", "canceled"} {
+		t.Run(operation, func(t *testing.T) {
+			tools := t.TempDir()
+			if err := os.WriteFile(filepath.Join(tools, "git"), []byte("#!/bin/sh\nprintf synthetic-private-credential >&2\nexit 128\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			runner := Runner{Work: privateTestDir(t), Env: []string{"PATH=" + tools + string(os.PathListSeparator) + os.Getenv("PATH")}}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			selected := operation
+			if operation == "canceled" {
+				cancel()
+				selected = "fetch"
+			}
+			err := runner.Run(ctx, []string{"git", "-C", runner.Work, selected}, "installer-fetch", 5*time.Second)
+			if err == nil || strings.Contains(err.Error(), "local credential policy:") != (operation == "fetch") {
+				t.Fatalf("fetch policy guidance escaped its failure scope: %v", err)
+			}
+			if operation == "canceled" {
+				if !errors.Is(err, context.Canceled) {
+					t.Fatal("cancellation cause lost")
+				}
+			} else {
+				if CommandExitCode(err) != 128 {
+					t.Fatal("Git command exit status lost")
+				}
+				var coded *nkderrors.Error
+				if operation == "fetch" && (!errors.As(err, &coded) || coded.Code != nkderrors.CodeFetchFailed) {
+					t.Fatal("fetch diagnostic lacks its owning code")
+				}
+			}
+			if strings.Contains(err.Error(), "synthetic-private-credential") {
+				t.Fatal("fetch diagnostic exposed private child output")
+			}
+		})
+	}
+}
+
 func TestRunnerGitAdmissionNamesFailingPhase(t *testing.T) {
 	root := privateTestDir(t)
 	checkout := filepath.Join(root, "source")

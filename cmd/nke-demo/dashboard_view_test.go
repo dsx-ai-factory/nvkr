@@ -489,6 +489,35 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 	}
 }
 
+func TestDashboardCompletionDistinguishesRetentionFromCleanup(t *testing.T) {
+	for _, test := range []struct {
+		name, status, cleanup, current string
+	}{
+		{"retained", "retained", "pending", "Environment retained; not cleaned up"},
+		{"cleanup", "", "complete", "Deployment, tenant checks and owned cleanup completed"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.DeploymentFinished, Name: "local-demo", Status: test.status})
+			s := d.snapshot()
+			if s.current != test.current || s.phases[5].state != test.cleanup {
+				t.Fatalf("completion misrepresented retention/cleanup: current=%q cleanup=%q", s.current, s.phases[5].state)
+			}
+			for _, phase := range s.phases[2:5] {
+				if phase.state != "complete" {
+					t.Fatal("owning deployment completion did not finish its deployment phases")
+				}
+			}
+			screen := dashboardScreen(t, 140)
+			d.draw(screen, time.Now(), false)
+			text := dashboardText(screen)
+			if !strings.Contains(text, test.current) || test.status == "retained" && strings.Contains(text, "owned cleanup completed") {
+				t.Fatal("final dashboard frame disagrees with owning retention mode")
+			}
+		})
+	}
+}
+
 func TestDashboardBuildLogRecognizesNeutralAndHistoricalPrefixes(t *testing.T) {
 	for _, prefix := range []string{"[log +1s] ", "[build +1s] "} {
 		t.Run(prefix, func(t *testing.T) {

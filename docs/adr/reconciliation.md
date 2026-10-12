@@ -220,21 +220,26 @@ Ordinary local source Git and installer preparation now use the existing
 templates and line-ending conversion. Developer credential and selected proxy/TLS
 trust settings are projected only into network fetch; explicit absolute local-repository redirects remain
 available. Its transport override admits HTTPS, SSH and local files, not cleartext
-HTTP/Git or external helpers. Clone fixes upload-pack, enables transferred-object
-checks and disables recursive submodules; ref discovery also fixes upload-pack.
+HTTP/Git or external helpers. Clone fixes upload-pack, disables local-path
+optimization with `--no-local`, enables transferred-object checks and disables
+recursive submodules; ref discovery also fixes upload-pack.
 Neither expands developer credential projection beyond fetch. Real Git fixtures
 exercise TLS-verified helper fetch, plaintext refusal and exact local clone/ref
 results; these are not current private-source access or held receipt evidence.
-Ordinary local sources with a root `.gitmodules` descriptor (including
-indexed-but-deleted descriptors) or indexed gitlinks fail admission without
-recursing into nested repositories. Git owns the bounded index-mode query;
-ignoring submodules during status is not evidence of clean nested sources.
+Ordinary local sources reject indexed gitlinks and nonempty, untracked, missing,
+symlinked or mismatched root `.gitmodules` descriptors. A regular tracked empty
+descriptor requires Git's empty-HEAD and index/worktree correspondence checks;
+the maintained OVN fork's inert descriptor does not authorize nested sources.
+Git owns the bounded index-mode query; its Git 2.38+ capability floor is named on
+query failure. Ignoring submodules during status is not evidence of clean nested sources.
 The ordinary adapter accepts operation-first arguments only; its explicit
 directory owns repository selection. The demo may consume one leading `-C`
 before that admission; additional global options are refused before repository
 queries or command-log creation. Git still owns operation argument syntax.
-Privacy-safe refusal diagnostics name only static configuration families or
-redirect indices, never configuration values, paths or URLs.
+Privacy-safe refusal diagnostics name static configuration families and
+redirect indices, never configuration values, paths or URLs. Ordinary fetch and
+configuration-query failures explain the supported fetch-only credential policy
+without assigning an authentication cause or changing cancellation codes.
 Real Git fixtures cover exact checkout bytes, callback exclusion,
 local redirects and authenticated fetch. The E2E build adapter preserves these
 bounded, owner-validated redirects, and the NKE clone launcher appends its two

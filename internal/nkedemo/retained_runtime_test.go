@@ -4,7 +4,9 @@
 package nkedemo
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -41,6 +43,86 @@ func retainedObserve(t *testing.T, owner *retainedRuntime) retainedRuntimeSnapsh
 		t.Fatal(err)
 	}
 	return snapshot
+}
+
+func TestRetainedPanicIsRecordedBeforeNestedHold(t *testing.T) {
+	for _, kind := range []string{"panic", "timeout", "raw deadline", "wrapped deadline"} {
+		t.Run(kind, func(t *testing.T) {
+			owner, work, _ := retainedTestOwner(t)
+			privatePath := filepath.Join(privateTestDir(t), "owner-panic.log")
+			owner.panicRecorder = func(raw []byte) error { return privateWrite(privatePath, raw) }
+			joined := make(chan error, 1)
+			done := make(chan struct{})
+			defer func() {
+				_ = owner.requestCleanup(context.WithoutCancel(t.Context()))
+				select {
+				case <-done:
+				case <-time.After(time.Second):
+					t.Error("panic fixture did not join")
+				}
+			}()
+			go func() {
+				defer close(done)
+				result := func() (result error) {
+					defer func() { result = errors.Join(result, waitRetainedCleanup(work, result)) }()
+					defer recoverRetainedPanic(work, &result)
+					if kind == "panic" {
+						panic("PRIVATE-PANIC-PAYLOAD")
+					}
+					if kind == "raw deadline" {
+						return context.DeadlineExceeded
+					}
+					if kind == "wrapped deadline" {
+						return &CommandError{Phase: "private-command", ExitCode: -1, Cause: context.DeadlineExceeded}
+					}
+					return nkderr.Wrap(nkderr.CodeTimeout, context.DeadlineExceeded, "private-timeout-cause")
+				}()
+				joined <- result
+			}()
+			if state := retainedObserve(t, owner); state.state != retainedPartial {
+				t.Fatal(state)
+			}
+			control := &retainedControl{owner: owner}
+			state, err := control.snapshot(t.Context())
+			want := nkderr.CodeTimeout
+			if kind == "panic" {
+				want = nkderr.CodeInternal
+				private, readErr := os.ReadFile(privatePath)
+				info, statErr := os.Stat(privatePath)
+				if readErr != nil || statErr != nil || info.Mode().Perm() != 0o600 || info.Size() > (1<<20)+(33<<10) || !bytes.Contains(private, []byte("recoverRetainedPanic")) || !bytes.Contains(private, []byte("PRIVATE-PANIC-PAYLOAD")) {
+					t.Fatal("private panic value or stack hidden until cleanup")
+				}
+			}
+			if err != nil || state.FailureCode != want || state.TeardownReturned {
+				t.Fatal("public failure classification unavailable before hold", state, err)
+			}
+			raw, _ := json.Marshal(state)
+			if bytes.Contains(raw, []byte("PRIVATE")) || bytes.Contains(raw, []byte("private-timeout")) {
+				t.Fatal("private cause crossed control")
+			}
+			if err := owner.requestCleanup(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case result := <-joined:
+				if kind == "raw deadline" || kind == "wrapped deadline" {
+					if !errors.Is(result, context.DeadlineExceeded) {
+						t.Fatal("raw owner deadline identity lost", result)
+					}
+					break
+				}
+				var coded *nkderr.Error
+				if !errors.As(result, &coded) || coded.Code != want {
+					t.Fatal("owner primary lost", result)
+				}
+				if bytes.Contains([]byte(result.Error()), []byte("PRIVATE-PANIC-PAYLOAD")) {
+					t.Fatal("private panic value crossed public error")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("fixture stack not joined")
+			}
+		})
+	}
 }
 
 func TestRetainedRuntimeOperationCancellationNeverAuthorizesCleanup(t *testing.T) {

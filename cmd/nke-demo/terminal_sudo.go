@@ -134,7 +134,11 @@ func withSudoSession(ctx context.Context, authenticate, refresh func(context.Con
 		stop()
 		result = errors.Join(result, group.Wait())
 		mu.Lock()
-		result = errors.Join(result, latest)
+		// A joined keepalive failure gated no privileged command. Every such
+		// command checks again; it cannot reverse an already accepted result.
+		if result != nil || unjoined != nil {
+			result = errors.Join(result, latest)
+		}
 		mu.Unlock()
 	}()
 	group.Go(func() error {

@@ -147,7 +147,7 @@ func TestSudoSessionAdmission(t *testing.T) {
 }
 
 func TestSudoSessionRefreshOwnership(t *testing.T) {
-	for _, mode := range []string{"return", "cancel", "panic", "refresh-fails", "unjoined", "panic-unjoined"} {
+	for _, mode := range []string{"return", "cancel", "panic", "refresh-fails", "refresh-and-work-fail", "unjoined", "panic-unjoined"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
@@ -165,7 +165,7 @@ func TestSudoSessionRefreshOwnership(t *testing.T) {
 				}
 				close(started)
 				defer close(joined)
-				if mode == "refresh-fails" {
+				if mode == "refresh-fails" || mode == "refresh-and-work-fail" {
 					return cause
 				}
 				<-refreshCtx.Done()
@@ -185,10 +185,13 @@ func TestSudoSessionRefreshOwnership(t *testing.T) {
 				case "cancel":
 					cancel()
 					return workCtx.Err()
-				case "refresh-fails":
+				case "refresh-fails", "refresh-and-work-fail":
 					<-joined
 					if workCtx.Err() != nil {
 						t.Fatal("joined refresh failure canceled workflow")
+					}
+					if mode == "refresh-and-work-fail" {
+						return context.Canceled
 					}
 					return nil
 				default:
@@ -212,8 +215,12 @@ func TestSudoSessionRefreshOwnership(t *testing.T) {
 			case "panic":
 				assertCode(t, err, nkderr.CodeInternal)
 			case "refresh-fails":
-				if !errors.Is(err, cause) {
-					t.Fatalf("refresh failure lost: %v", err)
+				if err != nil {
+					t.Fatalf("joined keepalive reversed accepted work: %v", err)
+				}
+			case "refresh-and-work-fail":
+				if !errors.Is(err, cause) || !errors.Is(err, context.Canceled) {
+					t.Fatalf("failed work lost keepalive or primary cause: %v", err)
 				}
 			case "unjoined", "panic-unjoined":
 				if !errors.Is(err, nkedemo.ErrUnjoined) {

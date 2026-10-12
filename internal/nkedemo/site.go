@@ -1193,10 +1193,11 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 		return errors.New("fresh private registry identity exists")
 	}
 	defer func() {
-		result = cleanupAfterJoinedWork(ctx, result, 2*time.Minute, func(cleanupCtx context.Context) error {
+		result = cleanupAfterJoinedWork(ctx, result, retainedRegistryCleanupTimeout, func(cleanupCtx context.Context) error {
 			return registryCleanup(cleanupCtx, session.Runner, registryName, session.Name, materials.RegistryID)
 		})
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	host, err := startSiteRegistry(ctx, session.Runner, registryName, session.Name, node, materials)
 	if err != nil {
 		return err

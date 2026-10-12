@@ -94,8 +94,9 @@ func TestRetainedOperatorStatusRejectsInvalidOrOversizeEnvelopes(t *testing.T) {
 			if test.text != "" {
 				progress.Report(ProgressEvent{Kind: PhaseStarted, Name: "after refused observation"})
 				var cursor uint64
-				if err := relayRetainedProgress(io.Discard, &cursor, progress.frames()); err == nil || cursor != 0 {
-					t.Fatal("refused result left no visible sequence gap", err)
+				var notices bytes.Buffer
+				if err := relayRetainedProgress(&notices, &cursor, progress.frames()); err != nil || cursor != 2 || strings.Count(notices.String(), "Warning: foreground missed") != 1 {
+					t.Fatal("refused result was not reported and resynchronized", err)
 				}
 			}
 		})
@@ -136,8 +137,11 @@ func TestRetainedProgressRelaysBoundedOrderedPublicFrames(t *testing.T) {
 	if err != nil || len(raw) > retainedProgressLimit+2 {
 		t.Fatal("control progress envelope exceeded its bound", len(raw), err)
 	}
-	if err := relayRetainedProgress(&out, &cursor, progress.frames()); err == nil {
-		t.Fatal("evicted progress became a hidden stall")
+	if err := relayRetainedProgress(&out, &cursor, progress.frames()); err != nil || strings.Count(out.String(), "Warning: foreground missed") != 1 || cursor != 102 {
+		t.Fatal("evicted progress did not visibly resynchronize", err, cursor)
+	}
+	if err := relayRetainedProgress(&out, &cursor, progress.frames()); err != nil || strings.Count(out.String(), "Warning: foreground missed") != 1 {
+		t.Fatal("repeated snapshot duplicated the gap warning", err)
 	}
 	if progress.SudoAuthentication() != nil {
 		t.Fatal("unattended lane acquired an authentication bridge")
@@ -208,8 +212,8 @@ func TestRetainedWorkPanicRemainsPrivateAndDoesNotInventCleanup(t *testing.T) {
 		t.Fatal("panic falsely authorized joined cleanup")
 	}
 	stack, readErr := os.ReadFile(filepath.Join(root, "owner-panic.log"))
-	if readErr != nil || len(stack) == 0 || !bytes.Contains(stack, []byte("retainedWork")) {
-		t.Fatal("actual panic stack not retained privately", readErr)
+	if readErr != nil || len(stack) == 0 || !bytes.Contains(stack, []byte("retainedWork")) || !bytes.Contains(stack, []byte("PRIVATE-PANIC-SENTINEL")) {
+		t.Fatal("actual panic value and stack not retained privately", readErr)
 	}
 }
 

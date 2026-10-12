@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -44,16 +45,20 @@ type retainedAccessDescription struct {
 }
 
 type retainedControlSnapshot struct {
-	Version        int                       `json:"version"`
-	Work           string                    `json:"work"`
-	Selector       string                    `json:"selector"`
-	State          retainedRuntimeState      `json:"state"`
-	CheckedAt      time.Time                 `json:"checkedAt,omitempty"`
-	Access         retainedAccessDescription `json:"access"`
-	Detached       bool                      `json:"detached"`
-	Joined         bool                      `json:"joined"`
-	Progress       []retainedProgressFrame   `json:"progress,omitempty"`
-	NetworkStarted bool                      `json:"networkStarted"`
+	Version          int                       `json:"version"`
+	Work             string                    `json:"work"`
+	Selector         string                    `json:"selector"`
+	State            retainedRuntimeState      `json:"state"`
+	CheckedAt        time.Time                 `json:"checkedAt,omitempty"`
+	Access           retainedAccessDescription `json:"access"`
+	Detached         bool                      `json:"detached"`
+	Joined           bool                      `json:"joined"`
+	Progress         []retainedProgressFrame   `json:"progress,omitempty"`
+	NetworkStarted   bool                      `json:"networkStarted"`
+	TeardownReturned bool                      `json:"teardownReturned"`
+	CleanupFailed    bool                      `json:"cleanupFailed"`
+	OwnerExitSafe    bool                      `json:"ownerExitSafe"`
+	FailureCode      nkderr.Code               `json:"failureCode,omitempty"`
 }
 
 // This private live control owns only the downstream service process. Root
@@ -136,6 +141,7 @@ func (control *retainedControl) snapshot(ctx context.Context) (retainedControlSn
 	}
 	control.owner.mu.Lock()
 	state, networkStarted := control.owner.snapshot, control.owner.networkStarted
+	returned, cleanupErr, failureCode := control.owner.teardownReturned, control.owner.cleanupErr, control.owner.failureCode
 	control.owner.mu.Unlock()
 	switch state.state {
 	case retainedStarting, retainedPartial, retainedReady, retainedCleanupRequested:
@@ -151,7 +157,8 @@ func (control *retainedControl) snapshot(ctx context.Context) (retainedControlSn
 		frames = control.progress.frames()
 	}
 	return retainedControlSnapshot{Version: 1, Work: control.description.Work, Selector: control.description.Selector, State: state.state, CheckedAt: state.checkedAt,
-		Access: retainedAccessDescription{access.kubectl, access.site, access.tenant, access.uiService, access.uiPort, access.uiHTTPObserved}, Detached: detached, Joined: joined, Progress: frames, NetworkStarted: networkStarted}, nil
+		Access: retainedAccessDescription{access.kubectl, access.site, access.tenant, access.uiService, access.uiPort, access.uiHTTPObserved}, Detached: detached, Joined: joined, Progress: frames, NetworkStarted: networkStarted,
+		TeardownReturned: returned, CleanupFailed: returned && cleanupErr != nil, OwnerExitSafe: returned && !errors.Is(cleanupErr, ErrUnjoined) && !errors.Is(cleanupErr, ErrRetainedControls), FailureCode: failureCode}, nil
 }
 
 func (control *retainedControl) handle(writer http.ResponseWriter, request *http.Request) {
@@ -186,14 +193,18 @@ func (control *retainedControl) handle(writer http.ResponseWriter, request *http
 	case request.Method == http.MethodPost && request.URL.Path == "/cleanup":
 		err = control.owner.requestCleanup(ctx)
 	case request.Method == http.MethodPost && request.URL.Path == "/finish":
+		control.owner.mu.Lock()
+		returned := control.owner.teardownReturned && control.owner.snapshot.state == retainedCleanupRequested
+		failedExitSafe := returned && control.owner.cleanupErr != nil && !errors.Is(control.owner.cleanupErr, ErrUnjoined) && !errors.Is(control.owner.cleanupErr, ErrRetainedControls)
 		control.mu.Lock()
-		if !control.joined {
+		if !control.joined && !failedExitSafe {
 			err = nkderr.New(nkderr.CodePreflightFailed, "live services have not joined; owner must remain")
 		} else if !control.finishing {
 			control.finishing = true
 			close(control.finish)
 		}
 		control.mu.Unlock()
+		control.owner.mu.Unlock()
 	default:
 		http.Error(writer, "retained control operation unavailable", http.StatusNotFound)
 		return
@@ -437,6 +448,12 @@ func decodeRetainedResponse(ctx context.Context, body io.Reader, work string) (r
 	case retainedStarting, retainedPartial, retainedReady, retainedCleanupRequested:
 	default:
 		return retainedControlSnapshot{}, nkderr.New(nkderr.CodePreflightFailed, "retained response has an unknown owner state")
+	}
+	if result.FailureCode != "" && !slices.Contains(nkderr.AllCodes, result.FailureCode) {
+		return retainedControlSnapshot{}, nkderr.New(nkderr.CodePreflightFailed, "retained response has an unknown failure code")
+	}
+	if result.CleanupFailed && (!result.TeardownReturned || result.Joined) || result.OwnerExitSafe && !result.TeardownReturned {
+		return retainedControlSnapshot{}, nkderr.New(nkderr.CodePreflightFailed, "retained response has an inconsistent teardown outcome")
 	}
 	return result, nil
 }

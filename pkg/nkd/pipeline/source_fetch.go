@@ -256,6 +256,9 @@ func gitOut(ctx context.Context, dir string, args ...string) (string, error) {
 		if ctx.Err() != nil {
 			return "", e.Wrap(e.CodeTimeout, ctx.Err(), "git execution canceled")
 		}
+		if args[0] == "fetch" {
+			return "", e.Wrap(e.CodeFetchFailed, err, "local source Git fetch failed; %s", sourcegit.LocalCredentialPolicy)
+		}
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil

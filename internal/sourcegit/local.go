@@ -18,6 +18,10 @@ import (
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
+// LocalCredentialPolicy is static guidance, not a diagnosis of a Git failure.
+// Keep it aligned with the fetch-only projection below and ADR-18 section 8.
+const LocalCredentialPolicy = "local credential policy: fetch projects global credential.helper, credential.username and credential.useHttpPath, or use an explicit local repository redirect; system helpers, GH/GCM/keyring environment and arbitrary SSH command overrides are not inherited"
+
 // LocalCommand isolates ordinary developer Git operations. Git itself reads
 // developer credential configuration, which is projected only into fetch. It
 // never forwards global build callbacks, filters, templates or line conversions.
@@ -34,8 +38,8 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 	if len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
 		return nil, e.New(e.CodeEngineCapability, "local source Git requires an operation without caller-supplied global options")
 	}
-	if dir != "" && !filepath.IsAbs(dir) {
-		return nil, e.New(e.CodeEngineCapability, "local source Git requires an absolute explicit repository directory")
+	if dir != "" && (!filepath.IsAbs(dir) || filepath.Clean(dir) != dir || strings.ContainsRune(dir, os.PathListSeparator)) {
+		return nil, e.New(e.CodeEngineCapability, "local source Git requires a canonical absolute explicit repository directory without a search-path separator")
 	}
 	path, err := SearchPath(environment)
 	if err != nil {
@@ -78,18 +82,55 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 			// Do not ask status to inspect nested repositories: their callbacks
 			// have not passed this admission. Refuse submodule sources instead of
 			// treating ignoreSubmodules=all as evidence of a clean source.
-			if _, err := os.Lstat(filepath.Join(dir, ".gitmodules")); err == nil {
-				return nil, e.New(e.CodeEngineCapability, "selected source repository .gitmodules is unsupported; submodule sources are not admitted")
+			descriptorPresent := false
+			descriptorExecutable := false
+			if info, err := os.Lstat(filepath.Join(dir, ".gitmodules")); err == nil {
+				if !info.Mode().IsRegular() || info.Size() != 0 {
+					return nil, e.New(e.CodeEngineCapability, "selected source repository .gitmodules is unsupported; submodule sources are not admitted")
+				}
+				descriptorPresent = true
+				descriptorExecutable = info.Mode().Perm()&0o111 != 0
 			} else if !os.IsNotExist(err) {
 				return nil, e.New(e.CodeEngineCapability, "cannot inspect selected source repository submodule descriptor")
 			}
-			query = append(append([]string{}, prefix...), "ls-files", "--cached", "-z", "--", ".gitmodules")
-			data, err = localGitQuery(ctx, executable, baseline, query, "submodule descriptor", 64<<10, false)
+			query = append(append([]string{}, prefix...), "ls-files", "--cached", "--format=%(objectmode)", "--", ".gitmodules")
+			data, err = localGitQuery(ctx, executable, baseline, query, "submodule descriptor modes", 64<<10, false)
 			if err != nil {
 				return nil, err
 			}
-			if len(data) != 0 {
+			if descriptorPresent != (len(data) != 0) {
 				return nil, e.New(e.CodeEngineCapability, "selected source repository indexed .gitmodules is unsupported; submodule sources are not admitted")
+			}
+			if descriptorPresent {
+				if (!bytes.Equal(data, []byte("100644\n")) && !bytes.Equal(data, []byte("100755\n"))) ||
+					descriptorExecutable != bytes.Equal(data, []byte("100755\n")) {
+					return nil, e.New(e.CodeEngineCapability, "selected source repository indexed .gitmodules must be a regular tracked empty blob")
+				}
+				// The maintained OVN fork tracks an inert empty descriptor. Git
+				// authenticates its HEAD bytes and both index/worktree comparisons;
+				// an empty untracked file or compensating staged edits cannot qualify.
+				query = append(append([]string{}, prefix...), "cat-file", "-t", "HEAD:.gitmodules")
+				data, err = localGitQuery(ctx, executable, baseline, query, "submodule descriptor type", 64<<10, false)
+				if err != nil {
+					return nil, err
+				}
+				if !bytes.Equal(data, []byte("blob\n")) {
+					return nil, e.New(e.CodeEngineCapability, "selected source repository .gitmodules must be a tracked empty blob")
+				}
+				query = append(append([]string{}, prefix...), "cat-file", "-s", "HEAD:.gitmodules")
+				data, err = localGitQuery(ctx, executable, baseline, query, "submodule descriptor HEAD", 64<<10, false)
+				if err != nil {
+					return nil, err
+				}
+				if !bytes.Equal(data, []byte("0\n")) {
+					return nil, e.New(e.CodeEngineCapability, "selected source repository .gitmodules is unsupported; only an authenticated empty descriptor is admitted")
+				}
+				for _, arguments := range [][]string{{"diff", "--quiet", "--no-ext-diff", "--no-textconv", "--cached", "HEAD", "--", ".gitmodules"}, {"diff", "--quiet", "--no-ext-diff", "--no-textconv", "--", ".gitmodules"}} {
+					query = append(append([]string{}, prefix...), arguments...)
+					if _, err := localGitQuery(ctx, executable, baseline, query, "submodule descriptor correspondence", 64<<10, false); err != nil {
+						return nil, err
+					}
+				}
 			}
 			// Git reads its own index and emits only its documented objectmode
 			// field, one per line. No paths, objects or nested configuration are
@@ -202,7 +243,7 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 		// Installer copies receive no developer helper or HOME. Keep their
 		// object transport and submodule policy as explicit as fetch's.
 		prefix = append(prefix, "-c", "transfer.fsckObjects=true", "-c", "fetch.fsckObjects=true")
-		args = append([]string{"clone", "--upload-pack=git-upload-pack", "--no-recurse-submodules"}, args[1:]...)
+		args = append([]string{"clone", "--no-local", "--upload-pack=git-upload-pack", "--no-recurse-submodules"}, args[1:]...)
 	case "ls-remote":
 		args = append([]string{"ls-remote", "--upload-pack=git-upload-pack"}, args[1:]...)
 	}
@@ -232,9 +273,10 @@ func LocalRedirectEnvironment(environment []string) ([]string, error) {
 		suffix := strconv.Itoa(index)
 		key := localEnvironmentValue(environment, "GIT_CONFIG_KEY_"+suffix)
 		value := localEnvironmentValue(environment, "GIT_CONFIG_VALUE_"+suffix)
+		family := localConfigurationFamilies([]byte(strings.ToLower(key)))
 		const variable = ".insteadOf"
 		if !strings.HasPrefix(key, "url.") || len(key) <= len("url.")+len(variable) || !strings.EqualFold(key[len(key)-len(variable):], variable) {
-			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_KEY_%d must select an explicit absolute local repository redirect", index)
+			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_KEY_%d (%s) must select an explicit absolute local repository redirect", index, family)
 		}
 		local := key[len("url.") : len(key)-len(variable)]
 		clean := filepath.Clean(local)
@@ -242,10 +284,10 @@ func LocalRedirectEnvironment(environment []string) ([]string, error) {
 		// Git's exact rewrite base, while still refusing embedded dot segments,
 		// repeated separators and URI forms outside the local path contract.
 		if !filepath.IsAbs(local) || (local != clean && local != clean+string(filepath.Separator)) {
-			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_KEY_%d must use a canonical absolute local repository path", index)
+			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_KEY_%d (%s) must use a canonical absolute local repository path", index, family)
 		}
 		if value == "" {
-			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_VALUE_%d must provide a nonempty repository redirect source", index)
+			return nil, e.New(e.CodeEngineCapability, "GIT_CONFIG_VALUE_%d (GIT_CONFIG_KEY_%d, %s) must provide a nonempty repository redirect source", index, index, family)
 		}
 		result = append(result, "GIT_CONFIG_KEY_"+suffix+"="+key, "GIT_CONFIG_VALUE_"+suffix+"="+value)
 	}
@@ -262,7 +304,7 @@ const UnsupportedConfiguration = `^(filter|include|includeif|hook|url|http)\.|^e
 func localConfigurationFamilies(data []byte) string {
 	records := bytes.Split(data, []byte{0})
 	var families []string
-	for _, family := range []string{"core", "extensions", "filter", "hook", "http", "include", "includeif", "remote", "url"} {
+	for _, family := range []string{"core", "credential", "extensions", "filter", "hook", "http", "include", "includeif", "remote", "safe", "url"} {
 		for _, record := range records {
 			if bytes.HasPrefix(record, []byte(family+".")) {
 				families = append(families, family+".*")
@@ -321,6 +363,12 @@ func localGitQuery(ctx context.Context, executable string, environment, args []s
 		return nil, nil
 	}
 	if err != nil || stderr.Len() != 0 {
+		if description == "index modes" || description == "submodule descriptor modes" {
+			return nil, e.Wrap(e.CodeEngineCapability, err, "source Git %s query failed; local source admission requires Git 2.38+ with ls-files --format support", description)
+		}
+		if description == "configuration" {
+			return nil, e.Wrap(e.CodeEngineCapability, err, "source Git configuration query failed; %s", LocalCredentialPolicy)
+		}
 		return nil, e.Wrap(e.CodeEngineCapability, err, "source Git %s query failed", description)
 	}
 	return stdout.Bytes(), nil

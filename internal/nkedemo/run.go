@@ -40,6 +40,16 @@ type diskService struct {
 	closing  bool
 }
 
+const retainedRuntimeCleanupTimeout = 8 * time.Minute
+const retainedRestoreTimeout = 8 * time.Minute
+const retainedRegistryCleanupTimeout = 2 * time.Minute
+const retainedManagementCleanupTimeout = 3 * time.Minute
+
+// RetainedCleanupTimeout covers natural tenant deletion, joined producer
+// teardown, foreground network restoration and control acknowledgment. It is
+// a wait budget, not permission to skip an owner or claim cleanup on expiry.
+const RetainedCleanupTimeout = tenantCleanupTimeout + retainedRegistryCleanupTimeout + retainedManagementCleanupTimeout + retainedRuntimeCleanupTimeout + retainedRestoreTimeout + time.Minute
+
 func startDiskService(ctx context.Context, path, address string) (*diskService, error) {
 	file, info, err := securepath.OpenRegular(path)
 	if err != nil {
@@ -395,7 +405,7 @@ func run(ctx context.Context, cfg Config) (result error) {
 		if errors.Is(result, ErrUnjoined) || errors.Is(result, ErrRetainedControls) {
 			restore = false
 		}
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Minute)
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), retainedRuntimeCleanupTimeout)
 		defer cancel()
 		var cleanupErr error
 		if runtimeRetention(ctx) != nil {
@@ -415,6 +425,7 @@ func run(ctx context.Context, cfg Config) (result error) {
 			recordRetainedCleanup(ctx, result)
 		}
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	simulatorWork := filepath.Join(admitted.out, "simulator")
 	if err = os.Mkdir(simulatorWork, 0o700); err != nil {
 		return err
@@ -646,12 +657,12 @@ func cleanupRetainedRuntime(ctx context.Context, server *OwnedProcess, httpServi
 	}
 	if server != nil {
 		if err := SweepOwnedDomains(ctx, domains, filepath.Join(work, "simulator")); err != nil {
-			return err
+			return errors.Join(ErrRetainedControls, err)
 		}
 	}
 	inventory, err := DomainInventory(ctx, domains)
 	if err != nil {
-		return err
+		return errors.Join(ErrRetainedControls, err)
 	}
 	if len(inventory) != 0 {
 		return errors.Join(ErrRetainedControls, nkderr.New(nkderr.CodePreflightFailed, "remaining domains prevent retained owner completion"))

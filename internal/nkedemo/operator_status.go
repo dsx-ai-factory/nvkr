@@ -23,6 +23,11 @@ import (
 // It describes a timestamped observation, not retention or readiness authority.
 type OperatorStatus struct{ text string }
 
+// A current diagnostic observation is not the already-completed tenant
+// acceptance result. Only this owner-issued marker may be ignored by its
+// post-acceptance presenter; standalone status still returns a coded failure.
+var errOperatorHealthUnconfirmed = errors.New("current diagnostic health unconfirmed")
+
 // Text returns the formatted public observation, never raw Kubernetes responses.
 func (status OperatorStatus) Text() string { return status.text }
 
@@ -111,9 +116,9 @@ func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner,
 		return err
 	}
 	if failed {
-		var err error = nkderr.New(nkderr.CodePreflightFailed, "current cluster health was not confirmed; retained environment was not changed")
+		var err error = nkderr.Wrap(nkderr.CodePreflightFailed, errOperatorHealthUnconfirmed, "current cluster health was not confirmed; retained environment was not changed")
 		if cancellation != nil {
-			err = nkderr.Wrap(nkderr.CodeTimeout, cancellation, "current cluster observation was canceled or expired; retained environment was not changed")
+			err = nkderr.Wrap(nkderr.CodeTimeout, errors.Join(cancellation, errOperatorHealthUnconfirmed), "current cluster observation was canceled or expired; retained environment was not changed")
 		}
 		if unjoined {
 			return errors.Join(err, ErrUnjoined)

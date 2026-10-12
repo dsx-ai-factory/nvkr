@@ -23,6 +23,7 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/securepath"
 	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
+	nkderrors "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -171,6 +172,7 @@ type OwnedProcess struct {
 	processWriter   io.Writer
 	processExitOnce sync.Once
 	activity        *buildactivity.Receiver
+	localGitFetch   bool
 }
 
 func (p *OwnedProcess) PID() int { return p.cmd.Process.Pid }
@@ -483,6 +485,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	}
 	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
+	localGitFetch := false
 	if args[0] == "git" {
 		// Admit the same effective directory Git will execute in. Diagnostic
 		// storage and command cwd are independent, and a relative -C is relative
@@ -508,6 +511,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		if err != nil {
 			return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
 		}
+		localGitFetch = gitArgs[0] == "fetch"
 	}
 	cmd.Dir = r.Work
 	if r.directory != "" {
@@ -516,7 +520,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	if err := ownedcmd.ConfigureCancellation(cmd, ownedcmd.DefaultTerminationGrace); err != nil {
 		return nil, err
 	}
-	p := &OwnedProcess{cmd: cmd, phase: phase, done: make(chan struct{}), groupProbe: groupAlive, groupSignal: signalGroup}
+	p := &OwnedProcess{cmd: cmd, phase: phase, done: make(chan struct{}), groupProbe: groupAlive, groupSignal: signalGroup, localGitFetch: localGitFetch}
 	if r.Work != "" {
 		p.logDir, _, err = securepath.OpenDirectory(r.Work)
 		if err != nil {
@@ -677,6 +681,9 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 		var exit *exec.ExitError
 		if outErr == nil && stderrErr == nil && errors.As(waitErr, &exit) {
 			code = exit.ExitCode()
+		}
+		if p.localGitFetch && waitErr != nil && ctx.Err() == nil {
+			err = nkderrors.Wrap(nkderrors.CodeFetchFailed, err, "local source Git fetch failed; %s", sourcegit.LocalCredentialPolicy)
 		}
 		return raw, &CommandError{Phase: phase, ExitCode: code, Cause: err}
 	}

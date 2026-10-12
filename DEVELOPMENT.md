@@ -6,7 +6,9 @@ neither a registry nor a source checkout. Linux is required for held-executable 
 macOS supports development, planning and contract tests.
 
 The ordinary test gate (`go test ./...`, `make test`, and `make check`) also requires Bash 3.2 or later,
-Git, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
+Git 2.38 or later, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
+Ordinary local source admission uses Git's bounded `ls-files --format` query to reject indexed gitlinks;
+an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
 if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
 for `make test-ci-tools`, which runs the CI report parser and all local adapter contract suites using

@@ -722,8 +722,9 @@ func WithManagement(ctx context.Context, cfg Config, consumer func(context.Conte
 		}
 	}
 	defer func() {
-		result = cleanupAfterJoinedWork(ctx, result, 3*time.Minute, func(cleanupCtx context.Context) error { return cleanupManagement(cleanupCtx, session, existing) })
+		result = cleanupAfterJoinedWork(ctx, result, retainedManagementCleanupTimeout, func(cleanupCtx context.Context) error { return cleanupManagement(cleanupCtx, session, existing) })
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	if err = session.Runner.Run(ctx, []string{filepath.Join(tools, "kind"), "create", "cluster", "--name", name, "--config", filepath.Join(admitted.out, "kind.yaml"), "--kubeconfig", environmentValue(session.Runner.Env, "SITE_KUBECONFIG")}, "create-management", 600*time.Second); err != nil {
 		return err
 	}

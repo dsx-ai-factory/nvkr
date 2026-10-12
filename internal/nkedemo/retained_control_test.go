@@ -31,6 +31,61 @@ func TestRetainedControlUnsupportedPlatformAdmitsNoEndpoint(t *testing.T) {
 	}
 }
 
+func TestRetainedFailedTeardownExitNeverClaimsJoinedCleanup(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		failure        error
+		returned, safe bool
+	}{
+		{"still running", errors.New("private-resource-failure"), false, false},
+		{"returned resource failure", errors.New("private-resource-failure"), true, true},
+		{"unjoined producer", errors.Join(ErrUnjoined, errors.New("private-resource-failure")), true, false},
+		{"unknown ownership", ErrRetainedControls, true, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			owner, ctx, _ := retainedTestOwner(t)
+			if err := owner.requestCleanup(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			recordRetainedCleanup(ctx, test.failure)
+			if test.returned {
+				owner.recordTeardownReturn(test.failure)
+			}
+			control := &retainedControl{owner: owner, finish: make(chan struct{}), description: retainedControlDescription{Work: "/exact", Token: strings.Repeat("a", 64)}}
+			request := httptest.NewRequest(http.MethodPost, "/finish", nil)
+			request = request.WithContext(context.WithValue(request.Context(), retainedRequesterKey{}, true))
+			request.Header.Set("Authorization", "Bearer "+control.description.Token)
+			request.Header.Set("X-NKE-Retained-Work", control.description.Work)
+			response := httptest.NewRecorder()
+			control.handle(response, request)
+			if (response.Code == http.StatusOK) != test.safe || control.joined {
+				t.Fatal("failed exit invented join or bypassed ownership", response.Code, control.joined)
+			}
+			snapshot, err := control.snapshot(t.Context())
+			if err != nil || snapshot.TeardownReturned != test.returned || snapshot.CleanupFailed != test.returned || snapshot.OwnerExitSafe != test.safe {
+				t.Fatal("terminal outcome lost", snapshot, err)
+			}
+			if strings.Contains(response.Body.String(), "private-resource-failure") {
+				t.Fatal("private teardown cause crossed control")
+			}
+			select {
+			case <-control.finish:
+				if !test.safe {
+					t.Fatal("unsafe owner released")
+				}
+			default:
+				if test.safe {
+					t.Fatal("returned failed owner cannot finish")
+				}
+			}
+			err = retainedTeardownFailure("/exact")
+			if !errors.Is(err, ErrRetainedControls) || nkderr.Retryable(err) || !strings.Contains(err.Error(), "owner-return.log") || !strings.Contains(err.Error(), "owner-error.log") {
+				t.Fatal("failed teardown was retryable or missing diagnostics", err)
+			}
+		})
+	}
+}
+
 func TestRetainedControlRejectsUnissuedAndUnboundedDescriptions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
@@ -185,6 +240,10 @@ func TestRetainedResponseRejectsOverflowEvenAfterValidJSON(t *testing.T) {
 		{"unknown field", `{"version":1,"work":"/exact","state":"retained-ready","invented":true}`, true},
 		{"different workspace", `{"version":1,"work":"/different","state":"retained-ready"}`, true},
 		{"unknown state", `{"version":1,"work":"/exact","state":"invented"}`, true},
+		{"unknown error code", `{"version":1,"work":"/exact","state":"held-partial","failureCode":"private-provider-text"}`, true},
+		{"failure before returned teardown", `{"version":1,"work":"/exact","state":"cleanup-requested","cleanupFailed":true}`, true},
+		{"joined failed teardown", `{"version":1,"work":"/exact","state":"cleanup-requested","cleanupFailed":true,"teardownReturned":true,"joined":true}`, true},
+		{"exit before returned teardown", `{"version":1,"work":"/exact","state":"cleanup-requested","ownerExitSafe":true}`, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := decodeRetainedResponse(t.Context(), strings.NewReader(test.raw), "/exact")

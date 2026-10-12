@@ -136,7 +136,7 @@ func finishDashboardProgress(writer *checkedWriter, out io.Writer, logPath strin
 		}
 	}
 	if err == nil {
-		writer.emit("Demo command returned successfully. See its result and access/cleanup instructions below.\nUnqualified local diagnostic, not a signed Release.\n")
+		writer.emit("Demo command returned successfully.\nUnqualified local diagnostic, not a signed Release.\n")
 	}
 	// Teardown and scrollback writes can fail after the owner has returned.
 	// Retain distinct failures, but do not repeat a terminal sentinel already
@@ -240,6 +240,10 @@ func dashboardLoop(ctx context.Context, cancel context.CancelFunc, screen tcell.
 }
 
 func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, screen tcell.Screen, outputFailure func() error, writer *checkedWriter, view *dashboard, work func(context.Context, io.Writer) error, forceExit func()) (result error) {
+	return dashboardLoopWithCleanupNotice(ctx, cancel, screen, outputFailure, writer, view, work, forceExit, os.Stderr)
+}
+
+func dashboardLoopWithCleanupNotice(ctx context.Context, cancel context.CancelFunc, screen tcell.Screen, outputFailure func() error, writer *checkedWriter, view *dashboard, work func(context.Context, io.Writer) error, forceExit func(), notice io.Writer) (result error) {
 	if err := screen.Init(); err != nil {
 		// The pinned tcell implementation enters raw mode only in its final
 		// successful Init stage. Earlier failures have no running screen;
@@ -290,6 +294,23 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 			terminalRestored = true
 		}
 	}
+	noticeWritten := false
+	cleanupNotice := func() error {
+		// Never retry output after a known terminal-write failure. Input failure
+		// and renderer failure can still leave scrolling stderr usable after Fini.
+		if noticeWritten || outputFailure() != nil {
+			return nil
+		}
+		noticeWritten = true
+		message := "Terminal display failed; waiting for owned cleanup."
+		if view.recoveryWork != "" {
+			message += " Recovery workspace (configured, escaped): " + terminalText(view.recoveryWork)
+		}
+		if n, err := fmt.Fprintln(notice, message); err != nil || n != len(message)+1 {
+			return nkderr.New(nkderr.CodePreflightFailed, "cannot display owned-cleanup wait notice")
+		}
+		return nil
+	}
 	startPump()
 	defer stopPump()
 	done := make(chan error, 1)
@@ -308,7 +329,7 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 			// then retain the normal mandatory worker join below.
 			cancel()
 			restoreTerminal()
-			result = errors.Join(result, recoveredPanic(ctx, "terminal renderer", value))
+			result = errors.Join(result, recoveredPanic(ctx, "terminal renderer", value), cleanupNotice())
 		}
 		cancel()
 		if !joined {
@@ -347,7 +368,9 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 			if ctx.Err() != nil {
 				canceled = nkderr.Wrap(nkderr.CodeTimeout, ctx.Err(), "demo work returned after cancellation; inspect retained/cleanup instructions")
 			}
-			return errors.Join(result, presentationErr, canceled)
+			// A presentation failure caused cancellation; the resulting worker
+			// timeout is secondary and must not turn terminal failure into retryable work.
+			return errors.Join(presentationErr, result, canceled)
 		case <-ctxDone:
 			canceling, ctxDone = true, nil
 			cancel()
@@ -358,6 +381,7 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 				canceling, drawing = true, false
 				cancel()
 				restoreTerminal()
+				presentationErr = errors.Join(presentationErr, cleanupNotice())
 				continue
 			}
 			switch event := event.(type) {
@@ -381,6 +405,7 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 				canceling, drawing = true, false
 				cancel()
 				restoreTerminal()
+				presentationErr = errors.Join(presentationErr, cleanupNotice())
 			}
 		case <-ticker.C:
 		}

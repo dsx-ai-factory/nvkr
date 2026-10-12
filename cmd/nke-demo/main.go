@@ -391,7 +391,11 @@ func newSessionCommand(name string, out io.Writer, actions demoActions) *cobra.C
 			}
 			return actions.owner(cmd.Context(), session)
 		}
-		budget, cancel := context.WithTimeout(cmd.Context(), 30*time.Minute)
+		ceiling := 30 * time.Minute
+		if name == "cleanup" {
+			ceiling = nkedemo.RetainedCleanupTimeout
+		}
+		budget, cancel := context.WithTimeout(cmd.Context(), ceiling)
 		defer cancel()
 		if name == "status" {
 			if actions.status == nil {

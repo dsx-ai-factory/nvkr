@@ -8,10 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"runtime/debug"
-	"strconv"
 
+	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
@@ -38,44 +37,8 @@ func recoveredPanic(_ context.Context, phase string, value any) error {
 	return nkderr.New(nkderr.CodeInternal, "%s panicked; recovery diagnostics retained at %q", phase, log.Name())
 }
 
-// Recovery must not invoke user-defined Format, String or Error methods, or
-// traverse arbitrarily large composite values. The standard reflection owner
-// exposes primitive values without those callbacks; complex/custom payloads
-// retain a type label plus an explicit omission, alongside the actual stack.
 func boundedPanicValue(value any) string {
-	if value == nil {
-		return "nil"
-	}
-	bounded := func(text string, limit int) string {
-		if len(text) > limit {
-			return text[:limit] + " [truncated]"
-		}
-		return text
-	}
-	row := reflect.ValueOf(value)
-	typeName := row.Kind().String()
-	typeOf := row.Type()
-	if typeOf.Name() != "" {
-		typeName = bounded(typeOf.PkgPath(), 1024) + "/" + bounded(typeOf.Name(), 1024)
-	}
-	var text string
-	switch row.Kind() {
-	case reflect.String:
-		text = bounded(row.String(), 32<<10)
-	case reflect.Bool:
-		text = strconv.FormatBool(row.Bool())
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		text = strconv.FormatInt(row.Int(), 10)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		text = strconv.FormatUint(row.Uint(), 10)
-	case reflect.Float32, reflect.Float64:
-		text = strconv.FormatFloat(row.Float(), 'g', -1, typeOf.Bits())
-	case reflect.Complex64, reflect.Complex128:
-		text = strconv.FormatComplex(row.Complex(), 'g', -1, typeOf.Bits())
-	default:
-		text = "[value omitted: composite traversal and custom formatting are disabled during recovery]"
-	}
-	return bounded(typeName+": "+text, 32<<10)
+	return nkedemo.PrivatePanicValueDescription(value)
 }
 
 func runProgressWork(ctx context.Context, out io.Writer, work func(context.Context, io.Writer) error) (result error) {

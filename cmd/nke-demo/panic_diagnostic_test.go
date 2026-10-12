@@ -6,10 +6,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -88,6 +90,47 @@ type panicDiagnosticFormatter struct{ called *bool }
 func (value panicDiagnosticFormatter) Format(fmt.State, rune) {
 	*value.called = true
 	panic("custom formatter must not execute in recovery")
+}
+
+type customRuntimePanicError struct{ called *bool }
+
+func (value customRuntimePanicError) RuntimeError() {}
+func (value customRuntimePanicError) Error() string {
+	*value.called = true
+	panic("custom runtime.Error must not execute in recovery")
+}
+
+func TestPanicDiagnosticTypeAndRuntimeDetails(t *testing.T) {
+	panicValue := func(work func()) (value any) {
+		defer func() { value = recover() }()
+		work()
+		return nil
+	}
+	called := false
+	for _, test := range []struct {
+		name  string
+		value any
+		want  []string
+	}{
+		{"standard error pointer", errors.New("private custom error text"), []string{"*errors.errorString", "value omitted"}},
+		{"type assertion", panicValue(func() { var value any = 1; _ = value.(string) }), []string{"*runtime.TypeAssertionError", "interface conversion", "int", "string"}},
+		{"bounds", panicValue(func() { _ = []int{}[1] }), []string{"runtime.boundsError", "index out of range", "length 0"}},
+		{"nil runtime pointer", (*runtime.TypeAssertionError)(nil), []string{"*runtime.TypeAssertionError", "value omitted"}},
+		{"incomplete runtime value", &runtime.TypeAssertionError{}, []string{"*runtime.TypeAssertionError", "runtime error detail unavailable"}},
+		{"caller runtime error", customRuntimePanicError{&called}, []string{"main.customRuntimePanicError", "value omitted"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			text := boundedPanicValue(test.value)
+			for _, want := range test.want {
+				if !strings.Contains(text, want) {
+					t.Fatalf("panic diagnostic omitted %q: %s", want, text)
+				}
+			}
+			if called || len(text) > 35<<10 || strings.Contains(text, "private custom error text") {
+				t.Fatalf("custom callback ran, private error formatted or bound exceeded: %s", text)
+			}
+		})
+	}
 }
 
 func TestPanicValueDoesNotInvokeCallbacksOrTraverseComposites(t *testing.T) {

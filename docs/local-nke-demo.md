@@ -688,13 +688,19 @@ they still return failure and preserve the owner's error rather than reporting
 successful cleanup. Default retained deployment does not turn a view failure
 into permission to delete its environment. Confirmed cancellation keeps its
 waiting screen until the work owner returns, unless force exit is confirmed.
-Recovered workflow or renderer panics report `NKD-E-INTERNAL`, not a host
+Recovered foreground workflow or renderer panics report `NKD-E-INTERNAL`, not a host
 preflight error. A value description and stack are retained in a separate, bounded
 mode-0600 `nke-demo-panic-*.log` file; only its escaped locator is printed.
 Primitive payloads are bounded before formatting. Composite or custom payloads
 retain a type label and explicit omission, not a traversal or user-defined
 formatter that could block shutdown. Their original stack is still recorded.
 Plain and dashboard workflow presentation use the same recovery boundary.
+The detached retained owner instead records a bounded private value description and stack in
+`owner-panic.log` before a nested cleanup hold blocks unwinding, and carries only
+the stable `NKD-E-INTERNAL` classification to its foreground. It uses the same
+primitive bounds and composite omission policy, never exposing the panic payload
+through that channel. Its private `owner-error.log` retains the
+operation failure; `owner-return.log` records a returned failed teardown.
 Keep these diagnostics private: panic values and stacks can contain sensitive
 configuration or implementation details. If storage fails, the internal error
 states that diagnostic retention failed rather than claiming a complete log.
@@ -905,6 +911,27 @@ unjoined cleanup does not imply those controls were restored. Preserve the
 original session directory and journal. The printed `restore --work` fallback
 recovers only authenticated original network controls after producers are idle;
 it does not delete tenants, VMs or containers. No global Docker prune occurs.
+
+Cleanup has an 82-minute foreground wait budget: the owner's one-hour tenant
+ceiling, two-minute registry cleanup, three-minute management cleanup,
+eight-minute producer teardown, eight-minute network restoration, and
+one minute of control-acknowledgment headroom. The dashboard relays the owner's bounded public
+activity during this wait. If the foreground deadline expires, cleanup continues
+in the owner; rerun the same `cleanup --session` command. Do not run `restore`
+while cleanup or its producers are still active.
+
+A returned failed teardown is reported immediately as a non-retryable
+`NKD-E-PREFLIGHT-FAILED`, naming private `owner-return.log` and `owner-error.log`.
+It never triggers network restoration or claims joined cleanup. If the returned
+stack has no unjoined or unknown-ownership obligation, the authenticated explicit
+cleanup request permits that owner to exit, while failed resources and host
+controls remain for recovery. Unjoined or unknown ownership keeps the owner
+resident; a returned stack alone is not evidence that its producers joined.
+Keep the original session, workspace and logs. Independently inspect the exact
+owned producer identities using those records, establish their termination and
+idle state, and only then use `restore --work "$WORK"` for the original journal.
+Missing processes, stale records or an elapsed timer are not proof of cleanup;
+resource deletion or an unknown ownership case requires administrator recovery.
 
 ### Full one-shot acceptance with explicit cleanup
 

@@ -606,7 +606,8 @@ Original checkout and receipt directories are rechecked
 through the held workspace before receipt reuse or commit. This capability grants filesystem access only, not
 producer observation, installed-content, publication or qualification authority. Ordinary Local fetch retains
 developer HTTPS/SSH transport without the held workspace guarantees. Cleartext HTTP and Git transports are
-not admitted. Clone and ref discovery fix the upload-pack program, clone checks transferred objects and
+not admitted. Clone and ref discovery fix the upload-pack program; clone disables local-path optimization
+with `--no-local` so transferred-object checks also apply to local installer copies, and
 disables recursive submodules; neither receives developer credentials. Its shared Git-command owner excludes
 ambient global callbacks, templates and line-ending conversion, projects selected developer credential and
 proxy/TLS trust settings into network fetch, and admits explicit absolute local-repository redirects. Arbitrary
@@ -616,8 +617,11 @@ system helpers, GH/GCM/keyring environment, arbitrary SSH commands and global SS
 not inherited. This is bounded helper compatibility, not a claim that every developer login works.
 Explicit redirects admit canonical absolute filesystem paths (including one terminal slash), not file URIs.
 Repository-local filters, includes, HTTP/SSH callbacks, delegated worktrees and object sources fail admission.
-Ordinary local source roots also refuse `.gitmodules` descriptors (including indexed descriptors missing
-from the worktree) and indexed gitlinks, using Git's bounded nonrecursive index-mode query. Disabling
+Ordinary local source roots refuse nonempty, untracked, missing, symlinked or mismatched `.gitmodules`
+descriptors and indexed gitlinks. A regular tracked empty descriptor is admitted only when bounded Git
+queries confirm its empty HEAD blob and matching index and worktree; it grants no nested-source acceptance.
+Git owns the bounded nonrecursive index-mode query, whose `ls-files --format` capability requires Git 2.38+;
+a failed capability query names that floor without interpreting private Git output. Disabling
 submodule recursion or ignoring submodules during status does not authenticate nested source cleanliness.
 Real Git fixtures exercise exact checkout bytes, callback exclusion, authenticated fetch and local redirects;
 they do not establish current private-source access or a held workspace receipt.
