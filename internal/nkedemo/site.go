@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -289,14 +290,28 @@ func admitSimulatorEndpoint(ctx context.Context, runner Runner) error {
 
 // This admission is a point-in-time availability check, not port ownership or
 // cleanup authorization. The owning simulator still has to bind at launch.
+const simulatorAPIPort = 18089
+
 func admitSimulatorPort(ctx context.Context, gateway string) error {
+	return admitSimulatorPortAt(ctx, gateway, simulatorAPIPort)
+}
+
+// Only socket fixtures select another port. Production callers use the fixed
+// wrapper above; this is not a configuration override or fallback endpoint.
+func admitSimulatorPortAt(ctx context.Context, gateway string, port int) error {
+	if ctx == nil || port < 1 || port > 65535 {
+		return nkderr.New(nkderr.CodeUsage, "simulator port admission requires a context and valid TCP port")
+	}
+	if err := ctx.Err(); err != nil {
+		return nkderr.Wrap(nkderr.CodeTimeout, err, "simulator port admission canceled")
+	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	address := net.JoinHostPort(gateway, "18089")
+	address := net.JoinHostPort(gateway, strconv.Itoa(port))
 	var config net.ListenConfig
 	listener, err := config.Listen(ctx, "tcp4", address)
 	if err != nil {
-		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "NICoSim API endpoint %s is unavailable; inspect its listener with `sudo ss -ltnp 'sport = :18089'`; stop an existing owned demo through its original process before retrying; unrelated listeners are never stopped automatically", address)
+		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "NICoSim API endpoint %s is unavailable; inspect its listener with `sudo ss -ltnp 'sport = :%d'`; use the original retained session with `nke-demo status --session` and `nke-demo cleanup --session` if its owner is connected; after a forced exit see docs/nkd-to-nke-demo.md#recover-network-controls-after-a-crash; unrelated listeners are never stopped automatically", address, port)
 	}
 	if err = listener.Close(); err != nil {
 		return nkderr.Wrap(nkderr.CodePreflightFailed, err, "close NICoSim API preflight listener %s", address)
@@ -310,8 +325,8 @@ func validateEndpoint(value string) (string, error) {
 		return "", errors.New("invalid NICoSim endpoint")
 	}
 	address, err := netip.ParseAddr(parsed.Hostname())
-	if err != nil || parsed.Scheme != "http" || parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" || !address.Is4() || !address.IsPrivate() || address.IsLoopback() || address.IsUnspecified() || parsed.Port() != "18089" {
-		return "", errors.New("require private non-loopback NICoSim HTTP endpoint on port18089")
+	if err != nil || parsed.Scheme != "http" || parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" || !address.Is4() || !address.IsPrivate() || address.IsLoopback() || address.IsUnspecified() || parsed.Port() != strconv.Itoa(simulatorAPIPort) {
+		return "", fmt.Errorf("require private non-loopback NICoSim HTTP endpoint on port %d", simulatorAPIPort)
 	}
 	return strings.TrimRight(value, "/"), nil
 }
@@ -416,9 +431,12 @@ func registryAddress(rows []dockerContainer, id, name, owner string, materials *
 		return "", err
 	}
 	row := rows[0]
+	if !row.State.Running {
+		return "", errors.New("owned registry container is stopped; private startup diagnostics retained")
+	}
 	network, present := row.NetworkSettings.Networks["kind"]
 	address, err := netip.ParseAddr(network.IPAddress)
-	if !row.State.Running || len(row.NetworkSettings.Networks) != 1 || !present || network.NetworkID != materials.KindNetworkID ||
+	if len(row.NetworkSettings.Networks) != 1 || !present || network.NetworkID != materials.KindNetworkID ||
 		err != nil || !address.Is4() || !address.IsPrivate() || address.String() != network.IPAddress ||
 		!prefix.Contains(address) || address == gateway || address == prefix.Addr() || address == networkLast(prefix) {
 		return "", errors.New("owned registry requires its exact running Kind-network IPv4 address")
@@ -492,7 +510,12 @@ func waitRegistry(ctx context.Context, runner Runner, id, name, owner string, ma
 	for budget.Err() == nil {
 		rows, err := captureJSON[[]dockerContainer](budget, probe, []string{"docker", "inspect", id}, "registry-startup-state")
 		if err != nil {
-			return "", err
+			// An unjoined inspection retains its original child obligation;
+			// do not start another diagnostic child in that state.
+			if errors.Is(err, ErrUnjoined) {
+				return "", err
+			}
+			return "", registryStartupDiagnostics(ctx, runner, id, name, owner, materials, err)
 		}
 		host, err := registryAddress(rows, id, name, owner, materials)
 		if err != nil {

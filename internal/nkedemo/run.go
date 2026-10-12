@@ -528,7 +528,7 @@ func run(ctx context.Context, cfg Config) (result error) {
 	if err != nil {
 		return err
 	}
-	endpoint := "http://" + admitted.materials.Gateway + ":18089"
+	endpoint := fmt.Sprintf("http://%s:%d", admitted.materials.Gateway, simulatorAPIPort)
 	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
 	for {
 		if exited, _ := simulator.Exited(); exited {

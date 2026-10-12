@@ -202,27 +202,61 @@ func TestKindNetworkAdmission(t *testing.T) {
 	}
 }
 
+func TestSimulatorPortAdmissionRejectsInvalidInputsBeforeBind(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, test := range []struct {
+		name string
+		ctx  context.Context
+		port int
+		code nkderr.Code
+	}{
+		{"nil context", nil, 18089, nkderr.CodeUsage},
+		{"zero port", t.Context(), 0, nkderr.CodeUsage},
+		{"negative port", t.Context(), -1, nkderr.CodeUsage},
+		{"overflow port", t.Context(), 65536, nkderr.CodeUsage},
+		{"canceled", canceled, 18089, nkderr.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// This non-IP locator cannot bind: the input/context boundary wins.
+			err := admitSimulatorPortAt(test.ctx, "not-an-ip", test.port)
+			var coded *nkderr.Error
+			if !errors.As(err, &coded) || coded.Code != test.code {
+				t.Fatalf("invalid input reached socket work: %v", err)
+			}
+			if test.code == nkderr.CodeTimeout && !errors.Is(err, context.Canceled) {
+				t.Fatal("cancellation cause lost", err)
+			}
+		})
+	}
+}
+
 func TestSimulatorPortAdmission(t *testing.T) {
+	if simulatorAPIPort != 18089 {
+		t.Fatal("production endpoint changed with the socket fixture seam")
+	}
 	for _, busy := range []bool{false, true} {
 		t.Run(map[bool]string{false: "free", true: "busy"}[busy], func(t *testing.T) {
 			// Only the socket helper is exercised on loopback. Production obtains
 			// its private gateway from admitKindNetwork, never from caller input.
-			listener, err := net.Listen("tcp4", "127.0.0.1:18089")
+			listener, err := net.Listen("tcp4", "127.0.0.1:0")
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer listener.Close()
+			port := listener.Addr().(*net.TCPAddr).Port
+			address := listener.Addr().String()
 			if !busy {
 				if err = listener.Close(); err != nil {
 					t.Fatal(err)
 				}
 			}
-			err = admitSimulatorPort(t.Context(), "127.0.0.1")
+			err = admitSimulatorPortAt(t.Context(), "127.0.0.1", port)
 			if !busy {
 				if err != nil {
 					t.Fatal(err)
 				}
-				listener, err := net.Listen("tcp4", "127.0.0.1:18089")
+				listener, err := net.Listen("tcp4", address)
 				if err != nil {
 					t.Fatal("preflight retained listener", err)
 				}
@@ -233,7 +267,7 @@ func TestSimulatorPortAdmission(t *testing.T) {
 			if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed {
 				t.Fatalf("busy endpoint did not return a coded error: %v", err)
 			}
-			for _, hint := range []string{"127.0.0.1:18089", "sudo ss -ltnp 'sport = :18089'", "original process", "unrelated listeners"} {
+			for _, hint := range []string{address, fmt.Sprintf("sudo ss -ltnp 'sport = :%d'", port), "status --session", "cleanup --session", "after a forced exit", "unrelated listeners"} {
 				if !strings.Contains(err.Error(), hint) {
 					t.Fatalf("missing guidance %q: %v", hint, err)
 				}
@@ -558,7 +592,7 @@ func TestRegistryStartRejectsIdentityBeforeNodeProbe(t *testing.T) {
 }
 
 func TestRegistryStartupRetainsOnlyAuthenticatedDiagnostics(t *testing.T) {
-	for _, scenario := range []string{"stopped", "log-failure", "foreign-owner", "foreign-id", "invalid-materials", "nil-materials", "canceled", "unjoined-original"} {
+	for _, scenario := range []string{"stopped", "log-failure", "inspect-failure", "foreign-owner", "foreign-id", "invalid-materials", "nil-materials", "canceled", "unjoined-original"} {
 		t.Run(scenario, func(t *testing.T) {
 			work := privateTestDir(t)
 			trace := filepath.Join(work, "commands")
@@ -590,11 +624,11 @@ func TestRegistryStartupRetainsOnlyAuthenticatedDiagnostics(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			script := "#!/bin/sh\nset -eu\nprintf '%s\\n' \"$@\" >>\"$TRACE\"\ncase \"$1\" in\n inspect) printf '%s' \"$REGISTRY\";;\n logs) printf 'owned-startup-detail\\n'; exit \"$LOG_EXIT\";;\n *) exit 42;;\nesac\n"
+			script := "#!/bin/sh\nset -eu\nprintf '%s\\n' \"$@\" >>\"$TRACE\"\ncase \"$1\" in\n inspect) if test \"$INSPECT_FAILURE\" = inspect-failure && test ! -f \"$INSPECT_ONCE\"; then : >\"$INSPECT_ONCE\"; exit 7; fi; printf '%s' \"$REGISTRY\";;\n logs) printf 'owned-startup-detail\\n'; exit \"$LOG_EXIT\";;\n *) exit 42;;\nesac\n"
 			if err = os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "REGISTRY=" + string(encoded), "LOG_EXIT=" + logExit}}
+			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "TRACE=" + trace, "REGISTRY=" + string(encoded), "LOG_EXIT=" + logExit, "INSPECT_FAILURE=" + scenario, "INSPECT_ONCE=" + filepath.Join(work, "inspect-once")}}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if scenario == "canceled" {
@@ -616,9 +650,12 @@ func TestRegistryStartupRetainsOnlyAuthenticatedDiagnostics(t *testing.T) {
 				t.Fatalf("diagnostics lost original cancellation: %v", err)
 			}
 			if scenario == "stopped" || scenario == "log-failure" {
-				if !strings.Contains(err.Error(), "exact running Kind-network IPv4 address") {
+				if !strings.Contains(err.Error(), "owned registry container is stopped") {
 					t.Fatalf("diagnostics lost stopped-registry reason: %v", err)
 				}
+			}
+			if scenario == "inspect-failure" && (CommandExitCode(err) != 7 || !strings.Contains(err.Error(), "registry-startup-state")) {
+				t.Fatalf("authenticated diagnostics lost initial inspection failure: %v", err)
 			}
 			if scenario == "log-failure" && CommandExitCode(err) != 7 {
 				t.Fatalf("log command failure was discarded: %v", err)

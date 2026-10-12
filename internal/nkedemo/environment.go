@@ -187,7 +187,7 @@ func simulatorEnvironment(ctx context.Context, work, disk, guardWork, gateway st
 		return nil, err
 	}
 	values := map[string]string{
-		"TMPDIR": temporary, "NICO_SIM_LISTEN_ADDR": gateway + ":18089", "NICO_SIM_DB_PATH": filepath.Join(work, "var/nico-sim.db"), "NICO_SIM_SEED_PATH": filepath.Join(work, "laptop-seed.yaml"), "NICO_SIM_FILES_DIR": filepath.Join(work, "files"),
+		"TMPDIR": temporary, "NICO_SIM_LISTEN_ADDR": fmt.Sprintf("%s:%d", gateway, simulatorAPIPort), "NICO_SIM_DB_PATH": filepath.Join(work, "var/nico-sim.db"), "NICO_SIM_SEED_PATH": filepath.Join(work, "laptop-seed.yaml"), "NICO_SIM_FILES_DIR": filepath.Join(work, "files"),
 		"NICO_VMS_VM_BACKEND": "libvirt", "NICO_VMS_LIBVIRT_URI": "qemu:///session", "NICO_VMS_LIBVIRT_NETWORK": "", "NICO_VMS_BRIDGE_NAME": BridgeName, "NICO_VMS_BRIDGE_CIDR": GuestCIDR, "NICO_VMS_BASE_IMAGE": disk,
 		"NICO_VMS_BGP_ENABLED": "true", "NICO_VMS_BGP_VIP_CIDRS": VIPCIDR, "NICO_VMS_BGP_LISTEN_PORT": "10179", "NICO_VMS_CONSOLE_SSH_PORT": "-1", "NICO_VMS_CLEANUP_ORPHANED_VMS": "false", "NICO_CONTAINERS_ENABLED": "false",
 		"NICO_VMS_READINESS_TIMEOUT": "30m", "NICO_VMS_DIAG_SSH_ENABLED": "true", "NICO_VMS_DIAG_SSH_USER": "nkd-demo", "NICO_VMS_DIAG_SSH_PASSWORD": hex.EncodeToString(password[:]),

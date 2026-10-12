@@ -49,8 +49,8 @@ var networkTools = []string{"sudo", "timeout", "ip", "iptables", "dnsmasq", "set
 const networkSudoProbe = "sudo -n -k timeout --signal=TERM --kill-after=5 25 true"
 
 // Unattended commands ignore cached credentials without invalidating the user's
-// timestamp. The explicit interactive bridge reauthenticates before each command;
-// sudo -n still refuses expired credentials or a denied policy without replay.
+// timestamp. Interactive commands use the caller's preauthenticated session;
+// sudo -n refuses expired credentials or a denied policy without replay.
 func networkSudoCommand(args []string, interactive bool) []string {
 	prefix := []string{"sudo", "-n"}
 	if !interactive {
@@ -948,7 +948,7 @@ func guestTCPRule(owner, address string, port int) networkRule {
 }
 
 func kindSimulatorRule(owner, kind, gateway string) networkRule {
-	return networkRule{"filter", "INPUT", []string{"-m", "comment", "--comment", owner, "-s", kind, "-d", gateway + "/32", "-p", "tcp", "--dport", "18089", "-j", "ACCEPT"}}
+	return networkRule{"filter", "INPUT", []string{"-m", "comment", "--comment", owner, "-s", kind, "-d", gateway + "/32", "-p", "tcp", "--dport", strconv.Itoa(simulatorAPIPort), "-j", "ACCEPT"}}
 }
 
 func admittedKindGateway(kind, gateway string) error {

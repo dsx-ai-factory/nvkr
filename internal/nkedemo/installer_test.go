@@ -216,12 +216,13 @@ esac
 				case "kernel-admission-missing":
 					admission = nil
 				case "simulator-port-busy":
-					listener, listenErr := net.Listen("tcp4", "127.0.0.1:18089")
+					listener, listenErr := net.Listen("tcp4", "127.0.0.1:0")
 					if listenErr != nil {
 						t.Fatal(listenErr)
 					}
 					defer listener.Close()
-					admission = func() error { return admitSimulatorPort(ctx, "127.0.0.1") }
+					port := listener.Addr().(*net.TCPAddr).Port
+					admission = func() error { return admitSimulatorPortAt(ctx, "127.0.0.1", port) }
 				}
 				actual, err = prepareInstaller(ctx, build, run, runner, admission)
 			}
