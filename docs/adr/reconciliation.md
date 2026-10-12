@@ -179,9 +179,21 @@ a real joined bake or extend hosted, signing or qualification admission.
 
 The Go downstream consumer invokes `nkdctl` for build, verification and
 extraction, and NKE's pinned staged installer for deployment. Kind hosts
-management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Final success
+management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Full E2E success
 requires two Ready nodes, workload/DNS checks, exact disk/artifact bindings and
-owned cleanup. Cobra/Viper configuration supplies descriptions, not receipts.
+owned cleanup. The explicit `--cleanup` route retains that full acceptance
+scope. Default `run`/`e2e` instead hand off a retained local environment to the
+shell, with separate `status` and explicit `cleanup` commands. A live retained
+owner, its serialized description and historical Ready time are not current
+Kubernetes health, joined cleanup or a release receipt. The actual launch/peer
+selection, detach, operation cancellation, partial retention and explicit
+teardown have controlled native Linux ARM64 process fixtures; these are not a
+fresh NKE retained deployment or proof of SSH/logout/cgroup persistence.
+Live access presentation executes bounded read-only bundled kubectl API/node
+queries for the site and tenant and keeps raw responses private. Its focused
+tests do not establish real Ubuntu runtime acceptance. New retained work does
+not retroactively change the exact-revision complete recording below.
+Cobra/Viper configuration supplies descriptions, not receipts.
 The combined build reuses bootstrap executables and the measured toolchain;
 catalog substitutions retain their own exact predecessor binding. `--jobs`
 bounds concurrent ready producer and packaging operations in the existing

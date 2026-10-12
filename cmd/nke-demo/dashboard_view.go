@@ -1045,7 +1045,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	}
 	state := current
 	if canceling {
-		state = "[lightcoral::b]CANCELING · cleanup still running[-::-]\n" + current
+		state = "[lightcoral::b]CANCELING · waiting for work owner[-::-]\n" + current
 		if s.forceAvailable {
 			if s.confirmForce {
 				state += "\n\n[lightcoral::b]FORCE EXIT NOW?[-::-]\n" + tview.Escape("[y] Exit immediately   [n / Esc] Keep waiting")
@@ -1057,7 +1057,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 				state += "\nRecovery workspace: " + tview.Escape(terminalText(s.recoveryWork))
 			}
 		} else {
-			state += "\nCancellation requested; waiting for owned cleanup to return."
+			state += "\nCancellation requested; waiting for work to stop and its owner to return."
 		}
 	} else {
 		state += "\n" + tview.Escape(s.tenant)
@@ -1112,10 +1112,10 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	d.activityView.SetText(tview.Escape(strings.Join(activity, "\n")))
 	help := " Tab focus · PgUp/PgDn activity · End live · q / Ctrl-C confirm cancel"
 	if s.confirmCancel {
-		help = " Cancel this demo and clean up its resources? y/N"
+		help = " Cancel current work? Retention/cleanup follows the selected mode. y/N"
 	}
 	if canceling {
-		help = " Canceling · waiting for owned processes and resource cleanup"
+		help = " Canceling · waiting for work owner; retained resources need explicit cleanup"
 		if s.forceAvailable {
 			help += " · f force exit"
 		}

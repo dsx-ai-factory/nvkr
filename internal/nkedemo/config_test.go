@@ -121,6 +121,29 @@ func TestDemoNetworkSelection(t *testing.T) {
 	}
 }
 
+func TestDemoCleanupRequiresStrictBoolean(t *testing.T) {
+	for _, test := range []struct {
+		value          string
+		valid, cleanup bool
+	}{{"false", true, false}, {"true", true, true}, {"'true'", false, false}, {"1", false, false}, {"null", false, false}, {"[]", false, false}} {
+		t.Run(test.value, func(t *testing.T) {
+			contents := strings.Replace(fullDemoYAML, "run:\n", "run:\n  cleanup: "+test.value+"\n", 1)
+			file, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))
+			if !test.valid {
+				assertConfigUsage(t, err)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := file.RunConfig(nil)
+			if err != nil || cfg.Cleanup != test.cleanup {
+				t.Fatal("cleanup intent lost", cfg.Cleanup, err)
+			}
+		})
+	}
+}
+
 func TestDemoFileSchemaRejection(t *testing.T) {
 	const valid = "version: 1\nrestore:\n  work: /native/work\n"
 	for _, tc := range []struct{ name, contents string }{

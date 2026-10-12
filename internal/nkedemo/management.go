@@ -540,12 +540,18 @@ type ManagementSession struct {
 }
 
 func cleanupAfterJoinedWork(ctx context.Context, primary error, timeout time.Duration, cleanup func(context.Context) error) error {
+	if holdErr := waitRetainedCleanup(ctx, primary); holdErr != nil {
+		return errors.Join(primary, holdErr)
+	}
 	if errors.Is(primary, ErrUnjoined) || errors.Is(primary, ErrRetainedControls) {
+		recordRetainedCleanup(ctx, primary)
 		return primary
 	}
 	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 	defer cancel()
-	return errors.Join(primary, cleanup(cleanupCtx))
+	cleanupErr := cleanup(cleanupCtx)
+	recordRetainedCleanup(ctx, cleanupErr)
+	return errors.Join(primary, cleanupErr)
 }
 
 func verifyToolMembers(tools string, members []string) error {

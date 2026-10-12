@@ -95,3 +95,33 @@ func TestDiskHTTPDoesNotFollowSubstitution(t *testing.T) {
 		t.Fatal("symlink admitted")
 	}
 }
+
+func TestRetainedDiskHTTPOutlivesWorkCancellationAndJoinsExplicitStop(t *testing.T) {
+	owner, work, cancelWork := retainedTestOwner(t)
+	path := filepath.Join(privateTestDir(t), "held.qcow2")
+	raw := []byte(strings.Repeat("retained-exact-disk", 256))
+	if err := os.WriteFile(path, raw, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	service, err := startDiskService(work, path, "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		cleanup, stop := context.WithTimeout(context.WithoutCancel(t.Context()), 10*time.Second)
+		defer stop()
+		if err := service.Stop(cleanup); err != nil {
+			t.Error(err)
+		}
+	}()
+	cancelWork()
+	image := lifecycle.Artifact{Digest: "sha256:" + plainSHA(raw), Disk: &delivery.DiskOutput{Size: int64(len(raw))}}
+	if err := verifyHTTPDisk(t.Context(), service.url, image); err != nil {
+		t.Fatal("canceled viewer lost the actual retained disk service", err)
+	}
+	if err := owner.requestCleanup(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	// Stop is deliberately called once: it owns the Serve/handler/file join.
+	// The deferred Stop above supplies the single cleanup obligation.
+}

@@ -29,6 +29,7 @@ type RunInputs struct {
 // Out must be a new private directory outside sources and accepted attempts.
 // Timeout bounds tenant provisioning; cleanup has separate bounded contexts.
 type Config struct {
+	Cleanup     bool
 	Network     string
 	NKECheckout string
 	NKDCTL      string
@@ -38,7 +39,7 @@ type Config struct {
 	Runs           RunInputs
 	Out            string
 	Timeout        time.Duration
-	Progress       io.Writer
+	Progress       io.Writer `json:"-"`
 }
 
 // BuildConfig selects the existing local launcher, which bootstraps and invokes

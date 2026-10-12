@@ -30,6 +30,7 @@ func main() {
 	os.Exit(nkderr.ExitCode(err))
 }
 func execute(ctx context.Context, args []string, out, diagnostics io.Writer) error {
+	var retained *nkedemo.RetainedSession
 	return executeRoot(ctx, newCommand(out, diagnostics, demoActions{
 		run: func(ctx context.Context, cfg nkedemo.Config) error {
 			path, err := os.Executable()
@@ -37,19 +38,41 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer) err
 				return nkderr.Wrap(nkderr.CodeEngineCapability, err, "select native demo network probe executable")
 			}
 			cfg.DemoExecutable = path
-			return nkedemo.Run(ctx, cfg)
+			if cfg.Cleanup {
+				return nkedemo.Run(ctx, cfg)
+			}
+			retained, err = nkedemo.Retain(ctx, cfg)
+			return err
 		}, build: nkedemo.BuildArtifacts, prepare: nkedemo.PrepareInstaller, restore: nkedemo.Restore, load: nkedemo.LoadDemoFile,
+		retention: nkedemo.CheckRetentionCapability, status: nkedemo.RetainedStatus, cleanup: nkedemo.CleanupRetained, owner: nkedemo.ServeRetained,
+		after: func(ctx context.Context, out io.Writer) error {
+			if retained == nil {
+				return nil
+			}
+			path, err := os.Executable()
+			if err != nil {
+				return nkderr.Wrap(nkderr.CodePreflightFailed, err, "select executable for retained access instructions")
+			}
+			bounded, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+			defer cancel()
+			return retained.WriteInstructions(bounded, path, out)
+		},
 	}), args)
 }
 
 // Actions stay typed library calls; injection lets command tests prove help,
 // completion and invalid input do not reach configuration I/O or runtime work.
 type demoActions struct {
-	run     func(context.Context, nkedemo.Config) error
-	build   func(context.Context, nkedemo.BuildConfig) (nkedemo.BuiltInputs, error)
-	prepare func(context.Context, nkedemo.BuildConfig, nkedemo.Config) (nkedemo.Config, error)
-	restore func(context.Context, string, io.Writer) error
-	load    func(context.Context, string) (nkedemo.DemoFile, error)
+	run       func(context.Context, nkedemo.Config) error
+	build     func(context.Context, nkedemo.BuildConfig) (nkedemo.BuiltInputs, error)
+	prepare   func(context.Context, nkedemo.BuildConfig, nkedemo.Config) (nkedemo.Config, error)
+	restore   func(context.Context, string, io.Writer) error
+	load      func(context.Context, string) (nkedemo.DemoFile, error)
+	retention func(context.Context) error
+	status    func(context.Context, string, io.Writer) error
+	cleanup   func(context.Context, string, io.Writer) error
+	owner     func(context.Context, string) error
+	after     func(context.Context, io.Writer) error
 }
 
 func executeRoot(ctx context.Context, root *cobra.Command, args []string) error {
@@ -67,7 +90,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 		Use: "nke-demo", Short: "Build and deploy a trusted local ARM64 NKE diagnostic",
 		SilenceUsage: true, SilenceErrors: true, Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			return nkderr.New(nkderr.CodeUsage, "select e2e, run, build, restore or completion; use --help")
+			return nkderr.New(nkderr.CodeUsage, "select e2e, run, build, status, cleanup, restore or completion; use --help")
 		},
 	}
 	root.SetOut(out)
@@ -85,6 +108,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 		},
 	})
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
+	root.AddCommand(newSessionCommand("status", out, actions), newSessionCommand("cleanup", out, actions), newSessionCommand("retained-owner", out, actions))
 	root.InitDefaultCompletionCmd()
 	for _, command := range root.Commands() {
 		if command.Name() == "completion" {
@@ -112,17 +136,23 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
+			if !cfg.Cleanup && actions.retention != nil {
+				if err := actions.retention(cmd.Context()); err != nil {
+					return err
+				}
+			}
 			plain, _ := cmd.Flags().GetBool("plain")
 			recoveryCtx, err := progressRecoveryContext(cmd.Context(), cfg.Out)
 			if err != nil {
 				return err
 			}
-			return withTerminalSudo(recoveryCtx, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+			result := withTerminalSudo(recoveryCtx, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
 				return runProgress(session, out, plain, func(ctx context.Context, progress io.Writer) error {
 					cfg.Progress = progress
 					return actions.run(ctx, cfg)
 				}, refresh)
 			})
+			return finishRetainedInstructions(cmd.Context(), actions, out, result)
 		},
 	}
 	addRunFlags(command, &flags.Run, true)
@@ -207,6 +237,11 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
+			if !run.Cleanup && actions.retention != nil {
+				if err := actions.retention(cmd.Context()); err != nil {
+					return err
+				}
+			}
 			recoveryCtx, err := progressRecoveryContext(cmd.Context(), run.Out)
 			if err != nil {
 				return err
@@ -215,7 +250,7 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			defer cancel()
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			plain, _ := cmd.Flags().GetBool("plain")
-			return withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+			result := withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
 				return runBuildProgress(session, out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
 					build.Progress, run.Progress = progress, progress
 					run, err = actions.prepare(ctx, build, run)
@@ -231,6 +266,7 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 					return actions.run(ctx, run)
 				}, refresh)
 			})
+			return finishRetainedInstructions(cmd.Context(), actions, out, result)
 		},
 	}
 	addBuildFlags(command, &flags.Build)
@@ -246,6 +282,7 @@ func addBuildFlags(command *cobra.Command, cfg *nkedemo.BuildFile) {
 }
 func addRunFlags(command *cobra.Command, cfg *nkedemo.RunFile, existing bool) {
 	flags := command.Flags()
+	flags.BoolVar(&cfg.Cleanup, "cleanup", false, "delete the tenant and join/restore owned resources before returning (default: retain environment)")
 	checkoutHelp := "optional clean pinned installer checkout; e2e prepares it when omitted"
 	if existing {
 		checkoutHelp = "required clean pinned NKE installer checkout"
@@ -308,5 +345,60 @@ func configuredFile(command *cobra.Command, path string, flags nkedemo.DemoFile,
 	if command.Flags().Changed("timeout") {
 		selected.Run.TimeoutSeconds = flags.Run.TimeoutSeconds
 	}
+	if command.Flags().Changed("cleanup") {
+		selected.Run.Cleanup = flags.Run.Cleanup
+	}
 	return selected, nil
+}
+
+func finishRetainedInstructions(ctx context.Context, actions demoActions, out io.Writer, result error) error {
+	if actions.after != nil {
+		// The progress presenter and sudo refresher have already returned and
+		// restored terminal ownership. Full commands must not enter a log ring.
+		return errors.Join(result, actions.after(ctx, out))
+	}
+	return result
+}
+
+func newSessionCommand(name string, out io.Writer, actions demoActions) *cobra.Command {
+	var session string
+	command := &cobra.Command{Use: name, Args: cobra.NoArgs, Hidden: name == "retained-owner"}
+	switch name {
+	case "status":
+		command.Short = "Observe the exact retained demo owner; does not delete resources"
+	case "cleanup":
+		command.Short = "Explicitly delete/join the retained demo and restore owned host networking"
+	case "retained-owner":
+		command.Short = "Private service-owner child entry"
+	}
+	command.Flags().StringVar(&session, "session", "", "original private retained session directory printed after run")
+	command.RunE = func(cmd *cobra.Command, _ []string) error {
+		if session == "" || cmd.Flags().Changed("config") || cmd.Flags().Changed("verbose") || name == "retained-owner" && cmd.Flags().Changed("plain") {
+			return nkderr.New(nkderr.CodeUsage, "retained command requires only its original --session selector")
+		}
+		if name == "retained-owner" {
+			if actions.owner == nil {
+				return nkderr.New(nkderr.CodeEngineCapability, "retained owner entry unavailable")
+			}
+			return actions.owner(cmd.Context(), session)
+		}
+		budget, cancel := context.WithTimeout(cmd.Context(), 30*time.Minute)
+		defer cancel()
+		if name == "status" {
+			if actions.status == nil {
+				return nkderr.New(nkderr.CodeEngineCapability, "retained status unavailable")
+			}
+			return actions.status(budget, session, out)
+		}
+		if actions.cleanup == nil {
+			return nkderr.New(nkderr.CodeEngineCapability, "retained cleanup unavailable")
+		}
+		plain, _ := cmd.Flags().GetBool("plain")
+		return withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(ctx context.Context, refresh func(context.Context) error) error {
+			return runProgress(ctx, out, plain, func(ctx context.Context, progress io.Writer) error {
+				return actions.cleanup(ctx, session, progress)
+			}, refresh)
+		})
+	}
+	return command
 }

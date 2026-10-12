@@ -803,14 +803,26 @@ func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session
 		return errors.New("management node changed before guest route admission")
 	}
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
 		if errors.Is(result, ErrUnjoined) {
+			recordRetainedCleanup(ctx, result)
 			return
 		}
 		cleanup, cancel := tenantCleanupContext(ctx)
 		defer cancel()
 		closeErr := t.close(cleanup)
+		recordRetainedCleanup(ctx, closeErr)
 		result = errors.Join(result, closeErr)
 		if errors.Is(closeErr, ErrUnjoined) {
+			return
+		}
+		if runtimeRetention(ctx) != nil {
+			// Detached owners never retry privileged commands. The original
+			// network journal retains guest-rule intent for a freshly authorized
+			// foreground restore, after all actual producers have joined.
 			return
 		}
 		withdrawal, stopWithdrawal := context.WithTimeout(cleanup, tenantWithdrawalTimeout)
@@ -822,5 +834,23 @@ func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session
 	if err = guard.AllowGuestTCP(ctx, rows[0].NetworkSettings.Networks["kind"].IPAddress, []int{30440, 30443}); err != nil {
 		return err
 	}
-	return t.run(ctx, cfg.Timeout)
+	if err = t.run(ctx, cfg.Timeout); err != nil {
+		return err
+	}
+	if owner := runtimeRetention(ctx); owner != nil {
+		access, accessErr := InspectOperatorAccess(ctx, session)
+		if accessErr != nil {
+			return accessErr
+		}
+		if cfg.Progress != nil {
+			// Show actual bounded kubectl observations in the dashboard activity
+			// before the handoff, not only its old readiness events. This extra
+			// read-only display does not replace the tenant acceptance checks.
+			if err := access.WriteLiveStatus(ctx, session.Runner, cfg.Progress); err != nil {
+				return err
+			}
+		}
+		return owner.markReady(ctx, access)
+	}
+	return nil
 }

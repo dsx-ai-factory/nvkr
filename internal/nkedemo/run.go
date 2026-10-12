@@ -57,7 +57,11 @@ func startDiskService(ctx context.Context, path, address string) (*diskService, 
 	}
 	name := filepath.Base(path)
 	service := &diskService{done: make(chan error, 1), file: file, url: "http://" + listener.Addr().String() + "/" + name}
-	serveContext, cancel := context.WithCancel(ctx)
+	serviceLifetime := ctx
+	if owner := runtimeRetention(ctx); owner != nil {
+		serviceLifetime = owner.lifetime
+	}
+	serveContext, cancel := context.WithCancel(serviceLifetime)
 	service.cancel = cancel
 	handler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		service.mu.Lock()
@@ -310,7 +314,7 @@ func Run(ctx context.Context, cfg Config) (result error) {
 	cfg.Network = mode
 	err = run(ctx, cfg)
 	if err == nil {
-		if cfg.Progress != nil {
+		if cfg.Progress != nil && runtimeRetention(ctx) == nil {
 			fmt.Fprintln(cfg.Progress, demoSuccessSummary(mode))
 		}
 		return nil
@@ -374,6 +378,7 @@ func run(ctx context.Context, cfg Config) (result error) {
 	if err != nil {
 		return err
 	}
+	noteRetainedNetworkStart(ctx) // Original journal now owns a restore obligation.
 	var simulator *OwnedProcess
 	var httpService *diskService
 	restore := true
@@ -382,15 +387,32 @@ func run(ctx context.Context, cfg Config) (result error) {
 	domainRunner.Env = SetEnv(admitted.env, admitted.binding)
 	privateDisk := ""
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			guard.releaseHandles()
+			return
+		}
 		if errors.Is(result, ErrUnjoined) || errors.Is(result, ErrRetainedControls) {
 			restore = false
 		}
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Minute)
 		defer cancel()
-		result = errors.Join(result, cleanupRuntime(cleanup, simulator, httpService, guard, admitted.out, domainRunner, restore))
+		var cleanupErr error
+		if runtimeRetention(ctx) != nil {
+			if !restore {
+				cleanupErr = errors.Join(ErrRetainedControls, result)
+			} else {
+				cleanupErr = cleanupRetainedRuntime(cleanup, simulator, httpService, guard, admitted.out, domainRunner)
+			}
+		} else {
+			cleanupErr = cleanupRuntime(cleanup, simulator, httpService, guard, admitted.out, domainRunner, restore)
+		}
+		recordRetainedCleanup(ctx, cleanupErr)
+		result = errors.Join(result, cleanupErr)
 		guard.releaseHandles()
 		if result == nil {
 			result = errors.Join(verifyDiskBytes(cleanup, admitted.disk, admitted.image), verifyDiskBytes(cleanup, privateDisk, admitted.image))
+			recordRetainedCleanup(ctx, result)
 		}
 	}()
 	simulatorWork := filepath.Join(admitted.out, "simulator")
@@ -596,6 +618,45 @@ func cleanupRuntime(ctx context.Context, server *OwnedProcess, httpService *disk
 		guard.cleanupCheckpoint(ctx)
 	}
 	return guard.Close(ctx)
+}
+
+// The retained owner joins its actual producers and exact owned domains, but
+// deliberately leaves recorded privileged host controls for foreground Restore.
+// This is not full E2E cleanup and must never emit the full-cleanup PASS banner.
+func cleanupRetainedRuntime(ctx context.Context, server *OwnedProcess, httpService *diskService, guard *NetworkGuard, work string, domains Runner) error {
+	owner := runtimeRetention(ctx)
+	if !owner.issued() || guard == nil {
+		return nkderr.New(nkderr.CodeUsage, "retained service teardown requires its live owner and original network guard")
+	}
+	owner.mu.Lock()
+	requested := owner.snapshot.state == retainedCleanupRequested
+	owner.mu.Unlock()
+	if !requested {
+		return errors.Join(ErrRetainedControls, nkderr.New(nkderr.CodePreflightFailed, "service teardown requires explicit cleanup"))
+	}
+	var producers []stopper
+	if server != nil {
+		producers = append(producers, server)
+	}
+	if httpService != nil {
+		producers = append(producers, httpService)
+	}
+	if err := joinRuntime(ctx, producers, guard.StopDNS); err != nil {
+		return errors.Join(ErrRetainedControls, err)
+	}
+	if server != nil {
+		if err := SweepOwnedDomains(ctx, domains, filepath.Join(work, "simulator")); err != nil {
+			return err
+		}
+	}
+	inventory, err := DomainInventory(ctx, domains)
+	if err != nil {
+		return err
+	}
+	if len(inventory) != 0 {
+		return errors.Join(ErrRetainedControls, nkderr.New(nkderr.CodePreflightFailed, "remaining domains prevent retained owner completion"))
+	}
+	return nil
 }
 
 func allowedKeys(row map[string]json.RawMessage, keys ...string) bool {

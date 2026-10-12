@@ -45,6 +45,7 @@ type BuildFile struct {
 }
 
 type RunFile struct {
+	Cleanup        bool          `yaml:"cleanup" mapstructure:"cleanup"`
 	Network        string        `yaml:"network" mapstructure:"network"`
 	NKECheckout    string        `yaml:"nkeCheckout" mapstructure:"nkeCheckout"`
 	NKDCTL         string        `yaml:"nkdctl" mapstructure:"nkdctl"`
@@ -98,8 +99,8 @@ func LoadDemoFile(ctx context.Context, path string) (DemoFile, error) {
 	raw := contents.Bytes()
 	// The existing YAML owner rejects duplicate/unknown fields and additional
 	// documents. Its typed decoder alone permits float-to-int conversion, so
-	// inspect its parsed tags too: this schema contains only maps, strings and
-	// integers. No YAML codec or scalar grammar is implemented here.
+	// inspect its parsed tags too: this schema contains only maps, strings,
+	// integers and the typed cleanup boolean. No scalar grammar is implemented.
 	decoder := yaml.NewDecoder(bytes.NewReader(raw))
 	decoder.KnownFields(true)
 	var described DemoFile
@@ -153,7 +154,7 @@ func demoScalarTypes(node *yaml.Node, depth int) bool {
 		}
 		return true
 	case yaml.ScalarNode:
-		return node.Tag == "!!str" || node.Tag == "!!int"
+		return node.Tag == "!!str" || node.Tag == "!!int" || node.Tag == "!!bool"
 	default:
 		return false
 	}
@@ -182,7 +183,7 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if file.Version != 1 || (run.NKECheckout != "" && !configString(run.NKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
 		return Config{}, nkderr.New(nkderr.CodeUsage, "run requires version 1, out, valid optional nkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	return Config{Network: network, NKECheckout: run.NKECheckout, NKDCTL: run.NKDCTL, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+	return Config{Cleanup: run.Cleanup, Network: network, NKECheckout: run.NKECheckout, NKDCTL: run.NKDCTL, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 

@@ -99,8 +99,8 @@ func TestDashboardLayout(t *testing.T) {
 				}
 			}
 			d.draw(screen, time.Now(), true)
-			if !strings.Contains(dashboardText(screen), "waiting for owned processes") {
-				t.Fatal("cancellation omitted cleanup obligation")
+			if !strings.Contains(dashboardText(screen), "waiting for work owner") {
+				t.Fatal("cancellation omitted actual work-owner wait")
 			}
 		})
 	}
@@ -131,7 +131,7 @@ func TestDashboardQuitConfirmationFooter(t *testing.T) {
 	screen := dashboardScreen(t, 80)
 	screen.SetSize(80, 24)
 	d.draw(screen, time.Now(), false)
-	if !strings.Contains(dashboardText(screen), "Cancel this demo and clean up its resources? y/N") {
+	if !strings.Contains(dashboardText(screen), "Cancel current work? Retention/cleanup follows the selected mode. y/N") {
 		t.Fatal("quit confirmation omitted its cancellation and cleanup meaning")
 	}
 	d.input(tcell.NewEventKey(tcell.KeyEscape, 0, tcell.ModNone))

@@ -146,7 +146,13 @@ Inspect Cluster API objects with the same executable and kubeconfig using
 `virsh -c qemu:///session list --all` shows the QCOW2 guests. Detailed private
 stage logs remain under `"$DEMO_OUT/site"`; do not post kubeconfigs or logs without
 checking for credentials. A failed network preflight has not created these
-clusters. The adapter cleans up owned clusters and guests after acceptance.
+clusters. These watch commands are optional operator tools, not required
+workarounds to discover success. At the default retained handoff, the CLI shows
+actual read-only API/node checks and prints separate site/tenant `kubectl`
+commands. `status --session` repeats live cluster checks. Default deployment
+leaves the environment running; `--cleanup` or the separate `cleanup --session`
+command performs owned teardown. See the
+[retained access instructions](local-nke-demo.md#retained-deployment-and-actual-cluster-access).
 
 ## Local safety boundary
 
@@ -244,7 +250,9 @@ journal requires manual inspection. Recovery does not create E2E evidence.
 
 Require one explicit input set, exact artifact read-back, completed NKE stages,
 two Ready QCOW2-backed tenant nodes, workload/DNS success and owned cleanup.
-The adapter prints its final PASS only after those checks.
+The explicit `--cleanup` route prints its final PASS only after those checks.
+Default retained success is a usable deployment handoff, not completed owned
+cleanup or full recorded E2E acceptance.
 
 A separate successful deployment replay does not establish a fresh one-shot
 rebuild, complete source-built distribution, full OS smoke or qualification.

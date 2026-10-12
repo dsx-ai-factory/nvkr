@@ -304,7 +304,7 @@ func (d *dashboard) drawBuild(screen tcell.Screen, s dashboardSnapshot, now time
 		help = " ↑/↓ select · Enter/Esc activity · PgUp/PgDn scroll · q / Ctrl-C confirm cancel"
 	}
 	if s.confirmCancel {
-		help = " Cancel this demo and clean up its resources? y/N"
+		help = " Cancel current work? Retention/cleanup follows the selected mode. y/N"
 	}
 	d.footer.SetText("[lightcyan]" + help + "[-]\n " + dashboardLogLocator(s))
 	d.header.SetRect(0, 0, width, min(3, height))

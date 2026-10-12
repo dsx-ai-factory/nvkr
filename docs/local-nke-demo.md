@@ -21,8 +21,11 @@ Calico diagnostic has separate readiness and datapath checks, not an OVN pass.
 See the selections below.
 
 Run everything on a dedicated Ubuntu ARM64 host with Docker. On an Apple Silicon
-Mac, first create that Linux host with Colima below. This is **not a native macOS
-build**. Docker Desktop alone does not provide the libvirt tenant runtime.
+Mac, first create that Linux host with Colima below. The Go CLI itself can be
+built on macOS with the pinned Go toolchain using `make demo`, which produces
+`bin/nke-demo`; help, tests and diagnostics are separate from deployment.
+Native macOS cannot run this Linux ARM64 deployment or its retained service
+owner. Docker Desktop alone does not provide the libvirt tenant runtime.
 
 This is a trusted-user, unqualified diagnostic, not a signed Release, complete
 source-built distribution or qualified OS. See the
@@ -171,7 +174,7 @@ Run the demo from an interactive Linux terminal. It first checks the exact
 unattended networking wrapper. If that is approved without cached credentials,
 no password authentication or session refresh is needed. Otherwise it authenticates
 before opening the dashboard or starting the build, then refreshes that sudo session
-non-interactively every 30 seconds through deployment and cleanup. Deployment and cleanup
+non-interactively every 30 seconds while the foreground command owns its work. Deployment and cleanup
 do not open password prompts. The main demo remains unprivileged; passwords go
 directly to the initial sudo prompt, not through the demo's logs.
 Do not add a separate `sudo -v` before the demo: it manages authentication itself.
@@ -301,6 +304,26 @@ complete artifact Run: E2E subsequently builds the selected tools again as part
 of its complete fresh membership, rather than silently reusing bootstrap outputs.
 
 ## 4. Build and run the demo
+
+By default, `run` and `e2e` return to the shell after the checked deployment
+reaches Ready and leave the tenant, management cluster and supporting services
+running under their exact local service owner. They do not delete them merely
+because the dashboard closes. A deployment stopped before Ready retains its
+partial environment for inspection too; it returns failure, not a Ready claim.
+Installer or artifact-build failures before deployment have no such usable
+cluster promise. Neither stale output nor process existence proves readiness.
+
+For a one-shot acceptance run or continuous recording that must include natural
+NKE tenant deletion and joined owned cleanup, add `--cleanup` to the same command.
+The YAML equivalent is the strictly typed `run.cleanup: true`; the default is
+false, and an explicit `--cleanup=false` overrides it. Cleanup is never a
+silent fallback from retention to a different network or input selection.
+
+The new retained-owner CLI and live access presentation have focused contract
+tests and native process/control fixtures. Those fixtures do not prove a fresh
+NKE retained deployment, SSH-logout persistence or acceptance of this revision.
+Session detachment does not escape host cgroup/login policy; do not assume
+services survive logout or reboot. No linger or administrator policy is changed.
 
 Inspect existing Docker subnets and host routes first:
 
@@ -586,13 +609,14 @@ activity remain visible.
 | a during builds | Return to shared activity and automatic selection |
 | PgUp / PgDn | Scroll retained activity |
 | End | Return to live activity |
-| q / Ctrl+C | Ask for confirmation; only y/Y requests cancellation and owned cleanup |
+| q / Ctrl+C | Ask for confirmation; only y/Y stops current work; default deployment retains its environment, while `--cleanup` requests owned teardown |
 | n / Escape at confirmation | Dismiss the prompt and keep working |
 | f while canceling | Ask to force exit; only y/Y exits immediately, leaving cleanup unverified |
 
 Confirmation applies while the dashboard owns terminal input. During the initial
 sudo prompt, or in plain or verbose mode, interrupt and termination signals still
-cancel work and run owned cleanup without this dialog.
+cancel work without this dialog. Default deployment retention and explicit
+`--cleanup` remain distinct; cancellation alone does not request retained cleanup.
 Timeouts and terminal failures also cancel without requiring a usable prompt.
 
 Add `--plain` to the command above for scrolling elapsed START/DONE/FAIL output.
@@ -622,8 +646,9 @@ graph are diagnostics, not artifact verification receipts or a signed Release;
 the final command result and owned checks still determine success. After deployment
 fails, unfinished active panes show `stopped`; explicit failures remain `failed`.
 This does not claim that every unfinished check failed. Normal confirmed cancellation
-waits for bounded subprocess joining and owned cleanup before restoring the
-terminal. The state pane names diagnostics collection, tenant deletion and the
+waits for its work owner to return before restoring the terminal. A retained
+deployment then prints its exact inspection and explicit-cleanup commands.
+In `--cleanup` mode, the state pane names diagnostics collection, tenant deletion and the
 deletion wait as their owners report them; it does not keep counting the canceled
 tenant readiness budget. Tenant cleanup has its own one-hour ceiling, independent
 of canceled work: up to six minutes for diagnostics, two minutes for the delete
@@ -651,7 +676,9 @@ producers. `restore` repairs recorded network controls, not tenants, VMs or
 containers. Renderer panics, terminal output/input failures and a closed event
 stream restore the terminal before waiting for the workflow's cleanup to join;
 they still return failure and preserve the owner's error rather than reporting
-successful cleanup. Normal confirmed cancellation keeps its cleanup screen.
+successful cleanup. Default retained deployment does not turn a view failure
+into permission to delete its environment. Confirmed cancellation keeps its
+waiting screen until the work owner returns, unless force exit is confirmed.
 Recovered workflow or renderer panics report `NKD-E-INTERNAL`, not a host
 preflight error. A value description and stack are retained in a separate, bounded
 mode-0600 `nke-demo-panic-*.log` file; only its escaped locator is printed.
@@ -726,8 +753,8 @@ session and repeat the check; changing account groups does not update an
 existing session. Do not run the whole demo as root.
 
 If a TCG run is already active, press Ctrl+C, confirm with `y` in the dashboard,
-and wait for its command and cleanup
-to finish before changing the inputs. Before a new build, run this from the
+and wait for its command to return. If deployment was retained, use its printed
+explicit cleanup command and wait for cleanup before changing inputs. Before a new build, run this from the
 NKE Recipes repository root on Linux. It updates [the OS overlay](../definitions/nke-local-dev-arm64/os-tcg.json)
 and [the Docker Environment](../definitions/nke-local-dev-arm64/environment-local-docker.json):
 
@@ -774,7 +801,63 @@ The attempt name does not select acceleration; the JSON input changes do.
 
 ## 5. Recognize success
 
-Require exit zero and the final message for the selected network. For the default:
+### Retained deployment and actual cluster access
+
+Default success returns zero with `retained-ready`, the time of the completed
+Ready check, and full access instructions after the dashboard restores the
+terminal. It is not a completed cleanup or full recorded E2E claim. The CLI
+also executes the bundled `kubectl` against both selected APIs and prints their
+`/readyz` results and a node table containing roles, Ready conditions,
+architecture and Kubernetes version. The Site table is the Kind management
+cluster; the Tenant table is the separate QCOW2 cluster. These are live bounded
+observations, not inferred status from an elapsed timer or old dashboard events.
+Names, addresses, private responses and kubeconfigs are not copied into that table.
+
+Copy the exact `DEMO`, `SESSION`, `KUBECTL`, `SITE_CONFIG` and `TENANT_CONFIG`
+assignments printed by your invocation. These are private local locators, not
+portable credentials or public evidence. The printed commands include:
+
+```sh
+"$KUBECTL" --kubeconfig "$TENANT_CONFIG" --request-timeout=10s get nodes
+"$KUBECTL" --kubeconfig "$TENANT_CONFIG" --request-timeout=10s get pods -A
+"$KUBECTL" --kubeconfig "$SITE_CONFIG" --request-timeout=10s get nodes
+"$KUBECTL" --kubeconfig "$SITE_CONFIG" --request-timeout=10s get pods -A
+"$DEMO" status --session "$SESSION"
+```
+
+`status` authenticates the original live owner and runs fresh read-only cluster
+queries when Ready access was issued. Owner connection and historical Ready
+timestamps alone do not claim Kubernetes health. Failed health checks return
+failure without deleting the environment; full commands remain available for
+inspection. Private per-invocation command logs are retained separately.
+
+The selected demo includes Temporal UI. Browser guidance requires an actual
+matching Service/port and bounded HTTP response through the Kubernetes Service
+proxy; the CLI does not invent a separate NVKE UI or claim functional UI health.
+It prints the discovered loopback-only port-forward command, but does not start
+that forward for you. Stop that forward with Ctrl+C without deleting the demo.
+For a remote execution host, use your existing SSH tunnel to its loopback port;
+the instructions never assume or publish a server address.
+
+Delete the retained environment only when you choose to:
+
+```sh
+"$DEMO" cleanup --session "$SESSION"
+```
+
+This separate foreground command authenticates administrator access before
+opening its dashboard. The live owner performs its natural tenant deletion and
+joined service teardown; only after that owner exits does the foreground
+restore the original recorded host-network controls. A refused, failed or
+unjoined cleanup does not imply those controls were restored. Preserve the
+original session directory and journal. The printed `restore --work` fallback
+recovers only authenticated original network controls after producers are idle;
+it does not delete tenants, VMs or containers. No global Docker prune occurs.
+
+### Full one-shot acceptance with explicit cleanup
+
+Add `--cleanup` to `e2e` (or the exact-input `run` diagnostic) and require exit
+zero and the final message for the selected network. For NVIDIA OVN:
 
 ```text
 PASS (NVIDIA OVN): real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.
@@ -799,7 +882,7 @@ base64-encoded private bytes; a canceled empty poll does not erase the last usef
 inventory. Failure to retain this diagnostic never prevents owned deletion or
 changes its result.
 
-The command removes owned tenant/VMs, management node/volume, registry, bridge,
+The explicit `--cleanup` command removes owned tenant/VMs, management node/volume, registry, bridge,
 temporary firewall rules and grants. It retains accepted Runs, logs, shared
 image caches and the native TPM CA. It does not prune Docker or reset Colima.
 

@@ -125,7 +125,7 @@ func finishDashboardProgress(writer *checkedWriter, out io.Writer, logPath strin
 		writer.emit(fmt.Sprintf("Retained build log: %q\n", logPath))
 	}
 	if err == nil {
-		writer.emit("Demo command completed; its owned checks and cleanup returned successfully.\nUnqualified local diagnostic, not a signed Release.\n")
+		writer.emit("Demo command returned successfully. See its result and access/cleanup instructions below.\nUnqualified local diagnostic, not a signed Release.\n")
 	}
 }
 
@@ -320,7 +320,7 @@ func dashboardLoopWithForceExit(ctx context.Context, cancel context.CancelFunc, 
 			}
 			var canceled error
 			if ctx.Err() != nil {
-				canceled = nkderr.Wrap(nkderr.CodeTimeout, ctx.Err(), "demo canceled; owned cleanup returned")
+				canceled = nkderr.Wrap(nkderr.CodeTimeout, ctx.Err(), "demo work returned after cancellation; inspect retained/cleanup instructions")
 			}
 			return errors.Join(result, presentationErr, canceled)
 		case <-ctxDone:
