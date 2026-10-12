@@ -8,21 +8,27 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/dsx-ai-factory/nvkr/internal/versionpolicy"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 // Output describes one observed deliverable. Reference is a transport locator;
-// ContentDigest excludes it from the immutable release-content identity.
+// ContentDigest excludes it and descriptive platform/chart metadata from the
+// immutable release-content identity. Image indexes describe platforms through
+// their exact child membership instead of a single OS/Arch pair.
 type Output struct {
-	Name        string             `json:"name"`
-	Kind        string             `json:"kind"`
-	Digest      string             `json:"digest"`
-	Reference   string             `json:"reference,omitempty"`
-	BuildDigest string             `json:"buildDigest"`
-	Components  []string           `json:"components,omitempty"`
-	Disk        *DiskOutput        `json:"disk,omitempty"`
-	ImageIndex  *ImageIndexBinding `json:"imageIndex,omitempty"`
+	Name         string             `json:"name"`
+	Kind         string             `json:"kind"`
+	Digest       string             `json:"digest"`
+	Reference    string             `json:"reference,omitempty"`
+	OS           string             `json:"os,omitempty"`
+	Arch         string             `json:"arch,omitempty"`
+	ChartVersion string             `json:"chartVersion,omitempty"`
+	BuildDigest  string             `json:"buildDigest"`
+	Components   []string           `json:"components,omitempty"`
+	Disk         *DiskOutput        `json:"disk,omitempty"`
+	ImageIndex   *ImageIndexBinding `json:"imageIndex,omitempty"`
 }
 
 // DiskOutput is the descriptive copy of a binding established by factory's held
@@ -55,6 +61,13 @@ func (output Output) Validate() error {
 		(output.BuildDigest != "" && !canonical.IsDigest(output.BuildDigest)) {
 		return e.New(e.CodeVerifyFailed, "artifact %q must identify exact immutable bytes", output.Name)
 	}
+	if (output.OS == "") != (output.Arch == "") ||
+		(output.OS != "" && (!canonicalToken(output.OS) || !canonicalToken(output.Arch))) {
+		return e.New(e.CodeVerifyFailed, "artifact %q requires a complete canonical platform", output.Name)
+	}
+	if output.ChartVersion != "" && (output.Kind != outputFormatHelm || !versionpolicy.Helm(output.ChartVersion)) {
+		return e.New(e.CodeVerifyFailed, "artifact %q carries an invalid Helm chart version", output.Name)
+	}
 	previous := ""
 	for _, component := range output.Components {
 		if !outputNamePattern.MatchString(component) || component <= previous {
@@ -63,8 +76,8 @@ func (output Output) Validate() error {
 		previous = component
 	}
 	if output.ImageIndex != nil {
-		if output.Kind != "oci" || len(output.Components) != 1 {
-			return e.New(e.CodeVerifyFailed, "image index metadata requires one OCI output component")
+		if output.Kind != "oci" || len(output.Components) != 1 || output.OS != "" || output.Arch != "" {
+			return e.New(e.CodeVerifyFailed, "image index metadata requires one OCI output component and no single platform")
 		}
 		if err := output.ImageIndex.validateBuildDigest(output.BuildDigest); err != nil {
 			return err

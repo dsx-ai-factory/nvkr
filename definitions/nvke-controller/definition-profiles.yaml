@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-controller-profiles
+  description: Runnable controller fixture profiles for both Linux architectures; source fixture URLs and deployment settings are not fleet configuration.
+catalog:
+  base: ./catalog
+outputs:
+  - name: controller-profiles-image
+    components: [nvke-controller-profiles-image]
+    format: oci
+    platforms: [linux/amd64, linux/arm64]

@@ -1,0 +1,13 @@
+diff --git a/nvkr-controller-profiles/Dockerfile b/nvkr-controller-profiles/Dockerfile
+new file mode 100644
+--- /dev/null
++++ b/nvkr-controller-profiles/Dockerfile
+@@ -0,0 +1,8 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++# The pinned Alpine base supplies /bin/sh and cp for the chart materializer.
++# This packages source fixtures; it does not supply fleet deployment settings.
++FROM docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
++COPY controller/test/fixtures/profiles/ /profiles/
++COPY controller/test/fixtures/runbooks/ /profiles/runbooks/

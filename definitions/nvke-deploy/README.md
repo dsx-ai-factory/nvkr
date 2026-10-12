@@ -1,8 +1,8 @@
 # NVKE deploy example
 
-This eight-output Definition builds CWE and its controller chart and acquires the four external charts
+This nine-output Definition builds CWE, a runnable fixture profiles image, and its controller chart and acquires the four external charts
 selected by NVKE `v0.21.0`. It remains available for local execution. The committed GitHub workflow uses
-[the combined M2 Definition](../nvke-m2/README.md), which includes these outputs and additional artifacts.
+[the combined M2 Definition](../nvke-m2/README.md), which has its own output selection and additional artifacts.
 
 | Output | Selected input |
 |---|---|
@@ -10,6 +10,7 @@ selected by NVKE `v0.21.0`. It remains available for local execution. The commit
 | `nvkectl-linux-arm64` | Native ARM64 CLI binary bundle |
 | `cwe` | Source-built controller image |
 | `controller-chart` | Source controller chart, with its `controller` slot bound to the exact `cwe` image |
+| `controller-profiles-image` | Runnable source fixture profiles with a pinned Alpine base; one OCI index with AMD64 and ARM64 members |
 | `postgresql` | Acquired chart `18.5.15` |
 | `spire` | Acquired chart `0.30.1` |
 | `spire-crds` | Acquired chart `0.6.1` |
@@ -23,14 +24,27 @@ The source-owned `controller/deploy/nke-sbom/nke-deploy.yaml` supplies the four 
 every other deploy member is explicitly accounted for. Re-pinning fails on unreviewed membership,
 type, path or chart-identity changes. See the [pin-set adapter guide](../../docs/nvke-pin-set-usage.md).
 
-Both controller sources select the umbrella tag. This does not reconstruct the different module-tag
-composition in NVKE's release-asset BOM; automatic derivation from that BOM remains unimplemented.
+The CLI, controller, profiles and chart producers share source commit
+`33fb71b2f4224b470ebc628a9165fc4b92870406`, the umbrella `v0.21.0` source.
+The CLI has a separate preparation source alias at that exact commit so its
+Go dependency closure does not change the controller or profiles fetches. It
+uses the source-owned Make target for linker symbols and version assertions.
+This does not reconstruct the different module-tag composition in NVKE's
+release-asset BOM; automatic derivation from that BOM remains unimplemented.
 The separate controller Definitions retain their provider-image output, which this example does not select.
 
 The source chart's templates and repository defaults stay unchanged. Installation supplies
 `image.repository` for the destination registry. External chart archives retain their pinned upstream
 bytes. Their SBOMs inspect chart metadata; they do not scan or acquire referenced container images.
 Installation order, deployment values and topology remain with NVKE.
+
+The profiles image supplies `/bin/sh`, `cp`, `/profiles`, and its runbooks for the
+chart's `materialize-profiles` init container. The authenticated additive
+Dockerfile packages the pinned source fixtures without changing upstream files.
+Fixtures contain placeholder deployment URLs and do not establish usable fleet
+profiles or boot acceptance. Supply the exact image reference through NVKE's
+profiles image setting; the chart's profile defaults are not enabled by this
+Definition. The local demo uses its separately defined native diagnostic profiles image.
 
 ## Execute locally
 
@@ -48,7 +62,7 @@ go run ./cmd/nvkr run local \
   --environment definitions/nvke-deploy/environment-local.yaml \
   --attempt nvke-deploy-preview --dry-run
 
-# Execute all eight outputs; use a new attempt name for every Run.
+# Execute all nine outputs; use a new attempt name for every Run.
 go run ./cmd/nvkr run local \
   --definition definitions/nvke-deploy/definition.yaml \
   --environment definitions/nvke-deploy/environment-local.yaml \
@@ -69,8 +83,8 @@ No parallel generated deploy workflow is maintained at that fixed path.
 Historical static validation checked the earlier six-output Definition and both controller Definitions with the
 repository gate, workflow lint and dry-runs. Those dry-runs observed zero artifacts and remained
 `static-unqualified`; no complete six-output build or hosted publication was exercised at that revision.
-The current eight-output Definition has separate native-route and generation contract coverage;
-those checks do not extend the historical record or establish a complete eight-output build.
+The current nine-output Definition has separate native-route and profiles producer contract coverage;
+those checks do not extend the historical record or establish a complete nine-output build.
 Current M2 candidate publication is separate evidence with its own exact inputs and limits.
 
 This example does not package an installer/deploy bundle, build NKTP or the provider image, mirror all

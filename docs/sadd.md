@@ -291,6 +291,17 @@ and cannot restore a live verification capability. Explicit Release verification
 policy checks. [Release navigation](release-navigation.md) documents the registry and local entry points and
 their validation scope.
 
+Release export and JSON browsing share the versioned `nvkr.dev/release-description/v1` read model.
+The immutable publication reference supplies every artifact and evidence record; a cached layout may
+provide the same exact metadata closure. Export retains all named outputs and platforms, including aggregate
+image-index identity and child membership. Checked config metadata supplies native platforms and chart
+versions; output-bound source SBOM properties describe each source repository/commit without inventing a
+Git tag or a release-wide source pin. Publisher-declared qualification remains separate from metadata
+inspection scope and the explicit checks not performed. No Plan, mapping, platform selection, producer
+workspace, new identity or serialized verification capability is introduced. Consumers own role mapping,
+source compatibility, installation formats and offline completeness. Unpublished packages remain Run
+artifacts; this interface describes publications and does not assemble a release from a local workspace.
+
 Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
 unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
 one image output with a sorted finite platform set; the compiler freezes a native Build, result and SBOM use

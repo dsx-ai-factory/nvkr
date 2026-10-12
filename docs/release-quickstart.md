@@ -1,4 +1,4 @@
-# Browse and verify a release
+# Browse, export and verify a release
 
 Explore the outputs and evidence in an existing release, then apply your consumer policy separately.
 Start at the repository root with `bin/nvkr` built using the [quickstart](quickstart.md). Browsing works
@@ -36,6 +36,18 @@ component, and evidence relationships. This is release membership, not build ord
 
 Browsing validates all release metadata before filtering, without downloading artifact payload layers,
 including OS disk images. It does **not** verify payload bytes, signatures, or your acceptance policy.
+
+## Export the complete description
+
+```sh
+bin/nvkr release export --reference "$RELEASE_REF" > "$NVKR_RELEASE_DIR/release.json"
+```
+
+This writes `nvkr.dev/release-description/v1` JSON with all named outputs, platform metadata and bound
+source/evidence records. The release reference supplies every input; no Plan, mapping, platform selection
+or producer checkout is required. Consumers own installation roles and compatibility checks. See the
+[description contract](release-navigation.md#export-a-complete-release-description) for fields and inspection
+limits. Export and unfiltered JSON browsing produce the same description, without verifying payloads or policy.
 
 ## Verify against an accepted policy
 

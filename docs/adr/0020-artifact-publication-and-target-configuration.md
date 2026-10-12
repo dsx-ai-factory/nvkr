@@ -358,6 +358,34 @@ payload-layer download contracts include disk releases; the [historical v3 metad
 separately records the earlier external inspection scope. Current readers require publication-root v4 and
 reject that v3 release; current-schema external acceptance is not established by the dated record.
 
+Artifact descriptions expose checked OS/architecture and Helm chart version in both bounded metadata and
+held full-payload projections. Chart version is read from the exact Helm config, separately from appVersion;
+full inspection also compares config metadata with the archive's Chart.yaml. Native image indexes retain
+their explicit child platform membership rather than a false single-platform label. Legacy chart outputs
+without a declared platform remain unlabeled. These descriptive additions do not change canonical release
+content bytes or substitute for the existing typed identities.
+
+Release description export projects the complete metadata closure into `nvkr.dev/release-description/v1`.
+It requires only the immutable publication reference as metadata input; an optional cached layout must match
+that exact root. No separate Plan, mapping, platform selection, producer checkout or unpublished workspace is
+accepted. Export and unfiltered JSON browsing share one explicit versioned wire description, backed by the
+same delivery-owned metadata reader. The schema does not directly serialize internal authority-bearing
+types or add a public lifecycle object, canonical identity or publication format.
+
+Every named output is retained, without a consumer-role dictionary or producer allowlist. Native artifacts
+keep their config-declared OS/architecture; aggregate images keep the published index digest and exact child
+platform membership. Helm chart version remains distinct from appVersion and says nothing about workload
+compatibility. Source repository/commit descriptions remain attached to their exact evidence/output/component
+bindings. There is no release-wide source pin, inferred Git tag or rule requiring all uses of one repository
+to share a revision. Missing or redacted source properties stay explicit descriptions, not invented pins.
+
+Metadata inspection scope and the publisher's declared qualification are separate fields. Export reads no
+artifact payload layers and authenticates no signatures or consumer policy. Its JSON cannot restore a held
+capability or become a verification receipt. Consumer-owned code selects deployment roles, target platforms,
+compatible source revisions and complete offline dependencies, then authenticates accepted artifacts under
+its policy. Full release verification retains its existing payload and policy checks. Unpublished packages
+remain Run artifacts and are not converted into a publication by this export interface.
+
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
 Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
 no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement

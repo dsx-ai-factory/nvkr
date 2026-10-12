@@ -7,7 +7,7 @@ catalog:
 cosignTool: cosign
 kind: Definition
 metadata:
-  description: Build Linux AMD64/ARM64 CWE images as one OCI index, its controller chart and CLI binaries;
+  description: Build Linux AMD64/ARM64 CWE and fixture profiles images as OCI indexes, the controller chart and CLI binaries;
     acquire the four external charts selected by NVKE v0.21.0.
   name: nvke-deploy
 outputs:
@@ -20,22 +20,25 @@ outputs:
   name: controller-chart
   platform: linux/amd64
 - components:
+  - nvke-controller-profiles-image
+  format: oci
+  name: controller-profiles-image
+  platforms:
+  - linux/amd64
+  - linux/arm64
+- components:
   - nvke-controller
   format: oci
   name: cwe
   platforms:
   - linux/amd64
   - linux/arm64
-- catalog:
-    base: ../nvke-v1/catalog
-  components:
+- components:
   - nvkectl
   format: executable
   name: nvkectl-linux-amd64
   platform: linux/amd64
-- catalog:
-    base: ../nvke-v1/catalog
-  components:
+- components:
   - nvkectl
   format: executable
   name: nvkectl-linux-arm64

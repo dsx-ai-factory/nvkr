@@ -44,6 +44,61 @@ build. New bytes receive new identities. The release inventory guides membership
 and versions; it does not prove the source-to-binary relationship or qualification.
 See the [staged-installer handoff](nvkr-to-nvke-demo.md) for installer alignment and E2E blockers.
 
+## Offline deployment inventory
+
+Source-build completeness and offline-install completeness are separate requirements. The following
+inventory was inspected on 2026-10-10 against NKE commit
+[`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e).
+It describes that consumer's dependencies, not an NVKR export schema or a completed installation.
+
+The [M2 image catalog](../definitions/nvke-m2/image-catalog/registry.yaml) selects twelve non-test runtime
+images per architecture: PostgreSQL, eight SPIRE images and three Temporal images. Their pins reflect the
+selected NKE deployment values and do not cover every installation mode. The bootstrap CLI's embedded
+PostgreSQL selection differs from the NICo deployment's Bitnami chart image.
+
+The [local site catalog](../definitions/nvke-local-dev-arm64/site-catalog/registry.yaml) bundles the NKTP
+dependency charts `opentelemetry-kube-stack` 0.22.0, `prometheus-node-exporter` 4.56.1 and
+`metrics-server` 3.13.1. Rendering the inspected NKE source with NICo values and those exact archives
+selected these additional runtime images; the archive hashes matched the catalog pins during inspection:
+
+| Runtime role | Rendered image reference |
+| --- | --- |
+| Collector | `otel/opentelemetry-collector-k8s:0.162.0` |
+| Operator | `ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.159.0` |
+| Target allocator | `ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.159.0` |
+| Node exporter | `quay.io/prometheus/node-exporter:v1.12.1` |
+| Kubernetes state metrics | `registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0` |
+| Metrics server | `registry.k8s.io/metrics-server/metrics-server:v0.8.1` |
+| Development telemetry backend | `grafana/otel-lgtm:0.32.0` |
+
+The charts also use `rancher/kubectl:v1.34.1` for a pre-delete hook and `busybox:latest` for Helm test hooks.
+The Operator declares a fallback collector at 0.159.0 while NKE's rendered collector resources specify
+0.162.0. The downstream inventory must state whether tests, uninstall, fallback resources and an
+operator-selected production telemetry backend are in scope. These tags are findings, not admitted digest pins.
+
+NKE's [bootstrap code](https://github.com/dsx-ai-factory/nke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/controllerdeploy/capi.go)
+requests CAPI core, kubeadm bootstrap and kubeadm control-plane v1.12.3 through `clusterctl init`.
+The [clusterctl default](https://github.com/kubernetes-sigs/cluster-api/blob/v1.12.3/cmd/clusterctl/client/config/cert_manager_client.go)
+is cert-manager v1.19.3 unless configuration overrides it. Their release manifests identify these images:
+
+| Prerequisite | Images |
+| --- | --- |
+| CAPI v1.12.3 | `registry.k8s.io/cluster-api/cluster-api-controller:v1.12.3`, `registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.12.3`, `registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.12.3` |
+| cert-manager v1.19.3 | `quay.io/jetstack/cert-manager-controller:v1.19.3`, `quay.io/jetstack/cert-manager-cainjector:v1.19.3`, `quay.io/jetstack/cert-manager-webhook:v1.19.3` |
+
+Offline bootstrap also needs `core-components.yaml`, `bootstrap-components.yaml`,
+`control-plane-components.yaml` and `metadata.yaml` from the [CAPI release](https://github.com/kubernetes-sigs/cluster-api/releases/tag/v1.12.3),
+plus [`cert-manager.yaml`](https://github.com/cert-manager/cert-manager/releases/download/v1.19.3/cert-manager.yaml).
+The consumer must stage provider components and metadata in clusterctl's local provider repository layout.
+Publishing these files in an artifact does not configure clusterctl to use them.
+
+Complete offline installation remains unimplemented. It requires per-platform digest acquisition for the
+additional images, provider manifests and local configuration, chart values that name available images, and
+loading each selected image into every relevant node. The selected mode also needs Kind/bootstrap node
+images, CNI and storage dependencies, installation tools and site profiles. Acceptance requires an
+installation from empty caches with external network access disabled. Metadata export, chart rendering and
+existing local demos do not establish that result.
+
 ## What needs external input
 
 Two source/access inputs cannot be invented: the fleet-profile repository/revision

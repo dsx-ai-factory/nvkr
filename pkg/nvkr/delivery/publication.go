@@ -377,6 +377,7 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 				members = append(members, entry.Name)
 			}
 		case "apt-repository":
+			platforms[output.Name] = publicationPlatform{OS: object.OS, Arch: object.Arch}
 			expected := filepath.ToSlash(filepath.Join(".nvkr", "factory", "packages", output.Name))
 			if binding.TransportPath != expected {
 				return nil, e.New(e.CodeVerifyFailed, "APT output has an unsafe transport binding")
@@ -405,12 +406,31 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 			if binding.TransportPath != "" {
 				return nil, e.New(e.CodeVerifyFailed, "Helm output has an unexpected transport path")
 			}
+			config, err := publishedHelmChartConfig(ctx, layout, object)
+			if err != nil {
+				return nil, err
+			}
+			manifest, err := flatManifest(ctx, layout, object)
+			if err != nil {
+				return nil, err
+			}
+			archive, err := readBlob(ctx, layout, manifest.Layers[0], maxDeliveryFileBytes)
+			if err != nil {
+				return nil, err
+			}
+			if err := matchHelmChartConfig(archive, config); err != nil {
+				return nil, err
+			}
+			output.ChartVersion = config.Version
+			platforms[output.Name] = publicationPlatform{OS: object.OS, Arch: object.Arch}
 		default:
 			return nil, e.New(e.CodeVerifyFailed, "unsupported publication output format")
 		}
 		if !slices.Equal(members, output.Components) {
 			return nil, e.New(e.CodeVerifyFailed, "publication output %q payload members differ from its binding", output.Name)
 		}
+		platform := platforms[output.Name]
+		output.OS, output.Arch = platform.OS, platform.Arch
 		outputs = append(outputs, output)
 	}
 	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })

@@ -29,12 +29,23 @@ func InspectMetadataDescription(ctx context.Context, root, reference string) (Pu
 		return PublicationDescription{}, err
 	}
 	platforms := map[string]publicationPlatform{}
+	chartVersions := map[string]string{}
 	for _, object := range inspection.Root.Objects {
 		platform, err := metadataObjectPlatform(ctx, root, object)
 		if err != nil {
 			return PublicationDescription{}, err
 		}
 		platforms[object.Name] = platform
+		if object.Output != nil && object.Output.Format == outputFormatHelm {
+			config, err := publishedHelmChartConfig(ctx, root, object)
+			if err != nil {
+				return PublicationDescription{}, err
+			}
+			chartVersions[object.Name] = config.Version
+		}
+	}
+	for i := range outputs {
+		outputs[i].ChartVersion = chartVersions[outputs[i].Name]
 	}
 	return publicationDescription(reference, inspection, outputs, platforms)
 }
@@ -129,10 +140,12 @@ func metadataObjectPlatform(ctx context.Context, root string, object PublishedOb
 			if object.Output.TransportPath != "" {
 				return platform, e.New(e.CodeVerifyFailed, "Helm output has an unexpected transport path")
 			}
+			platform = publicationPlatform{OS: object.OS, Arch: object.Arch}
 		case "apt-repository":
 			if object.Output.TransportPath != filepath.ToSlash(filepath.Join(".nvkr", "factory", "packages", object.Name)) {
 				return platform, e.New(e.CodeVerifyFailed, "APT output has an unsafe transport binding")
 			}
+			platform = publicationPlatform{OS: object.OS, Arch: object.Arch}
 		}
 	}
 	return platform, nil
