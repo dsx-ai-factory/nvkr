@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/gdamore/tcell/v2 v2.13.10
-	github.com/go-viper/mapstructure/v2 v2.4.0
+	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/go-containerregistry v0.22.1
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/opencontainers/go-digest v1.0.0
@@ -14,11 +14,11 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/urfave/cli/v2 v2.27.7
-	go.yaml.in/yaml/v2 v2.4.2
+	go.yaml.in/yaml/v2 v2.4.4
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/sync v0.23.0
-	golang.org/x/sys v0.48.0
-	golang.org/x/term v0.37.0
+	golang.org/x/sync v0.24.0
+	golang.org/x/sys v0.49.0
+	golang.org/x/term v0.47.0
 	oras.land/oras-go/v2 v2.6.2
 	sigs.k8s.io/yaml v1.6.0
 )
