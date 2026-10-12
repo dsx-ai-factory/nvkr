@@ -4,10 +4,71 @@
 package sign
 
 import (
+	"slices"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func TestCosignVerifyBindsExpectedPredicateOnlyToProvenance(t *testing.T) {
+	for _, tc := range []struct {
+		name, predicate string
+		want            e.Code
+	}{
+		{name: "exact provenance", predicate: ociTestPredicate},
+		{name: "substituted provenance", predicate: `{"buildDefinition":{"run":"other"}}`, want: e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			signature := qualificationBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer, []byte(`{}`))
+			provenance := qualificationBundle(t, ociTestDigest, ProvenancePredicateType, ociObservedIdentity, ociTestIssuer, []byte(tc.predicate))
+			stub := &cosignStub{stdout: map[string]string{"version": cosignVersionJSON}}
+			var phases []string
+			stub.onCall = func(call recordedCall) error {
+				switch call.args[0] {
+				case "download":
+					predicateType := call.args[3]
+					phases = append(phases, "download "+predicateType)
+					switch predicateType {
+					case CosignSignaturePredicateType:
+						stub.stdout["download"] = signature
+					case ProvenancePredicateType:
+						stub.stdout["download"] = provenance
+					default:
+						t.Fatalf("unexpected evidence type: %s", predicateType)
+					}
+				case "verify-blob-attestation":
+					phases = append(phases, "verify "+call.args[4])
+				}
+				return nil
+			}
+			record, err := newStubbedSigner(t, stub, Credential{}).Verify(t.Context(), ociSubject(), VerifyPolicy{
+				RequireAttestation: true,
+				ExpectedPredicate:  []byte(ociTestPredicate),
+			})
+			if tc.want != "" {
+				requireSignCode(t, err, tc.want)
+				if record.SignatureVerified || record.AttestationVerified || len(record.Ran) != 0 {
+					t.Fatal("substituted provenance returned partial verification success")
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			} else if !record.SignatureVerified || !record.AttestationVerified {
+				t.Fatalf("missing verified evidence: %+v", record)
+			}
+			wantPhases := []string{
+				"download " + CosignSignaturePredicateType,
+				"verify " + CosignSignaturePredicateType,
+				"download " + ProvenancePredicateType,
+			}
+			if tc.want == "" {
+				wantPhases = append(wantPhases, "verify "+ProvenancePredicateType)
+			}
+			if !slices.Equal(phases, wantPhases) {
+				t.Fatalf("verification phases = %v, want %v", phases, wantPhases)
+			}
+		})
+	}
+}
 
 func TestOCIBundleBindsExpectedPredicate(t *testing.T) {
 	raw := []byte(testOCIBundle(t, ociTestDigest, ProvenancePredicateType, ociObservedIdentity, ociTestIssuer))

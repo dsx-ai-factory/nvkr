@@ -96,8 +96,10 @@ authenticated integration exists. An upstream test adapter, process exit status 
 boolean alone is not qualifying evidence.
 
 C contract tests cover strict schemas and complete subjects, independent invocation/source-event binding,
-forged or closed receipts, failed checks before signing, evidence substitution, cancellation at admission
-and partial attachment failure. The following targeted race checks passed in a Linux container with external
+forged or closed receipts, failed checks before signing, evidence substitution, cancellation at admission,
+receipt revocation and cancellation during first/final attachments, and partial attachment failure.
+Signature/provenance regression fixtures exercise the combined verifier with distinct signature and exact
+production predicates, including substituted production evidence. The following targeted race checks passed in a Linux container with external
 networking disabled and the pinned cosign binary mounted read-only:
 
 ```sh

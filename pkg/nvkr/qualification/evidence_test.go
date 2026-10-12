@@ -6,6 +6,7 @@ package qualification
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -206,6 +207,82 @@ func TestPublicationFailureNeverReportsSuccessfulQualification(t *testing.T) {
 			}
 			if len(result.PublishedSubjects) != tc.wantPublished {
 				t.Fatalf("published=%v", result.PublishedSubjects)
+			}
+		})
+	}
+}
+
+func TestPublicationInterruptionAtAttachmentBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		interruptAt int
+		revoke      bool
+		code        e.Code
+	}{
+		{"receipt revoked between attachments", 1, true, e.CodeGateUnmet},
+		{"receipt revoked during final attachment", 2, true, e.CodeGateUnmet},
+		{"canceled between attachments", 1, false, e.CodeTimeout},
+		{"canceled during final attachment", 2, false, e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := evidenceFixture()
+			for i := range fixture.ArtifactChecks.Outputs {
+				fixture.ArtifactChecks.Outputs[i].Kind = lifecycle.OutputExecutable
+				fixture.Smoke[i].Status = "pass"
+				fixture.Smoke[i].Reason = ""
+			}
+			raw, err := canonical.Marshal(fixture.ArtifactChecks)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// This private fixture exercises the receipt's actual shared lifetime;
+			// it is not evidence from the still-unimplemented M3-B smoke issuer.
+			receipt := &SmokeReceipt{artifactChecks: string(raw), invocation: fixture.Invocation, verdicts: fixture.Smoke, closed: new(atomic.Bool)}
+			copied := *receipt
+			recheck := func() error {
+				_, err := collectSmoke(fixture.ArtifactChecks, fixture.Invocation, &copied)
+				return err
+			}
+			if err := recheck(); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var signed []string
+			p := &Publisher{newAttester: func(string) (qualificationAttester, error) {
+				return attesterFunc(func(_ context.Context, subject sign.Subject, _ []byte) error {
+					signed = append(signed, subject.Ref)
+					if len(signed) == tc.interruptAt {
+						if tc.revoke {
+							if err := receipt.Close(); err != nil {
+								t.Fatal(err)
+							}
+						} else {
+							cancel()
+						}
+					}
+					// The attachment completed before the interruption was observed.
+					// Its diagnostic must survive even though the gate cannot succeed.
+					return nil
+				}), nil
+			}}
+			result, err := p.publishEvidence(ctx, fixture, &Publication{}, recheck)
+			requireCode(t, err, tc.code)
+			if !tc.revoke && !errors.Is(err, context.Canceled) {
+				t.Fatalf("cancellation cause lost: %v", err)
+			}
+			if result.Successful {
+				t.Fatal("interrupted qualification claimed success")
+			}
+			want := []string{fixture.ArtifactChecks.Outputs[0].Reference}
+			if tc.interruptAt == 2 {
+				want = append(want, fixture.ArtifactChecks.Outputs[1].Reference)
+			}
+			if !slices.Equal(signed, want) {
+				t.Fatalf("signed=%v, want exactly %v", signed, want)
+			}
+			if !slices.Equal(result.PublishedSubjects, want) {
+				t.Fatalf("published=%v, want exactly %v", result.PublishedSubjects, want)
 			}
 		})
 	}

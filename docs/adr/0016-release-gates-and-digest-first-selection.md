@@ -210,7 +210,9 @@ signing machinery. All-verdicts-before-signing is a preflight guarantee, not a t
 attachments: an operational failure marks the invocation unsuccessful and blocks release even when earlier
 attachments remain. The release consumer must authenticate complete successful qualification publication;
 presence of one attachment cannot prove success for the set. M4's release manifest remains a separate deferred
-consumer and grants no qualified-lane clearance.
+consumer and grants no qualified-lane clearance. Its acceptance tests must reject an earlier output's surviving
+attachment when a later attachment fails or the qualification invocation is canceled, even if the surviving
+predicate records a complete passing preflight set.
 
 Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated
 verify-only dispatch and incremental reuse are deferred hardening. External qualification suites such as
