@@ -28,7 +28,7 @@ Regenerate with `make notices`.
 | `github.com/fsnotify/fsnotify` | v1.9.0 | BSD-3-Clause |
 | `github.com/gdamore/encoding` | v1.0.1 | Apache-2.0 |
 | `github.com/gdamore/tcell/v2` | v2.13.10 | Apache-2.0 |
-| `github.com/go-viper/mapstructure/v2` | v2.4.0 | MIT |
+| `github.com/go-viper/mapstructure/v2` | v2.5.0 | MIT |
 | `github.com/google/go-containerregistry` | v0.22.1 | Apache-2.0 |
 | `github.com/klauspost/compress` | v1.19.2 | BSD-3-Clause |
 | `github.com/lucasb-eyer/go-colorful` | v1.3.0 | MIT |
@@ -50,11 +50,11 @@ Regenerate with `make notices`.
 | `github.com/subosito/gotenv` | v1.6.0 | MIT |
 | `github.com/urfave/cli/v2` | v2.27.7 | MIT |
 | `github.com/xrash/smetrics` | v0.0.0-20240521201337-686a1a2994c1 | MIT |
-| `go.yaml.in/yaml/v2` | v2.4.2 | Apache-2.0 |
+| `go.yaml.in/yaml/v2` | v2.4.4 | Apache-2.0 |
 | `go.yaml.in/yaml/v3` | v3.0.5 | MIT |
-| `golang.org/x/sync` | v0.23.0 | BSD-3-Clause |
-| `golang.org/x/sys` | v0.48.0 | BSD-3-Clause |
-| `golang.org/x/term` | v0.37.0 | BSD-3-Clause |
+| `golang.org/x/sync` | v0.24.0 | BSD-3-Clause |
+| `golang.org/x/sys` | v0.49.0 | BSD-3-Clause |
+| `golang.org/x/term` | v0.47.0 | BSD-3-Clause |
 | `golang.org/x/text` | v0.41.0 | BSD-3-Clause |
 | `oras.land/oras-go/v2` | v2.6.2 | Apache-2.0 |
 | `sigs.k8s.io/yaml` | v1.6.0 | MIT |
@@ -827,7 +827,7 @@ Apache License
 
 ## github.com/go-viper/mapstructure/v2
 
-Version: v2.4.0
+Version: v2.5.0
 
 ```
 The MIT License (MIT)
@@ -2775,7 +2775,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## go.yaml.in/yaml/v2
 
-Version: v2.4.2
+Version: v2.4.4
 
 ```
 Apache License
@@ -3079,7 +3079,7 @@ limitations under the License.
 
 ## golang.org/x/sync
 
-Version: v0.23.0
+Version: v0.24.0
 
 ```
 Copyright 2009 The Go Authors.
@@ -3115,7 +3115,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## golang.org/x/sys
 
-Version: v0.48.0
+Version: v0.49.0
 
 ```
 Copyright 2009 The Go Authors.
@@ -3151,7 +3151,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## golang.org/x/term
 
-Version: v0.37.0
+Version: v0.47.0
 
 ```
 Copyright 2009 The Go Authors.

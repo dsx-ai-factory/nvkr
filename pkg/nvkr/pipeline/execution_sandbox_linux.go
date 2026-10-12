@@ -37,8 +37,8 @@ func applyExecutionSandbox(writeRoots []string) error {
 			unix.LANDLOCK_ACCESS_FS_REFER |
 			unix.LANDLOCK_ACCESS_FS_TRUNCATE)
 	attr := unix.LandlockRulesetAttr{
-		Access_fs:  writeAccess,
-		Access_net: unix.LANDLOCK_ACCESS_NET_BIND_TCP | unix.LANDLOCK_ACCESS_NET_CONNECT_TCP,
+		Handled_access_fs:  writeAccess,
+		Handled_access_net: unix.LANDLOCK_ACCESS_NET_BIND_TCP | unix.LANDLOCK_ACCESS_NET_CONNECT_TCP,
 	}
 	fdRaw, _, errno := unix.Syscall6(unix.SYS_LANDLOCK_CREATE_RULESET,
 		uintptr(unsafe.Pointer(&attr)), unsafe.Sizeof(attr), 0, 0, 0, 0)
