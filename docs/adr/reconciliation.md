@@ -92,6 +92,14 @@ execution. Preparation/validation stay offline; build networking needs explicit 
 and exposes the default bridge, not an outbound-only firewall. A narrow root extraction/ownership stage
 precedes non-root consumer work. Local execution has no subordinate-ID/user-namespace guarantee.
 Success, returned failure and cancellation own bounded cleanup; hard-crash orphan recovery remains deferred.
+An unjoined metadata observer retains only its exact dependent resources and
+keeps independently bounded cleanup for the rest. Its stop-issued object
+locators may be saved in a private no-replace `observer-retained.json` beside
+the attempt diagnostics; they are non-authoritative inspection data, never a
+cross-process adoption/deletion capability. Persistence failure stays visible
+without permitting an artifact or skipping independent cleanup. Controlled
+contracts distinguish successful private retention, no-replace/storage failure
+and unjoined ownership; this is not live orphan-recovery acceptance.
 ADR-10/18 own the complete driver and native runner contracts.
 
 Attempt-owned material manifests and bounded source-owned build logs are diagnostic. Unsafe entries fail
@@ -248,11 +256,11 @@ OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
 are independently produced; this does not close original-owner cross-output
 reuse or establish equal bytes. Fork graph/profile tests and actual pinned-chart
 Helm rendering with loopback OCI push/pull were reported locally, without a
-retrievable CI/Release evidence attachment for these exercises. Retained local attempt
-`kind-calico-e2e-20261010-09` at `de31a87` completed the combined artifact Run,
+retrievable CI/Release evidence attachment for these exercises. An author-reported
+local attempt at `de31a87` completed the combined artifact Run,
 including the fork OS bake, with 29 expected and 29 observed outputs in the
-`unqualified-local-execution` lane. Its lifecycle content subject is
-`sha256:99e74fe81dc754b28a04f85b31694aeb2902f8a1f3b6cbb3ba054479b55e7af9`.
+`unqualified-local-execution` lane. Its exact Run identity and original records
+remain private; no retrievable external artifact is cited here.
 Artifact completion does not establish tenant acceptance or default OVN startup.
 
 The selected fork's Ubuntu runtime omits `firewall-cmd`, while its non-DPU
@@ -478,8 +486,8 @@ CNI/DNS rollout failures and canceled waits prevent the single smoke submission.
 Kubeconfig, Ready-node, CNI and DNS waits retain their named stage and private
 diagnostic location; cancellation or a tenant deadline retains the timeout code
 at the public demo boundary. These fixtures do not start real guests or establish
-functional DNS. The retained
-continuous `arm-clean-20261010-183945` invocation at `bda67f0` subsequently
+functional DNS. An author-reported local
+continuous invocation at `bda67f0` subsequently
 observed both ARM64 tenant nodes Ready, both DNS rollouts and the unchanged
 workload/DNS smoke passing, but exited 17 at `tenant-deletion-wait`. Its original
 recording remains failed, not a successful E2E video. The downstream three-minute

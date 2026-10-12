@@ -188,7 +188,7 @@ type packerActivityRetention struct {
 }
 
 func (*packerActivityRetention) err() error {
-	return e.New(e.CodeTimeout, "owned Packer log observer did not join; dependent resources retained")
+	return e.New(e.CodeTimeout, "owned Packer log observer did not join; dependent resources retained; inspect private observer-retained.json if available and the stopped-attempt recovery guidance; serialized locators do not authorize deletion")
 }
 
 func (observer *packerActivityObserver) unjoined() bool {

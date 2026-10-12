@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +18,7 @@ import (
 
 	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/internal/heldfile"
+	"golang.org/x/sys/unix"
 )
 
 type packerDiagnosticTarEntry struct {
@@ -434,6 +437,78 @@ func TestPackerDiagnosticSinkRoutesDistinctSubjects(t *testing.T) {
 	routes, err := filepath.Glob(filepath.Join(root, packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*"))
 	if err != nil || len(routes) != 2 {
 		t.Fatalf("routes=%v error=%v", routes, err)
+	}
+}
+
+func TestPackerDiagnosticObserverRecoveryIsPrivateAndNoReplace(t *testing.T) {
+	for _, mode := range []string{"recorded", "no receipt", "empty container", "oversized volume", "closed", "canceled", "nil context", "conflict"} {
+		t.Run(mode, func(t *testing.T) {
+			root, sink, target, _ := newPackerDiagnosticFixture(t, "plan/observer-recovery")
+			defer sink.Close()
+			defer target.close()
+			retained := &packerActivityRetention{container: "nkd-packer-test-activity", work: "nkd-packer-test-work"}
+			ctx := t.Context()
+			want := e.Code("")
+			switch mode {
+			case "no receipt":
+				retained, want = nil, e.CodeEngineCapability
+			case "empty container":
+				retained.container, want = "", e.CodeEngineCapability
+			case "oversized volume":
+				retained.work, want = strings.Repeat("x", 257), e.CodeEngineCapability
+			case "closed":
+				if err := target.close(); err != nil {
+					t.Fatal(err)
+				}
+				want = e.CodeEngineCapability
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+				want = e.CodeTimeout
+			case "nil context":
+				ctx, want = nil, e.CodeUsage
+			case "conflict":
+				if err := unix.Mkdirat(int(target.root.Fd()), packerRetainedObserverName, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				want = e.CodeVerifyFailed
+			}
+			err := target.recordObserverRetention(ctx, retained)
+			if code(err) != want {
+				t.Fatalf("recovery metadata outcome=%v, want %s", err, want)
+			}
+			if mode == "canceled" && !errors.Is(err, context.Canceled) {
+				t.Fatal("recovery metadata lost cancellation", err)
+			}
+			routes, globErr := filepath.Glob(filepath.Join(root, packerDiagnosticDirectory, packerDiagnosticProducerDir, "run-*", packerRetainedObserverName))
+			if globErr != nil || (len(routes) == 1) != (mode == "recorded" || mode == "conflict") {
+				t.Fatal("recovery file created across a refused boundary", globErr)
+			}
+			if mode != "recorded" {
+				return
+			}
+			raw, readErr := os.ReadFile(routes[0])
+			info, statErr := os.Stat(routes[0])
+			var record struct {
+				Version                                      int
+				Scope, Status, ObserverContainer, WorkVolume string
+			}
+			if readErr != nil || statErr != nil || info.Mode().Perm() != 0o444 || json.Unmarshal(raw, &record) != nil || record.Version != 1 || record.Scope != "private-inspection-only" || record.Status != "unjoined" || record.ObserverContainer != retained.container || record.WorkVolume != retained.work {
+				t.Fatal("issued locators not retained privately and exactly", readErr, statErr)
+			}
+			if err := target.recordObserverRetention(t.Context(), retained); code(err) != e.CodeVerifyFailed {
+				t.Fatal("existing recovery metadata was replaced", err)
+			}
+			after, readErr := os.ReadFile(routes[0])
+			if readErr != nil || !bytes.Equal(raw, after) {
+				t.Fatal("no-replace refusal changed the original metadata", readErr)
+			}
+			public := retained.err().Error()
+			if !strings.Contains(public, packerRetainedObserverName) || strings.Contains(public, retained.container) || strings.Contains(public, retained.work) {
+				t.Fatal("public retention error omitted guidance or exposed private locators")
+			}
+		})
 	}
 }
 

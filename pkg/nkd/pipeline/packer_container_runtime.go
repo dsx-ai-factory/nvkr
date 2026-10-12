@@ -248,6 +248,15 @@ func runPackerContainerWithTimeouts(ctx context.Context, request packerContainer
 		[]string{nodeLabel, attemptLabel, "nkd.dev/role=log-activity"})
 	buildErr := startPackerBuildContainer(ctx, request.runtime, buildName, request.stdout, request.stderr, kvmProjection != nil)
 	observerErr := activity.stopWithTimeout(ctx, observerTimeout)
+	var recoveryErr error
+	if activity.unjoined() {
+		resources.mu.Lock()
+		retained := resources.retainedObserver
+		resources.mu.Unlock()
+		recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), packerContainerCleanupTimeout)
+		recoveryErr = diagnosticTarget.recordObserverRetention(recoveryCtx, retained)
+		cancel()
+	}
 	var diagnosticErr error
 	if request.bindings.buildLogDirectoryVariable != "" {
 		diagnosticCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), diagnosticTimeout)
@@ -270,7 +279,7 @@ func runPackerContainerWithTimeouts(ctx context.Context, request packerContainer
 	if activity.unjoined() {
 		// A live observer never authorizes artifact collection, but its stop
 		// failure must not suppress bounded diagnostics from the build.
-		return nil, errors.Join(buildErr, observerErr, diagnosticErr)
+		return nil, errors.Join(buildErr, observerErr, recoveryErr, diagnosticErr)
 	}
 	// A joined observer's failed removal remains registered with resources.
 	// The final reaper owns its retry and rejects the artifact if removal

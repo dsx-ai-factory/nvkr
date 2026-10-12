@@ -34,6 +34,7 @@ const (
 	packerDiagnosticProducerDir     = "packer"
 	packerDiagnosticManifestName    = "material-manifest.json"
 	packerDiagnosticLogsName        = "logs"
+	packerRetainedObserverName      = "observer-retained.json"
 	maxPackerDiagnosticEntries      = 128
 	maxPackerDiagnosticFiles        = 64
 	maxPackerDiagnosticFileBytes    = int64(16 << 20)
@@ -374,6 +375,37 @@ func (target *packerDiagnosticTarget) recordIncomplete(ctx context.Context, caus
 		return e.Wrap(e.CodeInternal, err, "encoding incomplete diagnostic marker")
 	}
 	return writePackerDiagnosticFile(ctx, target.root, "logs-incomplete.json", bytes.NewReader(raw), int64(len(raw)))
+}
+
+// These locators come only from the stop owner's private retention receipt.
+// They are private inspection data, never permission to adopt, signal or delete
+// a container, volume or runtime. No provider text or host paths are recorded.
+func (target *packerDiagnosticTarget) recordObserverRetention(ctx context.Context, retained *packerActivityRetention) error {
+	if ctx == nil {
+		return e.New(e.CodeUsage, "Packer observer recovery metadata requires a context")
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "Packer observer recovery metadata canceled")
+	}
+	if target == nil || retained == nil || retained.container == "" || retained.work == "" || len(retained.container) > 256 || len(retained.work) > 256 {
+		return e.New(e.CodeEngineCapability, "Packer observer recovery metadata requires its issued retention receipt")
+	}
+	target.mu.Lock()
+	defer target.mu.Unlock()
+	if target.closed || target.root == nil {
+		return e.New(e.CodeEngineCapability, "Packer diagnostic target is closed")
+	}
+	raw, err := json.Marshal(struct {
+		Version           int    `json:"version"`
+		Scope             string `json:"scope"`
+		Status            string `json:"status"`
+		ObserverContainer string `json:"observerContainer"`
+		WorkVolume        string `json:"workVolume"`
+	}{1, "private-inspection-only", "unjoined", retained.container, retained.work})
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "encoding private Packer observer recovery metadata")
+	}
+	return writePackerDiagnosticFile(ctx, target.root, packerRetainedObserverName, bytes.NewReader(raw), int64(len(raw)))
 }
 
 func (target *packerDiagnosticTarget) retainBuildLogsWithLimits(ctx context.Context, archive *heldfile.File,

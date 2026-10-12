@@ -703,8 +703,41 @@ observer's container, work volume and private identity workspace rather than
 deleting inputs that it may still use. Those Packer resources are separate from
 the deployment network journal: `restore` does not reap them. Do not prune them
 while their owning build or observer remains live. Inspect the exact stopped
-attempt and its owned resources before arranging recovery; automated
-cross-process Packer orphan recovery is not implemented.
+attempt and its owned resources before arranging recovery. If persistence
+succeeds, the attempt's private `diagnostics/packer/run-*/observer-retained.json`
+contains the stop owner's exact `observerContainer` and `workVolume` locators.
+The timeout names this fixed record, not resource identities or provider text;
+a record-write failure is separately reported. Keep the record and its material
+manifest private. The record is inspection data, not deletion authorization.
+
+Copy that exact private record path into `RECOVERY_RECORD`; do not pick a
+wildcard match or the newest timestamp. For that selected route, read the two
+fields and inspect the objects without changing them. Keep inspect output private:
+
+```sh
+OBSERVER=$(jq -er '.observerContainer' "$RECOVERY_RECORD")
+WORK_VOLUME=$(jq -er '.workVolume' "$RECOVERY_RECORD")
+docker container inspect "$OBSERVER"
+docker volume inspect "$WORK_VOLUME"
+```
+
+Compare the observer's `nkd.dev/role=log-activity`, exact `nkd.dev/attempt` label,
+selected toolchain image and read-only work-volume mount with the original
+attempt's material manifest and retained local command logs. Confirm the
+original build/observer owners and their runtime clients have stopped and
+joined. A missing client, timer, stale JSON name or one inspect response does
+not establish that join or resource ownership. An administrator may then remove
+only the independently verified observer and volume:
+
+```sh
+docker rm -fv "$OBSERVER"
+docker volume rm "$WORK_VOLUME"
+```
+
+If identity, labels, mounts or owner/client termination cannot be established,
+stop and retain the evidence. These are manual operator steps, not a new
+restore/adoption API. `restore` still covers only authenticated deployment
+network controls. Automated cross-process Packer orphan recovery is not implemented.
 If cleanup refuses, inspect retained resources and recovery instructions
 before rerunning. [Dashboard tests](../cmd/nke-demo/dashboard_test.go) and
 [simulation-screen tests](../cmd/nke-demo/dashboard_view_test.go) cover presentation,
