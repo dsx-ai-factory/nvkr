@@ -21,6 +21,13 @@ The launcher checks capabilities before downloading or creating an attempt.
 It does not install packages, start/resize VMs, prune caches or reset runtimes.
 Git authorization must work on the Linux execution host.
 
+Ordinary local fetch projects global `credential.helper`, `credential.username`
+and `credential.useHttpPath`, plus fetch-only HOME/XDG, SSH-agent and selected
+proxy/TLS-trust settings. System helpers, GH/GCM/DBus/keyring environment,
+arbitrary SSH commands and other global URL rewrites are not inherited.
+Use a compatible configured helper or an explicit local repository containing
+the pinned objects; checkout and status receive no developer helper or HOME.
+
 ### Apple Silicon Mac with Colima
 
 Follow [the quickstart's macOS setup](local-nke-demo.md#additional-macos-setup)
