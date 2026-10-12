@@ -36,9 +36,9 @@ current authored examples and exported Plans use the new names.
 
 ## Exact upstream contracts
 
-A Git repository rename does not rewrite a pinned source tree. The maintained
-catalog therefore preserves the following source-owned interfaces until NVKE
-provides a changed commit and the catalog is deliberately repinned:
+A Git repository rename does not rewrite a pinned source tree or rename its
+operational interfaces. The maintained catalog preserves the following exact
+source-owned contracts. Retaining these names is not unfinished rebranding:
 
 - CLI source directory `cli/cmd/nkectl`, linker module
   `github.com/NVIDIA/nke/cli`, Make inputs `NKECTL_*`, and Make output
@@ -54,20 +54,27 @@ provides a changed commit and the catalog is deliberately repinned:
   existing maintainer email. None is rewritten by the consuming repository.
 - Pinned runtime ABI `/nkd/toolchain/packer/plugins` and
   `/usr/local/bin/nkd-disk-inspect`, including its `NKD_INSPECTION ` diagnostic
-  wire prefix. New runtime builders retain these interfaces until
-  a deliberately versioned ABI and new measured pins are admitted together.
+  wire prefix. Renaming NVKR does not require changing this runtime ABI or
+  rebuilding an otherwise valid, pinned Packer/inspector image.
 - Version-2 host-network bridge, owner/staging prefixes and shared per-user lock.
   Keeping the complete durable namespace allows existing journal recovery and
   coordination without silently reinterpreting recovery state.
 
 Public component names, caller-owned output paths and documentation use NVKE.
 Captured upstream test fixtures retain the actual upstream bytes.
+Node packages, services, Kubernetes identifiers and Packer contracts keep their
+existing names. A future independent interface change requires an explicit
+producer change and matching consumer validation; it is not a naming-cutover
+prerequisite. Repinning to NVKE's renamed CLI is likewise a separate source
+update, not permission to rewrite the CLI paths in an older pinned checkout.
 
 ## Deployment cutover
 
 Existing provider identities remain in use, rather than silently creating
 unprotected replacements: `nkd-arc`, `nkd-release`, `NKE_SOURCE_TOKEN` and
-`@dsx-ai-factory/nke-write`. Published immutable Packer/inspector references
+`@dsx-ai-factory/nvke-write`. The team has been renamed and its NVKR repository
+write access is verified; the old `nke-write` slug no longer exists.
+Published immutable Packer/inspector references
 remain under `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/`;
 a Git repository rename does not move GHCR packages.
 
@@ -76,10 +83,11 @@ Before migrating those external names:
 1. Provision or rename the two repositories, preserving Git history, tags and
    access. Verify external repository permissions and consumers of the Go module.
    Verify replacement CODEOWNERS write access before changing the existing team.
-2. Build and publish the renamed helper, Packer and disk-inspector closures from
-   their renamed sources. Measure the new binaries and replace the applicable
-   OCI/executable pins. Relocating an old image cannot rename its embedded paths
-   or `/usr/local/bin/nkd-disk-inspect` executable.
+2. Build, measure and publish the renamed standalone execution helper before
+   admitting its image. Keep existing Packer/inspector images and their measured
+   interfaces; no rebuild is required merely to change the framework name.
+   A separately requested image relocation must be verified at its actual
+   registry subject without pretending its embedded interfaces changed.
 3. If a producer-owned format or runtime ABI changes, repin the producer/closure
    together with its consumer. This PR preserves the existing acquisition format;
    it does not require an upstream schema migration or convert captured evidence.

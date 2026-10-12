@@ -690,8 +690,10 @@ historical signed bytes or imply external deployment acceptance. Generated recor
 must be regenerated from the renamed authored inputs.
 
 The current hosted path retains the existing provider-owned `nkd-arc` and
-`nkd-release` protected environments, `NKE_SOURCE_TOKEN`, and the `nke-write`
-CODEOWNERS team. Published Packer/inspector subjects stay at their exact
+`nkd-release` protected environments and `NKE_SOURCE_TOKEN`. CODEOWNERS uses the
+provider-renamed `nvke-write` team with verified NVKR repository write access;
+the old `nke-write` slug no longer exists. Published Packer/inspector subjects
+stay at their exact
 `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/` addresses with the
 existing digests. Their plugin path and inspector executable remain the pinned
 in-image ABI. The external package-capture envelope remains
@@ -699,11 +701,15 @@ in-image ABI. The external package-capture envelope remains
 NVKR evidence identities remain distinct. Go network recovery preserves its complete
 version-2 durable host namespace and shared coordination lock. These are explicit
 external/durable contract exceptions, not public namespace aliases.
+Retained node, package, Kubernetes and Packer names are compatibility contracts,
+not missing rebranding work. Source repinning or an independently changed ABI
+requires its own validation and is not part of this naming cutover.
 
 The standalone renamed execution helper has measured AMD64/ARM64 executable pins;
-its image pins remain unpublished. New provider names and republished runtime
-subjects are deferred until provisioning, permissions, digest measurements and
-operational read-back are verified. Contract tests do not establish that external
+its image pins remain unpublished. Any independently chosen provider-name or
+runtime-publication migration requires verified provisioning, permissions,
+digest measurements and operational read-back; retaining existing contracts
+does not require that migration. Contract tests do not establish an external
 cutover, hosted publication, independent consumer acceptance or qualification.
 
 
