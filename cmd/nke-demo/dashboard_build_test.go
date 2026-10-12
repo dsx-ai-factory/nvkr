@@ -9,12 +9,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/NVIDIA/nke-recipes/internal/buildactivity"
 	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
+	"github.com/NVIDIA/nke-recipes/pkg/nkd/factory"
 	"github.com/NVIDIA/nke-recipes/pkg/nkd/planview"
 	"github.com/gdamore/tcell/v2"
 )
@@ -280,6 +284,104 @@ func TestDashboardGraphDisplayBounds(t *testing.T) {
 				t.Fatal("malformed display was accepted, authorized completion or omitted incomplete status")
 			}
 		})
+	}
+}
+
+// Read through the existing catalog owner, not a second overlay parser. A
+// source-selector rename must update the display deliberately, rather than
+// silently losing the fixed, privacy-safe Packer reports.
+func TestDashboardGuestReportsFollowMaintainedPackerSelectors(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../definitions/nke-m2/os-catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../definitions/nke-local-dev-arm64/os-tcg.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	kvm := base.Components["nke-node-image"]
+	for _, selected := range []struct {
+		mode      string
+		component *catalog.Component
+	}{{"kvm", &kvm}, {"tcg", overlay.Components["nke-node-image"].Component}} {
+		t.Run(selected.mode, func(t *testing.T) {
+			component := selected.component
+			if component == nil || component.Packer == nil || component.Packer.BuildName == "" {
+				t.Fatal("maintained disk selector is unavailable")
+			}
+			for _, report := range dashboardPackerReports {
+				message := report.message
+				if report.prefix {
+					message += "private-suffix"
+				}
+				line := "==> " + component.Packer.BuildName + ": " + message
+				if got := dashboardGuestReport(line); got != report.summary {
+					t.Fatalf("selected %s report lost its projection: got %q, want %q", selected.mode, got, report.summary)
+				}
+			}
+		})
+	}
+}
+
+func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
+	jq, err := exec.LookPath("jq")
+	if err != nil {
+		t.Skip("launcher projection integration requires jq")
+	}
+	plan, err := factory.LoadPlanContext(t.Context(), "../../.github/nkd-run/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := planview.Inspect(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, err := doc.Graph(planview.GraphOptions{View: "complete", Format: "json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	script, err := os.ReadFile("../../scripts/nke-full-arm64-local.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Execute the launcher's actual jq expression, not a copied projection or
+	// fabricated vertex/edge fixture. Exact delimiters fail on script drift.
+	start := "# verification. Preserve owner keys/edges; omit route refs and producer duplicates.\njq -r '\n"
+	end := "\n' \"${bootstrap}/graph.json\" >&2"
+	if strings.Count(string(script), start) != 1 {
+		t.Fatal("launcher graph projection boundary changed")
+	}
+	_, projection, _ := strings.Cut(string(script), start)
+	expression, _, found := strings.Cut(projection, end)
+	if !found {
+		t.Fatal("launcher graph projection terminator changed")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, jq, "-r", expression)
+	command.Stdin = bytes.NewReader(graph)
+	command.WaitDelay = time.Second
+	raw, err := command.Output()
+	if err != nil {
+		t.Fatal("actual launcher projection failed", err)
+	}
+	d := newDashboard()
+	d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+	if _, err := d.Write(raw); err != nil {
+		t.Fatal(err)
+	}
+	s := d.snapshot()
+	if s.buildTruncated || len(s.buildVertices) == 0 || len(s.buildEdges) == 0 || s.phases[1].state != "running" {
+		t.Fatal("maintained Plan projection lost links or promoted execution authority")
+	}
+	vertices := make(map[string]bool, len(s.buildVertices))
+	for _, vertex := range s.buildVertices {
+		vertices[vertex.Key] = true
+	}
+	for _, edge := range s.buildEdges {
+		if !vertices[edge.From] || !vertices[edge.To] {
+			t.Fatal("launcher emitted a dangling Plan link")
+		}
 	}
 }
 

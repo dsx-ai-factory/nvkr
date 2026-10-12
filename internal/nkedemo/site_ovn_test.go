@@ -538,7 +538,7 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, failed := range []string{"", "missing-node", "binding", "site-ovs-ready", "site-ovn-node-ready", "site-ovn-observation"} {
+		for _, failed := range []string{"", "missing-node", "missing-kubeconfig", "reference-digest", "export-manifest", "export-name", "export-version", "archive-bytes", "binding", "site-ovs-fresh", "site-ovs-ready", "site-ovn-node-ready", "site-ovn-observation"} {
 			t.Run(network+"/"+failed, func(t *testing.T) {
 				work := privateTestDir(t)
 				digest := "sha256:" + strings.Repeat("a", 64)
@@ -551,6 +551,12 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 				node := strings.Repeat("d", 64)
 				if failed == "missing-node" {
 					node = ""
+				}
+				if failed == "missing-kubeconfig" {
+					session.Runner.Env = SetEnv(session.Runner.Env, map[string]string{"SITE_KUBECONFIG": ""})
+				}
+				if failed == "reference-digest" {
+					reference = "172.18.0.2:5000/nkd-local/ovn@sha256:" + strings.Repeat("c", 64)
 				}
 				var phases []string
 				capture := func(ctx context.Context, runner Runner, args []string, phase string, timeout time.Duration) ([]byte, error) {
@@ -586,7 +592,22 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 						if err != nil {
 							t.Fatal(err)
 						}
-						return json.Marshal(delivery.HelmChartExport{ManifestDigest: outputs["ovn-chart"].Observation.Digest, ArchiveDigest: sum, Name: "ovn-kubernetes", Version: version})
+						exported := delivery.HelmChartExport{ManifestDigest: outputs["ovn-chart"].Observation.Digest, ArchiveDigest: sum, Name: "ovn-kubernetes", Version: version}
+						switch failed {
+						case "export-manifest":
+							exported.ManifestDigest = "sha256:" + strings.Repeat("c", 64)
+						case "export-name":
+							exported.Name = "foreign-chart"
+						case "export-version":
+							exported.Version = "0.0.0"
+						case "archive-bytes":
+							// Change the file after computing the export receipt's
+							// digest, without changing that receipt or selected output.
+							if err := os.WriteFile(path, []byte("substituted archive bytes"), 0o600); err != nil {
+								t.Fatal(err)
+							}
+						}
+						return json.Marshal(exported)
 					case "site-ovn-defaults":
 						binding := strings.TrimPrefix(digest, "sha256:")
 						if failed == "binding" {
@@ -615,11 +636,24 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 					t.Fatal("CAPI override escaped its scoped child runner")
 				}
 				if failed != "" {
-					if failed == "missing-node" && len(phases) != 0 {
-						t.Fatalf("missing node identity reached a command: %v", phases)
-					}
 					if err == nil || slices.Contains(phases, "install-capi") || failed == "binding" && slices.Contains(phases, "site-ovs-create") {
 						t.Fatalf("failed network reached CAPI/deployment: %v %v", phases, err)
+					}
+					var want []string
+					switch failed {
+					case "missing-node", "missing-kubeconfig", "reference-digest":
+						// Admission must precede even chart extraction.
+					case "export-manifest", "export-name", "export-version", "archive-bytes":
+						want = []string{"site-ovn-chart"}
+					case "binding":
+						want = []string{"site-ovn-chart", "site-ovn-defaults"}
+					case "site-ovs-fresh":
+						want = []string{"site-ovn-chart", "site-ovn-defaults", "site-ovs-fresh"}
+					default:
+						return
+					}
+					if !slices.Equal(phases, want) || slices.Contains(phases, "site-ovs-create") || slices.Contains(phases, "site-ovn-install") {
+						t.Fatalf("unverified input reached network mutation: %v, want %v", phases, want)
 					}
 					return
 				}
