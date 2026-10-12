@@ -783,6 +783,14 @@ func TestNodeSimulatorProbeRequiresBoundedHealthFromOwnedNode(t *testing.T) {
 			if strings.Contains(writer.String(), "private-connectivity-detail") || strings.Contains(writer.String(), "secret-marker") {
 				t.Fatal("private simulator response reached public output")
 			}
+			if scenario == "curl-failure" {
+				log := filepath.Join(work, "node-simulator-connectivity.log")
+				info, statErr := os.Stat(log)
+				raw, readErr := os.ReadFile(log)
+				if statErr != nil || readErr != nil || info.Mode().Perm() != 0o600 || string(raw) != response {
+					t.Fatalf("private node-probe failure diagnostics were not retained: %v, %v", statErr, readErr)
+				}
+			}
 			if scenario == "canceled" || scenario == "invalid-endpoint" {
 				if scenario == "canceled" && !errors.Is(err, context.Canceled) {
 					t.Fatalf("lost cancellation: %v", err)
