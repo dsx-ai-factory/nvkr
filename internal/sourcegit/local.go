@@ -21,6 +21,8 @@ import (
 // LocalCommand isolates ordinary developer Git operations. Git itself reads
 // developer credential configuration, which is projected only into fetch. It
 // never forwards global build callbacks, filters, templates or line conversions.
+// args starts with the operation, not Git global options. Repository selection
+// belongs exclusively to dir; Git still owns each operation's argument grammar.
 // The caller owns execution and stop/join of the returned command.
 func LocalCommand(ctx context.Context, environment []string, dir string, args ...string) (*exec.Cmd, error) {
 	if ctx == nil {
@@ -28,6 +30,9 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "local source Git canceled")
+	}
+	if len(args) == 0 || args[0] == "" || strings.HasPrefix(args[0], "-") {
+		return nil, e.New(e.CodeEngineCapability, "local source Git requires an operation without caller-supplied global options")
 	}
 	if dir != "" && !filepath.IsAbs(dir) {
 		return nil, e.New(e.CodeEngineCapability, "local source Git requires an absolute explicit repository directory")

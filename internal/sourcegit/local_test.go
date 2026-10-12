@@ -660,6 +660,25 @@ func TestLocalGitAdmissionContextIsCoded(t *testing.T) {
 	}
 }
 
+func TestLocalGitRejectsGlobalOptionsBeforeWork(t *testing.T) {
+	for _, args := range [][]string{
+		nil, {""}, {"-C", "/unselected", "status"}, {"-C/unselected", "status"},
+		{"-c", "color.ui=false", "-C", "/unselected", "status"},
+		{"--git-dir=/unselected/.git", "status"}, {"--work-tree=/unselected", "status"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			// Invalid PATH and a missing directory must not be inspected first.
+			cmd, err := LocalCommand(t.Context(), nil, "/missing-selected-source", args...)
+			if cmd != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "without caller-supplied global options") {
+				t.Fatalf("global option reached another admission boundary: %v", err)
+			}
+			if strings.Contains(err.Error(), "unselected") {
+				t.Fatal("refusal exposed caller-supplied repository selector")
+			}
+		})
+	}
+}
+
 func TestLocalGitRejectsUnselectedProcessConfiguration(t *testing.T) {
 	for _, fields := range [][]string{
 		{"GIT_CONFIG_COUNT=not-a-count"},

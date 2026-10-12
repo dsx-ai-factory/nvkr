@@ -94,6 +94,33 @@ func TestRunnerGitAdmitsEffectiveCommandDirectory(t *testing.T) {
 	}
 }
 
+func TestRunnerGitRejectsAdditionalRepositorySelectors(t *testing.T) {
+	for _, args := range [][]string{
+		{"-c", "color.ui=false", "-C", "/unselected", "status"},
+		{"-C", "/selected", "-C", "/unselected", "status"},
+		{"--git-dir=/unselected/.git", "status"}, {"--work-tree=/unselected", "status"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			root := privateTestDir(t)
+			runner := Runner{Work: root, Env: []string{"PATH=" + os.Getenv("PATH")}}
+			_, err := runner.Capture(t.Context(), append([]string{"git"}, args...), "refuse-git-selector", 10*time.Second)
+			var command *CommandError
+			var coded *nkderrors.Error
+			if !errors.As(err, &command) || command.Phase != "refuse-git-selector" || command.ExitCode != -1 ||
+				!errors.As(err, &coded) || coded.Code != nkderrors.CodeEngineCapability {
+				t.Fatalf("unsupported selector lost phase or coded cause: %v", err)
+			}
+			if strings.Contains(err.Error(), "unselected") {
+				t.Fatal("admission refusal exposed repository argument")
+			}
+			entries, readErr := os.ReadDir(root)
+			if readErr != nil || len(entries) != 0 {
+				t.Fatalf("unsupported selector created diagnostics before admission: %v", readErr)
+			}
+		})
+	}
+}
+
 func privateTestDir(t *testing.T) string {
 	t.Helper()
 	dir, err := filepath.EvalSymlinks(t.TempDir())
