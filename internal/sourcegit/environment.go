@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package sourcegit owns the closed child environment used by hosted source Git.
+// Package sourcegit owns admitted child environments for held source Git and
+// ordinary Local Git. Their credential and transport policies remain distinct.
 // It describes process configuration, not source, build or release authority.
 package sourcegit
 
@@ -112,9 +113,10 @@ func Admit(repository string, environment []string) (string, []string, error) {
 		result = append(result, key+"="+expected[key])
 	}
 	if repository != "" && fields[Token] == "" {
-		// The new held route supports the maintained HTTPS sources and absolute
-		// local repositories used by developer/native fixtures. General catalog
-		// Git/SSH support remains with the unchanged ordinary Local route.
+		// The held route supports maintained HTTPS sources and absolute local
+		// repositories used by developer/native fixtures. Ordinary Local Git
+		// has its separate LocalCommand admission and fetch-only credentials;
+		// it additionally permits SSH, not arbitrary ambient configuration.
 		parsed, err := url.Parse(repository)
 		local := filepath.IsAbs(repository) && filepath.Clean(repository) == repository
 		if err == nil && parsed.Scheme == "file" && parsed.Host == "" && parsed.User == nil &&

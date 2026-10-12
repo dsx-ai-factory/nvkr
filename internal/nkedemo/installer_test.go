@@ -20,6 +20,7 @@ import (
 )
 
 func TestPrepareInstallerPinnedAttempt(t *testing.T) {
+	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, name := range []string{"remote", "local", "sibling", "override", "diagnostic", "interactive", "interactive-auth-failed", "interactive-sudo-failed", "budget-minimum", "budget-maximum", "budget-low", "budget-high", "budget-overflow", "dirty", "wrong-pin", "preflight", "sudo", "fetch", "retained", "symlink", "canceled", "cancel-fetch", "kernel", "kernel-admission-missing", "output-inside-installer", "output-installers", "output-runs", "output-laptop-bootstrap", "output-bootstrap-attempt", "kind-missing", "kind-wrong-id", "kind-wrong-arch", "registry-missing", "registry-wrong-arch", "registry-empty-id", "registry-invalid-id", "registry-duplicate", "registry-malformed", "network-invalid-gateway", "simulator-port-busy"} {
 		t.Run(name, func(t *testing.T) {
 			root := privateTestDir(t)
@@ -368,6 +369,7 @@ func TestPrepareInstallerCanceledAdmissionIsCoded(t *testing.T) {
 }
 
 func TestPrepareInstallerAttemptDiagnostics(t *testing.T) {
+	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, root := range []string{"runs", "laptop-bootstrap", "installers"} {
 		for _, blockedParent := range []bool{false, true} {
 			t.Run(root+map[bool]string{false: "/existing", true: "/not-directory"}[blockedParent], func(t *testing.T) {

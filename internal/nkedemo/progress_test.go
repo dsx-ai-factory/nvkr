@@ -390,6 +390,7 @@ func TestProgressDeploymentFailureAndCleanupOrdering(t *testing.T) {
 }
 
 func TestProgressInstallerAdmissionFailure(t *testing.T) {
+	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, canceled := range []bool{false, true} {
 		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())

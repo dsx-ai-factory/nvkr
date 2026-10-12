@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -18,12 +19,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NVIDIA/nke-recipes/internal/ownedcmd"
 	"github.com/NVIDIA/nke-recipes/internal/sourcegit"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 	"golang.org/x/sys/unix"
 )
 
 func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
+	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, home := range []string{"", "/developer/home"} {
 		t.Run("HOME="+home, func(t *testing.T) {
 			t.Setenv("HOME", home)
@@ -51,6 +54,7 @@ func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
 }
 
 func TestBuildTransportSettingsReachOnlyGitFetch(t *testing.T) {
+	t.Setenv("GIT_CONFIG_COUNT", "0")
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("GIT_SSH_COMMAND", "unselected-callback")
@@ -463,6 +467,7 @@ func TestBuiltInputsShareCombinedRun(t *testing.T) {
 }
 
 func TestBuildAttemptDiagnostics(t *testing.T) {
+	t.Setenv("GIT_CONFIG_COUNT", "0")
 	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
 		t.Skip("artifact build admission requires native Linux ARM64")
 	}
@@ -507,5 +512,23 @@ func TestBuildAttemptDiagnostics(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// Positive fixtures select their invocation environment explicitly. Production
+// admission still rejects this unselected override; negative tests keep their
+// own vectors rather than inheriting a blanket package-wide reset.
+func TestPositiveBuildFixturesDoNotInheritUnselectedGitOverrides(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
+	defer cancel()
+	selected := "^Test(BuildOnlyPreservesDeveloperGitHome|BuildTransportSettingsReachOnlyGitFetch|BuildAttemptDiagnostics|PrepareInstallerPinnedAttempt|PrepareInstallerAttemptDiagnostics|ProgressInstallerAdmissionFailure)$"
+	command := exec.CommandContext(ctx, os.Args[0], "-test.run="+selected, "-test.count=1", "-test.timeout=80s")
+	command.Env = SetEnv(os.Environ(), map[string]string{
+		"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "/unselected-fixture",
+	})
+	var output bytes.Buffer
+	command.Stdout, command.Stderr = &output, &output
+	if err := ownedcmd.Run(ctx, command); err != nil {
+		t.Fatalf("positive fixtures inherited ambient Git configuration: %v\n%s", err, &output)
 	}
 }

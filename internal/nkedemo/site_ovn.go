@@ -135,6 +135,10 @@ func admitSiteOVNArchive(ctx context.Context, raw []byte, imageDigest string) er
 	return admitSiteOVNArchiveForNetwork(ctx, "ovn", raw, imageDigest)
 }
 
+// This raw-byte boundary remains independently safe for direct callers. Its
+// shared archive inspection is intentionally repeated after ReadHelmChart:
+// bytes alone do not carry the delivery owner's prior admission, and tests also
+// call this boundary with unverified or malformed archives.
 func admitSiteOVNArchiveForNetwork(ctx context.Context, network string, raw []byte, imageDigest string) error {
 	version, _, _, err := selectedOVNOutputs(network)
 	if err != nil {
