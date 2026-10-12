@@ -384,6 +384,14 @@ isolated. The report is projected into deterministic component names, versions a
 records, temporary paths, timestamps and scanner-generated IDs are excluded. Scanner executable identity is
 recorded separately. Unknown versions remain unknown; they are never filled from unrelated module tags.
 
+For path-based host-package inspection, a literal `.deb` extension is retained only as the constant private
+snapshot name `subject.deb`, because the pinned Syft archive cataloger selects Debian archives by extension.
+The caller's basename is not copied, and the extension is a discovery hint rather than format or identity
+proof. Syft parses the same held bytes, with the existing digest pin and post-scan snapshot check. Other host
+files retain the generic snapshot name; the held-only API has no pathname hint. Debian archive inventory
+covers observed package/control metadata. It does not establish every application dependency inside the
+payload, preserve a source package through later packaging, enable direct APT publication, or prove installation.
+
 For Helm source archives and exact acquired archives selected as Helm outputs, a generic manifest reader inventories bundled `Chart.yaml` declarations and chart
 dependency declarations/locks. It never executes
 installation scripts or fetches external charts. Bundled charts and locked references are

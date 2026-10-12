@@ -96,7 +96,9 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 	if subject.Digest() != artifactDigest {
 		return DependencyInventory{}, e.New(e.CodeVerifyFailed, "SBOM subject bytes differ from producer digest")
 	}
-	return inspectHeldDependencies(ctx, subject, kind, scanner)
+	// Syft selects its Debian archive reader by extension. Keep only this
+	// discovery hint; the scanner still owns parsing the exact held bytes.
+	return inspectHeldDependencies(ctx, subject, kind, scanner, filepath.Ext(artifactPath) == ".deb")
 }
 
 // InspectHeldDependencies consumes the existing held capability without opening
@@ -123,7 +125,7 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	inventory, err := inspectHeldDependencies(ctx, subject, kind, scanner)
+	inventory, err := inspectHeldDependencies(ctx, subject, kind, scanner, false)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +135,7 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	return &DependencyScanReceipt{subject: subject.Digest(), size: subject.Size(), kind: kind, inventory: inventory}, nil
 }
 
-func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner) (DependencyInventory, error) {
+func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, debianArchiveHint bool) (DependencyInventory, error) {
 	artifactDigest := subject.Digest()
 	if kind == "tarball" {
 		components, err := inspectHelmArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
@@ -166,7 +168,11 @@ func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	// then recheck it before accepting the inventory. OCI scans use the held FD.
 	var snapshot string
 	if kind == "host-package" {
-		snapshot = filepath.Join(workdir, "subject")
+		name := "subject"
+		if debianArchiveHint {
+			name = "subject.deb"
+		}
+		snapshot = filepath.Join(workdir, name)
 		file, err := os.OpenFile(snapshot, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
 		if err != nil {
 			return DependencyInventory{}, e.Wrap(e.CodeInternal, err, "staging scanner subject")

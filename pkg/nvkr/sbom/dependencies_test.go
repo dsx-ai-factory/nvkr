@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
 func dependencySubject(t *testing.T) *BOM {
@@ -272,6 +273,68 @@ func TestPinnedScannerProtocol(t *testing.T) {
 			}
 			if err != nil || len(got.Components) != 1 {
 				t.Fatalf("scanner result: %+v %v", got, err)
+			}
+		})
+	}
+}
+
+func TestPinnedScannerDiscoveryHint(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held scanner execution is Linux-only")
+	}
+	const inventory = `{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"type":"library","name":"dependency","version":"1.0.0","purl":"pkg:generic/dependency@1.0.0"}]}`
+	for _, tc := range []struct {
+		name, filename, snapshot string
+		held, mutate             bool
+	}{
+		{"generic binary", "tool", "subject", false, false},
+		{"Debian archive", "source-package.deb", "subject.deb", false, false},
+		{"uppercase is not a hint", "package.DEB", "subject", false, false},
+		{"nonterminal extension", "package.deb.tmp", "subject", false, false},
+		{"other extension", "package.rpm", "subject", false, false},
+		{"held input has no filename hint", "package.deb", "subject", true, false},
+		{"Debian snapshot mutation", "package.deb", "subject.deb", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, tc.filename)
+			raw := []byte("fixture")
+			if err := os.WriteFile(file, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			body := "file=${2#file:}\n[ \"${file##*/}\" = " + tc.snapshot + " ] || exit 29\n"
+			if tc.mutate {
+				body += "chmod u+w \"$file\"\nprintf changed > \"$file\"\n"
+			}
+			script := []byte("#!/bin/sh\n" + body + "printf '%s' '" + inventory + "'\n")
+			scannerPath := filepath.Join(dir, "scanner")
+			if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			scanner := Scanner{Path: scannerPath, Digest: fmt.Sprintf("sha256:%x", sha256.Sum256(script))}
+			digest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
+			var err error
+			if tc.held {
+				subject, openErr := heldfile.OpenContext(t.Context(), file, heldfile.Options{Label: "hint-test-subject", MaxBytes: 1024, ExpectedDigest: digest})
+				if openErr != nil {
+					t.Fatal(openErr)
+				}
+				defer subject.Close()
+				var receipt *DependencyScanReceipt
+				receipt, err = InspectHeldDependencies(t.Context(), subject, "host-package", scanner)
+				if err == nil {
+					observed, size, kind := receipt.Binding()
+					if observed != digest || size != int64(len(raw)) || kind != "host-package" {
+						t.Fatalf("held scan binding = %s/%d/%s", observed, size, kind)
+					}
+				}
+			} else {
+				_, err = InspectDependencies(t.Context(), file, digest, "host-package", scanner)
+			}
+			if tc.mutate {
+				assertDependencyCode(t, err, e.CodeVerifyFailed)
+			} else if err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

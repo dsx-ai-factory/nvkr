@@ -131,6 +131,20 @@ An opted-in run fails on inadequate capacity rather than skipping its positive c
 owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NVKE image.
 Actual native disk build/inspection evidence remains separately scoped in the evidence index.
 
+The independent Debian archive scanner regression requires native Linux amd64 or arm64 and the existing
+`/usr/bin/dpkg-deb`. Export `NVKR_SBOM_SCANNER` with the selected Syft executable path, and
+`NVKR_SBOM_SCANNER_DIGEST` and `NVKR_SBOM_PACKAGE_READER_DIGEST` with their exact `sha256:` executable
+digests from your selected toolchain. Opting in with missing or mismatched pins fails rather than skipping:
+
+```sh
+NVKR_SBOM_DEBIAN_INTEGRATION=1 \
+go test ./pkg/nvkr/sbom -run '^TestRealDebianArtifactDependencies$' -count=1 -v
+```
+
+It builds controlled gzip/xz packages, inspects their final bytes through the ordinary scanner owner and
+checks exact package metadata, digest/length read-back and malformed-package rejection. This covers Debian
+archive package/control metadata, not all embedded application dependencies, installation, signing or publication.
+
 ## Repository layout
 
 - `definitions/`: tutorial, deploy, combined candidate, and OS-image Definitions, Environments, and catalogs.
