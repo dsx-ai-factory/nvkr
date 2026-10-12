@@ -240,8 +240,11 @@ func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR, demoExecutabl
 }
 
 func admitNetworkProbeExecutable(ctx context.Context, path string) (string, error) {
+	if ctx == nil {
+		return "", nkderr.New(nkderr.CodeUsage, "network probe executable requires a context")
+	}
 	if err := requireContext(ctx); err != nil {
-		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "network probe executable context")
+		return "", nkderr.Wrap(nkderr.CodeTimeout, err, "network probe executable context")
 	}
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
 		return "", nkderr.New(nkderr.CodeEngineCapability, "require explicitly selected absolute native demo executable for network admission")
@@ -250,8 +253,11 @@ func admitNetworkProbeExecutable(ctx context.Context, path string) (string, erro
 	if err != nil {
 		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "resolve network probe executable")
 	}
-	held, info, err := securepath.OpenRegular(resolved)
+	held, info, err := holdNetworkProbeExecutable(ctx, resolved)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return "", nkderr.Wrap(nkderr.CodeTimeout, err, "network probe executable context")
+		}
 		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "open network probe executable")
 	}
 	defer held.Close()
@@ -263,9 +269,65 @@ func admitNetworkProbeExecutable(ctx context.Context, path string) (string, erro
 		return "", nkderr.New(nkderr.CodeEngineCapability, "network probe requires an executable owned by root/current user without set-ID or group/other write permissions")
 	}
 	if err = ctx.Err(); err != nil {
-		return "", nkderr.Wrap(nkderr.CodeEngineCapability, err, "network probe executable context")
+		return "", nkderr.Wrap(nkderr.CodeTimeout, err, "network probe executable context")
 	}
 	return resolved, nil
+}
+
+// Reuse securepath's descriptor-relative O_NOFOLLOW walk, as the existing
+// source-vendor helper admission does. The sudo child later executes by path;
+// reject ancestors another principal could rename. This is trusted-host path
+// admission, not immutable executable authority against root/the same user.
+func holdNetworkProbeExecutable(ctx context.Context, path string) (*os.File, os.FileInfo, error) {
+	current, _, err := securepath.OpenDirectory(string(filepath.Separator))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if current != nil {
+			_ = current.Close()
+		}
+	}()
+	parts := strings.Split(strings.TrimPrefix(path, string(filepath.Separator)), string(filepath.Separator))
+	for index, part := range parts {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		var stat unix.Stat_t
+		if err := unix.Fstat(int(current.Fd()), &stat); err != nil {
+			return nil, nil, err
+		}
+		if err := networkProbeDirectoryProtection(stat.Uid, uint32(stat.Mode)); err != nil {
+			return nil, nil, err
+		}
+		directory := index != len(parts)-1
+		next, info, err := securepath.OpenChild(current, part, directory)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := current.Close(); err != nil {
+			_ = next.Close()
+			return nil, nil, err
+		}
+		current = next
+		if !directory {
+			current = nil // Transfer the exact final descriptor to its caller.
+			return next, info, nil
+		}
+	}
+	return nil, nil, errors.New("network probe path has no executable member")
+}
+
+func networkProbeDirectoryProtection(uid, mode uint32) error {
+	trustedOwner := uid == 0 || uid == uint32(os.Getuid())
+	// Root-owned sticky temporary directories protect each accepted root/user
+	// child against other users' rename/unlink. Non-sticky writable ancestors
+	// and foreign-owned intermediate children are never admitted.
+	stickyRoot := uid == 0 && mode&unix.S_ISVTX != 0
+	if mode&unix.S_IFMT != unix.S_IFDIR || !trustedOwner || mode&0o111 == 0 || mode&0o022 != 0 && !stickyRoot {
+		return errors.New("network probe ancestors must be root/current-user owned and not replaceable by other principals")
+	}
+	return nil
 }
 
 // ProbeNetworkPrivilegedPorts is the fixed native helper: it accepts no target,

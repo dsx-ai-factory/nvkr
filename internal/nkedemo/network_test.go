@@ -1172,7 +1172,7 @@ func TestNetworkUnattendedSudoAdmissionDiagnostics(t *testing.T) {
 }
 
 func TestNetworkProbeExecutableAdmission(t *testing.T) {
-	for _, name := range []string{"valid", "empty", "relative", "missing", "directory", "no-exec", "group-write", "other-write", "symlink"} {
+	for _, name := range []string{"valid", "empty", "relative", "missing", "directory", "no-exec", "group-write", "other-write", "setuid", "setgid", "parent-group-write", "parent-other-write", "symlink"} {
 		t.Run(name, func(t *testing.T) {
 			dir := privateTestDir(t)
 			path := filepath.Join(dir, "nke-demo")
@@ -1193,6 +1193,22 @@ func TestNetworkProbeExecutableAdmission(t *testing.T) {
 				if err := os.Chmod(path, mode); err != nil {
 					t.Fatal(err)
 				}
+			case "setuid", "setgid":
+				mode := os.FileMode(0o700) | os.ModeSetuid
+				if name == "setgid" {
+					mode = 0o700 | os.ModeSetgid
+				}
+				if err := os.Chmod(path, mode); err != nil {
+					t.Fatal(err)
+				}
+			case "parent-group-write", "parent-other-write":
+				mode := os.FileMode(0o770)
+				if name == "parent-other-write" {
+					mode = 0o777
+				}
+				if err := os.Chmod(dir, mode); err != nil {
+					t.Fatal(err)
+				}
 			case "symlink":
 				link := path + "-link"
 				if err := os.Symlink(path, link); err != nil {
@@ -1210,6 +1226,49 @@ func TestNetworkProbeExecutableAdmission(t *testing.T) {
 				if !errors.As(err, &coded) || coded.Code != nkderr.CodeEngineCapability || resolved != "" {
 					t.Fatalf("unsafe executable admitted=%q, %v", resolved, err)
 				}
+			}
+		})
+	}
+}
+
+func TestNetworkProbeDirectoryProtection(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		uid     uint32
+		mode    uint32
+		allowed bool
+	}{
+		{"root private", 0, unix.S_IFDIR | 0o755, true},
+		{"current private", uint32(os.Getuid()), unix.S_IFDIR | 0o700, true},
+		{"root sticky temporary", 0, unix.S_IFDIR | unix.S_ISVTX | 0o777, true},
+		{"root non-sticky writable", 0, unix.S_IFDIR | 0o777, false},
+		{"root group writable", 0, unix.S_IFDIR | 0o775, false},
+		{"foreign owner", uint32(os.Getuid()) + 1, unix.S_IFDIR | 0o755, false},
+		{"foreign sticky owner", uint32(os.Getuid()) + 1, unix.S_IFDIR | unix.S_ISVTX | 0o777, false},
+		{"non-directory", 0, unix.S_IFREG | 0o755, false},
+		{"unsearchable", 0, unix.S_IFDIR | 0o600, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if (networkProbeDirectoryProtection(test.uid, test.mode) == nil) != test.allowed {
+				t.Fatal("unsafe directory protection decision")
+			}
+		})
+	}
+}
+
+func TestNetworkProbeContextRefusalBeforePathWork(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, test := range []struct {
+		name string
+		ctx  context.Context
+		code nkderr.Code
+	}{{"nil context", nil, nkderr.CodeUsage}, {"canceled", canceled, nkderr.CodeTimeout}} {
+		t.Run(test.name, func(t *testing.T) {
+			path, err := admitNetworkProbeExecutable(test.ctx, "/must-not-inspect")
+			var coded *nkderr.Error
+			if path != "" || !errors.As(err, &coded) || coded.Code != test.code {
+				t.Fatal("context refusal reached file work or lost code", path, err)
 			}
 		})
 	}
