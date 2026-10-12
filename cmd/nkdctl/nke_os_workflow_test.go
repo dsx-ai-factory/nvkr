@@ -23,6 +23,16 @@ func TestOSWorkflowToolchainLockGate(t *testing.T) {
 	}
 	// Execute the actual workflow expression, not a second implementation of
 	// its trust policy. These delimiters identify its existing literal jq input.
+	const invocation = "jq -n -e --slurpfile candidate \"${candidate_lock}\" \\\n  --slurpfile reviewed toolchains/nkd-packer/toolchain.lock.json '\n"
+	_, gateAndRemainder, invocationFound := strings.Cut(source.Run, invocation)
+	if !invocationFound {
+		t.Fatal("workflow lock gate must invoke jq -n -e with the actual candidate and reviewed files")
+	}
+	gateTail, _, gateFound := strings.Cut(gateAndRemainder, "pin=\"$(bin/nkdctl catalog source-pin")
+	if !gateFound {
+		t.Fatal("workflow lock gate boundary is missing")
+	}
+	gateScript := invocation + gateTail
 	_, tail, found := strings.Cut(source.Run, "--slurpfile reviewed toolchains/nkd-packer/toolchain.lock.json '\n")
 	if !found {
 		t.Fatal("workflow lock gate is missing")
@@ -39,46 +49,47 @@ func TestOSWorkflowToolchainLockGate(t *testing.T) {
 	}
 	validID := "sha256:" + strings.Repeat("a", 64)
 	for _, row := range []struct {
-		name      string
-		mutate    func(map[string]any)
-		duplicate bool
-		accept    bool
+		name       string
+		mutate     func(map[string]any)
+		duplicate  bool
+		accept     bool
+		diagnostic string
 	}{
 		{name: "checked-in Docker-only lock", accept: true},
 		{name: "observed native Docker IDs", mutate: func(lock map[string]any) {
 			lock["localDockerImages"] = map[string]any{"amd64": validID, "arm64": validID}
 		}, accept: true},
-		{name: "missing Docker IDs", mutate: func(lock map[string]any) { delete(lock, "localDockerImages") }},
+		{name: "missing Docker IDs", mutate: func(lock map[string]any) { delete(lock, "localDockerImages") }, diagnostic: "missing localDockerImages"},
 		{name: "missing native architecture", mutate: func(lock map[string]any) {
 			lock["localDockerImages"] = map[string]any{"arm64": validID}
-		}},
+		}, diagnostic: "expected exactly amd64 and arm64"},
 		{name: "additional architecture", mutate: func(lock map[string]any) {
 			lock["localDockerImages"] = map[string]any{"amd64": nil, "arm64": nil, "riscv64": nil}
-		}},
+		}, diagnostic: "expected exactly amd64 and arm64"},
 		{name: "malformed image ID", mutate: func(lock map[string]any) {
 			lock["localDockerImages"] = map[string]any{"amd64": nil, "arm64": "mutable:tag"}
-		}},
+		}, diagnostic: "image IDs must be null or exact sha256 digests"},
 		{name: "non-string image ID", mutate: func(lock map[string]any) {
 			lock["localDockerImages"] = map[string]any{"amd64": nil, "arm64": 1}
-		}},
+		}, diagnostic: "image IDs must be null or exact sha256 digests"},
 		{name: "legacy Podman IDs", mutate: func(lock map[string]any) {
 			lock["localPodmanImages"] = map[string]any{"amd64": nil, "arm64": nil}
-		}},
+		}, diagnostic: "legacy localPodmanImages is unsupported"},
 		{name: "legacy local IDs", mutate: func(lock map[string]any) {
 			delete(lock, "localDockerImages")
 			lock["localImages"] = map[string]any{"amd64": nil, "arm64": nil}
-		}},
+		}, diagnostic: "legacy localImages is unsupported"},
 		{name: "mixed legacy local IDs", mutate: func(lock map[string]any) {
 			lock["localImages"] = map[string]any{"amd64": nil, "arm64": nil}
-		}},
+		}, diagnostic: "legacy localImages is unsupported"},
 		{name: "source pin substitution", mutate: func(lock map[string]any) {
 			lock["validatedNKE"].(map[string]any)["commit"] = strings.Repeat("a", 40)
-		}},
+		}, diagnostic: "mismatched locked fields: validatedNKE"},
 		{name: "archive pin substitution", mutate: func(lock map[string]any) {
 			lock["go"].(map[string]any)["archives"].(map[string]any)["arm64"] = validID
-		}},
-		{name: "additional trusted field", mutate: func(lock map[string]any) { lock["unknown"] = true }},
-		{name: "duplicate document", duplicate: true},
+		}, diagnostic: "mismatched locked fields: go"},
+		{name: "additional trusted field", mutate: func(lock map[string]any) { lock["unknown"] = true }, diagnostic: "mismatched locked fields: unknown"},
+		{name: "duplicate document", duplicate: true, diagnostic: "exactly one JSON document"},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			var lock map[string]any
@@ -108,6 +119,20 @@ func TestOSWorkflowToolchainLockGate(t *testing.T) {
 			if !row.accept {
 				if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 || strings.TrimSpace(string(output)) != "false" {
 					t.Fatalf("gate did not reject by policy: %v: %s", err, output)
+				}
+			}
+			// Execute the real shell invocation and its diagnostic handler too.
+			// Policy rows alone cannot detect a missing workflow jq -e flag.
+			cmd = exec.CommandContext(t.Context(), "bash", "-euc", gateScript)
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "candidate_lock="+candidate)
+			output, err = cmd.CombinedOutput()
+			if (err == nil) != row.accept || row.diagnostic != "" && !strings.Contains(string(output), row.diagnostic) {
+				t.Fatalf("workflow invocation/diagnostic accepted=%t, want %t, diagnostic=%q: %v: %s", err == nil, row.accept, row.diagnostic, err, output)
+			}
+			for _, line := range strings.Split(string(output), "\n") {
+				if strings.TrimSpace(line) == "mismatched locked fields:" {
+					t.Fatal("workflow printed an empty locked-field mismatch diagnostic")
 				}
 			}
 		})

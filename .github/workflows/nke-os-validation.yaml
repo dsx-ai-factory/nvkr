@@ -248,12 +248,27 @@ jobs:
               --slurpfile reviewed toolchains/nkd-packer/toolchain.lock.json '
               if ($candidate | length) != 1 then
                 "candidate lock must contain exactly one JSON document"
+              elif ($reviewed | length) != 1 then
+                "reviewed lock must contain exactly one JSON document"
               else
-                ($candidate[0] | del(.localImages, .localPodmanImages, .localDockerImages)) as $input |
+                $candidate[0] as $lock |
+                ($lock | del(.localImages, .localPodmanImages, .localDockerImages)) as $input |
                 ($reviewed[0] | del(.localImages, .localPodmanImages, .localDockerImages)) as $trusted |
-                [($input | keys[]), ($trusted | keys[])] | unique |
-                map(select($input[.] != $trusted[.])) |
-                "mismatched locked fields: " + join(", ")
+                (if ($lock | has("localImages")) then "legacy localImages is unsupported" else empty end),
+                (if ($lock | has("localPodmanImages")) then "legacy localPodmanImages is unsupported" else empty end),
+                (if ($lock | has("localDockerImages") | not) then
+                  "missing localDockerImages: expected amd64 and arm64 image IDs or null"
+                elif ($lock.localDockerImages | type) != "object" then
+                  "invalid localDockerImages: expected an object with amd64 and arm64"
+                elif ($lock.localDockerImages | keys | sort) != ["amd64", "arm64"] then
+                  "invalid localDockerImages: expected exactly amd64 and arm64"
+                elif ($lock.localDockerImages | any(.[]; . != null and
+                    (type != "string" or (test("^sha256:[0-9a-f]{64}$") | not)))) then
+                  "invalid localDockerImages: image IDs must be null or exact sha256 digests"
+                else empty end),
+                ([($input | keys[]), ($trusted | keys[])] | unique |
+                  map(select($input[.] != $trusted[.])) |
+                  if length > 0 then "mismatched locked fields: " + join(", ") else empty end)
               end
             ' >&2 || true
             printf '%s\n' \
