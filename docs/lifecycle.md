@@ -296,6 +296,48 @@ contract and local tests do not establish real hosted signing or complete-set co
 [Reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary) records contract coverage and
 the outstanding hosted signing, exact-input candidate and consumer acceptance evidence.
 
+## Publish qualification evidence
+
+On Linux, `nvkr run qualify` accepts the same exact input, candidate, source and pinned-cosign flags as
+`run check-artifacts`, plus the required `--qualification-workflow` repository-relative path. It must run
+in an active default-branch GitHub `workflow_run` invocation of that distinct approved workflow. The source
+build must already be completed successfully. The qualifier authenticates its own Run and the event's exact
+source Run, attempt and commit against GitHub before opening the candidate inputs. A manually dispatched
+qualifier or the source build's own identity is rejected.
+
+`qualification.PublishFiles` owns file orchestration and receipt lifetimes; `qualification.Publisher`
+consumes the live artifact-check and qualification-invocation receipts. Serialized reports, caller-supplied
+pass values and result files cannot replace these receipts. The publisher collects the complete verdict
+set before invoking the pinned signer, rechecks receipt validity before each attachment, and verifies each
+attached attestation against its exact artifact subject and the independent qualification identity.
+
+The strict canonical predicate uses schema `nvkr.dev/qualification-evidence/v1`, typed digest family
+`nvkr.qualification-evidence`, and predicate URI `https://nvkr.dev/qualification-evidence/v1`. It contains
+the gate version, full artifact-check report and source identity, exact input identities, complete named
+output checks, independent qualification invocation, smoke verdicts and external-suite status. Every
+selected output receives the same complete-set evidence under its own exact subject. Decoding this evidence
+does not grant release authorization.
+
+M3-B has no authenticated smoke-receipt issuer yet. Executable outputs therefore fail with a missing-smoke
+gate result; OCI and APT outputs fail capability admission until B establishes their delivered-tool smoke
+applicability. Disk and Helm outputs explicitly report smoke as not applicable. Disk evidence remains
+producer-only. These failures occur before signing. `--external-suite NAME` records that named suite as
+`not-evaluated` with reason `outside MVP scope`; it does not run the suite or claim a pass. There is no
+default suite. `--required-suite NAME` fails before provider or artifact work because authenticated
+external-suite integration is unavailable.
+
+The CLI emits canonical publication diagnostics and a stable failure code. An operational signing or
+attachment failure can leave earlier attachments; diagnostics retain their exact subjects and never report
+successful qualification. A successful attachment result is still separate from release authorization and
+independent consumer acceptance.
+
+No generated qualifier workflow is enabled. The current candidate still needs the authored embedded
+manifests, an exact-attempt source handoff and the B smoke integration. Linux race tests and real cosign
+3.1.3 local-key interoperability against a loopback registry exercise the implementation and attestation
+protocol. They do not exercise hosted OIDC, a real qualification workflow or complete-set consumer
+acceptance; [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary)
+records those outstanding boundaries.
+
 ## Use the SDK
 
 Configure the client with tool and registry settings once, then pass a reference and policy for each Release.

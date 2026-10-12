@@ -73,9 +73,10 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 		return out
 	}
 	for path, raw := range map[string]string{
-		"sbom.json":         `{"bomFormat":"CycloneDX","specVersion":"1.5","version":1}`,
-		"provenance.json":   `{"buildDefinition":{"buildType":"https://nvkr.dev/buildtypes/wrapped-build/v1","externalParameters":{}},"runDetails":{"builder":{"id":"local-fixture"}}}`,
-		"trusted-root.json": `{"mediaType":"application/vnd.dev.sigstore.trustedroot+json;version=0.1","tlogs":[],"certificateAuthorities":[],"ctlogs":[],"timestampAuthorities":[]}`,
+		"sbom.json":          `{"bomFormat":"CycloneDX","specVersion":"1.5","version":1}`,
+		"provenance.json":    `{"buildDefinition":{"buildType":"https://nvkr.dev/buildtypes/wrapped-build/v1","externalParameters":{}},"runDetails":{"builder":{"id":"local-fixture"}}}`,
+		"qualification.json": `{"schemaVersion":"nvkr.dev/qualification-evidence/v1","gateVersion":"local-key-interop-fixture"}`,
+		"trusted-root.json":  `{"mediaType":"application/vnd.dev.sigstore.trustedroot+json;version=0.1","tlogs":[],"certificateAuthorities":[],"ctlogs":[],"timestampAuthorities":[]}`,
 	} {
 		if err := os.WriteFile(filepath.Join(workspace, path), []byte(raw), 0o600); err != nil {
 			t.Fatal(err)
@@ -149,7 +150,8 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 		t.Fatal("missing provenance was accepted")
 	}
 	requireRun(signArgs(ociAttestArgs(subject, "provenance.json"))...)
-	for _, predicate := range []string{CosignSignaturePredicateType, ProvenancePredicateType} {
+	requireRun(signArgs(qualificationAttestArgs(subject, "qualification.json"))...)
+	for _, predicate := range []string{CosignSignaturePredicateType, ProvenancePredicateType, QualificationPredicateType} {
 		bundles, err := decodeOCIBundles(requireRun(ociDownloadBundleArgs(subject, predicate)...))
 		if err != nil {
 			t.Fatal(err)
