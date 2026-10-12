@@ -287,7 +287,7 @@ func (observer *tenantGuestObserver) update(ctx context.Context, t *tenant, now 
 					}
 					guests[i].Available, guests[i].Domain, guests[i].ProviderReady = true, presentedDomainState(state), binding.ready
 					if files, readErr := tenantConsoleMetadata(limited, work, binding.instance); readErr == nil {
-						observer.console[i].observe(time.Now(), files, &guests[i])
+						observer.console[i].observe(now, files, &guests[i])
 					}
 				}
 			}

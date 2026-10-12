@@ -489,6 +489,53 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 	}
 }
 
+func TestDashboardStoppedPhaseHasDistinctColor(t *testing.T) {
+	for _, width := range []int{80, 140} {
+		t.Run(fmt.Sprint(width), func(t *testing.T) {
+			d := newDashboard()
+			d.phases[2] = dashboardPhase{state: "observed"}
+			d.phases[3] = dashboardPhase{state: "stopped"}
+			d.tenantStages[0].states[0] = "stopped"
+			if checklist, _ := dashboardChecklist(d.snapshot(), time.Now()); !strings.Contains(checklist, "[lightsalmon]■") {
+				t.Fatal("stopped checkpoint reused the observation color")
+			}
+			screen := dashboardScreen(t, width)
+			d.draw(screen, time.Now(), false)
+			screen.Show()
+			cells, _, _ := screen.GetContents()
+			x, y, paneWidth, paneHeight := d.phasesView.GetRect()
+			color := func(label string) tcell.Color {
+				letters := []rune(label)
+				for start := 0; start+len(letters) <= len(cells); start++ {
+					column, row := start%width, start/width
+					if column < x || column+len(letters) > x+paneWidth || row < y || row >= y+paneHeight {
+						continue
+					}
+					matches := true
+					for index, letter := range letters {
+						if len(cells[start+index].Runes) == 0 || cells[start+index].Runes[0] != letter {
+							matches = false
+							break
+						}
+					}
+					if matches {
+						foreground, _, _ := cells[start].Style.Decompose()
+						return foreground
+					}
+				}
+				t.Fatalf("phase label %q not rendered", label)
+				return tcell.ColorDefault
+			}
+			if got := color("Site"); got != tcell.ColorLightSteelBlue {
+				t.Fatalf("observed phase color=%v", got)
+			}
+			if got := color("Tenant"); got != tcell.ColorLightSalmon {
+				t.Fatalf("stopped phase color=%v", got)
+			}
+		})
+	}
+}
+
 func TestDashboardSanitizationAndPrivacy(t *testing.T) {
 	d := newDashboard()
 	_, _ = io.WriteString(d, "visible\x1b[2J [red]literal[-]\n")

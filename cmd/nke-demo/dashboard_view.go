@@ -340,8 +340,10 @@ func dashboardOperation(name string) (index int, label string) {
 		return 1, "Execute the combined artifact graph"
 	case "network-preflight", "network-setup":
 		return 2, "Prepare isolated demo networking"
-	case "create-management", "management-ready":
+	case "create-management":
 		return 2, "Create and check Kind management cluster"
+	case "management-ready":
+		return 2, dashboardSiteStages[2].label
 	case "start-registry", "node-registry-connectivity", "registry-admission":
 		return 2, "Admit registry access from the actual node"
 	case "node-simulator-connectivity":
@@ -974,7 +976,7 @@ func dashboardChecklist(s dashboardSnapshot, now time.Time) (string, int) {
 		case "failed":
 			color, marker = "lightcoral", "✗"
 		case "stopped":
-			color, marker = "lightsteelblue", "■"
+			color, marker = "lightsalmon", "■"
 		}
 		if required == 2 && observed == 1 && state == "pending" {
 			detail = "1/2 pending"
@@ -1022,7 +1024,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	d.activityView.SetWrap(false)
 	var phases strings.Builder
 	names := [...]string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"}
-	colors := map[string]string{"pending": "goldenrod", "running": "lightcyan", "observed": "lightsteelblue", "complete": "lightgreen", "failed": "lightcoral", "stopped": "lightsteelblue"}
+	colors := map[string]string{"pending": "goldenrod", "running": "lightcyan", "observed": "lightsteelblue", "complete": "lightgreen", "failed": "lightcoral", "stopped": "lightsalmon"}
 	for index, phase := range s.phases {
 		if width <= 90 {
 			fmt.Fprintf(&phases, "[%s::b]%s[-::-] %s", colors[phase.state], names[index], phase.state)

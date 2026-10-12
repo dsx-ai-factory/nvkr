@@ -246,8 +246,9 @@ type managementAdmission struct {
 }
 
 // projectManagementConfig changes only this demo's private runtime copy after
-// exact source-byte admission. Downstream topology selects IPv4 NVIDIA OVN;
-// its source-owned Kind fixture disables the default CNI and kube-proxy.
+// exact source-byte admission. The projection selects IPv4 and, for either
+// OVN mode, disables the fixture's default CNI and kube-proxy. The explicit
+// kind-calico diagnostic keeps those source-owned defaults.
 func projectManagementConfig(source []byte) ([]byte, error) {
 	return projectManagementConfigForNetwork(source, "ovn")
 }

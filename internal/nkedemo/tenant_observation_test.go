@@ -325,7 +325,8 @@ esac
 			env := []string{"PATH=" + tools + ":/usr/bin:/bin", "ROWS=" + fixture, "SIM=" + simulator, "SCENARIO=" + scenario, "SITE_KUBECONFIG=owned"}
 			selected := tenant{name: "tenant", id: "cluster-id", session: ManagementSession{Work: site, Tools: tools, Runner: Runner{Work: site, Env: env, Progress: writer}}, domains: Runner{Env: env}}
 			observer := tenantGuestObserver{}
-			if err = observer.update(t.Context(), &selected, time.Now()); err != nil {
+			observedAt := time.Unix(1000, 0)
+			if err = observer.update(t.Context(), &selected, observedAt); err != nil {
 				t.Fatal(err)
 			}
 			if len(writer.events) != 1 || writer.events[0].Kind != TenantGuests {
@@ -344,6 +345,20 @@ esac
 			}
 			if scenario == "owned" && (guests[0].Domain != TenantDomainRunning || guests[0].ProviderReady != TenantConditionFalse || guests[1].ProviderReady != TenantConditionTrue) {
 				t.Fatalf("incorrect descriptive readiness: %+v", guests)
+			}
+			if scenario == "owned" {
+				console := filepath.Join(simulator, "var", "instances", "cp-instance", "disk.qcow2.ttyS0.log")
+				if err = os.WriteFile(console, []byte("private console secret grows"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				for _, elapsed := range []time.Duration{30 * time.Second, 75 * time.Second} {
+					if err = observer.update(t.Context(), &selected, observedAt.Add(elapsed)); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if len(writer.events) != 3 || !writer.events[1].Guests[0].ConsoleChanged || writer.events[1].Guests[0].ConsoleLastChange != 0 || writer.events[2].Guests[0].ConsoleLastChange != 45*time.Second {
+					t.Fatal("guest update discarded its injected observation time", writer.events)
+				}
 			}
 			public, err := json.Marshal(writer.events)
 			if err != nil {
