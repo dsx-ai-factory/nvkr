@@ -35,7 +35,7 @@ diagnostic selection; the other 25 output names remain unchanged:
 
 | Output | Format | Role |
 | --- | --- | --- |
-| `nke-node-image-upstream-ovn-arm64` | `disk-image` | QCOW2 with the selected upstream OVN packages |
+| `nvke-node-image-upstream-ovn-arm64` | `disk-image` | QCOW2 with the selected upstream OVN packages |
 | `upstream-ovn-image-arm64` | `oci` | Standalone upstream OVN image |
 | `upstream-ovn-chart-arm64` | `helm-oci` | Chart bound to the standalone image |
 | `controller-profiles-upstream-ovn` | `oci` | Profiles selecting the matching upstream chart stream |

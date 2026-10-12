@@ -113,10 +113,16 @@ func TestRetainedBackgroundFixture(t *testing.T) {
 }
 
 func TestRetainedCleanupReturnsFailedOutcomeBeforeBudgetAndRelaysProgress(t *testing.T) {
-	owner, ctx, _ := retainedTestOwner(t)
+	owner, ctx, cancelWork := retainedTestOwner(t)
 	root := privateTestDir(t)
 	progress := &retainedProgress{}
-	_, _ = progress.Write([]byte("public owner cleanup observation\n"))
+	_, _ = progress.Write([]byte("pre-invocation deployment history\n"))
+	owner.cancelOperations = func() {
+		// The synchronous observation is already in the /cleanup acknowledgment.
+		// Its caller must skip old deployment history without dropping this frame.
+		_, _ = progress.Write([]byte("public owner cleanup observation\n"))
+		cancelWork()
+	}
 	control, err := newRetainedControlWithProgress(t.Context(), owner, root, root, func() error { return nil }, progress)
 	if err != nil {
 		t.Fatal(err)
@@ -131,9 +137,6 @@ func TestRetainedCleanupReturnsFailedOutcomeBeforeBudgetAndRelaysProgress(t *tes
 	if err := privateJSON(filepath.Join(root, retainedDescriptionFile), control.description); err != nil {
 		t.Fatal(err)
 	}
-	if err := owner.requestCleanup(t.Context()); err != nil {
-		t.Fatal(err)
-	}
 	recordRetainedCleanup(ctx, errors.Join(ErrUnjoined, errors.New("private-cleanup-cause")))
 	owner.recordTeardownReturn(nil)
 	bounded, cancel := context.WithTimeout(t.Context(), 3*time.Second)
@@ -144,8 +147,8 @@ func TestRetainedCleanupReturnsFailedOutcomeBeforeBudgetAndRelaysProgress(t *tes
 	if !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed || !errors.Is(err, ErrRetainedControls) || bounded.Err() != nil {
 		t.Fatal("terminal teardown waited out its budget", err)
 	}
-	if !strings.Contains(output.String(), "public owner cleanup observation") || strings.Contains(err.Error()+output.String(), "private-cleanup-cause") {
-		t.Fatal("cleanup relay lost public activity or exposed cause", err)
+	if !strings.Contains(output.String(), "public owner cleanup observation") || strings.Contains(output.String(), "pre-invocation deployment history") || strings.Contains(err.Error()+output.String(), "private-cleanup-cause") {
+		t.Fatal("cleanup lost early activity, replayed deployment history or exposed cause", err)
 	}
 	select {
 	case <-control.finish:

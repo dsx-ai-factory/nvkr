@@ -120,7 +120,7 @@ func relayRetainedProgress(out io.Writer, cursor *uint64, frames []retainedProgr
 			// The authenticated owner's bounded ring may evict old frames. This
 			// is missing presentation, never permission to abort its deployment.
 			if out != nil {
-				const notice = "Warning: foreground missed bounded progress; resynchronized to available observations. Deployment remains owned; no restart or cleanup requested.\n"
+				const notice = "Warning: foreground missed bounded progress; resynchronized to available observations. This progress relay requested no restart or additional cleanup.\n"
 				written, err := io.WriteString(out, notice)
 				if err != nil || written != len(notice) {
 					return nvkrerr.Wrap(nvkrerr.CodePreflightFailed, errors.Join(err, io.ErrShortWrite), "present retained progress gap")

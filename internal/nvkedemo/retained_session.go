@@ -97,11 +97,13 @@ func Retain(ctx context.Context, cfg Config) (*RetainedSession, error) {
 	_, startErr := session.request(ctx, http.MethodPost, "/start")
 	var cursor uint64
 	aborted := false
+	foregroundAbort := false
 	primary := startErr
 	for {
 		observation, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		if (ctx.Err() != nil || primary != nil) && !aborted {
 			_, abortErr := session.request(observation, http.MethodPost, "/abort")
+			foregroundAbort = abortErr == nil && primary != nil && ctx.Err() == nil
 			primary = errors.Join(primary, ctx.Err(), abortErr)
 			aborted = true
 		}
@@ -146,17 +148,28 @@ func Retain(ctx context.Context, cfg Config) (*RetainedSession, error) {
 				continue
 			}
 			if state.State == retainedPartial {
-				code := state.FailureCode
-				if code == "" {
-					code = nvkrerr.CodePreflightFailed
-				}
-				return session, errors.Join(nvkrerr.New(code, "deployment stopped before Ready; partial environment retained; inspect private owner-error.log and owner-panic.log in the session directory"), primary)
+				return session, retainedPartialFailure(ctx, primary, state.FailureCode, foregroundAbort)
 			}
 			reportProgress(cfg.Progress, ProgressEvent{Kind: DeploymentFinished, Name: "local-demo", Status: "retained"})
 			return session, localDemoError(primary)
 		}
 		_ = pause(context.WithoutCancel(ctx), 100*time.Millisecond)
 	}
+}
+
+// An acknowledged abort requested for a coded foreground failure must not hide
+// that failure behind the owner's resulting cancellation. Actual caller/primary
+// cancellation and non-timeout owner failures retain their classification.
+func retainedPartialFailure(ctx context.Context, primary error, code nvkrerr.Code, foregroundAbort bool) error {
+	if code == "" {
+		code = nvkrerr.CodePreflightFailed
+	}
+	ownerErr := nvkrerr.New(code, "deployment stopped before Ready; partial environment retained; inspect private owner-error.log and owner-panic.log in the session directory")
+	var coded *nvkrerr.Error
+	if foregroundAbort && code == nvkrerr.CodeTimeout && ctx.Err() == nil && !errors.Is(primary, context.Canceled) && !errors.Is(primary, context.DeadlineExceeded) && errors.As(primary, &coded) {
+		return errors.Join(primary, ownerErr)
+	}
+	return errors.Join(ownerErr, primary, ctx.Err())
 }
 
 func awaitRetainedDescription(ctx context.Context, root, work string, child *retainedChild) (retainedControlDescription, error) {
@@ -298,10 +311,21 @@ func CleanupRetained(ctx context.Context, root string, progress io.Writer) (resu
 	if err != nil {
 		return err
 	}
-	if _, err := session.request(ctx, http.MethodPost, "/cleanup"); err != nil {
+	before, err := session.request(ctx, http.MethodGet, "/state")
+	if err != nil {
 		return err
 	}
-	var cursor uint64
+	// Select the presentation boundary before requesting cleanup, so deployment
+	// history is skipped but even cleanup frames emitted before its acknowledgment
+	// are relayed. This cursor grants no cleanup or completion authority.
+	cursor := retainedCleanupCursor(before.Progress)
+	cleanup, err := session.request(ctx, http.MethodPost, "/cleanup")
+	if err != nil {
+		return err
+	}
+	if err := relayRetainedProgress(progress, &cursor, cleanup.Progress); err != nil {
+		return err
+	}
 	for {
 		state, err := session.request(ctx, http.MethodGet, "/state")
 		if err != nil {
@@ -337,6 +361,13 @@ func CleanupRetained(ctx context.Context, root string, progress io.Writer) (resu
 			return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "retained cleanup continues in its owner; rerun cleanup --session with the same session; host controls remain, do not restore while producers are active")
 		}
 	}
+}
+
+func retainedCleanupCursor(frames []retainedProgressFrame) uint64 {
+	if len(frames) == 0 {
+		return 0
+	}
+	return frames[len(frames)-1].Sequence
 }
 
 func retainedTeardownFailure(root string) error {

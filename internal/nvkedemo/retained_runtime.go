@@ -251,6 +251,10 @@ func waitRetainedCleanup(ctx context.Context, primary ...error) error {
 // Register directly after a dependent hold's defer. Retained panic diagnostics
 // must exist before that hold blocks unwinding. Foreground recovery is unchanged;
 // Custom payload methods are never invoked; no value enters the public channel.
+// This scope still owns its registered cleanup handles: a recovered operation
+// panic must not invent unknown ownership and skip their explicit teardown.
+// Existing unjoined/retained-control errors and the outer entry recovery remain
+// fail-closed; this helper grants neither joined cleanup nor host restoration.
 func recoverRetainedPanic(ctx context.Context, result *error) {
 	owner := runtimeRetention(ctx)
 	if owner == nil {
@@ -263,7 +267,7 @@ func recoverRetainedPanic(ctx context.Context, result *error) {
 		if owner.panicRecorder != nil {
 			storeErr = owner.panicRecorder(fmt.Appendf(nil, "Panic: %s\n\n%s", PrivatePanicValueDescription(value), stack))
 		}
-		*result = errors.Join(*result, ErrRetainedControls, nvkrerr.Wrap(nvkrerr.CodeInternal, storeErr, "retained service owner panic; ownership is unknown, inspect private diagnostics"))
+		*result = errors.Join(*result, nvkrerr.Wrap(nvkrerr.CodeInternal, storeErr, "retained operation panic; inspect private diagnostics"))
 		_ = owner.retainFailure(*result)
 	}
 }

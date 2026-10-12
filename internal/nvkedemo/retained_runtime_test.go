@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -122,6 +124,97 @@ func TestRetainedPanicIsRecordedBeforeNestedHold(t *testing.T) {
 				t.Fatal("fixture stack not joined")
 			}
 		})
+	}
+}
+
+func TestRetainedNestedPanicCleansKnownHandlesAfterExplicitRequest(t *testing.T) {
+	owner, work, _ := retainedTestOwner(t)
+	privatePath := filepath.Join(privateTestDir(t), "owner-panic.log")
+	owner.panicRecorder = func(raw []byte) error { return privateWrite(privatePath, raw) }
+	control := &retainedControl{owner: owner, finish: make(chan struct{}),
+		description: retainedControlDescription{Work: "/owned-work", Selector: "/owned-session", Token: "fixture-token"}}
+	stages := []string{"runtime", "management", "registry", "tenant"}
+	var order []string
+	var consume func(int) error
+	consume = func(level int) (result error) {
+		// Match the owning scopes' defer order. Registry and management use
+		// the actual shared cleanup helper; tenant/runtime retain their guards.
+		defer func() {
+			cleanup := func(context.Context) error {
+				order = append(order, stages[level])
+				return nil
+			}
+			if stages[level] == "registry" || stages[level] == "management" {
+				result = cleanupAfterJoinedWork(work, result, time.Second, cleanup)
+				return
+			}
+			if holdErr := waitRetainedCleanup(work, result); holdErr != nil {
+				result = errors.Join(result, holdErr)
+				return
+			}
+			if errors.Is(result, ErrUnjoined) || stages[level] == "runtime" && errors.Is(result, ErrRetainedControls) {
+				recordRetainedCleanup(work, result)
+				return
+			}
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(work), time.Second)
+			defer cancel()
+			cleanupErr := cleanup(cleanupCtx)
+			recordRetainedCleanup(work, cleanupErr)
+			result = errors.Join(result, cleanupErr)
+		}()
+		defer recoverRetainedPanic(work, &result)
+		if level == len(stages)-1 {
+			panic("PRIVATE-NESTED-PANIC")
+		}
+		return consume(level + 1)
+	}
+	joined := make(chan error, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		joined <- consume(0)
+	}()
+	defer func() {
+		_ = owner.requestCleanup(context.WithoutCancel(t.Context()))
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Error("nested panic fixture did not join")
+		}
+	}()
+	if snapshot := retainedObserve(t, owner); snapshot.state != retainedPartial {
+		t.Fatal("nested panic did not hold before teardown", snapshot)
+	}
+	private, err := os.ReadFile(privatePath)
+	state, stateErr := control.snapshot(t.Context())
+	if err != nil || !bytes.Contains(private, []byte("PRIVATE-NESTED-PANIC")) || stateErr != nil || state.FailureCode != nvkrerr.CodeInternal || state.TeardownReturned {
+		t.Fatal("panic diagnostics unavailable before explicit cleanup", err, state, stateErr)
+	}
+	request := func(path string) int {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		req = req.WithContext(context.WithValue(req.Context(), retainedRequesterKey{}, true))
+		req.Header.Set("Authorization", "Bearer "+control.description.Token)
+		req.Header.Set("X-NVKE-Retained-Work", control.description.Work)
+		req.Header.Set("X-NVKE-Retained-Session", control.description.Selector)
+		response := httptest.NewRecorder()
+		control.handle(response, req)
+		return response.Code
+	}
+	if status := request("/cleanup"); status != http.StatusOK {
+		t.Fatal("issued cleanup request was refused", status)
+	}
+	select {
+	case result := <-joined:
+		var coded *nvkrerr.Error
+		if !errors.As(result, &coded) || coded.Code != nvkrerr.CodeInternal || errors.Is(result, ErrRetainedControls) || !slices.Equal(order, []string{"tenant", "registry", "management", "runtime"}) {
+			t.Fatal("nested panic skipped known cleanup or lost its operation failure", order, result)
+		}
+		owner.recordTeardownReturn(result)
+		if err := control.recordJoined(t.Context(), nil); err != nil || request("/finish") != http.StatusOK {
+			t.Fatal("known joined cleanup did not permit owner finish", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("explicit cleanup did not join the nested panic chain")
 	}
 }
 
