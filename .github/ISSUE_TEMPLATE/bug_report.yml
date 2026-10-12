@@ -25,7 +25,7 @@ body:
       options:
         - label: I searched existing issues and found no duplicates
           required: true
-        - label: This is not a security vulnerability. I will report security vulnerabilities privately as described in the [security policy](https://github.com/dsx-ai-factory/nke-recipes/blob/main/SECURITY.md)
+        - label: This is not a security vulnerability. I will report vulnerabilities to NVIDIA PSIRT as described in the [security policy](https://github.com/dsx-ai-factory/nvkr/blob/main/SECURITY.md), not through a public issue or GitHub Security Advisory
           required: true
 
   - type: textarea
@@ -155,5 +155,5 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nke-recipes/blob/main/CODE_OF_CONDUCT.md)
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nvkr/blob/main/CODE_OF_CONDUCT.md)
           required: true

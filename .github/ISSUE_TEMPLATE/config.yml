@@ -17,5 +17,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/dsx-ai-factory/nke-recipes/blob/main/SECURITY.md
+    url: https://github.com/dsx-ai-factory/nvkr/blob/main/SECURITY.md
     about: Read the private NVIDIA PSIRT reporting instructions; do not file a public issue

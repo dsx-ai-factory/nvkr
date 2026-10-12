@@ -1,12 +1,15 @@
 ## Summary
 
 <!-- What changed? Keep it short (1-2 sentences). -->
+<!-- Note: this repository squash-merges, so the pull request TITLE becomes
+     the single commit subject on main. Write it as a Conventional Commit
+     for a reader; see CONTRIBUTING.md. -->
 
 ## Motivation / Context
 
 <!-- Why is this change needed? Link issues/discussions. -->
 
-Fixes: <!-- #123 or N/A -->
+Closes: <!-- #123 or N/A -->
 Related: <!-- #123 or N/A -->
 
 ## Type of Change
@@ -58,10 +61,9 @@ make check
 
 ## Checklist
 
-- [ ] Tests pass locally (`make test` with `-race`)
-- [ ] Linter passes (`make lint`)
+- [ ] `make check` passes locally
 - [ ] I did not skip/disable tests to make CI green
 - [ ] I added/updated tests for new functionality
 - [ ] I updated docs if user-facing behavior changed
 - [ ] Changes follow existing patterns in the codebase
-- [ ] Commits are cryptographically signed (`git commit -S`) — [GPG signing info](https://docs.github.com/en/authentication/managing-commit-signature-verification)
+- [ ] Every commit is cryptographically signed and carries a DCO sign-off (`git commit -S -s`) — [GPG signing info](https://docs.github.com/en/authentication/managing-commit-signature-verification)

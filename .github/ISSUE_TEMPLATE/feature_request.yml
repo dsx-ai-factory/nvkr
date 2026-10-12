@@ -15,7 +15,7 @@
 name: Feature Request
 description: Suggest a new feature or enhancement
 title: "[Feature]: "
-labels: ["enhancement"]
+labels: ["feature"]
 
 body:
   - type: checkboxes
@@ -134,5 +134,5 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nke-recipes/blob/main/CODE_OF_CONDUCT.md)
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nvkr/blob/main/CODE_OF_CONDUCT.md)
           required: true
