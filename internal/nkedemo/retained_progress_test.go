@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,102 @@ import (
 
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
+
+type retainedTypedStatusBuffer struct {
+	bytes.Buffer
+	statuses int
+}
+
+func (out *retainedTypedStatusBuffer) WriteOperatorStatus(status OperatorStatus) error {
+	out.statuses++
+	_, err := out.WriteString(status.Text())
+	return err
+}
+
+func TestRetainedOperatorStatusPreservesTypedPublicObservation(t *testing.T) {
+	access, runner := operatorStatusFixture(t)
+	progress := &retainedProgress{}
+	if err := access.WriteLiveStatus(t.Context(), runner, progress); err != nil {
+		t.Fatal(err)
+	}
+	// Exercise the existing JSON wire codec, not an in-process opaque value.
+	raw, err := json.Marshal(progress.frames())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var frames []retainedProgressFrame
+	if err := json.Unmarshal(raw, &frames); err != nil {
+		t.Fatal(err)
+	}
+	if len(frames) != 1 || frames[0].Text != "" || frames[0].Event != nil {
+		t.Fatal("owner result was fragmented or confused with generic logs")
+	}
+	var typed retainedTypedStatusBuffer
+	var cursor uint64
+	if err := relayRetainedProgress(&typed, &cursor, frames); err != nil || typed.statuses != 1 {
+		t.Fatal("typed cluster presenter was bypassed", err, typed.statuses)
+	}
+	for _, wanted := range []string{"Live Kubernetes checks", "Site / Kind management", "Tenant / QCOW2", "Nodes: 2/2 Ready", "control-plane", "worker", "arm64"} {
+		if !strings.Contains(typed.String(), wanted) {
+			t.Fatal("retained public observation omitted", wanted)
+		}
+	}
+	if strings.Contains(typed.String(), "PRIVATE") || strings.Contains(typed.String(), "private-") || strings.ContainsRune(typed.String(), '\x1b') {
+		t.Fatal("retained public observation exposed private responses or terminal controls")
+	}
+	if err := relayRetainedProgress(&typed, &cursor, frames); err != nil || typed.statuses != 1 {
+		t.Fatal("repeat control snapshot duplicated the cluster observation", err)
+	}
+	var plain bytes.Buffer
+	cursor = 0
+	if err := relayRetainedProgress(&plain, &cursor, frames); err != nil || plain.String() != typed.String() {
+		t.Fatal("ordinary output lost the same public observation", err)
+	}
+	cursor = 0
+	err = relayRetainedProgress(operatorShortWriter{}, &cursor, frames)
+	var coded *nkderr.Error
+	if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !errors.Is(err, io.ErrShortWrite) || cursor != 0 {
+		t.Fatal("short output was accepted or advanced the cursor", err, cursor)
+	}
+}
+
+func TestRetainedOperatorStatusRejectsInvalidOrOversizeEnvelopes(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		text string
+	}{
+		{"unissued", ""},
+		{"oversize", strings.Repeat("x", retainedProgressLimit)},
+		{"encoded oversize", strings.Repeat("\n", retainedProgressLimit/2)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			progress := &retainedProgress{}
+			var coded *nkderr.Error
+			if err := progress.WriteOperatorStatus(OperatorStatus{text: test.text}); !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || len(progress.frames()) != 0 {
+				t.Fatal("unissued or oversize cluster envelope was accepted", err)
+			}
+			if test.text != "" {
+				progress.Report(ProgressEvent{Kind: PhaseStarted, Name: "after refused observation"})
+				var cursor uint64
+				if err := relayRetainedProgress(io.Discard, &cursor, progress.frames()); err == nil || cursor != 0 {
+					t.Fatal("refused result left no visible sequence gap", err)
+				}
+			}
+		})
+	}
+	for _, frame := range []retainedProgressFrame{
+		{Sequence: 1, Status: "public fixture", Text: "ambiguous log"},
+		{Sequence: 1, Status: "public fixture", Event: &ProgressEvent{}},
+		{Sequence: 1, Status: strings.Repeat("x", retainedProgressLimit+1)},
+	} {
+		var out retainedTypedStatusBuffer
+		var cursor uint64
+		var coded *nkderr.Error
+		if err := relayRetainedProgress(&out, &cursor, []retainedProgressFrame{frame}); !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || out.Len() != 0 || cursor != 0 {
+			t.Fatal("invalid envelope reached a presenter", err)
+		}
+	}
+}
 
 func TestRetainedProgressRelaysBoundedOrderedPublicFrames(t *testing.T) {
 	progress := &retainedProgress{}

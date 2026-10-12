@@ -135,7 +135,7 @@ func (w *checkedWriter) retainResult(line string) {
 // Called with w.mu held, after the screen has restored scrolling output.
 func (w *checkedWriter) replayResults(success bool) {
 	if w.operatorStatus != "" {
-		w.emit("\nCluster snapshot observed before cleanup; historical, not a claim that services remain running.\n" + w.operatorStatus)
+		w.emit("\nCluster snapshot observed during this invocation; historical, not a claim that services remain running.\n" + w.operatorStatus)
 	}
 	for index, line := range w.results {
 		if line != "" && (success || index >= 4) {

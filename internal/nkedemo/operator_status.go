@@ -107,14 +107,8 @@ func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner,
 		return nkderr.New(nkderr.CodePreflightFailed, "public cluster observation exceeds its presentation limit; private diagnostics retained")
 	}
 	status := OperatorStatus{text: text.String()}
-	var outputErr error
-	if presenter, ok := out.(OperatorStatusWriter); ok {
-		outputErr = presenter.WriteOperatorStatus(status)
-	} else {
-		outputErr = writeOperatorText(out, status.Text())
-	}
-	if outputErr != nil {
-		return outputErr
+	if err := writeOperatorStatus(out, status); err != nil {
+		return err
 	}
 	if failed {
 		var err error = nkderr.New(nkderr.CodePreflightFailed, "current cluster health was not confirmed; retained environment was not changed")
@@ -127,6 +121,16 @@ func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner,
 		return err
 	}
 	return nil
+}
+
+func writeOperatorStatus(out io.Writer, status OperatorStatus) error {
+	if presenter, ok := out.(OperatorStatusWriter); ok {
+		if err := presenter.WriteOperatorStatus(status); err != nil {
+			return nkderr.Wrap(nkderr.CodePreflightFailed, err, "present local demo cluster observation")
+		}
+		return nil
+	}
+	return writeOperatorText(out, status.Text())
 }
 
 // Carry only the standard cancellation cause across the public boundary,

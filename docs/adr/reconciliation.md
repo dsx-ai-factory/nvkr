@@ -523,6 +523,12 @@ cancellation with controlled callbacks. The live cluster projection now crosses
 the concise CLI filter as an owner-generated public result rather than subprocess
 log text. Composed `run`/`e2e` and dashboard tests cover immediate tables,
 activity eviction, historical post-terminal replay and later cleanup failure.
+Retained-owner progress carries the same owner-generated table through its
+existing authenticated private control as a single typed result, with unchanged
+32 KiB queue/envelope and sequence-gap refusal. Mixed payloads and oversized
+results fail before presentation. JSON-relay contracts and native retained
+launch fixtures cover typed/plain output and cursor/error behavior; their
+synthetic cluster answers are not fresh retained NKE runtime acceptance.
 Synthetic Kubernetes answers establish presentation wiring only, not fresh NKE
 cluster acceptance. DNS/DHCP port admission now invokes a
 fixed Go helper through the existing bounded sudo runner before recording host

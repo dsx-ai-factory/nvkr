@@ -854,6 +854,10 @@ architecture and Kubernetes version. The Site table is the Kind management
 cluster; the Tenant table is the separate QCOW2 cluster. These are live bounded
 observations, not inferred status from an elapsed timer or old dashboard events.
 Names, addresses, private responses and kubeconfigs are not copied into that table.
+The retained service owner relays the same redacted table as a typed public result,
+not generic subprocess log text. It must fit the existing 32 KiB encoded progress
+envelope; an oversized result fails presentation instead of being silently split
+or truncated. The final shell handoff still performs separate fresh live queries.
 Explicit `--cleanup` runs also show these live checks before tenant deletion;
 plain output prints the table immediately. The dashboard keeps the table outside
 its activity ring and replays the same timestamped snapshot after restoring the

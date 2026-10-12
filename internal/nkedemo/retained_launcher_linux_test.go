@@ -105,6 +105,9 @@ func TestRetainedLauncherOwnerFixture(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		if err := access.WriteLiveStatus(ctx, runner, cfg.Progress); err != nil {
+			return err
+		}
 		return runtimeRetention(ctx).markReady(ctx, access)
 	})
 	if err != nil {
@@ -120,7 +123,7 @@ func TestRetainedLauncherForegroundFixture(t *testing.T) {
 	root, mode := arguments[0], arguments[1]
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
-	var progress bytes.Buffer
+	var progress retainedTypedStatusBuffer
 	session, err := Retain(ctx, Config{Network: "upstream-ovn", DemoExecutable: filepath.Join(root, "launcher"), Out: filepath.Join(root, "demo"), Timeout: 300 * time.Second, Progress: &progress})
 	if session == nil {
 		t.Fatal("actual launcher did not return its selected session", err)
@@ -141,6 +144,9 @@ func TestRetainedLauncherForegroundFixture(t *testing.T) {
 	}
 	if session.child == nil || !session.child.released || !strings.Contains(progress.String(), "public actual launcher fixture progress") {
 		t.Fatal("actual child was not handed off or public progress was lost")
+	}
+	if mode == "ready" && (progress.statuses != 1 || !strings.Contains(progress.String(), "Live Kubernetes checks") || strings.Count(progress.String(), "Nodes: 2/2 Ready") != 2) {
+		t.Fatal("actual retained owner lost the site/tenant observation before handoff", &progress)
 	}
 	var instructions bytes.Buffer
 	if err := session.WriteInstructions(ctx, os.Args[0], &instructions); err != nil {

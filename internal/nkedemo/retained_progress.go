@@ -24,6 +24,7 @@ type retainedProgressFrame struct {
 	Sequence uint64         `json:"sequence"`
 	Text     string         `json:"text,omitempty"`
 	Event    *ProgressEvent `json:"event,omitempty"`
+	Status   string         `json:"operatorStatus,omitempty"`
 }
 
 type retainedProgress struct {
@@ -35,16 +36,16 @@ type retainedProgress struct {
 	cached   bool
 }
 
-func (progress *retainedProgress) append(frame retainedProgressFrame) {
+func (progress *retainedProgress) append(frame retainedProgressFrame) bool {
 	progress.mu.Lock()
 	defer progress.mu.Unlock()
 	progress.sequence++
 	frame.Sequence = progress.sequence
 	raw, err := json.Marshal(frame)
-	if err != nil || len(raw) > retainedProgressLimit {
+	if err != nil || len(raw)+1 > retainedProgressLimit {
 		// Deliberately leave a detectable sequence gap. Presentation cannot
 		// silently skip an observation or substitute a health claim.
-		return
+		return false
 	}
 	progress.queue = append(progress.queue, frame)
 	progress.sizes = append(progress.sizes, len(raw)+1)
@@ -54,6 +55,21 @@ func (progress *retainedProgress) append(frame retainedProgressFrame) {
 		progress.queue[0] = retainedProgressFrame{}
 		progress.queue, progress.sizes = progress.queue[1:], progress.sizes[1:]
 	}
+	return true
+}
+
+// Preserve the owner's public projection as one typed result across the
+// authenticated private relay, not as generic subprocess-log fragments.
+// This remains presentation only; neither a frame nor its sequence grants
+// readiness, retention, artifact or cleanup authority.
+func (progress *retainedProgress) WriteOperatorStatus(status OperatorStatus) error {
+	if status.Text() == "" {
+		return nkderr.New(nkderr.CodePreflightFailed, "retained cluster presentation requires an owner-generated observation")
+	}
+	if !progress.append(retainedProgressFrame{Status: status.Text()}) {
+		return nkderr.New(nkderr.CodePreflightFailed, "retained cluster observation exceeds its bounded presentation envelope")
+	}
+	return nil
 }
 
 func (progress *retainedProgress) Write(raw []byte) (int, error) {
@@ -102,6 +118,16 @@ func relayRetainedProgress(out io.Writer, cursor *uint64, frames []retainedProgr
 		}
 		if frame.Sequence != *cursor+1 {
 			return nkderr.New(nkderr.CodePreflightFailed, "foreground missed bounded progress; services remain owned, not silently restarted")
+		}
+		if frame.Status != "" {
+			if frame.Text != "" || frame.Event != nil || len(frame.Status) > retainedProgressLimit {
+				return nkderr.New(nkderr.CodePreflightFailed, "retained cluster observation has an invalid presentation envelope")
+			}
+			if out != nil {
+				if err := writeOperatorStatus(out, OperatorStatus{text: frame.Status}); err != nil {
+					return err
+				}
+			}
 		}
 		if frame.Event != nil {
 			reportProgress(out, *frame.Event)
