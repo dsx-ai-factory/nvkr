@@ -128,7 +128,11 @@ func TestPackerObserverStopDoesNotSuppressBuildResultsOrDiagnostics(t *testing.T
 					}
 				}
 			})
-			artifact, err := runPackerContainerWithTimeouts(testContext(t), request, 100*time.Millisecond, 100*time.Millisecond)
+			// Only the deliberately blocked observer needs the short join bound.
+			// Normal diagnostic retention includes archive/file/directory fsyncs;
+			// it is not a 100 ms filesystem latency assertion. DiagnosticFailures
+			// separately injects and asserts the actual diagnostic deadline path.
+			artifact, err := runPackerContainerWithTimeouts(testContext(t), request, packerContainerCleanupTimeout, 100*time.Millisecond)
 			if code(err) != test.wantCode || (artifact != nil) != (test.wantCode == "") {
 				t.Fatalf("artifact=%v error=%v, want code %s", artifact, err, test.wantCode)
 			}
