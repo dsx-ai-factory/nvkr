@@ -85,6 +85,7 @@ type checkedWriter struct {
 	// One bounded latest line per public result category, independent of the
 	// dashboard's activity ring. Success statements replay only after success.
 	results        [6]string
+	operatorStatus string
 	guests         [2]nkedemo.TenantGuestObservation
 	guestsReported bool
 }
@@ -133,11 +134,33 @@ func (w *checkedWriter) retainResult(line string) {
 
 // Called with w.mu held, after the screen has restored scrolling output.
 func (w *checkedWriter) replayResults(success bool) {
+	if w.operatorStatus != "" {
+		w.emit("\nCluster snapshot observed before cleanup; historical, not a claim that services remain running.\n" + w.operatorStatus)
+	}
 	for index, line := range w.results {
 		if line != "" && (success || index >= 4) {
 			w.emit(line + "\n")
 		}
 	}
+}
+
+// The owner has already redacted and validated these rows. Do not send them
+// through the subprocess-log whitelist or parse table strings for authority.
+// Keep the bounded snapshot outside the activity ring for post-terminal replay,
+// even when subsequent cleanup fails. Plain output receives it immediately.
+func (w *checkedWriter) WriteOperatorStatus(status nkedemo.OperatorStatus) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.err != nil {
+		return w.err
+	}
+	text := status.Text()
+	if text == "" {
+		return w.fail("cluster presentation requires a bounded owner-generated observation")
+	}
+	w.operatorStatus = text
+	w.emit(text)
+	return w.err
 }
 
 func (w *checkedWriter) Write(data []byte) (int, error) {

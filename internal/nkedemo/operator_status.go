@@ -19,6 +19,19 @@ import (
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
 
+// OperatorStatus contains only the owner's validated public cluster projection.
+// It describes a timestamped observation, not retention or readiness authority.
+type OperatorStatus struct{ text string }
+
+// Text returns the formatted public observation, never raw Kubernetes responses.
+func (status OperatorStatus) Text() string { return status.text }
+
+// OperatorStatusWriter lets a presenter preserve the result separately from
+// filtered subprocess logs. Ordinary writers still receive the same text.
+type OperatorStatusWriter interface {
+	WriteOperatorStatus(OperatorStatus) error
+}
+
 // WriteLiveStatus runs the selected session's actual kubectl, rather than
 // projecting old Ready events or interpreting process existence as health.
 // Only a small, validated node projection is public. Names, addresses, raw
@@ -90,8 +103,18 @@ func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner,
 		_ = columns.Flush() // strings.Builder cannot fail.
 		failed = failed || ready != len(rows)
 	}
-	if err := writeOperatorText(out, text.String()); err != nil {
-		return err
+	if text.Len() > 64<<10 {
+		return nkderr.New(nkderr.CodePreflightFailed, "public cluster observation exceeds its presentation limit; private diagnostics retained")
+	}
+	status := OperatorStatus{text: text.String()}
+	var outputErr error
+	if presenter, ok := out.(OperatorStatusWriter); ok {
+		outputErr = presenter.WriteOperatorStatus(status)
+	} else {
+		outputErr = writeOperatorText(out, status.Text())
+	}
+	if outputErr != nil {
+		return outputErr
 	}
 	if failed {
 		var err error = nkderr.New(nkderr.CodePreflightFailed, "current cluster health was not confirmed; retained environment was not changed")

@@ -519,7 +519,12 @@ not establish a fresh successful E2E; that acceptance remains unproven.
 [Ordinary adapter tests](../../internal/nkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise
 bounded subprocess cancellation and joining; CLI tests exercise output-failure
-cancellation with controlled callbacks. DNS/DHCP port admission now invokes a
+cancellation with controlled callbacks. The live cluster projection now crosses
+the concise CLI filter as an owner-generated public result rather than subprocess
+log text. Composed `run`/`e2e` and dashboard tests cover immediate tables,
+activity eviction, historical post-terminal replay and later cleanup failure.
+Synthetic Kubernetes answers establish presentation wiring only, not fresh NKE
+cluster acceptance. DNS/DHCP port admission now invokes a
 fixed Go helper through the existing bounded sudo runner before recording host
 intent; executable admission precedes artifact inspection. Controlled tests
 cover fixed targets, rejected helper arguments, failures before journaling and

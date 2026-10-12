@@ -207,3 +207,37 @@ func TestOperatorLiveStatusPreservesCancellationWithoutPrivateErrorPayload(t *te
 		})
 	}
 }
+
+func TestOperatorLiveStatusBoundsPublicProjectionBeforeOutput(t *testing.T) {
+	access, runner := operatorStatusFixture(t)
+	var rows struct{ Items []tenantNode }
+	if err := json.Unmarshal([]byte(operatorNodesFixture), &rows); err != nil {
+		t.Fatal(err)
+	}
+	node := rows.Items[0]
+	node.Status.NodeInfo.KubeletVersion = "v" + strings.Repeat("1", 127)
+	rows.Items = nil
+	for index := range 512 {
+		node.Metadata.Name = fmt.Sprintf("private-node-%d", index)
+		rows.Items = append(rows.Items, node)
+	}
+	raw, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(runner.Work, "private-node-response.json")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\nset -eu\ncase \"$*\" in\n *--raw=/readyz*) printf 'ok\\n' ;;\n *'get nodes -o json'*) cat \"$NODES_FILE\" ;;\n *) exit 99 ;;\nesac\n"
+	if err := os.WriteFile(access.kubectl, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	runner.Env = SetEnv(runner.Env, map[string]string{"NODES_FILE": path})
+	var out bytes.Buffer
+	err = access.WriteLiveStatus(t.Context(), runner, &out)
+	var coded *nkderr.Error
+	if !errors.As(err, &coded) || coded.Code != nkderr.CodePreflightFailed || !strings.Contains(err.Error(), "presentation limit") || out.Len() != 0 {
+		t.Fatal("oversize result was emitted or refused at the wrong boundary", err)
+	}
+}
