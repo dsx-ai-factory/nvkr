@@ -1,0 +1,187 @@
+# Direct-Packer toolchain image
+
+This directory defines the OCI toolchain consumed by NVKR's local direct-Packer
+executor. Each host-platform image contains Packer 1.15.4, the QEMU plugin 1.1.6,
+QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
+`ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NVKE
+Packer project. It also contains Go 1.27.2, crane 0.21.9, nfpm 2.47.0,
+Helm 4.2.4 and ORAS 1.3.3,
+`dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
+and xorriso. Those are the preparation and ISO-composition tools required by the
+exact NVKE source at `726f76944404e1106626b8333d3576bdf67b575b` for non-FDE
+builds on the supported host architectures. The recorded ARM64 local image
+validated the older closure, not these updated bytes. The local launcher builds
+and validates a fresh attempt-bound image; this does not update maintained pins
+or establish a complete image-bake result. Helm and ORAS share this image rather
+than requiring a separate chart wrapper image. The compiler pin matches NVKR's
+`.go-version` because this image also builds the source-bound local bootstrap
+runner. `validatedNVKE.goVersion` retains the historical source's workspace
+version, 1.27.1; it does not select the image compiler or validate a rebuilt image.
+
+`toolchain.lock.json` binds the Ubuntu and download-helper multi-platform base
+indexes, one immutable Ubuntu archive snapshot, and the official Packer and
+QEMU-plugin release archive and extracted executable digests for both host
+architectures. It also pins the official Go, crane and nfpm archives and the
+extracted crane, nfpm, Helm and ORAS executables. Helm archive hashes come from
+`get.helm.sh` release checksums; ORAS archive hashes come from its GitHub release
+checksum file. Extracted binary hashes were measured from those exact archives.
+Both include Apache-2.0 license text, retained in the final image. The download
+helper supplies the CA bundle needed to bootstrap the signed Ubuntu snapshot
+from a minimal Ubuntu base. The Dockerfile reproduces Packer 1.15.4's documented
+namespaced plugin layout and checksum file from the separately verified plugin
+executable. It never executes a target-architecture Go binary while assembling
+an image. No plugin discovery or download is performed by NVKR at runtime.
+
+Build and validate one local host architecture. The runtime check proves the
+exact Packer, plugin, Go, crane, nfpm, Helm and ORAS versions; QEMU/QCOW2 and firmware
+availability; the SSH-key, Debian-package and ISO-composition tools; and a real
+`packer validate` call through the preinstalled QEMU plugin:
+
+```sh
+toolchains/nvkr-packer/build.sh --arch arm64
+toolchains/nvkr-packer/build.sh --arch amd64
+```
+
+Native builds run the toolchain under NVKR's read-only, network-disabled,
+capability-dropped container profile. A non-native image may be assembled with
+`--cross-build-only`, but that mode is structural evidence only and must be
+followed by the same validation and a real bake on a native host before
+publication.
+
+The [October 6 native preparation record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md#native-amd64-assembly-and-validation)
+records a successful AMD64 Docker assembly and this script's native validation.
+It includes the retained image archive and exact identities; it grants no
+publication or redistribution approval.
+
+Use `--check` for the network-free source-lock validation, including agreement
+with NVKR's `.go-version`. When that pin changes, update the locked Go version and
+both archive digests from the [official Go downloads](https://go.dev/dl/?mode=json)
+together. Building uses the fixed Ubuntu snapshot and verifies every release archive before
+extracting them. The command does not push, sign, or write a transport digest.
+
+For Docker builds behind a TLS proxy, `NVKR_BUILD_CA_BUNDLE` supplies a trusted
+public CA bundle as an ephemeral, read-only BuildKit secret. Its mode permits
+APT's unprivileged downloader to read it; it is never copied into the image.
+`NVKR_BUILD_ARCHIVES` selects a local directory through the `nvkr_archives`
+[named build context](https://docs.docker.com/reference/cli/docker/buildx/build/#build-context).
+Place the official Packer, QEMU plugin, Go, crane, nfpm, Helm and ORAS release archives
+there under their upstream filenames for the selected architecture. Helm uses
+`helm-v4.2.4-linux-<arch>.tar.gz`; ORAS uses `oras_1.3.3_linux_<arch>.tar.gz`. Local mode copies
+them through read-only build mounts and applies the same archive and executable
+checksum checks. Missing or corrupt inputs fail; local mode never falls back to
+downloading release archives. The pinned base images and signed Ubuntu snapshot
+still require network access. Both optional inputs require Docker Buildx.
+
+```sh
+CONTAINER_RUNTIME=docker NVKR_BUILD_ARCHIVES=/absolute/path/to/archives \
+  NVKR_BUILD_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+  toolchains/nvkr-packer/build.sh --arch amd64
+```
+
+Docker builds use Buildx with `SOURCE_DATE_EPOCH=0` and the Docker exporter's
+`rewrite-timestamp=true` option for deterministic image creation and layer-file
+timestamps. Docker explicitly streams the image archive to `docker image load`,
+separating timestamp rewriting from image-store unpacking; failure in either
+stage stops validation.
+The fixed epoch does not itself prove identical image
+bytes. Repeat a native Docker build on fresh runners and compare the resulting
+image IDs before adding a Docker pin.
+`localDockerImages` records maintained local Docker identities. A null entry
+permits a diagnostic build but is not itself an
+execution pin. The local Docker wrapper freezes the exact observed image ID
+into an attempt-specific catalog overlay before compiling the Plan; NVKR
+rechecks that ID before execution. This binds loaded image bytes to the attempt Plan, not toolchain provenance,
+and does not make the image an approved
+maintained toolchain. There is no toolchain publication workflow in this repository.
+`images` remains `null` because a local image ID is not an OCI repository
+digest. The build command fails if a rebuilt image differs from its recorded
+runtime-specific local ID.
+For first-time **local diagnostic** execution, `--diagnostic-local` permits fresh
+native assembly against the same locked sources without matching the older local
+image ID. Archive/executable digests, image structure and all native tool/Packer
+validation remain enforced. Cross-architecture diagnostic builds are rejected.
+The developer launcher freezes the observed ID in an attempt-specific catalog
+overlay before execution. This does not update maintained pins, establish
+reproducibility, authorize redistribution or change publication gates. Default
+builds retain the recorded-ID check. Never use a mutable tag as execution identity.
+
+For script callers, `--print-validated-image-id` prints only the exact image ID
+that passed native validation; build and validation diagnostics go to stderr.
+It emits no ID on failure and rejects `--check` and `--cross-build-only`.
+The developer launcher uses this returned ID directly, without resolving the
+build tag again. Image structure and identity also come from one inspection
+result before validation, so a retag cannot change the validated subject.
+
+After license approval and a vulnerability scan, the exact external publication
+sequence is:
+
+```sh
+IMAGE_REPOSITORY='<approved-registry>/nvkr-packer-toolchain'
+IMAGE_TAG=nvke-726f7694-amd64
+toolchains/nvkr-packer/build.sh --arch amd64 --tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+crane digest "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+```
+
+Record the resulting `${IMAGE_REPOSITORY}@sha256:...` under `images.amd64`,
+then sign, attach the SBOM and read the digest back through the approved
+registry workflow before selecting it from a maintained catalog. Do not use the
+mutable tag as the catalog pin.
+
+The Packer executable remains an external subprocess under the repository's
+license policy; it is not linked into `nvkr`. The image preserves the release
+archives' Packer BUSL-1.1 and QEMU-plugin MPL-2.0 license texts. Ubuntu package
+copyright records remain under `/usr/share/doc`; the Go BSD-3-Clause, crane
+Apache-2.0 and nfpm MIT texts are retained with the toolchain notices.
+
+This repository does not record NVIDIA approval to redistribute Packer under
+BUSL-1.1 or a completed vulnerability review of this image. The source may be
+reviewed and built locally, but the image must not be published, selected by a
+maintained catalog, or represented as an approved NVIDIA toolchain until both
+reviews are recorded by the owning process. Keeping the image digests null in
+the lock records that the source is not ready for maintained catalog use; the
+required review remains an organizational publication gate, not a technical
+control implemented by this source lock.
+
+The [October 6 candidate record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
+records the user's explicit exception for four measured native images used only by M2.
+That exception permits the candidate overlay; it does not mark these general review gates approved.
+
+This source and a successful container build prove only the toolchain layout.
+They do not prove an NVKE QCOW2 bake, bootability, publication, pipeline
+attestation or qualified reproduction.
+
+## Native preparation and catalog selection
+
+Run preparation from the final composed NVKR checkout with its pinned Go toolchain. Check the source lock
+without network, then build and inspect only the matching architecture on each native Linux host:
+
+```sh
+toolchains/nvkr-packer/build.sh --check
+packer_arch=arm64
+CONTAINER_RUNTIME=docker toolchains/nvkr-packer/build.sh --arch "$packer_arch"
+docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
+  "localhost/nvkr-packer-toolchain:dev-${packer_arch}"
+```
+
+Use `packer_arch=amd64` on the separate native AMD64 host. This build helper requires Docker Buildx.
+A cross-build does not supply native execution proof. A rebuilt image differing from
+a recorded runtime-specific local pin must be investigated; do not overwrite or bypass the check.
+Preparation neither pushes nor signs an image, writes a source lock, or supplies an approved repository digest.
+The native preparation script/workflow can retain exact image archives and measurements for a separately
+authorized publication owner.
+
+Consume a reviewed published native image through the catalog's existing `toolchainSubstitutions` contract:
+bind the exact predecessor catalog digest, native `arch`, existing `from` pin, measured `to` pin and sorted
+explicit component set. For each M2 disk, the nine source-map consumers are `nvke-agent`, `nvke-cni-calico`,
+`nvke-cni-ovn`, `nvke-image-inputs`, `nvke-kubeadm-distro`, `nvke-node-image`, `nvke-patched-installer-iso`,
+`nvke-spire-agent` and `ovn-kubernetes-chart`. Preserve `ovn-kube-ubuntu`'s independent BuildKit override.
+An upstream index tag or inherited local ID cannot replace the selected native publication pin.
+After publication, read back the exact repository reference's native descriptor, for example
+`crane digest --platform linux/arm64 '<repository>@sha256:<digest>'`, with the matching platform.
+
+The source lock's historical `validatedNVKE` commit is not validation of the capture-enabled M2 source.
+The [M2 README](../../definitions/nvke-m2/README.md) owns current source selections, candidate exceptions
+and generated execution requirements; the machine-managed locks and overlay own their exact values.
+Native preparation and registry read-back do not establish source-owner release acceptance, runtime
+isolation, a full image bake, organizational approval or independent consumer acceptance.

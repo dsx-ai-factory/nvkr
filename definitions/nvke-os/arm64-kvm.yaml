@@ -1,0 +1,87 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog-overlay/v3
+kind: CatalogOverlay
+name: nvke-os-arm64-native-kvm
+requiresCatalogDigest: sha256:11a2743c530af5e0e6183393ed1a3aac7c7a2655744c3d94b67fecaed7f32ac1
+components:
+  nvke-node-image:
+    component:
+      platforms: [linux/arm64]
+      fromSource: true
+      builderType: vm-image
+      buildNetwork: default
+      repo: https://github.com/dsx-ai-factory/nvke.git
+      tag: os-image/v0.1.0-rc.4-51-g726f7694
+      commit: 726f76944404e1106626b8333d3576bdf67b575b
+      treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+      toolchainImages:
+        arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+      vendorCommand:
+        - bash
+        - -ec
+        - |
+          cd agent
+          export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+          pins="$(sha256sum go.mod go.sum)"
+          # Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.
+          # Go owns transport fallback; checksum failures never select another proxy.
+          # Keep direct fallback limited to a missing proxy module (404/410).
+          proxy=https://proxy.golang.org
+          GOPROXY="${proxy}|${proxy}/|${proxy}//,direct" \
+            timeout --kill-after=10s 540s go mod download || {
+              status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit "$status";
+            }
+          printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+            echo 'agent module pins changed during download' >&2; exit 1;
+          }
+          # Offline verification and vendoring run once, after acquisition succeeds.
+          GOPROXY=off timeout --kill-after=10s 60s go mod verify || {
+            status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit "$status";
+          }
+          GOPROXY=off timeout --kill-after=10s 180s go mod vendor || {
+            status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit "$status";
+          }
+          printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+            echo 'agent module pins changed during vendoring' >&2; exit 1;
+          }
+      sourceDateEpoch: 1790192178
+      outputType: disk-image
+      disk:
+        format: qcow2
+        encryption: none
+      buildRequirements:
+        resources:
+          cpuMillis: 8000
+          memoryMiB: 10240
+          ephemeralStorageMiB: 65536
+        allowedHostPlatforms: [linux/arm64]
+        capabilities:
+          - name: kvm
+            policy: required
+        timeoutSeconds: 21600
+      packer:
+        projectPath: os-image/packer
+        packerVersion: 1.15.4
+        buildName: nke-node-non-fde.qemu.nke-non-fde
+        architectureVariable: architecture
+        acceleratorVariable: accelerator
+        materialManifestVariable: material_manifest
+        materialManifest:
+          schemaVersion: nke.dev/os-image-materials/v1
+          kinds:
+            image-inputs: archive
+            installer-iso: disk-image
+        outputDirectoryVariable: output_directory
+        sshPrivateKeyVariable: ssh_private_key_file
+        sshPublicKeyVariable: ssh_public_key_file
+        buildLogDirectoryVariable: build_log_directory
+        variables:
+          efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
+          efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
+          ssh_timeout: 180m
+      materials:
+        image-inputs: nvke-image-inputs
+        installer-iso: nvke-patched-installer-iso
+      artifactPath: non-fde/nke-node.qcow2

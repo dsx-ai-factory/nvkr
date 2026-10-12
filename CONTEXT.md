@@ -1,6 +1,6 @@
-# NKD Domain Language
+# NVKR Domain Language
 
-NKD describes product outputs, records their production, and connects immutable artifacts to verifiable evidence.
+NVKR describes product outputs, records their production, and connects immutable artifacts to verifiable evidence.
 The public lifecycle is Definition → Run → Release. Its six public objects are listed below; internal trust
 vocabulary preserves the distinctions needed to authenticate them.
 
@@ -70,10 +70,10 @@ It is validated as a complete executable graph before its logical identity is pr
 _Avoid_: Authored selection group, artifact, release
 
 **Build Digest**:
-The typed identity of a generated build graph's transport-independent logical content under `nkd.build`.
+The typed identity of a generated build graph's transport-independent logical content under `nvkr.build`.
 Output names and execution settings are bound by their
 owning records and excluded from this identity. Equal Build Digests do not merge required output uses or their evidence.
-The historical `nkd.recipe` identity family remains reserved; its signed bytes are not renamed or converted.
+`nvkr.recipe` is reserved and never minted. Historical `nkd.recipe` signed bytes are not renamed or converted.
 _Avoid_: Artifact digest, graph-file hash
 
 **Target platform**:
@@ -143,7 +143,7 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nkd:diskInspection: not-performed`; this supplies no installed inventory. M2 accepts producer
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 accepts producer
 provenance with its remaining delivery gates; M3 requires strict inspection and material reconciliation.
 Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection

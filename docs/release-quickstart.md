@@ -1,19 +1,19 @@
 # Browse and verify a release
 
 Explore the outputs and evidence in an existing release, then apply your consumer policy separately.
-Start at the repository root with `bin/nkdctl` built using the [quickstart](quickstart.md). Browsing works
+Start at the repository root with `bin/nvkr` built using the [quickstart](quickstart.md). Browsing works
 on macOS and Linux; verification runs on Linux, directly or through Docker on macOS.
 
 ## Find an output
 
 Set `RELEASE_REF` to the exact publication-root reference emitted by a completed publication:
 the full registry/repository followed by `@sha256:` and its digest. A tag, URL, or individual output
-manifest is not a release root. Obtain this reference from the release publisher. Current NVKE Recipes requires
+manifest is not a release root. Obtain this reference from the release publisher. Current NVKR requires
 publication-root v4; historical v3 publication roots are rejected.
 
 ```sh
 : "${RELEASE_REF:?Set RELEASE_REF to an exact publication-root reference}"
-bin/nkdctl release browse --reference "$RELEASE_REF"
+bin/nvkr release browse --reference "$RELEASE_REF"
 ```
 
 The listing shows named outputs, artifact types, components, Build Digests, and evidence. Registry access
@@ -23,12 +23,12 @@ Set `OUTPUT_NAME` to an exact name from that listing. Keep using the same termin
 
 ```sh
 : "${OUTPUT_NAME:?Set OUTPUT_NAME to an exact name from the listing}"
-NKD_RELEASE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nkd-release.XXXXXX")
-bin/nkdctl release browse --reference "$RELEASE_REF" --output "$OUTPUT_NAME"
-bin/nkdctl release browse --reference "$RELEASE_REF" --output "$OUTPUT_NAME" \
-  --format json > "$NKD_RELEASE_DIR/output.json"
-bin/nkdctl release browse --reference "$RELEASE_REF" --output "$OUTPUT_NAME" \
-  --format mermaid > "$NKD_RELEASE_DIR/output.mmd"
+NVKR_RELEASE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-release.XXXXXX")
+bin/nvkr release browse --reference "$RELEASE_REF" --output "$OUTPUT_NAME"
+bin/nvkr release browse --reference "$RELEASE_REF" --output "$OUTPUT_NAME" \
+  --format json > "$NVKR_RELEASE_DIR/output.json"
+bin/nvkr release browse --reference "$RELEASE_REF" --output "$OUTPUT_NAME" \
+  --format mermaid > "$NVKR_RELEASE_DIR/output.mmd"
 ```
 
 JSON preserves complete identifiers. Open the Mermaid export in a compatible viewer to follow output,
@@ -48,7 +48,7 @@ policy; do not derive accepted identities from an untrusted candidate merely to 
 : "${ACCEPTED_OIDC_ISSUER:?Set the accepted OpenID Connect issuer}"
 : "${COSIGN_PATH:?Set the path to the static Linux cosign executable}"
 : "${COSIGN_DIGEST:?Set the independently trusted cosign SHA-256 digest}"
-bin/nkdctl release verify --reference "$RELEASE_REF" \
+bin/nvkr release verify --reference "$RELEASE_REF" \
   --lane pipeline-attested --scope artifact-publication \
   --identity "$ACCEPTED_BUILD_IDENTITY_REGEXP" --issuer "$ACCEPTED_OIDC_ISSUER" \
   --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST"
@@ -57,8 +57,8 @@ bin/nkdctl release verify --reference "$RELEASE_REF" \
 This scope checks artifact bytes, signatures, and production attestations under that policy. It does not
 provide qualified acceptance or the capability-gated full `release` scope.
 
-From macOS, use the [consumer script](https://github.com/dsx-ai-factory/nke-recipes/blob/main/scripts/demo-release-consumer.sh) to run the
-same verification inside its pinned Linux Docker image. It builds a Linux amd64 `nkdctl`
+From macOS, use the [consumer script](https://github.com/dsx-ai-factory/nvkr/blob/main/scripts/demo-release-consumer.sh) to run the
+same verification inside its pinned Linux Docker image. It builds a Linux amd64 `nvkr`
 helper with the repository's pinned Go toolchain; supply a static Linux amd64 cosign
 executable and its trusted digest:
 

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Deliberately LIGHT golangci-lint config for the nkdctl POC (golangci-lint v2).
+# Deliberately LIGHT golangci-lint config for the nvkr POC (golangci-lint v2).
 # Per CLAUDE.md we do NOT port AICR's heavy multi-linter gate — this is the
 # standard linter set (errcheck, govet, ineffassign, staticcheck, unused) plus a
 # few low-noise, high-value extras. `make lint` stays green on the tree; the

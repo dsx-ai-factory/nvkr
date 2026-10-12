@@ -1,8 +1,8 @@
 # One authenticated release entry point, independently consumable artifacts
 
 The release index and its metadata live in `<publication.repositoryPrefix>/releases`. Deliverables and their
-SBOM attestations live in sibling repositories named after the Definition outputs. For NKE these are
-`ghcr.io/nvidia/nke-recipes/nkectl`, `…/cwe`, and `…/nke-helm`.
+SBOM attestations live in sibling repositories named after the Definition outputs. For NVKE these are
+`<publication.repositoryPrefix>/nvkectl`, `…/cwe`, and `…/nvke-helm`.
 
 ## Registry graph
 
@@ -17,7 +17,7 @@ flowchart TB
     M --> J["Canonical config: outputs, repositories, digests, evidence membership, document digests and stages"]
     RS["Release signature and SLSA attestation"] -. authenticates .-> R
   end
-  subgraph cli["…/nkectl"]
+  subgraph cli["…/nvkectl"]
     C["CLI manifest"] --> CC["Binary file/platform config"]
     C --> CL["CLI payload layer"]
     CB["SBOM referrer manifest"] -. "OCI subject" .-> C
@@ -33,7 +33,7 @@ flowchart TB
     IB --> ID["Sigstore bundle: verification material and signed DSSE statement containing CycloneDX; native manifest subject"]
     IS["Artifact signature and SLSA attestation"] -. authenticates .-> I
   end
-  subgraph helm["…/nke-helm"]
+  subgraph helm["…/nvke-helm"]
     H["Helm artifact manifest"] --> HC["Helm chart config: Chart.yaml metadata"]
     H --> HL["Final chart archive; exact CWE digest embedded"]
     HB["Final-package SBOM referrer manifest"] -. "OCI subject" .-> H
@@ -135,10 +135,10 @@ predicate explicitly at the deliverable's exact manifest reference:
 
 ```sh
 cosign verify-attestation --type https://sigstore.dev/cosign/sign/v1 \
-  --certificate-identity 'https://github.com/NVIDIA/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 cosign verify-attestation --type slsaprovenance1 \
-  --certificate-identity 'https://github.com/NVIDIA/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 ```
 
@@ -148,7 +148,7 @@ release. Fetch the single `application/vnd.dev.sigstore.bundle.v0.3+json` layer 
 ```sh
 cosign verify-blob-attestation --bundle sbom.bundle.json --type cyclonedx \
   --digest "$EXPECTED_SUBJECT_SHA256_HEX" --digestAlg sha256 \
-  --certificate-identity 'https://github.com/NVIDIA/nke-recipes/.github/workflows/nkd-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
 
@@ -157,26 +157,26 @@ trusting the downloaded bundle. For CWE it is the native manifest digest; for CL
 or archive digest. Referrer discovery alone establishes no trust. The registry adapter uses the standard
 referrers API or the library's OCI fallback index; discovery indexes are not additional SBOM documents.
 
-The NKD adapter downloads only the required signature and provenance bundles, verifies their exact bytes with
+The NVKR adapter downloads only the required signature and provenance bundles, verifies their exact bytes with
 `verify-blob-attestation`, and derives identity from the embedded certificate after successful verification.
 It does not copy the artifact or fall back to legacy attachments. Existing legacy signatures/provenance must
 be reissued as bundles before the updated consumer can accept them.
 
 ## Validation boundary
 
-Contract tests in [delivery](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/delivery), [signing](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/sign) and
-[factory](https://github.com/dsx-ai-factory/nke-recipes/tree/main/pkg/nkd/factory) cover missing, substituted, duplicate and unbound evidence, wrong subjects
+Contract tests in [delivery](https://github.com/dsx-ai-factory/nvkr/tree/main/pkg/nvkr/delivery), [signing](https://github.com/dsx-ai-factory/nvkr/tree/main/pkg/nvkr/sign) and
+[factory](https://github.com/dsx-ai-factory/nvkr/tree/main/pkg/nvkr/factory) cover missing, substituted, duplicate and unbound evidence, wrong subjects
 and stages, failed signing/verification, raw-evidence rejection, isolated repositories and failed fetches.
 Legacy finalization compares restored raw SBOM handoffs and final Helm package inspection; per-output
 finalization authenticates exact document bindings through signed metadata and independently verifies bundles.
 
-The [recorded M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed hosted publication,
+The [recorded M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed hosted publication,
 signing, verification and finalization for 34 outputs, including both native disks. It used an explicitly
 admitted validation branch and `build-provenance-v1` disk evidence. This does not establish main-only
 execution, independent full-payload disk consumption, strict disk inspection or qualification. Current
-support and remaining acceptance are owned by [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md).
+support and remaining acceptance are owned by [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
 
-Earlier [hosted release history](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/hosted-release-history.md#cosign-bundle-discovery) retains
+Earlier [hosted release history](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/hosted-release-history.md#cosign-bundle-discovery) retains
 the mixed-attestation discovery incident and its exact cosign interoperability limits. Historical
 layouts and unsigned loopback replays do not establish acceptance of the current publication format.
 

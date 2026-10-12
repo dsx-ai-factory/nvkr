@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	client "github.com/NVIDIA/nke-recipes/client/v1"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	client "github.com/dsx-ai-factory/nvkr/client/v1"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 type legacyCatalogProvider struct{ calls int }
@@ -33,7 +33,7 @@ func TestWithProviderRejectsLegacyIOBeforeRead(t *testing.T) {
 	_, err := client.New(client.WithProvider(provider)).ResolveBuild(context.Background(), client.ResolveRequest{
 		Components: []string{"kubectl"}, Platform: "linux/amd64",
 	})
-	if errorCode(err) != nkderr.CodeUsage {
+	if errorCode(err) != nvkrerr.CodeUsage {
 		t.Fatalf("legacy provider returned %v", err)
 	}
 	if provider.calls != 0 {
@@ -107,7 +107,7 @@ func TestWithCatalogIORejectsOversizedPayload(t *testing.T) {
 	base := catalog.Dir(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")).(catalog.ContextDataProvider)
 	_, err := client.New(client.WithCatalogIO(adversarialCatalogIO{base: base, oversized: true})).ResolveBuild(
 		context.Background(), client.ResolveRequest{Components: []string{"kubectl"}, Platform: "linux/amd64"})
-	if errorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "byte bound") {
+	if errorCode(err) != nvkrerr.CodeInvalidCatalog || !strings.Contains(err.Error(), "byte bound") {
 		t.Fatalf("oversized CatalogIO payload returned %v", err)
 	}
 }
@@ -116,7 +116,7 @@ func TestWithCatalogIORejectsUnsafeListing(t *testing.T) {
 	base := catalog.Dir(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")).(catalog.ContextDataProvider)
 	_, err := client.New(client.WithCatalogIO(adversarialCatalogIO{base: base, listing: []string{"../outside.yaml"}})).ResolveBuild(
 		context.Background(), client.ResolveRequest{Components: []string{"kubectl"}, Platform: "linux/amd64"})
-	if errorCode(err) != nkderr.CodeInvalidCatalog || !strings.Contains(err.Error(), "unsafe") {
+	if errorCode(err) != nvkrerr.CodeInvalidCatalog || !strings.Contains(err.Error(), "unsafe") {
 		t.Fatalf("unsafe CatalogIO listing returned %v", err)
 	}
 }
@@ -131,7 +131,7 @@ func TestInvalidProducerSelectionPrecedesCatalogIO(t *testing.T) {
 	} {
 		catalogIO := &countingCatalogIO{}
 		resolution, err := client.New(client.WithCatalogIO(catalogIO)).ResolveBuild(context.Background(), request)
-		if resolution != nil || errorCode(err) != nkderr.CodeInvalidCatalog || catalogIO.calls != 0 {
+		if resolution != nil || errorCode(err) != nvkrerr.CodeInvalidCatalog || catalogIO.calls != 0 {
 			t.Fatalf("invalid selection reached catalog I/O: resolution=%+v, err=%v, calls=%d", resolution, err, catalogIO.calls)
 		}
 	}

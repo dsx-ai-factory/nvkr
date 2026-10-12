@@ -1,6 +1,6 @@
 # Navigate release artifacts and evidence
 
-`nkdctl release browse` reads the bounded metadata and evidence of an exact release publication root and
+`nvkr release browse` reads the bounded metadata and evidence of an exact release publication root and
 shows its declared artifacts and memberships. It validates the complete metadata closure before displaying
 any output, without downloading or reading artifact payload layers. It can read a registry or an existing
 local OCI layout, and runs on macOS as well as Linux. Metadata inspection does not verify payload bytes,
@@ -13,7 +13,7 @@ registry and repository name. A tag, URL scheme, implicit registry, or an indivi
 release publication root.
 
 ```sh
-bin/nkdctl release browse --reference "$RELEASE_REF"
+bin/nvkr release browse --reference "$RELEASE_REF"
 ```
 
 The default text view shows the exact root and content identities, the recorded Definition and Environment
@@ -39,7 +39,7 @@ disk images, are not downloaded.
 ## Focus on one output
 
 ```sh
-bin/nkdctl release browse --reference "$RELEASE_REF" --output nkectl-linux-arm64
+bin/nvkr release browse --reference "$RELEASE_REF" --output nvkectl-linux-arm64
 ```
 
 Selection is an exact output name. Unknown names fail with a coded usage error. Selection changes the display
@@ -51,8 +51,8 @@ shown. Evidence references identify the exact manifest under the derived owning 
 ## Export readable data or a diagram
 
 ```sh
-bin/nkdctl release browse --reference "$RELEASE_REF" --format json > release-view.json
-bin/nkdctl release browse --reference "$RELEASE_REF" --format mermaid > release-graph.mmd
+bin/nvkr release browse --reference "$RELEASE_REF" --format json > release-view.json
+bin/nvkr release browse --reference "$RELEASE_REF" --format mermaid > release-graph.mmd
 ```
 
 JSON retains full artifact, manifest, blob, evidence-document and subject identities. It includes the total
@@ -70,7 +70,7 @@ the publication metadata. Registry-provided labels are escaped before rendering.
 ## Inspect a local layout
 
 ```sh
-bin/nkdctl release browse --reference "$RELEASE_REF" --layout /path/to/release-layout
+bin/nvkr release browse --reference "$RELEASE_REF" --layout /path/to/release-layout
 ```
 
 The layout may contain the complete publication or only its metadata and evidence; browsing does not open
@@ -101,18 +101,18 @@ downloads including disk images, failed admission before filesystem/network work
 in a read-only current directory, rejection of evidence without output membership, empty Helm build-subject
 arrays, filtered shared membership, Unicode-safe JSON round trips and CLI option admission. Those fixtures
 establish contracts, not GHCR, signing-service or production acceptance. Current support and external evidence remain recorded in
-[reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md).
+[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
 
-The [recorded loopback replay](https://github.com/dsx-ai-factory/nke-recipes/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI
-against a Docker registry carrying actual AMD64/ARM64 NKE CLI bundles and their dependency SBOMs. It is
+The [recorded loopback replay](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI
+against a Docker registry carrying actual AMD64/ARM64 NVKE CLI bundles and their dependency SBOMs. It is
 unsigned diagnostic evidence, separate from signed release consumption and the current metadata-only path.
-The [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nke-recipes/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md) records
+The [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nvkr/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md) records
 the scope and outcome of browsing the release published by Run `37533806963`. Current readers require
 publication-root v4 and reject that earlier v3 release; the dated record does not establish current-schema
 external acceptance.
 
 That record identifies the missing consumer source snapshots and distinguishes the original live observations
-from later local replays. Its [retained transport guard](https://github.com/dsx-ai-factory/nke-recipes/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata/inspect_transport.go.txt)
+from later local replays. Its [retained transport guard](https://github.com/dsx-ai-factory/nvkr/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata/inspect_transport.go.txt)
 is historical evidence with fixed local paths, not a maintained executable or a compiled repository test.
 The original guard bytes remain unchanged in Git history. It replaced the package-global
 `remote.DefaultTransport`; its request and byte counts describe that single execution through that transport,

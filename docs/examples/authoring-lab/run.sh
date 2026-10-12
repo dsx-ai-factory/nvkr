@@ -6,18 +6,18 @@
 set -euo pipefail
 
 die() { printf 'authoring lab: %s\n' "$*" >&2; exit 1; }
-usage() { printf 'Usage: bash run.sh --nkdctl PATH [--work NEW_DIRECTORY]\n'; }
+usage() { printf 'Usage: bash run.sh --nvkr PATH [--work NEW_DIRECTORY]\n'; }
 
 binary='' work='' have_work=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --nkdctl) [[ $# -ge 2 ]] || die '--nkdctl requires a path'; binary=$2; shift 2 ;;
+    --nvkr) [[ $# -ge 2 ]] || die '--nvkr requires a path'; binary=$2; shift 2 ;;
     --work) [[ $# -ge 2 && -n $2 ]] || die '--work requires a path'; work=$2; have_work=1; shift 2 ;;
     --help|-h) usage; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
-[[ -n $binary && -f $binary && -x $binary ]] || die '--nkdctl must be an executable file'
+[[ -n $binary && -f $binary && -x $binary ]] || die '--nvkr must be an executable file'
 for tool in git jq; do
   command -v "$tool" >/dev/null 2>&1 || die "missing required command: $tool"
 done
@@ -42,7 +42,7 @@ if [[ $have_work == 1 ]]; then
   bounded mkdir -p -- "$(dirname -- "$work")"
   bounded mkdir -- "$work" || die "cannot create new workspace: $work"
 else
-  work=$(bounded mktemp -d "${TMPDIR:-/tmp}/nkd-authoring.XXXXXXXX")
+  work=$(bounded mktemp -d "${TMPDIR:-/tmp}/nvkr-authoring.XXXXXXXX")
 fi
 work=$(CDPATH='' cd -- "$work" && pwd -P)
 bounded cp -pR -- "$here/catalog" "$here/upstream" "$work/"
@@ -57,8 +57,8 @@ unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE \
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="url.$work/upstream.insteadOf"
 export GIT_CONFIG_VALUE_0=https://authoring.example.invalid/platform
-export GIT_AUTHOR_NAME='NKD Authoring Fixture' GIT_AUTHOR_EMAIL=fixture@example.invalid
-export GIT_COMMITTER_NAME='NKD Authoring Fixture' GIT_COMMITTER_EMAIL=fixture@example.invalid
+export GIT_AUTHOR_NAME='NVKR Authoring Fixture' GIT_AUTHOR_EMAIL=fixture@example.invalid
+export GIT_COMMITTER_NAME='NVKR Authoring Fixture' GIT_COMMITTER_EMAIL=fixture@example.invalid
 export GIT_AUTHOR_DATE=2025-01-01T00:00:00Z GIT_COMMITTER_DATE=2025-01-01T00:00:00Z
 
 # Keep stdout byte-for-byte; command substitution would strip Plan newlines.
@@ -100,7 +100,7 @@ cli catalog pin --dir catalog --tag 1.0.0 platform
 bounded cp -- catalog/pins.lock.yaml original-pins.lock.yaml
 cli catalog pin --dir catalog --tag 1.0.0 platform
 unchanged_lock 'no-op pin'
-run_checked 13 NKD-E-UNSUPPORTED command.stdout "$binary" catalog pin --dir catalog --tag 1.0.0 app
+run_checked 13 NVKR-E-UNSUPPORTED command.stdout "$binary" catalog pin --dir catalog --tag 1.0.0 app
 unchanged_lock 'refused derived-member pin'
 
 cli_to definition.json definition inspect --definition definition.yaml
@@ -128,7 +128,7 @@ cli_to catalog-digest.txt catalog digest --data catalog
 catalog_digest=$(<catalog-digest.txt)
 # These are complete authored inputs and reports, never canonical identities.
 bounded jq -nS --arg digest "$catalog_digest" --arg supplier "sha256:$supplier_hash" '{
-  apiVersion: "nkd.dev/catalog-overlay/v3", kind: "CatalogOverlay", name: "supplier-doctor",
+  apiVersion: "nvkr.dev/catalog-overlay/v3", kind: "CatalogOverlay", name: "supplier-doctor",
   requiresCatalogDigest: $digest,
   components: {doctor: {version: "1.0.0", sourceDateEpoch: 1735689600,
     prebuilt: {url: "https://authoring.example.invalid/supplier/doctor.sh",
@@ -159,11 +159,11 @@ EOF
 git_fixture add versions.yaml
 git_fixture commit -q -m 'fixture platform 1.0.1'
 git_fixture tag platform/v1.0.1
-run_checked 3 NKD-E-DIFF pin-preview.txt "$binary" catalog bump --dir catalog --check platform
+run_checked 3 NVKR-E-DIFF pin-preview.txt "$binary" catalog bump --dir catalog --check platform
 unchanged_lock 'pin preview'
 cli catalog bump --dir catalog platform
 compile_plan source-pin
-run_checked 43 NKD-E-UNVERIFIED-REF command.stdout "$binary" run plan --definition whole-producer.json \
+run_checked 43 NVKR-E-UNVERIFIED-REF command.stdout "$binary" run plan --definition whole-producer.json \
   --environment environment.yaml --json
 
 bounded jq -nS --slurpfile baseline plans/baseline.json --slurpfile source plans/source-pin.json \

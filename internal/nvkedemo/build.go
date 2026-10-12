@@ -1,0 +1,238 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package nvkedemo
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"golang.org/x/sys/unix"
+)
+
+// BuiltInputs describes output paths of the existing launcher; it confers no
+// authority. Run independently admits observations and calls nvkr to verify.
+type BuiltInputs struct {
+	Runs RunInputs
+	NVKR string
+}
+
+// BuildArtifacts invokes the repository's existing bootstrap and nvkr local
+// build flow. It does not import execution from a Go SDK, implement a builder,
+// modify NVKE sources or fold deployment into an NVKR Definition.
+func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
+	result, err := buildArtifacts(ctx, cfg)
+	if err != nil {
+		return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "local NVKE artifact build")
+	}
+	return result, nil
+}
+func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
+	if err := requireContext(ctx); err != nil {
+		return BuiltInputs{}, err
+	}
+	launcherFlags, err := buildNetworkFlags(cfg.Network)
+	if err != nil {
+		return BuiltInputs{}, err
+	}
+	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
+		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "build inside native Ubuntu ARM64 execution host")
+	}
+	repo, err := resolveExisting(cfg.Repository)
+	if err != nil {
+		return BuiltInputs{}, err
+	}
+	if cfg.AttemptPrefix == "" || strings.ContainsAny(cfg.AttemptPrefix, "/\\\x00\r\n\t ") || strings.HasPrefix(cfg.AttemptPrefix, "-") {
+		return BuiltInputs{}, errors.New("require explicit fresh local attempt prefix")
+	}
+	if cfg.Jobs < 1 {
+		return BuiltInputs{}, errors.New("jobs must be positive")
+	}
+	script := filepath.Join(repo, "scripts/nvke-full-arm64-local.sh")
+	if _, err = boundedRegularRead(script, 1<<20); err != nil {
+		return BuiltInputs{}, err
+	}
+	env, err := localBuildEnvironment()
+	if err != nil {
+		return BuiltInputs{}, err
+	}
+	if cfg.NVKEClone != "" {
+		clone, readErr := resolveExisting(cfg.NVKEClone)
+		if readErr != nil {
+			return BuiltInputs{}, readErr
+		}
+		env = SetEnv(env, map[string]string{"NVKE_LOCAL_CLONE": clone})
+	}
+	runner := Runner{Env: env, Progress: cfg.Progress, output: cfg.Progress}
+	// All host checks and fresh-path checks precede the first bootstrap. The
+	// script remains authoritative for exact runtime/toolchain admission.
+	for _, root := range []string{"runs", "laptop-bootstrap"} {
+		owned := filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)
+		if _, readErr := os.Lstat(owned); readErr == nil {
+			return BuiltInputs{}, fmt.Errorf("attempt destination %q already exists; choose a fresh --attempt", owned)
+		} else if !errors.Is(readErr, os.ErrNotExist) {
+			return BuiltInputs{}, fmt.Errorf("cannot inspect attempt destination %q: %w", owned, readErr)
+		}
+	}
+	preflight := append([]string{"bash", script}, launcherFlags...)
+	if err = runner.Run(ctx, append(preflight, "--check", "all"), "preflight-all", 120*time.Second); err != nil {
+		return BuiltInputs{}, err
+	}
+	cfg.Repository = repo
+	if err = buildLocalArtifacts(ctx, runner, script, cfg); err != nil {
+		return BuiltInputs{}, err
+	}
+	return builtInputs(repo, cfg.AttemptPrefix), nil
+}
+
+func builtInputs(repo, attempt string) BuiltInputs {
+	path := filepath.Join(repo, ".nvkr/runs", attempt)
+	return BuiltInputs{RunInputs{OS: path, Components: path, Providers: path, Site: path, Tools: path, Profiles: path, Simulator: path}, filepath.Join(repo, ".nvkr/laptop-bootstrap", attempt, "nvkr")}
+}
+
+// The native build launcher receives these developer transport settings. The
+// sourcegit owner narrows its own Git children to fetch-only credentials; this
+// does not isolate every launcher subprocess from the launcher environment.
+// Deployment uses a separate environment without ambient source credentials.
+func localBuildEnvironment() ([]string, error) {
+	redirects, err := sourcegit.LocalRedirectEnvironment(os.Environ())
+	if err != nil {
+		return nil, err
+	}
+	env := SetEnv(NativeEnvironment(), map[string]string{"CONTAINER_RUNTIME": "docker"})
+	for _, key := range []string{"HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK",
+		"https_proxy", "http_proxy", "no_proxy", "ALL_PROXY", "all_proxy",
+		"GIT_SSL_CAINFO", "SSL_CERT_FILE", "SSL_CERT_DIR"} {
+		if value, ok := os.LookupEnv(key); ok && value != "" {
+			env = SetEnv(env, map[string]string{key: value})
+		}
+	}
+	return append(env, redirects...), nil
+}
+
+func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {
+	launcherFlags, err := buildNetworkFlags(cfg.Network)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 6*time.Hour)
+	defer cancel()
+	boundary := beginProgress(runner.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
+	defer func() { boundary.finish(result) }()
+	if runner.Progress != nil {
+		fmt.Fprintln(runner.Progress, "Build all artifacts in one Definition/Run (existing launcher → nvkr run local)")
+	}
+	// Bootstrap gets no activity pipe. Its selected Plan, previews and source
+	// preparation remain at the existing owner before the final direct child.
+	prepare := append([]string{"bash", script, "--prepare-only"}, launcherFlags...)
+	if err := runner.Run(ctx, append(prepare, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour); err != nil {
+		return err
+	}
+	args, err := preparedBuildInvocation(cfg)
+	if err != nil {
+		return err
+	}
+	env, err := preparedBuildEnvironment(runner.Env, cfg)
+	if err != nil {
+		return err
+	}
+	runner.Env, runner.directory, runner.buildActivity = env, cfg.Repository, true
+	// Resolve only the known bootstrap executable against the admitted repo.
+	args[0] = filepath.Join(cfg.Repository, args[0])
+	return runner.Run(ctx, args, "build-all", 6*time.Hour)
+}
+
+func buildNetworkFlags(network string) ([]string, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return nil, err
+	}
+	if mode == "upstream-ovn" {
+		return []string{"--network", mode}, nil
+	}
+	// The explicit Calico diagnostic retains the NVIDIA build inputs; it
+	// changes deployment intent only. No ambient variable selects a catalog.
+	return nil, nil
+}
+
+func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
+	bootstrap := filepath.ToSlash(filepath.Join(".nvkr/laptop-bootstrap", cfg.AttemptPrefix))
+	held, info, err := securepath.OpenRegular(filepath.Join(cfg.Repository, bootstrap, "build-invocation.json"))
+	if err != nil {
+		return nil, err
+	}
+	defer held.Close()
+	var stat unix.Stat_t
+	if info.Mode().Perm() != 0o600 || info.Size() > 16<<10 || unix.Fstat(int(held.Fd()), &stat) != nil || stat.Uid != uint32(os.Getuid()) || stat.Nlink != 1 {
+		return nil, errors.New("require bounded private owned build invocation")
+	}
+	raw, err := io.ReadAll(io.LimitReader(held, (16<<10)+1))
+	if err != nil || len(raw) > 16<<10 {
+		return nil, errors.New("cannot read bounded private build invocation")
+	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return nil, errors.New("invalid private build invocation")
+	}
+	var args []string
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	if err := decoder.Decode(&args); err != nil || len(args) != 17 {
+		return nil, errors.New("invalid private build invocation")
+	}
+	definition := args[4]
+	authored := "definitions/nvke-local-dev-arm64/definition.json"
+	if cfg.Network == "upstream-ovn" {
+		authored = "definitions/nvke-local-dev-arm64/definition-upstream-ovn.json"
+	}
+	if definition != authored && definition != bootstrap+"/definition.json" {
+		return nil, errors.New("private build invocation selected an unsupported definition path")
+	}
+	want := []string{bootstrap + "/nvkr", "run", "local", "--definition", definition,
+		"--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix,
+		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker"}
+	if !slices.Equal(args, want) {
+		return nil, errors.New("private build invocation differs from the supported local command")
+	}
+	return args, nil
+}
+
+func preparedBuildEnvironment(environment []string, cfg BuildConfig) ([]string, error) {
+	// The preparation shell's only additional Git configuration is this exact
+	// NVKE redirect pair. Recreate it from the already-admitted clone rather than
+	// copying arbitrary shell-exported environment into the final process.
+	env := append([]string(nil), environment...)
+	if clone := environmentValue(env, "NVKE_LOCAL_CLONE"); clone != "" {
+		count := 0
+		if declared := environmentValue(env, "GIT_CONFIG_COUNT"); declared != "" {
+			var err error
+			count, err = strconv.Atoi(declared)
+			if err != nil || count < 0 || count > 14 {
+				return nil, errors.New("local NVKE redirect requires two free Git entries")
+			}
+		}
+		for _, upstream := range []string{"https://github.com/dsx-ai-factory/nvke.git", "https://github.com/dsx-ai-factory/nvke"} {
+			suffix := strconv.Itoa(count)
+			env = SetEnv(env, map[string]string{"GIT_CONFIG_KEY_" + suffix: "url." + clone + ".insteadOf", "GIT_CONFIG_VALUE_" + suffix: upstream})
+			count++
+		}
+		env = SetEnv(env, map[string]string{"GIT_CONFIG_COUNT": strconv.Itoa(count)})
+	}
+	if _, err := sourcegit.LocalRedirectEnvironment(env); err != nil {
+		return nil, err
+	}
+	return SetEnv(env, map[string]string{"TMPDIR": filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "tmp")}), nil
+}

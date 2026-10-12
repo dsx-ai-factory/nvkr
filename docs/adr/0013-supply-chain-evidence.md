@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-13 in the consolidated NKD ADR set.
+- **Index:** ADR-13 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-05 (evidence linkage), ADR-09 (provenance), ADR-01 (canonical codec / serialization
   profile), ADR-19 (fleet boundary).
 - **Satisfies:** FR-15 (deterministic SBOM), SEC-18 (vulnerability reporting).
@@ -18,7 +18,7 @@
 
 The evidence contract includes per-artifact SBOMs, external references for acquired artifacts, and deferred
 vulnerability results. The set is deterministic, bound to artifact identity, and folds into the evidence bundle
-(ADR-05). One boundary governs all of it: NKD **produces** evidence and does not operate the fleet.
+(ADR-05). One boundary governs all of it: NVKR **produces** evidence and does not operate the fleet.
 
 ## Decision
 
@@ -42,7 +42,7 @@ locally generated evidence identity.
 
 ### 2. External evidence for acquired artifacts
 
-**NKE OS source-migration policy (proposed; candidate catalogs only).** Publicly
+**NVKE OS source-migration policy (proposed; candidate catalogs only).** Publicly
 available component sources are compiled from exact reviewed Git pins. A failed
 source build never authorizes fallback to a release binary. Where public source
 cannot be established, preserve the existing exact prebuilt payload as an explicitly
@@ -52,7 +52,7 @@ its access restriction is not a prebuilt exception. Producer metadata/docs and
 preparation logs identify these limitations without introducing a new schema field
 or waiving evidence policy. A warning reports the declared exception only: missing,
 inaccessible, unpinned or digest-mismatching bytes still fail closed. Source availability
-is not automatically discovered or enforced by NKD; reviewers must approve declarations
+is not automatically discovered or enforced by NVKR; reviewers must approve declarations
 before maintained Definition integration. Existing evidence gates and the waiver
 limitations below remain unchanged.
 
@@ -122,7 +122,7 @@ satisfy another. Component-level references are not implicitly reusable across p
 names the exact artifact subject it covers. The deferred ADR-16 release gate must consume only those capabilities or the
 authenticated receipt set; raw evidence files remain the auditable payloads those receipts reference.
 
-The removed evidence-gap waiver implementation used `nkd.dev/evidence-waiver/v3`. Its digest family remains
+The removed evidence-gap waiver implementation used `nvkr.dev/evidence-waiver/v3`. Its digest family remains
 reserved and nonminting; no current reader or issuer accepts this as clearance. A future waiver protocol must
 bind component, build, artifact, builder-profile scope, status checkpoint, missing evidence types, policy,
 approver and validity interval. It must authenticate its own schema and signer policy without reinterpreting
@@ -134,10 +134,10 @@ V1 emits deterministic CycloneDX documents per observed component artifact and a
 per-build SBOM node after terminal observation. Each subject is the runner-observed artifact digest; the index
 also binds Build Digest. Resolved component declarations are frozen in the plan so the node needs no live
 catalog. Adding those declarations or outputs changes canonical plan identity and requires regeneration.
-The internal index uses `nkd.dev/sbom-index/v2`; generated CycloneDX properties bind `nkd:buildDigest`.
+The internal index uses `nvkr.dev/sbom-index/v2`; generated CycloneDX properties bind `nvkr:buildDigest`.
 Replacing the former Recipe binding changes document identity; old evidence is not silently translated.
 
-A Definition may select a catalog-pinned Syft executable through `sbomTool`. Both maintained NKE
+A Definition may select a catalog-pinned Syft executable through `sbomTool`. Both maintained NVKE
 Environments require it. The graph then requires each observed payload and the acquired scanner as explicit
 SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismatched bytes, scanner errors and
 empty inventories fail closed. Without `sbomTool`, ordinary declaration-only documents provide source
@@ -148,8 +148,8 @@ pins must agree. A catalog scanner for another platform does not replace the nat
 The pipeline-attested M2 producer-provenance route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
 It retains the original held disk, exact producer results and authenticated transitive material handoffs,
 and publishes source-bound per-component CycloneDX producer documents under the existing signed evidence
-closure. These documents have no inspected dependency inventory and explicitly bind `nkd:diskEvidence`
-to `build-provenance-v1` and `nkd:diskInspection` to `not-performed`. The signed release disk binding carries
+closure. These documents have no inspected dependency inventory and explicitly bind `nvkr:diskEvidence`
+to `build-provenance-v1` and `nvkr:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
 The October 7, 2026 PR #97 task chat contains Ilya Kislenko's instruction:
@@ -183,7 +183,7 @@ Environment-native `diskInspectionProfiles` entry frozen in the Plan: the comple
 codec, guestfish, Syft and dpkg-deb executable pins, CPU/RAM ceilings (at least 2 GiB for the appliance), scratch capacity minima,
 filesystem expansion bound and wall-time limit. Changing this observation profile changes Environment/Plan identity rather
 than the logical producer Build. The pinned tools own disk/filesystem, package and OCI grammars;
-NKD projects their observations and does not execute guest programs or package installation scripts.
+NVKR projects their observations and does not execute guest programs or package installation scripts.
 
 The original held Packer artifact retains its declared acquisition carrier before producer cleanup.
 The runtime owns capacity admission, snapshot creation, bounded offline content scanning, snapshot
@@ -237,11 +237,11 @@ carrier and closure revalidated afterward. Direct OCI copies and sequential per-
 bounded separately, not charged to cumulative expansion bytes; shared member/image limits still apply.
 The 16,384-component report ceiling applies before downstream public deduplication, so shared-base
 inventories can fail closed even when their unique inventory would fit.
-Real NKE material complexity, cold-cache timing and full-matrix inspection remain unverified.
+Real NVKE material complexity, cold-cache timing and full-matrix inspection remain unverified.
 Modern mixed Docker-save
 archives, OCI member names prefixed with `./`, and OCI indexes carrying foreign/unknown-platform
 attestation manifests are unsupported; an attestation descriptor is not silently discarded as image evidence.
-The maintained NKE preparation at `b30117c25b2dcdf6c16021dae88a2eafdafcae61` uses pinned crane
+The maintained NVKE preparation at `b30117c25b2dcdf6c16021dae88a2eafdafcae61` uses pinned crane
 Docker-archive pulls followed by GNU-tar/gzip repacking, not modern Docker-save mixed layouts. This
 source inspection does not establish that retained prepared archive bytes were fully scanned. One operation shares its
 filesystem-byte expansion allowance across sibling archives and Debian exports, with 16,384 recursive
@@ -257,12 +257,12 @@ other compressed formats have no nested-image discovery. These adapters are cont
 controlled archives; complete native Syft discovery remains unexercised. The root file inventory
 retains actual exported paths and the exact outer archive hash;
 files inside cached Debian archives, Docker archives or SquashFS payloads are not presented as
-invented installed paths. Their discovered components carry descriptive `nkd:containedIn` values
+invented installed paths. Their discovered components carry descriptive `nvkr:containedIn` values
 binding the immediate held carrier path and digest. Repeated public package identities retain a
 sorted canonical string list of those carriers; no recursive ancestry, installed origin or package
 ownership is inferred. A contained payload's file inventory is not an independent root-file inventory.
-Every uncontained non-file component carries `nkd:observedAtSubjectRoot`, including when its public
-package ref also has contained observations; it is not an installed-origin claim. `nkd:materialSubjects` matches only
+Every uncontained non-file component carries `nvkr:observedAtSubjectRoot`, including when its public
+package ref also has contained observations; it is not an installed-origin claim. `nvkr:materialSubjects` matches only
 top-level regular-file hashes in each material observation. Nested Debian/SquashFS/image file digests
 do not currently participate in that file correspondence, and absence of the property is not non-correspondence proof.
 
@@ -275,10 +275,10 @@ reconciliation observations, selected admission/decoder failures, private issuer
 consumer architectures and export-owner revalidation. The issuer tests keep complete Plan, original Run,
 payload selection and material-trace checks concrete, while modeling stopped scan/profile observations;
 the public wrapper still requires the actual Packer capability and opaque inspection operations. Those
-tests do not establish full helper discovery. A separate opt-in [controlled ELF-protocol test](../../pkg/nkd/factory/disk_evidence_runtime_linux_test.go)
+tests do not establish full helper discovery. A separate opt-in [controlled ELF-protocol test](../../pkg/nvkr/factory/disk_evidence_runtime_linux_test.go)
 targets public producer/inspection owners, receipt issuance, exact export, six negative issuer rows
 and the concrete memory-profile guard; it is not actual Docker/Packer/guestfish/Syft discovery.
-Native AMD64 public positive issuance, complete native NKE content runs, original live NKE strict joins,
+Native AMD64 public positive issuance, complete native NVKE content runs, original live NVKE strict joins,
 strict inventory publication and strict production acceptance remain unexercised.
 Complete inventory documents are bounded to 32 MiB, composition helper reports to 16 MiB,
 and signed SBOM transports to 64 MiB. These document/bundle policies apply to every SBOM subject,
@@ -334,8 +334,8 @@ Limits are 16,384 packages, 1 GiB per package, 8 MiB manifest, 8 GiB archive, an
 locations per package, each at most 4,096 bytes. The owning held-archive verifier checks member-byte
 correspondence without extraction; package display metadata and locations remain source-reported descriptions.
 Header metadata and member padding are opaque digest-bound bytes, not canonical package evidence. Capture
-settings belong to the selected producer configuration. The [capture contract](../nke-os-acquisition-contract.md)
-describes the unpinned NKE candidate. The generic collector binds a selected carrier to its original
+settings belong to the selected producer configuration. The [capture contract](../nvke-os-acquisition-contract.md)
+describes the unpinned NVKE candidate. The generic collector binds a selected carrier to its original
 Run/QCOW2; native capture coverage and repository-origin authentication remain unverified. Neither this
 diagnostic observation nor its zero-value description authorizes production or substitutes for the full
 exact-QCOW2 inventory required above.
@@ -471,8 +471,8 @@ Curated/embedded aggregates use dependency edges from aggregate to members (ADR-
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nkd/sbom/*_test.go`, `pkg/nkd/attest/*_test.go`, and
-`pkg/nkd/catalog/prebuilt_test.go` covers deterministic documents, prebuilt declarations, publisher evidence
+Current module evidence in `pkg/nvkr/sbom/*_test.go`, `pkg/nvkr/attest/*_test.go`, and
+`pkg/nvkr/catalog/prebuilt_test.go` covers deterministic documents, prebuilt declarations, publisher evidence
 equality across online/mirror transport relocation, same-process exact-byte qualification, HTTPS-reference byte
 and subject verification, and mutation rejection. It does not prove vulnerability scanning, waiver evaluation,
 release clearance or signed cross-process receipt publication.

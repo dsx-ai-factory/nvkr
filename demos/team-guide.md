@@ -1,11 +1,11 @@
-# Presenting NVKE Recipes
+# Presenting NVKR
 
-Use the [14-slide deck](nkd-team-tour.html) for the story, the [concept gallery](demo-team-concepts.html)
+Use the [14-slide deck](nvkr-team-tour.html) for the story, the [concept gallery](demo-team-concepts.html)
 for questions, and the [HTML walkthrough](demo-team-walkthrough.html) for copyable commands.
 The [graph explorer](demo-team-explorer.html) displays saved Plans and release metadata offline.
 Keep all four HTML files together; they need no server or runtime downloads.
 
-NVKE Recipes turns declared build inputs into generated pipelines and traceable releases. The deck
+NVKR turns declared build inputs into generated pipelines and traceable releases. The deck
 explains the concepts without requiring knowledge of a demo script. Use the linked examples when the
 audience wants to see a concept in action.
 
@@ -41,7 +41,7 @@ GOTOOLCHAIN=local make build
 bash demos/demo-local.sh
 ```
 
-The local build needs no NKE checkout or registry credentials. `GO_BIN` and `NKDCTL_BIN` can select
+The local build needs no NVKE checkout or registry credentials. `GO_BIN` and `NVKR_BIN` can select
 installed executables. The resulting script runs on the host; its build executes in a Linux container.
 First use can take longer while downloading the toolchain image and compiling the helper.
 
@@ -106,53 +106,52 @@ This is real, unqualified local execution with a composition SBOM. It does not s
 ## Follow the OS-image materials
 
 At slide 9, open the ARM64 Plan. The consuming producer declares exact mappings such as
-`agent: nke-agent`: an input label on the left, a component key on the right.
+`agent: nvke-agent`: an input label on the left, a component key on the right.
 The disk output's `components` list explicitly includes the root and every transitive material.
-NVKE Recipes validates that selection against the catalog graph; the list is not positional wiring.
+NVKR validates that selection against the catalog graph; the list is not positional wiring.
 
-NVKE Recipes checks and stages the input bytes. NKE's source-owned commands understand the packages and
+NVKR checks and stages the input bytes. NVKE's source-owned commands understand the packages and
 archives, and Packer assembles the disk. Use the [Materials concept](demo-team-concepts.html#materials)
 for the full explanation. The separate OS script compiles and dry-runs the Plan; it does not bake a disk.
-Actual disk execution requires the matching host capabilities in the [OS-image guide](../definitions/nke-os/README.md).
+Actual disk execution requires the matching host capabilities in the [OS-image guide](../definitions/nvke-os/README.md).
 
 ## Browse the hosted release
 
-The featured [Run 37736529644](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37736529644)
-uses commit `105bb738521c9dbd7f1326ab15e78a699200f4f1` and publication-root v4.
-Here **v4 names the publication metadata schema**, not an NVKE Recipes product version. The root binds its Plan
-Digest along with the Definition and Environment identities. Earlier team-demo runs emitted v3 metadata;
-current NVKE Recipes rejects those roots. Their historical captures remain available in Git history.
-The successful consumer command can still emit `nkd.dev/release/v3`: that is the separately versioned
-consumer Release description, not the stored publication-root schema.
+The explorer's embedded [Run 37736529644](https://github.com/dsx-ai-factory/nvkr/actions/runs/37736529644)
+is a historical, pre-rebrand capture from commit `105bb738521c9dbd7f1326ab15e78a699200f4f1`.
+Its original repository, artifact names, carrier paths and schema identifiers
+remain unchanged. It is not a newly published NVKR release, and the current
+strict NVKR readers do not reinterpret its old-namespace records.
 
 Use the explorer's **Pipeline Release** view for a repeatable offline presentation.
 The saved view contains 34 outputs and 60 evidence records, including both QCOW2 disks.
-For a live browse, run:
+For a live browse, first supply an actual post-cutover NVKR release reference:
 
 ```sh
-export RELEASE_REF='ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:2fef87f426734a4427f7694aaf5ac181ba11352ea37522349bbb9cda7d84dc42'
+export RELEASE_REF="${NVKR_RELEASE_REF:?Set an actual post-cutover release reference}"
 bash demos/demo-team-release.sh --reference "$RELEASE_REF" \
-  --output nke-node-image-arm64 --mermaid
+  --output nvke-node-image-arm64 --mermaid
 ```
 
 Live browsing needs existing registry credentials for this release. Preflight access before the session.
-For offline browsing, use an authenticated GitHub CLI to download the small metadata carrier once:
+For offline browsing of that new release, set its actual producing Run ID and
+use an authenticated GitHub CLI to download its metadata carrier:
 
 ```sh
 DEMO_METADATA=$(mktemp -d)
-gh run download 37736529644 --repo dsx-ai-factory/nke-recipes \
-  --name nkd-package-release --dir "$DEMO_METADATA/download"
-bin/nkdctl transport-unpack \
+gh run download "${NVKR_RUN_ID:?Set the matching post-cutover Run ID}" --repo dsx-ai-factory/nvkr \
+  --name nvkr-package-release --dir "$DEMO_METADATA/download"
+bin/nvkr transport-unpack \
   --archive "$DEMO_METADATA/download/package-release.tar" \
-  --root "$DEMO_METADATA" --path .nkd/factory/packages/release
+  --root "$DEMO_METADATA" --path .nvkr/factory/packages/release
 bash demos/demo-team-release.sh --reference "$RELEASE_REF" \
-  --layout "$DEMO_METADATA/.nkd/factory/packages/release" \
-  --output nke-node-image-arm64 --mermaid
+  --layout "$DEMO_METADATA/.nvkr/factory/packages/release" \
+  --output nvke-node-image-arm64 --mermaid
 ```
 
 The Run artifact contains `package-release.tar`. The unpacker admits only its declared
-`.nkd/factory/packages/release` subtree; the resulting OCI layout includes metadata and evidence, with no
-image layers, executable archives or QCOW2 payloads. Reuse `$DEMO_METADATA/.nkd/factory/packages/release` for subsequent `--layout` calls. Archive extraction alone is not signature or payload verification.
+`.nvkr/factory/packages/release` subtree; the resulting OCI layout includes metadata and evidence, with no
+image layers, executable archives or QCOW2 payloads. Reuse `$DEMO_METADATA/.nvkr/factory/packages/release` for subsequent `--layout` calls. Archive extraction alone is not signature or payload verification.
 
 Choose ARM64, select the artifact, then follow an evidence membership to its component, stage and exact
 subject. Compare AMD64, a chart and a CLI. Distinguish the OCI manifest digest from the disk's declared
@@ -179,7 +178,7 @@ an accepted policy; private access can use an inline-auth Docker config via `--r
 See the [release quickstart](../docs/release-quickstart.md#verify-against-an-accepted-policy) for exact flags.
 Keep this optional operation separate from the short metadata-browsing stop.
 
-The macOS Docker route was exercised successfully against this run’s single-output `nkectl` publication:
+The macOS Docker route was exercised successfully against this run’s pre-rebrand single-output `nkectl` publication:
 `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases-nkectl@sha256:768b0ef67a09649465a66ff360eb44e74237a22c66da34bcee961247f06bd4d9`.
 It accepted the exact `main` workflow identity and GitHub OIDC issuer under the scope above. This check
 covers that CLI publication; it does not extend to the combined release or disk payloads.
@@ -191,6 +190,6 @@ substitutions, builder types, generator adapters, graph views, Helm bindings, co
 publication identities, verification policy, maintenance and the Go SDK.
 
 Use the [Markdown quickstart](../docs/quickstart.md) for first-time planning, the
-[full local NKE demo](m1-local.md) for CLI/image/chart execution and pull-back, and the
+[full local NVKE demo](m1-local.md) for CLI/image/chart execution and pull-back, and the
 [documentation index](../docs/README.md) for task guides. The
 [reconciliation record](../docs/adr/reconciliation.md) owns current support and evidence limits.

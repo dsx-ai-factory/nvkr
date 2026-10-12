@@ -6,13 +6,13 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-19 in the consolidated NKD ADR set (artifact membership and downstream ownership).
+- **Index:** ADR-19 in the consolidated NVKR ADR set (artifact membership and downstream ownership).
 - **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-12 (targets), ADR-16
   (release gates), ADR-14 (delivery), ADR-18 (build pipeline).
 
 ## Context
 
-NKD produces and verifies artifacts. The maintained NKE Definitions require exact output membership,
+NVKR produces and verifies artifacts. The maintained NVKE Definitions require exact output membership,
 pinned producers, packaging and evidence, but do not require a deployment topology. The former cluster-view
 model added node roles, categories, declared Kubernetes/OS context, and generated composition records without
 an implemented provisioning consumer or runtime-compatibility proof.
@@ -52,8 +52,8 @@ to a decoded legacy description.
 
 ### 3. Downstream systems own deployment
 
-NKE or another downstream owner decides topology, node placement, deployment timing, installation, Helm
-application and reconciliation using accepted artifact references. NKD has no provisioning-adapter interface or
+NVKE or another downstream owner decides topology, node placement, deployment timing, installation, Helm
+application and reconciliation using accepted artifact references. NVKR has no provisioning-adapter interface or
 cluster qualification result. A future integration requires a concrete consumer and its own scoped contract;
 this decision reserves no unused runtime interface or qualification record.
 
@@ -64,7 +64,7 @@ not gain deployment or runtime claims from removing cluster descriptions.
 ## Consequences
 
 Authors describe the artifacts they need once. The compiler and consumer maintain exact release membership
-without a parallel deployment taxonomy. NKD no longer authenticates a tenant/operator grouping or asserts node
+without a parallel deployment taxonomy. NVKR no longer authenticates a tenant/operator grouping or asserts node
 placement intent; downstream consumers that need such descriptions own them explicitly.
 
 ## Acceptance evidence

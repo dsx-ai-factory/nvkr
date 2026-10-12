@@ -13,7 +13,7 @@ import (
 // ordinary go test invocations, including agent runs. Short mode always wins.
 func RequireExtended(t *testing.T) {
 	t.Helper()
-	if testing.Short() || os.Getenv("NKD_TEST_EXTENDED") != "1" {
-		t.Skip("extended capacity/integration test; run make test-full or NKD_TEST_EXTENDED=1 go test")
+	if testing.Short() || os.Getenv("NVKR_TEST_EXTENDED") != "1" {
+		t.Skip("extended capacity/integration test; run make test-full or NVKR_TEST_EXTENDED=1 go test")
 	}
 }

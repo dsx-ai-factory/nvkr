@@ -1,6 +1,6 @@
 # Artifact dependency SBOMs
 
-The NKE Definition selects a catalog-pinned Syft executable using `sbomTool: syft`. The scanner
+The NVKE Definition selects a catalog-pinned Syft executable using `sbomTool: syft`. The scanner
 is acquired as a normal pipeline tool. SBOM jobs run offline after artifact observation and consume the exact
 payloads plus their producer records. The implementation is selected by artifact format, not component name.
 
@@ -8,8 +8,8 @@ payloads plus their producer records. The implementation is selected by artifact
 |---|---|---|
 | CLI executable | Syft reads compiled binary metadata | Embedded Go modules and other recognizable binary packages |
 | OCI image export | Syft reads the final image filesystem | Installed OS packages and recognizable application dependencies |
-| Helm source archive | NKD reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
-| Bound Helm package | NKD re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
+| Helm source archive | NVKR reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
+| Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
 
 The scanner executable is authenticated before use. Subject bytes must match the producer digest. Its output
 is normalized into CycloneDX 1.5: deterministic identities/order, package URLs, versions and artifact dependency
@@ -35,18 +35,18 @@ covers all these exact bytes recursively. Source-archive evidence is never relab
 See [the registry graph](publication-architecture.md) for every remaining manifest and attachment.
 
 Current contract coverage and hosted publication evidence are recorded in
-[reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md). Signed producer evidence in the M2 disk mode explicitly records
+[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md). Signed producer evidence in the M2 disk mode explicitly records
 deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
 The strict disk inventory/reconciliation contract is separate and remains an M3 requirement.
 
 ## Verification on real outputs
 
-[Recorded offline dependency scanning](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md#offline-dependency-scanning)
+[Recorded offline dependency scanning](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md#offline-dependency-scanning)
 retains the exact artifact/scanner identities, inventory counts and measured-fixture limitations.
 Unknown package versions remain unknown; an artifact or source digest does not supply a missing release version.
 
-The opt-in `TestRealArtifactsThroughSBOMExecutor` test reads `NKD_SBOM_ARTIFACT_DIR`, `NKD_SBOM_PLAN`, and
-`NKD_SBOM_SCANNER`; `NKD_SBOM_OUTPUT_DIR` optionally retains the resulting documents. It exercises graph
+The opt-in `TestRealArtifactsThroughSBOMExecutor` test reads `NVKR_SBOM_ARTIFACT_DIR`, `NVKR_SBOM_PLAN`, and
+`NVKR_SBOM_SCANNER`; `NVKR_SBOM_OUTPUT_DIR` optionally retains the resulting documents. It exercises graph
 admission, real scanning, deterministic document validation and index digests for all three outputs. The
 scanner bytes must match the generated plan's executable pin. Run on Linux with networking disabled.
 

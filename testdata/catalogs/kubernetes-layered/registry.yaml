@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/catalog/v3
+apiVersion: nvkr.dev/catalog/v3
 components:
   cni-plugins:
     artifactPath: bin/bridge
@@ -282,9 +282,9 @@ metadata:
   description: NVIDIA Kubernetes Definition — default LAYERED catalog (top-level
     recipes/). Sources + the full Tier-1 component set are declared here once; the
     recipe for a query is COMPOSED from overlays/ (base + the kubernetes category
-    overlay) + mixins/. Resolved pins live in pins.lock.yaml (machine-managed by `nkdctl
+    overlay) + mixins/. Resolved pins live in pins.lock.yaml (machine-managed by `nvkr
     catalog pin/bump`), so a version bump touches only the lock. See docs/versioning.md.
-  name: nkd-default
+  name: nvkr-default
 sources:
   checkout:
     constraint: 7.x
@@ -334,14 +334,14 @@ sources:
     constraint: 1.32.x
     repo: https://github.com/kubernetes/kubernetes
     toolchainImagesByArch:
-      amd64: nkd-toolchain-go@sha256:2154cb16a59fee9fa8d53167de0899936ed09b3b1a816b465bcce363e485c0ee
-      arm64: nkd-toolchain-go@sha256:0604f5c92d7dc2358ba205fd5474428022bab1b77cfbe297b370f7f7461c1c5e
+      amd64: nvkr-toolchain-go@sha256:2154cb16a59fee9fa8d53167de0899936ed09b3b1a816b465bcce363e485c0ee
+      arm64: nvkr-toolchain-go@sha256:0604f5c92d7dc2358ba205fd5474428022bab1b77cfbe297b370f7f7461c1c5e
   runc:
     constraint: 1.5.x
     repo: https://github.com/opencontainers/runc
     toolchainImagesByArch:
-      amd64: nkd-toolchain-cgo@sha256:d9ca6b8de5ae00fd2b25c2768652adb92e86c44db199c51520730cbc31f3f0ac
-      arm64: nkd-toolchain-cgo@sha256:e2d93f718fc21fa61f9157c54e03336daf7649b0f9a866667e35dec51fecc56a
+      amd64: nvkr-toolchain-cgo@sha256:d9ca6b8de5ae00fd2b25c2768652adb92e86c44db199c51520730cbc31f3f0ac
+      arm64: nvkr-toolchain-cgo@sha256:e2d93f718fc21fa61f9157c54e03336daf7649b0f9a866667e35dec51fecc56a
   setup-go:
     constraint: 7.x
     kind: github-action

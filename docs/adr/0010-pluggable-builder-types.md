@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-10 in the consolidated NKD ADR set.
+- **Index:** ADR-10 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-07 (reproduction identity & builder profile), ADR-08 (bake-off gate).
 
 - **Scope:** The numbered builder contract is for qualified execution; the later Decision sections define v1
@@ -17,9 +17,9 @@
 
 ## Context
 
-NKD builds a Kubernetes substrate from pinned upstream inputs and preserves the evidence appropriate to each
+NVKR builds a Kubernetes substrate from pinned upstream inputs and preserves the evidence appropriate to each
 producer. Qualified components may be reproduced exactly; wrapped aggregate artifacts remain pipeline-attested
-until their own qualified subjects reproduce. NKD will use **Nix** both to provide repeatable build environments
+until their own qualified subjects reproduce. NVKR will use **Nix** both to provide repeatable build environments
 and to build certain components (notably Kubernetes upstream), so the architecture must **orchestrate more than
 one builder**.
 
@@ -76,14 +76,14 @@ constraint, and Nix can enter the reproducibility boundary only after its execut
    fetch-then-offline-build discipline and preserves the no-network-during-compile invariant and the air-gap
    story.
 
-8. **Build isolation (mechanism deferred to a spike).** Nix's build sandbox is in tension with NKD's deliberately
+8. **Build isolation (mechanism deferred to a spike).** Nix's build sandbox is in tension with NVKR's deliberately
    least-privileged build isolation. The **target is rootless / user-namespace Nix** in the pinned container:
    sandbox without full privilege escalation. The exact privilege set is a **de-risking spike**, and the resulting
    privilege profile becomes an **output-affecting builder-profile field** (ADR-07). Fallback: single-user Nix
    with the kernel sandbox off, backstopped by the two-machine bake-off.
 
 9. **Reproducibility: verify, don't trust.** Nix raises the probability of bit-identical output — the reason it
-   fits hard-to-reproduce upstreams like Kubernetes — but does not guarantee it for every derivation. NKD's
+   fits hard-to-reproduce upstreams like Kubernetes — but does not guarantee it for every derivation. NVKR's
    guarantee stays **verification-based**: the same verify re-hash **and** the two-machine bake-off apply to `nix`
    components, and the builder profile pins the Nix version and sandbox configuration as output-affecting
    (fail-closed preflight when a `nix` component is present).
@@ -126,11 +126,11 @@ invocation mechanism, not a builder type or an output semantic:
 
 - `command` records one exact source-owned argument vector. The executable may be `make`, a repository script,
   or another pinned entrypoint. The current argument contract has only the existing `{{.Arch}}` substitution; it
-  has no material-manifest placeholder, fixed path, positional argument, or environment-variable handoff. NKD
+  has no material-manifest placeholder, fixed path, positional argument, or environment-variable handoff. NVKR
   does not infer one or interpret the Makefile or script. Material-bearing command producers therefore remain
   authoring-only until this ADR and the catalog add an explicit typed handoff before lowering is admitted.
 - `packer` invokes a pinned Packer executable against a source-owned HCL project and one exact Packer build name.
-  NKD does not generate, rewrite, or interpret HCL. Packer plugins and the VM toolchain are authenticated parts
+  NVKR does not generate, rewrite, or interpret HCL. Packer plugins and the VM toolchain are authenticated parts
   of the pre-realized toolchain closure, not downloads discovered during image construction. The Packer
   executable and every host executable that Packer or a plugin resolves through `PATH` are exact-digest inputs;
   admitted execution constructs `PATH` only from that held closure and never exposes the ambient host path.
@@ -141,8 +141,8 @@ invocation mechanism, not a builder type or an output semantic:
 
 The direct-Packer authoring form names the stable boundary that compilation records and future execution must
 enforce. The concrete projection values below match the source-owned
-[NKE direct-Packer contract](https://github.com/dsx-ai-factory/nke/blob/726f76944404e1106626b8333d3576bdf67b575b/os-image/packer/variables.pkr.hcl#L14-L58);
-they are example producer vocabulary, not NKD-reserved values.
+[NVKE direct-Packer contract](https://github.com/dsx-ai-factory/nvke/blob/726f76944404e1106626b8333d3576bdf67b575b/os-image/packer/variables.pkr.hcl#L14-L58);
+they are example producer vocabulary, not NVKR-reserved values.
 
 ```yaml
 builderType: vm-image
@@ -167,14 +167,14 @@ packer:
   variables:
     image_variant: standard
 materials:
-  image-inputs: nke-image-inputs
+  image-inputs: nvke-image-inputs
   installer-iso: ubuntu-installer-iso
-artifactPath: nke-node.qcow2
+artifactPath: nvke-node.qcow2
 ```
 
 `projectPath` is relative to the pinned source root. `buildName` is the exact compiled build name execution
 passes as one `-only=<buildName>` argument; Packer documents names such as
-`my_build.amazon-ebs.first-example`. NKD rejects Packer's list and glob selection syntax because one component
+`my_build.amazon-ebs.first-example`. NVKR rejects Packer's list and glob selection syntax because one component
 produces one declared artifact. Catalog loading checks bounded UTF-8 argument transport that rejects control,
 format, line/paragraph-separator and non-ASCII space-separator characters, distinct bindings, and exact
 `buildName` selection without list or glob syntax. It does not parse HCL or claim
@@ -186,7 +186,7 @@ name (for example `nke-node-non-fde.qemu.nke-non-fde`), not only the source type
 output directory bound through `outputDirectoryVariable`. `architectureVariable` always carries the selected
 target architecture. `acceleratorVariable` always carries the admitted `kvm` or `tcg` route; a source-owned
 default cannot override that decision. The required variable names and any source-exposed log or HTTP directory
-mapping are explicit and distinct, so NKD never guesses HCL names. Cache, temporary, configuration and home
+mapping are explicit and distinct, so NVKR never guesses HCL names. Cache, temporary, configuration and home
 directories remain runtime-owned standard paths rather than authored HCL-variable mappings.
 The optional SSH private/public variable-name pair, when declared, receives paths to an attempt-local keypair
 created inside the private execution root. That handoff remains reserved and unrealized until the authenticated
@@ -215,17 +215,17 @@ diagnostic marker without discarding a separately verified successful disk. Abso
 replacement of an existing diagnostic set fail closed. These files are non-authoritative diagnostics, not Build,
 Artifact or qualification evidence. The supported route supplies no secret channel and rejects FDE before work;
 the adapter does not retain the generated SSH key, environment, home, configuration, cache, HTTP or output
-directories. The [2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
-Docker/Packer/NKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
+directories. The [2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
+Docker/Packer/NVKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
 adapter on ARC, separate from generated hosted execution. The later
-[M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) exercised the generated native route with
+[M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) exercised the generated native route with
 explicit `build-provenance-v1` evidence and a validation-branch signing exception. Main-only execution,
 independent full-payload disk consumption, strict inspection and qualification remain unproved; the
 candidate does not establish complete maintained-release acceptance. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
 (`sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80`) and QEMU plugin 1.1.6
 (`sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6`), both matching HashiCorp's
 published `SHA256SUMS`. A minimal exact-version QEMU source returned exit zero, the single 28-byte success line
-on stdout, and empty stderr. This probes plugin discovery and validation framing only, not NKE execution or disk
+on stdout, and empty stderr. This probes plugin discovery and validation framing only, not NVKE execution or disk
 production.
 
 The optional `packer.acquisitionArchive` names one exact output-directory-relative guest acquisition
@@ -240,7 +240,7 @@ semantic reconciliation.
 the same output's build graph. The target may be a from-source build or a digest-pinned acquisition. Unknown,
 excluded, self-referential, duplicate-target, cyclic, or omitted targets fail catalog validation or build-graph
 resolution. The declaration does not create a second component graph or implicitly select producers; it adds
-typed edges between the existing selected component outputs. Source-owned HCL defaults do not authorize NKD to
+typed edges between the existing selected component outputs. Source-owned HCL defaults do not authorize NVKR to
 infer or fetch undeclared build materials.
 
 Compilation lowers each declared binding to the exact selected build or acquisition producer and records both
@@ -251,18 +251,18 @@ path derived from the binding name beneath a private staging root. A Packer prod
 `materialManifest` projection with its source-owned `schemaVersion` and one producer-visible `kind` for every
 declared binding. The projection must cover the binding set exactly and is a logical Build input. It changes only
 the serialized schema and kind vocabulary; authenticated bytes, component, architecture, digest and deterministic
-staging path remain the same. NKD has no source-specific conditional or implicit kind translation. Binding and
+staging path remain the same. NVKR has no source-specific conditional or implicit kind translation. Binding and
 component text use the display-safe canonical-text policy. Schema and kind values use the stricter
 whitespace-free canonical-token policy.
 Random or absolute execution-root paths never enter its canonical bytes. The manifest is a
 deterministic description, not an authenticated receipt; admitted execution must derive it from authenticated
 producer observations and bind the exact serialized file bytes before invoking a subprocess.
 
-An ordinary `oci-hermetic` producer may consume that native v2 closure without another authored field. NKD
-stages the manifest at `/nkd/inputs/material-manifest.json`, stages each exact producer output at the manifest's
-`/nkd/inputs/materials/<binding>` path, and mounts `/nkd/inputs` read-only beside the existing read-only `/src`
+An ordinary `oci-hermetic` producer may consume that native v2 closure without another authored field. NVKR
+stages the manifest at `/nvkr/inputs/material-manifest.json`, stages each exact producer output at the manifest's
+`/nvkr/inputs/materials/<binding>` path, and mounts `/nvkr/inputs` read-only beside the existing read-only `/src`
 source mount. The exact source-owned command reads those fixed paths and writes only beneath its declared
-`writeDir`; NKD neither appends arguments nor injects environment variables, unpacks inputs, or interprets the
+`writeDir`; NVKR neither appends arguments nor injects environment variables, unpacks inputs, or interprets the
 producer's composition order. The build remains offline. Missing, extra, relabeled, non-regular, or changed
 producer bytes fail before the toolchain container starts. This permits one selected component to compose other
 selected component outputs, including a deterministic tarball or repository payload, while every material
@@ -298,7 +298,7 @@ authority.
 The executable name grants no evidence lane. A Make-driven image may qualify when its exact command, staged
 materials, toolchain closure, enforced isolation, output collection, disk inspection, and reproduction evidence
 satisfy the same contracts as a direct Packer build. A direct Packer invocation receives no weaker controls and
-no qualification merely because NKD recognizes its driver. Networked or opaque acquisition inside either driver
+no qualification merely because NVKR recognizes its driver. Networked or opaque acquisition inside either driver
 remains pipeline-attested or fails qualified admission, according to the selected lane. Make also remains a valid
 command entrypoint for non-VM builders under their existing contracts.
 
@@ -312,7 +312,7 @@ compare its exact qualified disk subject.
 Secret-valued Packer inputs are not public variables and may not be transported in process arguments, environment
 variables, manifests, logs or evidence. The plain-image direct contract needs no such input. FDE remains closed
 until its source-owned contract provides an authenticated file-path secret handoff or generates and removes an
-attempt-local bootstrap secret without exposing it through NKD's public variable transport.
+attempt-local bootstrap secret without exposing it through NVKR's public variable transport.
 
 Runner capacity is not part of `vm-image`. A from-source component may declare generic `buildRequirements`
 using ADR-18's per-step execution contract. A `vm-image` producer must use that same generic type to declare a
@@ -330,26 +330,26 @@ architecture, `forbidden` must be withheld, and `preferred` retains the cross-ar
 Plan compilation binds KVM or the fallback before work rather than choosing opportunistically at runtime. Build network
 remains the existing IR semantic and is not duplicated in resource requirements.
 
-NKE host CPU, memory, storage, platform, KVM policy, and timeout requests require reviewed route measurements.
+NVKE host CPU, memory, storage, platform, KVM policy, and timeout requests require reviewed route measurements.
 The native candidate's authored profiles do not establish a general capacity bound or organizational acceptance.
 Guest vCPU, guest memory, and logical disk size are not host requests. Produced-artifact size is
 an artifact and transport concern rather than a runner-capacity field.
 
-For the [NKE Makefile at commit `6df693a`](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185),
+For the [NVKE Makefile at commit `6df693a`](https://github.com/dsx-ai-factory/nvke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185),
 the following source-owned targets illustrate the `command` driver. Plain and FDE are separate selectable
 components, not a public boolean or variant. The existing typed architecture token is resolved from the output target platform:
 
 ```text
 make -C os-image/packer os-image-non-fde ARCH={{.Arch}}
-  -> os-image/packer/output-non-fde/nke-node-non-fde-ubuntu-26.04.1-{{.Arch}}.qcow2
+  -> os-image/packer/output-non-fde/nvke-node-non-fde-ubuntu-26.04.1-{{.Arch}}.qcow2
 make -C os-image/packer os-image-fde ARCH={{.Arch}}
-  -> os-image/packer/output-fde/nke-node-fde-ubuntu-26.04.1-{{.Arch}}.qcow2
+  -> os-image/packer/output-fde/nvke-node-fde-ubuntu-26.04.1-{{.Arch}}.qcow2
 ```
 
-The current NKE release matrix realizes and publishes plain and FDE images for both amd64 and arm64. Definition
-output selection records that supported matrix without duplicating components per architecture. NKE merge commit
-[`5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2`](https://github.com/dsx-ai-factory/nke/commit/5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2)
-now owns the authenticated staged-material and private-output contract in its source HCL. A maintained NKE
+The current NVKE release matrix realizes and publishes plain and FDE images for both amd64 and arm64. Definition
+output selection records that supported matrix without duplicating components per architecture. NVKE merge commit
+[`5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2`](https://github.com/dsx-ai-factory/nvke/commit/5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2)
+now owns the authenticated staged-material and private-output contract in its source HCL. A maintained NVKE
 component may select that `packer` driver only after the catalog carries an ADR-22-valid source pin and the exact
 toolchain and material-supplier pins. That catalog choice changes the catalog snapshot and Build identity. It does
 not remove or invalidate the standalone Make entrypoint. Compiler lowering
@@ -358,16 +358,16 @@ material-bearing `vm-image` command/Make producer remains capability-gated. Unen
 execution and disk collection are connected locally; ADR-18/20 admit the explicit native ARC hosted
 publication route. General hosted VM, qualified and encrypted execution remain unavailable. Ordinary
 `oci-hermetic` producers use the admitted fixed material mount described above.
-An override that changes NKE's derived
-output filename must also change the catalog artifact path; NKD never guesses it.
+An override that changes NVKE's derived
+output filename must also change the catalog artifact path; NVKR never guesses it.
 
 The commit references in this section have distinct roles. `6df693a9748a78aafdf96e1f2d03772530783487` is the
-historical `NVIDIA/nke` Make-target example above; `5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2` is the
-`dsx-ai-factory/nke` merge that introduced the staged-material contract. The current development catalog pins
+historical `dsx-ai-factory/nvke` Make-target example above; `5ac0ce2389c06d0291535fb6bf0f25be8a4ca0f2` is the
+`dsx-ai-factory/nvke` merge that introduced the staged-material contract. The current development catalog pins
 `726f76944404e1106626b8333d3576bdf67b575b`, while the recorded 2026-09-23 Podman bake used the older
-`de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NKD bytes. The
-[2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed NKD candidates
-`bb6e870` and `1f989e9` executing the current NKE pin on ARM64 and AMD64, with successful builds and boot
+`de0e46bb14cae2f892677bf9e21b91a7add2f9d9` source and attempt-frozen draft NVKR bytes. The
+[2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed NVKR candidates
+`bb6e870` and `1f989e9` executing the current NVKE pin on ARM64 and AMD64, with successful builds and boot
 smoke in the unqualified diagnostic lane. Later runtime and workflow changes require their own execution proof.
 
 The BuildKit mode declares network access and fixed rootless container settings: UID/GID 1000, unconfined
@@ -384,14 +384,14 @@ image manifest, platform, config and compressed/uncompressed layer identities. N
 signed production predicate claim hermeticity, independent reproduction, or qualified execution. Qualified
 and direct in-container execution reject this mode before source work.
 
-A wrapped build makes no NKD hermeticity claim and requires neither builder-profile preflight nor bit-identity
+A wrapped build makes no NVKR hermeticity claim and requires neither builder-profile preflight nor bit-identity
 comparison in v1. Fuse build, re-hash, Run record, publish, sign, and verify into one job for large artifacts,
 preserving that exact order. Fetch privately held inputs first using a read-only credential; no credential may
 reach the build phase. Registry/OIDC credentials appear only after build exit and recorded observation.
 Prefer a pinned privileged container to an unpinned host build. The renderer must reject undeclared privilege,
 network, or credentials during build before output. An external reusable workflow is not a pinned entrypoint.
 
-`embeds` declares components inside the external artifact that NKD neither builds nor separately delivers.
+`embeds` declares components inside the external artifact that NVKR neither builds nor separately delivers.
 Names, versions and known source pins feed production dependencies, the aggregate SBOM dependency graph, and a
 qualification cross-check against the upstream version manifest **at the pinned commit**. Missing or disagreeing
 members fail that check. This declaration does not prove the image's observed contents. ADR-13 separately
@@ -410,7 +410,7 @@ owner's duty. Where ADR-22's curated set exists, derive `embeds` from it and re-
 - Hard-to-reproduce upstreams become buildable via Nix without changing the trust model.
 - Builder-type selection does not weaken the existing verification, attestation, or CI-adapter contracts;
   disk evidence, canonical delivery, and publication contracts are owned by ADR-13, ADR-14, and ADR-20.
-- NKD becomes builder-agnostic — additional builder types plug in at the same seam.
+- NVKR becomes builder-agnostic — additional builder types plug in at the same seam.
 
 **Negative / costs**
 - Nix build isolation under least-privilege needs a spike and may require a documented, profile-tracked privilege
@@ -454,7 +454,7 @@ path, the local-vs-emitted byte-identity contract is preserved.
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nkd/buildgraph/nix_test.go`, `pkg/nkd/buildgraph/prebuilt_test.go`, and
-`pkg/nkd/pipeline/pull_test.go` is partial. Acceptance requires an offline least-privilege execution of one real
+Current module evidence in `pkg/nvkr/buildgraph/nix_test.go`, `pkg/nvkr/buildgraph/prebuilt_test.go`, and
+`pkg/nvkr/pipeline/pull_test.go` is partial. Acceptance requires an offline least-privilege execution of one real
 Nix component and a test proving that byte-preserving acquisition has no profile while a deterministic
 repackaging step changes the build graph and binds its output to the measured builder profile.

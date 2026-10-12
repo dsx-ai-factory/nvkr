@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package sourcegit owns the closed child environment used by hosted source Git.
+// Package sourcegit owns admitted child environments for held source Git and
+// ordinary Local Git. Their credential and transport policies remain distinct.
 // It describes process configuration, not source, build or release authority.
 package sourcegit
 
@@ -13,14 +14,14 @@ import (
 	"sort"
 	"strings"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-const Token = "NKD_SOURCE_TOKEN"
+const Token = "NVKR_SOURCE_TOKEN"
 
 // CredentialHelper is the existing repository-scoped Git helper. Never accept
 // arbitrary caller-provided shell helpers in the held source route.
-const CredentialHelper = `!f() { if [ "$1" = get ]; then printf '%s\n' 'username=x-access-token' "password=$NKD_SOURCE_TOKEN"; fi; }; f`
+const CredentialHelper = `!f() { if [ "$1" = get ]; then printf '%s\n' 'username=x-access-token' "password=$NVKR_SOURCE_TOKEN"; fi; }; f`
 
 // Baseline excludes ambient Git configuration, credentials and proxies. PATH is
 // explicit and contains only absolute directories with an executable Git.
@@ -34,12 +35,12 @@ func Baseline(searchPath string) ([]string, error) {
 
 func executable(searchPath string) (string, error) {
 	if searchPath == "" {
-		return "", e.New(e.CodeEngineCapability, "source fetch requires an absolute Git executable search path")
+		return "", e.New(e.CodeEngineCapability, "source Git requires a nonempty PATH containing only absolute executable search directories")
 	}
 	directories := filepath.SplitList(searchPath)
-	for _, directory := range directories {
+	for index, directory := range directories {
 		if !filepath.IsAbs(directory) {
-			return "", e.New(e.CodeEngineCapability, "source fetch requires an absolute Git executable search path")
+			return "", e.New(e.CodeEngineCapability, "source Git PATH entry %d is empty or not absolute; provide only absolute executable search directories", index+1)
 		}
 	}
 	for _, directory := range directories {
@@ -49,7 +50,7 @@ func executable(searchPath string) (string, error) {
 			return path, nil
 		}
 	}
-	return "", e.New(e.CodeEngineCapability, "source fetch requires Git on its admitted executable search path")
+	return "", e.New(e.CodeEngineCapability, "source Git requires Git on its admitted executable search path")
 }
 
 // Admit accepts only the fixed public baseline or the existing exact four-item
@@ -112,9 +113,10 @@ func Admit(repository string, environment []string) (string, []string, error) {
 		result = append(result, key+"="+expected[key])
 	}
 	if repository != "" && fields[Token] == "" {
-		// The new held route supports the maintained HTTPS sources and absolute
-		// local repositories used by developer/native fixtures. General catalog
-		// Git/SSH support remains with the unchanged ordinary Local route.
+		// The held route supports maintained HTTPS sources and absolute local
+		// repositories used by developer/native fixtures. Ordinary Local Git
+		// has its separate LocalCommand admission and fetch-only credentials;
+		// it additionally permits SSH, not arbitrary ambient configuration.
 		parsed, err := url.Parse(repository)
 		local := filepath.IsAbs(repository) && filepath.Clean(repository) == repository
 		if err == nil && parsed.Scheme == "file" && parsed.Host == "" && parsed.User == nil &&

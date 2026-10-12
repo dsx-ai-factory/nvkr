@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/NVIDIA/nke-recipes/internal/securepath"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestTransportSnapshotRejectsChangedOrUnavailableSource(t *testing.T) {

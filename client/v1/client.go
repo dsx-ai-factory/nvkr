@@ -16,10 +16,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // CatalogIO is the narrow context-aware read boundary used by catalog.LoadContext.

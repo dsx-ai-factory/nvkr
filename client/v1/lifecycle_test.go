@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	client "github.com/NVIDIA/nke-recipes/client/v1"
-	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	client "github.com/dsx-ai-factory/nvkr/client/v1"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput(t *testing.T) {
@@ -23,12 +23,12 @@ func TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput(t *testing.T) {
 	t.Chdir(repo)
 	sdk := client.New()
 	ctx := context.Background()
-	prepared, err := sdk.PrepareLifecycleRun(ctx, "definitions/nke-v1/definition.yaml", "definitions/nke-v1/environment-local.yaml", "test", "sdk-attempt")
+	prepared, err := sdk.PrepareLifecycleRun(ctx, "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "sdk-attempt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	original := prepared.Description()
-	definition, err := sdk.LoadDefinition(ctx, "definitions/nke-v1/definition.yaml")
+	definition, err := sdk.LoadDefinition(ctx, "definitions/nvke-v1/definition.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput(t *testing.T) {
 	if got := prepared.Description(); got.Expected[0].Name != original.Expected[0].Name || got.Expected[0].Components[0] != original.Expected[0].Components[0] {
 		t.Fatal("description mutation changed frozen requirements")
 	}
-	attempts := filepath.Join(".nkd", "sdk-test-"+filepath.Base(filepath.Dir(t.TempDir())))
+	attempts := filepath.Join(".nvkr", "sdk-test-"+filepath.Base(filepath.Dir(t.TempDir())))
 	run, err := sdk.ExecuteLifecycleRun(ctx, prepared, client.LocalRunOptions{AttemptsRoot: attempts, DryRun: true})
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = sdk.ExecuteLifecycleRun(ctx, &restored, client.LocalRunOptions{AttemptsRoot: attempts, DryRun: true})
-	requireLifecycleCode(t, err, nkderr.CodeUsage)
+	requireLifecycleCode(t, err, nvkrerr.CodeUsage)
 	if _, err := os.Stat(attempts); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("serialized preparation created storage: %v", err)
 	}
@@ -79,13 +79,13 @@ func unmarshalOpaque(raw []byte, value any) error { return json.Unmarshal(raw, v
 func TestSDKRejectsUnsupportedGenerationBeforeInputsAndUnconfiguredConsumer(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "generated")
 	_, err := client.New().GenerateLifecycleRun(context.Background(), "absent-definition.yaml", "absent-environment.yaml", "test", "tekton", root, false)
-	requireLifecycleCode(t, err, nkderr.CodeEngineCapability)
+	requireLifecycleCode(t, err, nvkrerr.CodeEngineCapability)
 	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unsupported engine created output: %v", err)
 	}
 	_, err = client.New().VerifyRelease(context.Background(), "registry.example.test/product@sha256:0000000000000000000000000000000000000000000000000000000000000000",
 		client.VerificationPolicy{Lane: "pipeline-attested", Scope: "artifact-publication", IdentityRegexp: "^builder$", Issuer: "issuer"})
-	requireLifecycleCode(t, err, nkderr.CodeEngineCapability)
+	requireLifecycleCode(t, err, nvkrerr.CodeEngineCapability)
 }
 
 func TestSDKExposesTypedDiskEvidencePolicy(t *testing.T) {
@@ -100,9 +100,9 @@ func TestSDKExposesTypedDiskEvidencePolicy(t *testing.T) {
 	}
 }
 
-func requireLifecycleCode(t *testing.T, err error, expected nkderr.Code) {
+func requireLifecycleCode(t *testing.T, err error, expected nvkrerr.Code) {
 	t.Helper()
-	var coded *nkderr.Error
+	var coded *nvkrerr.Error
 	if !errors.As(err, &coded) || coded.Code != expected {
 		t.Fatalf("error = %v; want %s", err, expected)
 	}

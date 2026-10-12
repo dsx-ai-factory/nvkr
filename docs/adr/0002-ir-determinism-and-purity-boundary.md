@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-02 in the consolidated NKD ADR set.
+- **Index:** ADR-02 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-01 (canonical codec), ADR-07 (reproduction identity & builder profile), ADR-05 (trust
   objects), ADR-09 (build record / provenance).
 
@@ -14,7 +14,7 @@
 
 The **Build Digest** is the digest of the logical T1 projection of a fully resolved, compiled build graph.
 The full executable graph may also carry deterministic T2 execution metadata that Plan identity binds but Build
-identity excludes. NKD's define-once / publish-many model and its zero-binary trust both depend on Build identity
+identity excludes. NVKR's define-once / publish-many model and its zero-binary trust both depend on Build identity
 being a **pure function of resolved content inputs only**. If a host, clock, random, builder observation, or
 generated-identifier value leaks into it, the identity becomes host-dependent and the trust model collapses. The
 SRD states this directly: output-affecting clock, randomness, host, and automatically generated identifier values
@@ -41,7 +41,7 @@ Every field lives in exactly one tier:
   Plan bindings, the conformance claim, the ValidationVector reference, and the accelerated-runtime reference.
   Output names, catalog supported-platform admission lists and packaging
   are also excluded from build identity. They remain bound in the owning catalog/Definition/Plan
-  records. Deployment classification and topology are not admitted NKD inputs. Authority-bearing T2 records are signed **detached**, never embedded in the bytes the identity covers.
+  records. Deployment classification and topology are not admitted NVKR inputs. Authority-bearing T2 records are signed **detached**, never embedded in the bytes the identity covers.
 - **T3 — detached, non-identity record** (may carry host/clock/builder facts; **may be independently signed**):
   the signed build-observations attestation (observed host, actual build times, **observed engine class**), and
   lifecycle times (variant expiry, status effective-time). Operator-supplied lifecycle times are **inputs**,
@@ -51,11 +51,11 @@ Every field lives in exactly one tier:
 ### 2. Identity is over the resolved logical graph; pin-derived time is an input, host time is not
 
 - The Build Digest is the digest of the **resolved/compiled logical T1 projection** of one Definition output
-  under `nkd.build`, after exact producer and pin selection. There is no authored Recipe or intermediate group.
+  under `nvkr.build`, after exact producer and pin selection. There is no authored Recipe or intermediate group.
   Two named outputs with the same selected producers, target and pinned logical graph share one Build Digest.
 - An aggregate OCI image has a separate logical T1 projection: its exact required platform set and
   one `(platform, component, native Build Digest)` child per platform, sorted canonically and hashed under
-  `nkd.build` with schema `nkd.dev/image-index-build/v1`. Selected required platforms are logical membership,
+  `nvkr.build` with schema `nvkr.dev/image-index-build/v1`. Selected required platforms are logical membership,
   distinct from the catalog's supported-platform admission list. Labels, manifests, archive digests,
   packaging commands, runner routes and registry locations are absent. Each native child continues to use
   unchanged IR v4 identity. Recomputing this vector authenticates no producer execution or evidence.
@@ -155,12 +155,12 @@ Current package-level evidence includes:
 
 - the explicit `ir.LogicalGraph` / `ir.LogicalNode` identity DTOs, which cannot represent source, artifact, or
   flake transport locators;
-- `pkg/nkd/ir/marshal_test.go::TestBuildIdentityFieldRulesCoverEveryGraphField`, whose reflection coverage
+- `pkg/nvkr/ir/marshal_test.go::TestBuildIdentityFieldRulesCoverEveryGraphField`, whose reflection coverage
   makes every full-graph field declare whether Build identity includes its logical value or content reference,
   or excludes it as transport or execution metadata;
-- `pkg/nkd/ir/validate_test.go::TestGraphDigestRemainsTransportIndependentAfterFullValidation`, which proves
+- `pkg/nvkr/ir/validate_test.go::TestGraphDigestRemainsTransportIndependentAfterFullValidation`, which proves
   independently relocated full execution graphs project to identical logical bytes and `buildDigest`; and
-- `pkg/nkd/ir/marshal_test.go::TestDigestHostInvariance` plus the static guard in
+- `pkg/nvkr/ir/marshal_test.go::TestDigestHostInvariance` plus the static guard in
   `internal/architecture/purity_test.go` for host purity.
 
 Compiler tests additionally cover direct authored input binding, independent ownership after caller mutation,
@@ -168,7 +168,7 @@ exact producer references, forbidden copied execution settings, and unchanged Bu
 requirements change. These are contract checks, not provider capability evidence.
 
 The focused IR migration tests also cover concrete targets, exact producer membership, strict
-legacy-field rejection and the distinct `nkd.build` family. Repository checks are recorded in reconciliation.
+legacy-field rejection and the distinct `nvkr.build` family. Repository checks are recorded in reconciliation.
 Remaining external acceptance requires:
 
 1. negative tests showing one-byte/tree/revision substitution through an authenticated mirror fails before build;

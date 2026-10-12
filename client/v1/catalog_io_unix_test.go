@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	client "github.com/NVIDIA/nke-recipes/client/v1"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	client "github.com/dsx-ai-factory/nvkr/client/v1"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestWithDataRejectsOversizedAndSymlinkAuthorityFiles(t *testing.T) {
@@ -58,7 +58,7 @@ func TestWithDataRejectsOversizedAndSymlinkAuthorityFiles(t *testing.T) {
 			_, err := client.New(client.WithData(root)).ResolveBuild(context.Background(), client.ResolveRequest{
 				Components: []string{"kubectl"}, Platform: "linux/amd64",
 			})
-			if errorCode(err) != nkderr.CodeInvalidCatalog {
+			if errorCode(err) != nvkrerr.CodeInvalidCatalog {
 				t.Fatalf("WithData %s authority returned %v", test.name, err)
 			}
 		})
@@ -71,7 +71,7 @@ func TestWithDataPreCanceledContextDoesNotResolveDirectory(t *testing.T) {
 	_, err := client.New(client.WithData(filepath.Join(t.TempDir(), "missing"))).ResolveBuild(ctx, client.ResolveRequest{
 		Components: []string{"kubectl"}, Platform: "linux/amd64",
 	})
-	if errorCode(err) != nkderr.CodeTimeout {
+	if errorCode(err) != nvkrerr.CodeTimeout {
 		t.Fatalf("pre-canceled WithData returned %v", err)
 	}
 }

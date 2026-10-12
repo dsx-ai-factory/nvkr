@@ -82,7 +82,7 @@ body:
         - Environment — execution or publication configuration
         - Run — planning, generation, or execution
         - Release — verification or consumption
-        - CLI (nkdctl)
+        - CLI (nvkr)
         - Generator / pipeline emission
         - Signing / provenance / evidence
         - Docs / examples

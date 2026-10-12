@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{
+  "apiVersion": "nvkr.dev/catalog/v3",
+  "kind": "SourceBuildRegistry",
+  "metadata": {
+    "name": "nvke-operator-tools-arm64",
+    "description": "Native ARM64 assets at the same source-owned versions as the maintained M2 operator tools; machine-pinned before execution."
+  },
+  "components": {
+    "helm": {
+      "source": "helm",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "outputType": "host-package",
+      "prebuilt": {
+        "releaseExecutable": true,
+        "evidence": {
+          "none": true
+        }
+      }
+    },
+    "kubectl": {
+      "source": "kubectl",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "outputType": "host-package",
+      "prebuilt": {
+        "releaseExecutable": true,
+        "evidence": {
+          "none": true
+        }
+      }
+    }
+  },
+  "sources": {
+    "helm": {
+      "repo": "https://github.com/helm/helm",
+      "constraint": "4.1.4",
+      "tool": {
+        "format": "tar-gzip",
+        "url": "https://get.helm.sh/helm-{{.Tag}}-linux-arm64.tar.gz",
+        "platform": "linux/arm64",
+        "executablePath": "linux-arm64/helm"
+      }
+    },
+    "kubectl": {
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "constraint": "1.36.3",
+      "tool": {
+        "format": "raw",
+        "url": "https://dl.k8s.io/release/{{.Tag}}/bin/linux/arm64/kubectl",
+        "platform": "linux/arm64",
+        "executablePath": "kubectl"
+      }
+    }
+  }
+}

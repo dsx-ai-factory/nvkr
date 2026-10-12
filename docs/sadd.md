@@ -1,4 +1,4 @@
-# NKD (NVIDIA Kubernetes Definition) — Software Architecture & Design Document
+# NVKR (NVIDIA Kubernetes Definition) — Software Architecture & Design Document
 
 ## PLC-L1: Basic PLC: Software Architecture and Design Document
 
@@ -12,24 +12,24 @@
 > baseline pending ratification, not organizational approval.
 > Public lifecycle ownership is defined in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md).
 > The current ADRs state the qualified and pipeline-attested contracts directly; [milestones](milestones.md)
-> define v1 acceptance. Registration and full v1 release automation remain deferred; deployment topology and cluster qualification are outside NKD.
+> define v1 acceptance. Registration and full v1 release automation remain deferred; deployment topology and cluster qualification are outside NVKR.
 > **[INPUT NEEDED]** identifies an unresolved decision or an owner-supplied deployment parameter.
 
 # Introduction {#introduction}
 
 ## Purpose and Scope {#purpose-and-scope}
 
-NKD turns a product Definition into a Run and a Release of immutable artifacts and evidence. Its Go CLI,
-`nkdctl`, resolves pinned inputs, generates the pipelines that produce artifacts, and connects their bytes to
-verifiable evidence. NKE is the v1 customer: NVIDIA runs the generated pipeline and delivers signed OCI artifacts
+NVKR turns a product Definition into a Run and a Release of immutable artifacts and evidence. Its Go CLI,
+`nvkr`, resolves pinned inputs, generates the pipelines that produce artifacts, and connects their bytes to
+verifiable evidence. NVKE is the v1 customer: NVIDIA runs the generated pipeline and delivers signed OCI artifacts
 that a consumer can verify independently.
 
 This SADD is for implementers, release engineers, and architecture/security reviewers. It explains which parts
-of NKD run where, the objects they exchange, the trust boundaries they enforce, and the behavior required when
+of NVKR run where, the objects they exchange, the trust boundaries they enforce, and the behavior required when
 work fails. Shared structure comes first; the v1 and qualified contracts are then described separately.
 Implementation status is summarized once under Current support boundary.
 
-NKD supports two different evidence contracts. They share resolution and identity primitives, but require
+NVKR supports two different evidence contracts. They share resolution and identity primitives, but require
 separate acceptance decisions:
 
 | Concern | v1 delivery — `pipeline-attested` | Qualified release — `qualified` |
@@ -49,7 +49,7 @@ The tool and its catalogs are separate products: the tool owns resolution and ve
 provide reusable component producers and pins, including tool releases and GitHub actions.
 Generated Runs bind action commits from the catalog; compatible action updates need a lock bump and workflow
 regeneration without rebuilding the generator. Definitions declare named deliverable outputs once.
-NKD does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
+NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
 access, registry retention, runtime conformance, and deployment policy. Downstream systems consume accepted
 artifact references and own their deployment descriptions (ADR-19/20).
 
@@ -60,7 +60,7 @@ These assumptions are subject to the current ADRs and milestone acceptance crite
 - Source owners provide retrievable pinned commits, trees, toolchains, and acquired artifact digests. A pin
   establishes an expected identity; the fetch boundary must still check the bytes (ADR-22).
 - v1 has a networked hosted runner, reachable OCI registry, source mirror, and identity/transparency services.
-  Private NKE inputs are materialized through a mirror with vendored dependencies (ADR-18 §8).
+  Private NVKE inputs are materialized through a mirror with vendored dependencies (ADR-18 §8).
 - Workflow ownership, branch protection, and protected publication environments are security controls in v1.
   The consumer trusts the named producer and qualification identities under an explicit issuer policy.
 - Qualified reproduction assumes inputs can be normalized and the execution environment admitted against a
@@ -96,11 +96,11 @@ those obligations enter; a v1 run cannot satisfy them by sharing the same packag
 | Source/build owner | Pinned buildable source, vendored inputs where required, toolchain and build entrypoint | The affected component cannot be produced |
 | CI/release engineering | Hosted runner configuration, workflow ownership, fetch access, protected environment | The intended production workflow cannot be admitted or accepted |
 | Registry owner | OCI storage, access policy, retention, immutable-tag enforcement for planned releases | Publication or subsequent verification cannot complete |
-| Identity services and product security | Keyless identity issuance, transparency service, disclosure approval | No live keyless acceptance; approval precedes the first signed run containing NKE bytes |
+| Identity services and product security | Keyless identity issuance, transparency service, disclosure approval | No live keyless acceptance; approval precedes the first signed run containing NVKE bytes |
 | Consumer/operator | Trusted identities, issuer policy, retained references; qualified-lane policies and conformance | Evidence cannot be interpreted as authorization |
 | Downstream teams | Provisioning projection and proposed qualification/registration handoffs | Those integrations remain capability-gated |
 
-Service owners and concrete limits are **[INPUT NEEDED]** where listed under Future Work. NKD consumes these
+Service owners and concrete limits are **[INPUT NEEDED]** where listed under Future Work. NVKR consumes these
 services; their availability is not supplied by the CLI.
 
 ## Definitions, Acronyms, Abbreviations {#definitions}
@@ -117,7 +117,7 @@ The [domain vocabulary](../CONTEXT.md) defines six high-level public objects:
 | Verification Policy | Consumer requirements for acceptable identities, evidence, and lifecycle state |
 
 A binary bundle is an Artifact format. Deployment topology and node placement are downstream concerns,
-without another NKD authored object or generated realization.
+without another NVKR authored object or generated realization.
 
 The internal records appear where needed to explain trust: plans describe admitted execution; Inventory and
 ReleaseSet represent required and realized qualified membership; ValidationVectors carry signed reproduction
@@ -143,7 +143,7 @@ evidence remains visible but never upgrades the aggregate that consumed it.
 
 ## High-level architecture
 
-NKD has a compilation phase and an execution phase. Compilation closes a product definition over exact build
+NVKR has a compilation phase and an execution phase. Compilation closes a product definition over exact build
 and tool inputs, constructs an artifact dependency graph, and renders it for an admitted execution environment.
 Execution materializes those inputs, produces packages and evidence, and publishes according to the selected
 lane. Verification connects an observed or retrieved subject to its expected identity and trust policy.
@@ -152,11 +152,11 @@ lane. Verification connects an observed or retrieved subject to its expected ide
 
 ```mermaid
 flowchart LR
-  Author["Catalog and definition author"] -->|"reviewed definitions and pins"| NKD["NKD compiler and execution modules"]
-  Sources["Source and tool owners"] -->|"pinned inputs"| NKD
-  CI["Hosted CI platform"] -->|"job execution and workflow identity"| NKD
-  NKD -->|"artifacts and evidence"| Registry["Operator-owned OCI registry"]
-  Trust["Identity and transparency services"] -->|"keyless signing services"| NKD
+  Author["Catalog and definition author"] -->|"reviewed definitions and pins"| NVKR["NVKR compiler and execution modules"]
+  Sources["Source and tool owners"] -->|"pinned inputs"| NVKR
+  CI["Hosted CI platform"] -->|"job execution and workflow identity"| NVKR
+  NVKR -->|"artifacts and evidence"| Registry["Operator-owned OCI registry"]
+  Trust["Identity and transparency services"] -->|"keyless signing services"| NVKR
   Registry -->|"digest-addressed bytes and evidence"| Consumer["Independent consumer verifier"]
   Policy["Consumer trust policy"] --> Consumer
   Consumer -->|"accepted inputs"| Downstream["Downstream deployment system"]
@@ -171,7 +171,7 @@ owns provisioning and fleet behavior.
 ```mermaid
 flowchart TB
   subgraph Generation["Generation: developer workspace or regeneration job"]
-    Inputs["Definition, catalog pins, Environment"] --> Compiler["NKD compiler"]
+    Inputs["Definition, catalog pins, Environment"] --> Compiler["NVKR compiler"]
     Compiler --> Bundle["Plan, graph, generated workflow, manifest"]
   end
   Bundle --> Repository["Reviewed repository revision"]
@@ -243,7 +243,7 @@ Required membership exists before execution, so omitting a failed output cannot 
 Specialized byte-changing transformations remain explicit product intent.
 
 The compiler derives each output's graph from its exact selected components and concrete
-target. `nkd.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
+target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
 
 A `disk-image` named output explicitly selects one root producer with validated disk-image metadata and every
@@ -256,7 +256,7 @@ an eligible host with the resolved guest architecture; VM toolchain pins require
 host platform, whose selection is part of Build identity. A Packer producer may bind a source-owned material-manifest
 schema and one producer-visible kind for every declared input. That exact projection is part of Build identity and
 cannot alter the authenticated material bytes, component, architecture, digest or deterministic staged path. The
-NKE OS producer owns its embedded contents. IR/Plan lowering binds the exact source and material producers and
+NVKE OS producer owns its embedded contents. IR/Plan lowering binds the exact source and material producers and
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
 verdict. Production VM execution and held-result population use the separately admitted native ARC route;
@@ -265,7 +265,7 @@ live producer/material evidence and reports inspection as not performed, satisfy
 M2 still requires the remaining delivery and consumer gates. ADR-13's strict mode requires a full inventory
 reconciling traced materials with read-only inspection of each native AMD64 and ARM64 disk; these are M3
 qualification requirements under Ilya Kislenko's October 7 scope decision. That composition claim does not
-establish NKE-owned runtime correctness.
+establish NVKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
@@ -314,8 +314,8 @@ hosted execution, registry services, signing or operational release acceptance (
 All structured identities use ADR-01's canonical codec and named digest families. The codec uses its specified
 integer-only numeric profile; an arbitrary JSON serialization is not an identity implementation. Raw SHA-256
 remains appropriate for exact blob integrity. These distinctions explain why one build can produce different
-run evidence without changing Build Digest. The retired `nkd.recipe` family remains reserved for historical
-identities. Definition v5, catalog v3, IR v4 and Run plan/artifact graph v5 readers reject old shapes; signed bytes are not converted.
+run evidence without changing Build Digest. `nvkr.recipe` is reserved and never minted;
+historical `nkd.recipe` identities remain unsupported and unchanged. Definition v5, catalog v3, IR v4 and Run plan/artifact graph v5 readers reject old shapes; signed bytes are not converted.
 Compiler-handoff and execution-settings digest families remain reserved after removal. Production SLSA
 build-type `/v2` parameters bind the original Definition and Environment identities directly.
 
@@ -325,7 +325,7 @@ The module boundary follows ownership of invariants. Commands present inputs and
 the lifecycle owner and the same domain modules. Migrating existing command-layer orchestration is tracked
 in reconciliation; a facade alone does not discharge that debt.
 
-| Responsibility | Owning modules under `pkg/nkd` | Boundary |
+| Responsibility | Owning modules under `pkg/nvkr` | Boundary |
 |---|---|---|
 | Canonical identity and resolution | `canonical`, `ir`, `target`, `catalog`, `buildgraph` | Authenticate and normalize inputs into deterministic logical identities; catalog owns source/artifact pin maintenance and its lock transaction |
 | Execution requirements | `execution` | Own reusable per-step runner request shape; grant no runner capability |
@@ -338,7 +338,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
 | Release authority and durable status | `release`, `status` | Status owns diagnostic checkpoint acceptance and high-water persistence; qualified release authorization, trusted time and publication remain deferred |
-| Public adaptation | `errors`; `client/v1` and `cmd/nkdctl` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
+| Public adaptation | `errors`; `client/v1` and `cmd/nvkr` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
 
 The purity guard lives in `internal/architecture` as a repository test, not a domain module.
 
@@ -385,7 +385,7 @@ milestone specification.
 | Driver | Mechanism and view | Validation needed |
 |---|---|---|
 | Stable, reviewable definitions | Canonical identities, locked inputs, generated bundle | Golden identities; differential pin/destination tests; byte-exact regeneration |
-| M1 source-built delivery | Build → package → publish → sign → verify | Hosted NKE CLI run and independent cosign verification |
+| M1 source-built delivery | Build → package → publish → sign → verify | Hosted NVKE CLI run and independent cosign verification |
 | M2 artifact breadth | Multiple build targets, acquired inputs, compositions, proposed wrapped job | Each scoped artifact/variant delivered; large-output execution exercise |
 | M3 build/evidence qualification | Separate signer and subject-bound verdicts | Positive gate plus tamper, missing evidence, and wrong-pin negatives |
 | M4 release cadence | Immutable manifest and channel discovery | Re-run, concurrent-run and interrupted-publication exercises |
@@ -399,7 +399,7 @@ Plan/graph inspection, GitHub generation, metadata-only release navigation and t
 `pipeline-attested` / `artifact-publication` consumer are implemented. Local unencrypted direct-Packer
 execution retains exact QCOW2 bytes; local disk publication remains closed.
 
-The [recorded M2 candidate](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated hosted delivery,
+The [recorded M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated hosted delivery,
 signing, verification and finalization for all 34 outputs, including AMD64 and ARM64 disks. It used the
 explicit native ARC route, a validation-branch signing exception and `build-provenance-v1` disk evidence
 that records deferred inspection. This establishes candidate delivery for those exact inputs, not
@@ -453,8 +453,8 @@ linked build engines; qualified tools require the corresponding pinned execution
 ADR-22 §7 implements explicit derived pin sets for source and acquired members. Loading re-derives member
 versions from bounded YAML/JSON in the pinned upstream tree; provenance annotations alone cannot establish
 agreement. Re-pinning updates the declared set atomically. Unknown or missing records in selected collections
-fail closed. The NKE deploy adapter adds explicit deploy-item accounting and exact Helm package pins from
-HTTPS or anonymous OCI repositories; installation stays with NKE. Catalogs with pin sets require access
+fail closed. The NVKE deploy adapter adds explicit deploy-item accounting and exact Helm package pins from
+HTTPS or anonymous OCI repositories; installation stays with NVKE. Catalogs with pin sets require access
 to pinned Git objects when loaded. A `helm-oci` output can wrap an acquired `raw` chart without changing
 its compressed bytes or pinned layer digest. The wrapper has its own manifest digest; image binding
 remains source-only (ADR-20). Definitions map named chart image slots to image outputs; catalog producers own the digest value paths.
@@ -464,7 +464,7 @@ of Environment publication namespaces. Helm digest overrides remain possible; de
 
 `curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
 An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate
-strict inspection and material-reconciliation contract in ADR-13; runtime correctness remains with NKE. Any deferred
+strict inspection and material-reconciliation contract in ADR-13; runtime correctness remains with NVKE. Any deferred
 registration transport must consume accepted artifact references without adding a topology model.
 
 ### External Interface and Specification {#external-interface-and-specification}
@@ -473,13 +473,13 @@ registration transport must consume accepted artifact references without adding 
 |---|---|---|
 | Git/source transport | Upstream or mirror → source fetch or pin-set revalidation step | Retrieve pinned Git trees and check commit/tree; repository-scoped credentials limited to source retrieval and pin-set revalidation |
 | Container runtime | Helper → pinned toolchain container | Apply declared platform/network/privilege; qualified execution additionally requires runtime receipts |
-| CI artifact transport | Producer job → dependent job | Carry declared artifact edges; graph admission and identity checks remain NKD responsibilities |
+| CI artifact transport | Producer job → dependent job | Carry declared artifact edges; graph admission and identity checks remain NVKR responsibilities |
 | OCI distribution | Packager/publisher ↔ registry | Content selected by digest; layout/manifest integrity checked; remote failure cannot imply successful publication |
 | Keyless signing | Signing module ↔ cosign/Fulcio/Rekor | Exact pinned executable and subject, explicit identity/issuer; registry credentials in private `DOCKER_CONFIG` |
 | Consumer verification | Registry → independent verifier | Signature and production attestation against the digest and published identity policy; planned qualification uses a distinct identity |
 | Qualified evidence/status | External evidence producers → authorization modules | Authenticate role, subject, policy, completeness and fresh status before clearance |
-| qemu, Nix | NKD adapter → external utility | Pinned subprocess interface; reject absent capabilities; qualified Nix remains disabled |
-| Downstream deployment | Accepted artifact references → deployment owner | External systems own topology, placement and provisioning; NKD has no provisioning adapter |
+| qemu, Nix | NVKR adapter → external utility | Pinned subprocess interface; reject absent capabilities; qualified Nix remains disabled |
+| Downstream deployment | Accepted artifact references → deployment owner | External systems own topology, placement and provisioning; NVKR has no provisioning adapter |
 
 Exact schema and lifecycle contracts belong in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) and the owning
 ADRs; [the lifecycle guide](lifecycle.md) documents current commands. This interface view identifies architectural responsibility; it does not claim every listed adapter is enabled.
@@ -590,7 +590,7 @@ Installer-generated filesystem state and network-resolved inputs keep an Ubuntu 
 pipeline-attested lane unless a recorded bake-off proves the canonical RAW comparison. Hermetic inputs alone do
 not prove deterministic output.
 
-Accepted artifact references can be consumed by a downstream deployer. NKD does not generate a cluster
+Accepted artifact references can be consumed by a downstream deployer. NVKR does not generate a cluster
 realization or define a cluster qualification protocol. Deployment descriptions and runtime validation belong
 to that consumer. Proposed registration transport is separate from the v1 manifest and build/evidence gate.
 
@@ -784,7 +784,7 @@ A renderer unable to express the required guards must reject the affected lane. 
 it is not proof that an unexercised workflow or the proposed fused job already enforces it in production.
 
 Public transparency logs permanently disclose organization, repository, workflow identity and artifact digests.
-Product-security sign-off is required before the first signed run containing NKE bytes. Qualification evidence
+Product-security sign-off is required before the first signed run containing NVKE bytes. Qualification evidence
 uses a separate identity; consumers must enforce the appropriate role as well as cryptographic validity.
 
 ## Test Automation {#test-automation}
@@ -873,7 +873,7 @@ Produced-artifact size remains an artifact and transport budget.
 
 ### High Availability {#high-availability}
 
-NKD is a batch tool, so it does not need an always-running control plane. Successful production still depends on
+NVKR is a batch tool, so it does not need an always-running control plane. Successful production still depends on
 retrievable inputs, CI capacity, registry writes/reads and identity services. Already published artifacts depend
 on registry/evidence retention for later verification. An unavailable dependency causes a failed or bounded-out
 operation; it cannot turn verification into an optional step.
@@ -906,7 +906,7 @@ not claims of measured service levels or newly approved requirements.
 | Change only a registry destination | Same Build Digest; Environment and plan changes are explicit | Test the chosen Definition/Environment pair |
 | Substitute artifact bytes before signing | Coded refusal and no successful signing result for the substituted subject | Real workflow negative beyond injected adapters |
 | Cancel while external work blocks | Child/container work stops and is joined within the selected cleanup bound | Release engineering: deadline and Linux measurement |
-| Build/package the largest scoped OS image | Peak disk/memory and transfer volume remain within the admitted runner budget | NKE/build owner: representative size and scratch demand; CI owner: budget/headroom |
+| Build/package the largest scoped OS image | Peak disk/memory and transfer volume remain within the admitted runner budget | NVKE/build owner: representative size and scratch demand; CI owner: budget/headroom |
 | Registry or signing service is unavailable | Finite failure; no successful verification or release claim | Service owner: timeout, retry budget and recovery procedure |
 | Two runs attempt release publication | Immutable references remain stable; channel update has a defined winner | Release engineering: serialization/CAS, ordering and collision protocol |
 | Investigate a partial publication after CI expiry | Recover the relevant plan/run/subject and remote-state evidence | Registry/CI owners: retention period and durable record location |
@@ -919,9 +919,9 @@ already obtained.
 | Decision or acceptance gap | Responsible role | Blocks |
 |---|---|---|
 | Named-decider ratification of the ADR set | Architecture owners — **[INPUT NEEDED]** | Organizational acceptance of the proposed engineering baseline |
-| Default-branch production/PR trigger exercises, source access and protected-environment policy | CI/release engineering and NKE source owners | Remaining M1 acceptance beyond recorded manual candidate runs |
+| Default-branch production/PR trigger exercises, source access and protected-environment policy | CI/release engineering and NVKE source owners | Remaining M1 acceptance beyond recorded manual candidate runs |
 | Transparency disclosure approval, Fulcio/Rekor operations and deletion protection | Product security and service owners | Organizational approval and sustainable consumer verification |
-| Native route approval, measured capacity envelope and independent full-payload disk consumption | NKE build owner and CI engineering | M2 acceptance beyond the scoped candidate delivery |
+| Native route approval, measured capacity envelope and independent full-payload disk consumption | NVKE build owner and CI engineering | M2 acceptance beyond the scoped candidate delivery |
 | `curatedBy`, aggregate SBOM curation edges and `embeds` consistency | Catalog/build owners | Upstream composition binding beyond catalog pin validation |
 | M3 role policy and qualification implementation | Qualification owner | Build/evidence verdicts |
 | M4 concurrency, partial-write reconciliation, tag and retention protocol | Release engineering and registry owner | Reliable repeated and interrupted release publication |
@@ -937,7 +937,7 @@ reproduction of helper bytes.
 
 | Item | Description |
 | :---- | :---- |
-| Title | NKD (NVIDIA Kubernetes Definition) — Software Architecture and Design Document (PLC-L1) |
+| Title | NVKR (NVIDIA Kubernetes Definition) — Software Architecture and Design Document (PLC-L1) |
 | Author(s) | **[INPUT NEEDED]** |
 | Reviewers | **[INPUT NEEDED]** |
 | Approvers | **[INPUT NEEDED]** (per stakeholders) |

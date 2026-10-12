@@ -1,0 +1,44 @@
+[
+  {
+    "platform": "linux/amd64",
+    "components": [
+      "cni-plugins",
+      "containerd",
+      "coredns",
+      "crictl",
+      "etcd",
+      "helm",
+      "kube-apiserver",
+      "kube-controller-manager",
+      "kube-proxy",
+      "kube-scheduler",
+      "kubeadm",
+      "kubectl",
+      "kubelet",
+      "pause",
+      "runc"
+    ],
+    "buildDigest": "sha256:80ce22076333e140eea3eb54ca83400c82dd93888ebf17030ff6315699204fb0"
+  },
+  {
+    "platform": "linux/arm64",
+    "components": [
+      "cni-plugins",
+      "containerd",
+      "coredns",
+      "crictl",
+      "etcd",
+      "helm",
+      "kube-apiserver",
+      "kube-controller-manager",
+      "kube-proxy",
+      "kube-scheduler",
+      "kubeadm",
+      "kubectl",
+      "kubelet",
+      "pause",
+      "runc"
+    ],
+    "buildDigest": "sha256:31811860aba69a28d6849244b6b0c8bc37758484466d444d94f9b95c7c6d88c7"
+  }
+]

@@ -4,8 +4,8 @@ A catalog defines reusable components and how to build or acquire them. A Defini
 components belong in each required output. Start with the [quickstart](quickstart.md) for CLI setup;
 the [concept reference](user-concepts.md) explains the broader lifecycle.
 
-Adding a catalog with existing NKD capabilities requires declarations and pins, not Go code or
-component-specific Go tests. The NKE and OVN tests in this repository are regression coverage for
+Adding a catalog with existing NVKR capabilities requires declarations and pins, not Go code or
+component-specific Go tests. The NVKE and OVN tests in this repository are regression coverage for
 NVIDIA's supplied catalogs, not catalog authoring requirements. Generic validation checks declarations
 and dependency graphs; actual builds and output checks validate the declared producer commands.
 
@@ -23,13 +23,13 @@ The catalog has two files:
 
 A source can serve several components. A pin set can derive several source or acquired-artifact versions
 from one upstream release's version file. Update those members through their owning source. Use
-`catalog bump --check` to preview changes without writing the lock; pending changes return `NKD-E-DIFF`.
+`catalog bump --check` to preview changes without writing the lock; pending changes return `NVKR-E-DIFF`.
 
 ## Share sources with explicit roles
 
 Several producers can refer to one source key and reuse its exact pinned checkout. A single repository
 can also have independent source keys when components need different module tags, toolchains, or
-preparation steps. For example, NKE's controller catalog uses `nke` and `nke-helm` for different build
+preparation steps. For example, NVKE's controller catalog uses `nvke` and `nvke-helm` for different build
 roles. Sharing a repository URL does not create a pin-set relationship or guarantee matching commits.
 
 Keep coordinated source roles aligned through a reviewed complete-lock update. A derived member uses
@@ -103,7 +103,7 @@ An overlay retaining the component key `app-cli` retains that component-based na
 
 ## Keep material references consistent
 
-This exact excerpt belongs to the NKE `nke-cni-ovn` catalog producer:
+This exact excerpt belongs to the NVKE `nvke-cni-ovn` catalog producer:
 
 ```yaml
 materials:
@@ -132,15 +132,15 @@ The catalog also selects how source components are built:
 | `nix` | A locked flake build in a pinned container; qualified realized-input observation remains unavailable. |
 
 A builder type describes production, while an output format describes delivery. Runtime and evidence limits
-still apply; [ADR-10](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/0010-pluggable-builder-types.md) and [reconciliation](https://github.com/dsx-ai-factory/nke-recipes/blob/main/docs/adr/reconciliation.md) record them.
+still apply; [ADR-10](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md) and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) record them.
 
 A **toolchain substitution** changes the build container for explicitly named components and an architecture,
 checking the expected old digest. It keeps the existing source and command declarations. The
-[maintained OS overlay](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-m2/native-toolchains.yaml) shows the exact `from`, `to`, and
+[maintained OS overlay](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/native-toolchains.yaml) shows the exact `from`, `to`, and
 `components` fields. This differs from replacing the complete producer.
 
 **Version stamps** render source-pin values into build environment variables. This excerpt from the
-[NKE CLI producer](https://github.com/dsx-ai-factory/nke-recipes/blob/main/definitions/nke-v1/catalog/registry.yaml) embeds its commit and module tag:
+[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/catalog/registry.yaml) embeds its commit and module tag:
 
 ```yaml
 versionStamp:
@@ -158,7 +158,7 @@ Use macOS or Linux with Bash 3.2+, Git, Make, `jq`, GNU `timeout` or `gtimeout`,
 
 ```sh
 GOTOOLCHAIN=local make build
-bash docs/examples/authoring-lab/run.sh --nkdctl bin/nkdctl
+bash docs/examples/authoring-lab/run.sh --nvkr bin/nvkr
 ```
 
 The lab exercises the same overlay and selection operations with a separate fixture. It creates a fresh

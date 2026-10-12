@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/internal/securepath"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -481,7 +481,7 @@ func validateTransportEntryUnchanged(expected transportEntry, observed securepat
 // acceptance to the one caller that actually needs it (Helm chart carriers);
 // every other transport consumer keeps requiring plain tar, so this widened
 // decompression exposure and its budget do not silently apply to Packer,
-// APT, or the generic `nkdctl transport` carriers.
+// APT, or the generic `nvkr transport` carriers.
 //
 // maxHelmTransportDecompressedBytes bounds the decompressed size of the one
 // gzip-compressed transport lane (a real `helm package` .tgz, read via
@@ -713,7 +713,7 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	if err := os.MkdirAll(rootAbs, 0o755); err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating transport root")
 	}
-	stage, err := os.MkdirTemp(rootAbs, ".nkd-unpack-")
+	stage, err := os.MkdirTemp(rootAbs, ".nvkr-unpack-")
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating private transport staging directory")
 	}

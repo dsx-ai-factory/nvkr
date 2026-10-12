@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/definition/v5
+apiVersion: nvkr.dev/definition/v5
 kind: Definition
 metadata:
   name: authoring-lab

@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{
+  "apiVersion": "nvkr.dev/catalog/v3",
+  "kind": "SourceBuildRegistry",
+  "metadata": {
+    "name": "nvke-cli-arm64-local",
+    "description": "Explicit new native ARM64 CLI producer using the maintained CLI source release and existing reviewed build command; not a target-changing catalog overlay."
+  },
+  "components": {
+    "nvkectl-arm64": {
+      "artifactPath": "bin/nvkectl",
+      "buildCommand": [
+        "sh",
+        "-c",
+        "go build -mod=vendor -trimpath -ldflags \"-s -w -buildid= -X main.version=$NKECTL_VERSION -X main.gitCommit=$NKECTL_COMMIT -X main.gitTreeState=clean -X main.buildDate=$NKECTL_DATE -X github.com/NVIDIA/nke/cli/internal/cwedeploy.capiVersion=$NKECTL_CAPI_VERSION\" -o /src/bin/nvkectl ./cli/cmd/nkectl"
+      ],
+      "cgo": false,
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "source": "nvke",
+      "versionStamp": {
+        "NKECTL_CAPI_VERSION": "v1.12.3",
+        "NKECTL_COMMIT": "{{slice .Commit 0 8}}",
+        "NKECTL_DATE": "{{.Date}}",
+        "NKECTL_VERSION": "{{.ModuleTag}}"
+      },
+      "writeDir": "bin"
+    }
+  },
+  "sources": {
+    "nvke": {
+      "constraint": "0.1.x",
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "tagPrefix": "cli/",
+      "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
+    }
+  }
+}

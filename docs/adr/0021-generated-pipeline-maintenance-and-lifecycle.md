@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-21 in the consolidated NKD ADR set (added to close the day-2 pipeline-maintenance gap).
+- **Index:** ADR-21 in the consolidated NVKR ADR set (added to close the day-2 pipeline-maintenance gap).
 - **Relates to:** ADR-18 (what is emitted / the runner), ADR-11 (catalog producer overlays), ADR-07
   (runner/profile digest, re-sign), ADR-22 (the pin/lock contract a bump edits), ADR-01 (canonical codec +
   digest provenance), ADR-17 (CLI verbs), ADR-20 (publish phase).
@@ -15,7 +15,7 @@
 
 ## Context
 
-ADR-18 fixes *what* an emitted pipeline is: one IR, provider adapters, and a from-source `nkd-exec` executing
+ADR-18 fixes *what* an emitted pipeline is: one IR, provider adapters, and a from-source `nvkr-exec` executing
 each node. It does not fix the **lifecycle of those files after they land in an operator's repository**. That is
 the day-2 story: a generated pipeline goes stale when pins move, someone hand-edits it, the operator wants a
 newer tool, or the operator needs an org-specific step. A stress-test of that journey found no drift gate, no
@@ -221,7 +221,7 @@ disallowed; that ambiguity is what makes forgotten-regen drift possible.
 
 ## Acceptance evidence
 
-Current generated Run contract evidence in `pkg/nkd/factory/bundle_io_test.go` covers idempotent generation,
+Current generated Run contract evidence in `pkg/nvkr/factory/bundle_io_test.go` covers idempotent generation,
 byte-exact drift checks, unchanged obsolete-member retirement, empty-directory cleanup, and preservation of
 modified or unlisted files. These tests do not establish a complete crash/kill-point matrix.
 

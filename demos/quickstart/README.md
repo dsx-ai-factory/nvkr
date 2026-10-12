@@ -1,8 +1,8 @@
 # Build your first artifact
 
-This demo turns a tiny greeting script into a versioned executable through a real NVKE Recipes Run.
+This demo turns a tiny greeting script into a versioned executable through a real NVKR Run.
 It takes one source, one catalog component, and one requested output. Docker performs the build;
-NVKE Recipes pins the inputs, plans the work, checks the produced bytes, and records the result.
+NVKR pins the inputs, plans the work, checks the produced bytes, and records the result.
 
 From the repository root, with Docker running and the Go version in [`.go-version`](../../.go-version)
 on your `PATH`:
@@ -14,7 +14,7 @@ bash demos/demo-local.sh --pause
 
 Git and Python 3 are also required. Omit `--pause` to run straight through. The first invocation
 may download the small digest-pinned Alpine image and Go dependencies. Rehearse once before presenting.
-`NKDCTL_BIN` and `GO_BIN` can select already installed executables.
+`NVKR_BIN` and `GO_BIN` can select already installed executables.
 
 The script prints four short steps and keeps complete logs. Expect:
 
@@ -25,7 +25,7 @@ The script prints four short steps and keeps complete logs. Expect:
 4 / 4  Check the result and use it
   Run: complete | output: hello | lane: unqualified-local-execution
   Artifact bytes match the recorded SBOM subject.
-Hello, team! This is hello v1.0.0, built by NVKE Recipes.
+Hello, team! This is hello v1.0.0, built by NVKR.
 ```
 
 ## Read the inputs
@@ -39,7 +39,7 @@ Hello, team! This is hello v1.0.0, built by NVKE Recipes.
 
 The script creates a small local Git repository with two tags, then runs `catalog pin` to generate
 `catalog/pins.lock.yaml`. Its `demo.example.invalid` source URL is redirected to that local repository
-for this process only. No GitHub account, registry credentials, or NKE checkout is needed.
+for this process only. No GitHub account, registry credentials, or NVKE checkout is needed.
 
 The target is `linux/amd64`; Docker Desktop on Apple Silicon uses its Linux emulation support.
 The resulting application is a portable shell script, so the demo also runs it directly on the host.
@@ -54,7 +54,7 @@ bash demos/demo-local.sh --version 1.1.0
 
 The greeting changes to `Welcome`, and the version becomes `v1.1.0`. Compare the printed Build
 digests: the changed source pin changes the build's identity. Each invocation retains its inputs
-and results under a new `.nkd/demo-local.*` directory; the script prints the exact path.
+and results under a new `.nvkr/demo-local.*` directory; the script prints the exact path.
 Use `--out NEW_DIR` to choose a new directory yourself.
 
 ## Explore the result
@@ -66,9 +66,9 @@ Inside the printed workspace:
 | `catalog/pins.lock.yaml` | The exact source commit, tree, tag, and timestamp. |
 | `plan.json` | The compiled inputs, Build digest, operations, and artifact relationships. Load it into the [Plan explorer](../demo-team-explorer.html). |
 | `plan.mermaid` | The exported graph for a Mermaid viewer. |
-| `.nkd/runs/demo/lifecycle.json` | The complete Run, its requested output, and its observed artifact. |
-| `.nkd/runs/demo/hello/out/hello/hello` | The executable produced by the container build. |
-| `.nkd/runs/demo/hello/sbom/index.json` | The composition record bound to that executable's exact bytes. |
+| `.nvkr/runs/demo/lifecycle.json` | The complete Run, its requested output, and its observed artifact. |
+| `.nvkr/runs/demo/hello/out/hello/hello` | The executable produced by the container build. |
+| `.nvkr/runs/demo/hello/sbom/index.json` | The composition record bound to that executable's exact bytes. |
 | `logs/run.log` | Full execution output, including each completed operation. |
 
 This local Run is **unqualified local execution**. Its composition SBOM does not perform dependency

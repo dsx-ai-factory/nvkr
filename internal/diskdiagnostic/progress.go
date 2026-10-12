@@ -14,10 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 )
 
 const (
+	// Wire ABI emitted by the digest-pinned inspector image. Rename only with
+	// a versioned helper protocol and measured producer/consumer repin together.
 	Prefix              = "NKD_INSPECTION "
 	MaxRecordBytes      = 512
 	MaxRetainedBytes    = 32 << 10

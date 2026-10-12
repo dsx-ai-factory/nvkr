@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog-overlay/v3
+kind: CatalogOverlay
+name: nvke-m2-native-toolchains
+requiresCatalogDigest: sha256:ae6cee96a38f00bd818e3c0b946567e493bb91dbdaa254058347cfa1f8eb7a3c
+# Candidate-only exception: https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md.
+toolchainSubstitutions:
+  - arch: amd64
+    from: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+    to: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-image-amd64
+      - nvke-patched-installer-iso-amd64
+      - nvke-spire-agent
+      - ovn-kubernetes-chart

@@ -11,11 +11,11 @@ to the final update, so it includes scheduling and the aggregate gate.
 
 | Run | Workflow | Check job | Race and coverage tests |
 |---|---:|---:|---:|
-| [Upstream PR 96 latest](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37495073047) | 10m27s | 9m54s | 8m24s |
-| [Upstream PR 96 previous](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37492435442) | 16m34s | 15m58s | 13m50s |
-| [Upstream main at 61ec66f](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37423352366) | 12m21s | 11m59s | 10m13s |
-| [Upstream PR 95](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37421759982) | 17m40s | 15m40s | 13m31s |
-| [Upstream main at 7c0762d](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37420775719) | 15m11s | 14m51s | 12m53s |
+| [Upstream PR 96 latest](https://github.com/dsx-ai-factory/nvkr/actions/runs/37495073047) | 10m27s | 9m54s | 8m24s |
+| [Upstream PR 96 previous](https://github.com/dsx-ai-factory/nvkr/actions/runs/37492435442) | 16m34s | 15m58s | 13m50s |
+| [Upstream main at 61ec66f](https://github.com/dsx-ai-factory/nvkr/actions/runs/37423352366) | 12m21s | 11m59s | 10m13s |
+| [Upstream PR 95](https://github.com/dsx-ai-factory/nvkr/actions/runs/37421759982) | 17m40s | 15m40s | 13m31s |
+| [Upstream main at 7c0762d](https://github.com/dsx-ai-factory/nvkr/actions/runs/37420775719) | 15m11s | 14m51s | 12m53s |
 | [Fork main at 61ec66f](https://github.com/njhensley/nke-recipes/actions/runs/37426768864) | 16m25s | — | 13m46s |
 
 The fork's `check` job succeeded; its overall gate failed in other jobs. Those failures are separate from
@@ -27,11 +27,11 @@ vulnerability check. CodeQL ran concurrently and finished in 2m51s. Tests determ
 ## Slow packages
 
 The following durations come from the actual `go test` package summaries in
-[the latest check log](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37495073047/job/112377503678)
-and [the preceding check log](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37492435442/job/112368503196).
+[the latest check log](https://github.com/dsx-ai-factory/nvkr/actions/runs/37495073047/job/112377503678)
+and [the preceding check log](https://github.com/dsx-ai-factory/nvkr/actions/runs/37492435442/job/112368503196).
 They measure package execution; packages overlap, so these numbers must not be summed as wall time.
 
-| Package under pkg/nkd | Latest | Previous |
+| Package under pkg/nvkr | Latest | Previous |
 |---|---:|---:|
 | delivery | 235.922s | 410.821s |
 | factory | 222.080s | 372.261s |
@@ -48,13 +48,13 @@ these logs do not establish CPU contention, memory pressure, or a specific runne
 This includes filesystem, local registry, subprocess, and large-document contracts alongside small unit
 tests. In particular:
 
-- [Delivery's inventory attestation test](../pkg/nkd/delivery/disk_publication_test.go) constructs a nearly
+- [Delivery's inventory attestation test](../pkg/nvkr/delivery/disk_publication_test.go) constructs a nearly
   32 MiB SBOM and passes it through publication, attestation, reopening, and readback.
-- [SBOM capacity tests](../pkg/nkd/sbom/disk_inventory_capacity_test.go) construct inventories with
+- [SBOM capacity tests](../pkg/nvkr/sbom/disk_inventory_capacity_test.go) construct inventories with
   8,000 and 50,000 file entries. Other SBOM tests exercise the full 32 MiB document ceiling.
-- [Signing tests](../pkg/nkd/sign/sbom_attestation_test.go) also exercise large inventories and document
+- [Signing tests](../pkg/nvkr/sign/sbom_attestation_test.go) also exercise large inventories and document
   and bundle size limits.
-- [Linux signing fixtures](../pkg/nkd/sign/qualified_linux_test.go) may compile a separate static test
+- [Linux signing fixtures](../pkg/nvkr/sign/qualified_linux_test.go) may compile a separate static test
   executable when the race-enabled executable is dynamically linked.
 
 The inspected GitHub runs record package totals without individual test timings. Follow-up Linux profiling
@@ -117,8 +117,8 @@ escape boundaries. Both codecs emitted the same 4,382,789 bytes (exact-blob SHA-
 Reproduce the focused measurements with:
 
 ```sh
-go test -race -cover -run TestMarshalStringBytes -bench BenchmarkMarshalString -benchtime=3x -count=3 ./pkg/nkd/canonical
-go test -race -cover -json -run '^TestDiskPublicationLargeInventoryAttestationReadback$' -count=1 -cpuprofile=/tmp/delivery.cpu ./pkg/nkd/delivery
+go test -race -cover -run TestMarshalStringBytes -bench BenchmarkMarshalString -benchtime=3x -count=3 ./pkg/nvkr/canonical
+go test -race -cover -json -run '^TestDiskPublicationLargeInventoryAttestationReadback$' -count=1 -cpuprofile=/tmp/delivery.cpu ./pkg/nvkr/delivery
 ```
 
 ## Remaining opportunities
@@ -146,7 +146,7 @@ rules, formatting, and `git diff --check` also passed. Hosted cache restore/save
 remain configured but unexercised until this change runs on GitHub.
 
 The macOS `make check` attempt failed with five staticcheck diagnostics in the unchanged
-`pkg/nkd/pipeline/disk_inspection_runtime.go` and `pkg/nkd/pipeline/source_vendor.go`: SA4023 reports
+`pkg/nvkr/pipeline/disk_inspection_runtime.go` and `pkg/nvkr/pipeline/source_vendor.go`: SA4023 reports
 always-true error comparisons against unsupported-platform helpers. An untouched `HEAD` snapshot
 reproduced the same diagnostics under pinned Go 1.27.1 and golangci-lint 2.13.1. These pre-existing
 macOS gate failures remain unresolved; the Linux full gate is green. The follow-up native test run and

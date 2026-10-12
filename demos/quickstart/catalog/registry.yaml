@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: nkd.dev/catalog/v3
+apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: hello-nkd
+  name: hello-nvkr
 sources:
   hello:
     repo: https://demo.example.invalid/hello

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-controller-amd64
+  description: NVKE controller containers and helm chart.
+catalog:
+  base: ./catalog
+outputs:
+- name: cluster-api-provider-provisioned-amd64
+  components:
+  - cluster-api-provider-provisioned
+  format: oci
+  platform: linux/amd64
+- name: nvke-controller-amd64
+  components:
+  - nvke-controller
+  format: oci
+  platform: linux/amd64
+- name: nvke-controller-chart-amd64
+  components:
+  - nvke-controller-chart
+  format: helm-oci
+  helm:
+    images:
+      controller: nvke-controller-amd64
+  platform: linux/amd64

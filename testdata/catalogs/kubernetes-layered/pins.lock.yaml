@@ -1,5 +1,5 @@
-# Machine-managed by `nkdctl catalog pin` / `nkdctl catalog bump`. Do not hand-edit.
-apiVersion: nkd.dev/lock/v1
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
 kind: PinLock
 pins:
   checkout:

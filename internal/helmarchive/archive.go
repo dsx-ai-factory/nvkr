@@ -18,7 +18,7 @@ import (
 	"regexp"
 	"strings"
 
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv2 "go.yaml.in/yaml/v2"
 	"sigs.k8s.io/yaml"
 )
