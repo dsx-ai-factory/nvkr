@@ -1,6 +1,7 @@
 # Documentation
 
-Start with the [quickstart](quickstart.md): validate a Definition, inspect a Plan, and preview a Run
+Start with the [quickstart](quickstart.md): learn the workflow, build a tiny local artifact, change its
+version, and extend the same ideas into the NVKE tenant demo. It also includes a planning preview
 without Docker. The [34-concept reference](user-concepts.md) explains the vocabulary and connects
 each concept to a worked example.
 
@@ -8,6 +9,7 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
+| Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
