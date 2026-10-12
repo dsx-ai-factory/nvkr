@@ -1,6 +1,6 @@
 # NVKR Project Governance
 
-This document describes how the NVKR (NVKR) project is
+This document describes how the NVKR (`nvkr`) project is
 governed: the roles people hold, how decisions are made, and how maintainers
 join and leave. It is intentionally lightweight and will grow with the project.
 For the current roster and maintainer responsibilities, see

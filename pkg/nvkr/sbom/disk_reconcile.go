@@ -136,10 +136,15 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 type diskPackageKey struct{ name, version, format, architecture string }
 
 const (
-	diskContentClassProperty = "nvkr:diskContentClass"
-	diskClassFilesystem      = "filesystem"
-	diskClassContainer       = "container"
-	diskClassDebianArchive   = "debian-archive"
+	// These four names are the pinned inspector's report ABI, not framework
+	// metadata. Keep writer and reader exact until that closure is repinned.
+	diskContentClassProperty        = "nkd:diskContentClass"
+	diskPackageFormatProperty       = "nkd:packageFormat"
+	diskPackageArchitectureProperty = "nkd:packageArchitecture"
+	diskContainedInProperty         = "nkd:containedIn"
+	diskClassFilesystem             = "filesystem"
+	diskClassContainer              = "container"
+	diskClassDebianArchive          = "debian-archive"
 )
 
 type diskObservedPackageKey struct {
@@ -215,7 +220,7 @@ func diskDocumentComponents(observed []Component) ([]Component, error) {
 	carriers := make(map[string][]string)
 	for _, component := range observed {
 		for _, property := range component.Properties {
-			if property.Name == "nvkr:containedIn" {
+			if property.Name == diskContainedInProperty {
 				ref := dependencyRef(component)
 				carriers[ref] = append(carriers[ref], property.Value)
 			}
@@ -224,7 +229,7 @@ func diskDocumentComponents(observed []Component) ([]Component, error) {
 	result := make([]Component, len(observed))
 	for index, component := range observed {
 		component = diskDocumentComponent(component)
-		contained := slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == "nvkr:containedIn" })
+		contained := slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == diskContainedInProperty })
 		if values := carriers[dependencyRef(component)]; contained && len(values) > 0 {
 			values = slices.Clone(values)
 			slices.Sort(values)
@@ -233,8 +238,8 @@ func diskDocumentComponents(observed []Component) ([]Component, error) {
 			if err != nil {
 				return nil, e.Wrap(e.CodeInternal, err, "encoding descriptive archive containment")
 			}
-			component.Properties = slices.DeleteFunc(component.Properties, func(property Property) bool { return property.Name == "nvkr:containedIn" })
-			component.Properties = append(component.Properties, Property{Name: "nvkr:containedIn", Value: string(raw)})
+			component.Properties = slices.DeleteFunc(component.Properties, func(property Property) bool { return property.Name == diskContainedInProperty })
+			component.Properties = append(component.Properties, Property{Name: diskContainedInProperty, Value: string(raw)})
 		} else if component.Type != "file" {
 			// Public package refs may combine root and contained observations.
 			// Keep the actual root observation explicit without claiming that
@@ -318,9 +323,9 @@ func diskComponentKey(component Component, platform string) (diskPackageKey, err
 	key := diskPackageKey{name: component.Name, version: component.Version}
 	for _, property := range component.Properties {
 		switch property.Name {
-		case "nvkr:packageFormat":
+		case diskPackageFormatProperty:
 			key.format = property.Value
-		case "nvkr:packageArchitecture":
+		case diskPackageArchitectureProperty:
 			key.architecture = property.Value
 		}
 	}

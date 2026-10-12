@@ -64,6 +64,17 @@ class DemoPagesTest(unittest.TestCase):
                     digest = base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii")
                     self.assertIn("'sha256-" + digest + "'", sources)
 
+    def test_concepts_use_existing_source_secret(self):
+        page = self.pages["demo-team-concepts.html"]
+        examples = "\n".join(
+            concept.get("example", "") + json.dumps(concept.get("secondaryExample", {}))
+            for attributes, script in page.scripts
+            if attributes.get("id") == "concept-data"
+            for concept in json.loads(script)
+        )
+        self.assertIn("credentialRef: github:NKE_SOURCE_TOKEN", examples)
+        self.assertNotIn("github:NVKE_SOURCE_TOKEN", examples)
+
     def test_saved_explorer_links(self):
         explorer = self.pages["demo-team-explorer.html"]
         records = {attributes["id"]: json.loads(script) for attributes, script in explorer.scripts

@@ -231,7 +231,7 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 			"tag: git-" + pin.Commit,
 			"readonly image_dir=/usr/lib/nke/cni-ovn/" + ovnForkStream,
 			"readonly image_name=ovn-images_" + ovnForkStream + "_linux_{{.Arch}}.tgz",
-			"Maintainer: NVKE <nke-dev@exchange.nvidia.com>",
+			"Maintainer: NKE <nke-dev@exchange.nvidia.com>",
 		}},
 	} {
 		t.Run(tc.component, func(t *testing.T) {

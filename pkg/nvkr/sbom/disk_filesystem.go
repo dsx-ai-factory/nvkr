@@ -510,7 +510,7 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 	result := DependencyInventory{Method: "syft-cyclonedx/v1", ScannerDigest: scannerDigest}
 	for _, artifact := range report.Artifacts {
 		component := Component{Type: "library", Name: artifact.Name, Version: artifact.Version, PURL: artifact.PURL,
-			Properties: []Property{{Name: "nvkr:packageFormat", Value: artifact.Type}}}
+			Properties: []Property{{Name: diskPackageFormatProperty, Value: artifact.Type}}}
 		if artifact.Type == "deb" {
 			// Syft v1.51.1's dpkg-db-cataloger deliberately searches **/lib/dpkg.
 			// A nested database has no independently held filesystem/image owner
@@ -538,7 +538,7 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 			if artifact.Metadata.Architecture == "" || artifact.Version == "" {
 				return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "Debian filesystem package lacks exact version or architecture")
 			}
-			component.Properties = append(component.Properties, Property{Name: "nvkr:packageArchitecture", Value: artifact.Metadata.Architecture})
+			component.Properties = append(component.Properties, Property{Name: diskPackageArchitectureProperty, Value: artifact.Metadata.Architecture})
 			slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 		}
 		if err := validateSBOMComponent("filesystem dependency", component); err != nil {

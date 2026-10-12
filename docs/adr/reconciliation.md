@@ -695,8 +695,10 @@ provider-renamed `nvke-write` team with verified NVKR repository write access;
 the old `nke-write` slug no longer exists. Published Packer/inspector subjects
 stay at their exact
 `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/` addresses with the
-existing digests. Their plugin path and inspector executable remain the pinned
-in-image ABI. The external package-capture envelope remains
+existing digests. Their plugin path, inspector executable and report properties
+`nkd:diskContentClass`, `nkd:packageFormat`, `nkd:packageArchitecture` and
+`nkd:containedIn` remain the pinned in-image ABI. Host-generated evidence metadata
+continues to use `nvkr:*`. The external package-capture envelope remains
 `nkd.dev/package-acquisitions/v1`, emitted by the selected NVKE producer; internal
 NVKR evidence identities remain distinct. Go network recovery preserves its complete
 version-2 durable host namespace and shared coordination lock. These are explicit
@@ -704,6 +706,14 @@ external/durable contract exceptions, not public namespace aliases.
 Retained node, package, Kubernetes and Packer names are compatibility contracts,
 not missing rebranding work. Source repinning or an independently changed ABI
 requires its own validation and is not part of this naming cutover.
+
+Private toolchain credential preparation includes one narrowly scoped naming-cutover
+exception: the maintained `ghcr.io/dsx-ai-factory/nvkr/m2-candidate` publication
+prefix can pull digest-pinned images from the existing `nke-recipes/m2-candidate/toolchains/`
+namespace. It does not grant a credential to arbitrary images or other publication
+prefixes. Remove that compatibility exception only after all selected legacy
+toolchain subjects have authenticated replacement pins under the normal publication
+namespace and the regenerated Run passes its credential-boundary checks.
 
 The standalone renamed execution helper has measured AMD64/ARM64 executable pins;
 its image pins remain unpublished. Any independently chosen provider-name or

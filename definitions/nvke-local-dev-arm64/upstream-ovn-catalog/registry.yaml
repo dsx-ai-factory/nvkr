@@ -118,7 +118,7 @@ components:
         Package: nke-cni-ovn-$kind-$stream
         Version: $revision
         Architecture: {{.Arch}}
-        Maintainer: NVKE <nke-dev@exchange.nvidia.com>
+        Maintainer: NKE <nke-dev@exchange.nvidia.com>
         Provides: nke-cni-ovn-$kind
         Conflicts: nke-cni-ovn-$kind
         Description: NVKE OVN $kind from pinned upstream source

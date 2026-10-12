@@ -480,7 +480,7 @@ func TestCachedDebianArchivesDoNotInventInstalledPaths(t *testing.T) {
 					t.Fatalf("cached archive changed class: %q %v", class, err)
 				}
 				for _, property := range component.Properties {
-					if property.Name == "nvkr:containedIn" {
+					if property.Name == "nkd:containedIn" {
 						carriers[property.Value] = true
 					}
 				}
@@ -502,7 +502,7 @@ func TestMaterialScanOperationsIssueTheirOwnClasses(t *testing.T) {
 		t.Skip("held scanner execution requires Linux")
 	}
 	scannerPath := filepath.Join(t.TempDir(), "scanner")
-	script := []byte("#!/bin/sh\nprintf '%s' '{\"schema\":{\"version\":\"16.1.10\"},\"artifacts\":[{\"name\":\"observed\",\"version\":\"1\",\"type\":\"deb\",\"metadata\":{\"architecture\":\"all\"},\"properties\":[{\"name\":\"nvkr:diskContentClass\",\"value\":\"debian-archive\"}]}]}'\n")
+	script := []byte("#!/bin/sh\nprintf '%s' '{\"schema\":{\"version\":\"16.1.10\"},\"artifacts\":[{\"name\":\"observed\",\"version\":\"1\",\"type\":\"deb\",\"metadata\":{\"architecture\":\"all\"},\"properties\":[{\"name\":\"nkd:diskContentClass\",\"value\":\"debian-archive\"}]}]}'\n")
 	if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -784,7 +784,7 @@ func TestRootArchiveImageMergeKeepsExactCarrierAndBudget(t *testing.T) {
 				t.Fatalf("root archive merge or shared budget missing: %+v %v", budget, err)
 			}
 			contained := inspection.components[1]
-			if !slices.Contains(contained.Properties, Property{Name: "nvkr:containedIn", Value: "cache/images.tar@" + member.Digest()}) ||
+			if !slices.Contains(contained.Properties, Property{Name: "nkd:containedIn", Value: "cache/images.tar@" + member.Digest()}) ||
 				inspection.files[0].Path != "cache/images.tar" || inspection.files[0].Digest != member.Digest() {
 				t.Fatal("contained image lost immediate carrier or invented nested file paths")
 			}

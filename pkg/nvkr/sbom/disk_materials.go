@@ -237,8 +237,8 @@ func appendContainedArchive(root, nested *FilesystemInspection, carrierPath, car
 		component = cloneComponent(component)
 		// A deeper reader already bound this component to its immediate carrier.
 		// Do not overwrite that observation or invent a concatenated ancestry.
-		if !slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == "nvkr:containedIn" }) {
-			component.Properties = append(component.Properties, Property{Name: "nvkr:containedIn", Value: carrierPath + "@" + carrierDigest})
+		if !slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == diskContainedInProperty }) {
+			component.Properties = append(component.Properties, Property{Name: diskContainedInProperty, Value: carrierPath + "@" + carrierDigest})
 			slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 		}
 		root.components = append(root.components, component)
@@ -552,7 +552,7 @@ func inspectDebianMaterialBudget(ctx context.Context, subject *heldfile.File, pl
 		return nil, err
 	}
 	component := Component{Type: "library", Name: fields[0], Version: fields[1], Properties: []Property{
-		{Name: diskContentClassProperty, Value: diskClassDebianArchive}, {Name: "nvkr:packageArchitecture", Value: fields[2]}, {Name: "nvkr:packageFormat", Value: "deb"},
+		{Name: diskContentClassProperty, Value: diskClassDebianArchive}, {Name: diskPackageArchitectureProperty, Value: fields[2]}, {Name: diskPackageFormatProperty, Value: "deb"},
 	}}
 	inspection.components = append(inspection.components, component)
 	if inspection.packageMetadataByDigest == nil {

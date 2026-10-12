@@ -51,10 +51,13 @@ source-owned contracts. Retaining these names is not unfinished rebranding:
   by the pinned upstream tree. These describe producer bytes, not NVKR aliases.
 - Guest acquisition envelope `nkd.dev/package-acquisitions/v1`, OVN's
   `NKE_CTR_BIN`, `/usr/lib/nke/cni-ovn/` and post-install log, and the producer's
-  existing maintainer email. None is rewritten by the consuming repository.
+  existing maintainer name and email. None is rewritten by the consuming repository.
 - Pinned runtime ABI `/nkd/toolchain/packer/plugins` and
   `/usr/local/bin/nkd-disk-inspect`, including its `NKD_INSPECTION ` diagnostic
-  wire prefix. Renaming NVKR does not require changing this runtime ABI or
+  wire prefix. Its report properties `nkd:diskContentClass`, `nkd:packageFormat`,
+  `nkd:packageArchitecture` and `nkd:containedIn` also retain their exact names.
+  Host-generated framework evidence properties continue to use `nvkr:*`.
+  Renaming NVKR does not require changing this runtime ABI or
   rebuilding an otherwise valid, pinned Packer/inspector image.
 - Version-2 host-network bridge, owner/staging prefixes and shared per-user lock.
   Keeping the complete durable namespace allows existing journal recovery and
