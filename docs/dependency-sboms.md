@@ -57,9 +57,9 @@ admission, real scanning, deterministic document validation and index digests fo
 scanner bytes must match the generated plan's executable pin. Run on Linux with networking disabled.
 
 The separate opt-in `TestRealDebianArtifactDependencies` exercises the inspector API on controlled gzip/xz
-fixtures, not a compiled factory output. [Development prerequisites](../DEVELOPMENT.md) identify its tool
+fixtures, not a compiled factory output. [Development prerequisites](https://github.com/dsx-ai-factory/nvkr/blob/0f862f9f79de2beaf63dc994e3246b14e134b52c/DEVELOPMENT.md) identify its tool
 pins and command. Revalidate the discovery premise when changing the Syft pin. The
-[dated local observation](adr/reconciliation.md#external-run-references) records native ARM64 tool and
+[dated local observation](https://github.com/dsx-ai-factory/nvkr/blob/0f862f9f79de2beaf63dc994e3246b14e134b52c/docs/adr/reconciliation.md#external-run-references) records native ARM64 tool and
 fixture identities; native amd64 execution has not been recorded. Non-archive bytes named `.deb` produce no
 accepted inventory; corrupt payload members and complete embedded dependency discovery are not established.
 
