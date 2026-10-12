@@ -1172,8 +1172,11 @@ func TestNetworkUnattendedSudoAdmissionDiagnostics(t *testing.T) {
 }
 
 func TestNetworkProbeExecutableAdmission(t *testing.T) {
-	for _, name := range []string{"valid", "empty", "relative", "missing", "directory", "no-exec", "group-write", "other-write", "setuid", "setgid", "parent-group-write", "parent-other-write", "symlink"} {
+	for _, name := range []string{"valid", "empty", "relative", "missing", "directory", "no-exec", "group-write", "other-write", "setuid", "setgid", "foreign-owner", "parent-group-write", "parent-other-write", "symlink"} {
 		t.Run(name, func(t *testing.T) {
+			if name == "foreign-owner" && (runtime.GOOS != "linux" || os.Geteuid() != 0) {
+				t.Skip("foreign executable owner requires an isolated Linux root fixture")
+			}
 			dir := privateTestDir(t)
 			path := filepath.Join(dir, "nke-demo")
 			if err := os.WriteFile(path, []byte("fixture"), 0o700); err != nil {
@@ -1199,6 +1202,10 @@ func TestNetworkProbeExecutableAdmission(t *testing.T) {
 					mode = 0o700 | os.ModeSetgid
 				}
 				if err := os.Chmod(path, mode); err != nil {
+					t.Fatal(err)
+				}
+			case "foreign-owner":
+				if err := os.Chown(path, 1, -1); err != nil {
 					t.Fatal(err)
 				}
 			case "parent-group-write", "parent-other-write":

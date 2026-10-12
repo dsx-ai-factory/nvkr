@@ -46,6 +46,8 @@ The ordinary repository gate resolves all 14 producers for both architectures an
 
 The opt-in integration test uses real source preparation and containers. On a dedicated native Linux test host with rootful Docker, keep the disposable source/output owner aligned with Docker. The hosted diagnostic compiles as the runner user, then executes this credential-free test as root. This example requires passwordless sudo; on an interactive development host, authenticate with sudo first:
 
+The generic native Linux live test also accepts `NKD_OS_SOURCE_RUNTIME=podman`; this is separate from the Docker-only OS disk-build launcher and is not a macOS/TCG route.
+
 ```sh
 nkd_source_test_dir="$(mktemp -d)"
 go test -c -o "$nkd_source_test_dir/nke-os-source.test" ./pkg/nkd/buildgraph

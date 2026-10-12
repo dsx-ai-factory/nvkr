@@ -211,6 +211,8 @@ an NKD extension or a requirement for adding another catalog. Catalogs using exi
 need declarations and pins, not component-specific Go code. These tests exercise the generic compiler
 and executor and check this catalog's packaging and chart behavior.
 
+The generic native Linux live test also accepts `NKD_OVN_SOURCE_RUNTIME=podman`; this does not restore the removed macOS/Podman disk-build route or change the Docker-only demo launcher.
+
 ```sh
 go test ./pkg/nkd/buildgraph -run '^TestNKEOVNFork(Graphs|ReleaseOutputs)$' -count=1
 

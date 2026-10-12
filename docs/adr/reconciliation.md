@@ -499,6 +499,10 @@ fixed Go helper through the existing bounded sudo runner before recording host
 intent; executable admission precedes artifact inspection. Controlled tests
 cover fixed targets, rejected helper arguments, failures before journaling and
 child error propagation. This does not prove a fresh tenant deployment.
+Set-ID and replaceable-ancestor refusal run in the ordinary helper contracts.
+Foreign executable ownership requires the isolated Linux root fixture; the real
+TCP/UDP 53 and UDP 67 collision rows additionally require native ARM64 root.
+Ordinary hosted tests do not establish those privileged socket observations.
 These tests do not prove real SIGINT during
 NKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
 at every build/deployment phase. Network-only recovery uses version-2 journals

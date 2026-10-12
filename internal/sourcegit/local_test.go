@@ -368,6 +368,69 @@ func TestLocalGitPreservesExplicitEmptyHelperReset(t *testing.T) {
 	}
 }
 
+func TestLocalGitRenumbersTwoRedirectsAfterDeveloperCredential(t *testing.T) {
+	home := t.TempDir()
+	localFixtureGit(t, home, "config", "--file", filepath.Join(home, ".gitconfig"), "credential.helper", "synthetic-helper")
+	first, firstCommit := localFixtureRepository(t)
+	second, secondCommit := localFixtureRepository(t)
+	keys := []string{"url." + first + ".insteadOf", "url." + second + ".insteadOf"}
+	values := []string{"https://example.test/first", "https://example.test/second"}
+	environment := []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "GIT_CONFIG_COUNT=2",
+		"GIT_CONFIG_KEY_0=" + keys[0], "GIT_CONFIG_VALUE_0=" + values[0],
+		"GIT_CONFIG_KEY_1=" + keys[1], "GIT_CONFIG_VALUE_1=" + values[1]}
+	for index, commit := range []string{firstCommit, secondCommit} {
+		t.Run(strconv.Itoa(index), func(t *testing.T) {
+			checkout := t.TempDir()
+			runLocalFixture(t, environment, checkout, "init", "-q")
+			cmd, err := LocalCommand(t.Context(), environment, checkout, "fetch", "-q", "--depth=1", values[index], commit)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if localEnvironmentValue(cmd.Env, "GIT_CONFIG_COUNT") != "4" ||
+				localEnvironmentValue(cmd.Env, "GIT_CONFIG_KEY_1") != "credential.helper" ||
+				localEnvironmentValue(cmd.Env, "GIT_CONFIG_VALUE_1") != "synthetic-helper" {
+				t.Fatal("credential projection displaced redirects or helper reset")
+			}
+			for slot := range keys {
+				suffix := strconv.Itoa(slot + 2)
+				if localEnvironmentValue(cmd.Env, "GIT_CONFIG_KEY_"+suffix) != keys[slot] || localEnvironmentValue(cmd.Env, "GIT_CONFIG_VALUE_"+suffix) != values[slot] {
+					t.Fatal("exact redirect changed during credential renumbering")
+				}
+			}
+			var output bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &output, &output
+			if err := ownedcmd.Run(t.Context(), cmd); err != nil {
+				t.Fatalf("renumbered fetch failed: %v: %s", err, &output)
+			}
+			runLocalFixture(t, environment, checkout, "checkout", "-q", "--detach", "FETCH_HEAD")
+			if head := strings.TrimSpace(string(runLocalFixture(t, environment, checkout, "rev-parse", "HEAD"))); head != commit {
+				t.Fatal("renumbered fetch returned a different source")
+			}
+		})
+	}
+}
+
+func TestLocalGitConfigurationQueryFailuresAreClosedAndPrivate(t *testing.T) {
+	for _, test := range []struct{ name, config string }{
+		{"overflow", "[credential]\nhelper = " + strings.Repeat("synthetic-private-value", 4096) + "\n"},
+		{"invalid configuration", "[credential\nsynthetic-private-value\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			home := t.TempDir()
+			if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(test.config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cmd, err := LocalCommand(t.Context(), []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home}, "", "fetch")
+			if cmd != nil || errorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "configuration query failed") {
+				t.Fatalf("failed configuration query produced an executable fetch: %v", err)
+			}
+			if strings.Contains(err.Error(), home) || strings.Contains(err.Error(), "synthetic-private-value") {
+				t.Fatal("configuration query refusal exposed private details")
+			}
+		})
+	}
+}
+
 func TestLocalConfigurationDiagnosticDoesNotEchoUnexpectedRecords(t *testing.T) {
 	for _, data := range []string{"", "synthetic-private-value\x00", "unknown.synthetic-private-value\x00", "unknown.https://synthetic-private-url.test\n/synthetic-private-path\x00"} {
 		if got := localConfigurationFamilies([]byte(data)); got != "unrecognized" {

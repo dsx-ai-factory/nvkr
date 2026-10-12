@@ -152,46 +152,44 @@ if [[ ! -x "${runner}" ]]; then
 fi
 
 frozen_definition="${input_root}/definition.yaml"
-if [[ "${runtime}" == docker ]]; then
-  # The native Docker build is an attempt input, not a maintained release pin.
-  # Freeze its observed exact ID through the existing catalog overlay contract
-  # before compiling the executable Plan. The Packer runtime rechecks the ID.
-  plan="$("${runner}" run plan --definition "${frozen_definition}" \
-    --environment "${input_root}/environment-local.yaml" --json)"
-  root_component="$(jq -L scripts -er 'include "nke-os-plan"; disk_root' <<<"${plan}")"
-  baseline="$(jq -er --arg root "${root_component}" --arg arch "${arch}" \
-    '.builds[0].catalogSnapshot.Components[$root].toolchainImages[$arch]' <<<"${plan}")"
-  if [[ "${baseline}" != "${toolchain_image}" ]]; then
-    catalog_digest="$(jq -er '.builds[0].catalogDigest' <<<"${plan}")"
-    components="$(jq -c --arg arch "${arch}" --arg baseline "${baseline}" '
-      .builds[0].components as $selected |
-      [.builds[0].catalogSnapshot.Components | to_entries[] |
-        select(.key as $name | $selected | index($name)) |
-        select(.value.fromSource == true and .value.toolchainImages[$arch] == $baseline) | .key] | sort
-    ' <<<"${plan}")"
-    if [[ "$(jq 'length' <<<"${components}")" -eq 0 ]]; then
-      echo "no catalog components use the selected ${arch} toolchain baseline" >&2
-      exit 1
-    fi
-    jq -L scripts -n --arg arch "${arch}" --arg from "${baseline}" --arg to "${toolchain_image}" \
-      --arg digest "${catalog_digest}" --argjson components "${components}" '
-      include "nke-os-plan";
-      toolchain_overlay($arch; $from; $to; $digest; $components)
-    ' >"${input_root}/toolchain-attempt.json"
-    "${runner}" definition inspect --definition "${frozen_definition}" |
-      jq '.catalog.overlays = ((.catalog.overlays // []) + ["toolchain-attempt.json"])' \
-      >"${input_root}/definition-attempt.json"
-    frozen_definition="${input_root}/definition-attempt.json"
-  fi
-  final_plan="$("${runner}" run plan --definition "${frozen_definition}" \
-    --environment "${input_root}/environment-local.yaml" --json)"
-  if ! jq -e --arg root "${root_component}" --arg image "${toolchain_image}" '
-    [.builds[0].executionGraph.nodes[] |
-      select(.kind == "build" and .component == $root and .toolchain == $image)] | length == 1
-  ' <<<"${final_plan}" >/dev/null; then
-    echo "the frozen ${arch} Plan does not bind the observed Packer toolchain" >&2
+# The native Docker build is an attempt input, not a maintained release pin.
+# Freeze its observed exact ID through the existing catalog overlay contract
+# before compiling the executable Plan. The Packer runtime rechecks the ID.
+plan="$("${runner}" run plan --definition "${frozen_definition}" \
+  --environment "${input_root}/environment-local.yaml" --json)"
+root_component="$(jq -L scripts -er 'include "nke-os-plan"; disk_root' <<<"${plan}")"
+baseline="$(jq -er --arg root "${root_component}" --arg arch "${arch}" \
+  '.builds[0].catalogSnapshot.Components[$root].toolchainImages[$arch]' <<<"${plan}")"
+if [[ "${baseline}" != "${toolchain_image}" ]]; then
+  catalog_digest="$(jq -er '.builds[0].catalogDigest' <<<"${plan}")"
+  components="$(jq -c --arg arch "${arch}" --arg baseline "${baseline}" '
+    .builds[0].components as $selected |
+    [.builds[0].catalogSnapshot.Components | to_entries[] |
+      select(.key as $name | $selected | index($name)) |
+      select(.value.fromSource == true and .value.toolchainImages[$arch] == $baseline) | .key] | sort
+  ' <<<"${plan}")"
+  if [[ "$(jq 'length' <<<"${components}")" -eq 0 ]]; then
+    echo "no catalog components use the selected ${arch} toolchain baseline" >&2
     exit 1
   fi
+  jq -L scripts -n --arg arch "${arch}" --arg from "${baseline}" --arg to "${toolchain_image}" \
+    --arg digest "${catalog_digest}" --argjson components "${components}" '
+    include "nke-os-plan";
+    toolchain_overlay($arch; $from; $to; $digest; $components)
+  ' >"${input_root}/toolchain-attempt.json"
+  "${runner}" definition inspect --definition "${frozen_definition}" |
+    jq '.catalog.overlays = ((.catalog.overlays // []) + ["toolchain-attempt.json"])' \
+    >"${input_root}/definition-attempt.json"
+  frozen_definition="${input_root}/definition-attempt.json"
+fi
+final_plan="$("${runner}" run plan --definition "${frozen_definition}" \
+  --environment "${input_root}/environment-local.yaml" --json)"
+if ! jq -e --arg root "${root_component}" --arg image "${toolchain_image}" '
+  [.builds[0].executionGraph.nodes[] |
+    select(.kind == "build" and .component == $root and .toolchain == $image)] | length == 1
+' <<<"${final_plan}" >/dev/null; then
+  echo "the frozen ${arch} Plan does not bind the observed Packer toolchain" >&2
+  exit 1
 fi
 
 exec "${runner}" run local \
