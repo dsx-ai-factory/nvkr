@@ -48,8 +48,9 @@ See the [staged-installer handoff](nvkr-to-nvke-demo.md) for installer alignment
 
 Source-build completeness and offline-install completeness are separate requirements. The following
 inventory was inspected on 2026-10-10 against NKE commit
-[`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e).
+[`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nvke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e).
 It describes that consumer's dependencies, not an NVKR export schema or a completed installation.
+The pinned source links require access to the private NVKE repository, renamed from NKE.
 
 The [M2 image catalog](../definitions/nvke-m2/image-catalog/registry.yaml) selects twelve non-test runtime
 images per architecture: PostgreSQL, eight SPIRE images and three Temporal images. Their pins reflect the
@@ -76,7 +77,7 @@ The Operator declares a fallback collector at 0.159.0 while NKE's rendered colle
 0.162.0. The downstream inventory must state whether tests, uninstall, fallback resources and an
 operator-selected production telemetry backend are in scope. These tags are findings, not admitted digest pins.
 
-NKE's [bootstrap code](https://github.com/dsx-ai-factory/nke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/controllerdeploy/capi.go)
+NKE's [bootstrap code](https://github.com/dsx-ai-factory/nvke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/controllerdeploy/capi.go)
 requests CAPI core, kubeadm bootstrap and kubeadm control-plane v1.12.3 through `clusterctl init`.
 The [clusterctl default](https://github.com/kubernetes-sigs/cluster-api/blob/v1.12.3/cmd/clusterctl/client/config/cert_manager_client.go)
 is cert-manager v1.19.3 unless configuration overrides it. Their release manifests identify these images:

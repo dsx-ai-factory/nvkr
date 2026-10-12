@@ -201,16 +201,12 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// This fixed count and source pin below intentionally freeze the deploy input
-	// contract separately from the derived per-platform routing assertions.
+	// This fixed count and the authored source pins checked by the fixture freeze
+	// the deploy input contract separately from per-platform routing assertions.
 	if len(definition.Outputs) != 9 {
 		t.Fatalf("required outputs = %d, want nine", len(definition.Outputs))
 	}
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("definitions/nvke-controller/catalog"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	const sourceCommit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
+	base, sourceCommit := controllerCatalogFixture(t, "definitions/nvke-controller/catalog")
 	for _, output := range definition.Outputs {
 		if output.Catalog != nil {
 			t.Fatalf("deploy output %s uses a different source catalog", output.Name)

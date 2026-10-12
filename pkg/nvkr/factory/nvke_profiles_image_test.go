@@ -17,7 +17,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-// These tests compile the actual catalog and apply the authenticated patches.
+// These tests compile the authored catalog with a local pin-set source fixture
+// and apply the authenticated patches.
 // Executing the pinned runtime and the chart materializer remains a separate
 // external check; inspecting a Dockerfile alone does not establish runtime proof.
 func TestControllerProfilesImageProducerContracts(t *testing.T) {
@@ -28,10 +29,7 @@ func TestControllerProfilesImageProducerContracts(t *testing.T) {
 		{"source fixtures", "nvke-controller/catalog", "nvke-controller/definition-profiles.yaml", "nvke-controller-profiles-image", "nvkr-controller-profiles/Dockerfile", []string{"linux/amd64", "linux/arm64"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("../../../definitions", tc.catalogPath)))
-			if err != nil {
-				t.Fatal(err)
-			}
+			cat, _ := controllerCatalogFixture(t, filepath.Join("../../../definitions", tc.catalogPath))
 			stack, err := catalog.ApplyStack(cat)
 			if err != nil {
 				t.Fatal(err)
@@ -44,8 +42,8 @@ func TestControllerProfilesImageProducerContracts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// Pure compilation has no source access or publication. The real
-			// catalog pins, patches and each native child remain in the Plan.
+			// Compilation has no source access or publication. The authored
+			// producers, patches and each native child remain in the Plan.
 			env.SourceAccess, env.Publication, env.Signing = nil, nil, nil
 			plan, err := Compile(t.Context(), doc, env, stack, "profiles-contract")
 			if err != nil {
