@@ -54,6 +54,8 @@ parallel builds and unrelated workloads can consume the setup allowance.
 Install Docker Engine and Buildx using the
 [Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/).
 
+Local source admission requires Git 2.38 or later (`git --version`). Its bounded
+Git-owned index-mode query fails closed when the required format is unsupported.
 If this is a fresh Ubuntu installation without Git, install it before cloning:
 
 ```sh
