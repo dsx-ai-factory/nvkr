@@ -224,18 +224,18 @@ func (w *checkedWriter) lineOutput() {
 		}
 	}
 	if summary := dashboardGuestReport(line); summary != "" {
-		w.emit(fmt.Sprintf("[build +%s] %s%s\n", time.Since(w.started).Truncate(time.Second), dashboardGuestReportPrefix, summary))
+		w.emit(fmt.Sprintf("[log +%s] %s%s\n", time.Since(w.started).Truncate(time.Second), dashboardGuestReportPrefix, summary))
 		return
 	}
 	if strings.HasPrefix(line, "==> ") && strings.HasSuffix(line, ": Waiting for SSH to become available...") {
-		w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))
+		w.emit(fmt.Sprintf("[log +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))
 		return
 	}
 	// Human subprocess markers are labeled logs, not authenticated Run events.
 	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nkdctl command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Deployment is separate:", "Tenant created;", "PASS:", "PASS (NVIDIA OVN):", "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):", "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):", "Unqualified local diagnostic"} {
 		if strings.HasPrefix(line, prefix) {
 			w.retainResult(line)
-			w.emit(fmt.Sprintf("[build +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))
+			w.emit(fmt.Sprintf("[log +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))
 			return
 		}
 	}

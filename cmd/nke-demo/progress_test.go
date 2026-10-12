@@ -84,7 +84,7 @@ func TestProgressConciseAndVerbosePublicOutput(t *testing.T) {
 					t.Fatalf("verbose output changed: %q", &out)
 				}
 			} else {
-				for _, marker := range []string{"[build +0s]", "[dry-run] image", "[start] image", "Build graph:", "  output:", "[done] image", "Waiting for SSH", "escaped\\x1b[2J", "PASS:"} {
+				for _, marker := range []string{"[log +", "[dry-run] image", "[start] image", "Build graph:", "  output:", "[done] image", "Waiting for SSH", "escaped\\x1b[2J", "PASS:"} {
 					if !strings.Contains(out.String(), marker) {
 						t.Fatalf("missing %q: %q", marker, &out)
 					}

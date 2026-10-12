@@ -489,6 +489,37 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 	}
 }
 
+func TestDashboardBuildLogRecognizesNeutralAndHistoricalPrefixes(t *testing.T) {
+	for _, prefix := range []string{"[log +1s] ", "[build +1s] "} {
+		t.Run(prefix, func(t *testing.T) {
+			d := newDashboard()
+			d.phases[1] = dashboardPhase{state: "running"}
+			_, _ = io.WriteString(d, prefix+"  output: os [disk-image]: disk\n"+prefix+"[start] os/build-disk (build)\n")
+			s := d.snapshot()
+			if len(s.buildOutputs) != 1 || s.buildOutputs[0] != "os" || len(s.buildSteps) != 1 || s.buildSteps[0].id != "os/build-disk" || s.phases[1].state != "running" {
+				t.Fatal("timestamp label changed descriptive graph projection or lifecycle state")
+			}
+		})
+	}
+}
+
+func TestDashboardManagementReadinessUsesItsOwningStageLabel(t *testing.T) {
+	for _, operation := range []string{"create-management", "management-ready"} {
+		t.Run(operation, func(t *testing.T) {
+			phase, label := dashboardOperation(operation)
+			if phase != 2 {
+				t.Fatal("management observation left its Site phase")
+			}
+			if operation == "management-ready" && label != "Site nodes Ready" {
+				t.Fatalf("readiness mislabeled as another gate: %q", label)
+			}
+			if operation == "create-management" && label == "Site nodes Ready" {
+				t.Fatal("cluster creation implied node readiness")
+			}
+		})
+	}
+}
+
 func TestDashboardStoppedPhaseHasDistinctColor(t *testing.T) {
 	for _, width := range []int{80, 140} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
@@ -577,12 +608,59 @@ func TestDashboardBudgetAndNavigation(t *testing.T) {
 	if d.snapshot().deadline.After(before.deadline) {
 		t.Fatal("remaining budget increased")
 	}
-	for _, key := range []tcell.Key{tcell.KeyTab, tcell.KeyPgUp, tcell.KeyPgDn, tcell.KeyEnd, tcell.KeyCtrlC} {
-		d.input(tcell.NewEventKey(key, 0, tcell.ModNone))
+	for _, test := range []struct {
+		key           tcell.Key
+		offset, focus int
+	}{
+		{tcell.KeyTab, 0, 1},
+		{tcell.KeyPgUp, 10, 2},
+		{tcell.KeyPgDn, 0, 2},
+		{tcell.KeyPgUp, 10, 2},
+		{tcell.KeyEnd, 0, 2},
+	} {
+		if d.input(tcell.NewEventKey(test.key, 0, tcell.ModNone)) {
+			t.Fatal("navigation requested cancellation")
+		}
+		if got := d.snapshot(); got.offset != test.offset || got.focus != test.focus {
+			t.Fatalf("key %v: offset=%d focus=%d, want %d/%d", test.key, got.offset, got.focus, test.offset, test.focus)
+		}
 	}
+	d.input(tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModNone))
 	d.input(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone))
 	if got := d.snapshot(); got.offset != 0 || got.phases != before.phases {
 		t.Fatal("navigation changed observed state")
+	}
+}
+
+func TestDashboardPagingUsesCurrentScrollModel(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		details bool
+		up      int
+	}{
+		{"activity scrolls back from live output", false, 30},
+		{"details scrolls toward the top", true, 10},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nkedemo.ProgressEvent{Kind: nkedemo.LaneStarted, Name: "artifacts"})
+			d.offset, d.buildDetails = 20, test.details
+			before := d.snapshot()
+			for _, step := range []struct {
+				key    tcell.Key
+				offset int
+			}{{tcell.KeyPgUp, test.up}, {tcell.KeyPgDn, 20}, {tcell.KeyEnd, 0}} {
+				if d.input(tcell.NewEventKey(step.key, 0, tcell.ModNone)) {
+					t.Fatal("paging requested cancellation")
+				}
+				if got := d.snapshot(); got.offset != step.offset || got.phases != before.phases || got.confirmCancel {
+					t.Fatalf("key %v changed work or wrong scroll offset: %+v", step.key, got)
+				}
+			}
+			if d.snapshot().buildDetails {
+				t.Fatal("End failed to return to live activity")
+			}
+		})
 	}
 }
 

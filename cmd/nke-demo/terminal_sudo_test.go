@@ -43,8 +43,16 @@ func (s *authenticationScreen) ChannelEvents(events chan<- tcell.Event, quit <-c
 }
 
 func TestDashboardAuthenticationNeverSuspends(t *testing.T) {
-	for _, mode := range []string{"twice", "auth-failure", "canceled-auth-cleanup"} {
-		t.Run(mode, func(t *testing.T) {
+	for _, test := range []struct {
+		mode string
+		code nkderr.Code
+	}{
+		{"twice", ""},
+		{"auth-failure", nkderr.CodePreflightFailed},
+		{"canceled-auth-cleanup", nkderr.CodeTimeout},
+	} {
+		t.Run(test.mode, func(t *testing.T) {
+			mode := test.mode
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			screen := &authenticationScreen{testDashboardScreen: &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8")}}
@@ -83,12 +91,11 @@ func TestDashboardAuthenticationNeverSuspends(t *testing.T) {
 			if screen.suspends.Load() != 0 || screen.resumes.Load() != 0 || screen.pumps.Load() != 1 {
 				t.Fatal("noninteractive authentication changed terminal lifecycle")
 			}
+			assertCode(t, err, test.code)
 			if mode == "twice" {
-				if err != nil || calls.Load() != 2 {
+				if calls.Load() != 2 {
 					t.Fatalf("two auth cycles failed: %v calls=%d pumps=%d", err, calls.Load(), screen.pumps.Load())
 				}
-			} else if err == nil {
-				t.Fatal("authentication failure accepted")
 			}
 			if mode == "canceled-auth-cleanup" && calls.Load() != 2 {
 				t.Fatal("canceled work prevented independently bounded cleanup authentication")

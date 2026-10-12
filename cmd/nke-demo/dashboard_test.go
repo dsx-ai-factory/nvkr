@@ -255,8 +255,20 @@ func (s *testDashboardScreen) ChannelEvents(events chan<- tcell.Event, quit <-ch
 }
 
 func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
-	for _, mode := range []string{"context", "ctrl-c", "quit", "terminal-error", "closed-events", "output-error", "renderer-panic"} {
-		t.Run(mode, func(t *testing.T) {
+	for _, test := range []struct {
+		mode string
+		code nkderr.Code
+	}{
+		{"context", nkderr.CodeTimeout},
+		{"ctrl-c", nkderr.CodeTimeout},
+		{"quit", nkderr.CodeTimeout},
+		{"terminal-error", nkderr.CodePreflightFailed},
+		{"closed-events", nkderr.CodePreflightFailed},
+		{"output-error", nkderr.CodePreflightFailed},
+		{"renderer-panic", nkderr.CodeInternal},
+	} {
+		t.Run(test.mode, func(t *testing.T) {
+			mode := test.mode
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			screen := &testDashboardScreen{SimulationScreen: tcell.NewSimulationScreen("UTF-8"), closed: mode == "closed-events", panicDraw: mode == "renderer-panic"}
@@ -342,7 +354,8 @@ func TestDashboardCancellationWaitsForWorkerCleanup(t *testing.T) {
 			close(release)
 			select {
 			case err := <-result:
-				if err == nil || !screen.joined.Load() || strings.Contains(err.Error(), "private") {
+				assertCode(t, err, test.code)
+				if !screen.joined.Load() || strings.Contains(err.Error(), "private") {
 					t.Fatalf("lost cancellation, leaked private details or terminal unjoined: %v", err)
 				}
 			case <-time.After(3 * time.Second):

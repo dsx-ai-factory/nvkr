@@ -178,7 +178,7 @@ func (d *dashboard) observeBuildLog(line string) {
 	if d.phases[1].state != "running" {
 		return
 	}
-	if strings.HasPrefix(line, "[build +") {
+	if strings.HasPrefix(line, "[log +") || strings.HasPrefix(line, "[build +") {
 		_, line, _ = strings.Cut(line, "] ")
 	}
 	// These fixed public Packer messages are last reports, not a guest-health
@@ -343,7 +343,14 @@ func dashboardOperation(name string) (index int, label string) {
 	case "create-management":
 		return 2, "Create and check Kind management cluster"
 	case "management-ready":
-		return 2, dashboardSiteStages[2].label
+		// Stage order changes when a network gate is added. Match the owning
+		// operation, not an array position that may name a different check.
+		for _, stage := range dashboardSiteStages {
+			if stage.operations[0] == name {
+				return 2, stage.label
+			}
+		}
+		return -1, ""
 	case "start-registry", "node-registry-connectivity", "registry-admission":
 		return 2, "Admit registry access from the actual node"
 	case "node-simulator-connectivity":
