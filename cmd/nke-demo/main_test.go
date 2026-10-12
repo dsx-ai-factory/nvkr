@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,42 @@ import (
 	"github.com/NVIDIA/nke-recipes/internal/nkedemo"
 	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
 )
+
+func TestRunActionSelectsOwnExecutableForBothLifetimeModes(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil || !filepath.IsAbs(executable) {
+		t.Fatal("test executable unavailable", err)
+	}
+	for _, cleanup := range []bool{false, true} {
+		for _, fails := range []bool{false, true} {
+			name := map[bool]string{false: "retain", true: "cleanup"}[cleanup] + map[bool]string{false: "/success", true: "/refusal"}[fails]
+			t.Run(name, func(t *testing.T) {
+				var progress bytes.Buffer
+				cfg := nkedemo.Config{DemoExecutable: "/caller-supplied-executable", Cleanup: cleanup, Network: "upstream-ovn", Out: "/selected-output", Timeout: time.Minute, Progress: &progress}
+				var expected error
+				if fails {
+					expected = nkderr.New(nkderr.CodeFetchFailed, "fixture runtime refusal")
+				}
+				ctx := t.Context()
+				calls := 0
+				action := withOwnDemoExecutable(func(selected context.Context, actual nkedemo.Config) error {
+					calls++
+					if selected != ctx || actual.DemoExecutable != executable || actual.Cleanup != cfg.Cleanup || actual.Network != cfg.Network || actual.Out != cfg.Out || actual.Timeout != cfg.Timeout || actual.Progress != cfg.Progress {
+						t.Fatal("runtime action did not receive this CLI's executable and unchanged invocation")
+					}
+					return expected
+				})
+				result := action(ctx, cfg)
+				if result != expected || calls != 1 || cfg.DemoExecutable != "/caller-supplied-executable" || progress.Len() != 0 {
+					t.Fatal("executable selection lost the exact result, mutated caller input or performed runtime work", result)
+				}
+				if fails {
+					assertCode(t, result, nkderr.CodeFetchFailed)
+				}
+			})
+		}
+	}
+}
 
 func TestFlagsDoNotExecuteOnHelpCompletionOrInvalidInput(t *testing.T) {
 	t.Setenv("TMPDIR", t.TempDir())

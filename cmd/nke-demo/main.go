@@ -32,18 +32,14 @@ func main() {
 func execute(ctx context.Context, args []string, out, diagnostics io.Writer) error {
 	var retained *nkedemo.RetainedSession
 	return executeRoot(ctx, newCommand(out, diagnostics, demoActions{
-		run: func(ctx context.Context, cfg nkedemo.Config) error {
-			path, err := os.Executable()
-			if err != nil {
-				return nkderr.Wrap(nkderr.CodeEngineCapability, err, "select native demo network probe executable")
-			}
-			cfg.DemoExecutable = path
+		run: withOwnDemoExecutable(func(ctx context.Context, cfg nkedemo.Config) error {
 			if cfg.Cleanup {
 				return nkedemo.Run(ctx, cfg)
 			}
+			var err error
 			retained, err = nkedemo.Retain(ctx, cfg)
 			return err
-		}, build: nkedemo.BuildArtifacts, prepare: nkedemo.PrepareInstaller, restore: nkedemo.Restore, load: nkedemo.LoadDemoFile,
+		}), build: nkedemo.BuildArtifacts, prepare: nkedemo.PrepareInstaller, restore: nkedemo.Restore, load: nkedemo.LoadDemoFile,
 		retention: nkedemo.CheckRetentionCapability, status: nkedemo.RetainedStatus, cleanup: nkedemo.CleanupRetained, owner: nkedemo.ServeRetained,
 		after: func(ctx context.Context, out io.Writer) error {
 			if retained == nil {
@@ -58,6 +54,19 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer) err
 			return retained.WriteInstructions(bounded, path, out)
 		},
 	}), args)
+}
+
+// Both lifetime modes select this CLI's executable before entering the owning
+// runtime module. The module still independently admits the selected path.
+func withOwnDemoExecutable(action func(context.Context, nkedemo.Config) error) func(context.Context, nkedemo.Config) error {
+	return func(ctx context.Context, cfg nkedemo.Config) error {
+		path, err := os.Executable()
+		if err != nil {
+			return nkderr.Wrap(nkderr.CodeEngineCapability, err, "select native demo network probe executable")
+		}
+		cfg.DemoExecutable = path
+		return action(ctx, cfg)
+	}
 }
 
 // Actions stay typed library calls; injection lets command tests prove help,
