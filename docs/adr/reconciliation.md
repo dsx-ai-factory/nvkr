@@ -14,9 +14,10 @@ there is no authored Recipe, cluster topology, placement, inheritance or composi
 internal evidence records are generated or authenticated rather than separately authored public inputs.
 
 Planning, byte-exact GitHub generation, Plan/graph/diff views and metadata-only release navigation are
-implemented. Local immutable attempts and a Linux `pipeline-attested` / `artifact-publication` consumer
-are implemented. Browsing does not verify payload bytes, signatures or consumer policy. A supported
-artifact-publication result does not satisfy full v1 release or qualified acceptance; unsupported stronger
+implemented. Local immutable attempts and Linux `pipeline-attested` consumers for `authenticity` and
+`artifact-publication` are implemented. Authenticity verifies signatures and evidence without artifact
+payload downloads; artifact-publication retains payload integrity checks. Browsing does not verify payload
+bytes, signatures or consumer policy. Neither supported scope satisfies full v1 release or qualified acceptance; unsupported stronger
 scopes fail before work.
 
 Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
@@ -51,14 +52,14 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 01–03 Identity and errors | Canonical integer-only codec, frozen typed families, strict decoding, transport-free Build identity, whole-graph admission and stable coded errors | Independent-language corpus for every signed family; continuing external-failure contracts |
-| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound artifact-publication consumer with mandatory signature/provenance and exact closure | Earlier independent cosign and public/private consumer acceptance is recorded; M2 independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |
+| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound authenticity and artifact-publication consumers with separate capabilities; authenticity checks root/output signatures, production provenance and SBOM bundles without payloads | Authenticity has contract coverage only; no external consumer run recorded. Earlier independent cosign and public/private artifact-publication acceptance is recorded; M2 independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |
 | 05 Trust and membership | Subject-bound vectors, publisher evidence, required Inventory versus realized ReleaseSet, frozen lifecycle output slots | Signed cross-process publication of all authority records; governed coverage profiles |
 | 06 Status | Diagnostic document/checkpoint authentication, protected high-water reads and receipt-derived byte-CAS before withdrawal interpretation | Caller epoch is diagnostic. Production discovery, trusted-time/clearance integration, rotation, immutable v1 tags, revocation and channel concurrency are unimplemented |
 | 07–08 Reproduction | Linux stage-two helper/runtime/image and terminal-byte receipts, deterministic comparisons and profile matching | Provider receipts, other-platform authority, qualified helper images, independent two-machine bake-off and profile graduation |
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
 | 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected unencrypted local execution; exact component/material bindings and acquisition-carrier retention | Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation, fused general wrapped-job phase isolation and embedded-version consistency remain closed |
 | 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
-| 13 Evidence | Exact offline binary/image dependency scanning and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
+| 13 Evidence | Exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Factory callers retain ordinary hint-free dependency inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted/object-store delivery is unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics | Qualified receipt/clearance assembly, release-specific trusted time, M3 qualification and M4 manifests/revocation remain unimplemented |
@@ -604,7 +605,7 @@ requirements. Aggregate signing/verification and finalization use only bounded m
 payload-layer download. Aggregate image outputs retain the exact index and native manifest/config membership
 in this metadata closure, including platform-scoped evidence. Output-local publication alone owns discovery
 image tags; unrelated outputs and the metadata-only release root receive no payload aliases. The independent
-Release consumer still checks complete payloads.
+Release consumer's artifact-publication scope still checks complete payloads.
 
 ADR-20 admits earlier-attempt output roots only within the same GitHub run and unchanged Plan, with exact
 repository/builder and preparation/signing/consuming-attempt ordering. Contracts cover retries, mixed
@@ -799,6 +800,58 @@ finalization. Its branch exception and `build-provenance-v1` mode do not establi
 disk consumption, strict inspection, qualification, or organizational acceptance. Historical layout or
 source success never establishes a current source, policy, full inventory, or qualified result.
 
+On 2026-10-12, a local controlled Debian inspector API fixture run used the implementation at
+[source commit `28443004ad73ac6c69df60e10e032f6ca0cb209c`](https://github.com/dsx-ai-factory/nvkr/blob/28443004ad73ac6c69df60e10e032f6ca0cb209c/pkg/nvkr/sbom/debian_dependencies_integration_test.go).
+This is a local diagnostic observation, not an authenticated factory Run or approved toolchain. The native
+Linux ARM64 test executable was built with Go 1.27.2. The container used
+`ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3`,
+UID/GID `65534:65534`, `--read-only --network none --cap-drop ALL --security-opt no-new-privileges`,
+a read-only tool/test mount, and `--tmpfs /tmp:rw,nosuid,nodev,exec,size=256m`.
+Syft v1.51.1 ARM64 archive integrity matched the repository disk-inspector source pin
+`sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f`;
+its measured executable was `sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573`.
+The runtime's `dpkg-deb` 1.22.6 executable was
+`sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6`.
+These native diagnostic measurements are separate from the factory's scanner pin.
+
+| Controlled fixture | SHA-256 of archive bytes | Length |
+|---|---|---|
+| gzip | `ebf6ec1ed3830fe24ffdc9bd2339d8f427a5dc597ad4295224ac9da8586ef49a` | 612 bytes |
+| xz | `ee9bc9e457951f3510c72a564ff09e31095ac187b10e3e935dc5380d8a6f2563` | 748 bytes |
+
+Both fixtures yielded `pkg:deb/nvkr-debian-artifact-fixture@1.0.0?arch=arm64`. Pre-scan digest binding,
+original-fixture size stability, and non-archive bytes under a `.deb` hint were checked. This does not
+establish corrupt-payload rejection, complete embedded dependencies, source-created package delivery,
+signing, publication or installation. This historical revision exercised the filename-selected branch of
+`InspectDependencies`; it did not exercise the current separate `InspectDebianArchiveMetadata` API,
+the later diagnostic method, same-byte no-hint control or dependency BOM rejection guards.
+Native amd64 execution has not been recorded.
+
+On 2026-10-12, a separate local native Linux ARM64 run exercised the exact implementation at
+[source commit `8659cd28e5e615a8f490d0a302a419f329edc902`](https://github.com/dsx-ai-factory/nvkr/blob/8659cd28e5e615a8f490d0a302a419f329edc902/pkg/nvkr/sbom/debian_dependencies_integration_test.go).
+The Go 1.27.2 test executable was compiled before subsequent API edits. This run used the same Ubuntu image,
+Syft archive/executable and `dpkg-deb` executable identities, isolation flags and temporary-filesystem bound
+listed above, plus a read-only repository mount at `/workspace` with working directory
+`/workspace/pkg/nvkr/sbom` for catalog test fixtures. Both gzip/xz fixture digests, lengths and PURLs matched
+the earlier observation exactly.
+
+At this revision, filename-selected `InspectDependencies` returned `syft-debian-archive-metadata/v1`,
+with component type `library`, for both controlled packages. The same archive bytes scanned without the hint
+returned `CodeProvenanceMissing` and no accepted inventory. Actual fixture results were rejected by
+`WithDependencies` with `CodeUnsupported`. The separate
+[serialized BOM guard test](https://github.com/dsx-ai-factory/nvkr/blob/8659cd28e5e615a8f490d0a302a419f329edc902/pkg/nvkr/sbom/dependencies_test.go)
+rejected an injected diagnostic method with the then-current `CodeProvenanceMissing`; that test used a
+controlled component rather than the real scanner result. Scanner protocol, OCI isolation, filename-predicate
+and snapshot-mutation contract tests also passed in that runtime. Non-archive bytes were rejected.
+This observation does not exercise the subsequent separate `InspectDebianArchiveMetadata` API or establish
+corrupt-payload rejection, complete payload dependencies, source-created package delivery, signing,
+publication or installation. Native amd64 execution remains unrecorded.
+
+Current contract tests separately assert rejection of `syft-debian-archive-metadata/v1` by dependency SBOM
+attachment and serialized BOM validation. These tests do not retroactively strengthen the dated observation
+above. The [opt-in regression](../../pkg/nvkr/sbom/debian_dependencies_integration_test.go) must be rerun when
+changing either the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
+
 ## Remaining decisions
 
 Named-decider ratification and organizational toolchain/source/identity approval remain separate from candidate
@@ -811,6 +864,8 @@ Qualified owners must supply authenticated runtime/provider observations, discov
 loader/runtime closure, independent signed evidence, exact reproduction and any newly admitted offline lifecycle.
 Pinned-image helper transport cannot substitute for executable/runtime receipts. No missing stronger capability
 falls back to a diagnostic result, a v1 signature or an earlier historical success.
+
+## Consumer acceptance scopes
 
 Current publication-root v4 binds the exact Definition, Environment and Plan identities. Optional consumer
 expectations are checked before external work; the lifecycle owner authenticates the complete output match
@@ -836,3 +891,12 @@ defaults to `build-provenance-v1`; explicit `strict` requires inspected-disk evi
 defaults to strict and rejects the producer-only minimum. Every disk in the authenticated closure must
 meet that policy before a capability is issued. Synthetic publication contracts cover enforcement and
 failed-policy cleanup; they do not establish production disk-release acceptance.
+
+Consumer authenticity uses the same pinned reference and policy with a separate closeable
+`AuthenticatedRelease` capability. It validates the complete metadata/evidence closure, authenticates the
+root and every required named output's signature and subject-bound production provenance, and verifies
+required SBOM bundles. It applies the disk-evidence minimum without downloading or reinspecting artifact
+payloads. Its description reports `payloadIntegrityVerified: false`; it grants no payload export,
+exact-input receipt, qualification or revocation acceptance. Contract fixtures cover rejected signatures,
+missing or substituted evidence, whole-release membership, policy enforcement, capability separation and
+zero payload-layer retrieval. These are controlled contracts, not a recorded external authenticity run.

@@ -121,6 +121,10 @@ _Avoid_: Release, arbitrary archive
 
 ## Evidence and authority
 
+**Release authenticity**:
+Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.
+_Avoid_: Payload verification, deployment readiness, full release acceptance
+
 **Evidence lane**:
 The contract governing an artifact's evidence: pipeline-attested production or qualified reproduction and release authorization. Static or dry-run output is unqualified.
 _Avoid_: Build category, signing mode, release status

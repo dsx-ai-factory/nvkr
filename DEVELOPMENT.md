@@ -131,6 +131,33 @@ An opted-in run fails on inadequate capacity rather than skipping its positive c
 owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NVKE image.
 Actual native disk build/inspection evidence remains separately scoped in the evidence index.
 
+The independent Debian inspector API regression requires native Linux amd64 or arm64. Use the Syft
+v1.51.1 archive pins and executable measurement procedure in
+[`toolchains/nvkr-disk-inspect`](toolchains/nvkr-disk-inspect/README.md) as the source for the selected tools.
+Export `NVKR_SBOM_SCANNER` with the selected Syft executable path and `NVKR_SBOM_SCANNER_DIGEST` with
+its measured `sha256:` executable digest. `NVKR_SBOM_PACKAGE_READER_DIGEST` must match the actual
+`/usr/bin/dpkg-deb` executable in the test runtime, not a compressed archive hash. The diagnostic toolchain
+source is not an approved production runtime. Opting in with missing or mismatched pins fails rather than skipping:
+
+```sh
+NVKR_SBOM_DEBIAN_INTEGRATION=1 \
+go test ./pkg/nvkr/sbom -run '^TestRealDebianArtifactDependencies$' -count=1 -v
+```
+
+It builds controlled gzip/xz fixture packages and inspects them through the separate
+`InspectDebianArchiveMetadata` diagnostic. That API always uses the fixed private snapshot name
+`subject.deb`, independent of the caller's filename. It checks exact package metadata, pre-scan digest binding,
+original-fixture size stability, and rejection of non-archive bytes. The same fixture bytes supplied to ordinary
+`InspectDependencies` receive no filename hint and must return `CodeProvenanceMissing`, with no accepted
+inventory, under the selected Syft version. It does not test corrupted payload members. The diagnostic method
+is rejected by dependency SBOM attachment and serialized BOM validation. Factory callers retain the ordinary
+dependency API; no maintained factory output invokes this separate diagnostic. This is not delivered-package
+inspection, payload dependency coverage, installation, signing or publication.
+See [the dependency SBOM reference](docs/dependency-sboms.md) and the
+[dated local fixture observation](docs/adr/reconciliation.md#external-run-references). Native amd64 execution
+has not been recorded. Rerun the opt-in regression when changing either the factory catalog Syft pin or the
+Syft pin in `toolchains/nvkr-disk-inspect`; record which selected native executable was exercised.
+
 ## Repository layout
 
 - `definitions/`: tutorial, deploy, combined candidate, and OS-image Definitions, Environments, and catalogs.

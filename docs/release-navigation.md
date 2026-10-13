@@ -152,13 +152,15 @@ For authenticated consumption, follow [the lifecycle verification guide](lifecyc
 the same pinned reference to `release verify` with the consumer's accepted identity, issuer and evidence scope.
 Browsing invokes neither cosign nor a signer, and does not treat a raw preparation SBOM as a signed attestation.
 The existing Linux and capability requirements for policy verification still apply.
+Select `--scope authenticity` to authenticate signatures, provenance and required signed evidence without
+artifact payload downloads, or `--scope artifact-publication` to include payload integrity checks.
 
 ## Implementation and validation scope
 
 Delivery owns the bounded metadata reader and the output/evidence projection. Lifecycle admits the reference
 and options, bounds the operation, reads or pulls the metadata, obtains its detached description and removes
 temporary resources. Presentation owns the explicit versioned wire description and filters and formats only
-that description. No new release identity or publication format is introduced. Explicit release verification
+that description. No new release identity or publication format is introduced. Artifact-publication verification
 retains its full payload and policy checks. The pre-cutover exporter passed targeted tests, the full local
 completion gate with uncached tests, and the uncached race suite on pinned Go 1.27.2 on 2026-10-10. That
 validation and the existing inspection evidence below retain their original namespace and scope; they do

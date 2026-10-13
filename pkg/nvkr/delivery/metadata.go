@@ -193,7 +193,8 @@ func metadataEvidence(ctx context.Context, root string, object PublishedObject) 
 }
 
 // VisitMetadataEvidence visits each exact subject/bundle after validating the
-// complete control-document closure once. The visitor owns cryptographic policy.
+// complete control-document closure and requiring attested evidence. Raw
+// preparation documents cannot reach the visitor, which owns cryptographic policy.
 func VisitMetadataEvidence(ctx context.Context, root, expectedRootDigest string, visit func(context.Context, string, []byte) error) error {
 	if visit == nil || !canonical.IsDigest(expectedRootDigest) {
 		return e.New(e.CodeUsage, "metadata evidence requires a visitor")
@@ -204,6 +205,9 @@ func VisitMetadataEvidence(ctx context.Context, root, expectedRootDigest string,
 	}
 	if inspected.RootDigest != expectedRootDigest {
 		return e.New(e.CodeVerifyFailed, "metadata evidence root changed")
+	}
+	if err := RequireAttestedEvidence(inspected); err != nil {
+		return err
 	}
 	for _, object := range inspected.Root.Objects {
 		if object.Evidence == nil {
