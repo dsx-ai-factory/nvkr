@@ -289,6 +289,10 @@ closing that receipt also closes its internally created source.
 Payload digests remain distinct from OCI delivery-container subjects, and disk results explicitly retain
 producer-only scope without content inspection.
 
+An incomplete evidence traversal is labeled as a failure of the complete publication in every output's
+signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;
+no output receives a passing evidence verdict merely because its own signature check did not fail.
+
 Qualification requires the root and every output predicate to name that exact source attempt. When output
 metadata records publication origin, both preparation and signing invocations must also match. Earlier-attempt
 publication reuse remains available to the existing publication retry protocol, but cannot satisfy this MVP

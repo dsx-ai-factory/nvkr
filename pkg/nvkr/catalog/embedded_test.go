@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,6 +131,59 @@ func TestEmbeddedCheckAdmitsBeforeSourceWork(t *testing.T) {
 				}
 			} else if receipt != nil {
 				t.Fatal("failure issued a receipt")
+			}
+		})
+	}
+}
+
+func TestEmbeddedSelectedProducerCapacity(t *testing.T) {
+	component := goodComponent()
+	component.Embeds = embeddedFixture()
+	component.Embeds.Members["other"] = EmbeddedVersion{Version: "2.0.0"}
+	cat := &Catalog{Components: make(map[string]Component, 1025)}
+	names := make([]string, 1025)
+	for i := range names {
+		names[i] = fmt.Sprintf("producer-%04d", i)
+		cat.Components[names[i]] = component
+	}
+	for _, tc := range []struct {
+		name  string
+		count int
+		code  e.Code
+	}{
+		{"empty", 0, e.CodeInvalidCatalog},
+		{"at limit", 1024, ""},
+		{"one over limit", 1025, e.CodeInvalidCatalog},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tree := &nvkeFixtureTree{files: map[string][]byte{
+				"versions.yaml": []byte("components: {runtime: 1.2.3, other: 2.0.0}\n"),
+			}}
+			opened := 0
+			receipt, err := checkEmbeddedComponents(t.Context(), cat, names[:tc.count], func(context.Context, Source, Pin) (pinnedTree, error) {
+				opened++
+				return tree, nil
+			})
+			if got := catalogErrorCode(err); got != tc.code {
+				t.Fatalf("error = %v (%s), want %s", err, got, tc.code)
+			}
+			if tc.code != "" {
+				if receipt != nil || opened != 0 || len(tree.reads) != 0 {
+					t.Fatalf("rejected selection issued receipt or accessed source: receipt=%v opens=%d reads=%d", receipt, opened, len(tree.reads))
+				}
+				return
+			}
+			description, err := receipt.Description()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(description.Components) != tc.count || opened != tc.count || len(tree.reads) != tc.count {
+				t.Fatalf("selected producers=%d results=%d opens=%d reads=%d", tc.count, len(description.Components), opened, len(tree.reads))
+			}
+			for i, result := range description.Components {
+				if result.Name != names[i] || result.Status != "pass" {
+					t.Fatalf("selected producer %q has result %+v", names[i], result)
+				}
 			}
 		})
 	}

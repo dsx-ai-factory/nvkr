@@ -14,6 +14,10 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+// maxEmbeddedSelectedProducers bounds per-call producer checks and result entries.
+// It is independent of the member limit within each upstream manifest.
+const maxEmbeddedSelectedProducers = 1024
+
 // EmbeddedComponents declares the complete component map at Path in an upstream
 // YAML/JSON manifest. The manifest is read only from this producer's pinned Git
 // commit/tree. Members are metadata expectations, never observed disk contents.
@@ -110,6 +114,7 @@ func (receipt *EmbeddedReceipt) Description() (EmbeddedDescription, error) {
 // declarations. Wrapped image/disk producers require an explicit declaration,
 // even for an empty upstream map. Other source producers can opt in. Acquired
 // bytes and hermetic producers without a declaration are not applicable.
+// Each call admits 1 through 1,024 selected producers before any source access.
 func CheckEmbeddedComponents(ctx context.Context, snapshot *Catalog, selected []string) (*EmbeddedReceipt, error) {
 	return checkEmbeddedComponents(ctx, snapshot, selected, openPinnedTree)
 }
@@ -123,8 +128,8 @@ func checkEmbeddedComponents(ctx context.Context, snapshot *Catalog, selected []
 	if err := pinContextError(ctx); err != nil {
 		return nil, err
 	}
-	if len(selected) == 0 || len(selected) > documentpath.MaxMembers {
-		return nil, e.New(e.CodeInvalidCatalog, "embedded checks require a bounded nonempty producer selection")
+	if len(selected) == 0 || len(selected) > maxEmbeddedSelectedProducers {
+		return nil, e.New(e.CodeInvalidCatalog, "embedded checks require between 1 and %d selected producers", maxEmbeddedSelectedProducers)
 	}
 	digest, err := snapshot.SnapshotDigest()
 	if err != nil {

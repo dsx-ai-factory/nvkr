@@ -6,6 +6,7 @@ package lifecycle
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,15 +45,16 @@ func qualificationSourceFixture() *qualificationFixtureSource {
 }
 
 type qualificationVerifier struct {
-	origin      qualificationorigin.Description
-	source      *qualificationFixtureSource
-	predicate   []byte
-	fail        map[string]error
-	observed    map[string]string
-	evidenceErr error
-	verified    []string
-	policies    []sign.VerifyPolicy
-	evidence    int
+	origin        qualificationorigin.Description
+	source        *qualificationFixtureSource
+	predicate     []byte
+	fail          map[string]error
+	observed      map[string]string
+	evidenceErr   error
+	afterEvidence func()
+	verified      []string
+	policies      []sign.VerifyPolicy
+	evidence      int
 }
 
 func (*qualificationVerifier) SignAndAttest(context.Context, sign.Subject, []byte) (sign.SigningRecord, error) {
@@ -84,6 +86,9 @@ func (v *qualificationVerifier) VerifySBOM(_ context.Context, digest string, raw
 	v.evidence++
 	if _, err := sbom.AttestedDocument(raw, digest); err != nil {
 		return err
+	}
+	if v.afterEvidence != nil {
+		v.afterEvidence()
 	}
 	return v.evidenceErr
 }
@@ -159,6 +164,7 @@ func TestQualificationBroadSigningPolicyRequiresExactSource(t *testing.T) {
 	const broadIdentity = `^https://github\.com/.+/\.github/workflows/.+@refs/heads/main$`
 	for _, tc := range []struct {
 		name, observed             string
+		identity                   string
 		outputOnly, priorAttempt   bool
 		code                       e.Code
 		wantVerified, wantEvidence int
@@ -167,15 +173,21 @@ func TestQualificationBroadSigningPolicyRequiresExactSource(t *testing.T) {
 		{name: "different repository signer", observed: "https://github.com/other/nvkr/.github/workflows/build.yml@refs/heads/main", code: e.CodeUntrustedSigner, wantVerified: 1},
 		{name: "different output workflow", observed: "https://github.com/example/nvkr/.github/workflows/other.yml@refs/heads/main", outputOnly: true, code: e.CodeSignatureInvalid, wantVerified: 4, wantEvidence: 2},
 		{name: "prior production attempt", priorAttempt: true, code: e.CodeVerifyFailed},
+		{name: "literal substring exact workflow", identity: "build", wantVerified: 4, wantEvidence: 2},
+		{name: "literal substring different workflow", identity: "build", observed: "https://github.com/example/nvkr/.github/workflows/other-build.yml@refs/heads/main", outputOnly: true, code: e.CodeSignatureInvalid, wantVerified: 4, wantEvidence: 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			request, consumer, verifier := newQualificationFixtureWithSigningIdentity(t, broadIdentity)
+			identity := tc.identity
+			if identity == "" {
+				identity = broadIdentity
+			}
+			request, consumer, verifier := newQualificationFixtureWithSigningIdentity(t, identity)
 			origin := verifier.source.value
-			if request.Environment.Signing.Identity != broadIdentity || request.Plan.Environment.Signing.Identity != broadIdentity {
+			if request.Environment.Signing.Identity != identity || request.Plan.Environment.Signing.Identity != identity {
 				t.Fatal("broad authored identity was not compiled into the exact inputs")
 			}
 			if tc.observed != "" {
-				if !regexp.MustCompile(broadIdentity).MatchString(tc.observed) {
+				if !regexp.MustCompile(identity).MatchString(tc.observed) {
 					t.Fatal("negative signer does not exercise the broad authored policy")
 				}
 				if tc.outputOnly {
@@ -318,6 +330,67 @@ func TestQualificationCollectsEveryOutputFailureBeforeReceipt(t *testing.T) {
 			}
 			if !failed {
 				t.Fatal("failed verification reported all pass")
+			}
+		})
+	}
+}
+
+func TestQualificationDistinguishesIncompleteEvidenceTraversal(t *testing.T) {
+	const slotMessage = "invalid signature for this evidence slot"
+	const traversalMessage = "incomplete evidence traversal for the complete publication"
+	for _, tc := range []struct {
+		name                       string
+		cancel, slotFailure        bool
+		wantVisits, wantSlotErrors int
+		code                       e.Code
+	}{
+		{name: "slot failures", slotFailure: true, wantVisits: 2, wantSlotErrors: 2, code: e.CodeSignatureInvalid},
+		{name: "incomplete traversal", cancel: true, wantVisits: 1, code: e.CodeTimeout},
+		{name: "slot failure and incomplete traversal", cancel: true, slotFailure: true, wantVisits: 1, wantSlotErrors: 1, code: e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, consumer, verifier := newQualificationFixture(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.slotFailure {
+				verifier.evidenceErr = e.New(e.CodeSignatureInvalid, slotMessage)
+			}
+			if tc.cancel {
+				verifier.afterEvidence = cancel
+			}
+			receipt, report, err := consumer.checkQualification(ctx, request, verifier.source)
+			assertCode(t, err, tc.code)
+			if tc.cancel && !errors.Is(err, context.Canceled) {
+				t.Fatalf("lost traversal cancellation cause: %v", err)
+			}
+			if receipt != nil || report == nil || len(report.Outputs) != 2 || verifier.evidence != tc.wantVisits {
+				t.Fatalf("failed evidence traversal lost diagnostics or issued authority: receipt=%v report=%+v visits=%d", receipt, report, verifier.evidence)
+			}
+			var evidenceChecks, slotErrors int
+			for _, output := range report.Outputs {
+				if output.Overall != "fail" || len(output.Checks) != 6 {
+					t.Fatalf("incomplete evidence produced a passing or incomplete verdict: %+v", output)
+				}
+				for _, check := range output.Checks {
+					if check.Name != "signed-evidence" {
+						continue
+					}
+					evidenceChecks++
+					if check.Status != "fail" || strings.Contains(check.Message, traversalMessage) != tc.cancel {
+						t.Fatalf("evidence error scope is unclear: %+v", check)
+					}
+					wantCode := e.CodeVerifyFailed
+					if strings.Contains(check.Message, slotMessage) {
+						slotErrors++
+						wantCode = e.CodeSignatureInvalid
+					}
+					if check.Code != string(wantCode) {
+						t.Fatalf("evidence diagnostic lost its underlying code: %+v", check)
+					}
+				}
+			}
+			if evidenceChecks != 2 || slotErrors != tc.wantSlotErrors {
+				t.Fatalf("evidence checks=%d slot errors=%d, want 2 and %d", evidenceChecks, slotErrors, tc.wantSlotErrors)
 			}
 		})
 	}
