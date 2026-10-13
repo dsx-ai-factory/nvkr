@@ -344,7 +344,8 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
 
 **Neutral**
 - The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
-  It runs no suite, performs no infra rollback, and authorizes no mutation.
+  It runs no conformance suite, performs no infra rollback, and authorizes no mutation.
+  The unqualified artifact diagnostics proposed in ADR-23 do not cross this qualification boundary.
 
 ## Alternatives considered
 
