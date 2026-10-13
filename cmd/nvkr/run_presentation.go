@@ -15,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -113,12 +114,13 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		return err
 	}
 	stdout, stderr := commandOutput(c), io.Writer(os.Stderr)
+	var diagnostics rundiagnostics.Buffer
 	if view.json {
 		stdout = stderr
 	} else if view.tui {
-		// Raw producer diagnostics never enter the safe terminal projection.
-		// Lifecycle's existing private diagnostic owner retains supported logs.
-		stdout, stderr = io.Discard, io.Discard
+		// Raw bytes remain in bounded private memory, outside safe snapshots.
+		// Failure reporting waits until the presenter restores and joins work.
+		stdout, stderr = &diagnostics, &diagnostics
 	}
 	var result *lifecycle.Run
 	work := func(ctx context.Context) error {
@@ -149,6 +151,23 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		workErr = work(c.Context)
 	}
 	err = preserveRunError(workErr, presentationErr)
+	if view.tui && err != nil {
+		if raw, truncated := diagnostics.Snapshot(); len(raw) != 0 {
+			replay := []byte("\nMemory-captured producer console tail:\n")
+			if truncated {
+				replay = append(replay, "[Earlier diagnostics truncated; showing the last 128 KiB.]\n"...)
+			}
+			replay = append(replay, raw...)
+			if replay[len(replay)-1] != '\n' {
+				replay = append(replay, '\n')
+			}
+			output := c.App.ErrWriter
+			if output == nil {
+				output = os.Stderr
+			}
+			err = preserveRunError(err, checkedRunWrite(output, replay))
+		}
+	}
 	if view.json {
 		return preserveRunError(err, writeLocalRunJSON(commandOutput(c), prepared, result, err, c.Bool("dry-run"), result != nil && result.Status == lifecycle.RunComplete && workErr != nil))
 	}

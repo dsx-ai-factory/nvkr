@@ -7,15 +7,14 @@ dashboard, followed by read-only Plan/Run inspection, retaining script output,
 coded failures, capability admission, required outputs and execution ownership.
 This document is preparation, not an implemented dashboard or runtime acceptance.
 
-The supplied plan was read at
-`/Users/ikislenko/Workspace/github/nke-recipes/docs/session-plans-2026-10-12/02-nvkr-dashboard.md`.
+The supplied plan was read from the original checkout as
+`docs/session-plans-2026-10-12/02-nvkr-dashboard.md`.
 Its companion `01-native-mac-demo.md` was read only to identify the shared presenter
 boundary. Both are untracked in the original checkout; they were not changed.
 That checkout has other local documentation changes and an older code revision.
 
 `origin/main` was fetched on 2026-10-12. Analysis uses
-`540c5d3d8b8198ddd85450e413097fab0a69661b` in the clean, detached worktree
-`/Users/ikislenko/.codex/worktrees/07c6/nke-recipes`. The supplied research baseline
+`540c5d3d8b8198ddd85450e413097fab0a69661b` in a clean, detached worktree. The supplied research baseline
 `8f86087` is an ancestor of this revision. The configured remote remains
 `git@github.com:dsx-ai-factory/nke-recipes.git`; the Go module is
 `github.com/dsx-ai-factory/nvkr`.
@@ -235,15 +234,15 @@ The following existing contracts passed with the installed compiler and a writab
 scratch cache. These are baseline tests, not tests of the proposed implementation:
 
 ```sh
-GOCACHE=/private/tmp/nvkr-dashboard-go-cache GOTOOLCHAIN=local go test ./cmd/nvkr \
+GOCACHE="${TMPDIR:-/tmp}/nvkr-dashboard-go-cache" GOTOOLCHAIN=local go test ./cmd/nvkr \
   -run '^(TestRunPlanFileViewsRetainCanonicalBytes|TestRunGraphFormats|TestRunDiffCountsAllChangesAndSupportsExitStatus|TestPlanViewCommandsRejectBeforeOutput|TestLocalBuildActivityFlagAdmitsBeforeAuthoredInput|TestLocalBuildActivityIsSeparateAndOptional|TestBuildActivityFlagIsNotPublicHelp|TestRunLocalPrintsDurableDiskOutput|TestRunLocalPrintsRetainedDiskOutputWhenCommitCleanupFails)$' \
   -count=1
 
-GOCACHE=/private/tmp/nvkr-dashboard-analysis-go-cache GOTOOLCHAIN=local \
+GOCACHE="${TMPDIR:-/tmp}/nvkr-dashboard-analysis-go-cache" GOTOOLCHAIN=local \
   go test ./cmd/nvke-demo ./internal/nvkedemo \
   -run 'Test(Dashboard|CheckedTTY|Progress|RetainedProgress)' -count=1
 
-GOCACHE=/private/tmp/nvkr-dashboard-go-cache GOTOOLCHAIN=local \
+GOCACHE="${TMPDIR:-/tmp}/nvkr-dashboard-go-cache" GOTOOLCHAIN=local \
   go test ./client/v1 ./pkg/nvkr/lifecycle ./pkg/nvkr/errors ./pkg/nvkr/factory \
   -run '^(TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput|TestSDKRejectsUnsupportedGenerationBeforeInputsAndUnconfiguredConsumer|TestPreparedFilesDryRunPreservesFrozenRequirements|TestPrepareFilesRejectsInputsWithoutIssuingCapability|TestExitCodeContract|TestExitCode|TestRetryable|TestGitHubStepExitCodeKeepsPublicMapping)$' \
   -count=1

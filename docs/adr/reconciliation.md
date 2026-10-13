@@ -418,6 +418,11 @@ completion, release verification or runtime health. Stored inspection validates
 bounded canonical metadata and reports attempt markers without opening payloads
 or restoring execution authority. Safe panes omit raw errors, provider text and
 private paths. Static empty Activity panes are omitted; live Runs retain Activity.
+Interactive producer stdout/stderr are captured into a shared 128 KiB memory
+tail; failed command diagnostics are replayed to ordinary stderr only after
+terminal restoration and joining, with truncation marked. They never enter safe
+snapshots or panes. This is failure-console preservation, not durable general
+producer-log retention. Successful console output is not replayed.
 unsupported diagnostic placeholders are omitted. Existing Packer metadata transport remains separate.
 The tab strip identifies Outputs/Overview, Details and available Activity; separator lines
 divide the panes. Default browsing uses compact rows and owning-projected

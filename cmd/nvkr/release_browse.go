@@ -81,11 +81,7 @@ func releaseArtifactsDisplay(title, note string, artifacts []lifecycle.Artifact)
 		item := progress.Item{ID: "output/" + artifact.Name, Name: artifact.Name, Kind: artifact.Kind, State: "metadata", Primary: true,
 			Fields: []progress.Field{{Label: "Digest", Value: artifact.Digest}, {Label: "Build identity", Value: artifact.BuildDigest}}}
 		if artifact.Disk != nil {
-			mode := artifact.Disk.EvidenceMode
-			if mode == "" {
-				mode = "inspected"
-			}
-			item.Fields = append(item.Fields, progress.Field{Label: "Declared disk evidence", Value: mode})
+			item.Fields = append(item.Fields, progress.Field{Label: "Declared disk evidence", Value: declaredDiskEvidenceMode(artifact.Disk.EvidenceMode)})
 		}
 		if artifact.ImageIndex != nil {
 			for _, platform := range artifact.ImageIndex.RequiredPlatforms {
@@ -95,6 +91,16 @@ func releaseArtifactsDisplay(title, note string, artifacts []lifecycle.Artifact)
 		display.Items = append(display.Items, item)
 	}
 	return display
+}
+
+// Delivery defines an omitted disk evidence mode as the inspected contract.
+// This label describes that declaration; it neither changes signed metadata nor
+// establishes that this presentation performed inspection or verification.
+func declaredDiskEvidenceMode(mode string) string {
+	if mode == "" {
+		return "inspected"
+	}
+	return mode
 }
 
 func verifiedReleaseDisplay(result releaseVerificationResult) commandDisplay {
@@ -197,7 +203,7 @@ func releaseDescriptionDisplay(description releaseview.Description) commandDispl
 			item.Fields = append(item.Fields, progress.Field{Label: "Chart version", Value: output.ChartVersion})
 		}
 		if output.Disk != nil {
-			item.Fields = append(item.Fields, progress.Field{Label: "Declared disk evidence", Value: output.Disk.EvidenceMode})
+			item.Fields = append(item.Fields, progress.Field{Label: "Declared disk evidence", Value: declaredDiskEvidenceMode(output.Disk.EvidenceMode)})
 		}
 		if output.ImageIndex != nil {
 			for _, platform := range output.ImageIndex.RequiredPlatforms {

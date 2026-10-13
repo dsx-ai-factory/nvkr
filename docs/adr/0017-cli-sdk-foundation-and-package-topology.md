@@ -114,6 +114,12 @@ joined screen/event/worker lifetimes. It has no receipt or deployment ownership.
 Live CLI result/error pairs independently select final reporting and exit status;
 complete retained output plus cleanup failure remains a complete Run and a failed
 command. These transient descriptions add no field to signed/canonical identities.
+The CLI captures a bounded tail of interactive producer stdout/stderr in memory,
+without producer-side filesystem or renderer callbacks. A failed command replays
+that tail to ordinary stderr after terminal restoration and owner joining, with
+truncation marked. Raw diagnostics never enter safe snapshots or panes. This
+does not create durable general-purpose logs or replay successful console output;
+existing Packer diagnostic retention remains separately owned.
 
 Lifecycle's `InspectRun` owns bounded, no-follow canonical record inspection and
 projects safe file-recorded metadata and attempt-marker descriptions through the

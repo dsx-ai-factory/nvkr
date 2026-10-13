@@ -329,6 +329,44 @@ func TestReleaseBrowseLinksOnlyExactVisibleEvidenceBindings(t *testing.T) {
 	}
 }
 
+func TestReleaseBrowseAndExportDiskEvidenceDeclarationParity(t *testing.T) {
+	for _, test := range []struct {
+		name, mode, want string
+	}{
+		{name: "omitted inspected contract", mode: "", want: "inspected"},
+		{name: "producer provenance", mode: "build-provenance-v1", want: "build-provenance-v1"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			digest := "sha256:" + strings.Repeat("a", 64)
+			artifact := lifecycle.Artifact{Name: "node-image", Kind: "disk-image", Digest: digest, BuildDigest: digest, Components: []string{"node"},
+				Disk: &delivery.DiskOutput{EvidenceMode: test.mode, PayloadDigest: digest, Producer: "node-producer", Component: "node", Format: "qcow2", Encryption: "none", Size: 1, PlanDigest: digest, Outcome: "succeeded"}}
+			if err := artifact.Validate(); err != nil {
+				t.Fatalf("fixture does not satisfy delivery's owning disk contract: %v", err)
+			}
+			publication := delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{{Output: artifact}}}
+			description := releaseview.Description{TotalOutputs: 1, Outputs: []releaseview.Output{{Name: artifact.Name, Kind: artifact.Kind, Digest: artifact.Digest, BuildDigest: artifact.BuildDigest,
+				Disk: &releaseview.Disk{EvidenceMode: test.mode}}}}
+			for _, display := range []commandDisplay{releasePublicationDisplay(publication, ""), releaseDescriptionDisplay(description)} {
+				if len(display.Items) != 1 || display.Items[0].State != "metadata" || display.Note != "Metadata inspection only; payloads, signatures and policy were not verified." {
+					t.Fatalf("disk declaration acquired verification or lost scope: %+v", display)
+				}
+				declared := ""
+				for _, field := range display.Items[0].Fields {
+					if field.Label == "Declared disk evidence" {
+						declared = field.Value
+					}
+				}
+				if declared != test.want {
+					t.Fatalf("%s declaration = %q, want %q", display.Title, declared, test.want)
+				}
+			}
+			if publication.Outputs[0].Disk.EvidenceMode != test.mode || description.Outputs[0].Disk.EvidenceMode != test.mode {
+				t.Fatal("presentation changed the owning evidence-mode metadata")
+			}
+		})
+	}
+}
+
 func TestReleaseBrowsePlainFormatsKeepExistingBytes(t *testing.T) {
 	fixture := releaseBrowsePayloadFixture(t, "arm64")
 	inspection, err := delivery.Inspect(t.Context(), fixture.layout)

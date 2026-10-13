@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -82,8 +83,8 @@ func TestLocalPresentationModesPreserveOwningOutcome(t *testing.T) {
 						t.Fatal("missing descriptive monitor")
 					}
 					if mode == "tui" {
-						if options.Stdout != io.Discard || options.Stderr != io.Discard {
-							t.Fatal("raw producer logs admitted into TUI")
+						if _, ok := options.Stdout.(*rundiagnostics.Buffer); !ok || options.Stdout != options.Stderr {
+							t.Fatal("producer logs have no shared private memory collector")
 						}
 					}
 					if ownerCode == "" {

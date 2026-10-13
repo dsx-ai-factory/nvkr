@@ -131,6 +131,13 @@ outcome; a reporting failure can separately
 fail the command. A complete retained Run with incomplete cleanup keeps its
 observed outputs while returning the coded failure.
 
+While the dashboard is open, a shared memory buffer retains the last 128 KiB of
+producer stdout and stderr. If the command fails, the captured bytes are replayed
+to ordinary stderr after terminal restoration and owned-work joining. A marker
+identifies truncation. Raw producer text never enters the safe dashboard panes.
+This failure replay does not create a durable general-purpose log; successful
+Run output is not replayed. Existing Packer diagnostic retention is separate.
+
 `run local --json` emits one deterministic, safe final-result document on stdout
 under `nvkr.dev/local-run-result/v1`. It includes frozen required outputs, observed
 membership, status, lane, code, exit status and record/cleanup availability.
