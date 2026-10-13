@@ -286,6 +286,11 @@ defensive data and grants no authority. Callers close the receipt after use; clo
 copies. The direct consumer method borrows the caller's source Run receipt, whose closure also revokes the
 check receipt. The file adapter creates and transfers its source owner to the returned check receipt, so
 closing that receipt also closes its internally created source.
+If the source is revoked during verification, the final source check refuses receipt issuance. Each output
+then includes a separate failed `source-lifetime` diagnostic and an overall failure; completed signature,
+pin and other artifact checks keep their actual results. This extra diagnostic appears only on final
+source-admission failure. Successful reports retain the six artifact checks above. Always inspect the
+returned error or command exit status; diagnostic data alone never proves receipt issuance.
 Payload digests remain distinct from OCI delivery-container subjects, and disk results explicitly retain
 producer-only scope without content inspection.
 

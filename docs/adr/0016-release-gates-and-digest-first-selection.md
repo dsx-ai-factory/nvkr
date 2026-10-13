@@ -195,9 +195,14 @@ invocations must equal that source attempt. ADR-20's existing publication retry/
 but an earlier-attempt publication cannot satisfy this qualification gate. Reusing bytes never permits
 relabelling their producing attempt; authenticated qualification reuse remains deferred.
 
-Every output has exactly one overall pass/fail verdict and every applicable check has a result. All required
-gate and smoke results are collected before qualification signing begins. Any failed verdict prevents all
-qualification attestations for that invocation. Only a complete passing set can receive evidence for every
+Every output has exactly one overall pass/fail verdict and every applicable check has a result. The overall
+verdict includes final source-receipt admission: if revocation is detected after artifact checks complete,
+failure diagnostics add a separate `source-lifetime` result to every output and mark its overall verdict
+failed. The completed artifact checks retain their actual results. This failure-only diagnostic uses the
+existing check list; successful reports retain their six checks and unchanged canonical shape. No check
+receipt is issued, and the original source error is returned. All required gate and smoke results are
+collected before qualification signing begins. Any failed verdict prevents all qualification attestations
+for that invocation. Only a complete passing set can receive evidence for every
 selected subject under a qualification workflow identity distinct from the builder and an explicit issuer
 policy. The source build's successful default-branch invocation is authenticated separately from the
 qualification invocation (ADR-18); a green build or the publisher's own identity alone is insufficient.
