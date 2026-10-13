@@ -8,7 +8,8 @@ and validated by `planview.Load`; `graphDisplay` supplies the same typed
 description as `run graph --ui=tui`. Enter and Esc events drive the actual
 `runpresenter.View`, and `tcell.SimulationScreen.GetContents` captures its cells.
 The cells and their foreground/background colors are rasterized with Menlo
-without changing their text or layout. Box-drawing glyphs join at cell edges.
+on a fixed-width cell grid with one shared font baseline per row, without
+changing their text or layout. Box-drawing glyphs join at cell edges.
 Monochrome cells illustrate a dark sample terminal's defaults; NVKR does not
 choose the terminal's default colors.
 
