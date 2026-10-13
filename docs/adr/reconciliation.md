@@ -781,9 +781,10 @@ ADR-20 admits earlier-attempt output roots only within the same GitHub run and u
 repository/builder and preparation/signing/consuming-attempt ordering. Contracts cover retries, mixed
 attempts, re-signing and finalizer reuse; hosted retry acceptance remains unexercised. Cross-run reuse,
 remote rollback and an atomic multi-repository transaction are not provided. Failed/missing provider jobs
-still prevent completion. Finalization restores the six exact control carriers; assembly/finalization need
-registry read access, not OIDC or package-write permission. Custom static credentials, local execution and
-dry-run signing reject this mode.
+still prevent completion. Finalization restores the six aggregate/tool control carriers plus each output’s
+original publication reference, signing record and predicate for the qualification handoff, without restoring
+output payload packages. Assembly/finalization need registry read access, not OIDC or package-write
+permission. Custom static credentials, local execution and dry-run signing reject this mode.
 
 The root reader rejects extra blobs and bounds control/evidence to 512 MiB per root. Full and metadata-only
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
