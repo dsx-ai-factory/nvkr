@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -62,6 +63,35 @@ func cmdFactory() *cli.Command {
 					return err
 				}
 				return factory.CheckNodePlatform(c.Context, plan, c.String("node"))
+			},
+		}, {
+			Name:   "inspect-source",
+			Hidden: true,
+			Usage:  "verify one restored pinned source without fetching or building",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "plan"},
+				&cli.StringFlag{Name: "plan-digest"},
+				&cli.StringFlag{Name: "node"},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() || c.String("plan") == "" || c.String("plan-digest") == "" || c.String("node") == "" {
+					return e.New(e.CodeUsage, "inspect-source requires --plan, --plan-digest and --node, with no positional arguments")
+				}
+				plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
+				if err != nil {
+					return err
+				}
+				if err := factory.VerifyPlanDigest(plan, c.String("plan-digest")); err != nil {
+					return err
+				}
+				description, err := factory.InspectRestoredSource(c.Context, plan, c.String("node"))
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(description); err != nil {
+					return e.Wrap(e.CodeVerifyFailed, err, "writing source inspection")
+				}
+				return nil
 			},
 		}, cmdFactoryGitHub()},
 	}

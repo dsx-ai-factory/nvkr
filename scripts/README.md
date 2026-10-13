@@ -113,6 +113,12 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 
 ## Focused supporting contracts
 
+`nvke-qualification.py` prepares the existing pinned NVKE Go qualification suite
+after NVKR publication. See the
+[direct-suite integration and activation gates](../docs/nvke-nightly-qualification.md).
+The local driver stages and optionally compiles the suite; it does not allocate
+hardware or enable a nightly workflow. The special TestGrid integration is deferred.
+
 - `demo-catalog-change.sh` exercises previewed and machine-managed source pin
   changes against an isolated catalog copy.
 - `demo-tamper-detection.sh` demonstrates canonical identity changes, corrupt

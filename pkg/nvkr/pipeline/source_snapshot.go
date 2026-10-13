@@ -189,15 +189,8 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 		return err
 	}
 	if exists {
-		if receipt.Schema != sourceReceiptSchema || receipt.Commit != n.Commit || receipt.TreeHash != n.TreeHash || receipt.VendorSpecDigest != wantVendor {
-			return e.New(e.CodeFetchFailed, "source receipt for %q does not match the pinned fetch declaration", n.Dest)
-		}
-		got, err := sourceTreeDigestContext(opts.ctx(), dir)
-		if err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "hashing fetched source %s", n.Dest)
-		}
-		if got != receipt.ClosureDigest {
-			return e.New(e.CodeFetchFailed, "source closure drift for %q: got %s want %s", n.Dest, got, receipt.ClosureDigest)
+		if err := verifyRestoredClosure(opts.ctx(), n, dir, wantVendor, receipt); err != nil {
+			return err
 		}
 		return recheckSourceFetchDirectories(n, opts)
 	}
@@ -234,6 +227,65 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 		Schema: sourceReceiptSchema, Commit: n.Commit, TreeHash: n.TreeHash,
 		VendorSpecDigest: wantVendor, ClosureDigest: closure,
 	}, opts.fetchReceiptDirectory)
+}
+
+// InspectRestoredSource verifies an existing fetch receipt and its current Git
+// and checkout bytes. It never fetches, vendors, writes or creates a receipt.
+// The digest describes the bytes checked during this call, not future execution
+// authority over the returned pathname. Callers must own its subsequent lifetime.
+func InspectRestoredSource(ctx context.Context, n ir.Node, sourceRoot string) (string, error) {
+	if ctx == nil {
+		return "", e.New(e.CodeUsage, "restored source inspection requires a context")
+	}
+	if err := ctx.Err(); err != nil {
+		return "", e.Wrap(e.CodeTimeout, err, "restored source inspection canceled")
+	}
+	if n.Kind != ir.KindFetch || n.Commit == "" || n.TreeHash == "" || n.Dest == "" {
+		return "", e.New(e.CodeInvalidCatalog, "restored source inspection requires an exact fetch declaration")
+	}
+	dir, err := pathWithin(sourceRoot, n.Dest)
+	if err != nil {
+		return "", e.Wrap(e.CodeFetchFailed, err, "resolving restored source")
+	}
+	path, err := sourceReceiptPath(sourceRoot, n.Dest)
+	if err != nil {
+		return "", err
+	}
+	receipt, exists, err := readSourceReceiptContext(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", e.New(e.CodeFetchFailed, "restored source %q has no fetch receipt", n.Dest)
+	}
+	wantVendor, err := fetchVendorSpecDigest(n)
+	if err != nil {
+		return "", err
+	}
+	if err := verifyRestoredClosure(ctx, n, dir, wantVendor, receipt); err != nil {
+		return "", err
+	}
+	if err := (Local{}).verifyTree(dir, n, RunOptions{Ctx: ctx, SourceRoot: sourceRoot}); err != nil {
+		return "", err
+	}
+	return receipt.ClosureDigest, nil
+}
+
+func verifyRestoredClosure(ctx context.Context, n ir.Node, dir, wantVendor string, receipt sourceReceipt) error {
+	if receipt.Schema != sourceReceiptSchema || receipt.Commit != n.Commit || receipt.TreeHash != n.TreeHash || receipt.VendorSpecDigest != wantVendor {
+		return e.New(e.CodeFetchFailed, "source receipt for %q does not match the pinned fetch declaration", n.Dest)
+	}
+	got, err := sourceTreeDigestContext(ctx, dir)
+	if err != nil {
+		if ctx.Err() != nil {
+			return e.Wrap(e.CodeTimeout, ctx.Err(), "restored source inspection canceled")
+		}
+		return e.Wrap(e.CodeFetchFailed, err, "hashing fetched source %s", n.Dest)
+	}
+	if got != receipt.ClosureDigest {
+		return e.New(e.CodeFetchFailed, "source closure drift for %q: got %s want %s", n.Dest, got, receipt.ClosureDigest)
+	}
+	return nil
 }
 
 // materializeSource authenticates the fetch receipt, copies the exact closure to

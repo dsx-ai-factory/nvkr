@@ -29,10 +29,16 @@ type releaseVerificationResult struct {
 }
 
 type releaseVerifyOperation func(context.Context, string, lifecycle.VerificationPolicy,
-	lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error)
+	lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error)
+
+type releaseExportOptions struct {
+	Invocation string
+	Directory  string
+}
 
 func executeReleaseVerification(ctx context.Context, reference string, policy lifecycle.VerificationPolicy,
 	options lifecycle.ConsumerOptions, expectation *lifecycle.ExactInputExpectation,
+	export releaseExportOptions,
 ) (releaseVerificationResult, error) {
 	consumer, err := lifecycle.NewConsumer(options)
 	if err != nil {
@@ -49,6 +55,11 @@ func executeReleaseVerification(ctx context.Context, reference string, policy li
 		return releaseVerificationResult{}, err
 	}
 	defer func() { _ = verified.Close() }()
+	if export.Directory != "" {
+		if err := verified.ExportForInvocation(ctx, export.Invocation, export.Directory); err != nil {
+			return releaseVerificationResult{}, err
+		}
+	}
 	description, err := verified.Description()
 	if err != nil {
 		return releaseVerificationResult{}, err
@@ -141,6 +152,8 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require with --environment and --plan"},
 					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require with --definition and --plan"},
 					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment; unreadable or undecodable Plan bytes report pipeline drift, while validation errors keep their code"},
+					&cli.StringFlag{Name: "export-layout", Usage: "export held verified bytes to a new layout; requires exact inputs and --expected-invocation"},
+					&cli.StringFlag{Name: "expected-invocation", Usage: "exact originating invocation required for --export-layout"},
 					&cli.StringFlag{Name: "workspace", Value: ".nvkr/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
 				},
 				Action: func(c *cli.Context) error {
@@ -156,6 +169,12 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 					}
 					if exactInputCount != 0 && exactInputCount != 3 {
 						return e.New(e.CodeUsage, "release verification requires --definition, --environment, and --plan together")
+					}
+					export := releaseExportOptions{Invocation: c.String("expected-invocation"), Directory: c.String("export-layout")}
+					if c.IsSet("export-layout") || c.IsSet("expected-invocation") {
+						if strings.TrimSpace(export.Invocation) == "" || strings.TrimSpace(export.Directory) == "" || exactInputCount != 3 {
+							return e.New(e.CodeUsage, "publication export requires exact inputs, --export-layout and --expected-invocation")
+						}
 					}
 					policy := lifecycle.VerificationPolicy{Lane: c.String("lane"), Scope: c.String("scope"), IdentityRegexp: c.String("identity"), Issuer: c.String("issuer"),
 						MinimumDiskEvidence: lifecycle.DiskEvidenceRequirement(c.String("minimum-disk-evidence"))}
@@ -197,7 +216,7 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 						CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"),
 						Registry:      delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
 						WorkspaceRoot: c.String("workspace"),
-					}, expectation)
+					}, expectation, export)
 					if err != nil {
 						return err
 					}

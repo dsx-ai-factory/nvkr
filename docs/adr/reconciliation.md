@@ -817,6 +817,16 @@ expectations are checked before external work; the lifecycle owner authenticates
 and issues a policy/publication-bound opaque receipt. Current readers reject historical v3 roots, including
 the Run 37533806963 demo release. That browsing record does not establish current-schema external acceptance.
 
+Local direct-suite preparation authenticates an exact restored Plan source and
+can export a verified publication's held closure only for the expected aggregate
+invocation. Named binary/chart extraction and native image archive export reuse
+delivery owners; tests cover byte preservation, origin mismatch and no-replace
+failures. The [NVKE qualification integration](../nvke-nightly-qualification.md)
+stages core artifacts and optionally compiles the existing Go suite. The special
+TestGrid integration is deferred. Local contracts do not prove runtime execution,
+full hardware input closure, live IAM/capacity, result publication or nightly operation. Generated activation and OCI-to-HTTPS
+disk delivery remain unimplemented, with no production pin or runner-policy changes.
+
 Consumer Verification Policy binds `minimumDiskEvidence` into its typed digest. Pipeline-attested policy
 defaults to `build-provenance-v1`; explicit `strict` requires inspected-disk evidence. Qualified policy
 defaults to strict and rejects the producer-only minimum. Every disk in the authenticated closure must

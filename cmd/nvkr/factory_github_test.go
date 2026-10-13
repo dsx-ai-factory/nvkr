@@ -34,6 +34,8 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 		{"positional arguments", []string{"github", "recover", "--plan", "plan.json", "unexpected"}, e.CodeUsage},
 		{"extra authority flag", []string{"github", "run-node", "--plan", "plan.json", "--node", "unknown", "--workspace", "outside"}, e.CodeUsage},
 		{"substituted plan", []string{"execute-node", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
+		{"source missing expectation", []string{"inspect-source", "--plan", "plan.json", "--node", "unknown"}, e.CodeUsage},
+		{"source substituted plan", []string{"inspect-source", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()

@@ -22,6 +22,18 @@ import (
 // The destination parent must already exist. Once opened, all writes, cleanup,
 // no-replace commit and fsync use held directory descriptors, not reopened paths.
 func writeImageIndexLayout(ctx context.Context, out string, closure *imageIndexClosure) error {
+	blobs := make(map[string]func(io.Writer) error, len(closure.blobs))
+	for digest, file := range closure.blobs {
+		blobs[digest] = func(writer io.Writer) error { _, err := file.WriteToContext(ctx, writer); return err }
+	}
+	return writeHeldLayout(ctx, out, func(writer io.Writer) error {
+		_, err := closure.index.WriteToContext(ctx, writer)
+		return err
+	}, blobs)
+}
+
+// Both owners use the existing descriptor-relative, no-replace layout transaction.
+func writeHeldLayout(ctx context.Context, out string, writeIndex func(io.Writer) error, blobWriters map[string]func(io.Writer) error) error {
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
@@ -45,7 +57,7 @@ func writeImageIndexLayout(ctx context.Context, out string, closure *imageIndexC
 	defer func() {
 		if !committed {
 			if shaDirectory != nil {
-				for digest := range closure.blobs {
+				for digest := range blobWriters {
 					_ = unix.Unlinkat(int(shaDirectory.Fd()), strings.TrimPrefix(digest, "sha256:"), 0)
 				}
 			}
@@ -72,22 +84,18 @@ func writeImageIndexLayout(ctx context.Context, out string, closure *imageIndexC
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating image SHA-256 directory")
 	}
-	digests := make([]string, 0, len(closure.blobs))
-	for digest := range closure.blobs {
+	digests := make([]string, 0, len(blobWriters))
+	for digest := range blobWriters {
 		digests = append(digests, digest)
 	}
 	sort.Strings(digests)
 	for _, digest := range digests {
-		file := closure.blobs[digest]
 		if err := writeImageIndexFile(ctx, shaDirectory, strings.TrimPrefix(digest, "sha256:"),
-			func(writer io.Writer) error { _, err := file.WriteToContext(ctx, writer); return err }); err != nil {
+			blobWriters[digest]); err != nil {
 			return err
 		}
 	}
-	if err := writeImageIndexFile(ctx, stage, "index.json", func(writer io.Writer) error {
-		_, err := closure.index.WriteToContext(ctx, writer)
-		return err
-	}); err != nil {
+	if err := writeImageIndexFile(ctx, stage, "index.json", writeIndex); err != nil {
 		return err
 	}
 	if err := writeImageIndexFile(ctx, stage, "oci-layout", func(writer io.Writer) error {
