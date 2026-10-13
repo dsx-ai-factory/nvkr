@@ -889,11 +889,17 @@ workflow and manifests.
 Both initial profile declarations remain blocked by the coordinator before
 dispatch or native resource allocation. Independently dispatched generated
 producers retain their ordinary default-branch manual admission; the coordinator
-does not disable or authorize that route. Proposed Helm and independent Cosign ARM64 assets fail the
-pinned vulnerability scan; the retained site CLI source pin lacks the required
-release renderer. Reviewed source/tool replacements, matching generated bundles,
-complete native host admission and a recorded manual full cycle are still
-required. No new hosted runtime evidence or nightly service acceptance is claimed.
+does not disable or authorize that route. Proposed Helm and independent Cosign ARM64 assets have
+recorded findings from the pinned binary vulnerability scan, and the site chart
+producer still names a local-only Helm image without a hosted registry binding.
+The CLI, controller and chart source pins and suite revision are aligned at
+`04a6ed26c1e51d70167669a6882a04080eefadc7`, which includes the release renderer;
+matching named bundles pass drift checks. Existing ARC disk production and NVKE's
+kind plus ARM64 VM lane have completed externally, as linked in the nightly guide.
+Those capabilities do not need to be presented as unvalidated prerequisites.
+The new profile's tool bindings and scan findings, its host/network preflight and
+a recorded combined manual cycle remain outstanding. No acceptance of the new
+nightly service is claimed.
 Forge/DSX/Redstone targets and the special TestGrid publisher remain deferred.
 Unsigned runtime reports do not mint qualified conformance or promotion receipts.
 

@@ -32,9 +32,20 @@ service. Current blockers are:
   (`sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0`),
   with no verified registry reference or hosted availability. An admitted hosted
   chart toolchain is still required; no replacement image or waiver is supplied.
-- The protected native runner needs the complete host prerequisites and an
-  admitted Docker kind network, not only `/dev/kvm`. No live runtime acceptance
-  of this job has been recorded.
+
+Existing runner and tool functionality has already been exercised. NVKR's
+[ARM64](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963/job/112511485529)
+and [AMD64](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963/job/112512054661)
+disk jobs completed on their ARC KVM pools, and that historical Run completed
+[release signature verification](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963/job/112539131258).
+NVKE's existing
+[kind plus ARM64 VM job](https://github.com/dsx-ai-factory/nvke/actions/runs/38459969744/job/115512893269)
+also completed on `arc-arm64-kvm`. Existing NVKE CI uses Helm 4.2.4 and has
+executed its deployment and E2E scenarios. These results establish the existing
+capabilities; the binary-scan findings above are separate from functionality.
+The new nightly job retains its host and network preflight. Its combined
+publication-to-runtime cycle has not yet been recorded, and historical NVKR
+records do not establish current-schema Release acceptance.
 
 Both nightly Definitions now select the profile-owned site catalog at reviewed
 NVKE commit `04a6ed26c1e51d70167669a6882a04080eefadc7` for the CLI,
