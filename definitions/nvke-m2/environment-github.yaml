@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
-  description: M2 candidate publication namespace; native disk execution with build provenance; deep inspection and reconciliation deferred to M3.
+  description: M2 candidate publication namespace; native disk execution with build provenance; deep inspection and material reconciliation deferred beyond the M3 MVP.
   name: nvke-m2-github
 githubARC: native-kvm-v1
 githubRunners:

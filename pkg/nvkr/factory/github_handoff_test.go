@@ -13,7 +13,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
-func TestGitHubQualificationHandoffRequiresRealSigning(t *testing.T) {
+func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		plan func(*testing.T) *Plan
@@ -21,7 +21,7 @@ func TestGitHubQualificationHandoffRequiresRealSigning(t *testing.T) {
 	}{
 		{"unsigned", githubTestPlan, false},
 		{"dry run", func(t *testing.T) *Plan { return signedTestPlan(t, dryRunSigningProfile(), ghcrTarget()) }, false},
-		{"signed aggregate", func(t *testing.T) *Plan { return signedTestPlan(t, cosignSigningProfile(), ghcrTarget()) }, true},
+		{"signed aggregate", func(t *testing.T) *Plan { return signedTestPlan(t, cosignSigningProfile(), ghcrTarget()) }, false},
 		{"signed outputs", referenceTestPlan, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -57,30 +57,53 @@ func TestGitHubQualificationHandoffRequiresRealSigning(t *testing.T) {
 }
 
 func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
-	plan := signedTestPlan(t, cosignSigningProfile(), ghcrTarget())
+	plan := referenceTestPlan(t)
 	bundle, err := RenderGitHub(t.Context(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, test := range []struct{ name, old, replacement string }{
+		{"unchanged", "", ""},
 		{"wrong attempt", "name: 'nvkr-qualification-${{ github.run_id }}-${{ github.run_attempt }}'", "name: 'nvkr-qualification-latest'"},
 		{"whole workspace", "path: .nvkr/qualification/handoff.json", "path: .nvkr"},
-		{"failure upload", "if: ${{ success() }}", "if: ${{ always() }}"},
-		{"no deadline", "        timeout-minutes: 5\n", ""},
+		{"failure upload", "if: '${{ success() }}'", "if: '${{ always() }}'"},
+		{"no deadline", "timeout-minutes: 5, ", ""},
 		{"missing capture", " --handoff .nvkr/qualification/handoff.json", ""},
-		{"hidden omission", "          include-hidden-files: 'true'\n          if-no-files-found: error\n", "          include-hidden-files: 'false'\n          if-no-files-found: error\n"},
-		{"missing handoff ignored", "path: .nvkr/qualification/handoff.json\n          include-hidden-files: 'true'\n          if-no-files-found: error", "path: .nvkr/qualification/handoff.json\n          include-hidden-files: 'true'\n          if-no-files-found: ignore"},
+		{"hidden omission", "include-hidden-files: 'true'", "include-hidden-files: 'false'"},
+		{"missing handoff ignored", "if-no-files-found: error", "if-no-files-found: ignore"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			original := bundle.Files[GitHubWorkflowPath]
-			workflow := bytes.Replace(original, []byte(test.old), []byte(test.replacement), 1)
-			if bytes.Equal(workflow, original) {
-				t.Fatal("mutation did not change workflow")
+			workflow := bytes.Clone(original)
+			if test.old != "" {
+				if test.name == "missing capture" {
+					workflow = bytes.Replace(workflow, []byte(test.old), []byte(test.replacement), 1)
+				} else {
+					// Change only the admitted upload's compact YAML line. Preserve
+					// all other exact rendered bytes, including YAML aliases.
+					for _, line := range bytes.SplitAfter(original, []byte("\n")) {
+						if bytes.Contains(line, []byte("name: Upload complete qualification handoff,")) {
+							mutated := bytes.Replace(line, []byte(test.old), []byte(test.replacement), 1)
+							workflow = bytes.Replace(original, line, mutated, 1)
+							break
+						}
+					}
+				}
+				if bytes.Equal(workflow, original) {
+					t.Fatal("mutation did not change workflow")
+				}
 			}
 			changed := *bundle
 			changed.Files = maps.Clone(bundle.Files)
 			changed.Files[GitHubWorkflowPath], changed.WorkflowDigest = workflow, pipeline.FileDigest(workflow)
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+			err := ValidateGitHubBundle(t.Context(), plan, &changed)
+			if test.name == "unchanged" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 		})
 	}
 }

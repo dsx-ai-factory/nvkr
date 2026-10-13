@@ -276,11 +276,14 @@ approved repository and workflow, and the repository's actual default branch. It
 artifact download endpoints is required. The owned transport ignores proxy environment variables; an
 admitted artifact download location receives a fresh request without GitHub API credentials.
 
-Generated real-signing workflows save one `handoff.json` after complete finalization. It contains the
+Generated real-signing `per-output-v1` workflows save one `handoff.json` after complete finalization. It contains the
 original Plan, the compiler-read Definition and Environment, base and output-specific catalogs, overlays,
-registries, locks, patches and directory facts, plus the original root/output publication references and
-predicate bytes. The handoff contains no consumer policy. Unsigned or dry-run workflows do not produce it;
+registries, locks, patches and directory facts, plus the original predicate bytes keyed by the root and every
+delivered payload reference. The collector joins bounded aggregate metadata and saved output-route records
+without reading payload packages. The handoff contains no consumer policy. Unsigned, dry-run and legacy aggregate workflows do not produce it;
 an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
+Legacy aggregate builds/publication remain available, but they lack invocation-bound release metadata and
+the per-output route records needed for M3 qualification; direct qualification rejects that capability before publication work.
 
 The lifecycle owner recompiles the captured authored bytes with their original logical paths and requires
 the exact original Plan identity. Authored reads have no checkout fallback. Catalog-owned authentication
@@ -294,6 +297,10 @@ For programmatic use, `lifecycle.CheckQualificationRun` owns Run selection, poli
 retrieval. `lifecycle.CheckQualificationHandoff` borrows a provider-issued source receipt. The existing
 `lifecycle.CheckQualificationFiles` adapter remains available for explicit saved-file diagnostics; normal
 CLI use does not require those files or separately entered source-commit fields.
+All three adapters scope explicit registry pull credentials to the independently configured canonical
+`ConsumerOptions.Credential.Registry` host (the corresponding runtime credential for Run/handoff calls).
+A candidate or Environment cannot choose that destination; missing or mismatched hosts fail before
+registry access. Anonymous pulls and registry-scoped credential keychains remain available.
 
 At the consumer API boundary, source and Plan validation precede adapter-capability checks. A request with
 both malformed inputs and unavailable adapters reports the input error first. Neither case reaches registry

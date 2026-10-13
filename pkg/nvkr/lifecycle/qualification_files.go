@@ -59,6 +59,17 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	if err := options.Source.Validate(); err != nil {
 		return nil, nil, err
 	}
+	// Read only the bounded transport record before admitting its destination.
+	// Registry credentials are independently configured, never selected by the
+	// candidate or Environment; refuse a different host before compiler/provider I/O.
+	candidate, err := readQualificationCandidate(ctx, options.CandidatePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	consumer, err := newQualificationReferenceConsumer(candidate.Reference, options.Consumer)
+	if err != nil {
+		return nil, nil, err
+	}
 	definition, err := LoadDefinition(ctx, options.DefinitionPath)
 	if err != nil {
 		return nil, nil, err
@@ -72,6 +83,9 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	}
 	plan, err := factory.LoadPlanContext(ctx, options.PlanPath)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := factory.AdmitQualificationHandoff(plan); err != nil {
 		return nil, nil, err
 	}
 	expected, err := Compile(ctx, options.DefinitionPath, definition, options.EnvironmentPath, environment, plan.GeneratorVersion)
@@ -89,17 +103,8 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	if got != want {
 		return nil, nil, e.New(e.CodePipelineDrift, "qualification Plan differs from the exact recompiled inputs")
 	}
-	candidate, err := readQualificationCandidate(ctx, options.CandidatePath)
-	if err != nil {
-		return nil, nil, err
-	}
 	origin, err := qualificationorigin.NewGitHub(options.GitHubToken).AuthenticateSource(ctx, options.Source)
 	if err != nil {
-		return nil, nil, err
-	}
-	consumer, err := NewConsumer(options.Consumer)
-	if err != nil {
-		_ = origin.Close()
 		return nil, nil, err
 	}
 	receipt, report, err := consumer.CheckQualification(ctx, QualificationRequest{Reference: candidate.Reference,

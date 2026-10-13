@@ -14,7 +14,7 @@ const (
 )
 
 func githubQualificationHandoffEnabled(plan *Plan) bool {
-	return plan.Environment.Signing != nil && plan.Environment.Signing.Mode == SigningModeCosign
+	return AdmitQualificationHandoff(plan) == nil
 }
 
 func githubQualificationHandoffStep(actions githubActionRefs) githubStep {

@@ -103,6 +103,39 @@ func (v *qualificationVerifier) VerifySBOM(_ context.Context, digest string, raw
 	return v.evidenceErr
 }
 
+func legacyQualificationPlan(t *testing.T, original *factory.Plan) *factory.Plan {
+	t.Helper()
+	environment := original.Environment
+	publication := *environment.Publication
+	publication.Mode = ""
+	environment.Publication = &publication
+	stack, err := catalog.ApplyStack(original.CatalogSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := factory.Compile(t.Context(), original.Definition, environment, stack, original.GeneratorVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.DefinitionPath, plan.EnvironmentPath = original.DefinitionPath, original.EnvironmentPath
+	return plan
+}
+
+func TestQualificationRejectsLegacyAggregateBeforePublicationAccess(t *testing.T) {
+	request, consumer, verifier := newQualificationFixture(t)
+	request.Plan = legacyQualificationPlan(t, request.Plan)
+	request.Definition, request.Environment = request.Plan.Definition, request.Plan.Environment
+	consumer.materialize = func(context.Context, string) (*delivery.Publication, error) {
+		t.Fatal("unsupported legacy qualification opened a publication")
+		return nil, nil
+	}
+	receipt, report, err := consumer.checkQualification(t.Context(), request, verifier.source)
+	assertCode(t, err, e.CodeEngineCapability)
+	if receipt != nil || report != nil || len(verifier.verified) != 0 || verifier.evidence != 0 {
+		t.Fatal("unsupported legacy qualification performed verification or returned a partial result")
+	}
+}
+
 func newQualificationFixture(t *testing.T) (QualificationRequest, *Consumer, *qualificationVerifier) {
 	t.Helper()
 	return newQualificationFixtureWithSigningIdentity(t, "^"+regexp.QuoteMeta(qualificationSourceFixture().value.BuilderID)+"$")
@@ -119,6 +152,7 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (
 	definition, environment := base.definition, base.environment
 	definition.CosignTool = "cosign"
 	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: identity, Issuer: "https://token.actions.githubusercontent.com"}
+	environment.Publication.Mode = "per-output-v1"
 	snapshot := base.plan.CatalogSnapshot
 	snapshot.Tools = map[string]catalog.ToolPin{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.invalid/cosign.tar.gz", Platform: "linux/amd64", ArchiveDigest: "sha256:" + strings.Repeat("1", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + strings.Repeat("2", 64)}}
 	stack, err := catalog.ApplyStack(snapshot)
