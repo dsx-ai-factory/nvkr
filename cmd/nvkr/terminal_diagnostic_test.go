@@ -12,7 +12,7 @@ func TestTerminalDiagnosticCannotInjectDisplayControls(t *testing.T) {
 	for _, message := range []string{"registry: \x1b[2Jfalse success", "registry: \x1b]8;;https://untrusted.example\x07link", "registry: failed\nfalse success", "registry: \u202econcealed", "registry: \x9binvalid UTF-8"} {
 		t.Run(message, func(t *testing.T) {
 			got := terminalDiagnostic(message)
-			if !strings.HasPrefix(got, `"`) || !strings.HasSuffix(got, `"`) || strings.ContainsAny(got, "\x1b\x07\n\x9b\u202e") {
+			if !strings.HasPrefix(got, `"`) || !strings.HasSuffix(got, `"`) || strings.ContainsAny(got, "\x1b\x07\n\u202e") || strings.IndexByte(got, 0x9b) >= 0 {
 				t.Fatalf("unsafe diagnostic %q", got)
 			}
 		})
