@@ -150,6 +150,8 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if source == nil {
 		return nil, nil, e.New(e.CodeProvenanceMissing, "artifact qualification requires an authenticated producing Run")
 	}
+	// A nil request.Origin becomes a typed-nil source here. SourceRun.Description
+	// rejects it through the source owner's nil-safe Require guard.
 	origin, err := source.Description()
 	if err != nil {
 		return nil, nil, err

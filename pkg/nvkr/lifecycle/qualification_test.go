@@ -479,6 +479,57 @@ func TestQualificationDistinguishesIncompleteEvidenceTraversal(t *testing.T) {
 	}
 }
 
+func TestQualificationRejectsNilOriginBeforeAdapters(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, tc := range []struct {
+		name  string
+		ctx   context.Context
+		code  e.Code
+		cause error
+	}{
+		{name: "active context", ctx: t.Context(), code: e.CodeProvenanceMissing},
+		{name: "nil context", code: e.CodeUsage},
+		{name: "canceled context", ctx: canceled, code: e.CodeTimeout, cause: context.Canceled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, consumerState := range []string{"nil", "empty", "configured"} {
+				t.Run(consumerState, func(t *testing.T) {
+					verifier := &qualificationVerifier{}
+					verifierCalls, materializeCalls := 0, 0
+					var consumer *Consumer
+					switch consumerState {
+					case "empty":
+						consumer = &Consumer{}
+					case "configured":
+						consumer = &Consumer{
+							verifierFor: func(VerificationPolicy) (sign.OCISigner, error) {
+								verifierCalls++
+								return verifier, nil
+							},
+							materialize: func(context.Context, string) (*delivery.Publication, error) {
+								materializeCalls++
+								return nil, e.New(e.CodeInternal, "nil source must not reach the materializer")
+							},
+						}
+					}
+					receipt, report, err := consumer.CheckQualification(tc.ctx, QualificationRequest{})
+					assertCode(t, err, tc.code)
+					if tc.cause != nil && !errors.Is(err, tc.cause) {
+						t.Fatalf("missing context cause %v: %v", tc.cause, err)
+					}
+					if receipt != nil || report != nil {
+						t.Fatalf("nil source returned authority or partial diagnostics: receipt=%v report=%+v", receipt, report)
+					}
+					if verifierCalls != 0 || materializeCalls != 0 || len(verifier.verified) != 0 || verifier.evidence != 0 {
+						t.Fatalf("nil source reached adapters: verifier setup=%d materializer=%d signatures=%d evidence=%d", verifierCalls, materializeCalls, len(verifier.verified), verifier.evidence)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestQualificationRejectsAdmissionAndUnrelatedEvidence(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
