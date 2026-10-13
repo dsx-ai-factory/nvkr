@@ -88,6 +88,11 @@ HTTPS storage redirects after authorization and cookie headers are removed. Size
 checks still apply to the returned bytes. Anonymous OCI consumption is explicit. Plain HTTP
 is restricted to selected loopback fixtures.
 
+Publication and verification each have a three-minute operation deadline, including content
+transfer, signature attachment and read-back. A shorter caller deadline takes precedence. Large
+bundles over slow connections may time out after partial immutable effects; inspect the returned
+locator and unsuccessful status before retrying.
+
 ## Qualification and external acceptance
 
 Observation signing is separate from build signing and qualification. Native qualification v2

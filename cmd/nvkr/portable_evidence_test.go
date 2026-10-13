@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,6 +20,33 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testobservation"
 	"github.com/urfave/cli/v2"
 )
+
+func TestPublishedCLIResultLocatorExtraction(t *testing.T) {
+	jq, err := exec.LookPath("jq")
+	if err != nil {
+		t.Skip("jq is required for the documented locator extraction example")
+	}
+	locator := testobservation.Locator{SchemaVersion: testobservation.LocatorSchemaVersion, Reference: "example.com/evidence@sha256:" + strings.Repeat("a", 64), ObservationDigest: "sha256:" + strings.Repeat("b", 64)}
+	app := newApp()
+	var output bytes.Buffer
+	app.Writer = &output
+	if err := evidenceJSON(cli.NewContext(app, flag.NewFlagSet("publish", flag.ContinueOnError), nil), testobservation.Published{Locator: locator, Successful: false}); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasSuffix(output.Bytes(), []byte("\n")) {
+		t.Fatal("CLI JSON has no terminal newline")
+	}
+	command := exec.CommandContext(t.Context(), jq, "--sort-keys", "--compact-output", "--join-output", ".locator")
+	command.Stdin = bytes.NewReader(output.Bytes())
+	raw, err := command.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := testobservation.DecodeLocator(raw)
+	if err != nil || decoded != locator {
+		t.Fatalf("documented extraction changed locator: %+v %v", decoded, err)
+	}
+}
 
 func TestPortableEvidenceCLIIndependentLocalLoop(t *testing.T) {
 	source := t.TempDir()

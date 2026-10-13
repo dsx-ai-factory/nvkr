@@ -127,7 +127,22 @@ func TestObservationRegistrySignedRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer verified.Close()
+			// Fixture metadata exercises receipt methods, not certificate acceptance.
+			// Production sets these fields only after its exact certificate checks.
+			verified.identity, verified.issuer = "local-key-fixture", "local-key-issuer"
 			copiedReceipt := *verified
+			for _, receipt := range []*Verified{verified, &copiedReceipt} {
+				identity, issuer, err := receipt.Signer(t.Context())
+				if err != nil || identity != "local-key-fixture" || issuer != "local-key-issuer" {
+					t.Fatalf("live signer capability: %q %q %v", identity, issuer, err)
+				}
+				if state != "not-run" {
+					raw, err := receipt.Read(t.Context(), "results/junit.xml")
+					if err != nil || len(raw) == 0 {
+						t.Fatalf("live covered read: bytes=%d error=%v", len(raw), err)
+					}
+				}
+			}
 			result, err := verified.Description(t.Context())
 			if err != nil {
 				t.Fatal(err)

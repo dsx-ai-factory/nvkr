@@ -118,6 +118,11 @@ func TestLocatorStrictAdmissionBeforeExternalWork(t *testing.T) {
 			}
 			_, err = DecodeLocator(raw)
 			requireCode(t, err, tc.code)
+			receipt, err := VerifyLocator(t.Context(), l, Expected{}, RegistryOptions{})
+			if receipt != nil {
+				t.Fatal("invalid locator issued receipt")
+			}
+			requireCode(t, err, tc.code)
 		})
 	}
 	raw, err := canonical.Marshal(valid)
@@ -129,6 +134,13 @@ func TestLocatorStrictAdmissionBeforeExternalWork(t *testing.T) {
 		requireCode(t, err, e.CodeVerifyFailed)
 	}
 	expected := Expected{ObservationDigest: rawPin("observation"), Inputs: observationFixture().Inputs, Subjects: observationFixture().Subjects, Suite: observationFixture().Suite}
+	wrong := expected
+	wrong.ObservationDigest = rawPin("other")
+	rejected, err := VerifyLocator(t.Context(), valid, wrong, RegistryOptions{})
+	if rejected != nil {
+		t.Fatal("mismatched locator issued receipt")
+	}
+	requireCode(t, err, e.CodeVerifyFailed)
 	options := RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}, Credential: sign.Credential{Registry: "other", Username: "user", Password: "private"}}
 	receipt, err := VerifyOCI(t.Context(), valid.Reference, expected, options)
 	if receipt != nil {
@@ -138,5 +150,7 @@ func TestLocatorStrictAdmissionBeforeExternalWork(t *testing.T) {
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err = VerifyOCI(canceled, valid.Reference, expected, options)
+	requireCode(t, err, e.CodeTimeout)
+	_, err = VerifyLocator(canceled, valid, expected, options)
 	requireCode(t, err, e.CodeTimeout)
 }

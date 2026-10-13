@@ -11,7 +11,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
+	"unicode/utf8"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -32,9 +35,18 @@ func main() {
 		// The final diagnostic must not replace the selected exit status when
 		// its log reader has closed. No command work remains at this point.
 		signal.Ignore(syscall.SIGPIPE)
-		fmt.Fprintln(os.Stderr, "nvkr: "+err.Error())
+		fmt.Fprintln(os.Stderr, "nvkr: "+terminalDiagnostic(err.Error()))
 		os.Exit(factory.GitHubStepExitCode(err))
 	}
+}
+
+// Registry and subprocess diagnostics are untrusted terminal presentation.
+// Preserve ordinary text and escape controls without changing the original error.
+func terminalDiagnostic(message string) string {
+	if !utf8.ValidString(message) || strings.IndexFunc(message, func(r rune) bool { return !strconv.IsPrint(r) }) >= 0 {
+		return strconv.QuoteToASCII(message)
+	}
+	return message
 }
 
 func newApp() *cli.App {
