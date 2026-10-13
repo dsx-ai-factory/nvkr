@@ -279,6 +279,17 @@ only in the referenced instruction. Rendering and local execution resolve those 
 operation. Lifecycle owns attempts and persistence without constructing another compiler-input document or
 completing a returned Plan.
 
+Factory and lifecycle also project typed operation and named-output updates into
+bounded descriptive progress snapshots. The terminal presenter never parses log
+strings into completion or blocks producers on rendering. Final command reporting
+uses the returned Run/error pair; a retained complete Run can coexist with cleanup
+or reporting failure. Read-only Run inspection validates bounded canonical metadata
+and describes attempt markers without opening payloads or restoring authority.
+Public command result browsers also consume typed projections after their owning
+operations return and release receipts. Maintenance transactions and verifier
+scope remain with their existing owners; closing a view neither repeats nor
+reverses an operation. These presentation records are outside artifact/Plan/Run identity.
+
 A named Artifact keeps its payload digest across Run and Release views. The enclosing publication root has a
 separate identity. Release content binds the exact named payload membership, and the outer publication carries
 that content with its output and evidence bindings. Using the outer root as one of its own

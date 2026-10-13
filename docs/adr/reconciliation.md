@@ -63,7 +63,7 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted/object-store delivery is unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics | Qualified receipt/clearance assembly, release-specific trusted time, M3 qualification and M4 manifests/revocation remain unimplemented |
-| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention and SDK/CLI delegation | No general resume protocol or authority restored by serialization; strict local publication, encrypted disks and qualified lifecycle remain unavailable |
+| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, bounded descriptive progress, typed result browsers on all public commands, read-only stored Run inspection and SDK/CLI delegation | No general resume protocol or authority restored by serialization; strict local publication, encrypted disks and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
@@ -402,6 +402,57 @@ nftables/firewalld input-hook drop can still reject it; the owned-node probe,
 not an iptables accept alone, decides admission. The demo does not override that
 administrator policy; see the [operator firewall guidance](../local-nvke-demo.md).
 Live acceptance of the new route remains unexercised.
+
+The NVKR CLI now supports interactive local Run presentation with explicit
+plain/JSON choices, read-only Plan/recorded-Run terminal views, and typed result
+browsers on all 22 public command leaves, including the versioned Release export. Result browsers open after the owning
+operation returns; catalog maintenance, generation and verification retain their
+existing transactions and scopes. Local release inspection checks closure
+membership and payload integrity; release browsing remains metadata-only.
+Neither inspection path supplies signature or consumer-policy acceptance. Default output formats and owning failure/diff
+codes remain intact. Hidden execution/CI helpers retain their existing interface. Factory and
+lifecycle issue typed descriptive updates into fixed graph/output tables and a
+bounded public activity ring. Output observations, final retained membership and
+the command error remain distinct; no log text, growth or UI event grants
+completion, release verification or runtime health. Stored inspection validates
+bounded canonical metadata and reports attempt markers without opening payloads
+or restoring execution authority. Safe panes omit raw errors, provider text and
+private paths. Static empty Activity panes are omitted; live Runs retain Activity.
+unsupported diagnostic placeholders are omitted. Existing Packer metadata transport remains separate.
+The tab strip identifies Outputs/Overview, Details and available Activity; separator lines
+divide the panes. Default browsing uses compact rows and owning-projected
+overview entries; complete nodes remain available through search, the all-entry
+toggle and exact dependency navigation. Details and Activity are disclosed on
+focus; dependency links precede selected metadata and technical context. A path
+identifies drill-down depth and the previous selection; exact Back navigation is
+retained. Static rows omit repeated shared states, while Details retain state.
+Static filters include only supplied Changed/Failed states. Below 40x12, browsing
+is suspended while close/cancel controls remain available. Recorded Run details
+retain the recorded output digest as metadata, without checking current payloads.
+Release outputs link to their exact bound evidence and evidence links back to
+its outputs. A pinned dependency hint
+identifies the exact selected action even after scrolling. q asks for confirmation, defaulting to staying; only y confirms
+canceling a live Run or closing a read-only viewer. Ctrl+C remains immediate.
+Owner completion and external cancellation dismiss an open prompt without
+waiting for input; confirmed cancellation still joins owned work.
+
+Controlled local tests cover output/index membership, coalescing, causal failure,
+required-count preservation, complete-plus-cleanup-error results, record
+substitution, symlinks, mode/output equivalence, short writes, broken pipes,
+all-public flag coverage, typed command projections, exact default output bytes,
+explicit JSON admission, preserved difference status, responsive keyboard navigation, quit confirmation, and joined terminal
+failure/cancellation.
+Darwin and Linux ARM64 isolated-PTY fixtures exercise full terminal restoration
+and repeated SIGHUP cancellation with joined work. The SIGHUP fixture sends
+signals; it does not establish actual PTY-master-disconnection behavior.
+Cross-compiled ARM64 test binaries also passed native Linux progress, presenter,
+lifecycle/SDK inspection and CLI presentation fixtures on the existing local
+Podman VM. Targeted native Darwin race tests passed; Linux race instrumentation
+remains unexercised because that VM has no Go or C compiler. Linux AMD64
+cross-compilation establishes build compatibility only. These local
+working-tree fixtures are not a fresh NVKE producer Run,
+an external qualification record or a human usability study. The
+[lifecycle guide](../lifecycle.md#choose-local-run-presentation) owns usage.
 
 The demo CLI automatically selects a terminal dashboard for interactive standard
 input/output. Its phase map, observed state and bounded public activity use typed

@@ -95,6 +95,120 @@ selected attempts root; the default root is `.nvkr/runs`. The attempts root must
 path under `.nvkr`. Publication is a separately enabled operation. The
 implementation record distinguishes contract tests from external execution.
 
+### Choose local Run presentation
+
+`run local --ui=auto` selects a terminal dashboard only with interactive standard
+input/output and a usable terminal. Pipes, redirected output and `--ui=plain`
+retain scrolling output. The dashboard lists required named outputs, selected
+producer operations and dependencies, observation counts and bounded public
+activity. Producer completion and fresh activity do not establish output
+observation, finalization, release verification or runtime health.
+
+```sh
+bin/nvkr run local \
+  --definition definitions/nvke-v1/definition.yaml \
+  --environment definitions/nvke-v1/environment-local.yaml \
+  --attempt build-001 --ui=plain
+```
+
+Choose `--ui=tui` explicitly to require an interactive dashboard; incompatible
+terminal/JSON choices fail before input or execution work. `--no-color` or a
+nonempty `NO_COLOR` selects monochrome presentation. A tab strip identifies
+Outputs, Details and Activity; separator lines distinguish their contents. Tab
+or 1/2/3 changes panes, arrows navigate the focused pane, Enter opens details,
+Esc goes back, `/` searches output names, `f` changes the filter and `?` shows help.
+The initial screen uses one row per output. Details and Activity open when
+selected; a wide terminal pairs the list with Details only after inspection is
+requested. Selection stays bound to the same named output while execution updates. Activity scrolling pauses following new
+entries; End resumes it. On a small terminal the view uses one pane at a time.
+
+During a live Run, q opens a cancellation confirmation. Press y to cancel;
+n, Esc or Enter keeps the Run open. Ctrl+C requests cancellation immediately.
+Cancellation waits for owned work to stop. Esc otherwise navigates. The dashboard
+has no force-exit or implicit deployment cleanup action. A successful or failed
+command restores the terminal and returns to the shell with its original owning
+outcome; a reporting failure can separately
+fail the command. A complete retained Run with incomplete cleanup keeps its
+observed outputs while returning the coded failure.
+
+`run local --json` emits one deterministic, safe final-result document on stdout
+under `nvkr.dev/local-run-result/v1`. It includes frozen required outputs, observed
+membership, status, lane, code, exit status and record/cleanup availability.
+Producer diagnostics go to stderr. It omits private paths, transport references
+and raw failure messages; it is a description, not a resumable Run or verification
+receipt. Existing `run plan --json` still emits exact canonical Plan bytes.
+
+Auto presentation stays plain for `--dry-run`. Explicit `--dry-run --ui=tui` first
+admits the normal dry-run, then opens a static read-only view; it executes no
+producers and creates no attempt. Closing that view does not cancel another Run.
+
+### Browse public command results
+
+Every public command accepts `--ui=tui` and `--no-color`: Definition validation
+and inspection; Run planning, graph, comparison, inspection, generation and local
+execution; producer resolution; all catalog inspection and maintenance commands;
+and Release inspection, browsing, export and verification. Other than the interactive
+local Run default described above, commands default to `--ui=plain` and keep their
+existing text, canonical JSON or diagram output. On commands with a result
+browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
+and `--ui=tui` are incompatible and fail before input, network or write work.
+
+```sh
+bin/nvkr definition inspect --definition definitions/nvke-v1/definition.yaml --ui=tui
+bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
+bin/nvkr catalog list --data definitions/nvke-v1/catalog --ui=tui
+```
+
+Graph and release browsers start with an output overview when their supplied
+results also contain internal nodes or evidence entries. Press `g` to toggle all
+supplied entries; `/` searches the complete supplied set. Producer-only graph
+views keep their supplied producers. The default list uses one row per entry,
+with readable output names; repeated static states are omitted. Full digests and command context live in
+Details.
+
+Results and Details show projected names, identities, counts and dependencies;
+`/` searches names and `f` cycles the available All, Changed and Failed filters.
+Static views offer Activity only when activity is supplied; live Runs retain it.
+Tab cycles the available panes, and 1/2/3 selects a pane when available.
+Details group navigable dependencies before item metadata and command context.
+A path shows each drill-down step; Esc returns to the exact previous selection.
+A pinned hint
+identifies the dependency Enter will follow even when its row is scrolled away.
+Enter follows an available dependency and Esc returns. q asks before
+closing; y closes, while n, Esc or Enter stays. Small terminals use one pane.
+Below 40 columns or 12 rows, browsing pauses until the terminal is resized;
+close confirmation and Ctrl+C remain available.
+
+The result browser opens after the command's existing operation finishes. Catalog
+maintenance and generation retain their normal write/check behavior; closing the
+browser neither repeats nor undoes it. Verification results reflect only the
+owning verifier's accepted lane and scope. Release browsing checks metadata;
+local Release inspection additionally checks closure membership and payload
+integrity. Neither operation authenticates signatures or consumer policy. Differences still return status 3 when requested. Raw changed
+values, source URLs, private paths, signer expressions and error messages are
+excluded from safe result panes; use existing plain output for the complete
+machine or diagram representation. Hidden execution and CI helpers keep their
+existing interface.
+
+### Inspect a recorded attempt
+
+```sh
+bin/nvkr run inspect --record .nvkr/runs/build-001/lifecycle.json
+bin/nvkr run inspect --record .nvkr/runs/build-001/lifecycle.json --json
+bin/nvkr run inspect --record .nvkr/runs/build-001/lifecycle.json --ui=tui
+```
+
+Inspection defaults to plain output. The bounded lifecycle-owned loader rejects
+symlinked directories/files, malformed canonical bytes and inconsistent named
+output metadata. It describes the sibling disk-commit marker separately. A marker
+without a record, an interrupted attempt without a record, and a complete record
+with incomplete cleanup have different descriptions. q asks before closing a
+read-only viewer; y closes it, while n, Esc or Enter keeps it open. Closure happens
+without execution, record changes or cleanup. Stored observations establish no
+current payload availability, signature verification or health; file modification
+times are not live freshness. The SDK exposes the same description through
+`Client.InspectRun`.
+
 For a completed local `disk-image` output, lifecycle retains the exact observed QCOW2 as
 `<attempts-root>/<attempt>/outputs/<output-name>.qcow2` and prints that path. The file is read-only, is committed
 only after held-source digest/size revalidation and successful Run binding, and remains local unqualified output.
@@ -184,7 +298,7 @@ description directly:
 
 ```json
 {
-  "schemaVersion": "nvkr.dev/release/v3",
+  "schemaVersion": "nvkr.dev/release/v4",
   "subject": "registry.example/releases@sha256:<release-digest>",
   "lane": "pipeline-attested",
   "scope": "artifact-publication",
@@ -210,7 +324,7 @@ verified `Release` description and the defensive exact-input description:
 {
   "schemaVersion": "nvkr.dev/release-verification-result/v1",
   "release": {
-    "schemaVersion": "nvkr.dev/release/v3",
+    "schemaVersion": "nvkr.dev/release/v4",
     "subject": "registry.example/releases@sha256:<release-digest>",
     "lane": "pipeline-attested",
     "scope": "artifact-publication",
@@ -309,6 +423,6 @@ normal product authors do not construct and join them manually.
 
 Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
-The direct-output model uses Definition v4, catalog v3 and generated IR v4. Run and Release use v3. Older recipe layouts and cluster/placement fields
+The direct-output model uses Definition v5, catalog v3 and producer IR v4. Generated Run Plans use v5; Run and Release use v4. Older recipe layouts and cluster/placement fields
 are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;
 historical Runs retain the authoring and wire contracts exercised at the time.

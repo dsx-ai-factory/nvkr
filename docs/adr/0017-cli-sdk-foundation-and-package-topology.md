@@ -105,7 +105,31 @@ these maintenance descriptions cannot grant execution or release authority.
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
 separating per-output Build Digest changes from execution and transport changes. It issues no authority.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse|export`, with
+`progress` owns bounded descriptive snapshots of admitted operations and named
+outputs, supplied by factory scheduling and lifecycle output-observation boundaries.
+It calls no renderer or caller-controlled writer from producer updates. Lossy
+wakeups and bounded public activity cannot change frozen membership or finalization.
+`internal/runpresenter` owns terminal admission, rendering, cancellation requests and
+joined screen/event/worker lifetimes. It has no receipt or deployment ownership.
+Live CLI result/error pairs independently select final reporting and exit status;
+complete retained output plus cleanup failure remains a complete Run and a failed
+command. These transient descriptions add no field to signed/canonical identities.
+
+Lifecycle's `InspectRun` owns bounded, no-follow canonical record inspection and
+projects safe file-recorded metadata and attempt-marker descriptions through the
+SDK. It validates the existing output slot bindings, without opening payload
+locators, restoring execution authority or inferring current availability/health.
+The CLI may show these views as plain/JSON or an explicitly selected read-only
+terminal explorer. All public command leaves additionally admit an explicitly
+selected result browser. Owning operations, including maintenance transactions
+and verification, finish and release receipts before this read-only view opens.
+Typed names, identity fields, counts and navigation links are descriptions; they
+exclude transport locations, private paths and raw error/value text. Closing a
+result view neither repeats nor reverses the operation, and owning status codes
+remain authoritative. Existing default output bytes and exact Plan JSON are
+preserved; hidden CI/execution helpers retain their existing interface.
+
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate`, and `release verify|inspect|browse|export`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the

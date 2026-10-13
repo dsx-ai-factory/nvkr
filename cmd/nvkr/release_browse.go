@@ -4,11 +4,14 @@
 package main
 
 import (
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/releaseview"
 	"github.com/urfave/cli/v2"
 )
@@ -16,7 +19,7 @@ import (
 func releaseBrowseCmd() *cli.Command {
 	return &cli.Command{
 		Name: "browse", Usage: "inspect exact OCI release metadata and evidence (payloads and signatures not verified)",
-		Flags: []cli.Flag{
+		Flags: append([]cli.Flag{
 			&cli.StringFlag{Name: "reference", Required: true, Usage: "publication root repository@sha256:digest"},
 			&cli.StringFlag{Name: "layout", Usage: "inspect a local OCI layout instead of pulling the registry"},
 			&cli.StringFlag{Name: "format", Value: "text", Usage: "text, json or mermaid"},
@@ -25,8 +28,12 @@ func releaseBrowseCmd() *cli.Command {
 			&cli.DurationFlag{Name: "timeout", Value: 10 * time.Minute, Usage: "bound the complete inspection"},
 			&cli.BoolFlag{Name: "anonymous", Usage: "disable ambient registry credentials"},
 			&cli.BoolFlag{Name: "plain-http", Usage: "use HTTP for a local registry"},
-		},
-		Action: func(c *cli.Context) error {
+		}, commandPresentationFlags()...),
+		Action: func(c *cli.Context) (returnedErr error) {
+			view, err := selectCommandPresentation(c)
+			if err != nil {
+				return err
+			}
 			if c.NArg() != 0 || c.Duration("timeout") <= 0 {
 				return e.New(e.CodeUsage, "release browse takes flags only and requires a positive timeout")
 			}
@@ -34,6 +41,12 @@ func releaseBrowseCmd() *cli.Command {
 			if err := presentation.Validate(); err != nil {
 				return err
 			}
+			shown := false
+			defer func() {
+				if returnedErr != nil && view.tui && !shown {
+					returnedErr = showCommandResult(c, view, releaseFailureDisplay("Release metadata browse"), returnedErr)
+				}
+			}()
 			description, err := lifecycle.InspectRelease(c.Context, c.String("reference"), lifecycle.InspectionOptions{
 				LayoutPath: c.String("layout"), WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"),
 				Registry: delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
@@ -45,10 +58,171 @@ func releaseBrowseCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
+			if view.tui {
+				shown = true
+				return showCommandResult(c, view, releasePublicationDisplay(description, presentation.Output), nil)
+			}
 			if _, err := c.App.Writer.Write(raw); err != nil {
 				return e.Wrap(e.CodeUnavailable, err, "writing release view")
 			}
 			return nil
 		},
 	}
+}
+
+func releaseFailureDisplay(title string) commandDisplay {
+	return commandDisplay{Title: title, Note: "The requested operation did not complete. No verification or runtime health result is established."}
+}
+
+func releaseArtifactsDisplay(title, note string, artifacts []lifecycle.Artifact) commandDisplay {
+	display := commandDisplay{Title: title, Note: note,
+		Fields: []progress.Field{{Label: "Outputs", Value: fmt.Sprint(len(artifacts))}}}
+	for _, artifact := range artifacts {
+		item := progress.Item{ID: "output/" + artifact.Name, Name: artifact.Name, Kind: artifact.Kind, State: "metadata", Primary: true,
+			Fields: []progress.Field{{Label: "Digest", Value: artifact.Digest}, {Label: "Build identity", Value: artifact.BuildDigest}}}
+		if artifact.Disk != nil {
+			mode := artifact.Disk.EvidenceMode
+			if mode == "" {
+				mode = "inspected"
+			}
+			item.Fields = append(item.Fields, progress.Field{Label: "Declared disk evidence", Value: mode})
+		}
+		if artifact.ImageIndex != nil {
+			for _, platform := range artifact.ImageIndex.RequiredPlatforms {
+				item.Fields = append(item.Fields, progress.Field{Label: "Required platform", Value: platform})
+			}
+		}
+		display.Items = append(display.Items, item)
+	}
+	return display
+}
+
+func verifiedReleaseDisplay(result releaseVerificationResult) commandDisplay {
+	display := releaseArtifactsDisplay("Release verification result", "Verified consumer scope only; runtime health and deployment were not evaluated.", result.Release.Artifacts)
+	display.Fields = append(display.Fields,
+		progress.Field{Label: "Accepted lane", Value: result.Release.Lane},
+		progress.Field{Label: "Accepted scope", Value: result.Release.Scope},
+		progress.Field{Label: "Content identity", Value: result.Release.ContentSubject},
+		progress.Field{Label: "Policy identity", Value: result.Release.PolicyDigest})
+	for index := range display.Items {
+		display.Items[index].State = "verified"
+	}
+	if exact := result.ExactInputs; exact != nil {
+		display.Items = append(display.Items, progress.Item{ID: "exact-inputs", Name: "Exact authored inputs", Kind: "input binding", State: "verified",
+			Fields: []progress.Field{{Label: "Definition identity", Value: exact.DefinitionDigest}, {Label: "Environment identity", Value: exact.EnvironmentDigest}, {Label: "Plan identity", Value: exact.PlanDigest}, {Label: "Content identity", Value: exact.ContentSubject}, {Label: "Policy identity", Value: exact.PolicyDigest}}})
+	}
+	return display
+}
+
+func releasePublicationDisplay(description delivery.PublicationDescription, selection string) commandDisplay {
+	artifacts := make([]lifecycle.Artifact, 0, len(description.Outputs))
+	for _, output := range description.Outputs {
+		if selection == "" || output.Name == selection {
+			artifacts = append(artifacts, output.Output)
+		}
+	}
+	display := releaseArtifactsDisplay("Release metadata browse", "Metadata inspection only; payloads, signatures and policy were not verified.", artifacts)
+	for _, output := range description.Outputs {
+		if output.OS == "" && output.Arch == "" {
+			continue
+		}
+		for index := range display.Items {
+			if display.Items[index].ID == "output/"+output.Name {
+				display.Items[index].Fields = append(display.Items[index].Fields, progress.Field{Label: "Recorded platform", Value: output.OS + "/" + output.Arch})
+			}
+		}
+	}
+	display.Fields = append(display.Fields,
+		progress.Field{Label: "Declared qualification", Value: description.DeclaredQualification},
+		progress.Field{Label: "Publication identity", Value: description.RootDigest},
+		progress.Field{Label: "Definition identity", Value: description.Metadata.DefinitionDigest},
+		progress.Field{Label: "Environment identity", Value: description.Metadata.EnvironmentDigest},
+		progress.Field{Label: "Plan identity", Value: description.Metadata.PlanDigest},
+		progress.Field{Label: "Content identity", Value: description.Metadata.ContentSubject},
+		progress.Field{Label: "Total outputs", Value: fmt.Sprint(len(description.Outputs))})
+	evidenceCount := 0
+	for _, evidence := range description.Evidence {
+		if selection != "" && !slices.Contains(evidence.Binding.Outputs, selection) {
+			continue
+		}
+		evidenceCount++
+		item := progress.Item{ID: "evidence/" + evidence.Name, Name: evidence.Name, Kind: evidence.Kind, State: "metadata",
+			Fields: []progress.Field{{Label: "Stage", Value: evidence.Binding.Stage}, {Label: "Subject kind", Value: evidence.Binding.SubjectKind}, {Label: "Subject digest", Value: evidence.Binding.SubjectDigest}, {Label: "Manifest digest", Value: evidence.ManifestDigest}, {Label: "Blob digest", Value: evidence.BlobDigest}}}
+		if evidence.Binding.Platform != "" {
+			item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: evidence.Binding.Platform})
+		}
+		for _, output := range evidence.Binding.Outputs {
+			if selection == "" || selection == output {
+				linkReleaseEvidence(&display, &item, output)
+			}
+		}
+		display.Items = append(display.Items, item)
+	}
+	display.Fields = append(display.Fields, progress.Field{Label: "Evidence records", Value: fmt.Sprint(evidenceCount)})
+	return display
+}
+
+// Navigation follows the owner's exact output binding in both directions. Only
+// displayed targets are linked, including when browsing one selected output.
+func linkReleaseEvidence(display *commandDisplay, evidence *progress.Item, output string) {
+	for index := range display.Items {
+		if display.Items[index].ID == "output/"+output {
+			display.Items[index].Dependencies = append(display.Items[index].Dependencies, evidence.ID)
+			evidence.Dependencies = append(evidence.Dependencies, display.Items[index].ID)
+			return
+		}
+	}
+}
+
+func releaseDescriptionDisplay(description releaseview.Description) commandDisplay {
+	display := commandDisplay{Title: "Release description export", Note: "Metadata inspection only; payloads, signatures and policy were not verified.",
+		Fields: []progress.Field{
+			{Label: "Outputs", Value: fmt.Sprint(len(description.Outputs))},
+			{Label: "Total outputs", Value: fmt.Sprint(description.TotalOutputs)},
+			{Label: "Evidence records", Value: fmt.Sprint(len(description.Evidence))},
+			{Label: "Declared qualification", Value: description.DeclaredQualification},
+			{Label: "Publication identity", Value: description.RootDigest},
+			{Label: "Definition identity", Value: description.Metadata.DefinitionDigest},
+			{Label: "Environment identity", Value: description.Metadata.EnvironmentDigest},
+			{Label: "Plan identity", Value: description.Metadata.PlanDigest},
+			{Label: "Content identity", Value: description.Metadata.ContentSubject},
+		}}
+	for _, output := range description.Outputs {
+		item := progress.Item{ID: "output/" + output.Name, Name: output.Name, Kind: output.Kind, State: "metadata", Primary: true,
+			Fields: []progress.Field{{Label: "Digest", Value: output.Digest}, {Label: "Build identity", Value: output.BuildDigest}}}
+		if output.OS != "" || output.Arch != "" {
+			item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: output.OS + "/" + output.Arch})
+		}
+		if output.ChartVersion != "" {
+			item.Fields = append(item.Fields, progress.Field{Label: "Chart version", Value: output.ChartVersion})
+		}
+		if output.Disk != nil {
+			item.Fields = append(item.Fields, progress.Field{Label: "Declared disk evidence", Value: output.Disk.EvidenceMode})
+		}
+		if output.ImageIndex != nil {
+			for _, platform := range output.ImageIndex.RequiredPlatforms {
+				item.Fields = append(item.Fields, progress.Field{Label: "Required platform", Value: platform})
+			}
+			for _, child := range output.ImageIndex.Children {
+				item.Fields = append(item.Fields,
+					progress.Field{Label: "Child platform", Value: child.Platform},
+					progress.Field{Label: child.Platform + " manifest digest", Value: child.ManifestDigest},
+					progress.Field{Label: child.Platform + " build identity", Value: child.BuildDigest},
+					progress.Field{Label: child.Platform + " build subject", Value: child.BuildSubject})
+			}
+		}
+		display.Items = append(display.Items, item)
+	}
+	for _, evidence := range description.Evidence {
+		item := progress.Item{ID: "evidence/" + evidence.Name, Name: evidence.Name, Kind: evidence.Kind, State: "metadata",
+			Fields: []progress.Field{{Label: "Stage", Value: evidence.Binding.Stage}, {Label: "Subject kind", Value: evidence.Binding.SubjectKind}, {Label: "Subject digest", Value: evidence.Binding.SubjectDigest}, {Label: "Manifest digest", Value: evidence.ManifestDigest}, {Label: "Blob digest", Value: evidence.BlobDigest}}}
+		if evidence.Binding.Platform != "" {
+			item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: evidence.Binding.Platform})
+		}
+		for _, output := range evidence.Binding.Outputs {
+			linkReleaseEvidence(&display, &item, output)
+		}
+		display.Items = append(display.Items, item)
+	}
+	return display
 }
