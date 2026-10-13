@@ -105,8 +105,8 @@ bin/nvkr release verify --reference "$RELEASE_REF" \
 
 The lifecycle owner requires its own exact-input receipt before export. Metadata-only
 `release export` does not verify payloads or signer policy. See
-[NVKE input staging](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/nvke-e2e-staging.md)
-for downstream preparation and its limits.
+[NVKE nightly workflow](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/nvke-nightly.md)
+for downstream testing and its current admission limits.
 
 From macOS, use the [consumer script](https://github.com/dsx-ai-factory/nvkr/blob/main/scripts/demo-release-consumer.sh) to run the
 artifact-publication verification inside its pinned Linux Docker image. It builds a Linux amd64 `nvkr`

@@ -872,19 +872,30 @@ expectations are checked before external work; the lifecycle owner authenticates
 and issues a policy/publication-bound opaque receipt. Current readers reject historical v3 roots, including
 the Run 37533806963 demo release. That browsing record does not establish current-schema external acceptance.
 
-Local input staging checks a restored checkout against the exact Plan Git commit/tree,
-tracked worktree state and unsigned source-receipt closure. This diagnostic check does
-not authenticate the restored vendor closure. A verified publication's held closure
-can be exported only with its owner's exact-input receipt and expected aggregate
-invocation. Named binary/chart extraction retains held delivery descriptors; native image
-archive export reuses delivery checks. Tests cover byte preservation, origin mismatch
-and no-replace failures. The [NVKE input staging adapter](../nvke-e2e-staging.md)
-and its regression tests use Go to stage core artifacts and optionally compile the existing
-suite without executing it. NVKR remains passive toward the externally owned runtime suite
-under ADR-16. Authenticated restored source/vendor binding and the special TestGrid integration
-are deferred. Local contracts do not prove runtime execution, full hardware input closure,
-live IAM/capacity, result publication or nightly operation. Generated activation and OCI-to-HTTPS
-disk delivery remain unimplemented, with no production pin or runner-policy changes.
+A verified publication's held closure can be exported only with its owner's
+exact-input receipt and expected aggregate invocation. Named binary/chart
+extraction and image export retain delivery ownership. The downstream harness
+uses the held publication directly rather than adding another command interface.
+
+The standalone input-staging command and compile-only adapter are removed.
+The [NVKE nightly coordinator](../nvke-nightly.md) instead declares scheduled and
+manual GitHub execution: complete project producer, exact run correlation,
+authenticated publication handoff, existing NVKE Go tests on kind plus real KVM
+guests, and separate test/resource-cleanup verdicts. This is downstream
+orchestration under ADR-16, not runtime authority inside the supply-chain core.
+Named generated bundles isolate these project producers from the retained M2
+workflow and manifests.
+
+Both initial profile declarations remain blocked by the coordinator before
+dispatch or native resource allocation. Independently dispatched generated
+producers retain their ordinary default-branch manual admission; the coordinator
+does not disable or authorize that route. Proposed Helm and independent Cosign ARM64 assets fail the
+pinned vulnerability scan; the retained site CLI source pin lacks the required
+release renderer. Reviewed source/tool replacements, matching generated bundles,
+complete native host admission and a recorded manual full cycle are still
+required. No new hosted runtime evidence or nightly service acceptance is claimed.
+Forge/DSX/Redstone targets and the special TestGrid publisher remain deferred.
+Unsigned runtime reports do not mint qualified conformance or promotion receipts.
 
 Consumer Verification Policy binds `minimumDiskEvidence` into its typed digest. Pipeline-attested policy
 defaults to `build-provenance-v1`; explicit `strict` requires inspected-disk evidence. Qualified policy

@@ -222,8 +222,8 @@ func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 	plan.Environment.DiskEvidence = "build-provenance-v1"
 	stage := githubStage{ID: "disk-stage", DiskOutput: "image", Nodes: []Node{{Container: plan.Environment.Publication.RepositoryPrefix + "/toolchains/packer@sha256:" + strings.Repeat("a", 64)}}}
 	stage.diskExecutionBudget = time.Minute
-	prepare := githubStep{Run: githubRunnerCommand("prepare-images", "stage", stage.ID), Env: githubImageEnvironment()}
-	run := githubStep{ID: "run-disk", Run: githubRunnerCommand("run-disk", "output", stage.DiskOutput), TimeoutMinutes: 1 + githubDiskCleanupHeadroomMinutes}
+	prepare := githubStep{Run: githubRunnerCommand("prepare-images", "stage", stage.ID, plan), Env: githubImageEnvironment()}
+	run := githubStep{ID: "run-disk", Run: githubRunnerCommand("run-disk", "output", stage.DiskOutput, plan), TimeoutMinutes: 1 + githubDiskCleanupHeadroomMinutes}
 	actions, err := resolveGitHubActions(plan.Actions)
 	if err != nil {
 		t.Fatal(err)

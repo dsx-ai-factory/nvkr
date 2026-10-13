@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -53,6 +54,9 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 		!safeGeneratedPath(bundle.PlanPath) {
 		return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run paths are unsafe")
 	}
+	if err := validateBundleNamespace(bundle); err != nil {
+		return GeneratedManifest{}, nil, err
+	}
 	workflow, ok := bundle.Files[bundle.WorkflowPath]
 	if !ok || pipeline.FileDigest(workflow) != bundle.WorkflowDigest {
 		return GeneratedManifest{}, nil, e.New(e.CodePipelineDrift,
@@ -79,6 +83,33 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 		return GeneratedManifest{}, nil, err
 	}
 	return manifest, append(raw, '\n'), nil
+}
+
+// Ownership descriptions may include retired records in this namespace, but
+// cannot grant write or retirement ownership over another generated bundle.
+func validateBundleNamespace(bundle *GeneratedBundle) error {
+	name := ""
+	if bundle.WorkflowPath != GitHubWorkflowPath {
+		name = strings.TrimSuffix(strings.TrimPrefix(bundle.WorkflowPath, ".github/workflows/nvkr-run-"), ".yml")
+		if name == "" {
+			return e.New(e.CodeInvalidCatalog, "generated Run has an invalid namespace")
+		}
+	}
+	if err := definition.ValidateGitHubBundleName(name); err != nil {
+		return err
+	}
+	layout := githubBundleLayout(name)
+	if bundle.WorkflowPath != layout.workflowPath || bundle.ManifestPath != layout.manifestPath || bundle.PlanPath != layout.planPath {
+		return e.New(e.CodeInvalidCatalog, "generated Run paths do not share one admitted namespace")
+	}
+	prefix := filepath.ToSlash(filepath.Dir(layout.manifestPath)) + "/"
+	for path := range bundle.Files {
+		if path == bundle.ManifestPath || path == bundle.ManifestPath+".lease" ||
+			(path != layout.workflowPath && !strings.HasPrefix(path, prefix)) {
+			return e.New(e.CodeInvalidCatalog, "generated Run member %q is outside its namespace", path)
+		}
+	}
+	return nil
 }
 
 // WriteGeneratedBundle stages generated payloads, retires unchanged prior members,

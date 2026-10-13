@@ -191,14 +191,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				continue
 			}
 			if stage, ok := byNodeForJob(stages, jobID); ok && len(githubStagePrivateImages(plan, stage)) > 0 &&
-				strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID) {
+				strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID, plan) {
 				if !reflect.DeepEqual(step.Env, githubImageEnvironment()) || step.If != "" || step.ContinueOnError || step.Uses != "" {
 					return e.New(e.CodeEngineCapability, "private image preparation requires only its exact read credential")
 				}
 				continue
 			}
 			if jobID == "nvkr-lifecycle-run" && step.ID == "recover-artifacts" {
-				if !reflect.DeepEqual(step.Env, map[string]string{"NVKR_JOB_RESULTS": "${{ toJSON(needs) }}"}) || strings.TrimSpace(step.Run) != githubRunnerCommand("recover", "", "") || step.ContinueOnError || step.If != "" || step.Uses != "" {
+				if !reflect.DeepEqual(step.Env, map[string]string{"NVKR_JOB_RESULTS": "${{ toJSON(needs) }}"}) || strings.TrimSpace(step.Run) != githubRunnerCommand("recover", "", "", plan) || step.ContinueOnError || step.If != "" || step.Uses != "" {
 					return e.New(e.CodeEngineCapability, "GitHub recovery must receive only exact provider job results")
 				}
 				continue
@@ -222,7 +222,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 					return e.New(e.CodeEngineCapability, "GitHub job %q source environment differs at %s", jobID, key)
 				}
 			}
-			if stage, ok := byNodeForJob(stages, jobID); !ok || len(stage.Nodes) != 1 || strings.TrimSpace(step.Run) != githubRunnerCommand("run-node", "node", stage.Nodes[0].ID) {
+			if stage, ok := byNodeForJob(stages, jobID); !ok || len(stage.Nodes) != 1 || strings.TrimSpace(step.Run) != githubRunnerCommand("run-node", "node", stage.Nodes[0].ID, plan) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q must refuse an empty source credential", jobID)
 			}
 			foundSource = true
@@ -378,7 +378,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			}
 		}
 		for _, output := range node.Outputs {
-			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("pack-outputs", "node", node.ID)) ||
+			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("pack-outputs", "node", node.ID, plan)) ||
 				!actions.stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
@@ -388,7 +388,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			return err
 		}
 		for _, input := range carrierInputs {
-			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("restore-inputs", "stage", stage.ID)) {
+			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("restore-inputs", "stage", stage.ID, plan)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not restore exact input %q", jobID, input)
 			}
 		}
@@ -429,7 +429,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err != nil {
 		return err
 	}
-	if !bytes.Equal(workflow, expected.Files[GitHubWorkflowPath]) {
+	if !bytes.Equal(workflow, expected.Files[expected.WorkflowPath]) {
 		return e.New(e.CodeEngineCapability, "GitHub workflow differs from its exact admitted rendering")
 	}
 	return nil
@@ -591,7 +591,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 	if len(githubStagePrivateImages(plan, stage)) > 0 {
 		prepared := false
 		for _, step := range steps {
-			if strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID) {
+			if strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID, plan) {
 				if prepared || !reflect.DeepEqual(step.Env, githubImageEnvironment()) {
 					return e.New(e.CodeEngineCapability, "private toolchain preparation must occur exactly once with scoped credentials")
 				}
@@ -621,7 +621,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		}
 		for i, step := range steps {
 			if step.ID == "run-disk" {
-				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes {
+				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput, plan) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes {
 					return e.New(e.CodeEngineCapability, "disk stage requires its bounded unconditional live executor")
 				}
 				executors++

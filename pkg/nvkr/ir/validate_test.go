@@ -9,7 +9,55 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func TestGraphNVKECLIStampAdmissionAndIdentity(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		value   string
+		allowed bool
+	}{
+		{name: "NVKECTL_VERSION", value: "reviewed-source", allowed: true},
+		{name: "NVKECTL_COMMIT", value: strings.Repeat("a", 40), allowed: true},
+		{name: "NVKECTL_DATE", value: "2026-10-13T12:00:00Z", allowed: true},
+		{name: "NKECTL_VERSION", value: "retained-source", allowed: true},
+		{name: "NKECTL_COMMIT", value: strings.Repeat("b", 40), allowed: true},
+		{name: "NKECTL_DATE", value: "2026-10-12T12:00:00Z", allowed: true},
+		{name: "NKECTL_CAPI_VERSION", value: "v1.12.3", allowed: true},
+		{name: "NVKECTL_UNREVIEWED", value: "unreviewed"},
+		{name: "NVKECTL_TOKEN", value: "fixture-secret"},
+		{name: "AWS_SECRET_ACCESS_KEY", value: "fixture-secret"},
+		{name: "NVKECTL_VERSION", value: "bad\x00stamp"},
+	} {
+		t.Run(test.name+"/"+test.value, func(t *testing.T) {
+			graph := sample()
+			graph.Nodes[0].Env = append(graph.Nodes[0].Env, EnvVar{Name: test.name, Value: test.value})
+			graph.Normalize()
+			if !test.allowed {
+				assertIRCode(t, graph.Validate(), e.CodeInvalidCatalog)
+				_, err := graph.Digest()
+				assertIRCode(t, err, e.CodeInvalidCatalog)
+				_, err = graph.CanonicalJSON()
+				assertIRCode(t, err, e.CodeInvalidCatalog)
+				return
+			}
+			before, err := graph.Digest()
+			if err != nil {
+				t.Fatalf("reviewed CLI stamp rejected: %v", err)
+			}
+			for i := range graph.Nodes[0].Env {
+				if graph.Nodes[0].Env[i].Name == test.name {
+					graph.Nodes[0].Env[i].Value += "-changed"
+				}
+			}
+			after, err := graph.Digest()
+			if err != nil || after == before {
+				t.Fatalf("changed pinned CLI stamp must change Build identity: %s -> %s, %v", before, after, err)
+			}
+		})
+	}
+}
 
 func TestGraphAuthorityRejectsUnsafeCallerComposedSemantics(t *testing.T) {
 	for name, mutate := range map[string]func(*Graph){

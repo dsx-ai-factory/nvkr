@@ -113,12 +113,12 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 
 ## Focused supporting contracts
 
-The Go `nvke-e2e-staging` command prepares inputs for the pinned NVKE Go end-to-end
-suite after NVKR publication. Its implementation and tests live under
-`cmd/nvke-e2e-staging` and `internal/nvkee2estaging`. See the
-[input staging and activation gates](../docs/nvke-e2e-staging.md).
-The local driver stages and optionally compiles the suite; it does not allocate
-hardware or enable a nightly workflow. The special TestGrid integration is deferred.
+`nightly-build.sh` dispatches one maintained generated producer and joins its
+exact GitHub run. The separately authored nightly coordinator invokes the Go
+integration test and NVKE's existing runtime suite after authenticated publication.
+See the [nightly workflow and current admission](../docs/nvke-nightly.md).
+The initial kind plus KVM profiles remain blocked by producer/verifier security
+and source compatibility prerequisites. The special TestGrid integration is deferred.
 
 - `demo-catalog-change.sh` exercises previewed and machine-managed source pin
   changes against an isolated catalog copy.

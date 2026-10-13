@@ -792,7 +792,23 @@ the finalizer itself from starting; inspect provider status when no Run record e
 - The runner is a mode/subset of `nvkr`. Maintained hosted steps use `nvkr-exec factory github`; its utility-container
   child uses `factory execute-node` bound to the expected Plan digest. Producer execution is shared with local Runs. Qualified graph protocols retain the separate `exec-node` entry point.
 
+### Downstream nightly runtime route
+
+The separately authored NVKE nightly coordinator may use `arc-arm64-kvm` under
+the protected `nkd-arc` environment for its kind plus native KVM runtime target.
+This narrow downstream test route is separate from generated build execution.
+It grants no qualified runner measurement or release authorization. Arbitrary
+self-hosted labels and other runtime targets remain unadmitted.
+Before dispatch or resource allocation the coordinator requires reviewed project
+inputs and security-admitted installer and independent verifier tools. Before
+host mutation the runtime owner admits native architecture, KVM, host packages,
+private source/workspace, serialization, Docker network and journaled cleanup.
+A KVM device or configured runner label alone does not establish that contract.
+Current profiles remain blocked; provider capacity and live full-cycle acceptance
+are tracked in reconciliation rather than inferred from generation.
+
 ## Alternatives considered
+
 
 - **Engine-owned isolation per provider.** Rejected as the shared execution model because provider-specific network control duplicates the local launcher and can require bespoke executors.
 - **Emitter renders the build command per node.** Rejected — byte-identity would be *asserted*, since rendered

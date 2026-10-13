@@ -172,6 +172,13 @@ Distinct independently authenticated release claims covering exact reproduction,
 Qualified release-gate acceptance is deferred; no retained clearance implementation consumes these claims.
 _Avoid_: Generic pass result, cluster qualification
 
+**Downstream test coordinator**:
+A separately authored automation that joins exact project producer Runs, consumes
+authenticated publication bytes, and invokes an externally owned suite in an
+isolated runtime job. It owns temporary test-resource cleanup and unsigned
+reports; those reports are not qualified conformance receipts or a seventh
+public lifecycle object (ADR-16).
+
 **Clearance**:
 Authenticated authorization for one exact qualified ReleaseSet after its required evidence, policy, and lifecycle checks pass.
 This is a deferred contract; the unused authorization implementation has been removed.

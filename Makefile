@@ -7,7 +7,6 @@
 BIN         := bin/nvkr
 DEMO_BIN    ?= bin/nvke-demo
 DEMO_TEST_BIN ?= bin/nvke-demo.test
-E2E_STAGING_BIN ?= bin/nvke-e2e-staging
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
@@ -53,10 +52,6 @@ demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvk
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
 	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
-
-.PHONY: nvke-e2e-staging
-nvke-e2e-staging: go-version-check ## Build the downstream Go NVKE input-preparation command.
-	go build -o $(E2E_STAGING_BIN) ./cmd/nvke-e2e-staging
 
 .PHONY: install
 install: ## Install nvkr into $$(go env GOBIN).
@@ -174,10 +169,10 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # byte, recorded evidence and example data, templates that emit workflows, and
 # build output. Keep LICENSE_UNCHECKED in step with LICENSE_IGNORES.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
-	-ignore '.github/workflows/nvkr-run.yml' -ignore '**/*.tmpl' \
+	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-run-*.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-run\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-run(-[a-z0-9-]+)?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -213,6 +208,14 @@ workflows-check: ## Verify the committed Run generation matches the catalog (ADR
 	bin/nvkr-exec run generate --engine github \
 		--definition definitions/nvke-m2/definition.yaml \
 		--environment definitions/nvke-m2/environment-github.yaml \
+		--root . --check
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-arm64/definition.json \
+		--environment definitions/nvke-nightly-arm64/environment-github.json \
+		--root . --check
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
+		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json \
 		--root . --check
 
 .PHONY: check

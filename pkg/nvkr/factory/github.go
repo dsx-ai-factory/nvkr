@@ -33,6 +33,15 @@ const (
 var githubLayout = generationLayout{workflowPath: GitHubWorkflowPath,
 	manifestPath: GeneratedManifestPath, planPath: FactoryPlanPath}
 
+func githubBundleLayout(name string) generationLayout {
+	if name == "" {
+		return githubLayout
+	}
+	root := ".github/nvkr-run-" + name
+	return generationLayout{workflowPath: ".github/workflows/nvkr-run-" + name + ".yml",
+		manifestPath: root + "/manifest.json", planPath: root + "/plan.json"}
+}
+
 // RenderGitHub emits a locally inspectable workflow and its complete canonical Plan,
 // then runs the semantic static validator before returning any bytes.
 func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
@@ -70,7 +79,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err != nil {
 		return nil, err
 	}
-	files, planDigest, err := renderStaticInputs(ctx, plan, githubLayout)
+	layout := githubBundleLayout(plan.Environment.GitHubBundle)
+	files, planDigest, err := renderStaticInputs(ctx, plan, layout)
 	if err != nil {
 		return nil, err
 	}
@@ -243,10 +253,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for _, key := range sortedKeys(githubImageEnvironment()) {
 				fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(githubImageEnvironment()[key]))
 			}
-			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand("prepare-images", "stage", stage.ID))
+			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand("prepare-images", "stage", stage.ID, plan))
 		}
 		if stage.DiskOutput != "" {
-			fmt.Fprintf(&body, "      - name: %s\n        id: run-disk\n        timeout-minutes: %d\n        run: %s\n", yamlSingle(stage.Name), int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes, githubRunnerCommand("run-disk", "output", stage.DiskOutput))
+			fmt.Fprintf(&body, "      - name: %s\n        id: run-disk\n        timeout-minutes: %d\n        run: %s\n", yamlSingle(stage.Name), int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes, githubRunnerCommand("run-disk", "output", stage.DiskOutput, plan))
 			writeGitHubPackerDiagnosticStep(&body, stage, actions)
 			if !diskBuildProvenance(plan) {
 				// Diagnostics are short-lived descriptions, never planned evidence
@@ -317,7 +327,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			return nil, err
 		}
 		writeCatalogValidationStep(&body, plan, "Finalize Run and check completeness", "finalize-catalog", fmt.Sprintf("./nvkr-exec run finalize --definition %s --environment %s --plan %s --attempt \"${{ github.run_id }}-${{ github.run_attempt }}\" --workspace .nvkr/factory --out .nvkr/run.json",
-			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(FactoryPlanPath)))
+			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(layout.planPath)))
 		fmt.Fprintf(&body, "      - name: Upload final Run record\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nvkr-lifecycle-run\n          path: .nvkr/run.json\n          if-no-files-found: error\n", actions.Upload)
 	}
 	workflow := body.Bytes()
@@ -330,8 +340,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err := validateGitHubWorkflowSize(workflow); err != nil {
 		return nil, err
 	}
-	files[GitHubWorkflowPath] = append([]byte(nil), workflow...)
-	bundle := newGeneratedBundle(EngineGitHub, githubLayout, files, planDigest)
+	files[layout.workflowPath] = append([]byte(nil), workflow...)
+	bundle := newGeneratedBundle(EngineGitHub, layout, files, planDigest)
 	if validate {
 		if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
 			return nil, err

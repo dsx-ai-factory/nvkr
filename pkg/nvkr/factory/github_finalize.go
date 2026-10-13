@@ -44,6 +44,6 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 		return err
 	}
 	fmt.Fprintf(out, "      - name: Download artifacts and evidence\n        uses: %s\n        continue-on-error: true\n        with:\n          pattern: %s\n          path: .nvkr/carriers\n          merge-multiple: 'true'\n", actions.Download, yamlSingle(pattern))
-	fmt.Fprintf(out, "      - name: Recover planned carriers\n        id: recover-artifacts\n        env:\n          NVKR_JOB_RESULTS: ${{ toJSON(needs) }}\n        run: %s\n", githubRunnerCommand("recover", "", ""))
+	fmt.Fprintf(out, "      - name: Recover planned carriers\n        id: recover-artifacts\n        env:\n          NVKR_JOB_RESULTS: ${{ toJSON(needs) }}\n        run: %s\n", githubRunnerCommand("recover", "", "", plan))
 	return nil
 }

@@ -39,6 +39,18 @@ workflow are removed. Cluster-composition files and nodes are also removed; rege
 owned members through the same prior-manifest checks described below. Changed graph/plan and lifecycle records use their new schema majors; old records
 cannot be relabeled into current identities.
 
+Environment's optional `githubBundle` selects an independent generated GitHub namespace.
+Empty preserves `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/{plan,manifest}.json`
+byte-for-byte. A nonempty name contains at most 48 lowercase letters, digits and hyphens,
+with alphanumeric ends; it derives `.github/workflows/nvkr-run-<name>.yml` and
+`.github/nvkr-run-<name>/{plan,manifest}.json`. Authored paths are unsupported. Namespace
+selection changes Environment and Plan identity without changing producer Build identity.
+Every generated execution, recovery and utility-container command selects that exact
+Plan path; validation rejects a bundle whose paths differ from the admitted Environment.
+Signing identity and issuer remain explicit Environment policy and are never rewritten
+to accommodate a selected workflow filename. Operators must select the matching policy.
+This admits independent generated project bundles, not scheduling or callable workflows.
+
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
 plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
@@ -139,6 +151,10 @@ The legacy `--toolchain` spelling cannot alter component producer pins.
 Catalog lock writes use original-byte compare-and-swap, a persistent kernel lock inode, same-filesystem
 staging, fsync and atomic replacement (ADR-22). Generated Run writes acquire their per-bundle kernel lock,
 stage complete files and fsync them, publish payloads, retire obsolete members, and replace the manifest last.
+Each named namespace owns its distinct manifest and lock. Write and check reject mixed
+namespace paths or members before output work; retirement cannot claim another bundle's
+workflow or generated directory. Default and multiple named bundles may coexist. Changing
+a bundle name creates a separate owner and does not delete the previously named bundle.
 The current generated Run writer serializes same-checkout writers; it does not promise an optimistic CAS
 conflict for two separately compiled bundles.
 
@@ -224,6 +240,10 @@ disallowed; that ambiguity is what makes forgotten-regen drift possible.
 Current generated Run contract evidence in `pkg/nvkr/factory/bundle_io_test.go` covers idempotent generation,
 byte-exact drift checks, unchanged obsolete-member retirement, empty-directory cleanup, and preservation of
 modified or unlisted files. These tests do not establish a complete crash/kill-point matrix.
+Named-bundle contracts additionally cover default-byte preservation, coexisting bundles,
+independent drift and retirement, cross-namespace ownership rejection, exact utility Plan
+selection and unsafe-name admission before catalog resolution. They do not prove hosted
+execution or nightly service acceptance.
 
 Retired qualified renderer and bundle-transaction tests were removed with their unused implementation. The
 maintained Run writer keeps its ownership, retirement, cancellation and drift tests. Retired-engine admission

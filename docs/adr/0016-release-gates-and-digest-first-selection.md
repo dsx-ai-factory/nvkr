@@ -74,8 +74,10 @@ private state; it cannot be serialized or reconstructed from public fields. A fi
 reference, untyped `verified` or `complete` flag, decoded report, or receipt or capability for a different
 artifact, evidence document, or policy is rejected.
 
-- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**. It **never
-  runs the conformance suite**; running it would break verifier isolation and cross into fleet operation.
+- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**.
+  Release verification and authorization never execute the suite. A downstream
+  coordinator may invoke NVKE's suite in a separate runtime job under section 6;
+  its unsigned report cannot authorize promotion.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
   distinct from the build/publish identity**. `vectorDigests` is sorted and exhaustive for the promoted set.
@@ -189,10 +191,20 @@ gated on reproduction. Unattended merge requires separate security authorization
 rerun behavior and revocation; ADR-04 owns explicit consumer scopes. An artifact-publication verification result
 does not establish full-release acceptance. M3/M4 remain unimplemented.
 
-### 6. Passive external qualification handoff — deferred producer protocol
+### 6. External runtime coordination and deferred qualified handoff
 
-The external suite owns execution, provisioning, process context and lifecycle. NVKR never initiates or
-supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
+The external suite owns runtime assertions, provisioning and guest lifecycle.
+A separately authored GitHub Actions coordinator may schedule project-specific
+producer Runs and invoke NVKE's existing suite in an isolated runtime job. Its
+first proposed target is kind plus KVM guests on the explicitly admitted native
+ARM64 runner (ADR-18). The supply-chain core verifies the complete exact-input
+publication and hands held bytes to the downstream harness; it issues no runtime
+pass receipt. The coordinator binds one exact producing run, invocation,
+publication, suite source and coverage profile. Successful cycles require
+nonempty executed assertions, native guest observations and successful owned
+cleanup. Schedules and unsigned results do not establish service acceptance.
+
+A future qualified adapter must authenticate an already-produced independently signed observation containing pinned suite,
 suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
 `resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
 unpinned identities, caller-provided pass booleans, wrong roles, expired evidence or mismatched subjects fail
@@ -214,14 +226,14 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
 - The clearance result is a new consumable object the downstream must agree to check.
 
 **Neutral**
-- The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
-  It runs no suite, performs no infra rollback, and authorizes no mutation.
+- Release authorization consumes independently authenticated conformance.
+  A downstream coordinator cannot turn its unsigned runtime report into clearance.
 
 ## Alternatives considered
 
 - **Infer conformance from reproduction (single gate).** Rejected — SEC-08 requires two independent gates.
-- **Run the conformance suite inside NVKR.** Rejected — it breaks verifier isolation and the produce-vs-operate
-  boundary.
+- **Run the conformance suite inside release verification or authorization.** Rejected: it breaks verifier
+  isolation. A separate downstream runtime job retains that boundary and owns test-resource cleanup.
 - **Select releases by tag.** Rejected — a mutable tag must never bypass digest and signature verification.
 - **Rollback that mutates running infrastructure.** Rejected — NVKR re-selects a verified set; the engine makes
   any infra change.

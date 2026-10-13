@@ -12,16 +12,17 @@ import (
 
 // githubRunnerCommand binds a provider step to the complete generated Plan. The
 // helper owns execution and transport mechanics; no paths or argv are authored here.
-func githubRunnerCommand(operation, selectorFlag, selector string) string {
-	command := "./nvkr-exec factory github " + operation + " --plan " + shellQuote(FactoryPlanPath)
+func githubRunnerCommand(operation, selectorFlag, selector string, plan *Plan) string {
+	layout := githubBundleLayout(plan.Environment.GitHubBundle)
+	command := "./nvkr-exec factory github " + operation + " --plan " + shellQuote(layout.planPath)
 	if selectorFlag != "" {
 		command += " --" + selectorFlag + " " + shellQuote(selector)
 	}
 	return command
 }
 
-func githubNodeCommands(node Node, _ *Plan) []string {
-	return []string{githubRunnerCommand("run-node", "node", node.ID)}
+func githubNodeCommands(node Node, plan *Plan) []string {
+	return []string{githubRunnerCommand("run-node", "node", node.ID, plan)}
 }
 
 // This allowlist intentionally excludes arbitrary recipe arguments: they may

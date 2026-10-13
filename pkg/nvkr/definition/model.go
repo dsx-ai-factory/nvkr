@@ -88,6 +88,9 @@ type APTOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
+	// GitHubBundle selects an independent generated workflow namespace; empty
+	// preserves the original generated Run paths. Paths are never authored.
+	GitHubBundle string `json:"githubBundle,omitempty"`
 	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
 	// configuration, not provider isolation or runtime-capacity evidence.
 	GitHubARC string `json:"githubARC,omitempty"`
@@ -240,6 +243,9 @@ func (definition Definition) Digest() (string, error) {
 func (environment Environment) Validate() error {
 	if environment.APIVersion != EnvironmentAPIVersion || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
+	}
+	if err := ValidateGitHubBundleName(environment.GitHubBundle); err != nil {
+		return err
 	}
 	if environment.UtilityContainer == "" || (environment.UtilityPlatform != "linux/amd64" && environment.UtilityPlatform != "linux/arm64") {
 		return e.New(e.CodeUnpinnedSource, "environment requires a digest-pinned utilityContainer and linux/amd64|linux/arm64 utilityPlatform")

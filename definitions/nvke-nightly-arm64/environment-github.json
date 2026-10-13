@@ -1,0 +1,57 @@
+{
+  "apiVersion": "nvkr.dev/environment/v1",
+  "kind": "Environment",
+  "metadata": {
+    "name": "nvke-nightly-arm64-github",
+    "description": "Native ARM64 GitHub nightly candidate with operator-trusted ARC KVM disk production and pipeline-attested build-provenance-v1 publication. Runner availability, protected-environment admission and runtime qualification are independently gated."
+  },
+  "githubARC": "native-kvm-v1",
+  "githubRunners": {
+    "linux/amd64": "ubuntu-24.04",
+    "linux/arm64": "ubuntu-24.04-arm"
+  },
+  "diskEvidence": "build-provenance-v1",
+  "executionClasses": [
+    {
+      "name": "arc-arm64-kvm",
+      "runsOn": "arc-arm64-kvm",
+      "hostPlatform": "linux/arm64",
+      "resources": {
+        "cpuMillis": 8000,
+        "memoryMiB": 36864,
+        "ephemeralStorageMiB": 229376
+      },
+      "maxTimeoutSeconds": 21600,
+      "capabilities": [
+        "kvm"
+      ]
+    }
+  ],
+  "publication": {
+    "mode": "per-output-v1",
+    "credentialRef": "github:GITHUB_TOKEN",
+    "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64"
+  },
+  "runtime": {
+    "runtime": "docker",
+    "buildNetworkPolicy": "producer-declared"
+  },
+  "signing": {
+    "identity": "^https://github\\.com/dsx-ai-factory/nvkr/\\.github/workflows/nvkr-run-nvke-nightly-arm64\\.yml@refs/heads/main$",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "mode": "cosign"
+  },
+  "sourceAccess": {
+    "https://github.com/dsx-ai-factory/nvke": {
+      "credentialRef": "github:NKE_SOURCE_TOKEN",
+      "mirror": "https://github.com/dsx-ai-factory/nvke"
+    },
+    "https://github.com/dsx-ai-factory/nvke.git": {
+      "credentialRef": "github:NKE_SOURCE_TOKEN",
+      "mirror": "https://github.com/dsx-ai-factory/nvke"
+    }
+  },
+  "utilityContainer": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+  "utilityPlatform": "linux/amd64",
+  "githubBundle": "nvke-nightly-arm64"
+}

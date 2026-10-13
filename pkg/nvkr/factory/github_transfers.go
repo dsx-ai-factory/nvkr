@@ -32,7 +32,7 @@ func writeGitHubStageInputSteps(out *bytes.Buffer, plan *Plan, stage githubStage
 		return err
 	}
 	fmt.Fprintf(out, "      - name: Download %d required input carriers\n        uses: %s\n        with:\n          pattern: %s\n          path: .nvkr/carriers\n          merge-multiple: 'true'\n", len(inputs), actions.Download, yamlSingle(pattern))
-	writeGitHubShellStep(out, fmt.Sprintf("Restore %d required inputs", len(inputs)), []string{githubRunnerCommand("restore-inputs", "stage", stage.ID)})
+	writeGitHubShellStep(out, fmt.Sprintf("Restore %d required inputs", len(inputs)), []string{githubRunnerCommand("restore-inputs", "stage", stage.ID, plan)})
 	return nil
 }
 
@@ -40,7 +40,7 @@ func writeGitHubOutputSteps(out *bytes.Buffer, plan *Plan, node Node, artifacts 
 	if len(node.Outputs) == 0 {
 		return
 	}
-	writeGitHubShellStep(out, "Prepare output carriers: "+githubNodeLabel(plan, node), []string{githubRunnerCommand("pack-outputs", "node", node.ID)})
+	writeGitHubShellStep(out, "Prepare output carriers: "+githubNodeLabel(plan, node), []string{githubRunnerCommand("pack-outputs", "node", node.ID, plan)})
 	for _, output := range node.Outputs {
 		actions.writeUploadStep(out, githubArtifactLabel(plan, artifacts[output]), githubArtifactName(output), carrierPath(output))
 	}

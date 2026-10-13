@@ -52,6 +52,10 @@ regeneration without rebuilding the generator. Definitions declare named deliver
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
 access, registry retention, runtime conformance, and deployment policy. Downstream systems consume accepted
 artifact references and own their deployment descriptions (ADR-19/20).
+A separately authored repository test coordinator may schedule project producer
+Runs and invoke an external suite in a separate runtime job (ADR-16). That
+downstream job owns temporary test resources and cleanup. Its unsigned runtime
+reports do not add qualification authority to the artifact-verification core.
 
 ## Assumptions {#assumptions}
 
