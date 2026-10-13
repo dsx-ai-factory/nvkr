@@ -174,7 +174,7 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 		"--identity", "^builder$", "--issuer", "issuer", "--anonymous",
 		"--definition", "definitions/nvke-m2/definition.yaml",
 		"--environment", "definitions/nvke-m2/environment-github.yaml",
-		"--plan", "testdata/plans/nvke-m2.json",
+		"--plan", ".github/nvkr-run/plan.json",
 	}
 	app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}
 	raw, err := runCLIWithCapturedStdout(t, app, args...)
@@ -213,7 +213,7 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 				"--identity", "^builder$", "--issuer", "issuer",
 				"--definition", "definitions/nvke-m2/definition.yaml",
 				"--environment", "definitions/nvke-m2/environment-github.yaml",
-				"--plan", "testdata/plans/nvke-m2.json",
+				"--plan", ".github/nvkr-run/plan.json",
 			}
 			if minimum != "" {
 				args = append(args, "--minimum-disk-evidence", string(minimum))

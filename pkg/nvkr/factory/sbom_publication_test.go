@@ -184,7 +184,7 @@ func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {
 
 func TestPublicationGraphRequiresSBOMInputs(t *testing.T) {
 	testutil.RequireExtended(t)
-	plan, err := LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

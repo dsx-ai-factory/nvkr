@@ -36,20 +36,27 @@ type PublicationDescription struct {
 type PublicationOutput struct {
 	Output
 	ArtifactType  string         `json:"artifactType"`
-	OS            string         `json:"os,omitempty"`
-	Arch          string         `json:"arch,omitempty"`
 	BuildSubjects []BuildSubject `json:"buildSubjects"`
 }
 
 type PublicationEvidence struct {
-	Name           string          `json:"name"`
-	Kind           string          `json:"kind"`
-	Reference      string          `json:"reference"`
-	ArtifactType   string          `json:"artifactType"`
-	ManifestDigest string          `json:"manifestDigest"`
-	BlobDigest     string          `json:"blobDigest"`
-	SemanticDigest string          `json:"semanticDigest"`
-	Binding        EvidenceBinding `json:"binding"`
+	Name           string             `json:"name"`
+	Kind           string             `json:"kind"`
+	Reference      string             `json:"reference"`
+	ArtifactType   string             `json:"artifactType"`
+	ManifestDigest string             `json:"manifestDigest"`
+	BlobDigest     string             `json:"blobDigest"`
+	SemanticDigest string             `json:"semanticDigest"`
+	Binding        EvidenceBinding    `json:"binding"`
+	Source         *PublicationSource `json:"source,omitempty"`
+}
+
+// PublicationSource describes the source-built subject of exact release evidence.
+// Empty fields preserve missing or redacted properties; this is not a source or
+// signer authorization. The original tag cannot be reconstructed from an SBOM.
+type PublicationSource struct {
+	Repo   string `json:"repo,omitempty"`
+	Commit string `json:"commit,omitempty"`
 }
 
 // Description joins outputs and evidence from this exact held publication.
@@ -94,10 +101,14 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 		}
 		binding := *object.Evidence
 		binding.Outputs = append([]string{}, binding.Outputs...)
+		var source *PublicationSource
+		if value, ok := inspection.sources[object.Name]; ok {
+			source = &value
+		}
 		view.Evidence = append(view.Evidence, PublicationEvidence{
 			Name: object.Name, Kind: object.Kind, Reference: evidenceRefs[object.Name],
 			ArtifactType: object.ArtifactType, ManifestDigest: object.DescriptorDigest,
-			BlobDigest: object.BlobDigest, SemanticDigest: object.SemanticDigest, Binding: binding,
+			BlobDigest: object.BlobDigest, SemanticDigest: object.SemanticDigest, Binding: binding, Source: source,
 		})
 	}
 	for _, output := range cloneOutputs(outputs) {
@@ -107,8 +118,9 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 		}
 		output.Reference = outputRefs[output.Name]
 		platform := platforms[output.Name]
+		output.OS, output.Arch = platform.OS, platform.Arch
 		view.Outputs = append(view.Outputs, PublicationOutput{
-			Output: output, ArtifactType: object.ArtifactType, OS: platform.OS, Arch: platform.Arch,
+			Output: output, ArtifactType: object.ArtifactType,
 			BuildSubjects: append([]BuildSubject{}, object.Output.BuildSubjects...),
 		})
 	}

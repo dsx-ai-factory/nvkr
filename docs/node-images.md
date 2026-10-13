@@ -1,6 +1,6 @@
 # Build a node image from component materials
 
-A disk output combines different kinds of inputs into one VM image. In the maintained NVKE example,
+A disk output combines different kinds of inputs into one VM image. In the plain-image NVKE example below,
 producers build an agent Debian package, networking archives, an OCI image archive and a chart archive;
 another producer acquires an installer ISO. Source-owned commands prepare those files for Packer, which
 creates the final unencrypted QCOW2 disk. Selecting these components does not automatically install or

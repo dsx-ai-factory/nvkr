@@ -22,31 +22,26 @@ type InspectionOptions struct {
 	Timeout       time.Duration
 }
 
+const defaultInspectionTimeout = 10 * time.Minute
+
 // InspectRelease checks all bounded release metadata and evidence before returning
 // a detached view, even when a caller later displays only one output. It never
 // retrieves output layers or issues a verified publication capability.
 func InspectRelease(ctx context.Context, reference string, options InspectionOptions) (delivery.PublicationDescription, error) {
-	if ctx == nil {
-		return delivery.PublicationDescription{}, e.New(e.CodeUsage, "release inspection requires a context")
-	}
-	if err := ctx.Err(); err != nil {
-		return delivery.PublicationDescription{}, e.Wrap(e.CodeTimeout, err, "release inspection canceled")
-	}
-	if options.Timeout < 0 {
-		return delivery.PublicationDescription{}, e.New(e.CodeUsage, "release inspection timeout must be positive")
-	}
-	if err := options.Registry.Validate(); err != nil {
-		return delivery.PublicationDescription{}, err
-	}
-	if options.LayoutPath != "" && (options.WorkspaceRoot != "" || options.Registry != (delivery.RegistryOptions{})) {
-		return delivery.PublicationDescription{}, e.New(e.CodeUsage, "local release inspection cannot use registry or workspace options")
-	}
-	if err := delivery.ValidatePublicationReference(reference); err != nil {
+	return inspectReleaseMetadata(ctx, reference, options, nil)
+}
+
+// The optional visitor authenticates the exact evidence bytes bound by the
+// requested root before its private metadata workspace is removed.
+func inspectReleaseMetadata(ctx context.Context, reference string, options InspectionOptions,
+	verifyEvidence func(context.Context, string, []byte) error,
+) (delivery.PublicationDescription, error) {
+	if err := admitReleaseInspection(ctx, reference, options); err != nil {
 		return delivery.PublicationDescription{}, err
 	}
 	timeout := options.Timeout
 	if timeout == 0 {
-		timeout = 10 * time.Minute
+		timeout = defaultInspectionTimeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -77,5 +72,29 @@ func InspectRelease(ctx context.Context, reference string, options InspectionOpt
 		}
 		return delivery.PublicationDescription{}, err
 	}
+	if verifyEvidence != nil {
+		if err := delivery.VisitMetadataEvidence(ctx, layout, description.RootDigest, verifyEvidence); err != nil {
+			return delivery.PublicationDescription{}, err
+		}
+	}
 	return description, nil
+}
+
+func admitReleaseInspection(ctx context.Context, reference string, options InspectionOptions) error {
+	if ctx == nil {
+		return e.New(e.CodeUsage, "release inspection requires a context")
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "release inspection canceled")
+	}
+	if options.Timeout < 0 {
+		return e.New(e.CodeUsage, "release inspection timeout must be positive")
+	}
+	if err := options.Registry.Validate(); err != nil {
+		return err
+	}
+	if options.LayoutPath != "" && (options.WorkspaceRoot != "" || options.Registry != (delivery.RegistryOptions{})) {
+		return e.New(e.CodeUsage, "local release inspection cannot use registry or workspace options")
+	}
+	return delivery.ValidatePublicationReference(reference)
 }

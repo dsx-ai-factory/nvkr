@@ -1,6 +1,7 @@
 # Documentation
 
-Start with the [quickstart](quickstart.md): validate a Definition, inspect a Plan, and preview a Run
+Start with the [quickstart](quickstart.md): learn the workflow, build a tiny local artifact, change its
+version, and extend the same ideas into the NVKE tenant demo. It also includes a planning preview
 without Docker. The [34-concept reference](user-concepts.md) explains the vocabulary and connects
 each concept to a worked example.
 
@@ -8,6 +9,7 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
+| Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
@@ -19,7 +21,7 @@ each concept to a worked example.
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
-[eight-output deploy example](../definitions/nvke-deploy/README.md), [35-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
+[nine-output deploy example](../definitions/nvke-deploy/README.md), [37-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
 and [OS-image routes](../definitions/nvke-os/README.md). The separate
 [FDE-only diagnostic workflow](../definitions/nvke-fde/README.md) selects one native disk for branch iteration.
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
@@ -35,7 +37,7 @@ records source availability and remaining gaps.
 |---|---|
 | Immutable attempts, completeness, consumer policy, and SDK | [Lifecycle](lifecycle.md) |
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
-| Registry/layout browsing, credentials, and metadata limits | [Release navigation](release-navigation.md) |
+| Registry/layout browsing, generic JSON export, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |

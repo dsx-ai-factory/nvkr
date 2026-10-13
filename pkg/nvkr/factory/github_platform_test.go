@@ -201,14 +201,22 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// This fixed count and source pin below intentionally freeze the deploy input
-	// contract separately from the derived per-platform routing assertions.
-	if len(definition.Outputs) != 8 {
-		t.Fatalf("required outputs = %d, want eight", len(definition.Outputs))
+	// This fixed count and the authored source pins checked by the fixture freeze
+	// the deploy input contract separately from per-platform routing assertions.
+	if len(definition.Outputs) != 9 {
+		t.Fatalf("required outputs = %d, want nine", len(definition.Outputs))
 	}
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("definitions/nvke-v1/catalog"))
-	if err != nil {
-		t.Fatal(err)
+	base, sourceCommit := controllerCatalogFixture(t, "definitions/nvke-controller/catalog")
+	for _, output := range definition.Outputs {
+		if output.Catalog != nil {
+			t.Fatalf("deploy output %s uses a different source catalog", output.Name)
+		}
+		for _, name := range output.Components {
+			component := base.Components[name]
+			if component.FromSource && component.Commit != sourceCommit {
+				t.Fatalf("deploy producer %s source=%s, want %s", name, component.Commit, sourceCommit)
+			}
+		}
 	}
 	stack, err := catalog.ApplyStack(base)
 	if err != nil {
@@ -226,7 +234,7 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 				selected = output
 			}
 		}
-		if selected.Catalog == nil || selected.Catalog.Base != "../nvke-v1/catalog" || selected.Platform != "linux/"+arch || selected.Format != authored.OutputExecutable {
+		if selected.Catalog != nil || selected.Platform != "linux/"+arch || selected.Format != authored.OutputExecutable {
 			t.Fatalf("wrong CLI output: %+v", selected)
 		}
 		build, err := compileOutputBuild(selected, environment, stack)
@@ -239,11 +247,14 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 				continue
 			}
 			found = true
-			if node.Component != "nvkectl" || node.Platform != "linux/"+arch || node.SourceCommit != "ed9fb09b04fd40bf331d25df2222206ffaca593e" {
+			if node.Component != "nvkectl" || node.Platform != "linux/"+arch || node.SourceCommit != sourceCommit {
 				t.Fatalf("wrong CLI instruction: %+v", node)
 			}
 			if !strings.Contains(strings.Join(node.Command, " "), "-mod=vendor") {
 				t.Fatal("CLI stopped building offline")
+			}
+			if !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NKECTL_TREE=clean") {
+				t.Fatal("CLI must use source-owned linker symbols and version assertion")
 			}
 			env := map[string]string{}
 			for _, value := range node.Env {
@@ -352,7 +363,7 @@ func TestNativeRoutesPreserveARCDiskGrouping(t *testing.T) {
 }
 
 func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

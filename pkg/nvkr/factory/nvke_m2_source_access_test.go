@@ -44,9 +44,9 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			producer := "nvke-node-image"
-			if output.Platform == "linux/amd64" {
-				producer += "-amd64"
+			producer, err := buildgraph.DiskRootName(selected.Components)
+			if err != nil {
+				t.Fatal(err)
 			}
 			graph, err := buildgraph.CompileForHostPlatforms(selected, map[string]execution.HostPlatform{producer: execution.HostPlatform(output.Platform)})
 			if err != nil {

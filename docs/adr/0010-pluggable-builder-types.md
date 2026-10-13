@@ -12,8 +12,8 @@
 - **Scope:** The numbered builder contract is for qualified execution; the later Decision sections define v1
   source lanes and disk compilation. Unencrypted direct-Packer execution is admitted locally and through
   ADR-18's explicit native ARC pipeline-attested route. Qualified Nix/VM execution, general hosted VM
-  adapters and general fused large-output wrapped jobs remain capability-gated. A build-only diagnostic
-  exception admits direct-Packer LUKS2 with the explicit public bootstrap value described below. The BuildKit lane and
+  adapters and general fused large-output wrapped jobs remain capability-gated. Direct-Packer LUKS2 with the
+  explicit public bootstrap value below is admitted for raw diagnostics and native ARC build-provenance publication. The BuildKit lane and
   strict/M2 disk evidence modes retain their separate contracts.
 
 ## Context
@@ -316,9 +316,11 @@ variables, manifests, logs or evidence. The plain-image direct contract needs no
 direct-Packer `luks2` producer may explicitly declare exactly one public `luks_passphrase: changeit` variable.
 That documented placeholder is a public logical input included in Build identity, not a secret reference.
 Omission, duplicate bindings and other values fail capability admission without echoing their contents.
-The shared pipeline admission owner enforces this before source, runtime or output work. This route grants
-raw artifact retention only, locally or in ADR-18's build-only native ARC workflow; encrypted publication,
-inspection and qualified reproduction remain closed.
+The shared pipeline admission owner enforces this before source, runtime or output work. This route admits
+raw artifact retention locally or in ADR-18's build-only native ARC workflow. Native ARC publication additionally
+requires explicit `build-provenance-v1` evidence, with the producer's `luks2` declaration bound through the
+QCOW2 wrapper and signed release metadata. Encrypted inspection, strict publication and qualified reproduction
+remain closed; publication authenticates production and exact delivery bytes, not confidentiality.
 
 The public bootstrap disk makes no confidentiality claim, including after TPM enrollment: cloning its
 LUKS payload preserves the volume key, and changing unlock slots does not rotate that key. The source audit
@@ -368,7 +370,7 @@ not remove or invalidate the standalone Make entrypoint. Compiler lowering
 supports a direct-Packer producer with typed materials and a command producer without materials. A
 material-bearing `vm-image` command/Make producer remains capability-gated. Unencrypted direct-Packer
 execution and disk collection are connected locally; ADR-18/20 admit the explicit native ARC hosted
-publication route. The explicit public-bootstrap FDE exception is build-only. General hosted VM, qualified
+publication route, including public-bootstrap FDE only in build-provenance mode. General hosted VM, qualified
 and secret-valued encrypted execution remain unavailable. Ordinary
 `oci-hermetic` producers use the admitted fixed material mount described above.
 An override that changes NVKE's derived

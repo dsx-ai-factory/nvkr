@@ -52,7 +52,7 @@ func TestReadHelmChartSharesExactExportAdmissionWithoutWrites(t *testing.T) {
 				case "wrong layer media":
 					manifest.Layers[0].MediaType = MediaOctetStream
 				case "config differs":
-					targetDiagnostic = "chart config/archive or selected name/version differ"
+					targetDiagnostic = "chart config and archive metadata differ"
 					config, readErr := helmChartMetadata(data)
 					if readErr != nil {
 						t.Fatal(readErr)

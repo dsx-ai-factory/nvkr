@@ -54,8 +54,10 @@ ADR-18 separately admits generated native ARC jobs for unencrypted direct-Packer
 M2 candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
 deferring inspection, under a validation-branch exception. A separate native ARC build-only route omits
 publication and signing, retains exact raw QCOW2 bytes and producer records, and finalizes a static-unqualified
-Run. It admits ADR-10's explicitly public-bootstrap FDE producer as well as plain disks. General hosted VM
-adapters, secret-valued FDE, encrypted publication and qualified execution remain capability-gated.
+Run. It admits ADR-10's explicitly public-bootstrap FDE producer as well as plain disks. Native ARC also admits
+public-bootstrap FDE publication with explicit `build-provenance-v1` evidence and exact encryption metadata
+binding. General hosted VM adapters, secret-valued FDE, encrypted inspection, strict FDE publication and
+qualified execution remain capability-gated.
 The strict live full-disk evidence/publication path has guarded APIs
 without a successful real NVKE join; main-only execution, independent full-payload disk consumption,
 M3 inventory/qualification and organizational acceptance remain separate gaps in
@@ -108,7 +110,7 @@ these maintenance descriptions cannot grant execution or release authority.
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
 separating per-output Build Digest changes from execution and transport changes. It issues no authority.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse`, with
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse|export`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
@@ -123,6 +125,15 @@ to `build-provenance-v1`; explicitly selecting `strict` requires inspected evide
 to strict and rejects the producer-only minimum. Inspected evidence satisfies either minimum; producer metadata
 cannot weaken the selected consumer policy. The signed mode remains
 descriptive and does not grant authority.
+
+`Consumer.Authenticate` admits only pipeline-attested `authenticity` policy and issues a distinct opaque
+`AuthenticatedRelease` after checking the complete metadata/evidence closure and its required signatures,
+production provenance and SBOM bundles. It never opens the full-payload publication owner. Its description
+explicitly reports `payloadIntegrityVerified: false`; it supplies no payload export or exact-input receipt.
+`Consumer.Verify` retains the full-payload artifact-publication contract. These capabilities cannot substitute
+for one another, and their serialized descriptions cannot restore live authority. The CLI selects the narrow
+operation through `release verify --scope authenticity`; exact-input flags are rejected at admission.
+
 Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
@@ -135,8 +146,19 @@ render text, JSON, or Mermaid; platform labels describe checked config metadata.
 admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
 by default; an explicit caller-owned workspace is retained while its private staging child is removed.
 Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
-signature or policy verification, and cannot restore a verified Release capability. Explicit Release
-verification retains its full payload and policy checks. The existing compact local `release inspect` view remains.
+signature or policy verification, and cannot restore an authenticated or verified Release capability. Explicit
+`artifact-publication` verification retains its full payload and policy checks; `authenticity` adds policy-bound
+signature/evidence checks to metadata acquisition. The existing compact local `release inspect` view remains.
+
+`lifecycle.ExportRelease(ctx, reference, options)` owns complete release-description export (ADR-19/20).
+It uses the same bounded inspection and versioned JSON description as `release browse --format json`.
+The `nvkr.dev/release-description/v1` schema is a detached read model, not another public lifecycle object.
+Export takes one immutable OCI reference; an optional local layout caches that exact publication. It needs
+no Plan, mapping, requested platform, producer checkout or build workspace. Every named output and platform
+is retained, including aggregate image-index children and exact evidence/source bindings. Consumer-specific
+roles, source compatibility and installation requirements remain outside this interface. The CLI writes the
+complete description after admission and metadata validation. Export creates no identity, Run completion,
+payload or signature acceptance, or publication authority. Unpublished workspace export is not an interface.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic

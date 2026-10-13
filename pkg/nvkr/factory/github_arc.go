@@ -74,12 +74,16 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 			if instruction.Kind != ir.KindBuild || instruction.BuilderType != ir.BuilderVMImage ||
 				instruction.Packer == nil || len(instruction.Command) != 0 || instruction.Disk == nil ||
 				instruction.Disk.Format != "qcow2" ||
-				(!GitHubDiskBuildOnly(plan) && instruction.Disk.Encryption != "none") ||
 				instruction.Packer.AcquisitionArchive == "" || instruction.Requirements == nil || instruction.ExecutionBinding == nil {
 				return deny()
 			}
 			if err := pipeline.ValidateVMImagePackerDiskExecution(instruction); err != nil {
 				return err
+			}
+			if !GitHubDiskBuildOnly(plan) {
+				if err := admitDiskPublicationEncryption(plan, instruction); err != nil {
+					return err
+				}
 			}
 			binding := instruction.ExecutionBinding
 			platform := string(binding.Class.HostPlatform)

@@ -139,7 +139,10 @@ cgroups and the provider's nesting policy. A mounted privileged Docker socket re
 Missing prerequisites fail capability admission. Arbitrary self-hosted labels are not admitted by the native disk route.
 
 The pipeline-attested `githubARC: native-kvm-v1` Environment policy admits only native Linux AMD64 and ARM64
-unencrypted direct-Packer QCOW2 outputs with required KVM. Their execution classes select exactly
+direct-Packer QCOW2 outputs with required KVM. Plain outputs retain their strict or build-provenance evidence
+selection. ADR-10's explicit public-bootstrap LUKS2 outputs require `diskEvidence: build-provenance-v1` for
+publication; secret-valued FDE, encrypted inspection and qualified execution fail admission before work.
+Their execution classes select exactly
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
 The operator must provision ephemeral single-job runners and restrict pool access to the reviewed workflow on the default branch and any exact
@@ -783,8 +786,9 @@ permission. All credentials and signing remain outside ARC producer jobs.
 Every generated run script remains checked against GitHub's 21,000-character ceiling, conservatively measured
 as UTF-8 bytes, including explicit operator setup and bootstrap commands. The generator also rejects a
 workflow file over 500,000 UTF-8 bytes before returning a bundle or writing generated files; validation and
-bundle persistence enforce the same bound. Per-output workflows compact repeated values with YAML anchors
-and inline step maps, then compare the fully expanded JSON to the uncompressed workflow before acceptance.
+bundle persistence enforce the same bound. Per-output workflows compact repeated values with short YAML anchors
+and inline job maps, preserving string types when removing optional quotes, then compare the fully expanded JSON
+to the uncompressed workflow before acceptance.
 Compaction changes presentation only, not jobs, scripts or permissions. The limit follows GitHub's
 [500 KB workflow-file ceiling](https://docs.github.com/en/actions/reference/limits#workflow-file-size);
 files that remain oversized fail closed instead of generating an unstartable workflow.

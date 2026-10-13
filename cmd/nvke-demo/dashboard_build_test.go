@@ -328,7 +328,7 @@ func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
 	if err != nil {
 		t.Skip("launcher projection integration requires jq")
 	}
-	plan, err := factory.LoadPlanContext(t.Context(), "../../testdata/plans/nvke-m2.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../.github/nvkr-run/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

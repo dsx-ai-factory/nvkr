@@ -13,7 +13,7 @@ They do not publish, sign or build a complete source-only NVKE distribution.
 | OS-only loop | `definition-os.json` | One disk with its complete material closure |
 | Source-built provider loop | `definition-providers.json` | Two native provider images, no disk |
 | NICoSim build loop | `definition-simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive |
-| Staged-installer site loop | `definition-site.json` | Four source-aligned candidates: CLI, controller image, image-bound controller chart and NKTP chart |
+| Staged-installer site loop | `definition-site.json` | Five source-aligned candidates: CLI, controller image, native diagnostic profiles image, image-bound controller chart and NKTP chart |
 | Source-built installer tools | `definition-tools.json` | One five-component Linux ARM64 executable bundle; distinct from the acquired `operator-tools` |
 | Diagnostic controller profiles | `definition-profiles.json` | One native Linux ARM64 OCI image containing plain ARM64/Ubuntu 26.04 profile data at `/profiles`; not fleet profiles |
 

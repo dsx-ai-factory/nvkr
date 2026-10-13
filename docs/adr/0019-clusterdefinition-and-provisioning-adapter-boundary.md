@@ -54,8 +54,20 @@ to a decoded legacy description.
 
 NVKE or another downstream owner decides topology, node placement, deployment timing, installation, Helm
 application and reconciliation using accepted artifact references. NVKR has no provisioning-adapter interface or
-cluster qualification result. A future integration requires a concrete consumer and its own scoped contract;
-this decision reserves no unused runtime interface or qualification record.
+cluster qualification result. Its `nvkr.dev/release-description/v1` export describes the complete immutable
+publication using the same versioned JSON contract as release browsing. Exact output names and membership,
+artifact kinds, platform declarations, aggregate children, chart versions and output-bound source/evidence
+records are retained without translating component names into deployment roles or selecting one platform.
+Multiple repositories and revisions remain distinct facts; a consumer decides which combination it accepts.
+No Plan, mapping file or producer workspace is required alongside the pinned publication reference.
+
+Consumers own artifact selection, deployment-role mapping, installer formats, source compatibility and
+offline dependency completeness. These concerns do not become new Definition fields or an NVKR-owned
+installation schema. The description reports metadata inspection separately from the publisher's declared
+qualification and establishes no payload, signature, installation or release-policy acceptance. It owns no
+new build or release identity. See [release navigation](../release-navigation.md) for the data contract and
+the [NVKE handoff reference](../nvkr-to-nvke-demo.md) for that consumer's separate deployment boundary.
+This decision reserves no unused runtime interface or qualification record.
 
 Signer and authenticated-receipt roles remain mandatory security controls. Existing qualified release-policy
 compatibility and conformance receipts retain their exact subject, signer, policy and expiry checks. They do

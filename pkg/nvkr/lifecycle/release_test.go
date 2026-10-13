@@ -927,11 +927,12 @@ func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
 			for _, mode := range []struct {
-				name, value, inspection string
+				name, value, inspection, encryption string
 			}{{name: "strict"}, {name: "producer-only", value: string(DiskEvidenceBuildProvenance)},
+				{name: "public-bootstrap FDE", value: string(DiskEvidenceBuildProvenance), encryption: "luks2"},
 				{name: "historical producer-only", value: string(DiskEvidenceBuildProvenance), inspection: "deferred-m3"}} {
 				t.Run(mode.name, func(t *testing.T) {
-					layout, digest := testDiskPublication(t, arch, mode.value, mode.inspection)
+					layout, digest := testDiskPublication(t, arch, mode.value, mode.inspection, mode.encryption)
 					reference := "registry.example.test/product@" + digest
 					for _, minimum := range []DiskEvidenceRequirement{"", DiskEvidenceBuildProvenance, DiskEvidenceStrict} {
 						name := "default-producer-minimum"
@@ -983,8 +984,12 @@ func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
 	}
 }
 
-func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string) (string, string) {
+func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string, selectedEncryption ...string) (string, string) {
 	t.Helper()
+	encryption := "none"
+	if len(selectedEncryption) != 0 && selectedEncryption[0] != "" {
+		encryption = selectedEncryption[0]
+	}
 	ctx := t.Context()
 	payload := []byte("synthetic qcow2 envelope for consumer policy")
 	payloadPath := filepath.Join(t.TempDir(), "node.qcow2")
@@ -997,7 +1002,7 @@ func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string) (s
 	layout := filepath.Join(t.TempDir(), "disk")
 	transport, err := delivery.BuildDiskArtifact(ctx, layout, delivery.DiskArtifactRequest{Path: payloadPath,
 		Digest: payloadDigest, Size: int64(len(payload)), Platform: "linux/" + arch, Format: "qcow2",
-		Encryption: "none", ArtifactType: delivery.MediaDiskImage})
+		Encryption: encryption, ArtifactType: delivery.MediaDiskImage})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1010,7 +1015,7 @@ func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string) (s
 		t.Fatal(err)
 	}
 	disk := &delivery.DiskOutput{EvidenceMode: evidenceMode, PayloadDigest: payloadDigest,
-		Producer: "packer", Component: "image", Format: "qcow2", Encryption: "none", Size: int64(len(payload)),
+		Producer: "packer", Component: "image", Format: "qcow2", Encryption: encryption, Size: int64(len(payload)),
 		PlanDigest: planDigest, Outcome: "succeeded"}
 	artifact := Artifact{Name: "node-image", Kind: OutputDiskImage, Digest: diskInspection.ManifestDigest,
 		BuildDigest: buildDigest, Components: []string{"image"}, Disk: disk}

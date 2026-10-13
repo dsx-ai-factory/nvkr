@@ -85,7 +85,7 @@ func TestImageIndexRunRejectsMissingAndSiblingBindings(t *testing.T) {
 
 func TestPrepareRunFreezesExplicitNativeImageUses(t *testing.T) {
 	// Preparation consumes the validated frozen plan and does not need source credentials.
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestPrepareExactInputsFreezesImageIndexRequirements(t *testing.T) {
 		{"required platform", func(p *factory.ImageIndexPlan) { p.RequiredPlatforms[0] = "changed" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, err := factory.LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
+			plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +156,7 @@ func TestPrepareExactInputsFreezesImageIndexRequirements(t *testing.T) {
 			check()
 			// A second expectation from the untouched prepared inputs must not
 			// share either nested slice with the first expectation.
-			fresh, err := factory.LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
+			fresh, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}

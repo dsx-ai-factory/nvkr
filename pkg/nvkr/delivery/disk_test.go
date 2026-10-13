@@ -184,7 +184,8 @@ func TestBuildDiskArtifactFailsWithoutPartialOutput(t *testing.T) {
 	}{
 		{"unsupported platform", func(r *DiskArtifactRequest) { r.Platform = "linux/s390x"; r.Path = "missing" }, e.CodeEngineCapability},
 		{"raw format", func(r *DiskArtifactRequest) { r.Format = "raw"; r.Path = "missing" }, e.CodeEngineCapability},
-		{"encrypted", func(r *DiskArtifactRequest) { r.Encryption = "luks"; r.Path = "missing" }, e.CodeEngineCapability},
+		{"unknown encryption", func(r *DiskArtifactRequest) { r.Encryption = "luks"; r.Path = "missing" }, e.CodeEngineCapability},
+		{"missing encryption", func(r *DiskArtifactRequest) { r.Encryption = ""; r.Path = "missing" }, e.CodeEngineCapability},
 		{"missing type", func(r *DiskArtifactRequest) { r.ArtifactType = "" }, e.CodeVerifyFailed},
 		{"disposition not media type", func(r *DiskArtifactRequest) { r.ArtifactType = "attachment" }, e.CodeVerifyFailed},
 		{"invalid media type", func(r *DiskArtifactRequest) { r.ArtifactType = "application/a(b)" }, e.CodeVerifyFailed},

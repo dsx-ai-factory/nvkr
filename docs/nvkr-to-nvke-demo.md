@@ -104,8 +104,33 @@ not a completely offline deployment.
 
 Diagnostic registry copies do not equal NVKR publication/signing. Hosted
 Release consumption additionally requires consumer-policy verification and
-the source-owned NVKE converter's supported artifact mappings. A whole
+the downstream consumer's artifact selection and deployment mapping. A whole
 disk-containing Release is not established by a local demo.
+
+## Published release descriptions
+
+The generic [release description](release-navigation.md#export-a-complete-release-description) exports all
+published artifacts, platform metadata and exact source/evidence bindings from one immutable reference.
+It contains no NVKE installer roles or release-wide source pin. NVKE owns conversion into any installer
+format, source-checkout compatibility, chart values and the required artifact selection. That conversion
+is not supplied by NVKR's exporter. The existing local demo above retains its separate pinned installer path.
+
+The historical NKE consumer inspected at
+[`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e)
+compares a supplied source commit with the deployment checkout's HEAD and imports images named by
+deployment-item metadata. Extra runtime image references alone do not cause their import or rewrite chart
+values. Its [`FindLayout` implementation](https://github.com/dsx-ai-factory/nke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/nkerelease/chartlayer.go)
+finds a native manifest listed in a layout's `index.json`, either directly or in a direct child directory.
+An NVKR aggregate layout instead uses `index.json` as the aggregate and lists its native children;
+finding the aggregate by that consumer's lookup requires consumer-owned staging that preserves its digest.
+The generic published description retains the aggregate digest and exact children without staging packages.
+
+A pre-cutover 2026-10-10 probe of that exact `FindLayout` implementation passed eleven discovery checks using
+synthetic NKD native AMD64/ARM64 image layouts and a retained inspected AMD64 binary bundle. It checked direct and
+parent-directory lookup plus missing/duplicate/scaffolding-digest rejection. This is discovery evidence
+only, with no container import, executable runtime, Release authentication or offline installation claim.
+The [full-source gap map](full-nvke-source-build.md#offline-deployment-inventory) retains the inspected
+NKTP/clusterctl prerequisites and remaining offline work.
 
 ## Deploy retained completed Runs
 

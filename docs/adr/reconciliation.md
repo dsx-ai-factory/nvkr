@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-10-09. ADR-01–22 own the lane-specific engineering contracts pending named-decider
+Reviewed 2026-10-13. ADR-01–22 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -14,9 +14,10 @@ there is no authored Recipe, cluster topology, placement, inheritance or composi
 internal evidence records are generated or authenticated rather than separately authored public inputs.
 
 Planning, byte-exact GitHub generation, Plan/graph/diff views and metadata-only release navigation are
-implemented. Local immutable attempts and a Linux `pipeline-attested` / `artifact-publication` consumer
-are implemented. Browsing does not verify payload bytes, signatures or consumer policy. A supported
-artifact-publication result does not satisfy full v1 release or qualified acceptance; unsupported stronger
+implemented. Local immutable attempts and Linux `pipeline-attested` consumers for `authenticity` and
+`artifact-publication` are implemented. Authenticity verifies signatures and evidence without artifact
+payload downloads; artifact-publication retains payload integrity checks. Browsing does not verify payload
+bytes, signatures or consumer policy. Neither supported scope satisfies full v1 release or qualified acceptance; unsupported stronger
 scopes fail before work.
 
 Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
@@ -46,6 +47,14 @@ contracts and retained-disk diagnostics exist, but a successful real native NVKE
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
+The maintained M2 candidate selects 37 named outputs, retaining the previous 35 and adding native AMD64
+and ARM64 public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
+`build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected
+output membership must agree. Strict inspection/publication, qualified reproduction and private-passphrase
+FDE remain closed. The consumer's strict evidence policy still rejects producer-only disks. This integration
+has no recorded combined-pipeline, FDE publication or ARM64 FDE execution result; the earlier AMD64 diagnostic
+Run below establishes only its exact bake and raw transport.
+
 The separate FDE diagnostic route admits direct Packer only with explicit public `luks_passphrase=changeit`.
 It retains raw QCOW2 bytes locally or through a generated native ARC build-only workflow, without release
 publication, signing, inspection or confidentiality claims. Its separate `definitions/nvke-fde` selection
@@ -62,21 +71,21 @@ requires no GitHub secret; private passphrases remain unsupported.
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 01–03 Identity and errors | Canonical integer-only codec, frozen typed families, strict decoding, transport-free Build identity, whole-graph admission and stable coded errors | Independent-language corpus for every signed family; continuing external-failure contracts |
-| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound artifact-publication consumer with mandatory signature/provenance and exact closure | Earlier independent cosign and public/private consumer acceptance is recorded; M2 independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |
+| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound authenticity and artifact-publication consumers with separate capabilities; authenticity checks root/output signatures, production provenance and SBOM bundles without payloads | Authenticity has contract coverage only; no external consumer run recorded. Earlier independent cosign and public/private artifact-publication acceptance is recorded; M2 independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |
 | 05 Trust and membership | Subject-bound vectors, publisher evidence, required Inventory versus realized ReleaseSet, frozen lifecycle output slots | Signed cross-process publication of all authority records; governed coverage profiles |
 | 06 Status | Diagnostic document/checkpoint authentication, protected high-water reads and receipt-derived byte-CAS before withdrawal interpretation | Caller epoch is diagnostic. Production discovery, trusted-time/clearance integration, rotation, immutable v1 tags, revocation and channel concurrency are unimplemented |
 | 07–08 Reproduction | Linux stage-two helper/runtime/image and terminal-byte receipts, deterministic comparisons and profile matching | Provider receipts, other-platform authority, qualified helper images, independent two-machine bake-off and profile graduation |
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
-| 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected plain/public-bootstrap diagnostic execution; exact component/material bindings and acquisition-carrier retention | Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation, fused general wrapped-job phase isolation and embedded-version consistency remain closed |
+| 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected plain/public-bootstrap execution; exact component/material bindings and acquisition-carrier retention | Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation, fused general wrapped-job phase isolation and embedded-version consistency remain closed |
 | 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
-| 13 Evidence | Exact offline binary/image dependency scanning and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
-| 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted release/object-store delivery is unavailable |
+| 13 Evidence | Exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Factory callers retain ordinary hint-free dependency inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
+| 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed plain/public-bootstrap FDE OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; private-passphrase FDE, strict FDE and object-store delivery are unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics | Qualified receipt/clearance assembly, release-specific trusted time, M3 qualification and M4 manifests/revocation remain unimplemented |
-| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention and SDK/CLI delegation | No general resume protocol or authority restored by serialization; strict local publication, encrypted release publication and qualified lifecycle remain unavailable |
+| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention and SDK/CLI delegation | No general resume protocol or authority restored by serialization; strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable |
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
-| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
+| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays and exact toolchain substitutions | Pin-set loading needs pinned Git access. Curated graph/SBOM edges and embedded-version observation remain deferred. Exact pin identity is not external acquisition or production acceptance |
 
@@ -616,7 +625,7 @@ requirements. Aggregate signing/verification and finalization use only bounded m
 payload-layer download. Aggregate image outputs retain the exact index and native manifest/config membership
 in this metadata closure, including platform-scoped evidence. Output-local publication alone owns discovery
 image tags; unrelated outputs and the metadata-only release root receive no payload aliases. The independent
-Release consumer still checks complete payloads.
+Release consumer's artifact-publication scope still checks complete payloads.
 
 ADR-20 admits earlier-attempt output roots only within the same GitHub run and unchanged Plan, with exact
 repository/builder and preparation/signing/consuming-attempt ordering. Contracts cover retries, mixed
@@ -630,6 +639,48 @@ The root reader rejects extra blobs and bounds control/evidence to 512 MiB per r
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
 config-declared platforms and derived sibling locators, without reading payload layers or verifying policy.
 Filtering follows complete metadata validation; detached views establish no registry-availability claim.
+Artifact views also expose config-derived OS/architecture and Helm chart version (not appVersion), with
+native indexes retaining child platforms. Full Helm verification compares the config with Chart.yaml.
+Generic release export and JSON browsing share the explicit `nvkr.dev/release-description/v1` schema.
+Export requires only the immutable publication reference and preserves every named output, native platform,
+aggregate image-index digest/child membership and exact evidence/source binding. Source repository/commit
+descriptions come from output-bound source SBOM properties, without inferred Git tags or a release-wide
+source pin. Different revisions of one repository remain valid descriptive records. The inspection scope and
+individual checks performed are separate from publisher-declared qualification. No NVKE role dictionary,
+installer schema, separate Plan/mapping or unpublished workspace path remains. Consumer-owned code selects
+roles, compatible revisions, platforms and complete installation dependencies. The
+[release navigation reference](../release-navigation.md) owns the versioned contract. Targeted lifecycle,
+CLI, delivery and description tests cover complete membership, byte-identical unfiltered export/browse
+JSON, source binding, explicit inspection scope and admission. Before the namespace cutover, on 2026-10-10,
+the pinned Go 1.27.2 local completion gate passed with uncached tests, vet, lint, license, shell/Python checks
+and vulnerability scanning; the full uncached race suite also passed on macOS. Changed published documentation passed MDX and local-link
+checks; Fern site compilation was not run because Fern was unavailable.
+That pre-cutover validation does not validate the renamed reader. Those contracts do not establish a
+downstream consumer's acceptance of this wire schema. No complete offline installation or authenticated
+Release acceptance is established by export.
+
+On 2026-10-10, bounded inspection of retained metadata from
+[Run 37736529644](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37736529644) reproduced 34 outputs
+and five Helm chart versions: controller 0.1.1, PostgreSQL 18.5.15, SPIRE 0.30.1, SPIRE CRDs 0.6.1 and
+Temporal 0.74.0. The publication reference is
+`ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:2fef87f426734a4427f7694aaf5ac181ba11352ea37522349bbb9cda7d84dc42`.
+This was metadata inspection only; an earlier independent full-payload attempt authenticated the root and
+then failed downloading the ARM64 disk with an HTTP/2 `PROTOCOL_ERROR`. There is no successful full-release
+verification result from that attempt. The controller uses `33fb71b2f4224b470ebc628a9165fc4b92870406` and the
+CLI uses `ed9fb09b04fd40bf331d25df2222206ffaca593e` from the same NKE repository; matching ARM64 controller/CLI
+artifacts are absent. These are inventory facts. A downstream installer decides whether those revisions and
+platforms satisfy its requirements; generic export neither reconciles them nor requires an unpublished Plan.
+The generic CLI export was exercised against that exact retained metadata cache on 2026-10-10. It emitted
+`nkd.dev/release-description/v1` with all 34 outputs, 60 evidence entries and 23 source records: 16 native
+AMD64 outputs, 13 native ARM64 outputs and five charts without platform labels. It preserved both NKE
+revisions above and five distinct repository-spelling/commit pairs. This was a local-cache metadata export,
+not a fresh registry read, payload or signature verification, or installer-compatibility check. These are
+historical NKD namespace records: current NVKR readers reject their old schemas and digest families. The
+record does not establish current-schema external acceptance or authorize converting signed metadata.
+Separate direct Docker builds of the pinned profiles carrier passed the chart's `/bin/sh` and
+`cp -a /profiles/. /profiles-out/` operation with container networking disabled on ARM64 and emulated
+AMD64, plus the ARM64 local diagnostic profile. These checks establish the runnable carrier only, not
+NKD wrapped execution, publication, native AMD64 runtime, fleet profile validity or offline installation.
 [Registry browsing of the recorded candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
 retains the external scope and binary identity.
 
@@ -639,12 +690,14 @@ avoid restoring its full material closure on publication runners. Consumed carri
 storage but does not establish a measured hosted storage bound.
 
 ## Native ARC disk route
-The single checked-in `nvkr-run.yml` on `codex/fde-image-pipeline` selects the separate one-output FDE
-Definition and build-only Environment. The Makefile drift gate repeats the exact Definition and Environment
-paths recorded in the committed Plan. Dispatch does not choose among Definitions. The M2 candidate,
-retained deploy and three-output inputs can be generated into a scratch root with their matching byte-exact
-check. This feature-branch configuration is not a ratified canonical-product/path migration or
-publication-namespace decision; that named-decider governance remains pending. On October 13, 2026, the
+The single checked-in `nvkr-run.yml` selects the 37-output M2 Definition and its main-only publication
+Environment, including plain and public-bootstrap FDE disks on both native architectures. The Makefile drift
+gate repeats the exact Definition and Environment paths recorded in the committed Plan. Dispatch does not
+choose among Definitions. Alternate selections can be generated into a scratch root with their matching
+byte-exact check. The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
+and build-only Environment for the recorded diagnostic below. Neither candidate selection is a ratified
+canonical-product/path migration or publication-namespace decision; that named-decider governance remains
+pending. On October 13, 2026, the
 `nkd-arc` Environment admitted the exact FDE branch through deployment policy `62934956`, preserving its
 existing `main` and M2 validation-branch policies. That provider configuration is not execution evidence.
 
@@ -686,18 +739,18 @@ ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted poli
 The grouped helper retains original material and disk owners through reconciliation and packaging; generation
 contracts cover both architectures, individual-node bypass rejection and unsupported policy rejection. For
 publication workflows, source fetch, bootstrap and release credentials remain outside ARC jobs. Native preparation/measurement is provided
-separately. M2 now generates all 35 named outputs with two native disk jobs from the same Definition,
+separately. M2 now generates all 37 named outputs with four native disk jobs from the same Definition,
 an exact catalog overlay and measured native inspection profiles. Four toolchain images were
 published to internal GHCR packages under the user's scoped candidate exception, with exact
 manifest/config read-back. This is not completed organizational license/security review.
 Private pulls use a separate packages:read step whose temporary credentials are removed before
 execution; cached exact image identities are revalidated by the held runtime.
-Both native builds and terminal checks completed in run `37445475840`; both deep disk inspections timed out.
+Both native plain-image builds and terminal checks completed in run `37445475840`; both deep disk inspections timed out.
 The user earlier moved deep disk/content inspection and dependent reconciliation to M3. The narrower candidate
 `diskEvidence: build-provenance-v1` selects live producer/material evidence with signed uninspected scope,
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
 The [inspection deferral record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
-The strict inspection path remains available. The October 7, 2026 PR #97 task chat contains Ilya Kislenko's
+The plain-image strict inspection path remains available. The October 7, 2026 PR #97 task chat contains Ilya Kislenko's
 instruction: "Preserve main/#106: producer provenance for M2, inspection for M3". This is a task-chat instruction,
 not an independently published decider approval; no such approval record is supplied here.
 It supersedes the task's October 6 proposed strict M2 target while retaining main/#106's AMD64-only product
@@ -774,7 +827,7 @@ cutover, hosted publication, independent consumer acceptance or qualification.
 ## Maintained input and schema boundaries
 
 The [M2 Definition instructions](../../definitions/nvke-m2/README.md) own example-specific selection and input
-preparation. The candidate requires 35 named outputs: eleven CLI/controller/chart/operator/disk outputs plus twelve
+preparation. The candidate requires 37 named outputs: thirteen CLI/controller/chart/operator/disk outputs plus twelve
 third-party runtime images per native architecture. The chosen runtime-image set follows pinned deployment
 values, not chart defaults; chart-test images and NVKE images outside the disk retain explicit owner questions.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
@@ -805,6 +858,58 @@ finalization. Its branch exception and `build-provenance-v1` mode do not establi
 disk consumption, strict inspection, qualification, or organizational acceptance. Historical layout or
 source success never establishes a current source, policy, full inventory, or qualified result.
 
+On 2026-10-12, a local controlled Debian inspector API fixture run used the implementation at
+[source commit `28443004ad73ac6c69df60e10e032f6ca0cb209c`](https://github.com/dsx-ai-factory/nvkr/blob/28443004ad73ac6c69df60e10e032f6ca0cb209c/pkg/nvkr/sbom/debian_dependencies_integration_test.go).
+This is a local diagnostic observation, not an authenticated factory Run or approved toolchain. The native
+Linux ARM64 test executable was built with Go 1.27.2. The container used
+`ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3`,
+UID/GID `65534:65534`, `--read-only --network none --cap-drop ALL --security-opt no-new-privileges`,
+a read-only tool/test mount, and `--tmpfs /tmp:rw,nosuid,nodev,exec,size=256m`.
+Syft v1.51.1 ARM64 archive integrity matched the repository disk-inspector source pin
+`sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f`;
+its measured executable was `sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573`.
+The runtime's `dpkg-deb` 1.22.6 executable was
+`sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6`.
+These native diagnostic measurements are separate from the factory's scanner pin.
+
+| Controlled fixture | SHA-256 of archive bytes | Length |
+|---|---|---|
+| gzip | `ebf6ec1ed3830fe24ffdc9bd2339d8f427a5dc597ad4295224ac9da8586ef49a` | 612 bytes |
+| xz | `ee9bc9e457951f3510c72a564ff09e31095ac187b10e3e935dc5380d8a6f2563` | 748 bytes |
+
+Both fixtures yielded `pkg:deb/nvkr-debian-artifact-fixture@1.0.0?arch=arm64`. Pre-scan digest binding,
+original-fixture size stability, and non-archive bytes under a `.deb` hint were checked. This does not
+establish corrupt-payload rejection, complete embedded dependencies, source-created package delivery,
+signing, publication or installation. This historical revision exercised the filename-selected branch of
+`InspectDependencies`; it did not exercise the current separate `InspectDebianArchiveMetadata` API,
+the later diagnostic method, same-byte no-hint control or dependency BOM rejection guards.
+Native amd64 execution has not been recorded.
+
+On 2026-10-12, a separate local native Linux ARM64 run exercised the exact implementation at
+[source commit `8659cd28e5e615a8f490d0a302a419f329edc902`](https://github.com/dsx-ai-factory/nvkr/blob/8659cd28e5e615a8f490d0a302a419f329edc902/pkg/nvkr/sbom/debian_dependencies_integration_test.go).
+The Go 1.27.2 test executable was compiled before subsequent API edits. This run used the same Ubuntu image,
+Syft archive/executable and `dpkg-deb` executable identities, isolation flags and temporary-filesystem bound
+listed above, plus a read-only repository mount at `/workspace` with working directory
+`/workspace/pkg/nvkr/sbom` for catalog test fixtures. Both gzip/xz fixture digests, lengths and PURLs matched
+the earlier observation exactly.
+
+At this revision, filename-selected `InspectDependencies` returned `syft-debian-archive-metadata/v1`,
+with component type `library`, for both controlled packages. The same archive bytes scanned without the hint
+returned `CodeProvenanceMissing` and no accepted inventory. Actual fixture results were rejected by
+`WithDependencies` with `CodeUnsupported`. The separate
+[serialized BOM guard test](https://github.com/dsx-ai-factory/nvkr/blob/8659cd28e5e615a8f490d0a302a419f329edc902/pkg/nvkr/sbom/dependencies_test.go)
+rejected an injected diagnostic method with the then-current `CodeProvenanceMissing`; that test used a
+controlled component rather than the real scanner result. Scanner protocol, OCI isolation, filename-predicate
+and snapshot-mutation contract tests also passed in that runtime. Non-archive bytes were rejected.
+This observation does not exercise the subsequent separate `InspectDebianArchiveMetadata` API or establish
+corrupt-payload rejection, complete payload dependencies, source-created package delivery, signing,
+publication or installation. Native amd64 execution remains unrecorded.
+
+Current contract tests separately assert rejection of `syft-debian-archive-metadata/v1` by dependency SBOM
+attachment and serialized BOM validation. These tests do not retroactively strengthen the dated observation
+above. The [opt-in regression](../../pkg/nvkr/sbom/debian_dependencies_integration_test.go) must be rerun when
+changing either the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
+
 ## Remaining decisions
 
 Named-decider ratification and organizational toolchain/source/identity approval remain separate from candidate
@@ -818,6 +923,8 @@ loader/runtime closure, independent signed evidence, exact reproduction and any 
 Pinned-image helper transport cannot substitute for executable/runtime receipts. No missing stronger capability
 falls back to a diagnostic result, a v1 signature or an earlier historical success.
 
+## Consumer acceptance scopes
+
 Current publication-root v4 binds the exact Definition, Environment and Plan identities. Optional consumer
 expectations are checked before external work; the lifecycle owner authenticates the complete output match
 and issues a policy/publication-bound opaque receipt. Current readers reject historical v3 roots, including
@@ -828,3 +935,12 @@ defaults to `build-provenance-v1`; explicit `strict` requires inspected-disk evi
 defaults to strict and rejects the producer-only minimum. Every disk in the authenticated closure must
 meet that policy before a capability is issued. Synthetic publication contracts cover enforcement and
 failed-policy cleanup; they do not establish production disk-release acceptance.
+
+Consumer authenticity uses the same pinned reference and policy with a separate closeable
+`AuthenticatedRelease` capability. It validates the complete metadata/evidence closure, authenticates the
+root and every required named output's signature and subject-bound production provenance, and verifies
+required SBOM bundles. It applies the disk-evidence minimum without downloading or reinspecting artifact
+payloads. Its description reports `payloadIntegrityVerified: false`; it grants no payload export,
+exact-input receipt, qualification or revocation acceptance. Contract fixtures cover rejected signatures,
+missing or substituted evidence, whole-release membership, policy enforcement, capability separation and
+zero payload-layer retrieval. These are controlled contracts, not a recorded external authenticity run.

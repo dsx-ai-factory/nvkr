@@ -14,10 +14,9 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-// imageIndexTestPlan selects an offline subset from the recorded M2 Plan.
 func imageIndexTestPlan(t *testing.T) *Plan {
 	t.Helper()
-	plan, err := LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

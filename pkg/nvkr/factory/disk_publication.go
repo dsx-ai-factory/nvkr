@@ -11,7 +11,43 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
+
+// Publication supports public-bootstrap LUKS2 only in the explicit native
+// producer-provenance lane. Transport metadata cannot create this admission.
+func admitDiskPublicationEncryption(plan *Plan, producer ir.Node) error {
+	if err := pipeline.ValidateVMImagePackerDiskExecution(producer); err != nil {
+		return err
+	}
+	if producer.Disk.Encryption == "luks2" && (plan == nil || !diskBuildProvenance(plan) ||
+		plan.Qualification != TierPipelineAttested || plan.Environment.GitHubARC != "native-kvm-v1" || plan.Environment.Publication == nil) {
+		return e.New(e.CodeEngineCapability, "public-bootstrap LUKS2 publication requires native build-provenance evidence")
+	}
+	return nil
+}
+
+// plannedDiskPublicationEncryption binds the declaration to this exact named
+// output's frozen root before a package or restored payload is opened.
+func plannedDiskPublicationEncryption(plan *Plan, expected LifecycleOutputPlan) (string, error) {
+	_, artifacts := planIndex(plan)
+	raw, ok := artifacts[expected.ArtifactID]
+	if !ok || raw.BuildTarget != expected.Name || raw.Kind != PackageDiskImage {
+		return "", e.New(e.CodePipelineDrift, "disk publication lacks its exact planned raw root")
+	}
+	build, producer, err := plan.producerInstruction(planNode(plan, raw.Producer))
+	if err != nil {
+		return "", err
+	}
+	if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest || producer.Component != raw.Component {
+		return "", e.New(e.CodePipelineDrift, "disk publication root differs from its named Build identity")
+	}
+	if err := admitDiskPublicationEncryption(plan, producer); err != nil {
+		return "", err
+	}
+	return producer.Disk.Encryption, nil
+}
 
 func diskPublicationWrapperID(output LifecycleOutputPlan) string {
 	return "package/" + output.Name
@@ -37,6 +73,10 @@ func inspectFactoryDisk(ctx context.Context, plan *Plan, expected LifecycleOutpu
 	if platform == "" {
 		return delivery.DiskArtifactInspection{}, e.New(e.CodePipelineDrift, "disk wrapper has no exact planned build")
 	}
+	encryption, err := plannedDiskPublicationEncryption(plan, expected)
+	if err != nil {
+		return delivery.DiskArtifactInspection{}, err
+	}
 	held, err := delivery.OpenSingleDiskArtifact(ctx, artifact.Path, platform, 64<<30)
 	if err != nil {
 		return delivery.DiskArtifactInspection{}, err
@@ -46,8 +86,8 @@ func inspectFactoryDisk(ctx context.Context, plan *Plan, expected LifecycleOutpu
 	if err := errors.Join(profileErr, held.Close()); err != nil {
 		return delivery.DiskArtifactInspection{}, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "checking standard disk wrapper"))
 	}
-	if inspection.ArtifactType != artifact.MediaType || inspection.Encryption != "none" {
-		return delivery.DiskArtifactInspection{}, e.New(e.CodeVerifyFailed, "disk wrapper differs from planned artifact type or plain profile")
+	if inspection.ArtifactType != artifact.MediaType || inspection.Encryption != encryption {
+		return delivery.DiskArtifactInspection{}, e.New(e.CodeVerifyFailed, "disk wrapper differs from planned artifact type or encryption")
 	}
 	return inspection, nil
 }
@@ -128,7 +168,7 @@ func ObserveDiskPublicationPayload(ctx context.Context, plan *Plan, expected Lif
 	output := delivery.Output{Name: expected.Name, Kind: PackageDiskImage, Digest: inspection.ManifestDigest,
 		BuildDigest: expected.BuildDigest, Components: append([]string(nil), expected.Components...),
 		Disk: &delivery.DiskOutput{PayloadDigest: inspection.PayloadDigest, Producer: strings.TrimPrefix(raw.Producer, expected.Name+"/"),
-			Component: raw.Component, Format: "qcow2", Encryption: "none", Size: inspection.Size,
+			Component: raw.Component, Format: "qcow2", Encryption: inspection.Encryption, Size: inspection.Size,
 			PlanDigest: planDigest, Outcome: "succeeded", EvidenceMode: plan.Environment.DiskEvidence}}
 	if err := output.Validate(); err != nil {
 		return delivery.Output{}, err

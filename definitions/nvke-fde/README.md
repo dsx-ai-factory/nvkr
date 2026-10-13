@@ -1,6 +1,8 @@
 # FDE-only branch build
 
 This Definition selects one native AMD64 QCOW2 and its complete eleven-component material closure.
+The maintained [M2 pipeline](../nvke-m2/README.md) includes both native FDE outputs with build-provenance
+publication; this separate selection retains the smaller build-only diagnostic route.
 It reuses the M2 OS catalog and native toolchain pins, selecting the separate `nvke-node-fde-amd64`
 producer. Other M2 outputs and the plain disk are absent. Material producers still run because their
 bytes are required by the FDE image; this does not introduce cross-Run cache reuse.
@@ -38,24 +40,29 @@ The image is for build iteration. Cloning its LUKS payload preserves the volume 
 does not rotate that key. The public golden image therefore supplies no confidentiality guarantee for
 later deployed clones. `swtpm` is unnecessary for baking; testing enrollment requires a separate boot test.
 
-## Generate and dispatch
+## Inspect the standalone bundle
 
 From the repository root with the Go patch in `.go-version`:
 
 ```sh
+fde_bundle_root=$(mktemp -d)
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
   --definition definitions/nvke-fde/definition.yaml \
   --environment definitions/nvke-fde/environment-github.yaml \
-  --engine github --root .
-make workflows-check
+  --engine github --root "$fde_bundle_root"
+GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
+  --definition definitions/nvke-fde/definition.yaml \
+  --environment definitions/nvke-fde/environment-github.yaml \
+  --engine github --root "$fde_bundle_root" --check
 ```
 
-Generation deliberately replaces the branch's managed workflow, Plan and manifest. It does not modify
-the M2 Definition or authorize registry publication. The drift gate repeats the selected paths in the
-committed Plan, so it checks the FDE bundle on this branch and M2 when that selection is restored.
-Do not hand-edit the rendered workflow or Plan.
+This writes a scratch workflow, Plan and manifest for the standalone selection. It does not authorize
+registry publication. The maintained repository bundle and tests select the combined M2 pipeline;
+`make workflows-check` verifies that committed selection. Do not hand-edit rendered files or replace
+the maintained bundle with this alternate selection in a PR to main.
 
-After committing and pushing the reviewed branch and admitting it in `nkd-arc`:
+The recorded diagnostic branch already contains its reviewed standalone bundle and exact `nkd-arc`
+branch admission. Its workflow can be dispatched separately:
 
 ```sh
 gh workflow run nvkr-run.yml --repo dsx-ai-factory/nvkr --ref codex/fde-image-pipeline

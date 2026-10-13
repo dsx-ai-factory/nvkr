@@ -51,18 +51,25 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	expected := map[string]struct{ platform, root, variant, encryption string }{
+		"nvke-node-fde-amd64":   {"linux/amd64", "nvke-node-fde-amd64", "fde", "luks2"},
+		"nvke-node-fde-arm64":   {"linux/arm64", "nvke-node-fde-arm64", "fde", "luks2"},
+		"nvke-node-image-amd64": {"linux/amd64", "nvke-node-image-amd64", "non-fde", "none"},
+		"nvke-node-image-arm64": {"linux/arm64", "nvke-node-image", "non-fde", "none"},
+	}
 	seen := make(map[string]bool)
 	for _, output := range authored.Outputs {
 		if output.Format != definition.OutputDiskImage {
 			continue
 		}
-		if output.Platform != "linux/amd64" && output.Platform != "linux/arm64" {
-			t.Fatalf("unsupported native disk platform %s", output.Platform)
+		want, ok := expected[output.Name]
+		if !ok || output.Platform != want.platform {
+			t.Fatalf("unexpected native disk output %s/%s", output.Name, output.Platform)
 		}
-		if seen[output.Platform] {
-			t.Fatalf("duplicate native disk platform %s", output.Platform)
+		if seen[output.Name] {
+			t.Fatalf("duplicate native disk output %s", output.Name)
 		}
-		seen[output.Platform] = true
+		seen[output.Name] = true
 		t.Run(output.Name, func(t *testing.T) {
 			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(inputRoot, output.Catalog.Base)))
 			if err != nil {
@@ -87,9 +94,9 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			root := "nvke-node-image"
-			if output.Platform == "linux/amd64" {
-				root += "-amd64"
+			root, err := DiskRootName(selected.Components)
+			if err != nil || root != want.root {
+				t.Fatalf("selected disk root = %q, want %q: %v", root, want.root, err)
 			}
 			graph, err := CompileForHostPlatforms(selected, map[string]execution.HostPlatform{root: execution.HostPlatform(output.Platform)})
 			if err != nil {
@@ -112,8 +119,12 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != approvedSource {
 					t.Fatalf("native source/toolchain binding changed: %+v", node)
 				}
-				if node.Packer == nil || node.Packer.AcquisitionArchive != "non-fde/apt-acquisitions.tar" {
+				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {
 					t.Fatal("capture carrier did not reach compiled graph")
+				}
+				if node.ArtifactPath != want.variant+"/nke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
+					node.Packer.BuildName != "nke-node-"+want.variant+".qemu.nke-"+want.variant {
+					t.Fatal("selected disk variant did not reach the source target and output paths")
 				}
 				capture := false
 				for _, variable := range node.Packer.Variables {
@@ -160,7 +171,7 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			}
 		})
 	}
-	if len(seen) != 2 || !seen["linux/amd64"] || !seen["linux/arm64"] {
-		t.Fatal("both native disk capture graphs are required")
+	if len(seen) != len(expected) {
+		t.Fatal("both FDE and non-FDE capture graphs are required on each native architecture")
 	}
 }
