@@ -91,6 +91,10 @@ func admittedAuthenticator(ctx context.Context, options RegistryOptions) (observ
 	if err := options.Transport.Validate(); err != nil {
 		return nil, err
 	}
+	if options.Transport.Anonymous && options.Credential != (sign.Credential{}) {
+		return nil, e.New(e.CodeUsage, "anonymous observation transport rejects explicit cosign registry credentials")
+	}
+
 	if !safetext.Valid(options.Identity, 4096, false) || !safetext.Valid(options.Issuer, 4096, false) || strings.TrimSpace(options.Identity) != options.Identity || strings.TrimSpace(options.Issuer) != options.Issuer || !canonical.IsDigest(options.CosignDigest) || options.CosignBinary == "" {
 		return nil, e.New(e.CodeTrustPolicyMissing, "observation authentication requires independently selected identity, issuer and cosign executable pin")
 	}
@@ -439,6 +443,29 @@ func pinnedReference(reference string) (registry.Reference, error) {
 	return parsed, nil
 }
 
+// ValidateReference admits pinned registry coordinates and transport without file,
+// keychain, executable or network work. It supplies no signature authority.
+func ValidateReference(reference string, options delivery.RegistryOptions) error {
+	parsed, err := pinnedReference(reference)
+	if err != nil {
+		return err
+	}
+	if err := options.Validate(); err != nil {
+		return err
+	}
+	return validateTransportOrigin(parsed.Registry, options)
+}
+func validateTransportOrigin(registryHost string, options delivery.RegistryOptions) error {
+	if options.PlainHTTP {
+		host := (&url.URL{Host: registryHost}).Hostname()
+		ip := net.ParseIP(host)
+		if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
+			return e.New(e.CodeUsage, "plain HTTP observation transport is restricted to explicit loopback fixtures")
+		}
+	}
+	return nil
+}
+
 func observationRepository(reference string, options delivery.RegistryOptions) (*remote.Repository, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
@@ -447,12 +474,8 @@ func observationRepository(reference string, options delivery.RegistryOptions) (
 	if err != nil || parsed.Registry+"/"+parsed.Repository != reference || parsed.Reference != "" {
 		return nil, e.New(e.CodeUsage, "observation publication requires a canonical untagged repository")
 	}
-	if options.PlainHTTP {
-		host := (&url.URL{Host: parsed.Registry}).Hostname()
-		ip := net.ParseIP(host)
-		if host != "localhost" && (ip == nil || !ip.IsLoopback()) {
-			return nil, e.New(e.CodeUsage, "plain HTTP observation transport is restricted to explicit loopback fixtures")
-		}
+	if err := validateTransportOrigin(parsed.Registry, options); err != nil {
+		return nil, err
 	}
 	repo, err := remote.NewRepository(reference)
 	if err != nil {

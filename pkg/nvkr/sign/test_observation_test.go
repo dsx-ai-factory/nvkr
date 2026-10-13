@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -82,6 +83,19 @@ func TestObservationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testing.
 			}
 			stub := &cosignStub{stdout: map[string]string{"download": observationBundle(t, digest, typ, identity, issuer, []byte(document))}}
 			stub.onCall = func(call recordedCall) error {
+				configDir := ""
+				for _, entry := range call.env {
+					if strings.HasPrefix(entry, "DOCKER_CONFIG=") {
+						configDir = strings.TrimPrefix(entry, "DOCKER_CONFIG=")
+					}
+				}
+				if configDir == "" {
+					t.Fatal("credential-free observation can consult ambient Docker keychain")
+				}
+				configBytes, configErr := os.ReadFile(filepath.Join(configDir, "config.json"))
+				if configErr != nil || string(configBytes) != `{"auths":{}}` {
+					t.Fatal("observation did not select explicit empty credential config", configErr)
+				}
 				if call.args[0] == tc.failure {
 					return fmt.Errorf("injected failure")
 				}

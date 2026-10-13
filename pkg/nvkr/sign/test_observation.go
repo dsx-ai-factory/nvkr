@@ -58,7 +58,7 @@ func (s *CosignOCISigner) AttestTestObservation(ctx context.Context, subject Sub
 	if err := writePrivateFile(ctx, path, exact); err != nil {
 		return err
 	}
-	dockerConfig, err := s.writeDockerConfig(ctx, workspace)
+	dockerConfig, err := s.writeObservationDockerConfig(ctx, workspace)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (s *CosignOCISigner) VerifyTestObservation(ctx context.Context, subject Sub
 		return err
 	}
 	defer cleanup()
-	dockerConfig, err := s.writeDockerConfig(ctx, workspace)
+	dockerConfig, err := s.writeObservationDockerConfig(ctx, workspace)
 	if err != nil {
 		return err
 	}
@@ -149,4 +149,20 @@ func requireObservationPredicate(predicate []byte) error {
 		return e.New(e.CodeVerifyFailed, "test observation requires exact canonical predicate bytes")
 	}
 	return nil
+}
+
+// Even credential-free observation operations select an explicit empty private
+// Docker config so cosign cannot consult an ambient HOME keychain.
+func (s *CosignOCISigner) writeObservationDockerConfig(ctx context.Context, workspace string) (string, error) {
+	if !s.credential.empty() {
+		return s.writeDockerConfig(ctx, workspace)
+	}
+	dir := filepath.Join(workspace, dockerConfigDirName)
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		return "", e.Wrap(e.CodeInternal, err, "creating empty private registry config")
+	}
+	if err := writePrivateFile(ctx, filepath.Join(dir, dockerConfigFileName), []byte(`{"auths":{}}`)); err != nil {
+		return "", err
+	}
+	return dir, nil
 }

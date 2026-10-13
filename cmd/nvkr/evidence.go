@@ -6,11 +6,13 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	client "github.com/dsx-ai-factory/nvkr/client/v1"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testobservation"
 	"github.com/urfave/cli/v2"
 )
@@ -26,10 +28,17 @@ func evidenceRegistryFlags() []cli.Flag {
 	}
 }
 func evidenceOptions(c *cli.Context) testobservation.RegistryOptions {
-	return testobservation.RegistryOptions{
+	options := testobservation.RegistryOptions{
 		Transport:    delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
 		CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"), Identity: c.String("identity"), Issuer: c.String("issuer"),
 	}
+	if !c.Bool("anonymous") {
+		options.Transport.Username = os.Getenv("NVKR_REGISTRY_USER")
+		options.Transport.Password = os.Getenv("NVKR_REGISTRY_PASSWORD")
+		options.Credential = sign.Credential{Registry: os.Getenv("NVKR_REGISTRY"), Username: options.Transport.Username, Password: options.Transport.Password}
+	}
+	return options
+
 }
 
 func cmdEvidence() *cli.Command {
