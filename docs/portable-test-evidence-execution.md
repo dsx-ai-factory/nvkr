@@ -56,7 +56,12 @@ nvkr evidence verify --locator reviewed-locator.json --expected independent-expe
 ```
 
 These are operator command templates; the repository, identity, issuer and destinations are explicitly
-selected policy inputs. No public destination is configured by this feature. Publication uploads exact
+selected policy inputs. No public destination is configured by this feature. Observation transport requires
+explicit `--anonymous` or complete host-scoped credentials through `NVKR_REGISTRY`, `NVKR_REGISTRY_USER`
+and `NVKR_REGISTRY_PASSWORD`. Anonymous mode ignores these environment credentials. Ambient Docker
+keychains and credential helpers are never consulted, because their resolution does not honor request
+cancellation. Cosign uses only an explicit private credential configuration, empty in anonymous mode.
+Publication uploads exact
 content, attaches the fixed observation predicate and independently verifies the served content before
 reporting success. Partial effects retain a locator and `successful: false`; they confer no authority.
 Publication can record a failed test without issuing passing qualification.

@@ -299,7 +299,7 @@ func TestObservationRejectsNoncanonicalSignerBeforeWork(t *testing.T) {
 	for _, v := range []string{" padded ", "identity\u202ehidden", "identity\x1b[2J"} {
 		for _, field := range []string{"identity", "issuer"} {
 			t.Run(field+v, func(t *testing.T) {
-				options := RegistryOptions{Identity: "https://identity.example/issuer", Issuer: "https://issuer.example", CosignBinary: "/must-not-open", CosignDigest: rawPin("fixture")}
+				options := RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}, Identity: "https://identity.example/issuer", Issuer: "https://issuer.example", CosignBinary: "/must-not-open", CosignDigest: rawPin("fixture")}
 				if field == "identity" {
 					options.Identity = v
 				} else {
@@ -353,4 +353,43 @@ func TestObservationCredentialsCannotFollowAnotherRegistryLocator(t *testing.T) 
 	if err := options.ValidateReference("registry.example/evidence@" + rawPin("x")); err == nil {
 		t.Fatal("transport credential lacks independent host scope")
 	}
+}
+
+func TestObservationRequiresExplicitAuthenticationBeforeWork(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		transport delivery.RegistryOptions
+		code      e.Code
+	}{
+		{"no-mode", delivery.RegistryOptions{}, e.CodeTrustPolicyMissing},
+		{"username-only", delivery.RegistryOptions{Username: "fixture"}, e.CodeUsage},
+		{"password-only", delivery.RegistryOptions{Password: "fixture"}, e.CodeUsage},
+		{"anonymous-with-credentials", delivery.RegistryOptions{Anonymous: true, Username: "fixture", Password: "fixture"}, e.CodeUsage},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			options := RegistryOptions{Transport: tt.transport, CosignBinary: "/must-not-open"}
+			reference := "registry.invalid/observations@" + rawPin("fixture")
+			requireCode(t, ValidateReference(reference, tt.transport), tt.code)
+			requireCode(t, options.ValidateReference(reference), tt.code)
+			_, err := observationRepository("registry.invalid/observations", tt.transport)
+			requireCode(t, err, tt.code)
+			_, err = admittedAuthenticator(t.Context(), options)
+			requireCode(t, err, tt.code)
+			_, err = Publish(t.Context(), "/must-not-open", "registry.invalid/observations", options)
+			requireCode(t, err, tt.code)
+			_, err = VerifyOCI(t.Context(), reference, Expected{}, options)
+			requireCode(t, err, tt.code)
+		})
+	}
+}
+
+func TestObservationAuthenticationAdmissionPreservesCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err := admittedAuthenticator(ctx, RegistryOptions{})
+	requireCode(t, err, e.CodeTimeout)
+	_, err = Publish(ctx, "/must-not-open", "registry.invalid/observations", RegistryOptions{})
+	requireCode(t, err, e.CodeTimeout)
+	_, err = VerifyOCI(ctx, "registry.invalid/observations@"+rawPin("fixture"), Expected{}, RegistryOptions{})
+	requireCode(t, err, e.CodeTimeout)
 }

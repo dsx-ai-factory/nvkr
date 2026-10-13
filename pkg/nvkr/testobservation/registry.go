@@ -24,8 +24,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/name"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
@@ -85,11 +83,29 @@ type observationAuthenticator interface {
 }
 
 func validateCredentialScope(host string, options RegistryOptions) error {
+	if err := validateObservationAuthentication(options.Transport); err != nil {
+		return err
+	}
+	if options.Transport.Anonymous && options.Credential != (sign.Credential{}) {
+		return e.New(e.CodeUsage, "anonymous observation transport rejects explicit cosign registry credentials")
+	}
 	if options.Credential != (sign.Credential{}) && options.Credential.Registry != host {
 		return e.New(e.CodeUsage, "observation credential is outside the independently selected registry host")
 	}
 	if (options.Transport.Username != "" || options.Transport.Password != "") && (options.Credential.Registry != host || options.Transport.Username != options.Credential.Username || options.Transport.Password != options.Credential.Password) {
 		return e.New(e.CodeUsage, "explicit observation transport credentials require the same host-scoped cosign credential")
+	}
+	return nil
+}
+
+// Observation authentication never consults ambient Docker configuration or helpers.
+// Both registry transport and cosign must use the independently supplied mode.
+func validateObservationAuthentication(options delivery.RegistryOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
+	if !options.Anonymous && (options.Username == "" || options.Password == "") {
+		return e.New(e.CodeTrustPolicyMissing, "observation registry requires explicit anonymous mode or username/password credentials")
 	}
 	return nil
 }
@@ -110,7 +126,7 @@ func admittedAuthenticator(ctx context.Context, options RegistryOptions) (observ
 	if err := captureContext(ctx); err != nil {
 		return nil, err
 	}
-	if err := options.Transport.Validate(); err != nil {
+	if err := validateObservationAuthentication(options.Transport); err != nil {
 		return nil, err
 	}
 	if options.Transport.Anonymous && options.Credential != (sign.Credential{}) {
@@ -143,6 +159,9 @@ type Published struct {
 }
 
 func Publish(ctx context.Context, root, repository string, options RegistryOptions) (*Published, error) {
+	if err := captureContext(ctx); err != nil {
+		return nil, err
+	}
 	parsed, parseErr := registry.ParseReference(repository)
 	if parseErr != nil || parsed.Registry+"/"+parsed.Repository != repository || parsed.Reference != "" {
 		return nil, e.New(e.CodeUsage, "canonical untagged observation repository required")
@@ -346,6 +365,9 @@ func (v *Verified) Close() error {
 }
 
 func VerifyOCI(ctx context.Context, reference string, expected Expected, options RegistryOptions) (*Verified, error) {
+	if err := captureContext(ctx); err != nil {
+		return nil, err
+	}
 	if err := options.ValidateReference(reference); err != nil {
 		return nil, err
 	}
@@ -489,7 +511,7 @@ func ValidateReference(reference string, options delivery.RegistryOptions) error
 	if err != nil {
 		return err
 	}
-	if err := options.Validate(); err != nil {
+	if err := validateObservationAuthentication(options); err != nil {
 		return err
 	}
 	return validateTransportOrigin(parsed.Registry, options)
@@ -506,7 +528,7 @@ func validateTransportOrigin(registryHost string, options delivery.RegistryOptio
 }
 
 func observationRepository(reference string, options delivery.RegistryOptions) (*remote.Repository, error) {
-	if err := options.Validate(); err != nil {
+	if err := validateObservationAuthentication(options); err != nil {
 		return nil, err
 	}
 	parsed, err := registry.ParseReference(reference)
@@ -532,21 +554,6 @@ func observationRepository(reference string, options delivery.RegistryOptions) (
 		return nil
 	}}
 	credential := auth.Credential{Username: options.Username, Password: options.Password}
-	if !options.Anonymous && options.Password == "" {
-		nameRepo, err := name.NewRepository(reference, name.StrictValidation)
-		if err != nil {
-			return nil, e.Wrap(e.CodeUsage, err, "admitting registry keychain host")
-		}
-		resolved, err := authn.DefaultKeychain.Resolve(nameRepo)
-		if err != nil {
-			return nil, e.Wrap(e.CodeTrustPolicyMissing, err, "resolving observation registry credentials")
-		}
-		config, err := resolved.Authorization()
-		if err != nil {
-			return nil, e.Wrap(e.CodeTrustPolicyMissing, err, "loading observation registry credentials")
-		}
-		credential = auth.Credential{Username: config.Username, Password: config.Password, RefreshToken: config.IdentityToken, AccessToken: config.RegistryToken}
-	}
 	repo.Client = &auth.Client{Client: client, Cache: auth.NewCache(), Credential: auth.StaticCredential(parsed.Registry, credential)}
 	return repo, nil
 }
