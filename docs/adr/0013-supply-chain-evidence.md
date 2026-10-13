@@ -389,7 +389,28 @@ The separate `InspectDebianArchiveMetadata` diagnostic always uses the constant 
 supplies no format or identity proof. Syft parses a private read-only copy of the held bytes, rechecked against
 the digest after scanning. Its result uses the diagnostic method `syft-debian-archive-metadata/v1`, which
 dependency SBOM attachment and serialized BOM validation reject. Package/control metadata cannot become
-payload dependency evidence. The ordinary path-based `InspectDependencies` and held-only
+payload dependency evidence. The separate `DiskInspectionRuntime.InspectDebianPackageContent` operation
+reuses the complete admitted Linux content-inspection profile and pinned `dpkg-deb` reader. It requires
+an exact archive digest, positive length within the reader's 1 GiB bound and a concrete consumer platform.
+The runtime reserves capacity before opening the caller path, owns an anonymous exact-byte snapshot,
+validates Package/Version/Architecture and expands the package data filesystem for scanner discovery and
+file hashing. The native inspection host and consumer architecture remain separate. Subject/runtime
+revalidation and owned cleanup must complete before an immutable content observation is returned.
+`DiskContentDocument` can describe that observation's exact archive subject through its existing admitted
+method; this adds no scanner-method exception. The operation neither rewrites the package nor executes
+its maintainer scripts. Control-script inventory, complete dependency coverage, original producer/Run joins,
+standalone factory packaging, signing, publication and install acceptance are not established by this API.
+Controlled snapshot/runtime tests do not establish a real complete package or container-service run.
+
+For the compiled standalone Debian producer, `PerArtifact` revalidates the complete resolved graph and
+matches its Build identity before taking the selected toolchain from the lowered build node. The source
+subject retains the resolved distribution profile and platform without changing the catalog's route
+declarations. These are source/recipe descriptions, not observed Debian control metadata, producer receipts
+or dependency discovery. In particular its source-tag version does not supply the Debian package Version.
+The existing `WithSourceSubject` composition can retain that description only when the exact archive subject
+and Build agree with an issued content document; the factory live-producer/inspection join remains deferred.
+
+The ordinary path-based `InspectDependencies` and held-only
 `InspectHeldDependencies` APIs retain hint-free host-file scanning; OCI scanning is unaffected.
 The Syft v1.51.1 discovery premise is version-specific: rerun the opt-in regression when changing either
 the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.

@@ -17,6 +17,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/discoverytags"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
@@ -30,6 +31,9 @@ const (
 	OutputAPT                    = "apt-repository"
 	OutputHelm                   = "helm-oci"
 	OutputDiskImage              = "disk-image"
+	OutputDebianPackage          = "debian-package"
+	PublicationTransportAPT      = "apt"
+	PublicationTransportOCI      = "oci"
 	BuildNetworkOfflineOnly      = "offline-only"
 	BuildNetworkProducerDeclared = "producer-declared"
 )
@@ -64,14 +68,15 @@ type Catalog struct {
 // DefinitionOutput is a named artifact slot frozen before a run. Components
 // selects exact outputs of one build; format selects the standard envelope.
 type DefinitionOutput struct {
-	Name       string      `json:"name"`
-	Platform   string      `json:"platform,omitempty"`
-	Platforms  []string    `json:"platforms,omitempty"`
-	Catalog    *Catalog    `json:"catalog,omitempty"`
-	Components []string    `json:"components,omitempty"`
-	Format     string      `json:"format"`
-	APT        *APTOutput  `json:"apt,omitempty"`
-	Helm       *HelmOutput `json:"helm,omitempty"`
+	Name       string        `json:"name"`
+	Platform   string        `json:"platform,omitempty"`
+	Platforms  []string      `json:"platforms,omitempty"`
+	Catalog    *Catalog      `json:"catalog,omitempty"`
+	Components []string      `json:"components,omitempty"`
+	Format     string        `json:"format"`
+	APT        *APTOutput    `json:"apt,omitempty"`
+	Debian     *DebianOutput `json:"debian,omitempty"`
+	Helm       *HelmOutput   `json:"helm,omitempty"`
 }
 
 // HelmOutput maps chart image slots to named OCI outputs. Repository locations
@@ -83,6 +88,12 @@ type HelmOutput struct {
 type APTOutput struct {
 	Distribution string `json:"distribution"`
 	Component    string `json:"component"`
+}
+
+// DebianOutput selects a source-owned distribution/ABI profile, independently of
+// an APT publication suite. Omission resolves the standalone default at compilation.
+type DebianOutput struct {
+	Distribution string `json:"distribution,omitempty"`
 }
 
 // Environment contains settings independently selected for one run. Publish
@@ -120,8 +131,12 @@ type SourceAccess struct {
 	CredentialRef string `json:"credentialRef"`
 }
 
-// Publication selects one OCI namespace. Release metadata/evidence use /releases; outputs use named sibling repositories.
+// Publication selects required transports. The admitted OCI route uses one namespace;
+// release metadata/evidence use /releases and outputs use named sibling repositories.
 type Publication struct {
+	// Transports is a sorted, unique selection. Omission preserves the OCI route.
+	// APT is recognized but unavailable until its publication adapter is admitted.
+	Transports []string `json:"transports,omitempty"`
 	// Mode selects output-local publication and metadata-only release assembly.
 	Mode string `json:"mode,omitempty"`
 	// ImageTags selects mutable discovery aliases for exact aggregate OCI outputs.
@@ -179,7 +194,7 @@ func (definition Definition) Validate() error {
 		if output.Catalog != nil && output.Catalog.Base == "" {
 			return e.New(e.CodeInvalidCatalog, "output %q has an empty catalog override", output.Name)
 		}
-		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage {
+		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage && output.Format != OutputDebianPackage {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has unsupported format %q", output.Name, output.Format)
 		}
 		if output.Format == OutputHelm {
@@ -191,6 +206,23 @@ func (definition Definition) Validate() error {
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
+		}
+		if output.Format == OutputDebianPackage {
+			if len(output.Components) != 1 {
+				return e.New(e.CodeInvalidCatalog, "Debian output %q requires one source producer", output.Name)
+			}
+			request := output.DebianTargetRequest()
+			if request.Distribution == "" {
+				request.Distribution = target.DefaultDebianDistribution
+			}
+			if request.Platform == "" {
+				request.Platform = target.DefaultDebianPlatform
+			}
+			if err := request.Validate(); err != nil {
+				return err
+			}
+		} else if output.Debian != nil {
+			return e.New(e.CodeInvalidCatalog, "output %q has Debian-only settings", output.Name)
 		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {
@@ -301,6 +333,9 @@ func (environment Environment) Validate() error {
 		}
 	}
 	if publication := environment.Publication; publication != nil {
+		if err := publication.validateTransports(); err != nil {
+			return err
+		}
 		if publication.Mode != "" && (publication.Mode != "per-output-v1" || environment.Signing == nil || environment.Signing.Mode != "cosign") {
 			return e.New(e.CodeEngineCapability, "per-output publication requires production cosign signing")
 		}

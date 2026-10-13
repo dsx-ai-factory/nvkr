@@ -164,6 +164,9 @@ func validateComponentTargets(name string, platforms []string) error {
 }
 
 func validateComponent(name string, c Component) error {
+	if c.Debian != nil || c.OutputType == OutputDebianPackage {
+		return validateDebianProducer(name, c)
+	}
 	if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
 		return err
 	}

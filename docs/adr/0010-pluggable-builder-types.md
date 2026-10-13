@@ -32,6 +32,13 @@ hold, and the trust/verify model is untouched.
 
 ## Decision
 
+An explicit `debian-package` source producer has catalog/graph compilation support through complete
+distribution/platform routes under ADR-12. Each route retains source-owned argv, exact toolchain pin and
+the final archive path in a private output directory. It uses the existing OCI-hermetic substrate; it is
+neither a new builder nor the loose-binary `host-package` wrapper. Runtime execution remains gated before
+work until the factory joins final-byte inspection, producer evidence and package observations. Controlled
+compilation tests establish no real package build, ABI support or installation behavior.
+
 Adopt a **builder abstraction**: one intermediate representation (IR), many builder types — the build-execution
 analogue of "one IR, many CI adapters." Nix is **orchestrated as a subprocess** inside a pinned container, never
 linked into the core, exactly as other external tools are treated. That satisfies the Apache-2.0 linkage

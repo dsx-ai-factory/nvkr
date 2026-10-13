@@ -22,6 +22,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		return Component{}, e.New(e.CodeInvalidCatalog, "component %q: toolchain override requires a from-source build", name)
 	}
 	c := Component{
+		Debian:          CloneDebianSpec(raw.Debian),
 		Helm:            raw.Helm,
 		Platforms:       append([]string(nil), raw.Platforms...),
 		FromSource:      raw.FromSource,

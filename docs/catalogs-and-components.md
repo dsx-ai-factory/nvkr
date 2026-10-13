@@ -151,6 +151,26 @@ versionStamp:
 These are build inputs, not labels added after the build. For the pinned tag `cli/v0.1.0-rc.2`,
 `.ModuleTag` is `v0.1.0-rc.2`; `.Version` is `0.1.0-rc.2`.
 
+## Debian producer compilation groundwork
+
+The explicit Debian producer schema and graph compiler currently provide configuration groundwork only.
+A `debian-package` component declares complete `debian.routes`, each with a distribution/platform `target`,
+digest-pinned `toolchainImage`, source-owned `buildCommand`, `artifactPath` and private `writeDir`.
+Commands and installation layout belong to the source. Common command/path/toolchain fields cannot compete
+with route fields. The complete route set must be sorted and unique and cover every declared platform.
+Source-specific distribution inputs belong in exact route arguments; only the existing `{{.Arch}}` token
+is substituted. A distribution profile key is separate from the APT publication suite and package version.
+
+Direct compiler selection resolves standalone defaults to `ubuntu-24.04` and `linux/amd64` only when that
+exact route exists, then binds the selected target and source archive path into Build identity. A Definition
+may select one such producer with `format: debian-package`, optional `debian.distribution` and optional
+standalone `platform`. The compiled Plan retains and rederives the resolved target and required raw archive;
+this admits compilation and Plan inspection only. Local execution and GitHub generation fail before work until the
+archive inspection/evidence joins are implemented. Actual OS/image dependency binding, ABI compatibility,
+package signing, publication and installation acceptance remain deferred. See
+[ADR-12](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0012-criteria-model-and-aicr-activation.md)
+and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
+
 ## Run the local lab
 
 Use macOS or Linux with Bash 3.2+, Git, Make, `jq`, GNU `timeout` or `gtimeout`, a SHA-256 utility

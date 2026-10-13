@@ -34,8 +34,18 @@ cross-environment byte-identity.
 
 ### 2. Target configuration surface
 
-Environment (`nvkr.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
-credential references and signing identity/issuer policy. `publication.repositoryPrefix` is an explicitly
+Environment (`nvkr.dev/environment/v1`) owns runtime settings, required publication transport selection,
+the admitted OCI publication namespace, credential references and signing identity/issuer policy.
+`publication.transports`, when present, is a nonempty, sorted, unique selection of `apt`, `oci`, or both.
+Omission preserves the existing OCI selection and canonical bytes. Every selected transport is required;
+availability of OCI cannot satisfy an APT selection. The current input owner recognizes APT but rejects
+any selection containing it with `CodeEngineCapability` before catalog or execution work, without requiring
+OCI namespace or credentials for an APT-only request. Plan validation, generation and execution repeat
+that admission. Direct APT service destinations, credentials, repository signing and authenticated read-back
+remain unimplemented; selection is not an enabled publisher or service approval.
+Explicit OCI selection is independently bound to Environment and Plan identity without changing native or
+aggregate logical Build identity. Compiler snapshots own the selection independently of caller mutations.
+`publication.repositoryPrefix` is an explicitly
 qualified, untagged repository prefix; credentials, anonymous access and plain HTTP are transport settings.
 When publication is configured, the release index and metadata publish under
 `<repositoryPrefix>/releases`. Each deliverable and its SBOM attestation bundles publish in

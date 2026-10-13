@@ -11,11 +11,17 @@ payloads plus their producer records. The implementation is selected by artifact
 | Helm source archive | NVKR reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
 | Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
 | Separate Debian archive metadata diagnostic | `InspectDebianArchiveMetadata` uses Syft v1.51.1 with the fixed private name `subject.deb`, independent of the caller's filename | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and serialized BOM validation; no maintained factory output invokes this diagnostic |
+| Standalone Debian content operation | `DiskInspectionRuntime.InspectDebianPackageContent` captures exact package bytes and reuses the complete admitted Linux runtime and pinned `dpkg-deb` data-filesystem reader | Architecture validation, recognized payload components and file hashes through the existing immutable observation; controlled contract tests only, with factory delivery and real package/install acceptance still deferred |
 
 Ordinary `InspectDependencies` and held-only `InspectHeldDependencies` retain hint-free host-file scanning;
 factory callers use those dependency APIs. The separate diagnostic's private `.deb` discovery hint supplies
 no format, target-architecture or payload-coverage authority. The existing
-digest-pinned `dpkg-deb` material reader owns authoritative Debian expansion and platform checks for disks.
+digest-pinned `dpkg-deb` material reader owns authoritative Debian expansion and platform checks for disks
+and the separately selected standalone content operation. That operation admits the full runtime/profile
+and reserves capacity before opening a path pinned by archive digest and exact length (at most 1 GiB).
+It owns the snapshot and cleanup, scans the package data filesystem without running maintainer scripts,
+and returns an immutable observation. `DiskContentDocument` binds its report to the original archive bytes;
+no control-script inventory, exhaustive dependency coverage or original producer/Run join is inferred.
 Standalone Debian delivery and declared-format propagation remain deferred; this diagnostic does not admit
 source-created packages through the executable/APT wrapper routes.
 
@@ -31,6 +37,12 @@ built source archive, preceding the separate image-binding and packaging operati
 
 A Definition without `sbomTool` still emits declaration-only source metadata and does not claim dependency
 inspection. This does not enable vulnerability scanning or qualified reproduction.
+
+For the compiled standalone Debian producer, per-artifact source metadata rederives the complete Build
+before recording its selected route toolchain, distribution profile and platform. The source-tag version
+describes the source recipe; it does not supply the Debian control Version. This description neither proves
+production nor adds inspected dependencies. The factory join to retained producer bytes and content
+inspection remains deferred.
 
 One release index references each required CycloneDX attestation bundle once in its owning artifact repository.
 The document appears only inside that signed statement; raw SBOM files remain private job handoffs. Its metadata records exact subject,

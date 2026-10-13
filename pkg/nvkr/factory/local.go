@@ -576,6 +576,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if err := rejectUnjoinedDebianPlan(plan, "local factory execution"); err != nil {
+		return err
+	}
 	if err := rejectUnsupportedRuntimeStorage(plan, "local factory execution"); err != nil {
 		return err
 	}

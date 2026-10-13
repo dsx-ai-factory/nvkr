@@ -61,6 +61,15 @@ M3 inventory/qualification and organizational acceptance remain separate gaps in
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
+An explicit `debian-package` Definition output has compiled Plan support under ADR-12: one source-created
+archive and a source-declared distribution/platform route. Factory retains the resolved target separately
+from authored defaults, owns its snapshots and rederives the complete source graph at Plan validation.
+The required output points at the raw archive without a binary/APT wrapper or ordinary SBOM claim. This
+descriptive compilation does not admit a Run: local scheduling, node execution and GitHub generation reject
+before work until the held archive/content-inspection/producer-evidence/final-output joins exist. Configured
+scanning, signing or publication also rejects before catalog reads. No installation or consumer ABI acceptance
+is inferred from this Plan support.
+
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.

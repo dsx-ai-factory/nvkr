@@ -14,6 +14,12 @@ import (
 )
 
 func lifecycleArtifactID(output authored.DefinitionOutput, components []catalog.NamedComponent) (string, error) {
+	if output.Format == authored.OutputDebianPackage {
+		if len(components) != 1 || components[0].OutputType != authored.OutputDebianPackage {
+			return "", e.New(e.CodeInvalidCatalog, "Debian output requires one archive producer")
+		}
+		return "artifact/" + output.Name + "/" + components[0].Name, nil
+	}
 	if output.Format != authored.OutputDiskImage {
 		return "package/" + output.Name, nil
 	}
@@ -65,7 +71,7 @@ func (plan Plan) validateLifecyclePlans() error {
 		producer := nodes[artifact.Producer]
 		var actualComponents []string
 		actualBuild := ""
-		if output.Kind == authored.OutputDiskImage {
+		if output.Kind == authored.OutputDiskImage || output.Kind == authored.OutputDebianPackage {
 			// Plan.Validate has already re-resolved and recompiled this BuildPlan
 			// from the held Definition and catalog snapshot. Use that authenticated
 			// selected closure rather than reconstructing only the root's direct
@@ -93,14 +99,14 @@ func (plan Plan) validateLifecyclePlans() error {
 		}
 		actualComponents = uniqueSorted(actualComponents)
 		nameMatches := artifact.Name == output.Name ||
-			(output.Kind == authored.OutputDiskImage && artifact.Name == artifact.Component)
+			((output.Kind == authored.OutputDiskImage || output.Kind == authored.OutputDebianPackage) && artifact.Name == artifact.Component)
 		if !canonicalName.MatchString(output.Name) || output.Name <= previous || !ok || artifact.Kind != lifecyclePackageKind(output.Kind) ||
 			!nameMatches || !buildOK || (output.Kind != "helm-oci" && len(output.Components) == 0) || !sort.StringsAreSorted(output.Components) ||
 			build.BuildDigest != output.BuildDigest || build.Name != actualBuild || !equalFactoryStrings(actualComponents, output.Components) {
 			return e.New(e.CodeUnverifiedRef, "lifecycle output %q is malformed or not bound to its graph build", output.Name)
 		}
-		authored := plan.Definition.Outputs[i]
-		if build.Platform != authored.Platform || !equalFactoryStrings(build.Components, authored.Components) {
+		selection := plan.Definition.Outputs[i]
+		if (selection.Format != authored.OutputDebianPackage && build.Platform != selection.Platform) || !equalFactoryStrings(build.Components, selection.Components) {
 			return e.New(e.CodeUnverifiedRef, "output %q producer selection differs from its definition", output.Name)
 		}
 		previous = output.Name
@@ -118,8 +124,8 @@ func lifecyclePackageKind(kind string) string {
 		return PackageHelm
 	case "oci":
 		return PackageImage
-	case authored.OutputDiskImage:
-		return authored.OutputDiskImage
+	case authored.OutputDiskImage, authored.OutputDebianPackage:
+		return kind
 	default:
 		return ""
 	}

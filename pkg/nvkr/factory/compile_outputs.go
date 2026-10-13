@@ -19,6 +19,11 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	if err := environment.Validate(); err != nil {
 		return err
 	}
+	for _, output := range definition.Outputs {
+		if output.Format == authored.OutputDebianPackage && (environment.Publication != nil || environment.Signing != nil || definition.SBOMTool != "") {
+			return e.New(e.CodeEngineCapability, "Debian scanning/publication/signing requires final-byte archive evidence joins")
+		}
+	}
 	if publication := environment.Publication; publication != nil {
 		for _, name := range sortedKeys(publication.ImageTags) {
 			matches := 0

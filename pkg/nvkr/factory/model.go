@@ -21,6 +21,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 const (
@@ -174,6 +175,7 @@ type LifecycleOutputPlan struct {
 type LifecycleBoundOutput = delivery.Output
 
 type BuildPlan struct {
+	Debian          *target.Debian           `json:"debian,omitempty"`
 	Name            string                   `json:"name"`
 	CatalogDigest   string                   `json:"catalogDigest"`
 	AppliedOverlays []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`

@@ -18,6 +18,10 @@ func (input Definition) Clone() Definition {
 		out := &input.Outputs[i]
 		out.Components = append([]string(nil), out.Components...)
 		out.Platforms = slices.Clone(out.Platforms)
+		if out.Debian != nil {
+			value := *out.Debian
+			out.Debian = &value
+		}
 		if out.Catalog != nil {
 			value := *out.Catalog
 			value.Overlays = append([]string(nil), value.Overlays...)
@@ -51,6 +55,7 @@ func (input Environment) Clone() Environment {
 	}
 	if input.Publication != nil {
 		value := *input.Publication
+		value.Transports = slices.Clone(value.Transports)
 		value.ImageTags = maps.Clone(value.ImageTags)
 		input.Publication = &value
 	}

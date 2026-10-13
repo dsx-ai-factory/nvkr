@@ -224,7 +224,8 @@ type ExternalEvidence struct {
 // (NVKR-FR-RC-026). It is the concrete shape every downstream stage consumes; the
 // loader produces it from the raw registry entry + its source + the lock.
 type Component struct {
-	Helm *HelmPackaging `json:"helm,omitempty"`
+	Debian *DebianSpec    `json:"debian,omitempty"`
+	Helm   *HelmPackaging `json:"helm,omitempty"`
 	// Platforms is the sorted, nonempty allowlist of supported output targets.
 	Platforms  []string `json:"platforms"`
 	FromSource bool     `json:"fromSource"`

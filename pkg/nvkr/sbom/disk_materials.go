@@ -21,6 +21,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
@@ -498,7 +499,7 @@ func inspectDebianMaterialDepth(ctx context.Context, subject *heldfile.File, pla
 }
 
 func inspectDebianMaterialBudget(ctx context.Context, subject *heldfile.File, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64, depth int, budget *materialInspectionBudget) (*FilesystemInspection, error) {
-	if subject == nil || subject.Size() <= 0 || subject.Size() > 1<<30 || depth > 1 || !canonical.IsDigest(packageReaderDigest) {
+	if subject == nil || subject.Size() <= 0 || subject.Size() > pipeline.MaxDebianPackageBytes || depth > 1 || !canonical.IsDigest(packageReaderDigest) {
 		return nil, e.New(e.CodeEngineCapability, "Debian material inspection requires bounded bytes and an exact package reader")
 	}
 	tool, err := heldfile.OpenContext(ctx, "/usr/bin/dpkg-deb", heldfile.Options{Label: "package-reader", Executable: true, MaxBytes: 512 << 20, ExpectedDigest: packageReaderDigest})

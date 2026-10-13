@@ -117,11 +117,10 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 	artifacts[observationID] = Artifact{ID: observationID, Name: target + "-terminal-observation",
 		Kind: string(TierTerminalObservation), Producer: verifyID, BuildTarget: target,
 		Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", target, "terminal-observation.json"))}
-	if targetSpec.Format == authored.OutputDiskImage && !diskPublication {
-		// The ordinary per-component SBOM operation does not prove the disk
-		// inventory and material reconciliation required by ADR-13. Diagnostic-only
-		// plans retain their raw disk without claiming a complete
-		// SBOM. Production plans require the separate live reconciliation operation.
+	if targetSpec.Format == authored.OutputDebianPackage || (targetSpec.Format == authored.OutputDiskImage && !diskPublication) {
+		// The ordinary per-component SBOM operation does not establish disk
+		// reconciliation or final Debian package content. These compiled plans
+		// retain raw producer subjects without claiming the unjoined evidence.
 		return nil
 	}
 
