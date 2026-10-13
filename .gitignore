@@ -18,6 +18,7 @@
 # persistent local coordination inodes for generated workflow bundle updates
 /.github/nvkr-run/*.lease
 /.github/nvkr-qualification/*.lease
+/.github/nvkr-dev/*.lease
 
 # advisory-lock guard `catalog pin`/`bump` leaves beside a machine-managed lock
 .pins.lock.yaml.lock

@@ -30,6 +30,8 @@ func TestGitHubRunSummariesHaveTwoOwners(t *testing.T) {
 			return nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
 		}},
 		{"metadata publication", referenceTestPlan},
+		{"unsigned development", githubDevelopmentTestPlan},
+		{"signed development", githubDevelopmentPublicationTestPlan},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := tc.plan(t)
@@ -37,7 +39,7 @@ func TestGitHubRunSummariesHaveTwoOwners(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			workflow := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
 			starts, ends := 0, 0
 			finalizations := 0
 			for id, job := range workflow.Jobs {
@@ -145,6 +147,8 @@ func TestGitHubRunRenderedSummaryResults(t *testing.T) {
 			return nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
 		}},
 		{"metadata publication", referenceTestPlan},
+		{"unsigned development", githubDevelopmentTestPlan},
+		{"signed development", githubDevelopmentPublicationTestPlan},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := tc.plan(t)
@@ -152,7 +156,7 @@ func TestGitHubRunRenderedSummaryResults(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			raw := bundle.Files[GitHubWorkflowPath]
+			raw := bundle.Files[bundle.WorkflowPath]
 			if PerOutputPublication(plan) {
 				var tree yamlv3.Node
 				if err := yamlv3.Unmarshal(raw, &tree); err != nil {

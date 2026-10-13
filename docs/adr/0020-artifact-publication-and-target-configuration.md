@@ -80,7 +80,12 @@ Environment may also map a canonical source URL to an HTTPS fetch mirror and a G
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
 commit/tree, or build identity. The current adapter binds credentials to the matching GitHub fetch execution step and, for private
 pin-set sources, the bootstrap regeneration and Run finalization steps that re-read pinned Git trees.
-Those jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18). Git configuration is transient and repository-scoped. Secret values never enter a remote URL,
+Production jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18).
+The separate development mode admits manual branch dispatch with the same fixed source-read steps.
+Signed development uses the explicit isolated publication contract below; arbitrary job setup and variables
+remain rejected. Branch code
+participates in source retrieval and must be reviewed before using that credentialed mode. Git configuration
+is transient and repository-scoped. Secret values never enter a remote URL,
 serialized plan or transported source tree. Local and GitLab execution reject this configuration until those
 adapters support equivalent credential isolation.
 
@@ -302,11 +307,13 @@ exact Plan/invocation-bound production predicate, output signatures/provenance a
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
 read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
-GitHub per-output publication admits only anonymous access or the job-scoped `github:GITHUB_TOKEN`;
-custom static publication credentials are rejected because job permissions cannot narrow their authority.
-Legacy publication without this mode retains its full-closure assembly/finalization path. Local execution and
-dry-run signing do not admit the new mode. Interrupted runs can leave independently published outputs; no
-cross-run reuse, rollback, retention protocol or atomic multi-repository transaction is added.
+Production GitHub per-output publication admits only anonymous access or the job-scoped
+`github:GITHUB_TOKEN`; arbitrary static credentials are rejected because job permissions cannot narrow their
+authority. The explicit signed-development contract below instead requires separately scoped read/write
+credentials. Legacy publication without this mode retains its full-closure assembly/finalization path. Local
+execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
+published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository
+transaction is added.
 
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
 the Definition, Environment and compiled Plan identities, output names, sibling repository locators, descriptor
@@ -485,6 +492,65 @@ signature verification nor qualification. Dependency scanning of acquired `raw` 
 Push, sign and pull-back verification are separate effects: later failure may leave bytes or partial evidence in
 the registry. No atomic remote rollback or cross-run resume is claimed. A complete local Run does not establish
 the deferred qualification/manifest acceptance in ADR-16. Retention and recovery require deployment ownership.
+
+### Disposable signed development publications
+
+The explicit GitHub development Environment can exercise the complete pipeline-attested publication graph,
+including the admitted native ARC disks. It requires `per-output-v1`, real cosign signing and the GitHub OIDC
+issuer. Its namespace is exactly `ghcr.io/<owner>/<repo>/development`, bound to that source repository's
+`.github/workflows/nvkr-dev.yml@refs/heads/…` certificate identities with an anchored prescribed regexp.
+Production workflow identities, arbitrary registry hosts/prefixes, anonymous/plain-HTTP access, mutable
+image-tag configuration and arbitrary credential references fail admission before work. This is a distinct
+trust policy within the existing evidence lane, not a new evidence tier or production authorization.
+
+`pkg/nvkr/development` owns the canonical namespace grammar. The factory owner derives each actual target
+as `<prefix>/runs/<run-id>/attempts/<attempt>/<repository-leaf>` from the admitted hosted invocation,
+revalidating source repository, dev workflow identity and canonical positive run/attempt IDs. No GitHub
+expression is interpolated into the committed Plan. The Plan binds the policy and route leaves; the runtime
+projection changes only transport location. Every publication, signing and verification boundary checks the
+same projection, and metadata authentication rejects another run or attempt's root. Existing subject,
+Plan, invocation, SBOM and signature checks remain mandatory. Native output digests and logical Build identity
+are unchanged. Helm aliases remain scoped inside that attempt's output repository.
+
+Full development retries rerun all jobs or start a fresh dispatch. They intentionally cannot reuse an
+older attempt's disposable roots, unlike the existing production same-run recovery rule. Each attempt owns
+its output roots, aggregate root, output bytes, signatures and referrers in separate packages. Partial or
+cancelled attempts therefore leave bounded, independently discoverable cleanup scope without requiring a
+successful final Run record.
+
+The fixed `github:NVKR_DEV_REGISTRY_WRITE` reference selects only the dedicated development publisher.
+Generated publishing/signing jobs use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
+assembly and finalization instead receive `NVKR_DEV_REGISTRY_READ` and `NVKR_DEV_REGISTRY_READ_USER`.
+The usernames are provider variables. No development job gets repository-token package-write permission.
+The operator must configure token scopes and package ACLs so these development principals cannot modify
+production packages. The same development account may hold separate write, read-only and cleanup tokens;
+token scope still differs by phase. Provider ACLs are external prerequisites, never inferred from a prefix.
+Only artifact signing and SBOM attestation receive OIDC. The distinct default-branch cleanup environment
+holds the cleanup token; branch execution receives no deletion credential.
+
+The development cleanup owner supports read-only preview by default and explicit apply. It inventories
+private GHCR container packages under only the exact reserved namespace, authenticates account/package identity
+and the matching `nvkr-dev.yml` manual-dispatch attempt, and requires completion plus at least 24 hours
+of age for that attempt, its package and every version. Source-repository linkage on package metadata is
+not proof of ownership and is not required: preserved native images can carry upstream annotations.
+The reserved namespace policy plus authenticated provider account, package and attempt checks determine
+cleanup scope. Ambiguous names, malformed/unknown run records, incomplete inventories or API errors fail
+closed. Active or young attempts are retained. All candidate admission precedes deletion; each candidate's
+package/version metadata and run eligibility are rechecked immediately before deleting that whole package.
+
+The handwritten repository cleanup workflow uses only default-branch code, a separate protected
+`nvkr-dev-cleanup` Environment and dedicated `NVKR_DEV_REGISTRY_CLEANUP` credential. Its daily schedule
+applies cleanup; manual dispatch defaults to preview. It never executes producer artifacts or feature-branch
+code. Whole-package deletion removes its versions and referrers without guessing reachability from tags.
+A report records candidates and API-confirmed deletions even on partial failure. Mutation is not retried
+after an ambiguous outcome. Calls, response sizes and pagination are bounded and cancellation-aware.
+
+The 24-hour age is eligibility, not an exact expiry SLA. GitHub's deletion/restoration and physical garbage
+collection remain provider behavior; Sigstore transparency records remain external and are not erased.
+Production packages, old shared prefixes and arbitrary registries are outside this protocol. The protocol
+assumes completed attempt namespaces are never repopulated by an external writer; development retries
+always obtain a new attempt namespace. Provider ACL enforcement and successful real deletion require
+separate external evidence.
 
 ### 7. Operator release registration — deferred
 

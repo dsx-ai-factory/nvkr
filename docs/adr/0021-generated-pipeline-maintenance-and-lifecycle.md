@@ -39,6 +39,19 @@ workflow are removed. Cluster-composition files and nodes are also removed; rege
 owned members through the same prior-manifest checks described below. Changed graph/plan and lifecycle records use their new schema majors; old records
 cannot be relabeled into current identities.
 
+The Environment's explicit GitHub development mode selects a second fixed generated layout:
+`.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/plan.json`, and `.github/nvkr-dev/manifest.json`.
+The production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
+compiler, renderer, exact validation and writer. The admitted Environment selects these paths; callers
+cannot relocate one bundle into the other layout. Each manifest owns only its own payloads and lock, so
+regeneration or retirement of one leaves the other intact. Helper commands and container launches bind the
+Plan at that layout and recheck its digest. Development mode changes Environment/Plan identity, not
+transport-independent logical Build identity. Its execution and retention policy is owned by ADR-18.
+Signed development also binds the disposable namespace and signer policy in this immutable Plan. Actual
+run-attempt destinations are derived by the execution owner under ADR-20; runtime substitutions never
+rewrite generated inputs or bypass drift checks. The maintained development bundle uses the complete M2
+Definition with its separate development Environment.
+
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
 plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
@@ -65,7 +78,13 @@ no-follow regular file capabilities and revalidated against their live pathname 
 oversized member or inode substitution fails closed before hashing or execution.
 
 A separately generated meta-lint workflow and automatic semantic explanation inside `--check` remain deferred.
-The maintained repository gate invokes `run generate --check` directly. Read-only `run diff` separately compares
+The maintained repository gate invokes `run generate --check` for both committed layouts using their exact
+recorded inputs and canonical generator stamp. Repository development tooling regenerates these bundles,
+checks a clean named branch against the explicit GitHub repository's current commit, and requests manual
+dispatch of the development workflow. It does not commit, push, edit deployment policies or authenticate
+an eventual provider result. GitHub must first register the workflow on the default branch; a moving remote
+branch after preflight remains a provider dispatch race and the resulting Run SHA must be inspected.
+Read-only `run diff` separately compares
 two fully validated canonical Plans: it reports changed named Build identities, classifies every changed field,
 keys named collections without array-shift noise, and preserves command/patch order. Concise text counts all
 changes; detailed text and descriptive JSON retain the full comparison. `run graph` exports complete linked

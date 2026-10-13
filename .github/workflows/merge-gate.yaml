@@ -159,6 +159,8 @@ jobs:
               - '.github/workflows/nvkr-qualify.yml'
               - '.github/workflows/nvkr-smoke.yml'
               - '.github/nvkr-qualification/**'
+              - '.github/workflows/nvkr-dev.yml'
+              - '.github/nvkr-dev/**'
               - 'cmd/**'
               - 'client/**'
               - 'internal/**'

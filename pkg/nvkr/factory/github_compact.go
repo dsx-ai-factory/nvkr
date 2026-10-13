@@ -52,7 +52,9 @@ func compactGitHubWorkflow(raw []byte) ([]byte, error) {
 		if err != nil {
 			return err
 		}
-		if node.Kind != yamlv3.DocumentNode && len(encoded) >= 24 {
+		// Short repeated runner labels and read-only permission maps also pay for
+		// their anchors in the full disk workflow, including explicit retention.
+		if node.Kind != yamlv3.DocumentNode && len(encoded) >= 12 {
 			key := string(encoded)
 			keys[node] = key
 			counts[key]++
@@ -79,7 +81,10 @@ func compactGitHubWorkflow(raw []byte) ([]byte, error) {
 				*node = yamlv3.Node{Kind: yamlv3.AliasNode, Value: first.Anchor, Alias: first}
 				return
 			}
-			node.Anchor = "n" + strconv.FormatInt(int64(len(anchors)+1), 36)
+			// Anchor identifiers are document-local presentation, not authority or
+			// user-facing labels. Unprefixed base-36 identifiers save thousands of
+			// repeated bytes in full-catalog workflows without changing their graph.
+			node.Anchor = strconv.FormatInt(int64(len(anchors)+1), 36)
 			anchors[key] = node
 		}
 		for i, child := range node.Content {

@@ -19,6 +19,10 @@ Separately selected execution settings, publication namespace, credential refere
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies; the workflow adapter consumes their locked commits.
+An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
+native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
+registry namespaces. Unsigned development remains static-unqualified. Neither setting grants production
+acceptance, provider access or qualified evidence.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -106,6 +110,8 @@ _Avoid_: Authored definition, execution observation
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
 Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
+Development and production use separate fixed bundle layouts selected by their Environment, with the same
+compiler and independent ownership manifests. A development bundle is not a release authorization.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
 **Catalog maintenance candidate**:

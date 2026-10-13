@@ -24,8 +24,9 @@ import (
 // This adapter tests authority handoffs only; it makes no cryptographic claim.
 type referenceSigner struct {
 	fakeOCISigner
-	sbomErr error
-	dry     bool
+	sbomErr          error
+	dry              bool
+	observedIdentity string
 }
 
 func (s *referenceSigner) Verify(ctx context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
@@ -38,6 +39,9 @@ func (s *referenceSigner) Verify(ctx context.Context, subject sign.Subject, poli
 		SignatureVerified: true, AttestationVerified: true, PredicateType: sign.ProvenancePredicateType, Ran: [][]string{{"fixture-verify"}}}
 	if s.dry {
 		return s.fakeOCISigner.Verify(ctx, subject, policy)
+	}
+	if s.observedIdentity != "" {
+		record.ObservedIdentity = s.observedIdentity
 	}
 	return record, nil
 }
@@ -56,9 +60,17 @@ func referenceSignerFactory(s *referenceSigner) signerFor {
 func referenceMetadataFixture(t *testing.T, attempts ...string) (*Plan, map[string]Artifact, *referenceSigner) {
 	t.Helper()
 	plan := referenceTestPlan(t)
+	return referenceMetadataFixtureForPlan(t, plan, attempts...)
+}
+
+func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...string) (*Plan, map[string]Artifact, *referenceSigner) {
+	t.Helper()
 	t.Chdir(t.TempDir())
 	for key, value := range map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "example/nvkr", "GITHUB_WORKFLOW_REF": "example/nvkr/.github/workflows/nvkr-factory.yml@refs/heads/main", "GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "1"} {
 		t.Setenv(key, value)
+	}
+	if plan.Environment.GitHubDevelopment {
+		setDevelopmentRun(t)
 	}
 	nodes, artifacts := planIndex(plan)
 	for _, a := range artifacts {
@@ -75,6 +87,9 @@ func referenceMetadataFixture(t *testing.T, attempts ...string) (*Plan, map[stri
 		}
 	}
 	signer := &referenceSigner{}
+	if plan.Environment.GitHubDevelopment {
+		signer.observedIdentity = "https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/feature/pipeline"
+	}
 	for i, output := range plan.LifecycleOutputs {
 		if i < len(attempts) {
 			t.Setenv("GITHUB_RUN_ATTEMPT", attempts[i])
@@ -209,7 +224,11 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 
 func writeReferenceSigningFixture(t *testing.T, plan *Plan, artifacts map[string]Artifact, route, digest string) {
 	t.Helper()
-	ref := plan.Targets[route].Ref + "@" + digest
+	target, err := runtimeTarget(plan, route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := target.Ref + "@" + digest
 	writeReferenceFile(t, artifacts["publication/"+route].Path, ref)
 	predicate, err := productionPredicateFor(plan, plan.Environment.Signing, time.Now().UTC(), time.Now().UTC())
 	if err != nil {

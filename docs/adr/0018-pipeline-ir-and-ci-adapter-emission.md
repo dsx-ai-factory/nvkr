@@ -145,10 +145,9 @@ publication; secret-valued FDE, encrypted inspection and qualified execution fai
 Their execution classes select exactly
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
-The operator must provision ephemeral single-job runners and restrict pool access to the reviewed workflow on the default branch and any exact
-branches explicitly admitted by `githubDispatchBranches`. The generated disk jobs use the `nkd-arc` protected Environment. Provider configuration and fresh
-native interoperability are external acceptance requirements; emitting a label or naming an Environment does
-not establish those facts.
+Production and standalone diagnostic disk jobs use the `nkd-arc` protected Environment, with pool access
+restricted to the reviewed workflow on the default branch and any exact branches explicitly admitted by
+`githubDispatchBranches`. The separate signed-development policy is described below.
 
 With publication and signing omitted, the same native policy also admits a **build-only diagnostic**
 workflow at `static-unqualified`. It accepts plain disks and ADR-10's explicit public-bootstrap LUKS2
@@ -168,8 +167,15 @@ the maintained `ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchain
 read-only credential remains outside producer execution. This mode does not use publication configuration
 as a surrogate for build credentials. Real native FDE execution is acceptance evidence recorded separately.
 
-The publication route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
-`nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
+The operator must provision ephemeral single-job runners and restrict pool access to reviewed workflows and
+admitted refs. Production uses the default branch plus exact `githubDispatchBranches` entries and the
+`nkd-arc` protected Environment. Signed development uses the separate `nvkr-dev-arc` Environment and its
+reviewed branch policy described below, with the same two fixed runner labels and execution contracts.
+Provider configuration and fresh native interoperability are external acceptance requirements; emitting a
+label or naming an Environment does not establish those facts.
+
+Production `nkd-arc`/`nkd-release` and development `nvkr-dev-arc`/`nvkr-dev-release` deployment policies
+and the corresponding signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
 Docker is the initial admitted runtime. For publication workflows, bootstrap, source fetch, registry publication,
 signing and finalization remain on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
@@ -683,9 +689,10 @@ Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selec
 | In-repository pull request | Build/package; read-only mirror credential on fetch steps only; no OIDC, push or environment access |
 | Default-branch push or manual dispatch on that ref | Publish/sign/attest/verify inside a protected environment; phase-scoped registry and OIDC credentials |
 | Explicitly allowed branch manual dispatch | Same publication lane; exact Environment allowlist, deployment policy and signing identity must admit the branch |
+| Development Environment branch manual dispatch | Unsigned hosted builds, or full signed publication using development environments/credentials, the admitted native ARC route, and disposable attempt namespaces |
 | Git tag | No signing trigger |
 
-The current generated Run workflow is manual-only. Execution admits the default branch plus exact branch
+Generated Run workflows are manual-only. Production execution admits the default branch plus exact branch
 names explicitly listed in `Environment.githubDispatchBranches`. The optional list is sorted and unique;
 wildcards, tag/PR refs and expression syntax are rejected. It is bound into Environment and Plan identity,
 cloned with its owner, and enforced in source access, execution and finalization guards. Local execution
@@ -702,7 +709,43 @@ bounded, and workflow concurrency does not cancel an in-progress publication. Te
 finalization still run after failures within an admitted execution. The generated Run workflow does not
 start on pull requests.
 
-Identity is one committed workflow path and explicitly admitted branch refs; verification rejects PR refs. Protect workflow,
+`Environment.githubDevelopment: true` selects the separate `nvkr-dev.yml` workflow and admits manual
+branch refs only. Tags and pull requests remain closed. It shares the compiler, complete graph, helper,
+output requirements and finalizer with production; no selected outputs are filtered out. Local execution
+rejects this GitHub-only setting. Arbitrary runtime setup/variables and a second dispatch-branch allowlist
+are rejected. Legacy runner overrides must name an admitted generic hosted label; disks use only the
+explicit native ARC policy and fixed execution-class labels above.
+
+Unsigned development omits both publication and signing, remains `static-unqualified`, and cannot use
+ARC or disk evidence. Signed development requires real cosign, the GitHub issuer, `per-output-v1`, the
+reserved development namespace and exact development workflow identity in ADR-20. It retains the
+`pipeline-attested` lane and all output-local signing, evidence, verification and completeness gates.
+The Environment cannot select a production signer, anonymous/plain-HTTP registry, or arbitrary publication
+credential. Development verification is a separate consumer trust decision, not production acceptance or
+qualified reproduction. The current hosted repository/workflow identity is admitted before execution.
+Development finalization emits its Run record without a production qualification handoff; explicit handoff
+admission rejects development before qualification evidence collection.
+
+Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
+They never inherit the production deployment environments. Dedicated write and read registry credentials
+are delivered only to their corresponding phases. Development jobs receive no repository-token package-write
+permission; only signing and SBOM attestation receive OIDC. Read-only toolchain preparation can still use
+the repository token for exact retained private M2 toolchain roots; credentials are removed before producer
+execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
+remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
+reviewed before dispatch. Provider ACLs must independently exclude production write access from development
+principals; selecting a namespace or protected environment alone cannot enforce token scope.
+
+Development and production have separate generated layouts and concurrency groups (ADR-21). Unsigned
+development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
+like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
+Final Run records and production qualification handoffs retain seven days and disk diagnostics one day. Provider cancellation or runner loss can
+prevent finalization. Expired carriers require a complete new Run. Signed development uses per-attempt
+registry namespaces and full-attempt retries; production's authenticated earlier-attempt reuse is unchanged.
+ADR-20 owns the separate default-branch registry cleanup protocol. Actual dispatch, credential/pool
+isolation, provider expiry and remote deletion require external evidence.
+
+Production identity is one committed workflow path and explicitly admitted branch refs; verification rejects PR refs. Protect workflow,
 generator, helper and signing code with branch protection and code ownership. Hosted source access uses a mirror
 with vendored inputs. The renderer must reject guards it cannot express, including OIDC outside the signing job
 family or credentials in build phases. These are testable contracts; current rendering is not proof that a

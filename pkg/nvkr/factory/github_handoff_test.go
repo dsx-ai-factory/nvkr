@@ -24,6 +24,8 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 		{"dry run", func(t *testing.T) *Plan { return signedTestPlan(t, dryRunSigningProfile(), ghcrTarget()) }, false},
 		{"signed aggregate", func(t *testing.T) *Plan { return signedTestPlan(t, cosignSigningProfile(), ghcrTarget()) }, false},
 		{"signed outputs", referenceTestPlan, true},
+		{"unsigned development", githubDevelopmentTestPlan, false},
+		{"signed development", githubDevelopmentPublicationTestPlan, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan := test.plan(t)
@@ -31,7 +33,7 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 			if err != nil {
 				t.Fatal(err)
 			}
-			job := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nvkr-lifecycle-run"]
+			job := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs["nvkr-lifecycle-run"]
 			if strings.Contains(joinRuns(job.Steps), " --handoff .nvkr/qualification/handoff.json") != test.want {
 				t.Fatalf("handoff capture admission differs for %s", test.name)
 			}
@@ -41,8 +43,8 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 					continue
 				}
 				uploads++
-				if step.Uses != plan.Actions["upload-artifact"].Uses() || step.If != "${{ success() }}" || step.TimeoutMinutes != 5 || step.ContinueOnError || len(step.Env) != 0 || len(step.With) != 4 ||
-					step.With["path"] != ".nvkr/qualification/handoff.json" || step.With["include-hidden-files"] != "true" || step.With["if-no-files-found"] != "error" {
+				if step.Uses != plan.Actions["upload-artifact"].Uses() || step.If != "${{ success() }}" || step.TimeoutMinutes != 5 || step.ContinueOnError || len(step.Env) != 0 || len(step.With) != 5 ||
+					step.With["path"] != ".nvkr/qualification/handoff.json" || step.With["include-hidden-files"] != "true" || step.With["if-no-files-found"] != "error" || step.With["retention-days"] != "7" {
 					t.Fatalf("handoff upload is not exact and bounded: %+v", step)
 				}
 			}
@@ -72,6 +74,7 @@ func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
 		{"missing capture", "run", " --handoff .nvkr/qualification/handoff.json", ""},
 		{"hidden omission", "with.include-hidden-files", "true", "false"},
 		{"missing handoff ignored", "with.if-no-files-found", "error", "ignore"},
+		{"extended retention", "with.retention-days", "7", "90"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			original := bundle.Files[GitHubWorkflowPath]

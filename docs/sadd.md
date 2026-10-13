@@ -536,6 +536,12 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+An explicit GitHub development Environment selects a separate fixed bundle. It shares the
+compiler, helper and complete output checks with production, while keeping its Plan, workflow and
+ownership manifest separate. Branch testing therefore does not replace the maintained publication bundle.
+Signed development retains the full publication and admitted disk graph, using separate credentials,
+signer policy and run-attempt registry destinations. Its runtime transport projection preserves Plan and
+Build identity; a default-branch cleanup owner expires only eligible disposable packages (ADR-20).
 `catalogmaintenance` composes atomic source/pin-set updates with that generator for disposable review
 candidates. Explicit schedules and optional complete local diagnostic execution do not change the public
 lifecycle or grant release acceptance. Lock and bundle writes retain separate failure/recovery boundaries;
@@ -843,12 +849,23 @@ ADR-18 §8's event policy is the admission contract for production rendering:
 | In-repository pull request | Build and package | Read-only credential on fetch steps; no publish or OIDC access |
 | Default-branch push / manual dispatch on default ref | Publish, sign, attest and verify in a protected environment | Phase-scoped registry and OIDC access |
 | Explicitly allowed branch manual dispatch | Full publication after branch-policy admission | Same scoped credentials; exact workflow identity |
+| Development Environment branch manual dispatch | Unsigned build-only, or full signed development including admitted native disks | Separate development environments, phase-scoped dev registry credentials and development workflow identity; OIDC only for signing/attestation |
 | Git tag | No v1 signing trigger | No signing authorization from the tag |
 
-The current generated Run workflow is manual-only. It admits the default branch and optional exact branch
+Generated Run workflows are manual-only. Production admits the default branch and optional exact branch
 exceptions in `Environment.githubDispatchBranches`; publication also requires deployment-environment and
-signing-identity policies that admit the selected workflow ref. Other branches and tag/PR refs remain closed.
-Repository Merge Gate performs PR regeneration checks when generator inputs or outputs change.
+signing-identity policies that admit the selected workflow ref. Other production branches and tag/PR refs remain closed.
+Development admits branch dispatch and supports the same native ARC route only with its explicit signed
+publication contract. Generic hosted runners retain bootstrap, source retrieval, publication, signing and
+finalization. The development account must lack production-package write/admin access; namespace names
+cannot enforce provider ACLs. Unsigned development cancels superseded Runs and retains transfers for one day.
+Signed development and production remain non-canceling with seven-day transfers; final Run records retain
+seven days and disk diagnostics one day. Development registry packages are isolated per run attempt and
+become cleanup candidates after completion and 24 hours of inactivity. A default-branch-only owner
+rechecks authenticated provider metadata before whole-package deletion; it never executes branch artifacts.
+Expired transfers or a development retry require a complete attempt; cancellation can prevent finalization.
+These are contract-tested behaviors pending external execution, access-policy and deletion evidence.
+Repository Merge Gate checks both producer bundles and the qualification pair for PR drift.
 
 A renderer unable to express the required guards must reject the affected lane. This table states the contract;
 it is not proof that an unexercised workflow or the proposed fused job already enforces it in production.

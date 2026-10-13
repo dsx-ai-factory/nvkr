@@ -5,8 +5,9 @@ from independently pinned NVKE module tags. The chart depends on the exact built
 instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
 runtime, destination and signing.
 
-The repository's committed workflow uses [M2](../nvke-m2/README.md). This three-output Definition is an
-alternative for learning or local execution. Its [historical hosted run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
+The repository's committed production and full development workflows use [M2](../nvke-m2/README.md).
+This three-output Definition retains a smaller unsigned development example for scratch generation.
+Its [historical hosted run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
 passed real signing, complete Run finalization and independent consumption in a personal namespace.
 That record predates the current schema, tool pins, Helm binding and namespace; it does not validate
 a hosted run of these updated inputs.
@@ -16,6 +17,7 @@ a hosted run of these updated inputs.
 | `definition.yaml` | Public Definition: direct producers, CLI/image/Helm outputs, and the Helm-to-image binding. |
 | `environment-local.yaml` | Local registry and dry-run signing settings. |
 | `environment-github.yaml` | Hosted GitHub destination and signing settings. |
+| `environment-github-dev.yaml` | Build-only branch dispatch with one-day output retention and no signing or publication. |
 | `catalog/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
 | `catalog/pins.lock.yaml` | Machine-managed exact source pins. |
 
@@ -85,6 +87,14 @@ overriding or clearing `image.digest` changes image selection. Deployment enforc
 packaging contract. A new complete build/publication using this source chart remains unexercised.
 
 ## Generate hosted CI
+
+For feature-branch generator changes, use `make workflows-generate` and `make workflows-check`, then
+commit and push your reviewed branch. `make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr`
+dispatches the current pushed commit after preflight using the full M2 development Environment.
+Development Environments generate `.github/workflows/nvkr-dev.yml` and `.github/nvkr-dev/`, independently
+of the production paths below. Generate this smaller unsigned example only into a scratch root.
+See [pipeline development](../../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for one-time
+registration, source access, development signing/publication, downloads and cleanup.
 
 The repository commits the [M2 candidate](../nvke-m2/README.md), selected by `make workflows-check`.
 This checked-in configuration is not a ratified canonical-product decision.

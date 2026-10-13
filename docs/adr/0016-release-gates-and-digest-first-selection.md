@@ -191,7 +191,9 @@ consumer verifier; neither the source Environment nor downloaded records can sup
 provider discovers the commit from the selected attempt and authenticates its successful default-branch
 execution. A Run URL without an attempt is ambiguous and is rejected.
 
-The real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+The production real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+The development Environment cannot supply this qualification handoff; admission rejects it before
+qualification evidence collection while its separate signed build/publication workflow remains available.
 It carries original Plan bytes, the compiler-read authored file closure and original root/output predicates.
 Predicates are keyed by the aggregate root and each delivered payload reference. The collector validates
 the bounded aggregate metadata against the Plan and joins its exact output origins to the saved output-route

@@ -23,7 +23,7 @@ func TestWorkflowCompactionPreservesExpandedGraph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(compact, []byte("*n")) || len(compact) >= len(raw) {
+	if len(compact) >= len(raw) {
 		t.Fatal("repeated steps not compacted")
 	}
 	expected, err := yaml.YAMLToJSONStrict(raw)
@@ -52,6 +52,9 @@ func TestWorkflowCompactionPreservesExpandedGraph(t *testing.T) {
 		}
 	}
 	visit(&tree)
+	if len(uses) == 0 {
+		t.Fatal("repeated steps not aliased")
+	}
 	for name := range definitions {
 		if !uses[name] {
 			t.Fatalf("unused anchor %s", name)
@@ -210,4 +213,23 @@ func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
 	}
 	document := decodeGitHubWorkflow(t, raw)
 	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(document.Jobs))
+}
+
+// Render the maintained complete Plan as well as checking its committed bytes:
+// a newly required field on hundreds of steps can overflow provider admission
+// even when the previous generated workflow still fits.
+func TestMaintainedM2RenderingFitsGitHubFileLimit(t *testing.T) {
+	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := bundle.Files[bundle.WorkflowPath]
+	if err := validateGitHubWorkflowSize(raw); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("maintained M2 rendering: %d bytes (%d bytes below GitHub limit)", len(raw), maxGitHubWorkflowBytes-len(raw))
 }

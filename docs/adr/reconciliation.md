@@ -90,7 +90,7 @@ independent policy approves repository, workflow and default branch and pins cos
 the commit from the selected attempt and authenticates successful completion and the actual default branch;
 downloaded records cannot select those trust decisions.
 
-Generated real-signing `per-output-v1` finalizers restore the original per-output publication references, signature records
+Generated production real-signing `per-output-v1` finalizers restore the original per-output publication references, signature records
 and predicates and upload one `handoff.json` as `nvkr-qualification-<run>-<attempt>` after success. The collector
 joins bounded aggregate metadata, exact output origins and saved route signing records to key original
 predicate bytes by the root and delivered payload references; it does not restore or read payload packages. The bounded
@@ -99,7 +99,8 @@ Environment, base/output catalogs, overlays, registries, locks, patches and dire
 logical paths, enforces byte/count/depth limits and has no authored-file checkout fallback. Catalog-owned
 pinned upstream Git validation still runs with its existing context and credentials; offline replay remains
 outside MVP. The old `CheckQualificationFiles` module adapter remains available for explicit diagnostics.
-Historical Runs without the complete handoff cannot use the simplified path. Legacy aggregate producers
+Historical Runs without the complete handoff cannot use the simplified path. Development finalizers retain
+their Run record but emit no production qualification handoff. Legacy aggregate producers
 retain their publication path but emit no qualification handoff: they lack invocation-bound release metadata
 and the per-output route records needed for complete original evidence transport. Explicit capability admission prevents
 export or consumption from implying otherwise. The file diagnostic adapter now shares the Run adapter's
@@ -254,11 +255,51 @@ that remains outstanding after merge.
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. Qualified clearance, release-specific trusted time and M4 manifests/revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
-| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials | Maintained candidate qualification is configured for post-merge acceptance; a fresh complete exact-attempt handoff and hosted/independent-consumer evidence remain unproved. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
+| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials | Maintained candidate qualification is configured for post-merge acceptance; a fresh complete exact-attempt handoff and hosted/independent-consumer evidence remain unproved. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
-| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
-| 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission | Qualification generation does not make both owner writes one atomic transaction. Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
+| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
+| 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission | Qualification generation does not make both owner writes one atomic transaction. Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
+
+## Feature-branch pipeline development
+
+The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
+with the same compiler, complete graph and helper. The committed development bundle now uses the full
+37-output M2 Definition, including all four native plain/public-bootstrap FDE disk outputs, output-local publication, SBOM attestation,
+cosign signing, verification, metadata assembly and finalization. It retains the candidate's existing disk
+and source limitations; development execution cannot approve those production exceptions. Development
+finalization retains its Run record without emitting the production qualification handoff; explicit handoff
+admission returns a capability error before qualification evidence collection. Production handoffs retain seven days.
+
+Unsigned development remains hosted build-only, static-unqualified, automatically cancelling older
+same-branch Runs and retaining transfers for one day. Signed development requires the prescribed
+`nvkr-dev.yml` branch identity, GitHub issuer, `per-output-v1` and reserved GHCR development namespace.
+It uses `nvkr-dev-release`/`nvkr-dev-arc`, fixed dedicated read/write credential names and no repository-token
+package-write permission. The native ARC labels and exact runtime/evidence admission are unchanged.
+Source and pinned-toolchain read credentials retain their separate fixed preparation steps.
+Provider pool/credential/ACL configuration is an external prerequisite, not established by rendering.
+
+The factory owner derives registry targets beneath the current run and attempt without mutating committed
+Plan bytes or Build identity. Subject/reference, metadata and predicate checks reject another attempt's
+publication. Production authenticated earlier-attempt reuse is unchanged; development retries rerun all
+jobs or dispatch a complete new Run. Signed-development helpers/carriers and all final Run records retain
+seven days; disk diagnostics retain one day. Full signed development is non-canceling.
+
+The development cleanup module inventories only private packages in that reserved attempt namespace.
+It authenticates account, package and exact completed workflow-attempt metadata; package, version and
+attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
+closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
+mutation. Preview is the default. The separate daily cleanup workflow executes only default-branch code
+with a cleanup-only credential; it never loads branch executables or downloaded artifacts. Production and
+older unscoped packages remain outside this protocol.
+
+Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
+credential/environment scope, retention, runtime namespace projection and cross-attempt rejection.
+Cleanup API fixtures cover eligibility, authentication errors, pagination, races and mutation failures;
+workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
+clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
+scope, ephemeral runner isolation, successful keyless services, GHCR deletion or physical storage reclaim.
+No new external Run or deleted package is claimed. ADR-04/18/20/21 own the contracts.
 
 ## Native disk execution and inspection
 
@@ -850,11 +891,13 @@ ADR-20 admits earlier-attempt output roots only within the same GitHub run and u
 repository/builder and preparation/signing/consuming-attempt ordering. Contracts cover retries, mixed
 attempts, re-signing and finalizer reuse; hosted retry acceptance remains unexercised. Cross-run reuse,
 remote rollback and an atomic multi-repository transaction are not provided. Failed/missing provider jobs
-still prevent completion. Finalization restores the six aggregate/tool control carriers plus each output’s
+still prevent completion. Production finalization restores the six aggregate/tool control carriers plus each output’s
 original publication reference, signing record and predicate for the qualification handoff: 117 control
-carriers for the 37-output candidate, without restoring output payload packages. Assembly/finalization need
+carriers for the 37-output candidate, without restoring output payload packages. Development finalization
+retains only the six aggregate/tool controls because it emits no qualification handoff. Assembly/finalization need
 registry read access, not OIDC or package-write
-permission. Custom static credentials, local execution and dry-run signing reject this mode.
+permission. Production rejects arbitrary static credentials; the explicit development mode uses its admitted
+scoped read/write credentials. Local execution and dry-run signing reject this mode.
 
 The root reader rejects extra blobs and bounds control/evidence to 512 MiB per root. Full and metadata-only
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
