@@ -249,13 +249,15 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		// and cause while distinguishing its scope in every affected diagnostic.
 		evidenceErr = fmt.Errorf("incomplete evidence traversal for the complete publication: %w", evidenceErr)
 	}
-	for _, output := range publication.Outputs {
+	for i, output := range publication.Outputs {
 		checks := []ArtifactCheckResult{{Name: "schema-and-membership", Status: "pass"}}
-		outputEvidenceErr := errors.Join(append(evidenceFailures[output.Name], evidenceErr)...)
-		outputRunErr := rootErr
+		memberEvidenceErrs := evidenceFailures[output.Name]
+		outputEvidenceErr := errors.Join(errors.Join(memberEvidenceErrs...), evidenceErr)
+		var outputRunOriginErr error
 		if output.Publication != nil && (output.Publication.PreparedInvocationID != origin.InvocationID || output.Publication.SignedInvocationID != origin.InvocationID) {
-			outputRunErr = errors.Join(outputRunErr, e.New(e.CodeVerifyFailed, "output %q was prepared or signed by another producing attempt; qualification reuse is not admitted", output.Name))
+			outputRunOriginErr = e.New(e.CodeVerifyFailed, "output %q was prepared or signed by another producing attempt; qualification reuse is not admitted", output.Name)
 		}
+		outputRunErr := errors.Join(rootErr, outputRunOriginErr)
 		checks = append(checks, qualificationCheck("run-and-inputs", outputRunErr), qualificationCheck("signed-evidence", outputEvidenceErr))
 		signatureErr := verifyQualificationSubject(ctx, verifier, output.Reference, predicates[output.Reference], policy, origin)
 		checks = append(checks, qualificationCheck("build-signature-and-provenance", signatureErr))
@@ -282,10 +284,19 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 				verdict.Overall = "fail"
 			}
 		}
-		failures = append(failures, signatureErr, pinErr, embeddedErr, outputEvidenceErr, outputRunErr)
+		failures = append(failures, signatureErr, pinErr, embeddedErr)
+		failures = append(failures, memberEvidenceErrs...)
+		if i == 0 {
+			// Keep shared failures at their first original position so coded-error
+			// precedence is unchanged, while every output retains its diagnostics.
+			failures = append(failures, evidenceErr, rootErr)
+		}
+		failures = append(failures, outputRunOriginErr)
 		report.Outputs = append(report.Outputs, verdict)
 	}
-	failures = append(failures, rootErr, evidenceErr)
+	if len(publication.Outputs) == 0 {
+		failures = append(failures, rootErr, evidenceErr)
+	}
 	if err := errors.Join(failures...); err != nil {
 		return nil, report, err
 	}
