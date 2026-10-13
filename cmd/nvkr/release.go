@@ -223,6 +223,10 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 						if err != nil {
 							return err
 						}
+						if view.tui {
+							shown = true
+							return showCommandResult(c, view, authenticatedReleaseDisplay(description), nil)
+						}
 						raw, err := canonical.Marshal(description)
 						if err != nil {
 							return err

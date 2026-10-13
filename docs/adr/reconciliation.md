@@ -413,6 +413,12 @@ cleanup failure remain distinct. Safe panes exclude raw diagnostic and private
 transport/path data. Command results are detached descriptions within progress;
 the SDK inspection DTO has no terminal snapshot method.
 
+The authenticity verification result browser projects the owning consumer's
+detached description and labels payload integrity as unchecked. It neither
+invokes full-payload verification nor promotes authenticated metadata to payload
+verification. Controlled CLI contracts cover scope selection, admission before
+owner work, safe projection, owning error codes and unchanged plain JSON bytes.
+
 Non-interactive and explicitly plain output retain existing bytes and owning
 failure/diff codes. Interactive `run local` defaults to auto and captures a shared
 128 KiB memory tail instead of streaming successful producer output. Nonempty

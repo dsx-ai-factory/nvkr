@@ -103,6 +103,20 @@ func declaredDiskEvidenceMode(mode string) string {
 	return mode
 }
 
+func authenticatedReleaseDisplay(description lifecycle.AuthenticityDescription) commandDisplay {
+	display := releaseArtifactsDisplay("Release authenticity result", "Signatures and evidence authenticated; payload integrity was not checked. Runtime health and deployment were not evaluated.", description.Artifacts)
+	display.Fields = append(display.Fields,
+		progress.Field{Label: "Accepted lane", Value: description.Lane},
+		progress.Field{Label: "Accepted scope", Value: description.Scope},
+		progress.Field{Label: "Content identity", Value: description.ContentSubject},
+		progress.Field{Label: "Policy identity", Value: description.PolicyDigest},
+		progress.Field{Label: "Payload integrity", Value: "not checked"})
+	for index := range display.Items {
+		display.Items[index].State = "authenticated"
+	}
+	return display
+}
+
 func verifiedReleaseDisplay(result releaseVerificationResult) commandDisplay {
 	display := releaseArtifactsDisplay("Release verification result", "Verified consumer scope only; runtime health and deployment were not evaluated.", result.Release.Artifacts)
 	display.Fields = append(display.Fields,

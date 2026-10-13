@@ -195,7 +195,9 @@ The result browser opens after the command's existing operation finishes. Catalo
 maintenance and generation retain their normal write/check behavior; closing the
 browser neither repeats nor undoes it. Ctrl+C closes this read-only browser and
 preserves the completed operation's owning result. Verification results reflect only the
-owning verifier's accepted lane and scope. Release browsing checks metadata;
+owning verifier's accepted lane and scope. Authenticity results explicitly state
+that signatures and evidence were authenticated while payload integrity was not
+checked; artifact rows describe authenticated publisher metadata. Release browsing checks metadata;
 local Release inspection additionally checks closure membership and payload
 integrity. Neither operation authenticates signatures or consumer policy. Differences still return status 3 when requested. Raw changed
 values, source URLs, private paths, signer expressions and error messages are
