@@ -116,6 +116,10 @@ the original producer/material owners instead. Producer provenance is the M2 acc
 and material reconciliation belong to M3 (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
+Local admission rejects that unsupported publication graph before runtime, source or workspace work;
+compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
+composition or authorize release.
+
 For artifact-publication consumption, the verified lifecycle owner may export
 the complete held transport closure after matching its authenticated aggregate
 invocation to the expected originating Run/attempt. Exact-input CLI export also
@@ -126,9 +130,6 @@ checks; archive transport checksums remain separate from native OCI subjects.
 This export grants no runtime verdict or stronger release/evidence lane. Contract
 tests exercise origin mismatch, closure substitution, closed capabilities and
 cancellation; externally exercised nightly consumption remains unrecorded.
-Local admission rejects that unsupported publication graph before runtime, source or workspace work;
-compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
-composition or authorize release.
 
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result

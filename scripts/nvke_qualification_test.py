@@ -223,6 +223,41 @@ class QualificationDriverTests(unittest.TestCase):
             self.assertEqual(driver.main(self.cli_args(out, compile_only=True)), 17)
         self.assertFalse(out.exists())
 
+    def test_invalid_image_fixture_fields_fail_before_owners_or_output_in_both_modes(self):
+        original = copy.deepcopy(self.mapping)
+        cases = [
+            ("missing-repository", "repository", None),
+            ("null-repository", "repository", None),
+            ("empty-repository", "repository", ""),
+            ("blank-repository", "repository", "  "),
+            ("nonstring-repository", "repository", 12),
+            ("missing-digest", "digest", None),
+            ("null-digest", "digest", None),
+            ("empty-digest", "digest", ""),
+            ("malformed-digest", "digest", "sha256:xyz"),
+            ("noncanonical-digest", "digest", "sha256:" + "A" * 64),
+            ("nonstring-digest", "digest", 12),
+        ]
+        for role in ("capi-provisioned", "profiles"):
+            for case, field, value in cases:
+                self.mapping = copy.deepcopy(original)
+                binding = self.mapping["bindings"]["images"][role]
+                if case.startswith("missing-"):
+                    binding.pop(field)
+                else:
+                    binding[field] = value
+                with self.subTest(role=role, case=case), self.assertRaises(ValueError):
+                    driver.stage(self.args, run_record(), self.mapping,
+                                 lambda *_: self.fail("reached an owner"),
+                                 lambda *_: self.fail("reached an owner"))
+                for mode in ("--plan-only", "--stage"):
+                    out = self.root / (role + "-" + case + mode)
+                    with self.subTest(role=role, case=case, mode=mode), \
+                            patch.object(driver.subprocess, "run", side_effect=AssertionError("network/process")), \
+                            contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(driver.main(self.cli_args(out, mode)), 17)
+                    self.assertFalse(out.exists())
+
     def test_existing_output_is_not_modified_when_cycle_reuse_is_refused(self):
         argv = self.cli_args(self.args.out)
         with patch.object(driver, "command_json", side_effect=AssertionError("network/process")), contextlib.redirect_stderr(io.StringIO()):

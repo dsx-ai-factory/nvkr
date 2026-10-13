@@ -104,6 +104,13 @@ def checked_mapping(mapping):
             raise ValueError("each role needs exactly one output or explicit fixture")
     if "fixture" in bindings["cli"]:
         raise ValueError("the CLI must come from the producing Run")
+    for binding in bindings["images"].values():
+        if "fixture" in binding:
+            repository, digest = binding.get("repository"), binding.get("digest")
+            if (not isinstance(repository, str) or not repository.strip()
+                    or not isinstance(digest, str)
+                    or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)):
+                raise ValueError("image fixtures need an explicit repository and native sha256 digest")
     relative = Path(bindings["cli"]["install_path"].lstrip("/"))
     if relative.is_absolute() or ".." in relative.parts or str(relative) == ".":
         raise ValueError("CLI install path must stay inside the extracted bundle")

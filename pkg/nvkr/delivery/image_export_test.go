@@ -311,3 +311,41 @@ func TestExportPublishedImageRejectsSubstitutionBeforeOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestExportPublishedImageRejectsDuplicateNameAcrossKindsBeforeOutput(t *testing.T) {
+	root, _, index := registryImageIndexFixture(t)
+	inspection, err := Inspect(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewriteDiskPublicationRoot(t, root, inspection, func(publication *PublicationRoot) {
+		for i := range publication.Objects {
+			object := &publication.Objects[i]
+			if object.Evidence != nil {
+				// Preserve this distinct SBOM descriptor and its different Kind so
+				// the rejection exercises release-name membership, not duplicate
+				// descriptors or an identical name/Kind pair.
+				object.Name = "cwe"
+				sortObjects(publication.Objects)
+				return
+			}
+		}
+		t.Fatal("aggregate fixture has no evidence object to duplicate the output name")
+	})
+	directory := t.TempDir()
+	child := index.Children[0]
+	result, err := ExportPublishedImage(t.Context(), root, "cwe",
+		"registry.example.test/cwe@"+child.ManifestDigest, child.Platform,
+		filepath.Join(directory, "image.tar"))
+	assertRegistryCode(t, err, e.CodeVerifyFailed)
+	if !strings.Contains(err.Error(), "duplicate release object name") {
+		t.Fatalf("duplicate name bypassed release membership admission: %v", err)
+	}
+	if result != (PublishedImageExport{}) {
+		t.Fatal("rejected duplicate name returned an image description")
+	}
+	files, err := os.ReadDir(directory)
+	if err != nil || len(files) != 0 {
+		t.Fatalf("duplicate name exposed an archive or temporary output: %v %v", files, err)
+	}
+}
