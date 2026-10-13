@@ -560,3 +560,13 @@ Qualified end-to-end acceptance requires publishing one cleared mixed-artifact R
 discovering every referrer by immutable digest, authenticating the downstream clearance, and proving that
 different destinations preserve every semantic and blob identity while omitted credentials never enter logs or
 payload bytes.
+
+## Portable test observation discovery
+
+Digest-pinned observation locators and verified historical indices are generated evidence metadata, not
+additional authored lifecycle objects. The passive reporter authenticates exact signer/issuer and independently
+selected Definition/subject/suite expectations within reviewed source namespaces before counting an entry.
+First-party/community labels come from admitted policy, never locator claims. Deduplication retains source,
+attempt and coverage boundaries. Public index hosting, anonymous OCI access, retention and TestGrid service
+registration/write/read-back require explicitly selected destinations and external evidence. A local immutable
+JSON/Markdown or TestGrid export supplies no publication receipt, qualifier role or current-health claim.

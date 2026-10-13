@@ -290,6 +290,19 @@ Contract tests cover exact policy/origin/role, missing native smoke, full member
 version separation and local-key cosign v3 interoperability. Hosted OIDC v3, exact deployed NVKE subjects
 and production qualification acceptance remain unexercised. Passive reporting is separately owned.
 
+`testreporting` now provides passive policy-bound first-party/community ingestion,
+historical discovery, immutable JSON/Markdown and local TestGrid export. It authenticates every input before
+source-specific deduplication, retains distinct attempts/failures/coverage and bounds total authenticated
+covered bytes to 256 MiB. Tests cover wrong source/signer/Definition, tampering, revocation/cancellation,
+aggregate bounds, deduplication, concurrent closure, immutable exports, multiple original JUnit and no-result
+failures without invented cases. These are protocol fixtures, not public/community service acceptance.
+
+The TestGrid adapter follows the inspected Autotest started/JUnit/finished contract and the actual multi-JUnit
+matcher, and includes exact evidence membership metadata. It performs no upload and has no destination,
+credential, tab or retention defaults. Existing TestGrid column configuration does not expose these new
+metadata keys; a selected target and companion backend/registration change remain required. Public anonymous
+bundle/index access, external contributor read-back and TestGrid API/UI ingestion remain unexercised.
+
 ## Support by owner
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |

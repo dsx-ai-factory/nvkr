@@ -38,6 +38,13 @@ The private `nvkr.dev/qualification-suite-configuration/v3` is operator configur
 authored lifecycle object. Its policy binds the full native policy digest and exact required suites. The relationship
 to the public Verification Policy is deferred; no projection or conversion is implemented.
 
+`evidence report` delegates passive ingestion and generated index/Markdown/local TestGrid projection to
+`testreporting`. Reviewed source admission and expected subjects remain external configuration; no cached
+projection restores receipt authority, no new authored lifecycle object is introduced, and no historical
+passing result establishes current cluster health. Service destinations and retention are explicit operator
+inputs; local export does not establish publication or TestGrid registration.
+
+
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
 set; the compiler derives one native producer target per member and one required image-index output

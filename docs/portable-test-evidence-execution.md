@@ -253,3 +253,46 @@ The generated qualifier/worker pair still emits native v2. Generated v3 activati
 changing its final command requires an explicit generator/policy extension and regeneration. The v3
 API and CLI contracts are tested, but no hosted v3 qualification or production acceptance is recorded.
 Raw-file publishing refuses before I/O because it cannot authenticate native smoke completion.
+
+## Discover and report verified observations
+
+`evidence report` consumes a canonical list of `testreporting.Input`: a digest-pinned locator,
+independent exact expectations, and explicitly reviewed `Admission` for each source. Admission selects
+literal signer/issuer, first-party or community tier, exact registry namespace/source path and Definition.
+There is no default allowlist. Every locator is authenticated before deduplication; a signature or cached
+index cannot expand namespace/subject policy. The generated discovery index retains historical attempts,
+failures, tested coverage, signer tier, exact references and reproduction inputs. It is generated metadata,
+not another authored lifecycle object or a claim about current health.
+
+```sh
+nvkr evidence report --inputs reviewed-evidence-inputs.json \
+  --cosign /approved/cosign --cosign-digest "$COSIGN_DIGEST" \
+  --anonymous --format markdown --out verified-results.md
+```
+
+Use `--format json` for a generated discovery index. Output is immutable and receipt lifetime is rechecked
+before export. Inputs have a cumulative 256 MiB authenticated covered-byte bound in addition to per-bundle
+limits. Community source paths use the independently selected Definition and authenticated signer projection;
+the grouping hash is a privacy/transport label, never identity or authority. A community attester receives
+no qualifier role from reporting. Closed/canceled receipts, inaccessible objects, wrong source paths,
+wrong identities, stale subjects and tampered files cannot become counted passes.
+
+### TestGrid local export and companion work
+
+Add paired `--testgrid-target reviewed-testgrid-target.json --testgrid-out local-testgrid-export` to export
+an explicitly selected observation/source as a local TestGrid directory. The canonical
+`testreporting.TestGridDestination` selects bucket, the complete `groups/group/dashboard/tab/build` prefix,
+observation digest, namespace and source path. No bucket, tab, credential or retention default is invented.
+The exporter retains exact original JUnit, writes started metadata first, then evidence/results, and finished
+metadata last. It binds deterministic JUnit transport labels to original filenames/raw pins in the evidence
+sidecar. No-result failures contain explicit status without synthetic passing cases. Producer timestamps are
+signed declared facts, not trusted time. TestGrid publication remains `published: false`.
+
+This is an export adapter, not service integration acceptance. The inspected existing Autotest publisher and
+TestGrid JUnit matcher informed its format; source/version details and the partial column-header example are
+in [the reporting contract](../pkg/nvkr/testreporting/README.md). The selected TestGrid backend still needs a
+companion registered-group/column-header change to render exact evidence links, tier and no-result status.
+An operator must select its actual bucket/tab/access/retention contract before a concrete deployable change
+or uploader can be prepared. Service authorization, immutable object writes and authenticated API/UI read-back
+remain unresolved. Public hosting and anonymous access also need a selected destination and read-back; local
+index generation proves neither. No external service writes or production evidence publication occur here.
