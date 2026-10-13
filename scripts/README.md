@@ -4,6 +4,20 @@ The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
 The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
+## CLI artifact test baseline
+
+```sh
+GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
+python3 scripts/test-artifacts.py --artifact /path/to/nvkectl --plan /path/to/matching/plan.json
+```
+
+Imports the matching pinned NVKE tests and invokes their `test-artifact` target
+against a supplied NVKR-built binary, without rebuilding it. See
+[artifact testing](../docs/artifact-testing.md) for prerequisites, results, and scope.
+This is a trusted-input diagnostic with author-reported isolated Linux ARM64 validation.
+The current production pin lacks the upstream entrypoint; pin refresh and CI wiring
+remain follow-ups. The guide distinguishes prior results from committed regressions.
+
 ## Definition → Run
 
 Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nvke-demo.md) for
