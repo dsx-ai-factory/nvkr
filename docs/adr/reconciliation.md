@@ -217,6 +217,35 @@ inputs/materials, source attempts, signatures, provenance, complete output membe
 smoke remain required. Concrete candidate policy pins do not establish the real producer/hosted acceptance
 that remains outstanding after merge.
 
+Portable test observations now have a complete local protocol owner in `pkg/nvkr/testobservation`
+and a strict JUnit projection in `pkg/nvkr/testresults`. The canonical
+`nvkr.dev/test-observation/v1` document uses the distinct `nvkr.test-observation` digest family;
+its OCI transport digest and variable signature bytes are separate identities. Explicit reviewed
+public files are held, raw-digest pinned and inventoried without rewriting their original bytes.
+Intake bounds include 256 members including the control document, 64 MiB per file, 256 MiB
+covered bytes, eight path segments, 1,024 path bytes and 100,000 aggregate cases. Unknown,
+missing, duplicate, extra, replaced or symlink members fail closed. Summary counts and required
+case outcomes are recomputed; valid failed, canceled and explicit no-result observations remain
+nonpassing. Unsigned verification reports self-consistency only.
+
+Linux stock publication uploads digest-addressed OCI content, attaches the fixed observation
+predicate and independently reads it back under exact consumer-selected signer, issuer, subject
+and policy expectations. Locators supply coordinates, never trust. Stock verification uses the
+existing pinned static-ELF cosign owner and issues a live closeable receipt only after crypto and
+all covered bytes pass. Test observation signatures confer no qualification or release authority.
+The reviewed public projection is supplied before signing; no automatic redaction or private-log
+publication is implemented. CLI/SDK emission, publication and passive verification delegate to
+these deep owners.
+
+Local fixtures cover original result preservation, failure/no-result records, excluded diagnostics,
+path and aggregate bounds, replacement, cancellation, closure, wrong policy/subject/key, partial
+attachment and separate unsigned/authenticated outcome reporting. A real Go test invocation and
+cosign 3.1.3 local-key loopback OCI round trip exercise original file publication, independent
+public-key consumption and tamper rejection. These prove the protocol, not hosted keyless signer
+acceptance, NVKE or Kubernetes coverage, public registry access or TestGrid ingestion. Conformance,
+qualification v2 and reporting are subsequent stack slices; qualification v1's required-suite
+capability rejection and M3-B gates remain unchanged in this slice.
+
 ## Support by owner
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |

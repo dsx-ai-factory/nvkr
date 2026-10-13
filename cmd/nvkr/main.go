@@ -70,6 +70,7 @@ func newApp() *cli.App {
 			cmdFetch(),
 			cmdBakeOff(),
 			cmdSBOM(),
+			cmdEvidence(),
 			cmdDisk(),
 			cmdExecNode(),
 			cmdTransportPack(),

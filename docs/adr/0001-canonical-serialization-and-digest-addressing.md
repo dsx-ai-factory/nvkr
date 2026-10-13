@@ -161,6 +161,20 @@ frozen even where their names contain a version; the schema inside the canonical
 major versions within a family. Run presentation and Release reference views do not acquire redundant identities
 without a canonical subject.
 
+Portable test observations register a separate descriptive family. They bind exact input and named
+artifact subjects, declared or unknown originating Run, suite invocation and policy, public environment
+observations, independent execution and cleanup outcomes, and the complete sorted covered-file inventory.
+Canonical bytes cover original result-file raw digests and lengths, with JUnit totals recomputed from those
+bytes. Signed failures remain observations; neither local self-consistency nor a signature grants passing
+qualification or release authority. Consumer expectations are supplied independently. Explicit not-run,
+infrastructure-error, canceled or unknown execution may have no JUnit and zero counts; completed execution
+requires nonempty covered results. Required-case skips, absent required cases and unsuccessful or unknown
+cleanup never produce a passing observation. The aggregate selected result set is bounded at 100,000 cases.
+
+| Object | Canonical schema | Frozen family kind | Attestation predicate type |
+|---|---|---|---|
+| Test observation | `nvkr.dev/test-observation/v1` | `nvkr.test-observation` | `https://nvkr.dev/test-observation/v1` |
+
 M3 qualification evidence (ADR-16) registers the following distinct schema and family. This is
 pipeline-attested build/evidence qualification; it does not reuse a reserved qualified-clearance family.
 

@@ -154,6 +154,26 @@ substitute for one another. Consumer instructions publish both identities and us
 independently verifiable with `verify-blob-attestation` and an independently selected digest. An NVKR reader is
 a convenience, never a mandatory trust service. Event and credential admission are owned by ADR-18.
 
+Portable test observations use the distinct `https://nvkr.dev/test-observation/v1` predicate.
+Its canonical configuration binds exact input/subject descriptions, suite policy and invocation,
+public environment facts, independent execution/cleanup outcomes, derived result summary and
+an inventory of every covered original file. Signed failures and no-result records are valid
+observations; authentication never converts them into passing qualification. Caller-selected
+signer identity and issuer are exact literals, separately admitted from build and qualifier roles.
+An OCI locator and its semantic observation digest are coordinates, not consumer trust policy.
+
+The consumer authenticates the statement's exact OCI transport subject and predicate type, then
+compares the authenticated predicate to the exact canonical configuration and verifies all covered
+file bytes. Cosign's custom-predicate DSSE formatting is normalized through the existing canonical
+codec before this comparison; the expected configuration itself must already be exact canonical
+bytes. Unknown fields, schemas and altered values have no fallback. Original result-file byte
+integrity is checked separately and results are recomputed from those unchanged files. Stock
+Linux admission checks the independently pinned static executable before artifact/network work.
+Verification drops signing OIDC credentials from its subprocess environment. A live closeable
+receipt retains the authenticated covered bytes; descriptions and unsigned local consistency
+reports cannot reconstruct it. This protocol does not authenticate installed deployment bytes,
+physical hardware or current cluster health. Local-key fixtures establish interoperability only.
+
 A Verification Policy explicitly selects lane and acceptance scope:
 
 | Lane / scope | Required acceptance |

@@ -6,6 +6,7 @@ package sign
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -73,10 +75,11 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 		return out
 	}
 	for path, raw := range map[string]string{
-		"sbom.json":          `{"bomFormat":"CycloneDX","specVersion":"1.5","version":1}`,
-		"provenance.json":    `{"buildDefinition":{"buildType":"https://nvkr.dev/buildtypes/wrapped-build/v1","externalParameters":{}},"runDetails":{"builder":{"id":"local-fixture"}}}`,
-		"qualification.json": `{"schemaVersion":"nvkr.dev/qualification-evidence/v2","gateVersion":"local-key-interop-fixture"}`,
-		"trusted-root.json":  `{"mediaType":"application/vnd.dev.sigstore.trustedroot+json;version=0.1","tlogs":[],"certificateAuthorities":[],"ctlogs":[],"timestampAuthorities":[]}`,
+		"sbom.json":             `{"bomFormat":"CycloneDX","specVersion":"1.5","version":1}`,
+		"provenance.json":       `{"buildDefinition":{"buildType":"https://nvkr.dev/buildtypes/wrapped-build/v1","externalParameters":{}},"runDetails":{"builder":{"id":"local-fixture"}}}`,
+		"qualification.json":    `{"schemaVersion":"nvkr.dev/qualification-evidence/v2","gateVersion":"local-key-interop-fixture"}`,
+		"trusted-root.json":     `{"mediaType":"application/vnd.dev.sigstore.trustedroot+json;version=0.1","tlogs":[],"certificateAuthorities":[],"ctlogs":[],"timestampAuthorities":[]}`,
+		"test-observation.json": `{"schemaVersion":"nvkr.dev/test-observation/v1","verdict":"fail"}`,
 	} {
 		if err := os.WriteFile(filepath.Join(workspace, path), []byte(raw), 0o600); err != nil {
 			t.Fatal(err)
@@ -151,7 +154,8 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 	}
 	requireRun(signArgs(ociAttestArgs(subject, "provenance.json"))...)
 	requireRun(signArgs(qualificationAttestArgs(subject, "qualification.json"))...)
-	for _, predicate := range []string{CosignSignaturePredicateType, ProvenancePredicateType, QualificationPredicateType} {
+	requireRun(signArgs(testObservationAttestArgs(subject, "test-observation.json"))...)
+	for _, predicate := range []string{CosignSignaturePredicateType, ProvenancePredicateType, QualificationPredicateType, TestObservationPredicateType} {
 		bundles, err := decodeOCIBundles(requireRun(ociDownloadBundleArgs(subject, predicate)...))
 		if err != nil {
 			t.Fatal(err)
@@ -168,6 +172,35 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 		if document.MediaType != sbom.BundleMediaType {
 			t.Fatalf("unexpected bundle format: %s", document.MediaType)
 		}
+		if predicate == TestObservationPredicateType {
+			var signed struct {
+				DSSE struct {
+					Payload string `json:"payload"`
+				} `json:"dsseEnvelope"`
+			}
+			if err := json.Unmarshal(bundles[0], &signed); err != nil {
+				t.Fatal(err)
+			}
+			payload, err := base64.StdEncoding.DecodeString(signed.DSSE.Payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var statement inTotoStatement
+			if err := json.Unmarshal(payload, &statement); err != nil {
+				t.Fatal(err)
+			}
+			expected, err := os.ReadFile(filepath.Join(workspace, "test-observation.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			actual, err := canonical.Marshal(statement.Predicate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(actual, expected) {
+				t.Fatalf("cosign changed exact observation bytes: %s", statement.Predicate)
+			}
+		}
 		path := filepath.Join(workspace, "verify.json")
 		if err := os.WriteFile(path, bundles[0], 0o600); err != nil {
 			t.Fatal(err)
@@ -178,6 +211,31 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 		args = args[:9]
 		args = append(args, "--key", "cosign.pub", "--insecure-ignore-tlog", "--offline", "--trusted-root", "trusted-root.json")
 		requireRun(args...)
+		if predicate == TestObservationPredicateType {
+			var bundle map[string]any
+			if err := json.Unmarshal(bundles[0], &bundle); err != nil {
+				t.Fatal(err)
+			}
+			envelope := bundle["dsseEnvelope"].(map[string]any)
+			payload, err := base64.StdEncoding.DecodeString(envelope["payload"].(string))
+			if err != nil {
+				t.Fatal(err)
+			}
+			envelope["payload"] = base64.StdEncoding.EncodeToString(bytes.ReplaceAll(payload, []byte(`"fail"`), []byte(`"pass"`)))
+			tampered, err := json.Marshal(bundle)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, tampered, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := run(args...); err == nil {
+				t.Fatal("cosign accepted observation tampering")
+			}
+			if err := os.WriteFile(path, bundles[0], 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
 		args[6] = strings.TrimPrefix(ociTestDigest, "sha256:")
 		if _, err := run(args...); err == nil {
 			t.Fatal("bundle accepted for a different digest")

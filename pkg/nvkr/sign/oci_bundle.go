@@ -106,12 +106,16 @@ func ociBundleClaims(raw []byte, digest, predicateType string, policy VerifyPoli
 		statement.Subject[0].Digest["sha256"] != strings.TrimPrefix(digest, "sha256:") {
 		return "", "", e.New(e.CodeVerifyFailed, "OCI bundle does not bind the required predicate and exact subject")
 	}
+
 	if len(policy.ExpectedPredicate) > 0 {
 		expected, err := canonical.Marshal(json.RawMessage(policy.ExpectedPredicate))
 		if err != nil {
 			return "", "", e.Wrap(e.CodeVerifyFailed, err, "canonicalize expected predicate")
 		}
 		actual, err := canonical.Marshal(statement.Predicate)
+		if policy.exactPredicateBytes {
+			expected = policy.ExpectedPredicate
+		}
 		if err != nil || !bytes.Equal(expected, actual) {
 			return "", "", e.New(e.CodeVerifyFailed, "authenticated statement does not bind the expected predicate")
 		}

@@ -124,6 +124,8 @@ func TestAuthorityFamiliesRejectSameByteSubstitution(t *testing.T) {
 		left, right string
 	}{
 		{name: "publication root vs content", left: KindPublicationRoot, right: KindReleaseContent},
+		{name: "test observation vs qualification", left: KindTestObservation, right: KindQualificationEvidence},
+		{name: "test observation vs evidence", left: KindTestObservation, right: KindEvidence},
 		{name: "publisher evidence vs reproduction", left: KindPublisherEvidence, right: KindReproductionObservation},
 		{name: "status checkpoint vs policy", left: KindStatusCheckpoint, right: KindStatusCheckpointPolicy},
 		{name: "provenance index vs statement", left: KindProvenance, right: KindProvenanceStatement},

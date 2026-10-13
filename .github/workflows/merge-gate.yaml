@@ -55,6 +55,10 @@ on:
   pull_request:
     branches:
       - main
+      # Validate the portable-evidence stack before its prerequisite lands.
+      - feat/m3-c-qualification-evidence
+      - codex/portable-test-evidence
+      - codex/kubernetes-conformance-evidence
   push:
     branches:
       - main
