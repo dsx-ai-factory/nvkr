@@ -231,23 +231,27 @@ func publishWith(ctx context.Context, root, repository string, transport deliver
 // Verified owns an authenticated observation and held covered bytes. Exported
 // descriptions never recreate it; closure and request cancellation revoke access.
 type Verified struct {
-	mu        sync.Mutex
+	state     *verifiedState
 	bundle    *Bundle
 	ctx       context.Context
 	reference string
-	closed    bool
 	identity  string
 	issuer    string
+}
+
+type verifiedState struct {
+	mu     sync.Mutex
+	closed bool
 }
 
 // Signer returns the exact independently admitted certificate identity/issuer.
 // Stock authentication matched the certificate to these literal values first.
 func (v *Verified) Signer(ctx context.Context) (string, string, error) {
-	if v == nil {
+	if v == nil || v.state == nil {
 		return "", "", invalid("authenticated observation is unavailable")
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.state.mu.Lock()
+	defer v.state.mu.Unlock()
 	if err := v.check(ctx); err != nil {
 		return "", "", err
 	}
@@ -258,11 +262,11 @@ func (v *Verified) Signer(ctx context.Context) (string, string, error) {
 }
 
 func (v *Verified) Read(ctx context.Context, name string) ([]byte, error) {
-	if v == nil {
+	if v == nil || v.state == nil {
 		return nil, invalid("authenticated observation is unavailable")
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.state.mu.Lock()
+	defer v.state.mu.Unlock()
 	if err := v.check(ctx); err != nil {
 		return nil, err
 	}
@@ -277,11 +281,11 @@ func (v *Verified) Read(ctx context.Context, name string) ([]byte, error) {
 }
 
 func (v *Verified) Reference(ctx context.Context) (string, error) {
-	if v == nil {
+	if v == nil || v.state == nil {
 		return "", invalid("authenticated observation is unavailable")
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.state.mu.Lock()
+	defer v.state.mu.Unlock()
 	if err := v.check(ctx); err != nil {
 		return "", err
 	}
@@ -289,11 +293,11 @@ func (v *Verified) Reference(ctx context.Context) (string, error) {
 }
 
 func (v *Verified) Observation(ctx context.Context) (Observation, error) {
-	if v == nil {
+	if v == nil || v.state == nil {
 		return Observation{}, invalid("authenticated observation is unavailable")
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.state.mu.Lock()
+	defer v.state.mu.Unlock()
 	if err := v.check(ctx); err != nil {
 		return Observation{}, err
 	}
@@ -301,11 +305,11 @@ func (v *Verified) Observation(ctx context.Context) (Observation, error) {
 }
 
 func (v *Verified) Description(ctx context.Context) (Verification, error) {
-	if v == nil {
+	if v == nil || v.state == nil {
 		return Verification{}, invalid("authenticated observation is unavailable")
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
+	v.state.mu.Lock()
+	defer v.state.mu.Unlock()
 	if err := v.check(ctx); err != nil {
 		return Verification{}, err
 	}
@@ -316,22 +320,25 @@ func (v *Verified) check(ctx context.Context) error {
 	if err := captureContext(ctx); err != nil {
 		return err
 	}
-	if v.closed || v.bundle == nil {
+	if v.state.closed || v.bundle == nil {
 		return invalid("authenticated observation was closed")
 	}
-	return captureContext(v.ctx)
+	if err := captureContext(v.ctx); err != nil {
+		return err
+	}
+	return v.bundle.snapshot.check(ctx)
 }
 
 func (v *Verified) Close() error {
-	if v == nil {
+	if v == nil || v.state == nil {
 		return nil
 	}
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	if v.closed {
+	v.state.mu.Lock()
+	defer v.state.mu.Unlock()
+	if v.state.closed {
 		return nil
 	}
-	v.closed = true
+	v.state.closed = true
 	if v.bundle == nil {
 		return nil
 	}
@@ -464,7 +471,7 @@ func verifyOCIWith(ctx context.Context, reference string, expected Expected, tra
 		_ = bundle.Close()
 		return nil, err
 	}
-	return &Verified{bundle: bundle, ctx: lifetime, reference: reference}, nil
+	return &Verified{state: &verifiedState{}, bundle: bundle, ctx: lifetime, reference: reference}, nil
 }
 
 func pinnedReference(reference string) (registry.Reference, error) {

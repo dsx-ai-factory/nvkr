@@ -127,6 +127,7 @@ func TestObservationRegistrySignedRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer verified.Close()
+			copiedReceipt := *verified
 			result, err := verified.Description(t.Context())
 			if err != nil {
 				t.Fatal(err)
@@ -153,6 +154,13 @@ func TestObservationRegistrySignedRoundTrip(t *testing.T) {
 			}
 			_, err = verified.Description(t.Context())
 			requireCode(t, err, e.CodeVerifyFailed)
+			_, err = copiedReceipt.Description(t.Context())
+			requireCode(t, err, e.CodeVerifyFailed)
+			_, err = copiedReceipt.Observation(t.Context())
+			requireCode(t, err, e.CodeVerifyFailed)
+			_, err = copiedReceipt.Reference(t.Context())
+			requireCode(t, err, e.CodeVerifyFailed)
+
 		})
 	}
 }
