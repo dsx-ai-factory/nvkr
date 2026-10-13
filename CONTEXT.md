@@ -178,6 +178,10 @@ attempt and an independent consumer policy. The generated handoff carries origin
 recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
 The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
 joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+Native workers exercise every selected delivered tool with fixed version checks in isolated containers and
+sign exact member observations. The final qualifier authenticates complete native coverage under the same
+independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
+they are not caller-authored pass records or release authorization.
 External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success

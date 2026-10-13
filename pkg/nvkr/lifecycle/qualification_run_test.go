@@ -397,3 +397,47 @@ func TestQualificationConsumerCredentialTransportScopes(t *testing.T) {
 		})
 	}
 }
+
+func TestQualificationConsumerSelectsNativePolicyPin(t *testing.T) {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip("qualification verifier admits AMD64 and ARM64")
+	}
+	native := "linux/" + runtime.GOARCH
+	other := "linux/amd64"
+	if native == other {
+		other = "linux/arm64"
+	}
+	nativePin, otherPin := "sha256:"+strings.Repeat("a", 64), "sha256:"+strings.Repeat("b", 64)
+	for _, tc := range []struct {
+		name string
+		pins map[string]string
+		code e.Code
+	}{
+		{"native platform pin", map[string]string{native: nativePin}, ""},
+		{"distinct native platform pins", map[string]string{native: nativePin, other: otherPin}, ""},
+		{"missing current platform pin", map[string]string{other: otherPin}, e.CodeUnpinnedInput},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			policy := qualificationPolicyFixture()
+			policy.Cosign = QualificationCosignPolicy{Path: filepath.Join(root, "must-not-execute"), PlatformDigests: tc.pins}
+			if err := policy.Validate(); err != nil {
+				t.Fatalf("independent policy is invalid: %v", err)
+			}
+			consumer, err := newQualificationConsumer("ghcr.io/product/releases@sha256:"+strings.Repeat("c", 64), policy,
+				QualificationRuntimeOptions{WorkspaceRoot: filepath.Join(root, "must-not-materialize"), Registry: delivery.RegistryOptions{Anonymous: true}})
+			if tc.code != "" {
+				assertCode(t, err, tc.code)
+				if consumer != nil {
+					t.Fatal("missing native executable pin returned verification/pull adapters")
+				}
+			} else if err != nil || consumer == nil {
+				t.Fatalf("native executable pin was not admitted: %v", err)
+			}
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("verifier pin admission touched workspace: %v, %v", entries, err)
+			}
+		})
+	}
+}

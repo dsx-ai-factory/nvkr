@@ -596,11 +596,15 @@ Downloaded records cannot select consumer policy or replace missing evidence.
 
 The lifecycle owner issues an opaque check receipt retaining the verified publication and frozen Plan.
 Closing it revokes copies, cancels and joins registered operations, then releases held bytes and any owned
-source receipt. The receipt grants neither smoke-execution nor signing authority. This A implementation does
-not establish M3-B smoke, M3-C signing or hosted qualification acceptance; reconciliation owns those gaps.
-The independent qualification publisher requires every applicable result before signing; missing smoke results
-fail closed. It authenticates
-the successful default-branch build separately from its own invocation and signs for every selected subject.
+source receipt. The receipt grants neither smoke-execution nor signing authority. Fixed native smoke workers
+consume its held executable members in nonroot network-disabled containers and compare versions with the
+frozen producer inputs. Their distinct signatures bind exact member observations, full policy and the current
+qualifier invocation. The final owner requires successful exact-attempt jobs, authenticates those signatures
+and certificate invocation claims, and recomputes complete native coverage before issuing a B receipt.
+The independently configured `run qualify --policy <path>` derives its source from the authenticated hosted
+event, consumes live A/B/invocation receipts and signs for every selected subject. The generator owns the
+same-commit worker pair and its secret/permission routing. These implementation contracts and local native
+execution do not establish hosted acceptance; reconciliation owns the remaining candidate and external gaps.
 Any failed verdict prevents all attestations; later signing/attachment failure marks qualification unsuccessful
 even if earlier attachments remain. Smoke execution has no qualification credentials.
 

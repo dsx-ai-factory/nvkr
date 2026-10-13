@@ -179,11 +179,15 @@ Catalog loading re-derives source-owned pin sets and may need Git access even fo
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
   --definition definitions/nvke-m2/definition.yaml \
   --environment definitions/nvke-m2/environment-github.yaml \
+  --qualification-policy definitions/nvke-m2/qualification.yaml \
   --engine github --root .
 make workflows-check
 ```
 
-These commands regenerate the workflow, Plan and manifest; they do not execute the pipeline.
+These commands regenerate the producer workflow, Plan and manifest plus the separately owned qualifier
+and smoke worker. The worker is the generated reusable GitHub Actions workflow `nvkr-smoke.yml`, invoked
+by `nvkr-qualify.yml` at the same commit; it is not a separately authored pipeline. The qualification manifest
+records both workflow files. Generation and drift checks do not execute any producer or qualification job.
 The generator rejects a workflow above 500,000 bytes before writing. YAML compaction preserves the
 expanded job graph and credential boundaries. Changes to authored inputs must regenerate these files;
 never edit the bundle by hand.
@@ -207,13 +211,27 @@ Source, patch, configuration and selected material identities remain bound to pr
 producer Run/attempt, output membership, signatures, provenance and applicable delivered-tool smoke remain
 required. No source or artifact pin changes are needed merely to satisfy the optional metadata check.
 
-The remaining integration inputs are an independently approved consumer/verifier policy and native smoke
-runtime trust pins and scope. Tool/image pins supplied by the producer are not automatically trusted for
-qualification. The artifact-check implementation alone supplies no smoke or signing authority.
+The [candidate policy](qualification.yaml) records concrete cosign version/executable hashes, native
+smoke-image manifest digests, three tool profiles and 25 exact deployment-image scope decisions. These
+independently authored trust selections are reviewed with the generated workflow pair; they are not inherited
+from the producing Run. The [hosted setup guide](../../docs/lifecycle.md#publish-qualification-evidence)
+explains the policy and generated worker. Concrete pins and repository validation do not establish
+organizational approval or hosted acceptance.
 
-Acceptance still needs a newly completed producer attempt with its original complete handoff, real
-delivered-tool checks and independently verified hosted qualification evidence. Earlier successful builds
-and local contract tests do not supply that evidence. These prerequisites add no command-line flags.
+The verifier is [cosign v3.1.3](https://github.com/sigstore/cosign/releases/tag/v3.1.3); both Linux
+executables were downloaded and their hashes matched the release asset metadata and checksum file. Smoke
+uses Docker Official Debian `trixie-20261005-slim`, pinned to the native
+[AMD64 manifest](https://github.com/debuerreotype/docker-debian-artifacts/blob/a3751996111ce2c1c904050c84440184535e23b1/trixie/slim/oci/index.json)
+and [ARM64 manifest](https://github.com/debuerreotype/docker-debian-artifacts/blob/cf1f4a45447842b45e9952e0f018ae734a7341c7/trixie/slim/oci/index.json).
+Both passed the required utility, environment and container-isolation probes. Catalog-pinned Helm and
+kubectl bytes passed their fixed version commands. ARM64 utility execution was native; AMD64 probes used
+local emulation. No fresh nvkectl artifact or hosted qualification was exercised by these checks.
+
+The reviewed implementation, policy and generated workflows may merge before the real acceptance runs.
+After merge, run a fresh complete producer attempt with its original handoff, followed by native delivered-tool
+checks, hosted positive/negative qualification and independent complete-set consumer verification. Those
+results remain unproved and required before production-readiness or operational-acceptance claims. Earlier
+successful builds and local contract tests do not replace them. Runtime authority checks remain unchanged.
 
 ## Recorded delivery and remaining acceptance
 

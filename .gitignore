@@ -15,8 +15,9 @@
 /toolchains/nkd-exec/out/
 /.github/nkd-run/*.lease
 
-# persistent local coordination inode for generated Run bundle updates
+# persistent local coordination inodes for generated workflow bundle updates
 /.github/nvkr-run/*.lease
+/.github/nvkr-qualification/*.lease
 
 # advisory-lock guard `catalog pin`/`bump` leaves beside a machine-managed lock
 .pins.lock.yaml.lock

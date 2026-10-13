@@ -164,7 +164,8 @@ local Run default described above, commands default to `--ui=plain` and keep the
 existing text, canonical JSON or diagram output. On commands with a result
 browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
 and `--ui=tui` are incompatible and fail before input, network or write work.
-`run check-artifacts` retains canonical machine-readable diagnostics and does not offer presentation flags.
+`run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
+presentation flags.
 
 ```sh
 bin/nvkr definition inspect --definition definitions/nvke-v1/definition.yaml --ui=tui
@@ -513,11 +514,131 @@ raw source metadata; it does not apply patches, configuration or material substi
 effective customized or installed composition. Source, patch, configuration and material identity/provenance
 checks remain required. The maintained candidate needs no new upstream component manifests.
 
-M3-B's authenticated smoke receipt is not available in this implementation, so required delivered-tool smoke
-blocks qualification signing. An A receipt alone cannot sign evidence or authorize release. The C publisher's
-contract and local tests do not establish real hosted signing or complete-set consumer acceptance.
+Delivered-tool smoke still requires the complete native worker results described below. An A receipt alone
+cannot sign evidence or authorize release. Local tests do not establish real hosted signing or complete-set
+consumer acceptance.
 [Reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary) records contract coverage and
 the outstanding hosted signing, exact-input candidate and consumer acceptance evidence.
+
+## Publish qualification evidence
+
+Hosted qualification uses one command:
+
+```sh
+nvkr run qualify --policy qualification.yaml
+```
+
+The generated workflow supplies its environment and credentials. The command discovers its source only
+from the authenticated `workflow_run` event, verifies the source's exact successful attempt, and downloads
+its original handoff. There are no source-commit, candidate-file, verdict-file or skip-smoke flags.
+A manually dispatched qualifier or the source build's own identity is rejected.
+
+Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
+qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
+Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
+candidate supplies `definitions/nvke-m2/qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
+and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
+all owned bytes without writing. The separately owned qualification manifest records both workflow files;
+hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
+workflow at the caller's exact commit. It is generated plumbing, not another operator command to configure
+for each Run. Before candidate or signing work, both commands check the trusted checkout against that
+manifest and the full loaded policy; policy or workflow drift requires regeneration.
+
+The independent policy extends the artifact-check policy with these decisions:
+
+| Policy field | What it controls |
+|---|---|
+| `qualificationWorkflow` | The default-branch workflow allowed to publish qualification evidence |
+| `cosign.version` and `cosign.platformDigests` | An exact release locator and independently approved executable bytes for every worker platform plus the AMD64 final signer |
+| `smoke.workflow` | A separate same-repository worker identity, distinct from both builder and final signer |
+| `smoke.images` | Exact native execution-image references, pinned by digest |
+| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm or kubectl version-check profiles |
+| `smoke.nonToolOutputs` | Exact OCI/APT output names, kinds and components explicitly outside loose-tool smoke |
+| `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
+
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/qualification.yaml)
+contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
+with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
+the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing
+Run. Concrete configuration does not establish organizational approval or successful hosted execution.
+
+For hosted generation, replace the earlier single `cosign.digest` field with `cosign.platformDigests`;
+using both is rejected. Map keys are exactly `linux/amd64` and `linux/arm64`. Set `cosign.version` to the
+approved stable `vX.Y.Z` download locator and leave `cosign.path` absent or `cosign`. Images must cover exactly
+the executable platforms selected by the Definition. An AMD64-only product generates one worker. An
+ARM64-only product still needs an AMD64 cosign pin because the final signer runs on AMD64. The maintained
+candidate selects both platforms. Generation validates all tool profiles, versions and non-tool membership
+against the Plan before writing either workflow; missing or extra scope is an error.
+
+`smoke.nonToolOutputs` is a list of `output`, `kind`, `components` and `reason` records. The admitted pairs
+are `kind: oci` with `reason: deployment-image`, and `kind: apt-repository` with
+`reason: package-repository`. Each record must match the complete named output's component set. The
+candidate policy contains all 25 OCI records, alongside three profiles covering its four native
+tool invocations. It contains no Helm/disk exemptions because those formats have a fixed non-tool rule.
+
+Use independently approved native images containing `/bin/sh`, `cat`, `wc`, `sha256sum`, `chmod` and
+`/usr/bin/env`. They must have no declared volumes or extra inherited environment. The payload environment
+is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C` and `TZ=UTC`; image configuration
+must not add or conflict with it. Builder images and pins are not automatically trusted smoke images.
+The generated route also requires a GitHub-signing producer, its generated source workflow, and GHCR
+publication under the same repository owner with the existing `github:GITHUB_TOKEN` credential reference.
+
+The fixed profiles are `nvkectl-version-json`, `helm-version` and `kubectl-client-version-json`. Expected
+versions and the nvkectl commit come from the authenticated frozen Plan. The policy cannot supply a
+replacement expected version or arbitrary executable arguments. Every member of every executable bundle
+must be covered. OCI deployment-image and APT package-repository exemptions require exact membership;
+there is no wildcard exemption for an artifact format. Disk and Helm outputs use their explicit non-tool
+format rule. Disk content remains uninspected.
+
+Each native worker independently performs artifact checks, streams the held delivered member into a
+network-disabled nonroot container, checks its native ELF identity and version response, and joins cleanup
+before signing its report. The payload receives no credentials, host mounts, daemon socket or inherited
+host environment. The worker can read artifacts and sign its own report; it cannot publish qualification
+attestations. Its generated upload contains exactly four files under an attempt-specific artifact name.
+
+A failed worker report lists every known native member: completed checks retain their actual pass result,
+the failed attempt is marked `fail`, and checks never reached are `not-evaluated` with a coded reason.
+Cleanup or revocation can fail the overall report even after all member checks passed. These diagnostics
+cannot be signed as successful evidence. If the final job cannot authenticate the delivered smoke set,
+every artifact receives a failed `delivered-tool-smoke-authentication` verdict while its genuine artifact
+check results remain intact; this does not claim the payload itself was executed and failed.
+
+After workers complete with success or failure, the final job repeats artifact checks and attempts to
+authenticate the complete smoke set. This produces refusal diagnostics when a worker failed. Canceled,
+skipped or untrusted source invocations do not enter this final job. Publication still requires successful worker
+jobs from the exact current attempt and verifies each report's signature, worker certificate SAN and GitHub
+issuer. The same verified leaf must bind the top-level workflow, workflow commit and exact Run attempt.
+It then recomputes the complete expected member set and compares the full independent policy, payload
+identities, native images, expected versions and observed results. A missing architecture, missing member,
+wrong identity, reused attempt or failed check prevents signing.
+
+`qualification.PublishTriggeredRun` owns this orchestration. The lower-level publisher consumes live A,
+B and invocation receipts; serialized reports cannot restore them. The old `qualification.PublishFiles`
+publishing adapter returns a capability error before I/O; saved-file artifact diagnostics remain available
+through `lifecycle.CheckQualificationFiles`.
+
+The canonical predicate uses schema and URI `nvkr.dev/qualification-evidence/v2` and
+`https://nvkr.dev/qualification-evidence/v2`, with typed family `nvkr.qualification-evidence`. Version 2
+requires the full smoke policy and member-level worker evidence. It also binds the complete artifact-check
+report, source and qualifier identities, input identities, per-output verdicts and external-suite status.
+Every selected output receives the same complete-set predicate under its own exact subject. An
+outside-MVP suite is `not-evaluated`, never passed. [Independent consumption](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/publication-architecture.md#independent-consumption)
+explains distinct builder/qualifier trust and complete-set rejection requirements. Requiring an external suite fails before provider or
+artifact work until authenticated integration exists.
+
+The publisher collects all results before signing and rechecks receipt lifetimes before constructing the
+signer, each attachment and successful return. An operational failure can leave earlier attachments;
+the command returns a failure code and retains those subjects in its diagnostics. Their presence does
+not establish successful qualification or release authorization.
+
+The maintained candidate's reviewed policy and generated workflows may merge before real acceptance runs.
+After merge, a fresh complete producer attempt must provide its original exact-attempt handoff; the hosted
+worker/qualifier and independent consumer then exercise positive and negative cases. These observations
+remain unproved and are required before production-readiness claims. Local native-container, race and protocol
+tests do not establish GitHub's actual reusable-job names, OIDC claims, production attachment/read-back or
+independent complete-set consumer acceptance. Merge does not waive any runtime verification;
+[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary)
+records their scope and status.
 
 ## Use the SDK
 

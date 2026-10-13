@@ -126,6 +126,18 @@ the candidate cannot select the credential destination. Anonymous and host-scope
 available. Defensive
 diagnostics cannot restore authority after closure. The independent `qualification` publisher contract
 consumes authenticated check and smoke receipts; its public descriptions are not receipt constructors.
+`run qualify --policy <path>` delegates to `qualification.PublishTriggeredRun`, which derives its source
+from the authenticated hosted event. The generated hidden native worker command also takes only that
+policy; it is not an independently authored lifecycle input. Pipeline owns isolated held-byte execution,
+lifecycle owns fixed version evaluation and authenticated complete worker aggregation, and qualification
+owns worker report signing and final subject-bound publication. Native and aggregate receipts borrow A and
+the qualifier invocation, preserve shared revocation, and expose only defensive descriptions. The old
+file-based publishing adapter is capability-gated before I/O; A's file diagnostics remain supported.
+`run generate --qualification-policy <path>` composes the producer generator with the qualification-owned
+workflow pair and manifest. `lifecycle.ValidateQualificationSmokePlan` owns the pure policy/Plan scope
+join shared by generation and runtime; adapters cannot choose a different applicability rule. Generation
+selects exactly the executable native platforms, retaining the final AMD64 signer requirement. The CLI
+only selects the use case and presents its result.
 ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
 acceptance boundaries.
 
@@ -170,8 +182,9 @@ excludes a live owner. Inspection admits only currently producible lanes, not
 qualified lifecycle records. It validates the existing output slot bindings, without opening payload
 locators, restoring execution authority or inferring current availability/health.
 The CLI may show these views as plain/JSON or an explicitly selected read-only
-terminal explorer. The interactive public command leaves additionally admit an explicitly
-selected result browser; `run check-artifacts` retains canonical machine-readable diagnostics.
+terminal explorer. Of the 24 public command leaves, 22 admit an explicitly selected result browser;
+`run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics. The hidden native
+worker is not a public command.
 Owning operations, including maintenance transactions
 and verification, finish and release receipts before this read-only view opens.
 Typed names, identity fields, counts and navigation links are descriptions; they
@@ -183,9 +196,10 @@ JSON, are preserved. Interactive `run local` defaults to the dashboard and does
 not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
 terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts`, and `release verify|inspect|browse|export`, with
-`--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
-available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify`,
+and `release verify|inspect|browse|export`. Producer operations select authored inputs with `--definition` and
+`--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
+and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
 current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
