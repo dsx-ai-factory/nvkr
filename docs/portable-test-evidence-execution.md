@@ -90,10 +90,11 @@ is restricted to selected loopback fixtures.
 
 ## Qualification and external acceptance
 
-Observation signing is separate from build signing and qualification. Existing qualification v1 retains
-its strict predicate and required-suite capability rejection; this first slice cannot satisfy that gate.
-Kubernetes conformance execution, authenticated suite receipts and verified reporting belong to the next
-two stacked changes. They must preserve complete artifact membership and the separate M3-B smoke gate.
+Observation signing is separate from build signing and qualification. Native qualification v2
+requires authenticated native smoke and rejects required external suites through its own policy.
+Observation receipts alone cannot satisfy that gate. Kubernetes conformance execution, authenticated
+required-suite integration and verified reporting are separate capabilities; reconciliation records
+their support. They must preserve complete artifact membership and native smoke authorization.
 
 Local contract coverage includes bounded intake, path and member rejection, mutation, cancellation,
 receipt closure, unsigned versus authenticated reporting, independent subject/policy checks and partial
