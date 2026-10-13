@@ -48,8 +48,10 @@ type qualificationVerifier struct {
 	source      *qualificationFixtureSource
 	predicate   []byte
 	fail        map[string]error
+	observed    map[string]string
 	evidenceErr error
 	verified    []string
+	policies    []sign.VerifyPolicy
 	evidence    int
 }
 
@@ -59,15 +61,20 @@ func (*qualificationVerifier) SignAndAttest(context.Context, sign.Subject, []byt
 
 func (v *qualificationVerifier) Verify(_ context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
 	v.verified = append(v.verified, subject.Ref)
+	v.policies = append(v.policies, policy)
 	if err := v.fail[subject.Ref]; err != nil {
 		return sign.VerificationRecord{}, err
 	}
 	if len(policy.ExpectedPredicate) > 0 && string(policy.ExpectedPredicate) != string(v.predicate) {
 		return sign.VerificationRecord{}, e.New(e.CodeSignatureInvalid, "fixture signature does not cover predicate")
 	}
+	identity := v.origin.BuilderID
+	if observed := v.observed[subject.Ref]; observed != "" {
+		identity = observed
+	}
 	return sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion, Ref: subject.Ref, Digest: subject.Digest,
 		Identity: policy.IdentityRegexp, Issuer: policy.Issuer, PredicateType: sign.ProvenancePredicateType,
-		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: v.origin.BuilderID, ObservedIssuer: policy.Issuer, Ran: [][]string{{"cosign", "verify"}}}, nil
+		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: identity, ObservedIssuer: policy.Issuer, Ran: [][]string{{"cosign", "verify"}}}, nil
 }
 
 func (*qualificationVerifier) AttestSBOM(context.Context, string, []byte) ([]byte, error) {
@@ -83,6 +90,11 @@ func (v *qualificationVerifier) VerifySBOM(_ context.Context, digest string, raw
 
 func newQualificationFixture(t *testing.T) (QualificationRequest, *Consumer, *qualificationVerifier) {
 	t.Helper()
+	return newQualificationFixtureWithSigningIdentity(t, "^"+regexp.QuoteMeta(qualificationSourceFixture().value.BuilderID)+"$")
+}
+
+func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (QualificationRequest, *Consumer, *qualificationVerifier) {
+	t.Helper()
 	origin := qualificationSourceFixture()
 	description, err := origin.Description()
 	if err != nil {
@@ -91,7 +103,7 @@ func newQualificationFixture(t *testing.T) (QualificationRequest, *Consumer, *qu
 	base := newExactInputFixture(t)
 	definition, environment := base.definition, base.environment
 	definition.CosignTool = "cosign"
-	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^" + regexp.QuoteMeta(description.BuilderID) + "$", Issuer: "https://token.actions.githubusercontent.com"}
+	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: identity, Issuer: "https://token.actions.githubusercontent.com"}
 	snapshot := base.plan.CatalogSnapshot
 	snapshot.Tools = map[string]catalog.ToolPin{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.invalid/cosign.tar.gz", Platform: "linux/amd64", ArchiveDigest: "sha256:" + strings.Repeat("1", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + strings.Repeat("2", 64)}}
 	stack, err := catalog.ApplyStack(snapshot)
@@ -141,6 +153,92 @@ func newQualificationFixture(t *testing.T) (QualificationRequest, *Consumer, *qu
 		return delivery.OpenPublication(ctx, fixture.layout, fixture.rootDigest)
 	}}
 	return request, consumer, verifier
+}
+
+func TestQualificationBroadSigningPolicyRequiresExactSource(t *testing.T) {
+	const broadIdentity = `^https://github\.com/.+/\.github/workflows/.+@refs/heads/main$`
+	for _, tc := range []struct {
+		name, observed             string
+		outputOnly, priorAttempt   bool
+		code                       e.Code
+		wantVerified, wantEvidence int
+	}{
+		{name: "exact provider workflow", wantVerified: 4, wantEvidence: 2},
+		{name: "different repository signer", observed: "https://github.com/other/nvkr/.github/workflows/build.yml@refs/heads/main", code: e.CodeUntrustedSigner, wantVerified: 1},
+		{name: "different output workflow", observed: "https://github.com/example/nvkr/.github/workflows/other.yml@refs/heads/main", outputOnly: true, code: e.CodeSignatureInvalid, wantVerified: 4, wantEvidence: 2},
+		{name: "prior production attempt", priorAttempt: true, code: e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, consumer, verifier := newQualificationFixtureWithSigningIdentity(t, broadIdentity)
+			origin := verifier.source.value
+			if request.Environment.Signing.Identity != broadIdentity || request.Plan.Environment.Signing.Identity != broadIdentity {
+				t.Fatal("broad authored identity was not compiled into the exact inputs")
+			}
+			if tc.observed != "" {
+				if !regexp.MustCompile(broadIdentity).MatchString(tc.observed) {
+					t.Fatal("negative signer does not exercise the broad authored policy")
+				}
+				if tc.outputOnly {
+					verifier.observed = map[string]string{request.Predicates[1].Reference: tc.observed}
+				} else {
+					verifier.origin.BuilderID = tc.observed
+				}
+			}
+			if tc.priorAttempt {
+				var predicate provenance.Predicate
+				if err := canonical.UnmarshalExact(verifier.predicate, &predicate); err != nil {
+					t.Fatal(err)
+				}
+				predicate.RunDetails.Metadata["invocationId"] = "https://github.com/example/nvkr/actions/runs/42/attempts/1"
+				raw, err := canonical.Marshal(predicate)
+				if err != nil {
+					t.Fatal(err)
+				}
+				verifier.predicate = raw
+				for i := range request.Predicates {
+					request.Predicates[i].Predicate = append([]byte(nil), raw...)
+				}
+			}
+			receipt, report, err := consumer.checkQualification(t.Context(), request, verifier.source)
+			if tc.code != "" {
+				assertCode(t, err, tc.code)
+				if receipt != nil {
+					t.Fatal("broader signer or wrong attempt minted qualification authority")
+				}
+			} else {
+				if err != nil || receipt == nil {
+					t.Fatalf("exact provider identity failed the complete gate: %v", err)
+				}
+				defer receipt.Close()
+				if _, err := receipt.Description(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if len(verifier.verified) != tc.wantVerified || verifier.evidence != tc.wantEvidence {
+				t.Fatalf("verified=%v evidence=%d, want %d and %d", verifier.verified, verifier.evidence, tc.wantVerified, tc.wantEvidence)
+			}
+			wantIdentity := "^" + regexp.QuoteMeta(origin.BuilderID) + "$"
+			for _, policy := range verifier.policies {
+				if policy.IdentityRegexp != wantIdentity || policy.Issuer != request.Environment.Signing.Issuer || !policy.RequireAttestation {
+					t.Fatalf("verification did not narrow to the exact provider identity: %+v", policy)
+				}
+			}
+			if tc.wantEvidence != 0 {
+				if report == nil || len(report.Outputs) != 2 {
+					t.Fatalf("complete output diagnostics missing: %+v", report)
+				}
+				for _, output := range report.Outputs {
+					want := "pass"
+					if tc.outputOnly && output.Reference == request.Predicates[1].Reference {
+						want = "fail"
+					}
+					if output.Overall != want || len(output.Checks) != 6 {
+						t.Fatalf("output verdict=%+v, want %s with every check", output, want)
+					}
+				}
+			}
+		})
+	}
 }
 
 func TestQualificationChecksCompleteSetAndOpaqueReceipt(t *testing.T) {
