@@ -1,7 +1,8 @@
 # Demos
 
-Use these guided examples to explore NVKR with a team or at your own pace. For current user
-instructions, start with the [documentation](../docs/README.md) and [quickstart](../docs/quickstart.md).
+Use these guided examples to explore NVKR with a team or at your own pace. Start with the
+[quickstart](../docs/quickstart.md) for the deck's core ideas, a tiny real local build, and the
+continuation into the NVKE tenant demo. The [documentation map](../docs/README.md) connects deeper tasks.
 
 ## Team tour
 
