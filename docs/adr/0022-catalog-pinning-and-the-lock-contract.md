@@ -41,6 +41,12 @@ Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact 
 versions/kinds/fields, and never interpret a future lock as the current version. A missing lock is an input error,
 not an implicit empty lock.
 
+The independent qualification policy selects its own verifier executable and native smoke-image pins; these
+are consumer trust inputs, not producer catalog pins or permissions inherited from the producing Run.
+Review and commit those concrete selections with their generated workflows. Hosted acceptance follows merge
+under ADR-16; a recorded pin or successful generation alone establishes neither production readiness nor
+organizational approval.
+
 Registry v3 contains producer components with explicit supported `platforms`.
 It contains no recipes, criteria, recipe layers, mixins, `versionFrom`, placement categories or node roles.
 Catalog overlay v3 can replace complete component producers under ADR-11. Its only narrow field-level operation

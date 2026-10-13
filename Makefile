@@ -169,10 +169,11 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # byte, recorded evidence and example data, templates that emit workflows, and
 # build output. Keep LICENSE_UNCHECKED in step with LICENSE_IGNORES.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
-	-ignore '.github/workflows/nvkr-run.yml' -ignore '**/*.tmpl' \
+	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
+	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-run\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run|qualify|smoke)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -196,7 +197,7 @@ license-header-check: ## Fail when a source file has no license header.
 	 [ -z "$$missing" ] || { echo "ERROR: no license line in the first 20 lines of:"; echo "$$missing" | sed 's/^/    /'; echo "Run 'make license'; add the header by hand to a Makefile or *.jq." >&2; exit 1; }
 
 .PHONY: workflows-check
-workflows-check: ## Verify the committed Run generation matches the catalog (ADR-21 drift gate).
+workflows-check: ## Verify committed producer and qualification generation (ADR-21 drift gate).
 	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
 	@# in .github/nvkr-run/plan.json as `generatorVersion`. Building via `make build`,
 	@# whose version comes from `git describe`, therefore always reports drift. Build
@@ -208,6 +209,7 @@ workflows-check: ## Verify the committed Run generation matches the catalog (ADR
 	bin/nvkr-exec run generate --engine github \
 		--definition definitions/nvke-m2/definition.yaml \
 		--environment definitions/nvke-m2/environment-github.yaml \
+		--qualification-policy definitions/nvke-m2/qualification.yaml \
 		--root . --check
 
 .PHONY: check

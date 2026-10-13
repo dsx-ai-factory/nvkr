@@ -169,9 +169,10 @@ attestation attachment, download and cryptographic verification in `pkg/nvkr/sig
 That earlier v1 minimal protocol fixture was not a complete passing M3 evidence record; its transcript does
 not establish the new v2 complete-set path, hosted OIDC identity or production registry behavior.
 
-`run generate --qualification-policy` now renders the original producer bundle plus a separately owned
-`workflow_run` qualifier and fixed same-commit reusable native worker. The generated pair has strict ownership,
-policy/Plan identities, exact file hashes/modes, manifest-last publication and read-only drift checks. It uses
+`run generate --qualification-policy` renders the original producer bundle plus a separately owned
+`workflow_run` qualifier and fixed same-commit reusable native worker. The worker is a generated GitHub
+Actions workflow, not a separately authored service or operator entrypoint. The generated pair has strict
+ownership, policy/Plan identities, exact file hashes/modes, manifest-last publication and read-only drift checks. It uses
 exactly the selected native executable platforms (one or both), pinned bootstrap tools/images, explicit
 trusted source-secret mappings and pull-only worker registry credentials. Only the final qualifier has
 registry write permission. It runs after worker success or failure to make complete refusal diagnostics
@@ -179,15 +180,20 @@ reachable, while excluding skipped/unknown dependency results, cancellation and 
 Scheduling does not relax provider job success, worker signature or complete-set receipt admission. Rendered
 workflow contracts and actionlint cover the condition; actual hosted failure scheduling remains part of
 external acceptance. The runtime checks the pair against the independent loaded policy before candidate work.
-The maintained candidate does not enable this pair yet. The review-only candidate policy example has
-intentionally invalid trust pins; independently approved verifier/native-image pins, reviewed smoke scope and
-a complete original exact-attempt handoff remain prerequisites. No artifact build or publication workflow was dispatched for this implementation.
+The maintained candidate records concrete verifier/native-image selections and exact smoke scope in
+`definitions/nvke-m2/qualification.yaml`. Its generated pair is `.github/workflows/nvkr-qualify.yml` and
+`.github/workflows/nvkr-smoke.yml`, with the separately owned qualification manifest. These inputs and workflows
+are configuration for post-merge acceptance, not evidence of production readiness or organizational approval.
+The user has accepted merging the reviewed implementation/configuration before the fresh complete producer
+attempt and hosted/independent positive and negative acceptance runs. No artifact build or publication workflow
+was dispatched for this implementation.
 
 No real hosted qualification Run, worker/qualifier OIDC signing transcript, subject-bound attachment/read-back
 or independent complete-set consumer verification is recorded here. [M3-D](https://nvidia.atlassian.net/browse/NKX-18046)
 retains positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy
-it. Acceptance must capture the actual reusable worker REST job names, native execution on both architectures,
-worker and qualifier certificate SAN/issuer, same-leaf caller-workflow commit and Run-attempt claims, exact
+it. The real producer handoff and hosted/consumer exercises follow merge and remain required before claiming
+production readiness or closing operational acceptance. Acceptance must capture the actual reusable worker
+REST job names, native execution on both architectures, worker and qualifier certificate SAN/issuer, same-leaf caller-workflow commit and Run-attempt claims, exact
 source/qualifier identities, complete attachments/read-back and wrong-identity rejection. The verifier uses
 fixed exact job names and claims; mismatch fails closed rather than widening identity admission. Current
 fixtures and earlier local-key transcripts do not satisfy this criterion.
@@ -201,7 +207,8 @@ contracts and defensive receipt checks. This authenticates raw upstream metadata
 patches, configuration or material substitutions, and supplies no effective-composition or installed-inventory
 claim. The maintained candidate does not need new upstream component manifests to qualify. Exact producer
 inputs/materials, source attempts, signatures, provenance, complete output membership and applicable tool
-smoke remain required; independent policy pins and real producer/hosted acceptance remain outstanding.
+smoke remain required. Concrete candidate policy pins do not establish the real producer/hosted acceptance
+that remains outstanding after merge.
 
 ## Support by owner
 
@@ -220,7 +227,7 @@ smoke remain required; independent policy pins and real producer/hosted acceptan
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. Qualified clearance, release-specific trusted time and M4 manifests/revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, encrypted disks and qualified lifecycle remain unavailable |
-| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials | Maintained candidate qualifier remains disabled pending independent policy pins, a complete exact-attempt handoff and hosted acceptance. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
+| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials | Maintained candidate qualification is configured for post-merge acceptance; a fresh complete exact-attempt handoff and hosted/independent-consumer evidence remain unproved. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission | Qualification generation does not make both owner writes one atomic transaction. Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |

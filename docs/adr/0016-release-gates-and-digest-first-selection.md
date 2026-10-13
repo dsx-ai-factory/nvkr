@@ -210,9 +210,11 @@ Smoke startup failure, unsuccessful execution or a conflicting version fails the
 use an explicit not-applicable rule. The publisher must reject missing required smoke results. No placeholder
 or absent implementation may mint passing smoke evidence.
 
-The native MVP uses one fixed same-repository reusable smoke workflow invoked at the qualifier's exact
-commit. The independent policy selects native Linux AMD64/ARM64 image pins and fixed nvkectl, Helm or
-kubectl version profiles by exact component name. Every delivered executable member must be exercised;
+The native MVP uses one fixed same-repository reusable GitHub Actions smoke workflow invoked at the
+qualifier's exact commit. The existing `run generate --qualification-policy` operation emits this worker
+and the qualifier alongside the producer workflow; the worker is generated infrastructure, not a separately
+authored operator workflow. The independent policy selects native Linux AMD64/ARM64 image pins and fixed
+nvkectl, Helm or kubectl version profiles by exact component name. Every delivered executable member must be exercised;
 expected versions and nvkectl source stamps come from A's frozen Plan. OCI/APT non-tool scope requires an
 exact named output, kind, component set and deployment-image/package-repository role. It does not assert
 that those artifacts contain no tools. Disk and Helm use the explicit non-tool format rule. One pure
@@ -265,7 +267,11 @@ policy. The source build's successful default-branch invocation is authenticated
 qualification invocation (ADR-18); a green build or the publisher's own identity alone is insufficient.
 Smoke execution receives no qualification signing authority.
 
-Before enabling hosted qualification for production, external acceptance must retain immutable Run/artifact
+The current scope directed by the user permits merging the reviewed implementation and concrete candidate
+policy/workflows before real acceptance runs. After merge, a fresh complete producer attempt with its original
+handoff and hosted positive/negative qualification and independent-consumer checks must establish acceptance.
+Until those results are recorded, production readiness remains unproved; merge is not operational acceptance.
+All runtime gates remain mandatory for those runs. External acceptance must retain immutable Run/artifact
 references for a real `workflow_run` exercise: the certificate SAN and OIDC issuer from the verified bundle,
 the exact source and qualification invocations, subject-bound attachment/read-back results, and rejection
 under a wrong expected signer identity. The observed certificate identity must match the independently

@@ -355,7 +355,10 @@ its original handoff. There are no source-commit, candidate-file, verdict-file o
 A manually dispatched qualifier or the source build's own identity is rejected.
 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
-qualifier and its native smoke worker alongside the producer. The same invocation with `--check` compares
+qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
+Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
+candidate supplies `definitions/nvke-m2/qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
+and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
 workflow at the caller's exact commit. It is generated plumbing, not another operator command to configure
@@ -374,10 +377,11 @@ The independent policy extends the artifact-check policy with these decisions:
 | `smoke.nonToolOutputs` | Exact OCI/APT output names, kinds and components explicitly outside loose-tool smoke |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-Start with the [complete maintained-candidate policy shape](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/qualification.yaml.example).
-Its `REPLACE_*` values are deliberately invalid; it cannot enable signing accidentally. Review the exact
-output scope and independently approved pins, then save the completed policy at a repository-relative path
-such as `qualification.yaml`. The trust policy belongs to the operator, not the producing Run.
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/qualification.yaml)
+contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
+with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
+the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing
+Run. Concrete configuration does not establish organizational approval or successful hosted execution.
 
 For hosted generation, replace the earlier single `cosign.digest` field with `cosign.platformDigests`;
 using both is rejected. Map keys are exactly `linux/amd64` and `linux/arm64`. Set `cosign.version` to the
@@ -390,7 +394,7 @@ against the Plan before writing either workflow; missing or extra scope is an er
 `smoke.nonToolOutputs` is a list of `output`, `kind`, `components` and `reason` records. The admitted pairs
 are `kind: oci` with `reason: deployment-image`, and `kind: apt-repository` with
 `reason: package-repository`. Each record must match the complete named output's component set. The
-candidate example contains all 25 OCI records for review, alongside three profiles covering its four native
+candidate policy contains all 25 OCI records, alongside three profiles covering its four native
 tool invocations. It contains no Helm/disk exemptions because those formats have a fixed non-tool rule.
 
 Use independently approved native images containing `/bin/sh`, `cat`, `wc`, `sha256sum`, `chmod` and
@@ -448,10 +452,12 @@ signer, each attachment and successful return. An operational failure can leave 
 the command returns a failure code and retains those subjects in its diagnostics. Their presence does
 not establish successful qualification or release authorization.
 
-These workflows are not enabled in the maintained candidate. That candidate still needs independently approved
-verifier/native-image trust pins and reviewed smoke scope, one complete exact-attempt producer handoff and
-hosted acceptance. Local native-container, race and protocol tests do not establish GitHub's actual reusable-job names, OIDC claims, production
-attachment/read-back or independent complete-set consumer acceptance. Those observations remain required;
+The maintained candidate's reviewed policy and generated workflows may merge before real acceptance runs.
+After merge, a fresh complete producer attempt must provide its original exact-attempt handoff; the hosted
+worker/qualifier and independent consumer then exercise positive and negative cases. These observations
+remain unproved and are required before production-readiness claims. Local native-container, race and protocol
+tests do not establish GitHub's actual reusable-job names, OIDC claims, production attachment/read-back or
+independent complete-set consumer acceptance. Merge does not waive any runtime verification;
 [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary)
 records their scope and status.
 

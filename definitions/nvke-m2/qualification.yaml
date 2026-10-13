@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Review-only shape for the maintained 35-output candidate. This is NOT an enabled policy.
-# REPLACE_* values are deliberately invalid. Obtain and review independent trust pins.
-# Review every deployment-image scope decision; copying a name does not approve an exemption.
-# Independent trust-pin approval, an original complete producer handoff and real hosted acceptance remain required.
+# Maintained policy for the 35-output candidate, reviewed with the generated workflows.
+# Pins are independent of producer artifacts. Real producer/hosted acceptance follows merge.
+# cosign v3.1.3 binaries match the official release assets and cosign_checksums.txt:
+# https://github.com/sigstore/cosign/releases/tag/v3.1.3
+# Smoke images are native manifests from Docker Official Debian trixie-20261005-slim.
+# Their utility/isolation probes passed; this does not establish hosted acceptance.
+# Review tool profiles and deployment-image scope whenever Definition membership changes.
 schemaVersion: nvkr.dev/qualification-policy/v1
 source:
   repository: dsx-ai-factory/nvkr
@@ -12,15 +15,15 @@ source:
   defaultBranch: main
 qualificationWorkflow: .github/workflows/nvkr-qualify.yml
 cosign:
-  version: REPLACE_WITH_APPROVED_COSIGN_VERSION
+  version: v3.1.3
   platformDigests:
-    linux/amd64: sha256:REPLACE_WITH_APPROVED_AMD64_EXECUTABLE_HASH
-    linux/arm64: sha256:REPLACE_WITH_APPROVED_ARM64_EXECUTABLE_HASH
+    linux/amd64: sha256:4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71
+    linux/arm64: sha256:c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a
 smoke:
   workflow: .github/workflows/nvkr-smoke.yml
   images:
-    linux/amd64: ghcr.io/REPLACE_WITH_APPROVED_IMAGE@sha256:REPLACE_WITH_AMD64_MANIFEST_HASH
-    linux/arm64: ghcr.io/REPLACE_WITH_APPROVED_IMAGE@sha256:REPLACE_WITH_ARM64_MANIFEST_HASH
+    linux/amd64: index.docker.io/library/debian@sha256:918311b7b6c4c6f68b232ba516584925f6c78ad82b6fd534b98979df6438e483
+    linux/arm64: index.docker.io/library/debian@sha256:a2ca65377c251208de42e1a2722cb949211236c161b634f6f3663754e2d06850
   tools:
     helm: helm-version
     kubectl: kubectl-client-version-json
