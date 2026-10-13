@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"regexp"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -91,8 +90,9 @@ type GitHub struct {
 
 // NewGitHub uses an explicit read credential; empty permits public repository
 // reads. Redirects are refused, including repository renames and token forwarding.
-// The owned transport connects directly to api.github.com; environment proxy
-// settings are not used. An approved proxy route is not currently supported.
+// The owned transport connects directly to the GitHub API and admitted artifact
+// storage destinations; environment proxy settings are not used. Archive reads
+// never receive the API credential. An approved proxy route is not supported.
 func NewGitHub(token string) *GitHub {
 	return &GitHub{token: token, api: "https://api.github.com", client: &http.Client{
 		Timeout:       30 * time.Second,
@@ -128,12 +128,11 @@ type runResponse struct {
 // Validate admits only the request's exact-identity shape. It does not
 // authenticate provider facts or grant source Run authority.
 func (r SourceRequest) Validate() error {
-	if !repositoryPattern.MatchString(r.Repository) || !numberPattern.MatchString(r.RunID) ||
-		!numberPattern.MatchString(r.Attempt) || !commitPattern.MatchString(r.Commit) || !workflowPattern.MatchString(r.Workflow) ||
-		r.DefaultBranch == "" || strings.TrimSpace(r.DefaultBranch) != r.DefaultBranch ||
-		strings.ContainsAny(r.DefaultBranch, " ~^:?*[\\\t\r\n") || strings.Contains(r.DefaultBranch, "..") ||
-		strings.Contains(r.DefaultBranch, "@{") || strings.HasPrefix(r.DefaultBranch, "/") || strings.HasSuffix(r.DefaultBranch, "/") {
-		return e.New(e.CodeTrustPolicyMissing, "qualification source requires an exact repository, Run, attempt, commit, workflow and default branch")
+	if err := (SourcePolicy{Repository: r.Repository, Workflow: r.Workflow, DefaultBranch: r.DefaultBranch}).Validate(); err != nil {
+		return err
+	}
+	if !numberPattern.MatchString(r.RunID) || !numberPattern.MatchString(r.Attempt) || !commitPattern.MatchString(r.Commit) {
+		return e.New(e.CodeTrustPolicyMissing, "qualification source requires an exact Run, attempt and commit")
 	}
 	return nil
 }
@@ -152,6 +151,13 @@ func (g *GitHub) AuthenticateSource(ctx context.Context, request SourceRequest) 
 	defer cancel()
 	repository, run, err := g.lookup(ctx, request)
 	if err != nil {
+		return nil, err
+	}
+	return authenticateSourceResponse(ctx, request, repository, run)
+}
+
+func authenticateSourceResponse(ctx context.Context, request SourceRequest, repository repositoryResponse, run runResponse) (*SourceRun, error) {
+	if err := admitContext(ctx); err != nil {
 		return nil, err
 	}
 	if err := matchRun(request, repository, run); err != nil {

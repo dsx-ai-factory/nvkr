@@ -4,7 +4,9 @@
 package qualificationorigin
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -23,8 +25,11 @@ func TestQualificationInvocationAuthenticatesIndependentRunAndExactSourceEvent(t
 		runEdit          func(*runResponse)
 		envKey, envValue string
 		code             e.Code
+		closeAction      string
 	}{
 		{name: "independent invocation"},
+		{name: "canceled after provider response", closeAction: "cancel", code: e.CodeVerifyFailed},
+		{name: "source revoked after provider response", closeAction: "revoke", code: e.CodeProvenanceMissing},
 		{name: "wrong source attempt", eventEdit: func(r *runResponse) { r.Attempt = "1" }, code: e.CodeVerifyFailed},
 		{name: "wrong source commit", eventEdit: func(r *runResponse) { r.HeadSHA = strings.Repeat("b", 40) }, code: e.CodeVerifyFailed},
 		{name: "failed source", eventEdit: func(r *runResponse) { r.Conclusion = "failure" }, code: e.CodeVerifyFailed},
@@ -67,6 +72,8 @@ func TestQualificationInvocationAuthenticatesIndependentRunAndExactSourceEvent(t
 				t.Fatal(err)
 			}
 			t.Setenv("GITHUB_EVENT_PATH", path)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
 			g := NewGitHub("")
 			g.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				var value any
@@ -82,14 +89,27 @@ func TestQualificationInvocationAuthenticatesIndependentRunAndExactSourceEvent(t
 				if err != nil {
 					t.Fatal(err)
 				}
-				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(string(raw)))}, nil
+				body := io.NopCloser(strings.NewReader(string(raw)))
+				if strings.Contains(r.URL.Path, "/actions/runs/") && tc.closeAction != "" {
+					body = invocationCloseBody{ReadCloser: body, after: func() {
+						if tc.closeAction == "cancel" {
+							cancel()
+						} else {
+							_ = source.Close()
+						}
+					}}
+				}
+				return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
 			})
-			receipt, err := g.AuthenticateInvocation(t.Context(), source, workflow)
+			receipt, err := g.AuthenticateInvocation(ctx, source, workflow)
 			if tc.code != "" {
 				if receipt != nil {
 					t.Fatal("invalid invocation has receipt")
 				}
 				assertCode(t, err, tc.code)
+				if tc.closeAction == "cancel" && !errors.Is(err, context.Canceled) {
+					t.Fatalf("lost cancellation cause: %v", err)
+				}
 				return
 			}
 			if err != nil {
@@ -115,4 +135,15 @@ func TestSourceAuthenticatorOwnsTransport(t *testing.T) {
 	if !ok || transport == http.DefaultTransport || transport.Proxy != nil || transport.DialContext == nil || transport.ResponseHeaderTimeout == 0 {
 		t.Fatal("source authority inherits replaceable global transport or unbounded IO")
 	}
+}
+
+type invocationCloseBody struct {
+	io.ReadCloser
+	after func()
+}
+
+func (body invocationCloseBody) Close() error {
+	err := body.ReadCloser.Close()
+	body.after()
+	return err
 }

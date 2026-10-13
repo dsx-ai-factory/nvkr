@@ -5,10 +5,8 @@ package qualification
 
 import (
 	"context"
-	"errors"
 	"regexp"
 	"runtime"
-	"sync/atomic"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -17,30 +15,17 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
-// SmokeReceipt reserves the exact-subject, invocation-bound M3-B integration.
-// No public constructor accepts pass booleans or caller-authored result files.
-// Until B implements its authenticated execution owner, required tool smoke
-// cannot produce this receipt and qualification must fail closed.
-type SmokeReceipt struct {
-	artifactChecks string
-	invocation     qualificationorigin.Description
-	verdicts       []Verdict
-	closed         *atomic.Bool
-}
-
-func (s *SmokeReceipt) Close() error {
-	if s != nil && s.closed != nil {
-		s.closed.Store(true)
-	}
-	return nil
-}
+// SmokeReceipt aliases the lifecycle-owned authenticated complete smoke receipt.
+// Only hosted aggregation can issue it; decoded reports cannot authorize signing.
+type SmokeReceipt = lifecycle.ToolSmokeReceipt
 
 // Policy reserves external suites without treating them as successful tests.
 // A policy requiring any external suite remains unavailable until its signed,
 // exact-subject result authenticator is implemented.
 type Policy struct {
-	OutsideMVPSuites []string
-	RequiredSuites   []string
+	QualificationPolicyDigest string
+	OutsideMVPSuites          []string
+	RequiredSuites            []string
 }
 
 type Options struct {
@@ -61,7 +46,8 @@ type Publication struct {
 }
 
 type Publisher struct {
-	newAttester func(string) (qualificationAttester, error)
+	cosignDigest string
+	newAttester  func(string) (qualificationAttester, error)
 }
 type qualificationAttester interface {
 	AttestQualification(context.Context, sign.Subject, []byte) error
@@ -76,7 +62,7 @@ func NewPublisher(options Options) (*Publisher, error) {
 	if !canonical.IsDigest(options.CosignDigest) || options.CosignBinary == "" {
 		return nil, e.New(e.CodeUnpinnedInput, "qualification requires an exact cosign executable pin")
 	}
-	return &Publisher{newAttester: func(identity string) (qualificationAttester, error) {
+	return &Publisher{cosignDigest: options.CosignDigest, newAttester: func(identity string) (qualificationAttester, error) {
 		return sign.NewCosignOCISigner(sign.CosignOCIOptions{
 			Binary: options.CosignBinary, BinaryDigest: options.CosignDigest, Identity: "^" + regexp.QuoteMeta(identity) + "$", Issuer: "https://token.actions.githubusercontent.com", Credential: options.Credential,
 		})
@@ -110,16 +96,22 @@ func (p *Publisher) Publish(ctx context.Context, checks *lifecycle.ArtifactCheck
 	if err := invocation.RequireSource(description.Origin); err != nil {
 		return nil, err
 	}
-	suites, err := outsideSuites(policy.OutsideMVPSuites)
-	if err != nil {
-		return nil, err
+	if !canonical.IsDigest(policy.QualificationPolicyDigest) {
+		return nil, e.New(e.CodeTrustPolicyMissing, "qualification requires the independently selected full policy digest")
 	}
-	verdicts, err := collectSmoke(description, qualifier, smoke)
+	verdicts, smokeDescription, err := collectSmoke(description, qualifier, smoke, policy.QualificationPolicyDigest)
 	result := &Publication{ArtifactChecks: &description, Verdicts: verdicts, PublishedSubjects: []string{}}
 	if err != nil {
 		return result, err
 	}
-	evidence := Evidence{SchemaVersion: SchemaVersion, GateVersion: GateVersion, ArtifactChecks: description, Invocation: qualifier, Smoke: verdicts, ExternalSuites: suites}
+	if err := matchPublicationPolicy(policy, smokeDescription.Policy, p.cosignDigest); err != nil {
+		return result, err
+	}
+	suites, err := outsideSuites(policy.OutsideMVPSuites)
+	if err != nil {
+		return result, err
+	}
+	evidence := Evidence{SchemaVersion: SchemaVersion, GateVersion: GateVersion, ArtifactChecks: description, Invocation: qualifier, Smoke: verdicts, ToolSmoke: smokeDescription, ExternalSuites: suites}
 	return p.publishEvidence(ctx, evidence, result, func() error {
 		if _, err := checks.Description(); err != nil {
 			return err
@@ -127,58 +119,94 @@ func (p *Publisher) Publish(ctx context.Context, checks *lifecycle.ArtifactCheck
 		if err := invocation.RequireSource(description.Origin); err != nil {
 			return err
 		}
-		_, err := collectSmoke(description, qualifier, smoke)
-		return err
+		return smoke.Require(description, qualifier, policy.QualificationPolicyDigest)
 	})
 }
 
-func collectSmoke(checks lifecycle.ArtifactCheckDescription, invocation qualificationorigin.Description, receipt *SmokeReceipt) ([]Verdict, error) {
-	var authenticated []Verdict
-	if receipt != nil {
-		raw, err := canonical.Marshal(checks)
-		if err != nil {
-			return nil, err
-		}
-		if receipt.closed == nil || receipt.closed.Load() || receipt.artifactChecks != string(raw) || receipt.invocation != invocation {
-			return nil, e.New(e.CodeGateUnmet, "smoke receipt does not bind the exact artifact checks and qualification invocation")
-		}
-		authenticated = receipt.verdicts
-		if len(authenticated) != len(checks.Outputs) {
-			return nil, e.New(e.CodeReleaseIncomplete, "smoke receipt omits or adds selected outputs")
-		}
+func matchPublicationPolicy(selected Policy, policy lifecycle.QualificationPolicy, cosignDigest string) error {
+	if len(policy.RequiredSuites) > 0 || len(selected.RequiredSuites) > 0 {
+		return e.New(e.CodeEngineCapability, "required external suite result authentication is unavailable")
 	}
-	verdicts := make([]Verdict, 0, len(checks.Outputs))
-	var failures []error
-	for i, output := range checks.Outputs {
+	digest, err := policy.Digest()
+	if err != nil {
+		return err
+	}
+	if digest != selected.QualificationPolicyDigest {
+		return e.New(e.CodeTrustPolicyMissing, "qualification publisher policy differs from authenticated smoke policy")
+	}
+	expected, err := outsideSuites(policy.OutsideMVPSuites)
+	if err != nil {
+		return err
+	}
+	actual, err := outsideSuites(selected.OutsideMVPSuites)
+	if err != nil {
+		return err
+	}
+	a, err := canonical.Marshal(expected)
+	if err != nil {
+		return err
+	}
+	b, err := canonical.Marshal(actual)
+	if err != nil {
+		return err
+	}
+	if string(a) != string(b) {
+		return e.New(e.CodeTrustPolicyMissing, "qualification suite selection differs from independent policy")
+	}
+	pin, err := policy.Cosign.ExecutableDigest("linux/" + runtime.GOARCH)
+	if err != nil {
+		return err
+	}
+	if cosignDigest != pin {
+		return e.New(e.CodeUnpinnedInput, "qualification signer differs from independent policy executable pin")
+	}
+	return nil
+}
+
+func collectSmoke(checks lifecycle.ArtifactCheckDescription, invocation qualificationorigin.Description, receipt *SmokeReceipt, policyDigest string) ([]Verdict, lifecycle.ToolSmokeDescription, error) {
+	if err := receipt.Require(checks, invocation, policyDigest); err != nil {
+		verdicts := make([]Verdict, 0, len(checks.Outputs))
+		for _, output := range checks.Outputs {
+			verdicts = append(verdicts, Verdict{Output: output.Name, Subject: output.Subject, Check: "delivered-tool-version", Status: "fail", Reason: "authenticated complete tool smoke is missing"})
+		}
+		return verdicts, lifecycle.ToolSmokeDescription{}, err
+	}
+	description, err := receipt.Description()
+	if err != nil {
+		return nil, lifecycle.ToolSmokeDescription{}, err
+	}
+	verdicts, err := smokeVerdicts(description)
+	return verdicts, description, err
+}
+
+// smokeVerdicts is a diagnostic projection of a structurally complete claim.
+// Only collectSmoke's live receipt check permits its use by the public publisher.
+func smokeVerdicts(description lifecycle.ToolSmokeDescription) ([]Verdict, error) {
+	if err := description.Validate(); err != nil {
+		return nil, err
+	}
+	reasons := map[string]string{}
+	for _, rule := range description.Policy.Smoke.NonToolOutputs {
+		reasons[rule.Output] = rule.Reason
+	}
+	verdicts := make([]Verdict, 0, len(description.ArtifactChecks.Outputs))
+	for _, output := range description.ArtifactChecks.Outputs {
 		verdict := Verdict{Output: output.Name, Subject: output.Subject, Check: "delivered-tool-version"}
-		required, err := requiresSmoke(output.Kind)
-		switch {
-		case err != nil:
-			verdict.Status = "fail"
-			verdict.Reason = "M3-B applicability is unavailable"
-			failures = append(failures, err)
-		case !required:
+		switch output.Kind {
+		case lifecycle.OutputExecutable:
+			verdict.Status = "pass"
+		case lifecycle.OutputHelm, lifecycle.OutputDiskImage:
 			verdict.Status = "not-applicable"
 			verdict.Reason = "non-tool artifact format"
-			if len(authenticated) != 0 && authenticated[i] != verdict {
-				verdict.Status = "fail"
-				verdict.Reason = "smoke receipt contradicts non-tool applicability"
-				failures = append(failures, e.New(e.CodeGateUnmet, "output %q has contradictory smoke evidence", output.Name))
-			}
-		case len(authenticated) == 0:
-			verdict.Status = "fail"
-			verdict.Reason = "authenticated M3-B smoke result is missing"
-			failures = append(failures, e.New(e.CodeGateUnmet, "output %q has no authenticated delivered-tool smoke", output.Name))
+		case lifecycle.OutputOCI, lifecycle.OutputAPT:
+			verdict.Status = "not-applicable"
+			verdict.Reason = reasons[output.Name]
 		default:
-			verdict = authenticated[i]
-			if verdict.Output != output.Name || verdict.Subject != output.Subject || verdict.Check != "delivered-tool-version" || verdict.Status != "pass" {
-				verdict.Status = "fail"
-				failures = append(failures, e.New(e.CodeGateUnmet, "output %q has failing or mismatched smoke", output.Name))
-			}
+			return nil, e.New(e.CodeEngineCapability, "unsupported smoke output kind %q", output.Kind)
 		}
 		verdicts = append(verdicts, verdict)
 	}
-	return verdicts, errors.Join(failures...)
+	return verdicts, nil
 }
 
 func (p *Publisher) publishEvidence(ctx context.Context, evidence Evidence, result *Publication, recheck func() error) (*Publication, error) {
@@ -192,6 +220,12 @@ func (p *Publisher) publishEvidence(ctx context.Context, evidence Evidence, resu
 	}
 	result.EvidenceDigest = digest
 	result.Evidence = &evidence
+	if err := recheck(); err != nil {
+		return result, err
+	}
+	if err := ctx.Err(); err != nil {
+		return result, e.Wrap(e.CodeTimeout, err, "qualification canceled before signer admission")
+	}
 	attester, err := p.newAttester(evidence.Invocation.BuilderID)
 	if err != nil {
 		return result, err
@@ -205,6 +239,9 @@ func (p *Publisher) publishEvidence(ctx context.Context, evidence Evidence, resu
 		}
 		if err := recheck(); err != nil {
 			return result, err
+		}
+		if err := ctx.Err(); err != nil {
+			return result, e.Wrap(e.CodeTimeout, err, "qualification canceled before attachment")
 		}
 		if err := attester.AttestQualification(ctx, sign.Subject{Ref: output.Reference, Digest: output.Subject}, raw); err != nil {
 			return result, e.Wrap(e.CodeGateUnmet, err, "qualification attachment failed for %q; earlier attachments may remain", output.Name)

@@ -64,7 +64,7 @@ type PublicationSource struct {
 // Returned slices are independent of both the source layout and the live owner.
 // A claimed qualification is reported as metadata, never authenticated here.
 func (publication *Publication) Description(reference string) (PublicationDescription, error) {
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return PublicationDescription{}, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()

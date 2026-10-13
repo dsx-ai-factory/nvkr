@@ -162,6 +162,36 @@ The NVKR adapter downloads only the required signature and provenance bundles, v
 It does not copy the artifact or fall back to legacy attachments. Existing legacy signatures/provenance must
 be reissued as bundles before the updated consumer can accept them.
 
+For M3 qualification, select the independent qualifier identity from the reviewed policy. The following
+shows the example qualifier path; it must match the actual approved workflow, and must differ from the
+builder identity used above:
+
+```sh
+cosign verify-attestation --type https://nvkr.dev/qualification-evidence/v2 \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-qualify.yml@refs/heads/main' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
+```
+
+Use an exact `repository@sha256:...` reference for every selected output. A valid cosign result authenticates
+the attestation's signature, identity and subject; it does not implement NVKR's complete-set semantics.
+Independent acceptance must also:
+
+1. Authenticate the producer publication and derive the complete selected output set from its original,
+   checked Definition/Plan, rather than from whichever attachments happen to be present.
+2. Require the strict `nvkr.dev/qualification-evidence/v2` record for every exact subject under the separately
+   trusted qualifier identity and issuer. Reject absent, malformed, duplicate/ambiguous or mismatched records.
+3. Check the complete record binds the intended source Run and attempt, input identities, qualifier invocation
+   and independently selected policy. Require all selected output verdicts and complete applicable smoke
+   evidence to pass. An external suite marked `not-evaluated` supplies no passing result.
+4. Require the same complete successful evidence across the entire selected set. Reject missing outputs,
+   different subjects, different attempts or differing complete records, even if individual signatures pass.
+   Earlier attachments left by a failed publication do not prove completion.
+
+Retain the exact Run/artifact references and positive and controlled-failure verification transcript for
+hosted acceptance. The commands and contract tests are not that transcript. There is no general M4 release
+authorization command in this stack; verifying one attachment cannot grant it. Current qualification
+acceptance gaps remain in [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary).
+
 ## Validation boundary
 
 Contract tests in [delivery](https://github.com/dsx-ai-factory/nvkr/tree/main/pkg/nvkr/delivery), [signing](https://github.com/dsx-ai-factory/nvkr/tree/main/pkg/nvkr/sign) and

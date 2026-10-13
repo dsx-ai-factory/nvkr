@@ -94,6 +94,8 @@ const (
 	KindEnvironment             = "nvkr.environment"              // independently selected execution/delivery settings (ADR-20 §6)
 	KindVerificationPolicy      = "nvkr.verification-policy"      // consumer-selected release acceptance policy (ADR-04 §5)
 	KindReleaseContent          = "nvkr.release-content/v1"       // internal exact artifact content subject (ADR-17 §6)
+	KindQualificationPolicy     = "nvkr.qualification-policy"     // independent complete M3 trust and smoke policy
+	KindToolSmokeWorker         = "nvkr.tool-smoke-worker"        // authenticated native worker observations
 	KindQualificationEvidence   = "nvkr.qualification-evidence"   // independent pipeline artifact checks (ADR-16)
 	KindClusterRealization      = "nvkr.cluster-realization/v1"   // retired cluster-realization family, reserved
 	KindLifecycleBinding        = "nvkr.lifecycle-binding/v1"     // retired redundant publication binding, reserved
@@ -126,7 +128,7 @@ var registeredKinds = [...]string{
 	KindDiskManifest, KindStagingManifest, KindBuildMaterialManifest,
 	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput, KindAICRBundle,
 	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindExecutionSettings, KindCompileSpec, KindRunPlan, KindFactoryObservation,
-	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindClusterRealization, KindLifecycleBinding,
+	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindQualificationPolicy, KindToolSmokeWorker, KindClusterRealization, KindLifecycleBinding,
 	KindQualifiedReport, KindTerminalVerification, KindTerminalTree,
 	KindStatusCheckpointPolicy, KindQualifiedObservation, KindQualifiedPublication,
 	KindHostObservation, KindExecutionSelection, KindExecutionObservation, KindRuntimeIdentity,

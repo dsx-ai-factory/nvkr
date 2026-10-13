@@ -6,33 +6,36 @@ package main
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 	"github.com/urfave/cli/v2"
 )
 
-type qualificationFilePublisher func(context.Context, qualification.FilesOptions) (*qualification.Publication, error)
+type qualificationRunPublisher func(context.Context, string, lifecycle.QualificationRuntimeOptions) (*qualification.Publication, error)
 
-func cmdRunQualify() *cli.Command { return cmdRunQualifyWithPublisher(qualification.PublishFiles) }
+func cmdRunQualify() *cli.Command {
+	return cmdRunQualifyWithPublisher(qualification.PublishTriggeredRun)
+}
 
-func cmdRunQualifyWithPublisher(publish qualificationFilePublisher) *cli.Command {
-	return &cli.Command{Name: "qualify", Usage: "publish independently signed qualification evidence only after all required checks pass", Flags: append(qualificationFileFlags(),
-		&cli.StringFlag{Name: "qualification-workflow", Required: true, Usage: "approved independent .github/workflows path for the active workflow_run invocation"},
-		&cli.StringSliceFlag{Name: "external-suite", Usage: "named external suite explicitly not evaluated because it is outside MVP scope"},
-		&cli.StringSliceFlag{Name: "required-suite", Usage: "required external suite; rejects qualification until authenticated integration is available"},
-	), Action: func(c *cli.Context) error {
-		files := qualificationFileOptions(c)
-		result, publishErr := publish(c.Context, qualification.FilesOptions{ArtifactFiles: files, QualificationWorkflow: c.String("qualification-workflow"),
-			Signer: qualification.Options{CosignBinary: files.Consumer.CosignBinary, CosignDigest: files.Consumer.CosignDigest, Credential: files.Consumer.Credential},
-			Policy: qualification.Policy{OutsideMVPSuites: c.StringSlice("external-suite"), RequiredSuites: c.StringSlice("required-suite")}})
+func cmdRunQualifyWithPublisher(publish qualificationRunPublisher) *cli.Command {
+	return &cli.Command{Name: "qualify", Usage: "qualify the authenticated triggering Run under independently selected policy", Flags: []cli.Flag{
+		&cli.StringFlag{Name: "policy", Usage: "independently selected qualification policy YAML"},
+		&cli.StringFlag{Name: "workspace", Value: ".nvkr/qualification", Usage: "private qualification workspace"},
+	}, Action: func(c *cli.Context) error {
+		if c.Args().Present() || strings.TrimSpace(c.String("policy")) == "" || strings.TrimSpace(c.String("workspace")) == "" {
+			return e.New(e.CodeUsage, "qualify requires --policy, a non-empty workspace, and no positional arguments")
+		}
+		result, publishErr := publish(c.Context, c.String("policy"), qualificationRuntimeOptions(c))
 		if result != nil {
 			raw, err := canonical.Marshal(result)
 			if err != nil {
 				return errors.Join(publishErr, e.Wrap(e.CodeInternal, err, "encoding qualification diagnostics"))
 			}
-			if _, err := c.App.Writer.Write(raw); err != nil {
+			if _, err := c.App.Writer.Write(append(raw, '\n')); err != nil {
 				return errors.Join(publishErr, e.Wrap(e.CodeInternal, err, "writing qualification diagnostics"))
 			}
 		}

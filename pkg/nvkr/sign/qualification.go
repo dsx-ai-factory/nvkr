@@ -13,7 +13,11 @@ import (
 )
 
 // QualificationPredicateType cannot substitute for production SLSA evidence.
-const QualificationPredicateType = "https://nvkr.dev/qualification-evidence/v1"
+const QualificationPredicateType = "https://nvkr.dev/qualification-evidence/v2"
+
+// MaxQualificationPredicateBytes is the shared publication and verification bound.
+// Callers admit the complete canonical predicate before constructing a signer.
+const MaxQualificationPredicateBytes = maxOCIPredicateBytes
 
 // AttestQualification attaches one exact qualification predicate to an existing
 // OCI subject, then independently downloads and verifies the attachment under
@@ -33,7 +37,7 @@ func (s *CosignOCISigner) AttestQualification(ctx context.Context, subject Subje
 	if err := subject.Validate(); err != nil {
 		return err
 	}
-	if err := requireOCIPredicateWithLimit(predicate, maxOCIPredicateBytes, e.CodeVerifyFailed, "qualification predicate"); err != nil {
+	if err := requireOCIPredicateWithLimit(predicate, MaxQualificationPredicateBytes, e.CodeVerifyFailed, "qualification predicate"); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)

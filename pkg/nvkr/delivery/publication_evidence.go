@@ -18,7 +18,7 @@ func (publication *Publication) VisitEvidence(ctx context.Context, visit func(co
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
-	if publication == nil || visit == nil {
+	if publication == nil || publication.publicationState == nil || visit == nil {
 		return e.New(e.CodeGateUnmet, "evidence visitation requires an open publication and visitor")
 	}
 	publication.mu.RLock()

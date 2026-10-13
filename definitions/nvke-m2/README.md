@@ -69,9 +69,10 @@ is diagnostic evidence, not this Environment's configuration or production appro
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
 The current candidate selects `diskEvidence: build-provenance-v1`, authenticating both held disks and their
 material producers without deep inspection. Profiles remain available for strict mode but are not pulled or
-executed in this mode; its signed evidence reports inspection as `not-performed`. Ilya Kislenko's October 7
-task-chat instruction preserves main/#106's producer-provenance M2 floor and full scan plus material
-reconciliation for M3 ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+executed in this mode; its signed evidence reports inspection as `not-performed`. The approved October 12
+M3 MVP retains this producer-provenance floor. Full disk inspection and material reconciliation are deferred
+beyond that MVP ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)
+and [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052)).
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
 extension, and both disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
@@ -117,8 +118,8 @@ origin or establish a complete installed-software inventory.
 
 The Environment explicitly selects `diskEvidence: build-provenance-v1`. M2 authenticates the held disk
 and its live producer/material subjects and signs evidence describing the deferred inspection scope.
-Deep content inspection and reconciliation move to M3. The existing strict inspection profiles remain
-available, but this M2 mode neither prepares nor invokes the inspector. A successful M2 pipeline still
+Deep content inspection and reconciliation are deferred beyond the approved M3 MVP. The existing strict
+inspection profiles remain available, but this mode neither prepares nor invokes the inspector. A successful M2 pipeline still
 requires every named output, exact-subject evidence, publication, signing and verification; deferral
 cannot substitute for those gates or establish qualified reproduction.
 
@@ -180,6 +181,30 @@ temporary SPIRE selection. The opt-in full graph integration runs with
 `NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1` and authorized pinned-source access; ordinary tests receive no
 private-source credentials. Pinning and graph tests establish their own contracts, not production launch.
 
+## Qualification readiness
+
+The simplified [artifact check](../../docs/lifecycle.md#authenticate-an-m3-candidate) takes a Run URL and a
+reusable policy. Upstream embedded-component manifests are not a qualification prerequisite. The maintained
+catalogs omit the optional declarations, so their metadata checks are `not-applicable`. Any declaration added
+later must strictly match its referenced map at the pinned source revision, including exact membership,
+versions and known source pins. That comparison reads raw upstream metadata; it cannot establish effective
+composition after patches, configuration or material substitutions, or verify installed contents.
+
+Source, patch, configuration and selected material identities remain bound to production evidence. Exact
+producer Run/attempt, output membership, signatures, provenance and applicable delivered-tool smoke remain
+required. No source or artifact pin changes are needed merely to satisfy the optional metadata check.
+
+The [complete policy example](qualification.yaml.example) shows this candidate's three tool profiles and
+25 exact deployment-image scope decisions. It is a review aid with deliberately invalid trust-pin
+placeholders, not an enabled policy. Operators must independently approve the verifier version and native
+executable hashes, both native smoke-image manifest digests, and the exact deployment-image scope decisions.
+The [hosted setup guide](../../docs/lifecycle.md#publish-qualification-evidence) explains those choices and
+how generation checks coverage. After policy approval, generate and review the workflow pair.
+
+Acceptance still needs a newly completed producer attempt with its original complete handoff, real
+delivered-tool checks and independently verified hosted qualification evidence. Earlier successful builds
+and local contract tests do not supply that evidence. These prerequisites add no command-line flags.
+
 ## Recorded delivery and remaining acceptance
 
 [Run 37533806963](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed all 34 outputs and aggregate
@@ -193,7 +218,8 @@ mentions CAPNICo, while the catalog's provisioned-provider build is a different 
 content-image selection supplies no portable tag/digest. Neither should be guessed into required membership
 or silently treated as deferred. Embedded SPIRE and chart-side SPIRE containers are distinct artifacts;
 one cannot satisfy the other's evidence row. These unresolved ownership/payload questions remain product
-acceptance gaps, alongside full M3 disk evidence and organizational toolchain reviews.
+acceptance gaps, alongside M3 build/evidence qualification, delivered-tool smoke and organizational toolchain
+reviews. Full disk inspection is a separate deferred capability, not an M3 MVP prerequisite.
 
 [Reconciliation](../../docs/adr/reconciliation.md) owns current implementation/evidence status;
 [the epic specification](../../docs/epics-v1-spec.md) owns product acceptance. This README owns the

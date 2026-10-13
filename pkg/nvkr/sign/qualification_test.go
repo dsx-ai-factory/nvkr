@@ -43,7 +43,7 @@ func qualificationBundle(t *testing.T, digest, predicateType, identity, issuer s
 }
 
 func TestQualificationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testing.T) {
-	const predicate = `{"schemaVersion":"nvkr.dev/qualification-evidence/v1","verdict":"pass"}`
+	const predicate = `{"schemaVersion":"nvkr.dev/qualification-evidence/v2","verdict":"pass"}`
 	for _, tc := range []struct {
 		name, failure string
 		code          e.Code

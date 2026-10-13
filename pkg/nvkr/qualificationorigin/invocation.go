@@ -114,5 +114,11 @@ func (g *GitHub) AuthenticateInvocation(ctx context.Context, source *SourceRun, 
 	if run.Event != "workflow_run" || run.Status != "in_progress" || run.Conclusion != "" {
 		return nil, e.New(e.CodeVerifyFailed, "qualification invocation is not an active workflow_run execution")
 	}
+	if err := admitContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := source.Require(); err != nil {
+		return nil, err
+	}
 	return &Invocation{description: describe(request), source: source, closed: new(atomic.Bool)}, nil
 }

@@ -14,12 +14,16 @@ not complete a milestone.
 | M4 — Automated releases | Reviewed pin updates, signed immutable release manifests, safe channel/tag behavior and revocation | [M4 criteria](epics-v1-spec.md#epic-m4--automated-releases) |
 
 M2 disk delivery binds the exact produced disk and traced materials. The
-[approved M3 MVP scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+[October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
 retains producer-only disk evidence and defers deep inventory, material reconciliation, waivers, offline
-pull-request qualification, a dedicated verify-only dispatch and incremental reuse. Embedded-component
-declarations still agree with the upstream version manifest at the pinned commit. A stronger input claim
-does not reproduce the aggregate disk. M3 qualification is a build/evidence gate; cluster conformance and
-exact-byte reproduction remain outside it. M4 does not grant the separate qualified-lane clearance.
+pull-request qualification, a dedicated verify-only dispatch and incremental reuse.
+
+The current scope directed by the user makes embedded-component declarations optional. Omission is not
+applicable, while authored declarations must match their referenced
+pinned upstream metadata. This comparison does not establish customized or installed composition. Exact source,
+patch, configuration and material bindings remain required. A stronger input claim does not reproduce the
+aggregate disk. M3 qualification is a build/evidence gate; cluster conformance and exact-byte reproduction
+remain outside it. M4 does not grant the separate qualified-lane clearance.
 
 Generated execution defaults to generic GitHub-hosted runners. ADR-18 admits only the explicit native
 KVM ARC disk route; it does not permit arbitrary self-hosted labels or qualified claims. The

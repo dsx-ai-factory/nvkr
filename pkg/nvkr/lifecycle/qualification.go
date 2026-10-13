@@ -81,10 +81,16 @@ type ArtifactCheckReceipt struct {
 }
 
 type artifactCheckLifetime struct {
-	mu          sync.RWMutex
-	closed      bool
-	closeSource func() error
-	closeErr    error
+	mu               sync.RWMutex
+	closed           bool
+	closeSource      func() error
+	closeErr         error
+	closeDone        chan struct{}
+	verified         *VerifiedRelease
+	plan             *factory.Plan
+	operationContext context.Context
+	stopOperations   context.CancelFunc
+	operations       sync.WaitGroup
 }
 
 // Private test seam; the public request accepts only the provider-issued type.
@@ -119,15 +125,73 @@ func (receipt *ArtifactCheckReceipt) Close() error {
 	if receipt == nil || receipt.lifetime == nil {
 		return nil
 	}
-	receipt.lifetime.mu.Lock()
-	defer receipt.lifetime.mu.Unlock()
-	if !receipt.lifetime.closed {
-		receipt.lifetime.closed = true
-		if receipt.lifetime.closeSource != nil {
-			receipt.lifetime.closeErr = receipt.lifetime.closeSource()
+	state := receipt.lifetime
+	state.mu.Lock()
+	if state.closed {
+		done := state.closeDone
+		state.mu.Unlock()
+		if done != nil {
+			<-done
 		}
+		state.mu.RLock()
+		defer state.mu.RUnlock()
+		return state.closeErr
 	}
-	return receipt.lifetime.closeErr
+	state.closed = true
+	state.closeDone = make(chan struct{})
+	stop := state.stopOperations
+	state.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+	// No operation can register after closed is set. Join its streaming and
+	// process cleanup before releasing any verified publication bytes.
+	state.operations.Wait()
+	var closeErr error
+	if state.verified != nil {
+		closeErr = state.verified.Close()
+	}
+	if state.closeSource != nil {
+		closeErr = errors.Join(closeErr, state.closeSource())
+	}
+	state.mu.Lock()
+	state.closeErr = closeErr
+	state.plan = nil
+	close(state.closeDone)
+	state.mu.Unlock()
+	return closeErr
+}
+
+// beginOperation is private: holding an artifact receipt never exposes payload
+// paths or grants execution. The owning gate registers work here so Close can
+// revoke, cancel and join before releasing its held publication.
+func (receipt *ArtifactCheckReceipt) beginOperation(ctx context.Context) (context.Context, func(), error) {
+	if ctx == nil {
+		return nil, nil, e.New(e.CodeUsage, "artifact operation requires context")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, e.Wrap(e.CodeTimeout, err, "artifact operation canceled")
+	}
+	if receipt == nil || receipt.lifetime == nil || receipt.origin == nil || receipt.raw == "" {
+		return nil, nil, e.New(e.CodeGateUnmet, "artifact checks have not authenticated the complete set")
+	}
+	state := receipt.lifetime
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.closed || state.verified == nil || state.plan == nil {
+		return nil, nil, e.New(e.CodeGateUnmet, "artifact check receipt has no live verified payload")
+	}
+	if err := receipt.origin.Require(); err != nil {
+		return nil, nil, err
+	}
+	if state.operationContext == nil {
+		state.operationContext, state.stopOperations = context.WithCancel(context.WithoutCancel(ctx))
+	}
+	operation, cancel := context.WithCancel(ctx)
+	stopCancellation := context.AfterFunc(state.operationContext, cancel)
+	state.operations.Add(1)
+	var finished sync.Once
+	return operation, func() { finished.Do(func() { stopCancellation(); cancel(); state.operations.Done() }) }, nil
 }
 
 // CheckQualification authenticates the full delivered closure against the
@@ -212,7 +276,12 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if err != nil {
 		return nil, nil, err
 	}
-	defer func() { _ = verified.Close() }()
+	transferred := false
+	defer func() {
+		if !transferred {
+			_ = verified.Close()
+		}
+	}()
 	inputDescription, err := inputs.Description()
 	if err != nil {
 		return nil, nil, err
@@ -317,7 +386,20 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if err != nil {
 		return nil, report, err
 	}
-	return &ArtifactCheckReceipt{origin: source, raw: string(raw), lifetime: &artifactCheckLifetime{}}, report, nil
+	if cause := ctx.Err(); cause != nil {
+		err := e.Wrap(e.CodeTimeout, cause, "artifact qualification canceled before receipt issuance")
+		// Completed checks remain facts, but a canceled operation cannot issue
+		// authority. The failure defer releases the retained publication bytes.
+		for i := range report.Outputs {
+			output := &report.Outputs[i]
+			output.Checks = append(output.Checks, qualificationCheck("operation-lifetime", err))
+			sort.Slice(output.Checks, func(i, j int) bool { return output.Checks[i].Name < output.Checks[j].Name })
+			output.Overall = "fail"
+		}
+		return nil, report, err
+	}
+	transferred = true
+	return &ArtifactCheckReceipt{origin: source, raw: string(raw), lifetime: &artifactCheckLifetime{verified: verified, plan: &plan}}, report, nil
 }
 
 func qualificationPredicates(values []QualificationPredicate, plan *factory.Plan, origin qualificationorigin.Description) (map[string][]byte, error) {

@@ -166,7 +166,7 @@ description directly:
 
 ```json
 {
-  "schemaVersion": "nvkr.dev/release/v3",
+  "schemaVersion": "nvkr.dev/release/v4",
   "subject": "registry.example/releases@sha256:<release-digest>",
   "lane": "pipeline-attested",
   "scope": "artifact-publication",
@@ -192,7 +192,7 @@ verified `Release` description and the defensive exact-input description:
 {
   "schemaVersion": "nvkr.dev/release-verification-result/v1",
   "release": {
-    "schemaVersion": "nvkr.dev/release/v3",
+    "schemaVersion": "nvkr.dev/release/v4",
     "subject": "registry.example/releases@sha256:<release-digest>",
     "lane": "pipeline-attested",
     "scope": "artifact-publication",
@@ -238,54 +238,76 @@ convenience NVKR reader.
 
 ## Authenticate an M3 candidate
 
-On Linux, `nvkr run check-artifacts` checks the already-published M2 bytes against the producing Run's
-saved inputs and evidence. Supply the original Definition, Environment, Plan and canonical candidate
-transport record, plus the independently expected source identity:
+On Linux, `nvkr run check-artifacts` checks the already-published bytes against one exact producing Run
+attempt and an independently selected trust policy:
 
 ```sh
 nvkr run check-artifacts \
-  --definition "$DEFINITION" --environment "$ENVIRONMENT" \
-  --plan "$ORIGINAL_PLAN" --candidate "$CANDIDATE" \
-  --source-repository "$SOURCE_REPOSITORY" --source-run "$SOURCE_RUN" \
-  --source-attempt "$SOURCE_ATTEMPT" --source-commit "$SOURCE_COMMIT" \
-  --source-workflow "$SOURCE_WORKFLOW" --default-branch main \
-  --cosign "$COSIGN_BINARY" --cosign-digest "$COSIGN_DIGEST"
+  --run https://github.com/OWNER/REPO/actions/runs/ID/attempts/N \
+  --policy qualification.yaml
 ```
 
-`SOURCE_WORKFLOW` is the approved repository-relative workflow path. `COSIGN_DIGEST` pins exact executable
-bytes. Optional `NVKR_GITHUB_TOKEN` supplies read access to GitHub; private registry reads use
-`NVKR_REGISTRY`, `NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`. No qualification signing credentials
-or identity token are required by this check. macOS rejects the operation before input or network work.
+Replace `OWNER/REPO`, `ID` and `N` with the intended Run and attempt. An attempt is mandatory; the command
+never selects the latest retry implicitly. Configure the trusted producer and verifier once in
+`qualification.yaml`, then reuse that policy across approved Runs:
 
-GitHub source authentication requires direct HTTPS access to `api.github.com`. Its owned transport ignores
-`HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`, and refuses redirects. Environments that require an outbound
-proxy are not currently supported for this operation.
+```yaml
+schemaVersion: nvkr.dev/qualification-policy/v1
+source:
+  repository: OWNER/REPO
+  workflow: .github/workflows/nvkr-run.yml
+  defaultBranch: main
+cosign:
+  # Replace this placeholder with the SHA-256 of the independently trusted executable.
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+```
 
-The candidate transport uses `schemaVersion: nvkr.dev/qualification-candidate/v1`, a digest-pinned root
-`reference`, and `predicates`, each containing its exact subject `reference` and original canonical predicate
-bytes in the JSON base64 `predicate` field. It includes one predicate for the root and every named output.
-It is a bounded internal handoff, not an independently authored lifecycle input or proof of success.
-Unknown fields, duplicate JSON keys, unsupported versions and noncanonical encodings are rejected. The
-current command consumes this saved handoff; it does not manufacture missing build evidence.
+The zero digest is a placeholder, not an accepted executable pin. The verifier defaults to `cosign` on
+`PATH`; optional `cosign.path` selects another executable, with relative paths resolved beside the policy.
+Its bytes must match the independent digest. Neither the producer's Environment nor downloaded files can
+select consumer trust. The optional `--workspace` defaults to `.nvkr/qualification`.
+`NVKR_GITHUB_TOKEN` supplies GitHub read credentials; private registry reads use `NVKR_REGISTRY`,
+`NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`. This check needs no qualification signing credentials
+or identity token. macOS rejects it before input or network work.
 
-The lifecycle file owner recompiles the exact supplied inputs and requires the original Plan identity to
-match. `qualificationorigin.GitHub.AuthenticateSource` separately authenticates a completed successful
-GitHub Run attempt, exact commit, expected workflow, intended repository and its actual default branch.
-The module-level `lifecycle.Consumer.CheckQualification` then authenticates the publication and original
-predicates. Descriptions and candidate files remain untrusted until their exact bytes, subjects, signatures,
-provenance and Plan bindings verify.
+The source owner discovers the commit from GitHub's exact attempt endpoint, checks successful completion,
+approved repository and workflow, and the repository's actual default branch. It then downloads the single
+`nvkr-qualification-ID-N` artifact for that attempt. Direct HTTPS access to `api.github.com` and approved
+artifact download endpoints is required. The owned transport ignores proxy environment variables; an
+admitted artifact download location receives a fresh request without GitHub API credentials.
+
+Generated real-signing workflows save one `handoff.json` after complete finalization. It contains the
+original Plan, the compiler-read Definition and Environment, base and output-specific catalogs, overlays,
+registries, locks, patches and directory facts, plus the original root/output publication references and
+predicate bytes. The handoff contains no consumer policy. Unsigned or dry-run workflows do not produce it;
+an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
+
+The lifecycle owner recompiles the captured authored bytes with their original logical paths and requires
+the exact original Plan identity. Authored reads have no checkout fallback. Catalog-owned authentication
+of pinned upstream Git trees remains required and may use its existing credentials and bounded network
+access; this is not offline compilation. Unknown fields, duplicate keys, noncanonical encodings, unsafe
+paths, incomplete inputs and oversized transport fail closed. The handoff is descriptive generated
+transport, not proof that any artifact passed. `lifecycle.Consumer.CheckQualification` still verifies the
+complete publication, original predicates, signatures, subjects and input bindings.
+
+For programmatic use, `lifecycle.CheckQualificationRun` owns Run selection, policy loading and handoff
+retrieval. `lifecycle.CheckQualificationHandoff` borrows a provider-issued source receipt. The existing
+`lifecycle.CheckQualificationFiles` adapter remains available for explicit saved-file diagnostics; normal
+CLI use does not require those files or separately entered source-commit fields.
 
 At the consumer API boundary, source and Plan validation precede adapter-capability checks. A request with
 both malformed inputs and unavailable adapters reports the input error first. Neither case reaches registry
 or signature-verification I/O.
 
 Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
-signature/provenance, applicable payload pins and embedded declarations. Failed checks return coded
+signature/provenance, applicable payload pins and any authored embedded declarations. Failed checks return coded
 diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
-defensive data and grants no authority. Callers close the receipt after use; closure revokes all shallow
-copies. The direct consumer method borrows the caller's source Run receipt, whose closure also revokes the
-check receipt. The file adapter creates and transfers its source owner to the returned check receipt, so
-closing that receipt also closes its internally created source.
+defensive data and grants no authority. A successful receipt retains the verified publication and a frozen
+Plan until closed. Closure revokes all shallow copies, cancels and joins registered operations, then releases
+held payload bytes. This lifetime does not itself authorize smoke execution. The direct consumer and handoff
+methods borrow the caller's source Run receipt, whose closure also revokes the check receipt. The Run and
+file adapters transfer their internally created source owner to the returned receipt and close it with that
+receipt.
 If the source is revoked during verification, the final source check refuses receipt issuance. Each output
 then includes a separate failed `source-lifetime` diagnostic and an overall failure; completed signature,
 pin and other artifact checks keep their actual results. This extra diagnostic appears only on final
@@ -305,55 +327,133 @@ qualification gate. Earlier bytes are never relabeled as produced by the current
 check diagnostics and returns the stable failure code; its serialized output cannot restore a live receipt
 or grant qualification signing authority.
 
-Wrapped source producers require the [pinned embedded declaration](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md)
-profile. Current M2 candidate catalogs have not supplied those declarations and therefore cannot pass
-the gate. M3-B's authenticated smoke receipt is not available, so required delivered-tool smoke blocks
-qualification signing. An A receipt alone cannot sign evidence or authorize release. The C publisher's
-contract and local tests do not establish real hosted signing or complete-set consumer acceptance.
+The [pinned embedded declaration](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md)
+profile is optional for source producers; no producer must supply it. Omission yields `not-applicable`.
+Any authored declaration must match its referenced pinned upstream metadata, and a missing, invalid or
+disagreeing reference fails. The check reads
+raw source metadata; it does not apply patches, configuration or material substitutions and cannot establish
+effective customized or installed composition. Source, patch, configuration and material identity/provenance
+checks remain required. The maintained candidate needs no new upstream component manifests.
+
+Delivered-tool smoke still requires the complete native worker results described below. An A receipt alone
+cannot sign evidence or authorize release. Local tests do not establish real hosted signing or complete-set
+consumer acceptance.
 [Reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary) records contract coverage and
 the outstanding hosted signing, exact-input candidate and consumer acceptance evidence.
 
 ## Publish qualification evidence
 
-On Linux, `nvkr run qualify` accepts the same exact input, candidate, source and pinned-cosign flags as
-`run check-artifacts`, plus the required `--qualification-workflow` repository-relative path. It must run
-in an active default-branch GitHub `workflow_run` invocation of that distinct approved workflow. The source
-build must already be completed successfully. The qualifier authenticates its own Run and the event's exact
-source Run, attempt and commit against GitHub before opening the candidate inputs. A manually dispatched
-qualifier or the source build's own identity is rejected.
+Hosted qualification uses one command:
 
-`qualification.PublishFiles` owns file orchestration and receipt lifetimes; `qualification.Publisher`
-consumes the live artifact-check and qualification-invocation receipts. Serialized reports, caller-supplied
-pass values and result files cannot replace these receipts. The publisher collects the complete verdict
-set before invoking the pinned signer, rechecks receipt validity before each attachment, and verifies each
-attached attestation against its exact artifact subject and the independent qualification identity.
+```sh
+nvkr run qualify --policy qualification.yaml
+```
 
-The strict canonical predicate uses schema `nvkr.dev/qualification-evidence/v1`, typed digest family
-`nvkr.qualification-evidence`, and predicate URI `https://nvkr.dev/qualification-evidence/v1`. It contains
-the gate version, full artifact-check report and source identity, exact input identities, complete named
-output checks, independent qualification invocation, smoke verdicts and external-suite status. Every
-selected output receives the same complete-set evidence under its own exact subject. Decoding this evidence
-does not grant release authorization.
+The generated workflow supplies its environment and credentials. The command discovers its source only
+from the authenticated `workflow_run` event, verifies the source's exact successful attempt, and downloads
+its original handoff. There are no source-commit, candidate-file, verdict-file or skip-smoke flags.
+A manually dispatched qualifier or the source build's own identity is rejected.
 
-M3-B has no authenticated smoke-receipt issuer yet. Executable outputs therefore fail with a missing-smoke
-gate result; OCI and APT outputs fail capability admission until B establishes their delivered-tool smoke
-applicability. Disk and Helm outputs explicitly report smoke as not applicable. Disk evidence remains
-producer-only. These failures occur before signing. `--external-suite NAME` records that named suite as
-`not-evaluated` with reason `outside MVP scope`; it does not run the suite or claim a pass. There is no
-default suite. `--required-suite NAME` fails before provider or artifact work because authenticated
-external-suite integration is unavailable.
+Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
+qualifier and its native smoke worker alongside the producer. The same invocation with `--check` compares
+all owned bytes without writing. The separately owned qualification manifest records both workflow files;
+hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
+workflow at the caller's exact commit. It is generated plumbing, not another operator command to configure
+for each Run. Before candidate or signing work, both commands check the trusted checkout against that
+manifest and the full loaded policy; policy or workflow drift requires regeneration.
 
-The CLI emits canonical publication diagnostics and a stable failure code. An operational signing or
-attachment failure can leave earlier attachments; diagnostics retain their exact subjects and never report
-successful qualification. A successful attachment result is still separate from release authorization and
-independent consumer acceptance.
+The independent policy extends the artifact-check policy with these decisions:
 
-No generated qualifier workflow is enabled. The current candidate still needs the authored embedded
-manifests, an exact-attempt source handoff and the B smoke integration. Linux race tests and real cosign
-3.1.3 local-key interoperability against a loopback registry exercise the implementation and attestation
-protocol. They do not exercise hosted OIDC, a real qualification workflow or complete-set consumer
-acceptance; [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary)
-records those outstanding boundaries.
+| Policy field | What it controls |
+|---|---|
+| `qualificationWorkflow` | The default-branch workflow allowed to publish qualification evidence |
+| `cosign.version` and `cosign.platformDigests` | An exact release locator and independently approved executable bytes for every worker platform plus the AMD64 final signer |
+| `smoke.workflow` | A separate same-repository worker identity, distinct from both builder and final signer |
+| `smoke.images` | Exact native execution-image references, pinned by digest |
+| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm or kubectl version-check profiles |
+| `smoke.nonToolOutputs` | Exact OCI/APT output names, kinds and components explicitly outside loose-tool smoke |
+| `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
+
+Start with the [complete maintained-candidate policy shape](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/qualification.yaml.example).
+Its `REPLACE_*` values are deliberately invalid; it cannot enable signing accidentally. Review the exact
+output scope and independently approved pins, then save the completed policy at a repository-relative path
+such as `qualification.yaml`. The trust policy belongs to the operator, not the producing Run.
+
+For hosted generation, replace the earlier single `cosign.digest` field with `cosign.platformDigests`;
+using both is rejected. Map keys are exactly `linux/amd64` and `linux/arm64`. Set `cosign.version` to the
+approved stable `vX.Y.Z` download locator and leave `cosign.path` absent or `cosign`. Images must cover exactly
+the executable platforms selected by the Definition. An AMD64-only product generates one worker. An
+ARM64-only product still needs an AMD64 cosign pin because the final signer runs on AMD64. The maintained
+candidate selects both platforms. Generation validates all tool profiles, versions and non-tool membership
+against the Plan before writing either workflow; missing or extra scope is an error.
+
+`smoke.nonToolOutputs` is a list of `output`, `kind`, `components` and `reason` records. The admitted pairs
+are `kind: oci` with `reason: deployment-image`, and `kind: apt-repository` with
+`reason: package-repository`. Each record must match the complete named output's component set. The
+candidate example contains all 25 OCI records for review, alongside three profiles covering its four native
+tool invocations. It contains no Helm/disk exemptions because those formats have a fixed non-tool rule.
+
+Use independently approved native images containing `/bin/sh`, `cat`, `wc`, `sha256sum`, `chmod` and
+`/usr/bin/env`. They must have no declared volumes or extra inherited environment. The payload environment
+is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C` and `TZ=UTC`; image configuration
+must not add or conflict with it. Builder images and pins are not automatically trusted smoke images.
+The generated route also requires a GitHub-signing producer, its generated source workflow, and GHCR
+publication under the same repository owner with the existing `github:GITHUB_TOKEN` credential reference.
+
+The fixed profiles are `nvkectl-version-json`, `helm-version` and `kubectl-client-version-json`. Expected
+versions and the nvkectl commit come from the authenticated frozen Plan. The policy cannot supply a
+replacement expected version or arbitrary executable arguments. Every member of every executable bundle
+must be covered. OCI deployment-image and APT package-repository exemptions require exact membership;
+there is no wildcard exemption for an artifact format. Disk and Helm outputs use their explicit non-tool
+format rule. Disk content remains uninspected.
+
+Each native worker independently performs artifact checks, streams the held delivered member into a
+network-disabled nonroot container, checks its native ELF identity and version response, and joins cleanup
+before signing its report. The payload receives no credentials, host mounts, daemon socket or inherited
+host environment. The worker can read artifacts and sign its own report; it cannot publish qualification
+attestations. Its generated upload contains exactly four files under an attempt-specific artifact name.
+
+A failed worker report lists every known native member: completed checks retain their actual pass result,
+the failed attempt is marked `fail`, and checks never reached are `not-evaluated` with a coded reason.
+Cleanup or revocation can fail the overall report even after all member checks passed. These diagnostics
+cannot be signed as successful evidence. If the final job cannot authenticate the delivered smoke set,
+every artifact receives a failed `delivered-tool-smoke-authentication` verdict while its genuine artifact
+check results remain intact; this does not claim the payload itself was executed and failed.
+
+After workers complete with success or failure, the final job repeats artifact checks and attempts to
+authenticate the complete smoke set. This produces refusal diagnostics when a worker failed. Canceled,
+skipped or untrusted source invocations do not enter this final job. Publication still requires successful worker
+jobs from the exact current attempt and verifies each report's signature, worker certificate SAN and GitHub
+issuer. The same verified leaf must bind the top-level workflow, workflow commit and exact Run attempt.
+It then recomputes the complete expected member set and compares the full independent policy, payload
+identities, native images, expected versions and observed results. A missing architecture, missing member,
+wrong identity, reused attempt or failed check prevents signing.
+
+`qualification.PublishTriggeredRun` owns this orchestration. The lower-level publisher consumes live A,
+B and invocation receipts; serialized reports cannot restore them. The old `qualification.PublishFiles`
+publishing adapter returns a capability error before I/O; saved-file artifact diagnostics remain available
+through `lifecycle.CheckQualificationFiles`.
+
+The canonical predicate uses schema and URI `nvkr.dev/qualification-evidence/v2` and
+`https://nvkr.dev/qualification-evidence/v2`, with typed family `nvkr.qualification-evidence`. Version 2
+requires the full smoke policy and member-level worker evidence. It also binds the complete artifact-check
+report, source and qualifier identities, input identities, per-output verdicts and external-suite status.
+Every selected output receives the same complete-set predicate under its own exact subject. An
+outside-MVP suite is `not-evaluated`, never passed. [Independent consumption](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/publication-architecture.md#independent-consumption)
+explains distinct builder/qualifier trust and complete-set rejection requirements. Requiring an external suite fails before provider or
+artifact work until authenticated integration exists.
+
+The publisher collects all results before signing and rechecks receipt lifetimes before constructing the
+signer, each attachment and successful return. An operational failure can leave earlier attachments;
+the command returns a failure code and retains those subjects in its diagnostics. Their presence does
+not establish successful qualification or release authorization.
+
+These workflows are not enabled in the maintained candidate. That candidate still needs independently approved
+verifier/native-image trust pins and reviewed smoke scope, one complete exact-attempt producer handoff and
+hosted acceptance. Local native-container, race and protocol tests do not establish GitHub's actual reusable-job names, OIDC claims, production
+attachment/read-back or independent complete-set consumer acceptance. Those observations remain required;
+[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary)
+records their scope and status.
 
 ## Use the SDK
 
@@ -405,6 +505,6 @@ normal product authors do not construct and join them manually.
 
 Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
-The direct-output model uses Definition v4, catalog v3 and generated IR v4. Run and Release use v3. Older recipe layouts and cluster/placement fields
+The direct-output model uses Definition v5, catalog v3 and generated IR v4. Run and Release use v4. Older recipe layouts and cluster/placement fields
 are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;
 historical Runs retain the authoring and wire contracts exercised at the time.

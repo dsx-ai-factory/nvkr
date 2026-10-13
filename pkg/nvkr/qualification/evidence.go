@@ -19,8 +19,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
-const SchemaVersion = "nvkr.dev/qualification-evidence/v1"
-const GateVersion = "nvkr.dev/qualification-gate/v1"
+const SchemaVersion = "nvkr.dev/qualification-evidence/v2"
+const GateVersion = "nvkr.dev/qualification-gate/v2"
 
 // Verdict is diagnostic data. Only owner-issued receipts authorize publication.
 type Verdict struct {
@@ -40,6 +40,7 @@ type ExternalSuite struct {
 // Evidence is the strict wire predicate. Decoding it describes a claim; the
 // separate qualification workflow signature authenticates that claim.
 type Evidence struct {
+	ToolSmoke      lifecycle.ToolSmokeDescription     `json:"toolSmoke"`
 	SchemaVersion  string                             `json:"schemaVersion"`
 	GateVersion    string                             `json:"gateVersion"`
 	ArtifactChecks lifecycle.ArtifactCheckDescription `json:"artifactChecks"`
@@ -52,7 +53,7 @@ var requiredArtifactChecks = []string{"build-signature-and-provenance", "embedde
 
 var subjectNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 
-func (evidence Evidence) Validate() error {
+func (evidence Evidence) validate() error {
 	if evidence.SchemaVersion != SchemaVersion || evidence.GateVersion != GateVersion || evidence.ArtifactChecks.GateVersion != lifecycle.ArtifactCheckGateVersion {
 		return e.New(e.CodeVerifyFailed, "unknown qualification schema or gate version")
 	}
@@ -68,16 +69,22 @@ func (evidence Evidence) Validate() error {
 		evidence.Invocation.Ref != checks.Origin.Ref || evidence.Invocation.BuilderID == "" || evidence.Invocation.InvocationID == "" {
 		return e.New(e.CodeVerifyFailed, "qualification evidence lacks separate exact build and qualification identities")
 	}
-	for _, digest := range []string{checks.CatalogDigest, checks.Inputs.ReleaseSubject, checks.Inputs.PolicyDigest, checks.Inputs.DefinitionDigest, checks.Inputs.EnvironmentDigest, checks.Inputs.PlanDigest, checks.Inputs.ContentSubject} {
+	for _, digest := range []string{checks.CatalogDigest, checks.Inputs.PolicyDigest, checks.Inputs.DefinitionDigest, checks.Inputs.EnvironmentDigest, checks.Inputs.PlanDigest, checks.Inputs.ContentSubject} {
 		if !canonical.IsDigest(digest) {
 			return e.New(e.CodeVerifyFailed, "qualification evidence omits exact input identities")
 		}
+	}
+	if err := delivery.ValidatePublicationReference(checks.Inputs.ReleaseSubject); err != nil {
+		return err
+	}
+	if strings.Contains(checks.Inputs.ReleaseSubject, "://") {
+		return e.New(e.CodeVerifyFailed, "qualification release subject must be a canonical immutable registry reference")
 	}
 	if len(checks.Outputs) == 0 || len(evidence.Smoke) != len(checks.Outputs) {
 		return e.New(e.CodeReleaseIncomplete, "qualification evidence requires the complete output and smoke set")
 	}
 	previous := ""
-	for index, output := range checks.Outputs {
+	for _, output := range checks.Outputs {
 		if output.Name <= previous || output.Overall != "pass" || !canonical.IsDigest(output.BuildDigest) {
 			return e.New(e.CodeGateUnmet, "qualification outputs must be sorted, unique and passing")
 		}
@@ -103,16 +110,43 @@ func (evidence Evidence) Validate() error {
 		if output.Kind != lifecycle.OutputDiskImage && output.DiskEvidence != "" {
 			return e.New(e.CodeVerifyFailed, "non-disk output claims disk evidence")
 		}
-		required, err := requiresSmoke(output.Kind)
-		if err != nil {
-			return err
-		}
-		verdict := evidence.Smoke[index]
-		if verdict.Output != output.Name || verdict.Subject != output.Subject || verdict.Check != "delivered-tool-version" ||
-			(required && verdict.Status != "pass") || (!required && (verdict.Status != "not-applicable" || verdict.Reason != "non-tool artifact format")) {
-			return e.New(e.CodeGateUnmet, "qualification smoke does not cover every exact output")
+	}
+	if err := evidence.ToolSmoke.Validate(); err != nil {
+		return err
+	}
+	bound, err := canonical.Marshal(evidence.ToolSmoke.ArtifactChecks)
+	if err != nil {
+		return err
+	}
+	actual, err := canonical.Marshal(checks)
+	if err != nil {
+		return err
+	}
+	if string(bound) != string(actual) || evidence.ToolSmoke.Invocation != evidence.Invocation {
+		return e.New(e.CodeGateUnmet, "qualification smoke differs from exact artifact checks or invocation")
+	}
+	expected, err := smokeVerdicts(evidence.ToolSmoke)
+	if err != nil {
+		return err
+	}
+	for i, verdict := range evidence.Smoke {
+		if verdict != expected[i] {
+			return e.New(e.CodeGateUnmet, "qualification smoke verdict differs from authenticated worker evidence")
 		}
 	}
+	suites, err := outsideSuites(evidence.ToolSmoke.Policy.OutsideMVPSuites)
+	if err != nil {
+		return err
+	}
+	if len(evidence.ExternalSuites) != len(suites) {
+		return e.New(e.CodeGateUnmet, "qualification external suite scope differs from independent policy")
+	}
+	for i, suite := range evidence.ExternalSuites {
+		if suite != suites[i] {
+			return e.New(e.CodeGateUnmet, "qualification external suite status differs from independent policy")
+		}
+	}
+
 	previous = ""
 	for _, suite := range evidence.ExternalSuites {
 		if suite.Name == "" || suite.Name <= previous || strings.TrimSpace(suite.Name) != suite.Name || suite.Status != "not-evaluated" || suite.Reason != "outside MVP scope" {
@@ -159,11 +193,24 @@ func validateOutputSubjects(output lifecycle.ArtifactCheckOutput) error {
 	return nil
 }
 
+// Validate admits both the complete claim and the exact signing transport bound.
+func (evidence Evidence) Validate() error {
+	_, err := evidence.Canonical()
+	return err
+}
+
 func (evidence Evidence) Canonical() ([]byte, error) {
-	if err := evidence.Validate(); err != nil {
+	if err := evidence.validate(); err != nil {
 		return nil, err
 	}
-	return canonical.Marshal(evidence)
+	raw, err := canonical.Marshal(evidence)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(raw)) > sign.MaxQualificationPredicateBytes {
+		return nil, e.New(e.CodeEngineCapability, "complete qualification evidence exceeds the signing transport limit")
+	}
+	return raw, nil
 }
 func (evidence Evidence) Digest() (string, error) {
 	if err := evidence.Validate(); err != nil {
@@ -172,6 +219,9 @@ func (evidence Evidence) Digest() (string, error) {
 	return canonical.Digest(canonical.KindQualificationEvidence, evidence)
 }
 func Decode(raw []byte) (Evidence, error) {
+	if int64(len(raw)) > sign.MaxQualificationPredicateBytes {
+		return Evidence{}, e.New(e.CodeVerifyFailed, "qualification evidence exceeds the signing transport limit")
+	}
 	var evidence Evidence
 	if err := canonical.UnmarshalExact(raw, &evidence); err != nil {
 		return Evidence{}, e.Wrap(e.CodeVerifyFailed, err, "decoding qualification evidence")
@@ -180,19 +230,6 @@ func Decode(raw []byte) (Evidence, error) {
 		return Evidence{}, err
 	}
 	return evidence, nil
-}
-
-func requiresSmoke(kind string) (bool, error) {
-	switch kind {
-	case lifecycle.OutputExecutable:
-		return true, nil
-	case lifecycle.OutputDiskImage, lifecycle.OutputHelm:
-		return false, nil
-	case lifecycle.OutputOCI, lifecycle.OutputAPT:
-		return false, e.New(e.CodeEngineCapability, "M3-B must establish tool smoke applicability for artifact format %q", kind)
-	default:
-		return false, e.New(e.CodeEngineCapability, "no qualification smoke applicability for artifact format %q", kind)
-	}
 }
 
 func outsideSuites(names []string) ([]ExternalSuite, error) {

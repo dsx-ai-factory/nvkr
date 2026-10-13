@@ -15,6 +15,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 	"github.com/urfave/cli/v2"
 )
 
@@ -65,8 +66,15 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 	return &cli.Command{Name: "run", Usage: "plan, generate, and execute Definition runs", Subcommands: []*cli.Command{
 		{Name: "finalize", Hidden: true, Usage: "finalize one generated hosted Run from restored carriers", Flags: append(lifecycleInputFlags(),
 			&cli.StringFlag{Name: "plan", Required: true}, &cli.StringFlag{Name: "attempt", Required: true},
-			&cli.StringFlag{Name: "workspace", Value: ".nvkr/factory"}, &cli.StringFlag{Name: "out", Value: ".nvkr/run.json"}), Action: func(c *cli.Context) error {
-			run, err := lifecycle.FinalizeGenerated(c.Context, c.String("definition"), c.String("environment"), c.String("plan"), factoryGeneratorVersion(), c.String("attempt"), c.String("workspace"), c.String("out"))
+			&cli.StringFlag{Name: "workspace", Value: ".nvkr/factory"}, &cli.StringFlag{Name: "out", Value: ".nvkr/run.json"},
+			&cli.StringFlag{Name: "handoff", Hidden: true, Usage: "generated qualification handoff output"}), Action: func(c *cli.Context) error {
+			var run *lifecycle.Run
+			var err error
+			if c.IsSet("handoff") {
+				run, err = lifecycle.FinalizeGeneratedWithHandoff(c.Context, c.String("definition"), c.String("environment"), c.String("plan"), factoryGeneratorVersion(), c.String("attempt"), c.String("workspace"), c.String("out"), c.String("handoff"))
+			} else {
+				run, err = lifecycle.FinalizeGenerated(c.Context, c.String("definition"), c.String("environment"), c.String("plan"), factoryGeneratorVersion(), c.String("attempt"), c.String("workspace"), c.String("out"))
+			}
 			if err != nil {
 				return err
 			}
@@ -78,10 +86,18 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		cmdRunDiff(),
 		cmdRunCheckArtifacts(),
 		cmdRunQualify(),
+		cmdRunSmokeWorker(),
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
+			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {
-			digest, err := lifecycle.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			var digest string
+			var err error
+			if c.IsSet("qualification-policy") {
+				digest, err = qualification.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), c.String("qualification-policy"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			} else {
+				digest, err = lifecycle.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			}
 			if err != nil {
 				return err
 			}

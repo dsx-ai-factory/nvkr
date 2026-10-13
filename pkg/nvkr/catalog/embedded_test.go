@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -101,20 +102,14 @@ func TestEmbeddedCheckAdmitsBeforeSourceWork(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		selected []string
-		wrapped  bool
 		code     e.Code
 	}{
-		{"unknown", []string{"unknown"}, false, e.CodeInvalidCatalog},
-		{"duplicate", []string{"tool", "tool"}, false, e.CodeInvalidCatalog},
-		{"missing declaration", []string{"tool"}, true, e.CodePinSetMismatch},
-		{"not applicable", []string{"tool"}, false, ""},
+		{"unknown", []string{"unknown"}, e.CodeInvalidCatalog},
+		{"duplicate", []string{"tool", "tool"}, e.CodeInvalidCatalog},
+		{"not applicable", []string{"tool"}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			component := goodComponent()
-			if tc.wrapped {
-				component.BuilderType, component.OutputType = BuilderBuildKit, "oci-image"
-				component.CGO = false
-			}
 			cat := base(component)
 			cat.Components = map[string]Component{"tool": component}
 			receipt, err := checkEmbeddedComponents(t.Context(), cat, tc.selected, func(context.Context, Source, Pin) (pinnedTree, error) {
@@ -265,4 +260,107 @@ func TestEmbeddedCatalogStrictLoadingAndIdentity(t *testing.T) {
 	}
 	_, err = load([]byte(strings.Replace(string(raw), "manifest: versions.yaml", "manifest: versions.yaml\n      ignored: true", 1)))
 	assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+}
+
+func TestEmbeddedDeclarationsAreOptionalForEveryProducer(t *testing.T) {
+	for _, producer := range []struct {
+		name string
+		make func() Component
+	}{
+		{"hermetic", goodComponent},
+		{"buildkit", func() Component {
+			component := goodComponent()
+			component.BuilderType, component.OutputType = BuilderBuildKit, "oci-image"
+			return component
+		}},
+		{"vm-image", func() Component { return vmMaterialComponent(nil) }},
+		{"default-network", func() Component {
+			component := vmMaterialComponent(nil)
+			component.BuildCommand = nil
+			component.BuildNetwork = "default"
+			component.Packer = &PackerConfig{ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node", ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest", OutputDirectoryVariable: "output_directory"}
+			return component
+		}},
+	} {
+		for _, declaration := range []struct {
+			name, body string
+			make       func() *EmbeddedComponents
+			code       e.Code
+			status     string
+			access     int
+		}{
+			{"absent", "", func() *EmbeddedComponents { return nil }, "", "not-applicable", 0},
+			{"explicit match", "components: {runtime: 1.2.3}", embeddedFixture, "", "pass", 1},
+			{"explicit mismatch", "components: {runtime: 9.9.9}", embeddedFixture, e.CodePinSetMismatch, "", 1},
+			{"explicit missing manifest", "", embeddedFixture, e.CodePinSetMismatch, "", 1},
+			{"explicit empty match", "components: {}", func() *EmbeddedComponents {
+				return &EmbeddedComponents{Manifest: "versions.yaml", Path: "components", Members: map[string]EmbeddedVersion{}}
+			}, "", "pass", 1},
+			{"explicit empty mismatch", "components: {runtime: 1.2.3}", func() *EmbeddedComponents {
+				return &EmbeddedComponents{Manifest: "versions.yaml", Path: "components", Members: map[string]EmbeddedVersion{}}
+			}, e.CodePinSetMismatch, "", 1},
+			{"invalid explicit declaration", "", func() *EmbeddedComponents {
+				return &EmbeddedComponents{Manifest: "versions.yaml", Path: "components"}
+			}, e.CodeInvalidCatalog, "", 0},
+		} {
+			t.Run(producer.name+"/"+declaration.name, func(t *testing.T) {
+				component := producer.make()
+				component.Embeds = declaration.make()
+				cat := base(component)
+				tree := &nvkeFixtureTree{files: map[string][]byte{}}
+				if declaration.body != "" {
+					tree.files["versions.yaml"] = []byte(declaration.body)
+				}
+				opened := 0
+				receipt, err := checkEmbeddedComponents(t.Context(), cat, []string{"x"}, func(_ context.Context, source Source, pin Pin) (pinnedTree, error) {
+					opened++
+					if source.Repo != component.Repo || pin.Commit != component.Commit || pin.TreeHash != component.TreeHash || pin.SourceDateEpoch != component.SourceDate {
+						t.Fatal("declaration check did not select the exact pinned source")
+					}
+					return tree, nil
+				})
+				if got := catalogErrorCode(err); got != declaration.code {
+					t.Fatalf("code=%s want=%s err=%v", got, declaration.code, err)
+				}
+				if opened != declaration.access || len(tree.reads) != declaration.access {
+					t.Fatalf("source accesses: opens=%d reads=%d want=%d", opened, len(tree.reads), declaration.access)
+				}
+				if declaration.code != "" {
+					if receipt != nil {
+						t.Fatal("invalid explicit declaration issued a receipt")
+					}
+					return
+				}
+				description, err := receipt.Description()
+				if err != nil || len(description.Components) != 1 || description.Components[0].Name != "x" || description.Components[0].Status != declaration.status {
+					t.Fatalf("description=%+v err=%v", description, err)
+				}
+			})
+		}
+	}
+}
+
+func TestEmbeddedMixedSelectionChecksOnlyExplicitDeclarations(t *testing.T) {
+	declared := goodComponent()
+	declared.Embeds = embeddedFixture()
+	wrapped := goodComponent()
+	wrapped.BuilderType, wrapped.OutputType = BuilderBuildKit, "oci-image"
+	cat := &Catalog{Components: map[string]Component{"declared": declared, "wrapped": wrapped, "acquired": goodPrebuilt()}}
+	tree := &nvkeFixtureTree{files: map[string][]byte{"versions.yaml": []byte("components: {runtime: 1.2.3}")}}
+	opened := 0
+	receipt, err := checkEmbeddedComponents(t.Context(), cat, []string{"wrapped", "declared", "acquired"}, func(context.Context, Source, Pin) (pinnedTree, error) {
+		opened++
+		return tree, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	description, err := receipt.Description()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []EmbeddedComponentResult{{Name: "acquired", Status: "not-applicable"}, {Name: "declared", Status: "pass"}, {Name: "wrapped", Status: "not-applicable"}}
+	if !slices.Equal(description.Components, want) || opened != 1 || len(tree.reads) != 1 {
+		t.Fatalf("mixed applicability=%+v opens=%d reads=%d", description, opened, len(tree.reads))
+	}
 }
