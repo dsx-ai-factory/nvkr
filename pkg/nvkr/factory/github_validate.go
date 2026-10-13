@@ -131,6 +131,23 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		bootstrap[node.RunsOn] = "build-runner-" + shortStableName(node.RunsOn)
 	}
+	// Summaries are exact, optional diagnostics outside execution and credential
+	// admission. Remove only the two admitted steps before validating job work.
+	startID := bootstrap[sortedKeys(bootstrap)[0]]
+	start := document.Jobs[startID]
+	if len(start.Steps) == 0 || !reflect.DeepEqual(start.Steps[0], githubRunStartSummary(plan)) {
+		return e.New(e.CodeEngineCapability, "GitHub Run opening summary must precede bootstrap work")
+	}
+	start.Steps = start.Steps[1:]
+	document.Jobs[startID] = start
+	if len(plan.LifecycleOutputs) > 0 {
+		finalizer := document.Jobs["nvkr-lifecycle-run"]
+		if len(finalizer.Steps) == 0 || !reflect.DeepEqual(finalizer.Steps[len(finalizer.Steps)-1], githubRunEndSummary(len(stages)+len(bootstrap))) {
+			return e.New(e.CodeEngineCapability, "GitHub Run closing summary must follow finalization and upload even after failure")
+		}
+		finalizer.Steps = finalizer.Steps[:len(finalizer.Steps)-1]
+		document.Jobs["nvkr-lifecycle-run"] = finalizer
+	}
 	expectedTimeouts := make(map[string]int, len(stages)+len(bootstrap)+1)
 	for _, stage := range stages {
 		timeoutMinutes, err := githubStageTimeoutMinutes(stage)
