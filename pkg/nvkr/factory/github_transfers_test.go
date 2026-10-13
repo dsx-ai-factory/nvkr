@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"sigs.k8s.io/yaml"
 )
 
@@ -171,12 +170,7 @@ func TestGitHubBatchSelectionCannotExpandRequiredClosure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mutated := *bundle
-	mutated.Files = make(map[string][]byte, len(bundle.Files))
-	for name, raw := range bundle.Files {
-		mutated.Files[name] = append([]byte(nil), raw...)
-	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	var pattern string
 	for _, id := range sortedKeys(document.Jobs) {
 		if id == "nvkr-lifecycle-run" {
@@ -185,6 +179,7 @@ func TestGitHubBatchSelectionCannotExpandRequiredClosure(t *testing.T) {
 		for _, step := range document.Jobs[id].Steps {
 			if step.With["pattern"] != "" {
 				pattern = step.With["pattern"]
+				step.With["pattern"] = "*"
 				break
 			}
 		}
@@ -195,10 +190,13 @@ func TestGitHubBatchSelectionCannotExpandRequiredClosure(t *testing.T) {
 	if pattern == "" {
 		t.Fatal("test plan has no external input batch")
 	}
-	workflow := bytes.Replace(bundle.Files[GitHubWorkflowPath], []byte("pattern: "+yamlSingle(pattern)), []byte("pattern: '*'"), 1)
-	mutated.Files[GitHubWorkflowPath], mutated.WorkflowDigest = workflow, pipeline.FileDigest(workflow)
+	raw, err := yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutated := relowerGitHubTestBundle(t, plan, bundle, raw)
 	var coded *e.Error
-	if err := ValidateGitHubBundle(t.Context(), plan, &mutated); !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+	if err := ValidateGitHubBundle(t.Context(), plan, mutated); !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 		t.Fatalf("broadened download set was admitted: %v", err)
 	}
 }

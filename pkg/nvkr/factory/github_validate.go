@@ -66,6 +66,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := validateGitHubWorkflowSize(workflow); err != nil {
 		return err
 	}
+	expected, err := renderGitHub(ctx, plan, false)
+	if err != nil {
+		return err
+	}
+	expanded, err := expandGitHubActions(workflow, bundle.Files)
+	if err != nil {
+		return err
+	}
 	if err := admitGitHubPlatforms(plan); err != nil {
 		return err
 	}
@@ -74,7 +82,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		return err
 	}
 	var document githubWorkflowDocument
-	if err := yaml.UnmarshalStrict(workflow, &document); err != nil {
+	if err := yaml.UnmarshalStrict(expanded, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
 	}
 	if err := validateGitHubScriptLimits(document); err != nil {
@@ -90,8 +98,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		return e.New(e.CodeEngineCapability, "GitHub Run requires manual dispatch only and non-canceling workflow concurrency")
 	}
 	if !strings.Contains(string(workflow), "# qualification: "+plan.Qualification.String()) ||
-		!strings.Contains(string(workflow), "# planDigest: "+bundle.PlanDigest) {
-		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits static qualification or plan identity header")
+		!strings.Contains(string(workflow), "# plan: "+FactoryPlanPath) ||
+		!strings.Contains(string(workflow), "# manifest: "+GeneratedManifestPath) {
+		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits static qualification or generated bundle references")
 	}
 
 	if len(plan.Environment.GitHubRunners) > 0 {
@@ -214,7 +223,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				}
 				continue
 			}
-			if len(wantSourceEnv) == 0 || step.ID != jobID || len(step.Env) != len(wantSourceEnv) {
+			sourceStage, sourceJob := byNodeForJob(stages, jobID)
+			if len(wantSourceEnv) == 0 || !sourceJob || len(sourceStage.Nodes) != 1 ||
+				step.ID != githubJobID(sourceStage.Nodes[0].ID) || len(step.Env) != len(wantSourceEnv) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q has unexpected step credentials or environment", jobID)
 			}
 			for key, value := range wantSourceEnv {
@@ -222,7 +233,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 					return e.New(e.CodeEngineCapability, "GitHub job %q source environment differs at %s", jobID, key)
 				}
 			}
-			if stage, ok := byNodeForJob(stages, jobID); !ok || len(stage.Nodes) != 1 || strings.TrimSpace(step.Run) != githubRunnerCommand("run-node", "node", stage.Nodes[0].ID) {
+			if strings.TrimSpace(step.Run) != githubRunnerCommand("run-node", "node", sourceStage.Nodes[0].ID) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q must refuse an empty source credential", jobID)
 			}
 			foundSource = true
@@ -425,12 +436,18 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	// Semantic checks above produce useful coded diagnostics. Exact regeneration
 	// additionally rejects unrecognized steps, appended shell commands and ambient
 	// authority on any job; substring checks alone cannot authorize an entire job.
-	expected, err := renderGitHub(ctx, plan, false)
-	if err != nil {
-		return err
+	if len(bundle.Files) != len(expected.Files) {
+		return e.New(e.CodePipelineDrift, "GitHub bundle member set differs from its admitted rendering")
 	}
-	if !bytes.Equal(workflow, expected.Files[GitHubWorkflowPath]) {
-		return e.New(e.CodeEngineCapability, "GitHub workflow differs from its exact admitted rendering")
+	for name := range bundle.Files {
+		if _, ok := expected.Files[name]; !ok {
+			return e.New(e.CodePipelineDrift, "GitHub bundle contains unexpected member %q", name)
+		}
+	}
+	for _, name := range sortedFileNames(expected.Files) {
+		if !bytes.Equal(bundle.Files[name], expected.Files[name]) {
+			return e.New(e.CodeEngineCapability, "GitHub member %q differs from its exact admitted rendering", name)
+		}
 	}
 	return nil
 }

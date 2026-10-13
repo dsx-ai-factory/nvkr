@@ -92,6 +92,12 @@ _Avoid_: Authored definition, execution observation
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
+Its workflow, shared composite templates and generated invocation data share one ownership manifest and
+byte-exact drift gate. Templates reuse fixed Plan operations; invocation parameters are recomputed from the
+admitted Plan at runtime. Neither scripts supplied as data nor separately authored lifecycle inputs are admitted.
+The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
+visible policy stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
+the complete bundle still requires regeneration and checking.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
 **Catalog maintenance candidate**:

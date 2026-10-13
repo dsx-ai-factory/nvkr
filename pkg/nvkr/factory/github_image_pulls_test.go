@@ -15,7 +15,6 @@ import (
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"sigs.k8s.io/yaml"
 )
 
@@ -141,7 +140,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	disks, fetches := 0, 0
 	for _, job := range document.Jobs {
 		for _, step := range job.Steps {
@@ -168,17 +167,8 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 		{"wrong helper", "factory github prepare-images --plan", "factory github run-node --plan"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			changed := *bundle
-			changed.Files = make(map[string][]byte, len(bundle.Files))
-			for name, value := range bundle.Files {
-				changed.Files[name] = value
-			}
-			changed.Files[GitHubWorkflowPath] = bytes.Replace(bundle.Files[GitHubWorkflowPath], []byte(test.before), []byte(test.after), 1)
-			if bytes.Equal(changed.Files[GitHubWorkflowPath], bundle.Files[GitHubWorkflowPath]) {
-				t.Fatal("mutation did not change workflow")
-			}
-			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[GitHubWorkflowPath])
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+			changed := replaceGitHubBundleBytes(t, bundle, []byte(test.before), []byte(test.after))
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
 }

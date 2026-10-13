@@ -115,15 +115,8 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 		return nil, e.New(e.CodePipelineDrift,
 			"%s bundle planDigest does not match the authoritative plan", bundle.Engine)
 	}
-	expectedFiles := map[string]bool{bundle.WorkflowPath: true, bundle.PlanPath: true}
-
-	if len(bundle.Files) != len(expectedFiles) {
-		return nil, e.New(e.CodePipelineDrift, "%s bundle has %d files; expected %d", bundle.Engine, len(bundle.Files), len(expectedFiles))
-	}
-	for name := range bundle.Files {
-		if !expectedFiles[name] {
-			return nil, e.New(e.CodePipelineDrift, "%s bundle contains unexpected file %q", bundle.Engine, name)
-		}
+	if bundle.Engine != EngineGitHub || bundle.WorkflowPath != GitHubWorkflowPath || bundle.PlanPath != FactoryPlanPath || bundle.ManifestPath != GeneratedManifestPath {
+		return nil, e.New(e.CodePipelineDrift, "generated Run bundle layout differs from the admitted GitHub layout")
 	}
 	workflow, ok := bundle.Files[bundle.WorkflowPath]
 	if !ok || pipeline.FileDigest(workflow) != bundle.WorkflowDigest {

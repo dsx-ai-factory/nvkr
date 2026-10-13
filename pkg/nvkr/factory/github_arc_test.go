@@ -318,7 +318,7 @@ func TestARCPreparesOutputPublicationWithoutHostedMaterialDownloads(t *testing.T
 			if err := ValidateGitHubBundle(t.Context(), plan, bundle); err != nil {
 				t.Fatal(err)
 			}
-			doc := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			doc := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			job := doc.Jobs[jobs[prep]]
 			if job.RunsOn != githubARCRunner(platform) || job.Permissions["id-token"] != "" || job.Permissions["packages"] == "write" || job.Env["NVKR_CREDENTIAL"] != "" {
 				t.Fatal("ARC preparation changed credential boundary")

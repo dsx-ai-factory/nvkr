@@ -160,9 +160,13 @@ func githubDiskProducerTimeoutSeconds(node Node) (uint64, error) {
 }
 
 func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
+	ordered, schedulingKeys, err := githubSchedulingProjection(plan)
+	if err != nil {
+		return nil, nil, err
+	}
 	var stages []githubStage
 	diskStages := make(map[string]int)
-	for _, node := range topologicalFactoryNodes(plan.Graph) {
+	for _, node := range ordered {
 		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return nil, nil, err
@@ -190,14 +194,15 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 		stages = append(stages, githubStage{Nodes: []Node{node}})
 	}
 	jobs := make(map[string]string, len(plan.Graph.Nodes))
+	jobOwners := map[string]string{"nvkr-lifecycle-run": "Run finalizer"}
 	for i := range stages {
 		stage := &stages[i]
-		stage.ID = githubJobID(stage.Nodes[0].ID)
+		stage.ID = githubJobID(schedulingKeys[stage.Nodes[0].ID])
 		stage.Name = githubStageLabel(plan, stage.Nodes)
 		if len(stage.Nodes) > 1 {
 			var ids []string
 			for _, node := range stage.Nodes {
-				ids = append(ids, node.ID)
+				ids = append(ids, schedulingKeys[node.ID])
 			}
 			stage.ID = githubJobID("process/" + strings.Join(ids, "+"))
 		}
@@ -213,6 +218,11 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 				return nil, nil, err
 			}
 		}
+		if previous, exists := jobOwners[stage.ID]; exists {
+			return nil, nil, e.New(e.CodeEngineCapability,
+				"GitHub job ID %q collides for %q and %q", stage.ID, previous, stage.Nodes[0].ID)
+		}
+		jobOwners[stage.ID] = stage.Nodes[0].ID
 		for _, node := range stage.Nodes {
 			jobs[node.ID] = stage.ID
 		}

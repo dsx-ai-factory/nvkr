@@ -756,14 +756,99 @@ admission still covers every stage and bootstrap job; any failed, skipped or mis
 completion. Assembly and finalization have registry-read permission and no OIDC minting or package-write
 permission. All credentials and signing remain outside ARC producer jobs.
 
-Every generated run script remains checked against GitHub's 21,000-character ceiling, conservatively measured
-as UTF-8 bytes, including explicit operator setup and bootstrap commands. The generator also rejects a
-workflow file over 500,000 UTF-8 bytes before returning a bundle or writing generated files; validation and
-bundle persistence enforce the same bound. Per-output workflows compact repeated values with YAML anchors
-and inline step maps, then compare the fully expanded JSON to the uncompressed workflow before acceptance.
-Compaction changes presentation only, not jobs, scripts or permissions. The limit follows GitHub's
+The top-level workflow keeps each named job, exact dependency set, runner, timeout, permission, protected
+Environment and execution condition visible. Native-platform preflight remains before checkout. After
+checkout, shared local composite templates carry generated execution and transport sequences. Jobs with the
+same admitted step shape and input interface reuse one template; job-specific action files do not duplicate
+those implementations. A shared preparation action downloads the selected same-Run helper and immediately
+restores its execute bit. Templates live under `.github/nvkr-run/actions/`; one canonical
+`.github/nvkr-run/action-data.json` stores invocation values keyed by stable job/segment selectors. Both are
+exact manifest-owned bundle members. Templates retain fixed helper commands and literal catalog-pinned
+provider actions; invocation data contains selected node IDs, carrier names, paths and other parameters,
+never executable scripts or credentials. They add no authored operation, new scheduling authority or
+independently selectable execution input.
+
+The internal `factory github describe-action` operation admits the complete Plan and recomputes the selected
+invocation from the renderer before emitting bounded canonical JSON to the provider's step-output channel.
+Each job's output is limited to 200,000 UTF-8 bytes, including `data=` and the terminating newline; this is
+not a limit on the complete `action-data.json` file. Generation and runtime reject oversized output before
+opening the provider output file.
+Shared preparation selects the stable provider job through the exact `github.job` context binding.
+The checked-in data file is an inspectable generated projection, not runtime execution authority. Templates
+map its recomputed parameters through explicit environment values or action inputs; fixed shell commands
+quote their parameter variables instead of evaluating generated command text. Caller-only expressions and
+credentials retain explicit bindings outside this data. Bootstrap uses a shared family that does not depend
+on the helper it is building. Different shell, operation ordering, output arity or credential interfaces may
+require separate templates; reuse does not merge independently required artifact uploads.
+
+The workflow header points to fixed Plan and manifest paths instead of embedding a changing Plan digest.
+Source-fetch scheduling keys and ordering derive from the build target and its actual consuming component
+cohort. The exact Plan, producer IR, source identities and execution selectors retain their pin-bound IDs;
+the node-to-job mapping connects them to the provider projection. Missing consumers, collisions and
+incomplete projected graphs fail closed. Updating a source pin cannot reorder otherwise unchanged jobs or
+regroup utilities merely because its content-derived fetch ID sorts differently.
+
+Routine source, artifact, toolchain, transport-action and generator-version updates preserve top-level
+workflow bytes when the scheduling projection, labels, action interface and visible policy are unchanged.
+Plan and manifest identities still change, with invocation data or shared action bodies changing when their
+exact parameters, commands or pins change. Template selection does not depend on changing node/carrier IDs
+or transport-action commits. Topology changes, including source-cohort splits/merges, and changes to the
+checkout pin, runtime job containers/services, runner/capability routes, permissions, secret references,
+timeouts, qualification or
+inline operator setup may require a workflow diff. The full bundle must still regenerate and pass its
+byte-exact check after every input update; workflow stability grants no exemption from admission or drift.
+
+Native preflight, pinned checkout, operator-authored environment setup and timed producer execution remain
+inline. Keeping setup inline preserves its caller contexts and action-path environment; arbitrary setup
+expressions do not become composite inputs. A controlled upload/download may use a local wrapper containing
+exactly one pinned transport step. Its ID, condition, timeout and continue-on-error policy remain on the
+caller, while carrier selections come from generated invocation values and transport pins live in the
+shared action. Transfer parameters are resolved before the caller's controlled boundary; descriptor
+preparation cannot disappear after a producer failure and silently suppress its diagnostic transfer.
+A caller step-output expression, such as the sealed disk diagnostic path, is passed explicitly into that
+transport's original input.
+An always-run transport also retains `always()` on its inner step because GitHub re-evaluates embedded
+conditions during cancellation; other wrappers keep the default inner success condition and remain
+cancellable. Transfers whose own outputs are referenced remain inline. This retains the provider boundary
+for bounded disk execution and failure/always-run diagnostic transport; controls cannot hide a multi-step producer
+sequence behind a different outcome. Remaining sequences preserve logical operation order and fail on the
+same mandatory execution or transfer errors. Composite shell steps explicitly preserve the original Linux
+default (`bash -e {0}` on the host, `sh -e {0}` in a job container), without
+introducing `pipefail`. Job policies and the source checkout are not hidden inside generated actions.
+
+The caller passes secrets and provider-result expressions as explicit action inputs. Each input is mapped
+only to the original inner step field that consumes it: source credentials remain on source execution,
+private-image credentials remain on preparation, and catalog credentials remain on catalog validation or
+finalization. Packing and uploads gain no credential environment through extraction. Recovery receives the
+caller's exact `toJSON(needs)` value; no matrix result or action output replaces the required provider-job set.
+Actions are statically selected from the generated bundle, with no arbitrary command or action-path input.
+
+Validation checks the closed shared-template and invocation-data set and expands its admitted references
+and input bindings before applying the existing graph, transport, permission, credential and execution-order
+checks. Exact regeneration additionally compares every generated member's bytes, including templates and
+invocation data. An unknown, missing or changed template or data member cannot be accepted merely because
+the top-level workflow is unchanged. This lowering replaces numbered YAML anchors and inline-map compaction;
+top-level policy and dependencies remain
+ordinary readable YAML. Complete, identical native-platform preflight, pinned checkout and shared job
+preparation steps may use descriptive aliases: `check-native-linux-amd64`, `check-native-linux-arm64`,
+`checkout-workflow-source` and `prepare-stage-<runner-artifact>`. Preparation retains the same caller step ID
+and binds its job selector through `github.job` in each job. Scalar values, permissions, dependency sets and
+execution/transport action calls are not aliased.
+
+Matrix scheduling and reusable `workflow_call` pipelines remain deferred. A matrix changes dependency
+barriers and the provider-result shape used by finalization; a callable workflow adds execution-context,
+credential and identity contracts. Neither is a presentation-only substitution for the current exact named
+jobs. Future admission must preserve each named output's execution/evidence slots, failure behavior and
+complete result accounting before either form is emitted.
+
+Every generated run script, including scripts inside composite actions, remains checked against GitHub's
+21,000-character ceiling, conservatively measured as UTF-8 bytes, including explicit operator setup and
+bootstrap commands. The generator also rejects a workflow file over 500,000 UTF-8 bytes before returning a
+bundle or writing generated files; validation and bundle persistence enforce the same bound. The limit follows GitHub's
 [500 KB workflow-file ceiling](https://docs.github.com/en/actions/reference/limits#workflow-file-size);
 files that remain oversized fail closed instead of generating an unstartable workflow.
+Local rendering and expanded-graph validation do not establish provider execution of the composite layout;
+reconciliation records which regression checks have actually run.
 Provider outage or failed local outcome storage can
 still prevent finalization.
 

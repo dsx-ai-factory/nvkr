@@ -66,7 +66,7 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
-| 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
+| 21 Generation | Exact recorded input selection, manifest-owned shared composite templates and Plan-derived invocation data with expanded-step validation, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Latest stable-workflow, shared-template and controlled-transfer regressions are unrun; shared-template hosted execution, automatic PR publication and scheduled/private-source service acceptance are unexercised; matrices and callable workflows remain deferred; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays and exact toolchain substitutions | Pin-set loading needs pinned Git access. Curated graph/SBOM edges and embedded-version observation remain deferred. Exact pin identity is not external acquisition or production acceptance |
 
 ## Native disk execution and inspection
@@ -621,10 +621,41 @@ Filtering follows complete metadata validation; detached views establish no regi
 [Registry browsing of the recorded candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
 retains the external scope and binary identity.
 
-The generator/validator/writer enforce a 500,000-byte workflow limit. YAML compaction must preserve expanded
-semantics; oversized bundles fail before writes. Native offline disk preparation shares the ARC group to
-avoid restoring its full material closure on publication runners. Consumed carrier deletion reduces duplicate
+The generator/validator/writer enforce a 500,000-byte workflow limit. The top-level workflow retains named
+jobs, exact dependencies, runner and credential policy, native preflight and checkout. Manifest-owned local
+composite templates carry ordinary step sequences and share helper preparation. Matching job/segment shapes
+reuse a template, with their exact values held in one canonical `action-data.json` member instead of
+duplicated job-specific action files. The runtime descriptor admits the Plan and recomputes the selected
+values; templates retain fixed commands and pinned actions without accepting executable script data.
+Operator setup and timed producer execution stay inline. Controlled upload/download wrappers contain one pinned transport step,
+with conditions, timeouts and continue-on-error on their callers; referenced transfer outputs remain
+inline. Static validation expands templates and invocation bindings for graph and credential checks and
+compares every generated member against exact regeneration; the 21,000-byte script limit also covers action
+bodies. Credential inputs map only to their
+original consuming steps. This replaces numbered-anchor/inline-map compaction without changing carrier
+membership or complete finalizer result accounting. Source provider IDs and scheduling order now derive
+from target/consumer cohorts, while exact Plan/IR IDs remain unchanged. Static Plan/manifest path headers
+replace the changing Plan digest. Ordinary source/artifact/toolchain/transport-action pins and generator
+updates can retain identical workflow bytes when topology, labels/interfaces and visible policy stay
+unchanged. Checkout pins, cohort splits/merges, runtime containers/services, runner/capability routes,
+permissions, secret references, timeouts, qualification and inline setup remain visible change boundaries.
+Complete bundle regeneration and drift checking remain mandatory. Complete native-preflight, pinned-checkout
+and shared-preparation steps use descriptive aliases; preparation selects its job through `github.job`.
+Matrix scheduling and reusable callable workflows remain deferred, and no fresh hosted execution of this
+composite layout is recorded. Oversized workflows still fail before writes. Native offline disk preparation
+shares the ARC group to avoid restoring its full material closure on publication runners. Consumed carrier deletion reduces duplicate
 storage but does not establish a measured hosted storage bound.
+
+The 2026-10-13 shared-template implementation compiled and generated the maintained candidate with internal
+renderer validation. Its workflow contains 288,417 bytes and 5,268 lines, compared with 496,315 bytes and
+5,429 lines before the change. The bundle has 20 shared actions and 23 manifest members; its 383,823-byte
+invocation-data member contains 295 job entries. The two most reused execution templates serve 138 and 77
+jobs. Sharing reduces the intermediate layout's 307 action files to 20; its explicit parameter bindings add
+39,206 workflow bytes relative to that intermediate 249,211-byte layout.
+
+The latest stability, controlled-transfer and shared-template regression tests were authored but not run
+after the user stopped test execution. The full completion gate remains incomplete. These local generation
+measurements establish neither GitHub execution nor hosted performance or release acceptance.
 
 ## Native ARC disk route
 The current Makefile drift gate and the single checked-in `nvkr-run.yml` select the M2 candidate Definition

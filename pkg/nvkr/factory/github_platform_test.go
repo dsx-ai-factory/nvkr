@@ -51,7 +51,11 @@ func TestGitHubNativePlatformRoutesAndHelper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+	_, nodeJobs, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct{ platform, runner string }{{"linux/amd64", "ubuntu-24.04"}, {"linux/arm64", "ubuntu-24.04-arm"}} {
 		bootstrapID := "build-runner-" + shortStableName(tc.runner)
 		bootstrap := document.Jobs[bootstrapID]
@@ -75,7 +79,7 @@ func TestGitHubNativePlatformRoutesAndHelper(t *testing.T) {
 				continue
 			}
 			count++
-			job := document.Jobs[githubJobID(node.ID)]
+			job := document.Jobs[nodeJobs[node.ID]]
 			if job.RunsOn != tc.runner || !containsString(job.Needs, bootstrapID) {
 				t.Fatalf("misbound %s native job: %+v", node.ID, job)
 			}
@@ -301,7 +305,7 @@ func TestGitHubFinalizerUsesUtilityPlatform(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nvkr-lifecycle-run"]
+	job := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs["nvkr-lifecycle-run"]
 	if job.RunsOn != "ubuntu-24.04" || !stepDownloadsArtifact(plan, job.Steps, "nvkr-exec-"+shortStableName("ubuntu-24.04")) {
 		t.Fatal("finalizer did not use the exact utility runner/helper")
 	}

@@ -51,13 +51,44 @@ bin/nvkr run generate \
 
 Under that scratch root, inspect:
 
-- `.github/workflows/nvkr-run.yml`: GitHub Actions jobs and their dependencies.
+- `.github/workflows/nvkr-run.yml`: named GitHub Actions jobs, dependencies, runners and credential policies.
+- `.github/nvkr-run/actions/`: shared composite templates for execution, transport and helper preparation.
+- `.github/nvkr-run/action-data.json`: generated invocation parameters selected by stable job/segment keys.
 - `.github/nvkr-run/plan.json`: the canonical Plan consumed by the workflow.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
 `--check` regenerates in memory and compares exact bytes without writing files. Use the same CLI build
 and inputs for both commands; the generator version contributes to generated content. Change authored
 inputs and regenerate instead of editing generated files.
+
+Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
+Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect
+the shared operations it calls, then find its invocation key in `action-data.json` for exact node and carrier
+values. Jobs with the same step shape reuse the same template. The helper recomputes those values from the
+admitted Plan at runtime; this data is generated, not another file to author. Templates contain fixed commands
+and pinned actions, not scripts supplied as parameters. Native preflight, checkout, operator setup and timed
+producer execution remain inline. A controlled transfer delegates to an action containing one upload or
+download, with its condition, timeout and failure policy still visible on the caller. Transfers whose
+outputs are referenced remain inline. Source credentials are passed explicitly and consumed only by the
+original source step, separately from packing and uploads.
+Repeated native preflight, checkout and helper/parameter preparation steps use descriptive aliases such as
+`*check-native-linux-amd64`, `*checkout-workflow-source` and `*prepare-stage-<runner-artifact>`.
+Preparation selects the current job through `github.job`; job policies, dependencies and operation calls
+remain explicit.
+
+The header points to fixed Plan and manifest files. Provider source-fetch names and ordering follow the
+target and its consuming components, so routine source, artifact, toolchain, transport-action or generator
+updates can leave this workflow unchanged while generated data and action bodies change. This holds when
+topology, labels, action interfaces and visible policy stay the same. A checkout-pin update, a split or merge
+of shared source consumers, or a change to runners, runtime containers/services, permissions, secret
+references, time limits, qualification or inline setup can still change the workflow. Always regenerate
+and check the complete bundle after an input change, even when the workflow file has no diff.
+
+The shared actions and invocation data are part of the same bundle: commit them with the workflow, Plan and
+manifest when adopting a generated pipeline. `--check` covers every template and data file, and regeneration
+retires unchanged obsolete actions through the previous manifest. Editing an action directly produces drift just like editing the
+workflow. Jobs retain explicit dependencies and separate results; matrices and reusable callable workflows
+are not currently emitted.
 
 Generation neither submits the workflow to GitHub nor builds, signs, or publishes artifacts. Continue with
 [Plan inspection and comparison](plan-and-graph-inspection.md) or the [Run lifecycle](lifecycle.md).

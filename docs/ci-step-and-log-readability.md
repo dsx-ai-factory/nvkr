@@ -12,6 +12,28 @@ the pinned source and execute its producer. Offline processing verifies observed
 and packages outputs. Helm binding embeds the selected image digest before packaging the chart. Publication,
 signing/attestation, and signature verification have separate isolation and credentials.
 
+The top-level workflow shows jobs, dependencies, permissions and protected Environments in ordinary YAML.
+After native preflight and checkout, local composite calls point into `.github/nvkr-run/actions/` for shared
+execution and transport templates. Matching step shapes reuse one template; stable invocation keys select
+their exact node and carrier values in `.github/nvkr-run/action-data.json`. The helper admits the Plan and
+recomputes those values before the fixed operations use them. Parameters carry data, never shell scripts.
+A shared action prepares the downloaded helper. Operator setup
+and timed producer execution retain their caller context inline. Controlled transport wrappers contain one
+pinned upload/download; their conditions, timeouts and continue-on-error policy stay on the caller. Diagnostic
+paths from another step pass through explicit inputs, and transfers whose outputs are referenced stay
+inline. These templates and invocation values are regenerated and checked with the workflow; they do not introduce another
+authored configuration surface.
+Repeated native preflight, pinned checkout and helper/parameter preparation steps use descriptive aliases.
+Preparation selects the current provider job with `github.job`; permissions, dependencies and execution or
+transport calls stay explicit.
+
+Workflow headers refer to fixed Plan and manifest paths. Source-fetch job names and ordering follow the
+target and actual consuming components; resolved commands and logs still identify exact pin-bound Plan nodes.
+Routine pin updates can change the Plan, invocation data, shared actions and manifest without changing the workflow. Topology,
+labels/interfaces and visible policy must remain the same; checkout pins, runtime containers/services,
+runners, credentials, timeouts and inline setup can still require workflow changes. The full bundle must
+be regenerated and checked after every input update.
+
 The finalizer recovers artifact and evidence carriers and checks the complete frozen output set, even after
 a producer failure. Each operation logs its Plan node, result, exit code, and elapsed time. A publication
 reference appears after it is persisted; a failed step retains the child process's original error.
@@ -58,14 +80,18 @@ successful output. The finalization gate still authenticates output membership, 
 
 ## Compact workflow commands
 
-The generated workflow invokes four operations against the canonical Plan. The helper derives exact input
+The shared templates resolve their invocation parameters through `factory github describe-action` and invoke
+the execution and transport operations against the canonical Plan. The helper derives exact input
 and output paths, execution settings, diagnostic context and recovery membership; the workflow retains
 meaningful step names, pinned provider actions, credentials, permissions, dependencies and conditions.
-There is no new authored transport manifest. Source-fetch credentials stay on `run-node`, while
+The generated invocation-data member is not an authored transport manifest or an alternative Plan. Source-fetch credentials stay on `run-node`, while
 `pack-outputs` remains a separate step.
 
-These excerpts illustrate a controller-chart operation and finalizer. Exact names and node IDs come from
-the selected Plan; the repository currently generates the 34-output M2 workflow.
+These excerpts illustrate the expanded controller-chart operations and finalizer. Exact names and node IDs
+come from the selected Plan. Composite shell steps preserve the original default with `bash -e {0}` on
+the host or `sh -e {0}` in a job container. Caller-only
+expressions such as `toJSON(needs)` are passed as explicit inputs and mapped to the original consuming field.
+Source credentials likewise reach only the source step's environment, never the packing or upload steps.
 
 ```yaml
       - name: 'Build nvke-controller-chart (controller-chart)'

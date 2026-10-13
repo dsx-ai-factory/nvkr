@@ -498,6 +498,19 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+GitHub keeps named jobs, dependencies, runners, permissions and failure/time boundaries visible in the
+top-level workflow. Manifest-owned shared composite templates contain ordinary execution/transport sequences
+and helper preparation. Matching job shapes reuse one template; one canonical invocation-data member holds
+their parameters. The runtime descriptor operation recomputes selected values from the admitted Plan;
+templates contain fixed commands and pinned actions, with no executable script inputs. Controlled transport
+wrappers contain one upload/download and retain their
+provider controls on the caller; native preflight, checkout, operator setup, timed producers and referenced
+transfer outputs stay inline. Static Plan/manifest references and source scheduling by target/consumer cohort
+reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
+while topology, labels/interfaces and visible policy stay unchanged; every input change still requires
+complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
+bytes, preserving credential scope and per-job finalizer results; matrix and callable scheduling remain
+deferred (ADR-18 §8).
 `catalogmaintenance` composes atomic source/pin-set updates with that generator for disposable review
 candidates. Explicit schedules and optional complete local diagnostic execution do not change the public
 lifecycle or grant release acceptance. Lock and bundle writes retain separate failure/recovery boundaries;

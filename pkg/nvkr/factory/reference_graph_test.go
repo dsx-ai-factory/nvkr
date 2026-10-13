@@ -87,7 +87,7 @@ func TestReferenceReleaseGraphHasNoAggregatePayloadEdges(t *testing.T) {
 	if strings.Contains(string(bundle.Files[GitHubWorkflowPath]), "refs/heads/feat/") {
 		t.Fatal("branch exception")
 	}
-	finalizer := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nvkr-lifecycle-run"]
+	finalizer := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs["nvkr-lifecycle-run"]
 	if finalizer.Environment != githubReleaseEnvironment || finalizer.Permissions["packages"] != "read" || finalizer.Permissions["id-token"] != "" {
 		t.Fatal("finalizer must use protected release credentials with read-only registry access")
 	}

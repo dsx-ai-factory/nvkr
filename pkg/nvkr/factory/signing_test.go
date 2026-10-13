@@ -313,7 +313,7 @@ func TestRenderGitHubSigningJobsCarryModeScopedPermissions(t *testing.T) {
 				t.Fatal(err)
 			}
 			var document githubWorkflowDocument
-			if err := yaml.UnmarshalStrict(bundle.Files[GitHubWorkflowPath], &document); err != nil {
+			if err := yaml.UnmarshalStrict(expandedGitHubWorkflow(t, bundle), &document); err != nil {
 				t.Fatal(err)
 			}
 			for jobID, want := range map[string]map[string]string{

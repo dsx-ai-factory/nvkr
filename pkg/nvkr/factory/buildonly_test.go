@@ -23,9 +23,7 @@ func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(bundle.Files) != 2 {
-				t.Fatalf("expected only Plan and workflow, got %d members", len(bundle.Files))
-			}
+			assertGeneratedGitHubMembers(t, bundle)
 			var decoded Plan
 			if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &decoded); err != nil {
 				t.Fatal(err)
@@ -34,8 +32,8 @@ func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
 			if err != nil || digest != bundle.PlanDigest {
 				t.Fatalf("committed Plan identity differs: %s %v", digest, err)
 			}
-			workflow := string(bundle.Files[bundle.WorkflowPath])
-			if !strings.Contains(workflow, "# planDigest: "+digest) || strings.Contains(workflow, "--nodes-digest") || strings.Contains(workflow, "/graphs/") {
+			workflow := string(expandedGitHubWorkflow(t, bundle))
+			if !strings.Contains(workflow, "# plan: "+bundle.PlanPath) || !strings.Contains(workflow, "# manifest: "+bundle.ManifestPath) || strings.Contains(workflow, "# planDigest:") || strings.Contains(workflow, "--nodes-digest") || strings.Contains(workflow, "/graphs/") {
 				t.Fatal("workflow uses a parallel producer graph")
 			}
 			for _, node := range plan.Graph.Nodes {
@@ -105,7 +103,7 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s build-only render: %v", engine.name, err)
 		}
-		wf := string(b.Files[engine.path])
+		wf := string(expandedGitHubWorkflow(t, b))
 		for _, forbidden := range []string{"NVKR_CREDENTIAL", "publish/", "docker login", "CI_REGISTRY"} {
 			if strings.Contains(wf, forbidden) {
 				t.Fatalf("%s build-only pipeline must not contain %q:\n%s", engine.name, forbidden, wf)
@@ -115,8 +113,8 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 }
 
 // TestCommittedCanonicalMembersHaveNoTrailingNewline guards every canonical bundle member
-// (Plan) that is read back at runtime with canonical.UnmarshalExact,
-// which rejects a trailing newline. Only the workflow (.yml) may end with one.
+// (Plan and action parameter data) that is decoded with canonical.UnmarshalExact,
+// which rejects a trailing newline. Workflow and action YAML may end with one.
 func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	b, err := RenderGitHub(context.Background(), plan)
@@ -165,7 +163,7 @@ func TestDeliveryRuntimeConfigRendersOnGitHub(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ghwf := string(gh.Files[GitHubWorkflowPath])
+	ghwf := string(expandedGitHubWorkflow(t, gh))
 	for _, want := range []string{"container: 'docker:27@sha256:", "image: 'docker:dind@sha256:",
 		"DOCKER_HOST: 'tcp://docker:2375'", "- name: Configure build environment", "docker login -u user -p pass registry.example"} {
 		if !strings.Contains(ghwf, want) {

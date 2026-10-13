@@ -12,6 +12,7 @@ import (
 
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -45,7 +46,7 @@ func TestRenderGitHubProducesStaticallyValidCompleteBundle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow := bundle.Files[GitHubWorkflowPath]
+	workflow := expandedGitHubWorkflow(t, bundle)
 	for _, required := range [][]byte{
 		[]byte("qualification: " + TierStaticUnqualified.String()),
 		// The bootstrap provisions Go via the pinned setup-go action (from .go-version) rather
@@ -76,7 +77,6 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	original := bundle.Files[GitHubWorkflowPath]
 	tests := []struct {
 		name string
 		old  []byte
@@ -100,14 +100,8 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mutated := *bundle
-			mutated.Files = make(map[string][]byte, len(bundle.Files))
-			for name, raw := range bundle.Files {
-				mutated.Files[name] = append([]byte(nil), raw...)
-			}
-			mutated.Files[GitHubWorkflowPath] = bytes.Replace(original, test.old, test.new, 1)
-			mutated.WorkflowDigest = pipeline.FileDigest(mutated.Files[GitHubWorkflowPath])
-			err := ValidateGitHubBundle(context.Background(), plan, &mutated)
+			mutated := replaceGitHubBundleBytes(t, bundle, test.old, test.new)
+			err := ValidateGitHubBundle(context.Background(), plan, mutated)
 			if err == nil {
 				t.Fatal("tampered workflow passed static validation")
 			}
@@ -131,7 +125,7 @@ func TestRenderGitHubPreparesHelperBeforeFirstUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	var document githubWorkflowDocument
-	if err := yaml.UnmarshalStrict(bundle.Files[GitHubWorkflowPath], &document); err != nil {
+	if err := yaml.UnmarshalStrict(expandedGitHubWorkflow(t, bundle), &document); err != nil {
 		t.Fatal(err)
 	}
 	restoring := 0
@@ -170,22 +164,34 @@ func TestValidateGitHubBundleRejectsLateHelperPreparation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	original := bundle.Files[GitHubWorkflowPath]
-	legacy := bytes.ReplaceAll(original,
-		[]byte("      - name: "+prepareHelperStepName+"\n        run: "+prepareHelperRun+"\n"), nil)
-	legacy = bytes.ReplaceAll(legacy, []byte("        run: |\n          ./nvkr-exec"),
-		[]byte("        run: |\n          "+prepareHelperRun+"\n          ./nvkr-exec"))
-	if bytes.Equal(legacy, original) {
-		t.Fatal("legacy workflow reconstruction changed nothing")
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+	changed := 0
+	for id, job := range document.Jobs {
+		var steps []githubStep
+		for _, step := range job.Steps {
+			if step.Name == prepareHelperStepName {
+				changed++
+				continue
+			}
+			if strings.Contains(step.Run, "factory github run-node") {
+				step.Run = prepareHelperRun + "\n" + step.Run
+			}
+			steps = append(steps, step)
+		}
+		job.Steps = steps
+		document.Jobs[id] = job
 	}
-	mutated := *bundle
-	mutated.Files = make(map[string][]byte, len(bundle.Files))
-	for name, raw := range bundle.Files {
-		mutated.Files[name] = append([]byte(nil), raw...)
+	if changed == 0 {
+		t.Fatal("legacy workflow reconstruction removed no preparation steps")
 	}
-	mutated.Files[GitHubWorkflowPath] = legacy
-	mutated.WorkflowDigest = pipeline.FileDigest(legacy)
-	err = ValidateGitHubBundle(context.Background(), plan, &mutated)
+	legacy, err := yaml.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This deliberately malformed helper order cannot pass shared-action
+	// preparation admission. Keep it unshared to exercise the helper-order guard.
+	mutated := unsharedGitHubTestBundle(t, plan, bundle, legacy)
+	err = ValidateGitHubBundle(context.Background(), plan, mutated)
 	if err == nil {
 		t.Fatal("workflow that chmods the helper after using it passed static validation")
 	}
@@ -201,6 +207,102 @@ func testActionRefs(t *testing.T, plan *Plan) githubActionRefs {
 		t.Fatal(err)
 	}
 	return refs
+}
+
+// Expand the generated local actions before asserting the logical job contract.
+func expandedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
+	t.Helper()
+	raw, err := expandGitHubActions(bundle.Files[GitHubWorkflowPath], bundle.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+// Mutate executable bundle bytes while retaining every other member. This avoids
+// accidentally testing a no-op when a step moves between the workflow and an action.
+func replaceGitHubBundleBytes(t *testing.T, bundle *GeneratedBundle, old, replacement []byte) *GeneratedBundle {
+	t.Helper()
+	changed := *bundle
+	changed.Files = make(map[string][]byte, len(bundle.Files))
+	for name, raw := range bundle.Files {
+		changed.Files[name] = append([]byte(nil), raw...)
+	}
+	for _, name := range sortedKeys(changed.Files) {
+		if !strings.HasSuffix(name, ".yml") || !bytes.Contains(changed.Files[name], old) {
+			continue
+		}
+		changed.Files[name] = bytes.Replace(changed.Files[name], old, replacement, 1)
+		if name == GitHubWorkflowPath {
+			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[name])
+		}
+		return &changed
+	}
+	// Literal transport settings can now live in structured parameter data.
+	// Mutate their expanded semantic field and regenerate the shared boundary.
+	expanded := expandedGitHubWorkflow(t, bundle)
+	if bytes.Contains(expanded, old) {
+		var plan Plan
+		if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
+			t.Fatal(err)
+		}
+		return relowerGitHubTestBundle(t, &plan, bundle, bytes.Replace(expanded, old, replacement, 1))
+	}
+	t.Fatalf("mutation did not match any executable bundle member: %q", old)
+	return nil
+}
+
+// Lower a deliberately hostile logical workflow through the same action boundary
+// so semantic tests reach their intended guard instead of failing on stale members.
+func relowerGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, raw []byte) *GeneratedBundle {
+	t.Helper()
+	changed := unsharedGitHubTestBundle(t, plan, bundle, raw)
+	workflow, err := shareGitHubActions(changed.Files[GitHubWorkflowPath], changed.Files, testActionRefs(t, plan))
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed.Files[GitHubWorkflowPath] = workflow
+	changed.WorkflowDigest = pipeline.FileDigest(workflow)
+	return changed
+}
+
+// Malformed preparation fixtures intentionally use the lower-level boundary so
+// the semantic validator can diagnose the original helper ordering violation.
+func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, raw []byte) *GeneratedBundle {
+	t.Helper()
+	if !bytes.Contains(raw, []byte("# plan: ")) {
+		raw = append([]byte("# qualification: "+plan.Qualification.String()+"\n# plan: "+bundle.PlanPath+"\n# manifest: "+bundle.ManifestPath+"\n"), raw...)
+	}
+	workflow, files, err := lowerGitHubActions(raw, testActionRefs(t, plan))
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := *bundle
+	changed.Files = files
+	changed.Files[bundle.PlanPath] = append([]byte(nil), bundle.Files[bundle.PlanPath]...)
+	changed.Files[GitHubWorkflowPath] = workflow
+	changed.WorkflowDigest = pipeline.FileDigest(workflow)
+	return &changed
+}
+
+func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
+	t.Helper()
+	if len(bundle.Files[bundle.PlanPath]) == 0 || len(bundle.Files[GitHubWorkflowPath]) == 0 || len(bundle.Files[GitHubActionDataPath]) == 0 {
+		t.Fatal("generated bundle omits its Plan, workflow, or action data")
+	}
+	actions := 0
+	for name := range bundle.Files {
+		if name == bundle.PlanPath || name == GitHubWorkflowPath || name == GitHubActionDataPath {
+			continue
+		}
+		if !strings.HasPrefix(name, ".github/nvkr-run/actions/") || !strings.HasSuffix(name, "/action.yml") {
+			t.Fatalf("unexpected generated member %q", name)
+		}
+		actions++
+	}
+	if actions == 0 {
+		t.Fatal("generated bundle omits local actions")
+	}
 }
 
 func TestGitHubExplicitDispatchBranchPolicy(t *testing.T) {
@@ -231,7 +333,7 @@ func TestGitHubExplicitDispatchBranchPolicy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			for name, job := range document.Jobs {
 				if strings.HasPrefix(name, "build-runner-") {
 					continue
