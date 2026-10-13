@@ -303,3 +303,32 @@ func TestObservationRejectsNoncanonicalSignerBeforeWork(t *testing.T) {
 		}
 	}
 }
+
+func TestObservationRegistryRejectsCredentialExfiltrationRealm(t *testing.T) {
+	var reached sync.Mutex
+	calls := 0
+	realm := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached.Lock()
+		calls++
+		reached.Unlock()
+		t.Error("unadmitted token realm was contacted")
+	}))
+	defer realm.Close()
+	registryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Bearer realm="`+realm.URL+`/token",service="fixture",scope="repository:observations:pull"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer registryServer.Close()
+	repo, err := observationRepository(strings.TrimPrefix(registryServer.URL, "http://")+"/observations", delivery.RegistryOptions{PlainHTTP: true, Username: "fixture-user", Password: "fixture-private"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = repo.Resolve(t.Context(), rawPin("missing")); err == nil {
+		t.Fatal("unadmitted realm accepted")
+	}
+	reached.Lock()
+	defer reached.Unlock()
+	if calls != 0 {
+		t.Fatal("registry credential escaped admitted origin")
+	}
+}

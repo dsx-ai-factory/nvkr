@@ -65,7 +65,8 @@ The locator contains schema, pinned OCI reference and semantic observation diges
 transport digest, canonical observation identity and signature bytes have distinct roles. Verification
 by locator or `--reference repository@sha256:...` authenticates signer, issuer and statement subject,
 checks the exact schema/inventory and every file, and recomputes results. It is passive and needs neither
-the original cluster nor producer checkout. Credentials are host-scoped and anonymous OCI consumption
+the original cluster nor producer checkout. All registry and token-realm requests are restricted to the explicitly admitted scheme and host;
+registries requiring a separate authentication host currently fail closed. Credentials are host-scoped and anonymous OCI consumption
 is explicit. Plain HTTP is restricted to explicitly selected loopback fixtures.
 
 ## Qualification and external acceptance

@@ -463,7 +463,7 @@ func observationRepository(reference string, options delivery.RegistryOptions) (
 	if options.PlainHTTP {
 		scheme = "http"
 	}
-	client := &http.Client{Timeout: 3 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+	client := &http.Client{Transport: registryTransport{base: http.DefaultTransport, scheme: scheme, host: parsed.Registry}, Timeout: 3 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if req.URL.Host != parsed.Registry || req.URL.Scheme != scheme || len(via) >= 5 {
 			return e.New(e.CodeVerifyFailed, "observation registry redirect changes host")
 		}
@@ -487,6 +487,20 @@ func observationRepository(reference string, options delivery.RegistryOptions) (
 	}
 	repo.Client = &auth.Client{Client: client, Cache: auth.NewCache(), Credential: auth.StaticCredential(parsed.Registry, credential)}
 	return repo, nil
+}
+
+// Check every request, including direct WWW-Authenticate token realm requests.
+// Redirect checks alone cannot protect credentials from a cross-origin realm.
+type registryTransport struct {
+	base         http.RoundTripper
+	scheme, host string
+}
+
+func (t registryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL == nil || req.URL.Scheme != t.scheme || req.URL.Host != t.host || req.URL.User != nil {
+		return nil, e.New(e.CodeVerifyFailed, "observation registry request leaves independently admitted origin")
+	}
+	return t.base.RoundTrip(req)
 }
 
 func descriptor(mediaType string, raw []byte) oci.Descriptor {
