@@ -28,6 +28,14 @@ const defaultInspectionTimeout = 10 * time.Minute
 // a detached view, even when a caller later displays only one output. It never
 // retrieves output layers or issues a verified publication capability.
 func InspectRelease(ctx context.Context, reference string, options InspectionOptions) (delivery.PublicationDescription, error) {
+	return inspectReleaseMetadata(ctx, reference, options, nil)
+}
+
+// The optional visitor authenticates the exact evidence bytes bound by the
+// requested root before its private metadata workspace is removed.
+func inspectReleaseMetadata(ctx context.Context, reference string, options InspectionOptions,
+	verifyEvidence func(context.Context, string, []byte) error,
+) (delivery.PublicationDescription, error) {
 	if err := admitReleaseInspection(ctx, reference, options); err != nil {
 		return delivery.PublicationDescription{}, err
 	}
@@ -63,6 +71,11 @@ func InspectRelease(ctx context.Context, reference string, options InspectionOpt
 			return delivery.PublicationDescription{}, e.Wrap(e.CodeTimeout, ctx.Err(), "release inspection canceled")
 		}
 		return delivery.PublicationDescription{}, err
+	}
+	if verifyEvidence != nil {
+		if err := delivery.VisitMetadataEvidence(ctx, layout, description.RootDigest, verifyEvidence); err != nil {
+			return delivery.PublicationDescription{}, err
+		}
 	}
 	return description, nil
 }

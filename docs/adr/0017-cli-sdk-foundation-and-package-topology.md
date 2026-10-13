@@ -120,6 +120,15 @@ to `build-provenance-v1`; explicitly selecting `strict` requires inspected evide
 to strict and rejects the producer-only minimum. Inspected evidence satisfies either minimum; producer metadata
 cannot weaken the selected consumer policy. The signed mode remains
 descriptive and does not grant authority.
+
+`Consumer.Authenticate` admits only pipeline-attested `authenticity` policy and issues a distinct opaque
+`AuthenticatedRelease` after checking the complete metadata/evidence closure and its required signatures,
+production provenance and SBOM bundles. It never opens the full-payload publication owner. Its description
+explicitly reports `payloadIntegrityVerified: false`; it supplies no payload export or exact-input receipt.
+`Consumer.Verify` retains the full-payload artifact-publication contract. These capabilities cannot substitute
+for one another, and their serialized descriptions cannot restore live authority. The CLI selects the narrow
+operation through `release verify --scope authenticity`; exact-input flags are rejected at admission.
+
 Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
@@ -132,8 +141,9 @@ render text, JSON, or Mermaid; platform labels describe checked config metadata.
 admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
 by default; an explicit caller-owned workspace is retained while its private staging child is removed.
 Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
-signature or policy verification, and cannot restore a verified Release capability. Explicit Release
-verification retains its full payload and policy checks. The existing compact local `release inspect` view remains.
+signature or policy verification, and cannot restore an authenticated or verified Release capability. Explicit
+`artifact-publication` verification retains its full payload and policy checks; `authenticity` adds policy-bound
+signature/evidence checks to metadata acquisition. The existing compact local `release inspect` view remains.
 
 `lifecycle.ExportRelease(ctx, reference, options)` owns complete release-description export (ADR-19/20).
 It uses the same bounded inspection and versioned JSON description as `release browse --format json`.

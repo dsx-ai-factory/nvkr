@@ -116,16 +116,18 @@ takes that reference and a Verification Policy and authenticates the complete se
 names the accepted evidence lane and identities. Qualified authorization, v1 pipeline evidence, and dry-run
 descriptions remain distinct. Unsupported authority adapters return a coded capability error.
 
-The policy explicitly selects what acceptance means. Authenticating build evidence for a selected artifact
-publication checks its exact bytes, build identity, and production provenance. Full v1 release acceptance adds
-qualification and revocation requirements. A result for the first scope cannot satisfy the second, and an
-unavailable stronger scope never falls back to weaker verification.
+The policy explicitly selects what acceptance means. `authenticity` checks signed membership, the root and
+every required output's signatures and production provenance, and required signed SBOMs without downloading
+artifact payload layers. `artifact-publication` checks the selected payload bytes as well as evidence.
+Full v1 release acceptance adds qualification and revocation requirements. Each result retains its scope;
+an unavailable stronger scope never falls back to weaker verification.
 
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is included in the policy digest. Pipeline-attested
 verification defaults to `build-provenance-v1`, accepting signed producer/material evidence without an inspected
 disk inventory. Use `--minimum-disk-evidence strict` to require inspected evidence. The
 SDK exposes `DiskEvidenceStrict` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
-and cannot opt into the producer-only mode.
+and cannot opt into the producer-only mode. Authenticity enforces the same minimum against signed evidence
+and metadata; it does not inspect or re-hash the disk.
 
 The CLI expresses build-evidence acceptance as `--scope artifact-publication`. On Linux, with a pinned cosign
 executable and an existing signed publication in a public registry, the consumer invocation is:
@@ -139,8 +141,24 @@ bin/nvkr release verify \
   --anonymous
 ```
 
+To authenticate release evidence without downloading artifact payloads, change the scope to `authenticity`:
+
+```sh
+bin/nvkr release verify \
+  --reference "$RELEASE_REF" \
+  --lane pipeline-attested --scope authenticity \
+  --identity "$BUILD_IDENTITY_REGEXP" --issuer "$OIDC_ISSUER" \
+  --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST" \
+  --anonymous
+```
+
+The result reports `payloadIntegrityVerified: false`. It authenticates the complete metadata/evidence
+closure, including each required output and SBOM bundle, but cannot authorize payload export or exact-input
+matching. `--definition`, `--environment`, and `--plan` are rejected with this scope before external work.
+Stock verification remains Linux-only with the same pinned cosign requirement.
+
 An independent consumer can additionally require the publication to realize
-exact authored and compiled inputs by supplying all three paths:
+exact authored and compiled inputs under `artifact-publication` by supplying all three paths:
 
 ```sh
 bin/nvkr release verify \
@@ -161,7 +179,7 @@ The Plan is generated pipeline state; an unreadable or undecodable Plan reports
 pipeline drift, while a decoded Plan that fails validation preserves its validation
 error rather than being reclassified by the command adapter.
 
-Without the three exact-input flags, `release verify` writes the verified `Release`
+For `artifact-publication` without the three exact-input flags, `release verify` writes the verified `Release`
 description directly:
 
 ```json
@@ -227,7 +245,8 @@ live and process-local and is never serialized by the CLI.
 
 `RELEASE_REF` is a registry reference pinned with `@sha256:…`; the identity and issuer belong to the
 consumer's trusted build policy. Signature and production-attestation verification are both required by this
-scope. The SDK retains a live, policy-bound capability until closed.
+scope. Authenticity separately requires these checks for the root and every required named output, along
+with cryptographic SBOM verification. The SDK retains a live, policy-bound capability until closed.
 The stock verifier remains Linux-only, and unit tests do not establish live signing-service
 acceptance. Full v1 release scope (`--scope release`) and qualified acceptance remain capability-gated.
 
@@ -272,6 +291,10 @@ func inspectRelease(ctx context.Context, c *client.Client, reference, identity, 
 	return verified.Description()
 }
 ```
+
+Use `AuthenticateRelease` with an `authenticity` policy for the metadata/evidence-only operation. It returns
+a distinct closeable `AuthenticatedRelease`; its description records that payload integrity is unchecked.
+It exposes no payload export or exact-input receipt and cannot be passed as a fully verified Release.
 
 The returned Release is a description of the accepted contents. Its serialized form does not
 recreate the live verified capability. Verification still requires the supported platform, pinned tool, and

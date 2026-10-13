@@ -20,7 +20,7 @@ import (
 type releaseMaterializer func(context.Context, string) (*delivery.Publication, error)
 
 // ConsumerOptions configures transport and signature verification once. Each
-// Verify call then accepts only the Release reference and Verification Policy.
+// verification operation then accepts only the Release reference and Verification Policy.
 type ConsumerOptions struct {
 	CosignBinary  string
 	CosignDigest  string
@@ -33,6 +33,7 @@ type Consumer struct {
 	verifier    sign.OCISigner
 	verifierFor func(VerificationPolicy) (sign.OCISigner, error)
 	materialize releaseMaterializer
+	inspection  InspectionOptions
 }
 
 // VerifiedRelease is an opaque, policy-bound live capability. Description is a
@@ -77,7 +78,7 @@ func NewConsumer(options ConsumerOptions) (*Consumer, error) {
 	if root == "" {
 		root = filepath.ToSlash(filepath.Join(".nvkr", "verified-releases"))
 	}
-	return &Consumer{verifierFor: func(policy VerificationPolicy) (sign.OCISigner, error) {
+	return &Consumer{inspection: InspectionOptions{WorkspaceRoot: options.WorkspaceRoot, Registry: options.Registry}, verifierFor: func(policy VerificationPolicy) (sign.OCISigner, error) {
 		return sign.NewCosignOCISigner(sign.CosignOCIOptions{Binary: options.CosignBinary,
 			BinaryDigest: options.CosignDigest, Identity: policy.IdentityRegexp, Issuer: policy.Issuer, Credential: options.Credential})
 	}, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {
@@ -231,6 +232,9 @@ func (consumer *Consumer) Verify(ctx context.Context, reference string, policy V
 	}
 	if policy.Scope == ScopeRelease {
 		return nil, e.New(e.CodeEngineCapability, "pipeline-attested full Release verification requires qualification and lifecycle-state adapters")
+	}
+	if policy.Scope != ScopeArtifactPublication {
+		return nil, e.New(e.CodeEngineCapability, "full payload verification requires artifact-publication scope; use Authenticate for authenticity scope")
 	}
 	if consumer == nil || (consumer.verifier == nil && consumer.verifierFor == nil) || consumer.materialize == nil {
 		return nil, e.New(e.CodeEngineCapability, "artifact-publication verification requires configured signature and registry adapters")
