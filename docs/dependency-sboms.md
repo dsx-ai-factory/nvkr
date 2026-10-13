@@ -63,7 +63,7 @@ gzip/xz fixtures, not a compiled factory output. [Development prerequisites](htt
 identify its tool pins and command. The same bytes scanned without the diagnostic's hint must return
 `CodeProvenanceMissing`, with no accepted inventory, under the selected Syft version. Revalidate the discovery
 premise when changing either the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`. The
-[dated local observation](https://github.com/dsx-ai-factory/nvkr/blob/0f862f9f79de2beaf63dc994e3246b14e134b52c/docs/adr/reconciliation.md#external-run-references) records native ARM64 tool and
+[dated local observations](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#external-run-references) record native ARM64 tool and
 fixture identities; native amd64 execution has not been recorded. Non-archive bytes named `.deb` produce no
 accepted inventory; corrupt payload members and complete embedded dependency discovery are not established.
 

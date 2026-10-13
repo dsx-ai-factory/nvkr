@@ -152,9 +152,9 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 }
 
 // inspectHeldDependencies scans the held bytes with the pinned scanner and
-// authenticates any private snapshot before returning its inventory. The
-// Debian filename hint selects archive discovery; it supplies no byte authority.
-func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, debianArchiveHint bool) (DependencyInventory, error) {
+// authenticates any private snapshot before returning its inventory. Explicit
+// Debian metadata diagnostics select archive discovery without supplying byte authority.
+func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, debianArchiveMetadata bool) (DependencyInventory, error) {
 	artifactDigest := subject.Digest()
 	if kind == "tarball" {
 		components, err := inspectHelmArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
@@ -188,7 +188,7 @@ func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	var snapshot string
 	if kind == "host-package" {
 		name := "subject"
-		if debianArchiveHint {
+		if debianArchiveMetadata {
 			name = "subject.deb"
 		}
 		snapshot = filepath.Join(workdir, name)
@@ -246,7 +246,7 @@ func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 		return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "scanner returned unsupported inventory schema")
 	}
 	result := DependencyInventory{Method: "syft-cyclonedx/v1", ScannerDigest: scanner.Digest}
-	if kind == "host-package" && debianArchiveHint {
+	if kind == "host-package" && debianArchiveMetadata {
 		result.Method = debianArchiveMetadataMethod
 	}
 	for _, component := range scanned.Components {

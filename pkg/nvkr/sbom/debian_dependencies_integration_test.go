@@ -53,7 +53,7 @@ func TestRealDebianArtifactDependencies(t *testing.T) {
 			if err := os.MkdirAll(filepath.Join(root, "DEBIAN"), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			control := "Package: " + packageName + "\nVersion: " + version + "\nArchitecture: " + runtime.GOARCH + "\nMaintainer: Fixture <fixture@example.invalid>\nDescription: final Debian archive regression\n"
+			control := "Package: " + packageName + "\nVersion: " + version + "\nArchitecture: " + runtime.GOARCH + "\nMaintainer: Fixture <fixture@example.invalid>\nDescription: controlled Debian archive fixture\n"
 			if err := os.WriteFile(filepath.Join(root, "DEBIAN", "control"), []byte(control), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -145,7 +145,7 @@ func TestRealDebianArtifactDependencies(t *testing.T) {
 		inventory, err := InspectDebianArchiveMetadata(ctx, filename, subject.Digest(), scanner)
 		assertDependencyCode(t, err, e.CodeProvenanceMissing)
 		if len(inventory.Components) != 0 {
-			t.Fatal("filename hint accepted invalid package bytes")
+			t.Fatal("Debian metadata diagnostic accepted invalid package bytes")
 		}
 	})
 }
