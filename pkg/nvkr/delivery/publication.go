@@ -349,7 +349,7 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 			observed, found := disks[object.DescriptorDigest]
 			if !found || observed.ManifestDigest != object.DescriptorDigest || observed.ArtifactType != object.ArtifactType ||
 				observed.Platform != object.OS+"/"+object.Arch || output.Disk == nil || observed.PayloadDigest != output.Disk.PayloadDigest ||
-				observed.Size != output.Disk.Size || observed.Encryption != "none" {
+				observed.Size != output.Disk.Size || observed.Encryption != output.Disk.Encryption {
 				return nil, e.New(e.CodeVerifyFailed, "disk output differs from its wrapper binding")
 			}
 			platforms[output.Name] = publicationPlatform{OS: "linux", Arch: strings.TrimPrefix(observed.Platform, "linux/")}

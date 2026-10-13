@@ -21,9 +21,9 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
-// RunGitHubDisk keeps all material consumptions, the held QCOW2, inspection and
-// packaging in one process under the original complete Plan. Only the resulting
-// wrapper and evidence cross jobs; serialized descriptions never recreate receipts.
+// RunGitHubDisk keeps material consumptions and the held QCOW2 in one process
+// under the original complete Plan through either publication preparation or
+// unqualified raw export. Serialized descriptions never recreate live receipts.
 func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHubStepOptions) (returnErr error) {
 	if err := admitGitHubPlan(ctx, plan); err != nil {
 		return err
@@ -63,7 +63,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, workspace.Close(), "close ARC workspace") }()
 	var inspectionLog *diskdiagnostic.Collector
-	if !diskBuildProvenance(plan) {
+	if githubDiskInspectionRequired(plan) {
 		inspectionLog = diskdiagnostic.NewCollector()
 		defer finishGitHubInspectionDiagnostics(ctx, workspace, output, inspectionLog, options)
 	}
@@ -92,7 +92,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	// Preparation follows host capability admission and precedes held image
 	// admission. Consumers use the exact pinned reference, never a mutable tag.
 	images := []string{instruction.Toolchain}
-	if !diskBuildProvenance(plan) {
+	if githubDiskInspectionRequired(plan) {
 		images = append(images, profile.Image)
 	}
 	for _, image := range uniqueSorted(images) {
@@ -110,7 +110,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		}
 	}
 	var inspector *sbom.DiskInspectionRuntime
-	if !diskBuildProvenance(plan) {
+	if githubDiskInspectionRequired(plan) {
 		inspector, err = openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 		if err != nil {
 			return err
@@ -184,6 +184,9 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 	}, func(ctx context.Context) error {
 		for _, expected := range plan.LifecycleOutputs {
 			if expected.Name == stage.DiskOutput {
+				if GitHubDiskBuildOnly(plan) {
+					return completeGitHubDiskBuild(ctx, plan, expected, owner)
+				}
 				return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, inspectionLog, options)
 			}
 		}

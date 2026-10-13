@@ -11,9 +11,9 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
-// observeHostedOutputs accepts disk transport projections only in the existing
-// pipeline-attested route. No LocalRunResult or evidence receipt is reconstructed;
-// full hosted outcome/provenance authentication still precedes Run completion.
+// observeHostedOutputs observes either publication wrappers or explicitly
+// unqualified raw ARC exports. It reconstructs no LocalRunResult or evidence
+// receipt; complete hosted outcomes and lane-specific evidence still gate success.
 func observeHostedOutputs(ctx context.Context, workspace string, slots []requiredOutput,
 	artifacts map[string]factory.Artifact, plan *factory.Plan,
 ) ([]Artifact, error) {
@@ -24,7 +24,7 @@ func observeHostedOutputs(ctx context.Context, workspace string, slots []require
 		return nil, e.Wrap(e.CodeTimeout, err, "hosted observation canceled")
 	}
 	for _, slot := range slots {
-		if slot.Kind == OutputDiskImage && (plan.Qualification != factory.TierPipelineAttested || plan.Environment.Publication == nil) {
+		if slot.Kind == OutputDiskImage && !factory.GitHubDiskBuildOnly(plan) && (plan.Qualification != factory.TierPipelineAttested || plan.Environment.Publication == nil) {
 			return nil, e.New(e.CodeEngineCapability, "restored disk output requires the authenticated production publication route")
 		}
 	}
@@ -49,6 +49,14 @@ func observeHostedOutputs(ctx context.Context, workspace string, slots []require
 		}
 		expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID,
 			BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...)}
+		if factory.GitHubDiskBuildOnly(plan) {
+			observation, err := factory.ObserveHostedDiskBuild(ctx, plan, expected, localized)
+			if err != nil {
+				return nil, err
+			}
+			observed = append(observed, artifactFromDiskObservation(slot, observation))
+			continue
+		}
 		artifact, err := factory.ObserveDiskPublicationPayload(ctx, plan, expected, localized)
 		if err != nil {
 			return nil, err

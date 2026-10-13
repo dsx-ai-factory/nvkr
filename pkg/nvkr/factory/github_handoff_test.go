@@ -11,6 +11,7 @@ import (
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
 
 func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *testing.T) {
@@ -62,32 +63,90 @@ func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, test := range []struct{ name, old, replacement string }{
-		{"unchanged", "", ""},
-		{"wrong attempt", "name: 'nvkr-qualification-${{ github.run_id }}-${{ github.run_attempt }}'", "name: 'nvkr-qualification-latest'"},
-		{"whole workspace", "path: .nvkr/qualification/handoff.json", "path: .nvkr"},
-		{"failure upload", "if: '${{ success() }}'", "if: '${{ always() }}'"},
-		{"no deadline", "timeout-minutes: 5, ", ""},
-		{"missing capture", " --handoff .nvkr/qualification/handoff.json", ""},
-		{"hidden omission", "include-hidden-files: 'true'", "include-hidden-files: 'false'"},
-		{"missing handoff ignored", "if-no-files-found: error", "if-no-files-found: ignore"},
+	for _, test := range []struct{ name, field, old, replacement string }{
+		{"unchanged", "", "", ""},
+		{"wrong attempt", "with.name", githubQualificationHandoffName, "nvkr-qualification-latest"},
+		{"whole workspace", "with.path", githubQualificationHandoffPath, ".nvkr"},
+		{"failure upload", "if", "${{ success() }}", "${{ always() }}"},
+		{"no deadline", "timeout-minutes", "5", ""},
+		{"missing capture", "run", " --handoff .nvkr/qualification/handoff.json", ""},
+		{"hidden omission", "with.include-hidden-files", "true", "false"},
+		{"missing handoff ignored", "with.if-no-files-found", "error", "ignore"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			original := bundle.Files[GitHubWorkflowPath]
 			workflow := bytes.Clone(original)
-			if test.old != "" {
-				if test.name == "missing capture" {
-					workflow = bytes.Replace(workflow, []byte(test.old), []byte(test.replacement), 1)
-				} else {
-					// Change only the admitted upload's compact YAML line. Preserve
-					// all other exact rendered bytes, including YAML aliases.
-					for _, line := range bytes.SplitAfter(original, []byte("\n")) {
-						if bytes.Contains(line, []byte("name: Upload complete qualification handoff,")) {
-							mutated := bytes.Replace(line, []byte(test.old), []byte(test.replacement), 1)
-							workflow = bytes.Replace(original, line, mutated, 1)
-							break
+			if test.field != "" {
+				var tree yamlv3.Node
+				if err := yamlv3.Unmarshal(original, &tree); err != nil {
+					t.Fatal(err)
+				}
+				mutated := false
+				var mutate func(*yamlv3.Node)
+				mutate = func(node *yamlv3.Node) {
+					if mutated {
+						return
+					}
+					if test.name == "missing capture" && node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, test.old) {
+						node.Value = strings.Replace(node.Value, test.old, test.replacement, 1)
+						mutated = true
+						return
+					}
+					if node.Kind == yamlv3.MappingNode && test.name != "missing capture" {
+						for i := 0; i < len(node.Content); i += 2 {
+							if node.Content[i].Value != "name" || node.Content[i+1].Value != "Upload complete qualification handoff" {
+								continue
+							}
+							// Locate the exact upload field independently of whole-job
+							// compaction, scalar quoting and unrelated step fields.
+							parent := node
+							fields := strings.Split(test.field, ".")
+							for depth, field := range fields {
+								found := false
+								for j := 0; j < len(parent.Content); j += 2 {
+									if parent.Content[j].Value != field {
+										continue
+									}
+									found = true
+									if depth < len(fields)-1 {
+										parent = parent.Content[j+1]
+										break
+									}
+									if parent.Content[j+1].Value != test.old {
+										t.Fatalf("upload field %s = %q, want %q", test.field, parent.Content[j+1].Value, test.old)
+									}
+									if test.replacement == "" {
+										parent.Content = append(parent.Content[:j], parent.Content[j+2:]...)
+									} else {
+										parent.Content[j+1].Value = test.replacement
+									}
+									mutated = true
+									return
+								}
+								if !found {
+									t.Fatalf("upload field %s is missing", test.field)
+								}
+							}
 						}
 					}
+					for _, child := range node.Content {
+						mutate(child)
+					}
+				}
+				mutate(&tree)
+				if !mutated {
+					t.Fatal("mutation did not apply")
+				}
+				raw, err := yamlv3.Marshal(&tree)
+				if err != nil {
+					t.Fatal(err)
+				}
+				workflow, err = compactGitHubWorkflow(raw)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := validateGitHubWorkflowSize(workflow); err != nil {
+					t.Fatal(err)
 				}
 				if bytes.Equal(workflow, original) {
 					t.Fatal("mutation did not change workflow")

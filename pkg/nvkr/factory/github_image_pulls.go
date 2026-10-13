@@ -23,8 +23,16 @@ import (
 const githubImageToken = "NVKR_TOOLCHAIN_READ_TOKEN"
 
 func githubPrivateToolchain(plan *Plan, image string) bool {
-	if plan.Environment.GitHubARC != "native-kvm-v1" || plan.Environment.Publication == nil ||
-		!strings.HasPrefix(plan.Environment.Publication.RepositoryPrefix, "ghcr.io/") || !strings.Contains(image, "@sha256:") {
+	if plan.Environment.GitHubARC != "native-kvm-v1" || !strings.Contains(image, "@sha256:") {
+		return false
+	}
+	if GitHubDiskBuildOnly(plan) {
+		// Build-only iteration consumes the same published native tooling, with
+		// read access independent of any output publication configuration.
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
+			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+	}
+	if plan.Environment.Publication == nil || !strings.HasPrefix(plan.Environment.Publication.RepositoryPrefix, "ghcr.io/") {
 		return false
 	}
 	prefix := plan.Environment.Publication.RepositoryPrefix
@@ -45,7 +53,7 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 			images = append(images, node.Container)
 		}
 	}
-	if stage.DiskOutput != "" && !diskBuildProvenance(plan) {
+	if stage.DiskOutput != "" && githubDiskInspectionRequired(plan) {
 		image := plan.Environment.DiskInspectionProfiles[stage.Nodes[0].Platform].Image
 		if githubPrivateToolchain(plan, image) {
 			images = append(images, image)

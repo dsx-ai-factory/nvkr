@@ -1,7 +1,9 @@
 # NVKE M2 inputs and customer choices
 
-The [M2 Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/definition.yaml) selects 34 named outputs, including independent
-`linux/amd64` and `linux/arm64` non-FDE disks. The catalog owns producer commands, material edges and
+The [M2 Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/definition.yaml) selects 37 named outputs, including independent
+`linux/amd64` and `linux/arm64` plain and public-bootstrap FDE disks. FDE publication carries build provenance
+without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md#native-execution-and-publication).
+The catalog owns producer commands, material edges and
 component-exposed Packer variables. The Environment owns runner, runtime, registry and signing choices.
 There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriting.
 
@@ -59,7 +61,7 @@ With authorized access to the exact private source objects:
 
 ```sh
 NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1 go test ./pkg/nvkr/buildgraph \
-  -run '^TestMaintainedM2All34OutputGraphs$' -count=1
+  -run '^TestMaintainedM2AllOutputGraphs$' -count=1
 go test ./pkg/nvkr/buildgraph -run '^TestMaintainedM2CustomerMaterialReplacement$' -count=1
 ```
 

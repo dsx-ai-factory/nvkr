@@ -45,7 +45,26 @@ or completed M1–M4 acceptance.
 Strict disk inspection and reconciliation are deferred hardening outside the approved M3 MVP. Controlled receipt/export/transport
 contracts and retained-disk diagnostics exist, but a successful real native NVKE live-Run full-content join
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
-qualified provider adapters, encrypted VM execution and air-gap operation remain unavailable.
+qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
+
+The maintained M2 candidate selects 37 named outputs, retaining the previous 35 and adding native AMD64
+and ARM64 public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
+`build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected
+output membership must agree. Strict inspection/publication, qualified reproduction and private-passphrase
+FDE remain closed. The consumer's strict evidence policy still rejects producer-only disks. This integration
+has no recorded combined-pipeline, FDE publication or ARM64 FDE execution result; the earlier AMD64 diagnostic
+Run below establishes only its exact bake and raw transport.
+
+The separate FDE diagnostic route admits direct Packer only with explicit public `luks_passphrase=changeit`.
+It retains raw QCOW2 bytes locally or through a generated native ARC build-only workflow, without release
+publication, signing, inspection or confidentiality claims. Its separate `definitions/nvke-fde` selection
+contains one AMD64 output and the complete material closure. Runtime admission and generated transport
+contracts are complemented by [Run 38443178035](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035),
+which completed the pinned FDE target and finalized a `static-unqualified` Run at code commit `68c219845398b8ef5890e5c76a13d4901a22630d`.
+The [native ARC record below](#native-arc-disk-route) binds the exact output and retained evidence.
+The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retained bootstrap
+files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
+requires no GitHub secret; private passphrases remain unsupported.
 
 ## M3 MVP scope and acceptance boundary
 
@@ -151,16 +170,16 @@ smoke remain required; independent policy pins and real producer/hosted acceptan
 | 06 Status | Diagnostic document/checkpoint authentication, protected high-water reads and receipt-derived byte-CAS before withdrawal interpretation | Caller epoch is diagnostic. Production discovery, trusted-time/clearance integration, rotation, immutable v1 tags, revocation and channel concurrency are unimplemented |
 | 07–08 Reproduction | Linux stage-two helper/runtime/image and terminal-byte receipts, deterministic comparisons and profile matching | Provider receipts, other-platform authority, qualified helper images, independent two-machine bake-off and profile graduation |
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
-| 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected unencrypted local execution; exact component/material bindings and acquisition-carrier retention; M3-A pinned embedded-declaration checker and contract fixtures | Optional upstream metadata integration is not an MVP prerequisite. Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation and fused general wrapped-job phase isolation remain closed |
+| 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected plain/public-bootstrap execution; exact component/material bindings and acquisition-carrier retention; M3-A pinned embedded-declaration checker and contract fixtures | Optional upstream metadata integration is not an MVP prerequisite. Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation and fused general wrapped-job phase isolation remain closed |
 | 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
 | 13 Evidence | Exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Factory callers retain ordinary hint-free dependency inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
-| 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted/object-store delivery is unavailable |
+| 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed plain/public-bootstrap FDE OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; private-passphrase FDE, strict FDE and object-store delivery are unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts | M3-B smoke receipt, hosted qualification signing/attachment and independent M3 consumer acceptance remain unavailable or unexercised. Qualified clearance, release-specific trusted time and M4 manifests/revocation remain unimplemented |
-| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, encrypted disks and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
-| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration, live summary delivery and fresh runtime evidence remain separate |
+| 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
+| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration, live summary delivery and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
-| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
+| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 
@@ -199,8 +218,9 @@ ADR-10/18 own the complete driver and native runner contracts.
 
 Attempt-owned material manifests and bounded source-owned build logs are diagnostic. Unsafe entries fail
 closed; ordinary log loss/overflow records incomplete diagnostics without discarding a separately verified
-disk. Retention closes before immutable Run recording and does not mask the primary build failure. FDE
-secrets are not admitted through this sink.
+disk. Retention closes before immutable Run recording and does not mask the primary build failure. Private
+FDE secrets are not admitted through this sink. The explicit public bootstrap value is diagnostic data;
+admitting it does not prove that upstream removes guest SSH host keys or every installer/initramfs copy.
 
 Diagnostic installed-package inspection of a retained QCOW2 is distinct from full content inspection. The
 [recorded native observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md) cover exact ARM64 subjects,
@@ -753,8 +773,9 @@ repository/builder and preparation/signing/consuming-attempt ordering. Contracts
 attempts, re-signing and finalizer reuse; hosted retry acceptance remains unexercised. Cross-run reuse,
 remote rollback and an atomic multi-repository transaction are not provided. Failed/missing provider jobs
 still prevent completion. Finalization restores the six aggregate/tool control carriers plus each output’s
-original publication reference, signing record and predicate for the qualification handoff, without restoring
-output payload packages. Assembly/finalization need registry read access, not OIDC or package-write
+original publication reference, signing record and predicate for the qualification handoff: 117 control
+carriers for the 37-output candidate, without restoring output payload packages. Assembly/finalization need
+registry read access, not OIDC or package-write
 permission. Custom static credentials, local execution and dry-run signing reject this mode.
 
 The root reader rejects extra blobs and bounds control/evidence to 512 MiB per root. Full and metadata-only
@@ -812,35 +833,73 @@ avoid restoring its full material closure on publication runners. Consumed carri
 storage but does not establish a measured hosted storage bound.
 
 ## Native ARC disk route
-The current Makefile drift gate and the single checked-in `nvkr-run.yml` select the M2 candidate Definition
-and Environment, replacing the earlier six-output deploy selection at that fixed generated path. Dispatch
-does not choose among Definitions, and no parallel generated six-output deploy workflow is maintained there.
-The retained deploy and three-output inputs can be generated into a scratch root with their matching
-byte-exact check. This records the current configuration, not a ratified canonical-product/path migration or
-publication-namespace decision; that named-decider governance remains pending.
+The single checked-in `nvkr-run.yml` selects the 37-output M2 Definition and its main-only publication
+Environment, including plain and public-bootstrap FDE disks on both native architectures. The Makefile drift
+gate repeats the exact Definition and Environment paths recorded in the committed Plan. Dispatch does not
+choose among Definitions. Alternate selections can be generated into a scratch root with their matching
+byte-exact check. The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
+and build-only Environment for the recorded diagnostic below. Neither candidate selection is a ratified
+canonical-product/path migration or publication-namespace decision; that named-decider governance remains
+pending. On October 13, 2026, the
+`nkd-arc` Environment admitted the exact FDE branch through deployment policy `62934956`, preserving its
+existing `main` and M2 validation-branch policies. That provider configuration is not execution evidence.
+
+The build-only finalizer uses the selected native ARC pool and matching helper with a two-hour bound,
+restoring and rehashing the complete raw-disk closure without publication authority. Comparable AMD64
+material, source and disk-package carriers in [Run 37533806963](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963)
+totaled 15,362,463,697 compressed bytes. This prior measurement motivated the runner choice. The FDE
+attempt below completed on ARC; peak scratch usage was not measured, so it establishes no general
+capacity bound.
+
+On October 13, 2026, [Run 38443178035](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
+completed all ten generated jobs on `codex/fde-image-pipeline` at commit
+`68c219845398b8ef5890e5c76a13d4901a22630d`, attempt `38443178035-1`.
+The [native job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/job/115457416653)
+ran for 43m 07s, including setup, a 29m 48s grouped build step and all uploads.
+Its log records successful Packer target `nke-node-fde.qemu.nke-fde`.
+The [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/job/115483887874)
+completed in 6m 22s on a fresh native runner, restoring the complete closure and checking its exact bytes.
+The retained Run has `status: complete`, `lane: static-unqualified`, one expected and observed
+`nvke-node-fde-amd64` disk output, its eleven-component closure and no failure:
+
+- Plan Digest: `sha256:3f5db9dda12b12accfe2ba10567b5d1b00e99538c469ee2d32ad631e5a91dba7`.
+- Output Build Digest: `sha256:b5c4dbb201dbac6e8f5498d67a2bba297f2ee4824766b0b6cf59f3d21a7e19b8`.
+- Raw QCOW2 payload: `sha256:c3d6b6694f1b0c626b1df0f61b10a60a5f2bd9fac9d0c37ff2407a0b7b85cede`,
+  6,738,411,520 bytes (6.28 GiB).
+- Run content subject: `sha256:5c2d10edb27c52e7ae99b8d0def2566762ae11a1e5a07db5feb708bb552dd75a`.
+
+The [image artifact](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11840209683),
+[producer result](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11841075777),
+[terminal observation](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11840159679)
+and [final Run record](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11841676055)
+retain the evidence. The payload digest and size agree across the producer and finalized Run; they are
+the raw QCOW2 identity, not the Actions ZIP identity. This proves the pinned FDE-target bake and generated
+build-only workflow for this attempt. The recorded `luks2` declaration is not independent guest inspection,
+boot or TPM-enrollment validation, deployed-clone confidentiality, reproducibility, qualification or
+publication evidence. The pinned-source audit's key-material and firstboot limitations still apply.
 
 ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted policy for the two native KVM pools.
 The grouped helper retains original material and disk owners through reconciliation and packaging; generation
-contracts cover both architectures, individual-node bypass rejection and unsupported policy rejection. Source
-fetch, bootstrap and release credentials remain outside ARC jobs. Native preparation/measurement is provided
-separately. M2 now generates all 35 named outputs with two native disk jobs from the same Definition,
+contracts cover both architectures, individual-node bypass rejection and unsupported policy rejection. For
+publication workflows, source fetch, bootstrap and release credentials remain outside ARC jobs. Native preparation/measurement is provided
+separately. M2 now generates all 37 named outputs with four native disk jobs from the same Definition,
 an exact catalog overlay and measured native inspection profiles. Four toolchain images were
 published to internal GHCR packages under the user's scoped candidate exception, with exact
 manifest/config read-back. This is not completed organizational license/security review.
 Private pulls use a separate packages:read step whose temporary credentials are removed before
 execution; cached exact image identities are revalidated by the held runtime.
-Both native builds and terminal checks completed in run `37445475840`; both deep disk inspections timed out.
+Both native plain-image builds and terminal checks completed in run `37445475840`; both deep disk inspections timed out.
 The user earlier moved deep disk/content inspection and dependent reconciliation out of M2. The narrower candidate
 `diskEvidence: build-provenance-v1` selects live producer/material evidence with signed uninspected scope,
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
 The [inspection deferral record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
-The strict inspection path remains available. M2 retains its AMD64-only product acceptance floor and accepts
+The plain-image strict inspection path remains available. M2 retains its AMD64-only product acceptance floor and accepts
 producer provenance with its remaining delivery/consumer gates. The approved October 12 M3 MVP scope also
 retains producer-only disk evidence and defers inspection/material reconciliation to hardening. This task
 scope supersedes the earlier M3 assignment without changing any historical signed bytes or establishing
 organizational ADR ratification. The native ARM64 route and this candidate Definition's
-additional ARM64 outputs are an implementation extension. Both native jobs and every declared output remain
-required for this candidate's complete Run and Release; the product floor waives none of those requirements.
+additional ARM64 outputs are an implementation extension. All four native disk jobs and every declared output
+remain required for this candidate's complete Run and Release; the product floor waives none of those requirements.
 Organizational ADR ratification remains separate.
 Both candidate disk jobs succeeded in run `37486058412`, but the aggregate release download failed with ENOSPC
 before publication. The [dated carrier evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records
@@ -910,7 +969,7 @@ cutover, hosted publication, independent consumer acceptance or qualification.
 ## Maintained input and schema boundaries
 
 The [M2 Definition instructions](../../definitions/nvke-m2/README.md) own example-specific selection and input
-preparation. The candidate requires 35 named outputs: eleven CLI/controller/chart/operator/disk outputs plus twelve
+preparation. The candidate requires 37 named outputs: thirteen CLI/controller/chart/operator/disk outputs plus twelve
 third-party runtime images per native architecture. The chosen runtime-image set follows pinned deployment
 values, not chart defaults; chart-test images and NVKE images outside the disk retain explicit owner questions.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual

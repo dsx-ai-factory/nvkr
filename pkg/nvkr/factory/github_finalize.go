@@ -8,7 +8,41 @@ import (
 	"fmt"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
+
+const githubDiskBuildFinalizerTimeoutMinutes = 120
+
+// Build-only finalization restores the complete raw disk/material/source closure.
+// Keep its storage on the one disk output's explicitly selected ARC pool. A
+// mixed-output closure has no admitted aggregate scratch-capacity contract.
+func githubDiskBuildFinalizerRunner(plan *Plan) (string, error) {
+	if !GitHubDiskBuildOnly(plan) || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Kind != PackageDiskImage || len(plan.Builds) != 1 {
+		return "", e.New(e.CodeEngineCapability, "GitHub build-only disk finalization requires exactly one disk output")
+	}
+	var runner string
+	for _, node := range plan.Builds[0].Graph.Nodes {
+		if node.BuilderType != ir.BuilderVMImage || node.ExecutionBinding == nil {
+			continue
+		}
+		binding := node.ExecutionBinding
+		if runner != "" || binding.Class.RunsOn == "" || binding.Class.RunsOn != githubARCRunner(string(binding.Class.HostPlatform)) {
+			return "", e.New(e.CodeEngineCapability, "GitHub build-only disk finalization requires one admitted native ARC root")
+		}
+		runner = binding.Class.RunsOn
+	}
+	if runner == "" {
+		return "", e.New(e.CodeEngineCapability, "GitHub build-only disk finalization has no admitted native ARC root")
+	}
+	return runner, nil
+}
+
+func githubFinalizerTimeoutMinutes(plan *Plan) int {
+	if GitHubDiskBuildOnly(plan) {
+		return githubDiskBuildFinalizerTimeoutMinutes
+	}
+	return githubSupportJobTimeoutMinutes
+}
 
 // writeGitHubFinalizerRestoreSteps emits the complete carrier download and restore
 // sequence for the lifecycle finalizer. actions/download-artifact v8.0.1 expands

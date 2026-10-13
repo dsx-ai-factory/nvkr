@@ -110,16 +110,15 @@ func (handle *NodeSession) AdmitVMImagePacker(
 			return nil, e.New(e.CodeInvalidCatalog, "VM-image Packer admission repeats subject %q", selection.Subject)
 		}
 		node := selection.Node
+		if err := ValidateVMImagePackerDiskExecution(node); err != nil {
+			return nil, err
+		}
 		if err := node.Validate(); err != nil {
 			return nil, err
 		}
 		if node.BuilderType != ir.BuilderVMImage || node.Packer == nil || node.ExecutionBinding == nil {
 			return nil, e.New(e.CodeEngineCapability,
 				"node %q is not a bound direct-Packer VM-image producer", node.ID)
-		}
-		if node.Disk == nil || node.Disk.Encryption != "none" {
-			return nil, e.New(e.CodeEngineCapability,
-				"node %q requests encrypted disk execution without a typed secret channel", node.ID)
 		}
 		if err := requireVMImagePackerNetworkAdmission(networkAdmission, selection); err != nil {
 			return nil, err
@@ -266,9 +265,8 @@ func (executor *VMImagePackerExecutor) Run(
 		return nil, nil, e.New(e.CodeEngineCapability,
 			"VM-image Packer execution requires held manifest, VM runtime and diagnostic capabilities")
 	}
-	if node.Disk == nil || node.Disk.Encryption != "none" {
-		return nil, nil, e.New(e.CodeEngineCapability,
-			"VM-image Packer execution does not admit encrypted disks without a typed secret channel")
+	if err := ValidateVMImagePackerDiskExecution(node); err != nil {
+		return nil, nil, err
 	}
 
 	executor.mu.Lock()

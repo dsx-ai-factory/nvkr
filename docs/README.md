@@ -24,8 +24,10 @@ each concept to a worked example.
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
-[nine-output deploy example](../definitions/nvke-deploy/README.md), [35-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
-and [OS-image routes](../definitions/nvke-os/README.md). The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
+[nine-output deploy example](../definitions/nvke-deploy/README.md), [37-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
+and [OS-image routes](../definitions/nvke-os/README.md). The separate
+[FDE-only diagnostic workflow](../definitions/nvke-fde/README.md) selects one native disk for branch iteration.
+The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
 Experimental [public OS source producers](../definitions/nvke-os-source/README.md) and the
 [OVN source-build option](../definitions/nvke-ovn-source/README.md) are separate candidates, not full OS

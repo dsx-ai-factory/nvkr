@@ -63,6 +63,9 @@ func runPackerContainerWithTimeouts(ctx context.Context, request packerContainer
 	if runtime.GOOS != "linux" {
 		return nil, e.New(e.CodeEngineCapability, "containerized Packer execution requires Linux")
 	}
+	if err := ValidateVMImagePackerDiskExecution(request.node); err != nil {
+		return nil, err
+	}
 	if err := request.node.Validate(); err != nil {
 		return nil, err
 	}
@@ -71,10 +74,6 @@ func runPackerContainerWithTimeouts(ctx context.Context, request packerContainer
 	}
 	if request.node.Packer.AcquisitionArchive != "" && request.node.Packer.AcquisitionArchive == request.node.ArtifactPath {
 		return nil, e.New(e.CodeInvalidCatalog, "acquisition carrier cannot be the disk payload")
-	}
-	if request.node.Disk == nil || request.node.Disk.Encryption != "none" {
-		return nil, e.New(e.CodeEngineCapability,
-			"containerized Packer does not admit encrypted disks without a typed secret channel")
 	}
 	if request.source == nil || request.source.Dir == "" {
 		return nil, e.New(e.CodeEngineCapability,

@@ -74,7 +74,7 @@ There is no new authored transport manifest. Source-fetch credentials stay on `r
 `pack-outputs` remains a separate step.
 
 These excerpts illustrate a controller-chart operation and finalizer. Exact names and node IDs come from
-the selected Plan; the repository currently generates the 35-output M2 workflow.
+the selected Plan; the repository currently generates the 37-output M2 workflow.
 
 ```yaml
       - name: 'Build nvke-controller-chart (controller-chart)'

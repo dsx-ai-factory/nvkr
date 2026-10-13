@@ -5,6 +5,7 @@ package factory
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,6 +63,89 @@ func TestWorkflowCompactionPreservesExpandedGraph(t *testing.T) {
 	}
 }
 
+func TestWorkflowCompactionPreservesScalarTypesAndAuthority(t *testing.T) {
+	for _, value := range []string{"yes", "No", "ON", "off", "y", "N", "true", "null", "01", "1e2", "2026-10-13", "# literal", "colon: value", "first\nsecond", "${{ secrets.NKE_SOURCE_TOKEN }}"} {
+		t.Run(value, func(t *testing.T) {
+			raw := []byte(fmt.Sprintf(`'on': {workflow_dispatch: {}}
+permissions: {contents: read}
+jobs:
+  fetch:
+    name: 'Fetch exact source'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions: {contents: read, packages: read}
+    if: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - name: 'Fetch exact source'
+        env: {NVKR_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}', LITERAL: %s}
+        run: |
+          set -eu
+          ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node fetch/source
+  sign:
+    name: 'Sign exact publication'
+    needs: [fetch]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions: {contents: read, packages: write, id-token: write}
+    if: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - name: 'Sign exact publication'
+        run: ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node sign/output
+`, yamlSingle(value)))
+			compact, err := compactGitHubWorkflow(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := yaml.YAMLToJSONStrict(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			after, err := yaml.YAMLToJSONStrict(compact)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatalf("compaction changed credentials, dependency, branch policy, permissions or script bytes: %v", err)
+			}
+		})
+	}
+}
+
+func TestWorkflowCompactionPreservesExistingAliases(t *testing.T) {
+	raw := []byte(`'on': {workflow_dispatch: {}}
+env: {EXACT_SOURCE: &n1 '${{ secrets.EXACT_SOURCE }}'}
+jobs:
+  first:
+    name: 'Repeated source fetch'
+    runs-on: ubuntu-24.04
+    steps:
+      - env: {EXACT_SOURCE: *n1}
+        run: 'fetch exact source bytes'
+  second:
+    name: 'Repeated source fetch'
+    runs-on: ubuntu-24.04
+    steps:
+      - env: {EXACT_SOURCE: *n1}
+        run: 'fetch exact source bytes'
+`)
+	expected, err := yaml.YAMLToJSONStrict(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		raw, err = compactGitHubWorkflow(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual, err := yaml.YAMLToJSONStrict(raw)
+		if err != nil || !bytes.Equal(expected, actual) {
+			t.Fatalf("recompaction changed an existing alias binding: %v", err)
+		}
+	}
+}
+
+func TestWorkflowCompactionRejectsRecursiveAliases(t *testing.T) {
+	_, err := compactGitHubWorkflow([]byte("jobs: &recursive {first: *recursive}\n"))
+	assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+}
+
 func TestGitHubWorkflowSizeAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -103,6 +187,13 @@ func TestOversizedWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 }
 
 func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
+	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.DefinitionPath != "definitions/nvke-m2/definition.yaml" || plan.EnvironmentPath != "definitions/nvke-m2/environment-github.yaml" {
+		t.Fatal("committed workflow must select the maintained combined M2 inputs")
+	}
 	raw, err := os.ReadFile("../../../" + GitHubWorkflowPath)
 	if err != nil {
 		t.Fatal(err)
@@ -110,4 +201,13 @@ func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
 	if err := validateGitHubWorkflowSize(raw); err != nil {
 		t.Fatal(err)
 	}
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(raw, bundle.Files[GitHubWorkflowPath]) {
+		t.Fatal("committed workflow differs from its complete regenerated Plan")
+	}
+	document := decodeGitHubWorkflow(t, raw)
+	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(document.Jobs))
 }

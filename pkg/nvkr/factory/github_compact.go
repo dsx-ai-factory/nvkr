@@ -5,7 +5,8 @@ package factory
 
 import (
 	"bytes"
-	"fmt"
+	"strconv"
+	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
@@ -21,6 +22,28 @@ func compactGitHubWorkflow(raw []byte) ([]byte, error) {
 	if err := yamlv3.Unmarshal(raw, &document); err != nil {
 		return nil, e.Wrap(e.CodePipelineDrift, err, "parse generated workflow for compaction")
 	}
+	before, err := yaml.YAMLToJSONStrict(raw)
+	if err != nil {
+		return nil, e.Wrap(e.CodePipelineDrift, err, "decode original workflow")
+	}
+	// Callers may recompact an edited generated workflow. Resolve its aliases
+	// before assigning new anchors so old names cannot bind to new definitions.
+	var expand func(*yamlv3.Node) yamlv3.Node
+	expand = func(node *yamlv3.Node) yamlv3.Node {
+		if node.Kind == yamlv3.AliasNode {
+			return expand(node.Alias)
+		}
+		result := *node
+		result.Anchor = ""
+		result.Content = make([]*yamlv3.Node, len(node.Content))
+		for i, child := range node.Content {
+			value := expand(child)
+			result.Content[i] = &value
+		}
+		return result
+	}
+	// The strict decode above rejects recursive and excessively expanding aliases.
+	document = expand(&document)
 	keys := map[*yamlv3.Node]string{}
 	counts := map[string]int{}
 	var scan func(*yamlv3.Node) error
@@ -56,7 +79,7 @@ func compactGitHubWorkflow(raw []byte) ([]byte, error) {
 				*node = yamlv3.Node{Kind: yamlv3.AliasNode, Value: first.Anchor, Alias: first}
 				return
 			}
-			node.Anchor = fmt.Sprintf("n%d", len(anchors)+1)
+			node.Anchor = "n" + strconv.FormatInt(int64(len(anchors)+1), 36)
 			anchors[key] = node
 		}
 		for i, child := range node.Content {
@@ -85,11 +108,23 @@ func compactGitHubWorkflow(raw []byte) ([]byte, error) {
 			node.Anchor = ""
 		}
 	}
-	// Keep jobs in block form; inline small step/permission maps. This removes
-	// repeated indentation without changing expressions, strings or run scripts.
+	// Keep the workflow and job names on separate lines, but inline each job's
+	// value. Whole-job flow maps remove repeated indentation from large material
+	// closures without changing expressions, strings, names or run scripts.
 	var inline func(*yamlv3.Node, int)
 	inline = func(node *yamlv3.Node, depth int) {
-		if depth >= 4 && node.Kind == yamlv3.MappingNode {
+		if node.Kind == yamlv3.ScalarNode {
+			// The encoder selects ordinary quoting from the preserved YAML tag,
+			// but YAML 1.1 consumers also treat these YAML 1.2 strings as booleans.
+			node.Style = 0
+			if node.Tag == "!!str" {
+				switch strings.ToLower(node.Value) {
+				case "y", "yes", "n", "no", "on", "off":
+					node.Style = yamlv3.SingleQuotedStyle
+				}
+			}
+		}
+		if depth >= 3 && (node.Kind == yamlv3.MappingNode || node.Kind == yamlv3.SequenceNode) {
 			node.Style |= yamlv3.FlowStyle
 		}
 		for _, child := range node.Content {
@@ -105,10 +140,6 @@ func compactGitHubWorkflow(raw []byte) ([]byte, error) {
 	}
 	if err := encoder.Close(); err != nil {
 		return nil, e.Wrap(e.CodePipelineDrift, err, "close compact workflow")
-	}
-	before, err := yaml.YAMLToJSONStrict(raw)
-	if err != nil {
-		return nil, e.Wrap(e.CodePipelineDrift, err, "decode original workflow")
 	}
 	after, err := yaml.YAMLToJSONStrict(output.Bytes())
 	if err != nil {

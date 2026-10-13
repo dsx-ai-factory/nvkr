@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/urfave/cli/v2"
 )
@@ -67,23 +68,41 @@ func TestCIRestrictsAutomaticSelectionOnly(t *testing.T) {
 	}
 }
 
-// The formatting baseline was captured with the pre-dashboard base executable at
-// 3558650e986cd7600558e4e38b77da5b89d780f0. Only the identical-Plans fixture's two
-// identity values track the maintained Plan; all other fixture bytes are unchanged.
+// These fixed bytes were captured with the pre-dashboard base executable at
+// 3558650e986cd7600558e4e38b77da5b89d780f0, not regenerated from this implementation.
+// Only the input-dependent Plan identity is adapted below.
 func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 	lifecycleCommandRepo(t)
+	const maintainedPlan = ".github/nvkr-run/plan.json"
 	for _, test := range []struct {
 		name, fixture string
 		args          []string
 	}{
 		{"Definition validation", "definition-validate.txt", []string{"definition", "validate", "--definition", "definitions/nvke-v1/definition.yaml"}},
 		{"Definition inspection", "definition-inspect.json", []string{"definition", "inspect", "--definition", "definitions/nvke-v1/definition.yaml"}},
-		{"identical Plans", "identical-plans.txt", []string{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", ".github/nvkr-run/plan.json"}},
+		{"identical Plans", "identical-plans.txt", []string{"run", "diff", "--before", maintainedPlan, "--after", maintainedPlan}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			want, err := os.ReadFile("cmd/nvkr/testdata/presentation/" + test.fixture)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if test.fixture == "identical-plans.txt" {
+				// The maintained output selection changes its Plan identity. Keep
+				// the captured wording and formatting, substituting only that input.
+				const capturedDigest = "sha256:2a59420b680dc5d5411b570fd72d7ae763cfa7657b02370712e54f092ec9181e"
+				if bytes.Count(want, []byte(capturedDigest)) != 2 {
+					t.Fatal("identical-Plans fixture lost its captured before/after identity")
+				}
+				plan, err := factory.LoadPlanContext(t.Context(), maintainedPlan)
+				if err != nil {
+					t.Fatal(err)
+				}
+				digest, err := plan.Digest()
+				if err != nil {
+					t.Fatal(err)
+				}
+				want = bytes.ReplaceAll(want, []byte(capturedDigest), []byte(digest))
 			}
 			actual, err := runCLIWithCapturedStdout(t, newApp(), append([]string{"nvkr"}, test.args...)...)
 			if err != nil || !bytes.Equal(actual, want) {

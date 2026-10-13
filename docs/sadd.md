@@ -425,7 +425,13 @@ Plan/graph inspection, GitHub generation, metadata-only release navigation and t
 `pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
 does not check artifact payload integrity or grant qualification; its contract tests establish no external
 registry or signing-service acceptance. Local unencrypted direct-Packer
-execution retains exact QCOW2 bytes; local disk publication remains closed.
+execution retains exact QCOW2 bytes; local disk publication remains closed. ADR-10 also admits an explicit
+public-bootstrap FDE diagnostic producer. ADR-18's native build-only workflow retains raw disk bytes and
+a static-unqualified Run without publication, signing or inspection. It makes no deployed confidentiality claim.
+The maintained M2 Definition also selects public-bootstrap FDE outputs for both native architectures with
+`build-provenance-v1` publication. Exact encryption metadata and payload identity are bound through delivery
+and signed release metadata; strict FDE inspection and qualified reproduction remain closed. The recorded
+AMD64 diagnostic bake does not establish FDE publication or ARM64 FDE operational acceptance.
 
 The [recorded M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated hosted delivery,
 signing, verification and finalization for all 34 outputs, including AMD64 and ARM64 disks. It used the
@@ -904,7 +910,7 @@ selected KVM handles for one deadline-scoped callback, re-observes capacity befo
 handles. CPU is capped by affinity and cgroup ancestry; memory by availability and cgroup headroom.
 These are current-availability checks, not resource reservations or provider allocation proof.
 
-The unencrypted direct-Packer driver consumes that capability. Its run-owned resolver binds source,
+The direct-Packer driver for plain or explicitly public-bootstrap disks consumes that capability. Its run-owned resolver binds source,
 Plan, runtime/daemon and already-local pinned native toolchain before mutation. It transports an
 authenticated input archive into private named volumes, mounts consumer inputs read-only, fixes the
 execution environment, validates one exact Packer selector and returns one held QCOW2. It performs no
@@ -923,7 +929,9 @@ temporary credential configuration is removed before source/producer execution.
 
 The retained KVM descriptor proves availability during the callback, not consumption by QEMU. Docker's
 fixed device projection additionally checks kernel boot identity and device numbers. Command/Make,
-encrypted-disk, general hosted and qualified VM adapters remain closed. Arbitrary devices, nested
+secret-valued encrypted-disk, general hosted and qualified VM adapters remain closed. Public-bootstrap FDE
+admits raw retention and native build-provenance publication; encrypted inspection and strict publication remain
+unavailable. Arbitrary devices, nested
 virtualization, NUMA, accelerators and additional provider-specific lowering are deferred. In-process
 cleanup owns success, failure and cancellation; authenticated orphan recovery after hard process/host
 failure is also deferred. ADR-10/18 own the detailed admission and driver contracts;

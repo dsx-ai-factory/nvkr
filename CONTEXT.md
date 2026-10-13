@@ -60,6 +60,9 @@ _Avoid_: Observed artifact, delivery route
 A named output containing exactly one disk-producing catalog root plus every explicitly selected component in
 that root's material closure. The disk format and encryption metadata describe the delivered bytes independently
 of the builder that produces them.
+An explicitly public bootstrap FDE disk can be retained diagnostically or published with build-provenance
+evidence. Neither grants inspected-content, reproduction or deployed confidentiality claims.
+TPM keyslot enrollment does not rotate the volume key shared by clones of that disk.
 _Avoid_: Container image, builder type, running node
 
 **Aggregate OS producer**:
@@ -102,6 +105,7 @@ _Avoid_: Authored definition, execution observation
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
+Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
 **Catalog maintenance candidate**:

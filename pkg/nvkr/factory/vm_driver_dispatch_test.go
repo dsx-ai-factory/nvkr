@@ -176,7 +176,7 @@ func compiledPackerVMNode(t *testing.T) (*Plan, Node) {
 	return compiledPackerVMNodeWithEncryption(t, "none")
 }
 
-func compiledPackerVMNodeWithEncryption(t *testing.T, encryption string) (*Plan, Node) {
+func compiledPackerVMNodeWithEncryption(t *testing.T, encryption string, publicVariables ...map[string]string) (*Plan, Node) {
 	t.Helper()
 	definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
 	catalogCopy := *stack.Catalog
@@ -193,6 +193,9 @@ func compiledPackerVMNodeWithEncryption(t *testing.T, encryption string) (*Plan,
 		ProjectPath: "os-image/packer", PackerVersion: "1.14.2", BuildName: "image.qemu.node",
 		ArchitectureVariable: "architecture", AcceleratorVariable: "accelerator", MaterialManifestVariable: "material_manifest",
 		OutputDirectoryVariable: "output_directory",
+	}
+	if len(publicVariables) != 0 {
+		component.Packer.Variables = publicVariables[0]
 	}
 	catalogCopy.Components["image"] = component
 	stack, err := catalog.ApplyStack(&catalogCopy)

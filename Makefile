@@ -205,10 +205,12 @@ workflows-check: ## Verify the committed Run generation matches the catalog (ADR
 	CGO_ENABLED=0 go build -trimpath \
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
-	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-m2/definition.yaml \
-		--environment definitions/nvke-m2/environment-github.yaml \
-		--root . --check
+	@# Repeat the committed Plan's authored selection, including focused feature-branch
+	@# Definitions. The generator still authenticates the complete bundle and inputs.
+	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
+	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
+	 bin/nvkr-exec run generate --engine github \
+		--definition "$$definition" --environment "$$environment" --root . --check
 
 .PHONY: check
 check: go-version-check fmt-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.

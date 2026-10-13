@@ -67,9 +67,8 @@ func (localVMPackerResolver) Admit(
 			return nil, e.New(e.CodeEngineCapability,
 				"vm-image command/Make execution requires an unimplemented held-output adapter")
 		}
-		if instruction.Disk == nil || instruction.Disk.Encryption != "none" {
-			return nil, e.New(e.CodeEngineCapability,
-				"vm-image execution requires a typed non-public encryption secret channel")
+		if err := pipeline.ValidateVMImagePackerDiskExecution(instruction); err != nil {
+			return nil, err
 		}
 		request, err := localVMRequestForPlan(plan, selected.ID)
 		if err != nil {
