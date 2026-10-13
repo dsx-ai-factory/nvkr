@@ -199,4 +199,4 @@ exec "${runner}" run local \
   --attempts-root .nvkr/runs \
   --runner-source . \
   --jobs "${jobs}" \
-  --runtime "${runtime}"
+  --runtime "${runtime}" --ui=plain
