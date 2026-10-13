@@ -45,16 +45,17 @@ func qualificationSourceFixture() *qualificationFixtureSource {
 }
 
 type qualificationVerifier struct {
-	origin        qualificationorigin.Description
-	source        *qualificationFixtureSource
-	predicate     []byte
-	fail          map[string]error
-	observed      map[string]string
-	evidenceErr   error
-	afterEvidence func()
-	verified      []string
-	policies      []sign.VerifyPolicy
-	evidence      int
+	origin            qualificationorigin.Description
+	source            *qualificationFixtureSource
+	predicate         []byte
+	fail              map[string]error
+	predicateFailures map[string]error
+	observed          map[string]string
+	evidenceErr       error
+	afterEvidence     func()
+	verified          []string
+	policies          []sign.VerifyPolicy
+	evidence          int
 }
 
 func (*qualificationVerifier) SignAndAttest(context.Context, sign.Subject, []byte) (sign.SigningRecord, error) {
@@ -66,6 +67,11 @@ func (v *qualificationVerifier) Verify(_ context.Context, subject sign.Subject, 
 	v.policies = append(v.policies, policy)
 	if err := v.fail[subject.Ref]; err != nil {
 		return sign.VerificationRecord{}, err
+	}
+	if len(policy.ExpectedPredicate) > 0 {
+		if err := v.predicateFailures[subject.Ref]; err != nil {
+			return sign.VerificationRecord{}, err
+		}
 	}
 	if len(policy.ExpectedPredicate) > 0 && string(policy.ExpectedPredicate) != string(v.predicate) {
 		return sign.VerificationRecord{}, e.New(e.CodeSignatureInvalid, "fixture signature does not cover predicate")
@@ -335,6 +341,73 @@ func TestQualificationCollectsEveryOutputFailureBeforeReceipt(t *testing.T) {
 	}
 }
 
+func TestQualificationReturnsSharedRootFailureOnce(t *testing.T) {
+	const rootMessage = "shared root production failure"
+	const memberMessage = "member signature failure"
+	for _, tc := range []struct {
+		name        string
+		members     []int
+		firstMember bool
+	}{
+		{name: "root only"},
+		{name: "root and first member", members: []int{0}, firstMember: true},
+		{name: "root and later member", members: []int{1}},
+		{name: "root and distinct members with identical messages", members: []int{0, 1}, firstMember: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, consumer, verifier := newQualificationFixture(t)
+			rootCause := errors.New("root verifier cause")
+			rootErr := e.Wrap(e.CodeProvenanceMissing, rootCause, rootMessage)
+			verifier.predicateFailures = map[string]error{request.Reference: rootErr}
+			memberErrors := make([]error, len(tc.members))
+			for i, member := range tc.members {
+				memberErrors[i] = e.New(e.CodeSignatureInvalid, memberMessage)
+				verifier.fail[request.Predicates[member+1].Reference] = memberErrors[i]
+			}
+			receipt, report, err := consumer.checkQualification(t.Context(), request, verifier.source)
+			if receipt != nil || report == nil || len(report.Outputs) != 2 || len(verifier.verified) != 4 || verifier.evidence != 2 {
+				t.Fatalf("shared failure skipped verdicts or issued authority: receipt=%v report=%+v calls=%v", receipt, report, verifier.verified)
+			}
+			wantFirst := error(rootErr)
+			if tc.firstMember {
+				wantFirst = memberErrors[0]
+			}
+			var first *e.Error
+			if !errors.As(err, &first) || first != wantFirst {
+				t.Fatalf("first coded failure=%v, want %v", first, wantFirst)
+			}
+			if !errors.Is(err, rootErr) || !errors.Is(err, rootCause) || strings.Count(err.Error(), rootMessage) != 1 {
+				t.Fatalf("shared root failure duplicated or lost its cause: %v", err)
+			}
+			if strings.Count(err.Error(), memberMessage) != len(memberErrors) {
+				t.Fatalf("distinct member failures were merged or repeated: %v", err)
+			}
+			for _, memberErr := range memberErrors {
+				if !errors.Is(err, memberErr) {
+					t.Fatalf("lost distinct member failure %v: %v", memberErr, err)
+				}
+			}
+			for _, output := range report.Outputs {
+				if output.Overall != "fail" || len(output.Checks) != 6 {
+					t.Fatalf("shared root failure lost output verdicts: %+v", output)
+				}
+				foundRoot := false
+				for _, check := range output.Checks {
+					if check.Name == "run-and-inputs" {
+						foundRoot = true
+						if check.Status != "fail" || check.Code != string(e.CodeProvenanceMissing) || strings.Count(check.Message, rootMessage) != 1 {
+							t.Fatalf("output lost shared root diagnostic: %+v", check)
+						}
+					}
+				}
+				if !foundRoot {
+					t.Fatal("missing run-and-inputs diagnostic")
+				}
+			}
+		})
+	}
+}
+
 func TestQualificationDistinguishesIncompleteEvidenceTraversal(t *testing.T) {
 	const slotMessage = "invalid signature for this evidence slot"
 	const traversalMessage = "incomplete evidence traversal for the complete publication"
@@ -362,6 +435,16 @@ func TestQualificationDistinguishesIncompleteEvidenceTraversal(t *testing.T) {
 			assertCode(t, err, tc.code)
 			if tc.cancel && !errors.Is(err, context.Canceled) {
 				t.Fatalf("lost traversal cancellation cause: %v", err)
+			}
+			wantTraversalErrors := 0
+			if tc.cancel {
+				wantTraversalErrors = 1
+			}
+			if strings.Count(err.Error(), traversalMessage) != wantTraversalErrors || strings.Count(err.Error(), slotMessage) != tc.wantSlotErrors {
+				t.Fatalf("returned error repeated global failure or lost member failures: %v", err)
+			}
+			if tc.slotFailure && !errors.Is(err, verifier.evidenceErr) {
+				t.Fatalf("lost evidence slot failure cause: %v", err)
 			}
 			if receipt != nil || report == nil || len(report.Outputs) != 2 || verifier.evidence != tc.wantVisits {
 				t.Fatalf("failed evidence traversal lost diagnostics or issued authority: receipt=%v report=%+v visits=%d", receipt, report, verifier.evidence)
