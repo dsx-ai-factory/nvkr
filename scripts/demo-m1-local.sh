@@ -190,7 +190,7 @@ demo_section "4/8  Build and publish all three outputs in one immutable Run"
 run_started=$SECONDS
 "$NVKR" run local --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-local.yaml" --attempts-root "$ATTEMPTS_ROOT" --attempt "$ATTEMPT" \
-  --runtime "$RUNTIME" --jobs "$JOBS" --publish
+  --runtime "$RUNTIME" --jobs "$JOBS" --publish --ui=plain
 run_seconds=$((SECONDS - run_started))
 
 reference_file="$WORKSPACE/publications/$ROUTE.txt"

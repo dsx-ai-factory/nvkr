@@ -12,6 +12,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
+	"github.com/dsx-ai-factory/nvkr/internal/tuitheme"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -113,13 +114,14 @@ type dashboard struct {
 }
 
 func newDashboard() *dashboard {
+	palette := tuitheme.Colors(false)
 	d := &dashboard{dashboardSnapshot: dashboardSnapshot{started: time.Now(), tenant: "Tenant readiness has not been observed.", buildSelected: -1, buildDetails: true}}
 	for i := range d.phases {
 		d.phases[i] = dashboardPhase{"pending", "No operation observed yet"}
 	}
 	pane := func(title string) *tview.TextView {
-		view := tview.NewTextView().SetDynamicColors(true).SetTextColor(tcell.ColorLightSteelBlue).SetWrap(true)
-		view.SetBackgroundColor(tcell.NewHexColor(0x1c2633)).SetBorder(true).SetBorderColor(tcell.NewHexColor(0x52657a)).SetTitle(title).SetTitleColor(tcell.ColorLightCyan)
+		view := tview.NewTextView().SetDynamicColors(true).SetTextColor(palette.Foreground).SetWrap(true)
+		view.SetBackgroundColor(palette.Background).SetBorder(true).SetBorderColor(palette.Border).SetTitle(title).SetTitleColor(palette.Accent)
 		return view
 	}
 	d.header, d.footer = pane(""), pane("")
@@ -1024,7 +1026,8 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	s := d.snapshot()
 	width, height := screen.Size()
 	content := max(0, height-5)
-	screen.SetStyle(tcell.StyleDefault.Background(tcell.NewHexColor(0x1c2633)).Foreground(tcell.ColorLightSteelBlue))
+	palette := tuitheme.Colors(false)
+	screen.SetStyle(tcell.StyleDefault.Background(palette.Background).Foreground(palette.Foreground))
 	screen.Clear()
 	d.header.SetText(fmt.Sprintf("[lightcyan::b] NVKE · local ARM64 build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]", max(time.Duration(0), now.Sub(s.started)).Truncate(time.Second)))
 	if dashboardBuildActive(s) && !canceling {
@@ -1173,9 +1176,9 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	_, _, _, activityHeight := d.activityView.GetInnerRect()
 	d.activityView.ScrollTo(max(0, len(activity)-activityHeight-s.offset), 0)
 	for index, view := range []*tview.TextView{d.phasesView, d.stateView, d.activityView} {
-		color := tcell.ColorSlateGray
+		color := palette.Border
 		if index == s.focus {
-			color = tcell.ColorLightCyan
+			color = palette.Accent
 		}
 		view.SetBorderColor(color)
 		view.Draw(screen)

@@ -61,7 +61,7 @@ With authorized access to the exact private source objects:
 
 ```sh
 NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1 go test ./pkg/nvkr/buildgraph \
-  -run '^TestMaintainedM2All34OutputGraphs$' -count=1
+  -run '^TestMaintainedM2AllOutputGraphs$' -count=1
 go test ./pkg/nvkr/buildgraph -run '^TestMaintainedM2CustomerMaterialReplacement$' -count=1
 ```
 

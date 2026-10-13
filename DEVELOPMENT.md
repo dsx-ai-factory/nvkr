@@ -106,6 +106,27 @@ restored and an updated cache saved only after successful checks. Other jobs can
 [CI test performance](docs/ci-test-performance.md) owns the measured Merge Gate follow-up and focused
 profiling commands.
 
+## Opt-in terminal presentation checks
+
+The ordinary presenter suite uses simulated screens. Real terminal fixtures must
+run in an isolated interactive TTY with usable `TERM`, never against the user's
+active shell input. Use the pinned Go version:
+
+```sh
+NVKR_TEST_RUNPRESENTER_TTY=1 go test ./internal/runpresenter \
+  -run '^TestPresenterRealTTYRestoresFlags$' -count=1 -v
+NVKR_TEST_RUNPRESENTER_HUP=1 go test ./internal/runpresenter \
+  -run '^TestPresenterRealTTYHangupJoinsOwner$' -count=1 -v
+go test -race ./internal/runpresenter ./internal/rundiagnostics ./pkg/nvkr/progress \
+  -count=1
+```
+
+The HUP fixture sends SIGHUP and verifies restoration and joined work; it does not
+establish physical PTY-master disconnection behavior. These controlled fixtures
+do not execute NVKE producers, qualify outputs, or prove human usability. Run the
+same opt-in fixture on native Linux for Linux terminal evidence; cross-compilation
+alone establishes build compatibility. A skipped fixture supplies no TTY evidence.
+
 ## Opt-in integration checks
 
 The ordinary suite skips integrations requiring external tools, private source, or exceptional host capacity.

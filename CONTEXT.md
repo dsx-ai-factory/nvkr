@@ -23,6 +23,9 @@ _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
 One execution attempt against frozen inputs and required outputs, recording progress, observed artifacts, evidence, and failures.
+Live progress and file-recorded inspection are descriptive views. Producer completion,
+activity and terminal presentation do not establish retained output membership,
+release verification or runtime health; the owning result and error remain separate.
 _Avoid_: Plan, release, proof of qualification
 
 **Artifact**:

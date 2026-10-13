@@ -36,6 +36,30 @@ Git objects for catalog pin-set revalidation. Reading an existing generated Plan
 Readers require the current schema, canonical bytes, safe bounded regular files, and complete graph and
 binding validation. Invalid input produces a coded error before any result bytes are emitted.
 
+## Browse in the terminal
+
+```sh
+nvkr run plan --plan .github/nvkr-run/plan.json --ui=tui
+```
+
+The explicit terminal explorer uses validated typed output/operation membership
+and dependencies. It leaves the Plan and generated ownership manifest unchanged.
+Use arrows to select, Enter for details/dependencies, Tab or 1/2 for panes, Esc to go back,
+`/` for output search, `f` for filters and `?` for help. Tabs identify Outputs
+and Details, with frames separating the panes. Activity appears only when supplied
+(for example, during live Runs); static Plans have no Activity tab. `a` selects
+the Activity pane only when available. q asks before closing
+this read-only view: y or Ctrl+C closes it; n, Esc or Enter keeps it open. Closure does not
+execute a Plan or clean up a Run. Small terminals use a single pane.
+`--no-color` and nonempty `NO_COLOR` preserve textual state and focus.
+
+The default Plan output remains plain; `--json` retains byte-exact canonical
+output and `--pretty` retains its display-only JSON format. Explicit terminal mode
+requires usable interactive stdin/stdout and cannot be combined with JSON/pretty
+output. Planned operations and declared evidence lanes are descriptions, not
+observed artifacts or authenticated runtime/release claims. For recorded attempts
+and live Run presentation, see [Lifecycle](lifecycle.md#choose-local-run-presentation).
+
 ## Follow linked graphs
 
 ```sh

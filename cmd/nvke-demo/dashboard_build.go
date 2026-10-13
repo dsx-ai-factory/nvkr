@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/tuitheme"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -315,10 +316,11 @@ func (d *dashboard) drawBuild(screen tcell.Screen, s dashboardSnapshot, now time
 	} else {
 		d.activityView.ScrollTo(max(0, len(activity)-activityHeight-s.offset), 0)
 	}
+	palette := tuitheme.Colors(false)
 	for index, view := range []*tview.TextView{d.phasesView, d.stateView, d.activityView} {
-		color := tcell.NewHexColor(0x52657a)
+		color := palette.Border
 		if index == s.focus || index == 0 && s.buildSelected >= 0 {
-			color = tcell.ColorLightCyan
+			color = palette.Accent
 		}
 		view.SetBorderColor(color)
 		view.Draw(screen)
