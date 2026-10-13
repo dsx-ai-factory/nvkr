@@ -316,25 +316,42 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 		}
 		owned[ref.path] = found.Metadata.UID
 	}
-	// Delete cluster-scoped RBAC before namespace; each DELETE carries the UID
-	// precondition authenticated by the API, avoiding GET/name-delete races.
+	return cleanupDeleteLoop(ctx, refs, owned,
+		func(ctx context.Context, ref resourceRef) (object, error) { return a.getObject(ctx, workspace, ref) },
+		func(ctx context.Context, ref resourceRef, body []byte) error {
+			_, _, err := a.kube(ctx, workspace, bytes.NewReader(body), "delete", "--raw="+ref.path, "--filename=-")
+			return err
+		}, time.Second)
+}
+
+// Keep the first deletion cause before subsequent GET or deadline errors. The
+// kubectl owner deliberately does not parse localized stderr: an unclassified
+// command refusal is permanent. Only an explicitly coded unavailable service or
+// bounded command timeout can be retried while the cleanup context remains live.
+func cleanupDeleteLoop(ctx context.Context, refs []resourceRef, owned map[string]string,
+	get func(context.Context, resourceRef) (object, error),
+	deleteObject func(context.Context, resourceRef, []byte) error, interval time.Duration) error {
+	// RBAC precedes namespace deletion; every DELETE retains the exact UID precondition.
 	order := []resourceRef{refs[1], refs[2], refs[0]}
-	var lastDeleteErr error
+	var firstDeleteErr error
 	for {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, err, "waiting for terminal cleanup"))
+		}
 		for _, ref := range order {
 			uid := owned[ref.path]
 			if uid == "" {
 				continue
 			}
-			found, err := a.getObject(ctx, workspace, ref)
+			found, err := get(ctx, ref)
 			if err != nil {
-				return err
+				return errors.Join(firstDeleteErr, err)
 			}
 			if found.Metadata.UID == "" {
 				continue
 			}
 			if found.Metadata.UID != uid {
-				return failure("attempt resource replaced; cleanup rejected")
+				return errors.Join(firstDeleteErr, failure("attempt resource replaced; cleanup rejected"))
 			}
 			body, err := canonical.Marshal(struct {
 				APIVersion    string `json:"apiVersion"`
@@ -346,20 +363,30 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 				UID string `json:"uid"`
 			}{UID: uid}})
 			if err != nil {
-				return failure("encoding UID cleanup precondition")
+				return errors.Join(firstDeleteErr, failure("encoding UID cleanup precondition"))
 			}
-			if _, _, err = a.kube(ctx, workspace, bytes.NewReader(body), "delete", "--raw="+ref.path, "--filename=-"); err != nil {
-				lastDeleteErr = err
+			if err = deleteObject(ctx, ref, body); err != nil {
+				first := firstDeleteErr == nil
+				if first {
+					firstDeleteErr = err
+				}
 				if ctx.Err() != nil {
-					return err
+					return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"))
+				}
+				var coded *e.Error
+				if !errors.As(err, &coded) || (coded.Code != e.CodeUnavailable && coded.Code != e.CodeTimeout) {
+					if first {
+						return firstDeleteErr
+					}
+					return errors.Join(firstDeleteErr, err)
 				}
 			}
 		}
 		allAbsent := true
 		for _, ref := range refs {
-			found, err := a.getObject(ctx, workspace, ref)
+			found, err := get(ctx, ref)
 			if err != nil {
-				return err
+				return errors.Join(firstDeleteErr, err)
 			}
 			if found.Metadata.UID != "" {
 				allAbsent = false
@@ -368,11 +395,11 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 		if allAbsent {
 			return nil
 		}
-		timer := time.NewTimer(time.Second)
+		timer := time.NewTimer(interval)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return errors.Join(e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"), lastDeleteErr)
+			return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"))
 		case <-timer.C:
 		}
 	}

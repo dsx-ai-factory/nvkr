@@ -265,16 +265,22 @@ func validateSuiteSubjectsV3(expected testobservation.Expected, checks lifecycle
 		if len(output.BuildSubjects) == 0 {
 			return e.New(e.CodeGateUnmet, "required suite lacks exact payload coverage for a named output")
 		}
-		for _, payload := range output.BuildSubjects {
-			covered := false
-			for _, subject := range expected.Subjects {
-				if subject.Output == output.Name && subject.ArtifactDigest == output.Subject && subject.BuildDigest == output.BuildDigest && subject.PayloadDigest == payload.Digest && (output.Platform == "" || subject.Platform == output.Platform) {
+		// Flat BuildSubjects describe materials of one delivered artifact, not
+		// separate observation subjects. The artifact and aggregate Build digest
+		// bind the entire output; one acquired material anchors its payload.
+		covered := false
+		for _, subject := range expected.Subjects {
+			if subject.Output != output.Name || subject.ArtifactDigest != output.Subject || subject.BuildDigest != output.BuildDigest || output.Platform != "" && subject.Platform != output.Platform {
+				continue
+			}
+			for _, payload := range output.BuildSubjects {
+				if subject.PayloadDigest == payload.Digest {
 					covered = true
 				}
 			}
-			if !covered {
-				return e.New(e.CodeGateUnmet, "required suite omits an exact named output payload")
-			}
+		}
+		if !covered {
+			return e.New(e.CodeGateUnmet, "required suite omits an exact named output payload")
 		}
 	}
 	return nil

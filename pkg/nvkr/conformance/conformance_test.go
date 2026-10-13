@@ -160,13 +160,10 @@ func TestPinnedProducerProcessContract(t *testing.T) {
 			if err != nil {
 				var coded *e.Error
 				want := e.CodeVerifyFailed
-				if tt.mode == "cleanup-failure" {
-					want = e.CodeTimeout
-				}
 				if !errors.As(err, &coded) || coded.Code != want {
 					t.Fatalf("coded error=%v want=%s", err, want)
 				}
-				messages := map[string]string{"version-mismatch": "major/minor versions differ", "api-overflow": "output byte budget exhausted", "after-failure": "pinned command failed", "failed": "exit 1", "zero": "zero cases", "missing": "original suite results unavailable", "deploy-failure": "exit 1", "cleanup-failure": "waiting for terminal cleanup", "replaced": "namespace replaced"}
+				messages := map[string]string{"version-mismatch": "major/minor versions differ", "api-overflow": "output byte budget exhausted", "after-failure": "pinned command failed", "failed": "exit 1", "zero": "zero cases", "missing": "original suite results unavailable", "deploy-failure": "exit 1", "cleanup-failure": "exit 8", "replaced": "namespace replaced"}
 				if !strings.Contains(err.Error(), messages[tt.mode]) {
 					t.Fatalf("wrong failure cause: %v", err)
 				}

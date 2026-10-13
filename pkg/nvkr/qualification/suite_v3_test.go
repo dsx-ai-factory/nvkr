@@ -399,7 +399,7 @@ func TestSuiteV3NativeChildMembership(t *testing.T) {
 	}{
 		{"arm64 child only", nil},
 		{"all native children", func(_ *testobservation.Subject) {}},
-		{"wrong platform", func(s *testobservation.Subject) { s.Platform = "linux/amd64" }},
+		{"wrong platform", func(s *testobservation.Subject) { s.Platform = "linux/riscv64" }},
 		{"wrong native build", func(s *testobservation.Subject) { s.BuildDigest = "sha256:" + strings.Repeat("f", 64) }},
 		{"sibling payload", func(s *testobservation.Subject) { s.PayloadDigest = "sha256:" + strings.Repeat("b", 64) }},
 		{"native manifest as payload", func(s *testobservation.Subject) { s.PayloadDigest = "sha256:" + strings.Repeat("d", 64) }},
@@ -427,13 +427,20 @@ func TestSuiteV3NativeChildMembership(t *testing.T) {
 			if tc.edit != nil {
 				tc.edit(&fixture.observation.Subjects[0])
 			}
-			if tc.name == "all native children" {
+			if tc.name != "arm64 child only" {
 				fixture.observation.Subjects = append([]testobservation.Subject{{Output: output.Name, Platform: children[0].Platform, ArtifactDigest: children[0].ManifestDigest, BuildDigest: children[0].BuildDigest, PayloadDigest: children[0].BuildSubject}}, fixture.observation.Subjects...)
 			}
 			rebindSuiteFixtureV3(t, fixture, &r)
 			receipt, err := authenticateSuiteV3(t.Context(), fixture, checks, r)
 			if tc.name != "all native children" {
 				requireCode(t, err, e.CodeGateUnmet)
+				message := "suite native subject differs from authenticated image-index child"
+				if tc.name == "arm64 child only" {
+					message = "required suite omits an exact native image-index child"
+				}
+				if !strings.Contains(err.Error(), message) {
+					t.Fatalf("wrong binding was not reached: %v", err)
+				}
 			} else {
 				if err != nil {
 					t.Fatal(err)
@@ -446,5 +453,56 @@ func TestSuiteV3NativeChildMembership(t *testing.T) {
 				requireCode(t, err, e.CodeGateUnmet)
 			}
 		})
+	}
+}
+
+func TestSuiteV3MultiComponentDeliveredOutputCoverage(t *testing.T) {
+	for _, kind := range []string{lifecycle.OutputExecutable, lifecycle.OutputDiskImage} {
+		for _, tc := range []struct {
+			name    string
+			edit    func(*testobservation.Subject)
+			missing bool
+			message string
+		}{
+			{name: "first material"},
+			{name: "second material", edit: func(s *testobservation.Subject) { s.PayloadDigest = "sha256:" + strings.Repeat("b", 64) }},
+			{name: "missing named output", missing: true, message: "required suite omits an exact named output payload"},
+			{name: "wrong artifact", edit: func(s *testobservation.Subject) { s.ArtifactDigest = "sha256:" + strings.Repeat("f", 64) }, message: "suite subject differs from exact named artifact"},
+			{name: "wrong aggregate build", edit: func(s *testobservation.Subject) { s.BuildDigest = "sha256:" + strings.Repeat("f", 64) }, message: "suite subject differs from exact named artifact"},
+			{name: "wrong material", edit: func(s *testobservation.Subject) { s.PayloadDigest = "sha256:" + strings.Repeat("f", 64) }, message: "suite subject has no matching exact acquired payload"},
+			{name: "wrong platform", edit: func(s *testobservation.Subject) { s.Platform = "linux/arm64" }, message: "suite subject differs from exact named artifact"},
+		} {
+			t.Run(kind+"/"+tc.name, func(t *testing.T) {
+				fixture, checks, requirement := suiteTestV3(t)
+				output := &checks.description.Outputs[0]
+				output.Kind = kind
+				output.Platform = "linux/amd64"
+				output.BuildSubjects = []delivery.BuildSubject{{Component: "a-tool", Digest: output.BuildSubjects[0].Digest}, {Component: "z-material", Digest: "sha256:" + strings.Repeat("b", 64)}}
+				if kind == lifecycle.OutputDiskImage {
+					output.DiskEvidence = "producer-only; content inspection not performed"
+				}
+				if tc.edit != nil {
+					tc.edit(&fixture.observation.Subjects[0])
+				}
+				if tc.missing {
+					fixture.observation.Subjects = fixture.observation.Subjects[1:]
+				}
+				rebindSuiteFixtureV3(t, fixture, &requirement)
+				receipt, err := authenticateSuiteV3(t.Context(), fixture, checks, requirement)
+				if tc.message != "" {
+					requireCode(t, err, e.CodeGateUnmet)
+					if receipt != nil || !strings.Contains(err.Error(), tc.message) {
+						t.Fatalf("wrong output binding was not reached: receipt=%v error=%v", receipt, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := receipt.require(t.Context(), checks.description); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
 	}
 }

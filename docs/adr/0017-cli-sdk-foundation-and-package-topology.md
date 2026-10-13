@@ -35,7 +35,8 @@ Unsigned self-consistency, authenticated historical observation and qualificatio
 after facade admission. That owner authenticates the triggering Run, native workers and independently
 selected suite configuration; caller files cannot construct missing smoke authority.
 The private `nvkr.dev/qualification-suite-configuration/v3` is operator configuration, not an
-authored lifecycle object. Its policy binds the full native policy digest and exact required suites.
+authored lifecycle object. Its policy binds the full native policy digest and exact required suites. The relationship
+to the public Verification Policy is deferred; no projection or conversion is implemented.
 
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
