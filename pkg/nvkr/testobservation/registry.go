@@ -84,6 +84,28 @@ type observationAuthenticator interface {
 	VerifyTestObservation(context.Context, sign.Subject, []byte) error
 }
 
+func validateCredentialScope(host string, options RegistryOptions) error {
+	if options.Credential != (sign.Credential{}) && options.Credential.Registry != host {
+		return e.New(e.CodeUsage, "observation credential is outside the independently selected registry host")
+	}
+	if (options.Transport.Username != "" || options.Transport.Password != "") && (options.Credential.Registry != host || options.Transport.Username != options.Credential.Username || options.Transport.Password != options.Credential.Password) {
+		return e.New(e.CodeUsage, "explicit observation transport credentials require the same host-scoped cosign credential")
+	}
+	return nil
+}
+
+// ValidateReference performs pure coordinate, transport and credential-host admission.
+func (o RegistryOptions) ValidateReference(reference string) error {
+	if err := ValidateReference(reference, o.Transport); err != nil {
+		return err
+	}
+	parsed, err := pinnedReference(reference)
+	if err != nil {
+		return err
+	}
+	return validateCredentialScope(parsed.Registry, o)
+}
+
 func admittedAuthenticator(ctx context.Context, options RegistryOptions) (observationAuthenticator, error) {
 	if err := captureContext(ctx); err != nil {
 		return nil, err
@@ -121,6 +143,13 @@ type Published struct {
 }
 
 func Publish(ctx context.Context, root, repository string, options RegistryOptions) (*Published, error) {
+	parsed, parseErr := registry.ParseReference(repository)
+	if parseErr != nil || parsed.Registry+"/"+parsed.Repository != repository || parsed.Reference != "" {
+		return nil, e.New(e.CodeUsage, "canonical untagged observation repository required")
+	}
+	if err := validateCredentialScope(parsed.Registry, options); err != nil {
+		return nil, err
+	}
 	authenticator, err := admittedAuthenticator(ctx, options)
 	if err != nil {
 		return nil, err
@@ -310,6 +339,9 @@ func (v *Verified) Close() error {
 }
 
 func VerifyOCI(ctx context.Context, reference string, expected Expected, options RegistryOptions) (*Verified, error) {
+	if err := options.ValidateReference(reference); err != nil {
+		return nil, err
+	}
 	if err := expected.Validate(); err != nil {
 		return nil, err
 	}

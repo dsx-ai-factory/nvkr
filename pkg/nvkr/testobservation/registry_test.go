@@ -332,3 +332,17 @@ func TestObservationRegistryRejectsCredentialExfiltrationRealm(t *testing.T) {
 		t.Fatal("registry credential escaped admitted origin")
 	}
 }
+
+func TestObservationCredentialsCannotFollowAnotherRegistryLocator(t *testing.T) {
+	options := RegistryOptions{Transport: delivery.RegistryOptions{Username: "fixture", Password: "private"}, Credential: sign.Credential{Registry: "registry.example", Username: "fixture", Password: "private"}}
+	if err := options.ValidateReference("untrusted.example/evidence@" + rawPin("x")); err == nil {
+		t.Fatal("credential followed locator to a different host")
+	}
+	if err := options.ValidateReference("registry.example/evidence@" + rawPin("x")); err != nil {
+		t.Fatal(err)
+	}
+	options.Credential = sign.Credential{}
+	if err := options.ValidateReference("registry.example/evidence@" + rawPin("x")); err == nil {
+		t.Fatal("transport credential lacks independent host scope")
+	}
+}
