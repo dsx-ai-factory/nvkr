@@ -27,10 +27,22 @@ type githubStage struct {
 
 const (
 	githubMaximumDiskJobTimeoutMinutes = 1440
+	githubMaximumStepTimeoutMinutes    = 360
 	githubDiskProviderOverheadMinutes  = githubSupportJobTimeoutMinutes
 	githubDiskCleanupHeadroomMinutes   = 5
 	githubDiskDiagnosticUploadMinutes  = 5
 )
+
+// GitHub limits an explicitly configured step timeout to six hours even on
+// self-hosted runners. Longer disk work retains its full helper-owned deadline
+// and enclosing job bound without emitting an unsupported step timeout.
+func githubDiskStepTimeoutMinutes(stage githubStage) int {
+	minutes := int((stage.diskExecutionBudget+time.Minute-1)/time.Minute) + githubDiskCleanupHeadroomMinutes
+	if minutes > githubMaximumStepTimeoutMinutes {
+		return 0
+	}
+	return minutes
+}
 
 // githubStageTimeoutMinutes projects the producer-owned per-node timeout into
 // GitHub's whole-minute job limit. A stage with no declared timeout keeps the
@@ -111,7 +123,7 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 	if roots != 1 || members == 0 || plan == nil {
 		return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q requires one bound VM producer", stage.ID)
 	}
-	if !diskBuildProvenance(plan) {
+	if githubDiskInspectionRequired(plan) {
 		started := time.Unix(0, 0)
 		deadline, err := diskEvidenceJoinDeadline(started, plan.Environment.DiskInspectionProfiles[platform].TimeoutSeconds, members)
 		if err != nil {
@@ -126,7 +138,7 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 	// The helper returns before the provider boundary, leaving time for owner
 	// cleanup and failure diagnostics. Earlier caller deadlines still win.
 	uploadMinutes := githubDiskDiagnosticUploadMinutes // failed Packer diagnostics
-	if !diskBuildProvenance(plan) {
+	if githubDiskInspectionRequired(plan) {
 		uploadMinutes += githubDiskDiagnosticUploadMinutes // always-run inspection diagnostics
 	}
 	overhead := uint64((githubDiskProviderOverheadMinutes + githubDiskCleanupHeadroomMinutes + uploadMinutes) * 60)
@@ -206,6 +218,9 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 			stage.Name = "Build, inspect and package " + stage.DiskOutput
 			if diskBuildProvenance(plan) {
 				stage.Name = "Build and package producer evidence for " + stage.DiskOutput
+			}
+			if GitHubDiskBuildOnly(plan) {
+				stage.Name = "Build and retain unqualified disk " + stage.DiskOutput
 			}
 			var err error
 			stage.diskExecutionBudget, stage.diskJobTimeoutMinutes, err = githubDiskStageBudget(plan, *stage)

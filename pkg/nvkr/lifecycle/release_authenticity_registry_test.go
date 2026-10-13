@@ -211,6 +211,12 @@ func TestAuthenticateRegistryNeverDownloadsPayloads(t *testing.T) {
 		{"disk-arm64", func(t *testing.T) (string, string) {
 			return testDiskPublication(t, "arm64", string(DiskEvidenceBuildProvenance), "")
 		}},
+		{"fde-amd64", func(t *testing.T) (string, string) {
+			return testDiskPublication(t, "amd64", string(DiskEvidenceBuildProvenance), "", "luks2")
+		}},
+		{"fde-arm64", func(t *testing.T) (string, string) {
+			return testDiskPublication(t, "arm64", string(DiskEvidenceBuildProvenance), "", "luks2")
+		}},
 		{"aggregate-image", authenticityRegistryIndexLayout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -265,7 +271,7 @@ func TestAuthenticateRegistryNeverDownloadsPayloads(t *testing.T) {
 				t.Fatalf("metadata requests=%d, forbidden payload GETs=%d", fixture.requests.Load(), fixture.payloadGets.Load())
 			}
 			assertAuthenticityWorkspaceClean(t, workspace)
-			if tc.name == "binary" {
+			if tc.name == "binary" || strings.HasPrefix(tc.name, "fde-") {
 				policy := authenticityRegistryPolicy()
 				policy.Scope = ScopeArtifactPublication
 				ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
@@ -328,15 +334,20 @@ func TestAuthenticateRegistryRejectsMissingOrCorruptEvidence(t *testing.T) {
 }
 
 func TestAuthenticateRegistryEnforcesDiskEvidenceMinimum(t *testing.T) {
-	for _, mode := range []string{"", string(DiskEvidenceBuildProvenance)} {
-		t.Run("evidence="+mode, func(t *testing.T) {
-			layout, _ := testDiskPublication(t, "amd64", mode, "")
+	for _, tc := range []struct{ arch, mode, encryption string }{
+		{"amd64", "", "none"},
+		{"amd64", string(DiskEvidenceBuildProvenance), "none"},
+		{"amd64", string(DiskEvidenceBuildProvenance), "luks2"},
+		{"arm64", string(DiskEvidenceBuildProvenance), "luks2"},
+	} {
+		t.Run(tc.arch+"/"+tc.encryption+"/"+tc.mode, func(t *testing.T) {
+			layout, _ := testDiskPublication(t, tc.arch, tc.mode, "", tc.encryption)
 			fixture := newAuthenticityRegistryFixture(t, layout)
 			consumer, _, workspace := fixture.consumer(t)
 			policy := authenticityRegistryPolicy()
 			policy.MinimumDiskEvidence = DiskEvidenceStrict
 			authenticated, err := consumer.Authenticate(t.Context(), fixture.reference, policy)
-			if mode != "" {
+			if tc.mode != "" {
 				assertCode(t, err, e.CodeGateUnmet)
 				if authenticated != nil {
 					t.Fatal("producer-only disk passed strict evidence policy")

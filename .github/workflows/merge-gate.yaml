@@ -597,7 +597,9 @@ jobs:
       - docs
       - docs-skip
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    # Allow runner finalization after the checks; a one-minute job budget can
+    # expire even after this script reports success.
+    timeout-minutes: 5
     steps:
       - name: Check gate
         run: |

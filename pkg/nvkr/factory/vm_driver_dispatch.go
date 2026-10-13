@@ -80,9 +80,8 @@ func dispatchAdmittedVMProducer(
 	if err != nil {
 		return nil, nil, err
 	}
-	if selected.Disk == nil || selected.Disk.Encryption != "none" {
-		return nil, nil, e.New(e.CodeEngineCapability,
-			"vm-image producer %q requires a typed non-public encryption secret channel", selected.Component)
+	if err := pipeline.ValidateVMImagePackerDiskExecution(selected); err != nil {
+		return nil, nil, err
 	}
 	if selected.BuilderType != ir.BuilderVMImage || selected.Packer == nil || len(selected.Command) != 0 {
 		return nil, nil, e.New(e.CodeEngineCapability,
@@ -105,7 +104,7 @@ func dispatchAdmittedVMProducer(
 				"Plan node %q is not a vm-image producer", node.ID)
 		}
 		if instruction.Packer == nil || len(instruction.Command) != 0 ||
-			instruction.Disk == nil || instruction.Disk.Encryption != "none" {
+			pipeline.ValidateVMImagePackerDiskExecution(instruction) != nil {
 			return e.New(e.CodePipelineDrift,
 				"vm-image producer %q changed its admitted Packer contract", instruction.Component)
 		}
@@ -160,11 +159,10 @@ func closeRejectedVMArtifact(primary error, artifact vmArtifactCloser) error {
 		"closing rejected VM driver artifact")
 }
 
-// validateVMDriverPlan keeps every encrypted vm-image form closed until the
-// source contract and runtime provide a typed non-public secret channel. It also
-// keeps command/Make authoring disconnected until a held-output adapter exists.
-// Public literal variables and source-owned defaults cannot grant either
-// authority.
+// validateVMDriverPlan admits only the pipeline-owned unencrypted or explicit
+// public-bootstrap disk contract. Private encryption credentials and source-owned
+// defaults remain unsupported. Command/Make authoring stays disconnected until
+// a held-output adapter exists.
 func validateVMDriverPlan(plan *Plan) error {
 	if plan == nil {
 		return e.New(e.CodeUsage, "VM driver validation requires a Plan")
@@ -180,9 +178,8 @@ func validateVMDriverPlan(plan *Plan) error {
 		if instruction.BuilderType != ir.BuilderVMImage {
 			continue
 		}
-		if instruction.Disk == nil || instruction.Disk.Encryption != "none" {
-			return e.New(e.CodeEngineCapability,
-				"vm-image execution requires a typed non-public encryption secret channel")
+		if err := pipeline.ValidateVMImagePackerDiskExecution(instruction); err != nil {
+			return err
 		}
 		if instruction.Packer == nil || len(instruction.Command) != 0 {
 			return e.New(e.CodeEngineCapability,

@@ -74,6 +74,9 @@ func TestGitHubReporterPreservesPrimaryResult(t *testing.T) {
 					if !brokenLogs && failed && (!strings.Contains(stderr.String(), "at execute controller/build (exit 22") || strings.Contains(stdout.String(), "Completed:")) {
 						t.Fatalf("wrong failure logs: %s %s", &stdout, &stderr)
 					}
+					if !brokenLogs && !failed && !strings.Contains(stdout.String(), "last phase: execute controller/build") {
+						t.Fatalf("successful operation lost its final phase in logs: %s", &stdout)
+					}
 				})
 			}
 		}

@@ -84,6 +84,18 @@ func (d *Document) Graph(o GraphOptions) ([]byte, error) {
 	}
 }
 
+// GraphSnapshot returns the owning typed display projection without rendering or
+// parsing a diagram. Its collections are newly allocated and grant no authority.
+func (d *Document) GraphSnapshot(view string) (Graph, error) {
+	if err := (GraphOptions{View: view, Format: "json"}).Validate(); err != nil {
+		return Graph{}, err
+	}
+	if err := d.valid(); err != nil {
+		return Graph{}, err
+	}
+	return d.graph(view), nil
+}
+
 func (d *Document) graph(view string) Graph {
 	graph := Graph{SchemaVersion: "nvkr.dev/plan-graph-view/v1", PlanDigest: d.digest, View: view, Authority: "description-only", Vertices: []Vertex{}, Edges: []Edge{}}
 	addVertex := func(key, kind, label, reference, build string) {

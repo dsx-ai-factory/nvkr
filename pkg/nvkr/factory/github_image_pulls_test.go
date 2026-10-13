@@ -159,7 +159,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 			}
 		}
 	}
-	if disks != 2 || fetches == 0 {
+	if disks != 4 || fetches == 0 {
 		t.Fatalf("missing preparation for native disks or their source vendors: %d/%d", disks, fetches)
 	}
 	for _, test := range []struct{ name, before, after string }{

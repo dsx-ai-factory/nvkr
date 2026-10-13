@@ -139,7 +139,10 @@ cgroups and the provider's nesting policy. A mounted privileged Docker socket re
 Missing prerequisites fail capability admission. Arbitrary self-hosted labels are not admitted by the native disk route.
 
 The pipeline-attested `githubARC: native-kvm-v1` Environment policy admits only native Linux AMD64 and ARM64
-unencrypted direct-Packer QCOW2 outputs with required KVM. Their execution classes select exactly
+direct-Packer QCOW2 outputs with required KVM. Plain outputs retain their strict or build-provenance evidence
+selection. ADR-10's explicit public-bootstrap LUKS2 outputs require `diskEvidence: build-provenance-v1` for
+publication; secret-valued FDE, encrypted inspection and qualified execution fail admission before work.
+Their execution classes select exactly
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
 The operator must provision ephemeral single-job runners and restrict pool access to the reviewed workflow on the default branch and any exact
@@ -147,11 +150,29 @@ branches explicitly admitted by `githubDispatchBranches`. The generated disk job
 native interoperability are external acceptance requirements; emitting a label or naming an Environment does
 not establish those facts.
 
-The route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
+With publication and signing omitted, the same native policy also admits a **build-only diagnostic**
+workflow at `static-unqualified`. It accepts plain disks and ADR-10's explicit public-bootstrap LUKS2
+producer. Its grouped executor retains the live owner through exact QCOW2 export and producer-result
+recording, then transports the raw disk as a same-Run Actions artifact. Finalization rechecks the selected
+output's bytes and result membership without reconstructing runtime or publication authority. No disk
+inspection, release wrapper, registry upload, signing or OIDC job is emitted. The workflow still requires
+the exact dispatch branch and `nkd-arc` deployment policy. Generated build-only workflows admit exactly one
+disk output. Their finalizer restores the complete source/material/raw-disk closure on that output's selected
+native ARC pool, using its matching helper and `nkd-arc` Environment with only `contents: read`. Its two-hour
+job bound covers transfer, recovery and exact-byte observation; it does not rebuild, inspect or use KVM.
+If the catalog selects a private pin set, existing catalog-source credentials remain scoped to the
+final catalog-recompilation step; they are not passed to recovery or disk execution.
+The pool's configured scratch capacity is not a provider reservation or an observed finalizer capacity proof.
+Private native toolchain preparation may read
+the maintained `ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` namespaces; its temporary
+read-only credential remains outside producer execution. This mode does not use publication configuration
+as a surrogate for build credentials. Real native FDE execution is acceptance evidence recorded separately.
+
+The publication route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
 `nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
-Docker is the initial admitted runtime. Bootstrap, source fetch, registry publication, signing and finalization remain
-on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
+Docker is the initial admitted runtime. For publication workflows, bootstrap, source fetch, registry publication,
+signing and finalization remain on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
 and packaging operations into one bounded helper invocation against the complete Plan. The original producer
 session and held disk survive through packaging; strict mode additionally requires reconciliation. The raw disk has no independent
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
@@ -189,7 +210,11 @@ reserves fifteen minutes shared across provider pre-steps and successful carrier
 minutes each for cleanup and failed Packer diagnostic upload. Strict inspection reserves another five minutes
 for its independently bounded, always-run diagnostic upload; build-provenance mode does not charge that absent
 upload. Each producer is
-independently bounded; earlier caller deadlines still win. The complete job remains capped at twenty-four hours; generic hosted jobs retain their
+independently bounded; earlier caller deadlines still win. GitHub permits at most six hours for an explicit
+[step timeout](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepstimeout-minutes),
+including on self-hosted runners. The disk step emits that timeout only when its full helper deadline plus
+cleanup headroom fits the limit; longer steps omit the provider step timeout and remain bounded by their
+unchanged helper deadline and enclosing job. The complete job remains capped at twenty-four hours; generic hosted jobs retain their
 six-hour cap. These configured allowances provide neither per-step transfer budgets, a maximum transferable-byte
 proof, nor a measurement of remaining provider-job time. Near the ceiling, slow image pulls or successful
 carrier transfers can exhaust the shared reserves; fifteen minutes is an allowance, not evidence that those
@@ -339,7 +364,8 @@ material bytes, digest, component, architecture or deterministic staging path. T
 class, uses its host architecture to select the pinned VM
 toolchain, and projects the raw disk producer artifact into the named lifecycle output without ordinary binary
 packaging. A material-bearing command producer remains unsupported because it has no typed manifest handoff.
-The local unencrypted direct-Packer adapter is connected; command, encrypted and qualified VM adapters
+The local direct-Packer adapter admits unencrypted disks and ADR-10's explicit public bootstrap; command,
+secret-valued encrypted and qualified VM adapters
 still fail before source, subprocess, or output work. Runner requirements are not VM-image-specific
 metadata. The generic `execution.Requirements` shape carries minimum CPU, memory and ephemeral-storage capacity,
 an optional sorted OR-set of eligible runner-host platforms, typed capability policies, and an exact
@@ -421,11 +447,12 @@ direct-Packer dispatch boundary that requires this exact admission before Packer
 resolver contract binds the exact Plan, producer session, runtime, daemon and digest-pinned OCI toolchain images
 after pure Plan/workspace-shape validation but before workspace mutation. The resulting executor may perform source,
 material and output work only inside the single-use VM callback. The local production resolver is connected for
-the direct-Packer, unencrypted form only. The exact full-Plan subject is checked independently by resolver
+the direct-Packer unencrypted or explicitly public-bootstrap form only. The exact full-Plan subject is checked independently by resolver
 admission, local VM admission and dispatch; a valid Plan-only change with unchanged producer IR fails before the
 driver. Command/Make `vm-image` authoring still lowers into the Plan, but local execution rejects it before resolver
-or workspace mutation until a held-output adapter exists. Every encrypted form is rejected before source,
-material, toolchain or VM work until a typed non-public secret channel exists.
+or workspace mutation until a held-output adapter exists. Encrypted forms other than ADR-10's explicit
+public `luks_passphrase: changeit` diagnostic input are rejected before source, material, toolchain or VM
+work until a typed non-public secret channel exists. Public bootstrap values grant no confidentiality claim.
 
 Direct-Packer execution authenticates one already-local digest-pinned OCI toolchain for the selected host platform;
 it never pulls an image or invokes `packer init`. The image may declare at most one inherited `PATH`, which NVKR
@@ -692,13 +719,22 @@ packaged outputs and disclose Helm image binding when present; stable execution 
 retain the graph binding independently of display names. Each execution step logs its operation, node and
 producer instruction, component and selected output where applicable, platform/network, declared inputs and
 expected outputs. The host helper reports successful outputs, elapsed seconds, primary exit
-status and the last phase; failed execution cannot print a successful completion. Job summaries show the same diagnostic context and
-outcome without requiring every transfer step to be expanded. Closed log streams and an absent or unwritable summary cannot change the
-operation's exit status. Descriptions are emitted as one-line runtime data and escaped for control lines and Markdown;
+status and the last phase; failed execution cannot print a successful completion. Per-operation details stay in
+job logs. Closed log streams cannot change the operation's exit status. Descriptions are emitted as one-line
+runtime data and escaped for control lines and Markdown;
 arbitrary recipe arguments, source/destination URLs, file contents and environment values are not dumped.
 The exact producer argv remains in the canonical Plan for deliberate local inspection. Packaging reports the
 actual bound image digest, and publication reports its persisted immutable reference. Logs and summaries remain
 diagnostics, not authority receipts, completion evidence or qualification.
+
+Generated workflows write at most two optional summaries per Run attempt. One deterministic runner-bootstrap
+job writes a brief opening after native admission and before checkout. The existing always-run lifecycle
+finalizer writes the closing summary as its last step, after the final Run record upload. Its standalone shell
+uses provider job and step outcomes without requiring a checkout or helper. It counts required jobs by
+`success`, `failure`, `cancelled` and `skipped`, and reports the finalization outcome without claiming an
+authenticated Run or Release verdict. Missing or unwritable summary files cannot change the result. Runner
+loss, force cancellation or a pending deployment environment may prevent the final summary from running;
+two summaries are a ceiling, not an availability guarantee.
 
 Strict native disk inspection retains the sanitized bounded progress log in one atomically published, no-replace regular file beneath
 the original held workspace. The helper drains progress into a package-owned memory collector and writes to
@@ -708,7 +744,7 @@ evidence and payload uploads remain mandatory. Retention failure is reported wit
 Temporary siblings are not upload targets; publication happens only after complete writing and file sync.
 An existing destination is rejected, not overwritten or authenticated as this attempt's log; operators must
 retain the ephemeral, single-job workspace policy. Failure snapshots are folded in job logs with the same
-truncation marker as retained files, and summaries show the last accepted inspection phase. Successful operations
+truncation marker as retained files, and logs show the last accepted inspection phase. Successful operations
 do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit M2
 build-provenance mode emits neither inspection work nor its diagnostic upload. Changing the helper requires
 rebuilding and repinning its complete inspection image before claiming hosted operation.
@@ -724,7 +760,8 @@ closure to be uploaded or published.
 Generated steps invoke `factory github run-node`, `restore-inputs`, `pack-outputs`, or `recover` against
 the complete canonical Plan and an exact node or derived stage selector. The factory module admits the
 complete graph and capabilities before work, derives carrier membership and paths, and owns progress,
-optional summaries and utility-container launch. Utility nodes share a launcher with local execution; the
+optional per-operation summaries for explicit API callers and utility-container launch. Generated CLI
+operations do not write per-operation summaries. Utility nodes share a launcher with local execution; the
 inner helper checks the outer helper's exact Plan digest before executing. Provider YAML retains topology,
 permissions, source credential scope, pinned actions and explicit operator setup. Packing remains a separate
 step from source fetch so it receives no source credential. No authored transport manifest or arbitrary
@@ -740,7 +777,7 @@ artifacts. Logical commands, transport authentication and isolation remain uncha
 
 The legacy finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits
 every carrier and records its producer and restore outcome separately; it continues after missing carriers,
-failed producer jobs and returned restore failures. A diagnostic summary names every outcome. A successful batch
+failed producer jobs and returned restore failures. The recovery log names every outcome. A successful batch
 download or recovery step proves no completeness: the finalizer consumes those unchanged per-carrier records
 and authenticates the complete output and evidence closure. The helper accepts bounded `toJSON(needs)` data
 through a step environment value, with an exact stage/bootstrap job set, known statuses, duplicate rejection
@@ -759,8 +796,9 @@ permission. All credentials and signing remain outside ARC producer jobs.
 Every generated run script remains checked against GitHub's 21,000-character ceiling, conservatively measured
 as UTF-8 bytes, including explicit operator setup and bootstrap commands. The generator also rejects a
 workflow file over 500,000 UTF-8 bytes before returning a bundle or writing generated files; validation and
-bundle persistence enforce the same bound. Per-output workflows compact repeated values with YAML anchors
-and inline step maps, then compare the fully expanded JSON to the uncompressed workflow before acceptance.
+bundle persistence enforce the same bound. Per-output workflows compact repeated values with short YAML anchors
+and inline job maps, preserving string types when removing optional quotes, then compare the fully expanded JSON
+to the uncompressed workflow before acceptance.
 Compaction changes presentation only, not jobs, scripts or permissions. The limit follows GitHub's
 [500 KB workflow-file ceiling](https://docs.github.com/en/actions/reference/limits#workflow-file-size);
 files that remain oversized fail closed instead of generating an unstartable workflow.

@@ -92,7 +92,8 @@ Transport settings stay replaceable by environment owners.
 The pipeline-attested disk transport uses a distinct OCI manifest over the unchanged QCOW2 payload. Its one
 `application/vnd.qemu.qcow2` layer binds the exact payload digest and size. The checked config declares the
 guest platform; the layer media type and manifest annotations declare the QCOW2 format and encryption.
-Production consumption requires the explicit unencrypted declaration to match the release binding;
+Production consumption requires the explicit encryption declaration to match the release binding: `none`, or
+`luks2` only with signed `build-provenance-v1` evidence. Unknown, missing or substituted declarations fail closed;
 the diagnostic reader keeps a missing encryption declaration unknown. Manifest identity and payload identity are separate.
 An importing descriptor walk retains its verified disk owner through the same phase's payload copy instead
 of reopening and hashing that inode again for selection. A standalone producer wrapper is selected and
@@ -134,8 +135,13 @@ pre-start cancellation; externally exercised end-to-end consumption remains unre
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
 before a consumer may accept that projection. Object-store schema, credentials, publication and consumption
-remain deferred. FDE publication and qualified disk reproduction remain capability-gated. An FDE payload
-containing an unlock credential cannot pass the existing no-secret publication rule.
+remain deferred. Qualified disk reproduction and strict FDE publication remain capability-gated. An FDE payload
+containing a private unlock credential cannot pass the existing no-secret publication rule. ADR-10's
+public `changeit` bootstrap value has no confidentiality requirement. Its native ARC publication route requires
+explicit `build-provenance-v1`, retains the exact producer encryption declaration through wrapper and signed
+metadata, and makes no inspected-content, secure-deployment or confidentiality claim. The consumer's existing
+minimum evidence policy still rejects producer-only evidence when strict is required; no separate confidentiality
+policy is implied by accepting a disk. The separate raw diagnostic route remains build-only.
 
 ### 3. The emitted publish phase
 

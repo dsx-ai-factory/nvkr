@@ -9,6 +9,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // The explicit policy trusts these operator-managed, single-job ARC pools.
@@ -51,7 +52,8 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 	deny := func() error {
 		return e.New(e.CodeEngineCapability, "%s requires the native-kvm-v1 ARC disk route", adapter)
 	}
-	if plan.Environment.GitHubARC != "native-kvm-v1" || plan.Qualification != TierPipelineAttested ||
+	if plan.Environment.GitHubARC != "native-kvm-v1" ||
+		(plan.Qualification != TierPipelineAttested && !GitHubDiskBuildOnly(plan)) ||
 		plan.Environment.RunsOn != "" ||
 		plan.Environment.RuntimeBinary() != "docker" || plan.Environment.Runtime.RuntimeImage != "" ||
 		len(plan.Environment.Runtime.Services) != 0 || len(plan.Environment.Runtime.Setup) != 0 ||
@@ -71,9 +73,17 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 			}
 			if instruction.Kind != ir.KindBuild || instruction.BuilderType != ir.BuilderVMImage ||
 				instruction.Packer == nil || len(instruction.Command) != 0 || instruction.Disk == nil ||
-				instruction.Disk.Format != "qcow2" || instruction.Disk.Encryption != "none" ||
+				instruction.Disk.Format != "qcow2" ||
 				instruction.Packer.AcquisitionArchive == "" || instruction.Requirements == nil || instruction.ExecutionBinding == nil {
 				return deny()
+			}
+			if err := pipeline.ValidateVMImagePackerDiskExecution(instruction); err != nil {
+				return err
+			}
+			if !GitHubDiskBuildOnly(plan) {
+				if err := admitDiskPublicationEncryption(plan, instruction); err != nil {
+					return err
+				}
 			}
 			binding := instruction.ExecutionBinding
 			platform := string(binding.Class.HostPlatform)
@@ -88,7 +98,7 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 			if !strings.Contains(instruction.Toolchain, "@sha256:") {
 				return e.New(e.CodeUnpinnedInput, "ARC disk toolchain requires a published native OCI digest")
 			}
-			if !diskBuildProvenance(plan) {
+			if githubDiskInspectionRequired(plan) {
 				_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
 				if err != nil {
 					return err
@@ -107,7 +117,7 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 		return deny()
 	}
 	for _, output := range plan.LifecycleOutputs {
-		if output.Kind == PackageDiskImage {
+		if output.Kind == PackageDiskImage && !GitHubDiskBuildOnly(plan) {
 			if _, err := admitDiskEvidenceBuild(plan, output); err != nil {
 				return err
 			}

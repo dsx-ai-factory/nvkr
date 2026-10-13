@@ -283,6 +283,17 @@ only in the referenced instruction. Rendering and local execution resolve those 
 operation. Lifecycle owns attempts and persistence without constructing another compiler-input document or
 completing a returned Plan.
 
+Factory and lifecycle also project typed operation and named-output updates into
+bounded descriptive progress snapshots. The terminal presenter never parses log
+strings into completion or blocks producers on rendering. Final command reporting
+uses the returned Run/error pair; a retained complete Run can coexist with cleanup
+or reporting failure. Read-only Run inspection validates bounded canonical metadata
+and describes attempt markers without opening payloads or restoring authority.
+Public command result browsers also consume typed projections after their owning
+operations return and release receipts. Maintenance transactions and verifier
+scope remain with their existing owners; closing a view neither repeats nor
+reverses an operation. These presentation records are outside artifact/Plan/Run identity.
+
 A named Artifact keeps its payload digest across Run and Release views. The enclosing publication root has a
 separate identity. Release content binds the exact named payload membership, and the outer publication carries
 that content with its output and evidence bindings. Using the outer root as one of its own
@@ -418,7 +429,13 @@ Plan/graph inspection, GitHub generation, metadata-only release navigation and t
 `pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
 does not check artifact payload integrity or grant qualification; its contract tests establish no external
 registry or signing-service acceptance. Local unencrypted direct-Packer
-execution retains exact QCOW2 bytes; local disk publication remains closed.
+execution retains exact QCOW2 bytes; local disk publication remains closed. ADR-10 also admits an explicit
+public-bootstrap FDE diagnostic producer. ADR-18's native build-only workflow retains raw disk bytes and
+a static-unqualified Run without publication, signing or inspection. It makes no deployed confidentiality claim.
+The maintained M2 Definition also selects public-bootstrap FDE outputs for both native architectures with
+`build-provenance-v1` publication. Exact encryption metadata and payload identity are bound through delivery
+and signed release metadata; strict FDE inspection and qualified reproduction remain closed. The recorded
+AMD64 diagnostic bake does not establish FDE publication or ARM64 FDE operational acceptance.
 
 The [recorded M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated hosted delivery,
 signing, verification and finalization for all 34 outputs, including AMD64 and ARM64 disks. It used the
@@ -712,12 +729,15 @@ observed identity when available. Production predicates and run records provide 
 qualified EvidenceBundle is diagnostic and cannot stand in for an authenticated receipt (ADR-03/05/17).
 
 Generated GitHub operations include safe compiled node/component/output context, declared inputs and expected
-outputs, with elapsed time, primary exit status and exact failed phase in logs and diagnostic job summaries.
+outputs, with elapsed time, primary exit status and exact failed phase in job logs.
 The host helper owns logging, Plan-bound utility launch and exact carrier preparation/recovery; generated
 steps retain node selectors, provider actions, permissions and credential scope. Transfer steps batch exact
 carrier selections while retaining every mandatory restore and independent upload.
-Finalization records each carrier's producer/restore outcome even after returned recovery failures. Summary
-availability cannot authorize a result or replace authenticated Run finalization; see the
+Finalization logs each carrier's producer/restore outcome even after returned recovery failures. Generated
+workflows emit at most two optional summaries per attempt: a brief bootstrap opening and a finalizer closing
+with required-job counts and the finalization outcome. The closing step needs no helper or checkout; provider
+interruption or a pending environment can still prevent it. Summary availability cannot alter execution status,
+authorize a result or replace authenticated Run finalization; see the
 [CI log guide](ci-step-and-log-readability.md).
 
 Operational retention must preserve enough run, plan and subject information to investigate a partial publication.
@@ -866,7 +886,7 @@ selected KVM handles for one deadline-scoped callback, re-observes capacity befo
 handles. CPU is capped by affinity and cgroup ancestry; memory by availability and cgroup headroom.
 These are current-availability checks, not resource reservations or provider allocation proof.
 
-The unencrypted direct-Packer driver consumes that capability. Its run-owned resolver binds source,
+The direct-Packer driver for plain or explicitly public-bootstrap disks consumes that capability. Its run-owned resolver binds source,
 Plan, runtime/daemon and already-local pinned native toolchain before mutation. It transports an
 authenticated input archive into private named volumes, mounts consumer inputs read-only, fixes the
 execution environment, validates one exact Packer selector and returns one held QCOW2. It performs no
@@ -885,7 +905,9 @@ temporary credential configuration is removed before source/producer execution.
 
 The retained KVM descriptor proves availability during the callback, not consumption by QEMU. Docker's
 fixed device projection additionally checks kernel boot identity and device numbers. Command/Make,
-encrypted-disk, general hosted and qualified VM adapters remain closed. Arbitrary devices, nested
+secret-valued encrypted-disk, general hosted and qualified VM adapters remain closed. Public-bootstrap FDE
+admits raw retention and native build-provenance publication; encrypted inspection and strict publication remain
+unavailable. Arbitrary devices, nested
 virtualization, NUMA, accelerators and additional provider-specific lowering are deferred. In-process
 cleanup owns success, failure and cancellation; authenticated orphan recovery after hard process/host
 failure is also deferred. ADR-10/18 own the detailed admission and driver contracts;

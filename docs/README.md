@@ -9,10 +9,13 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
+| Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Customer operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
+| Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
+| Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
@@ -22,8 +25,10 @@ each concept to a worked example.
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
-[nine-output deploy example](../definitions/nvke-deploy/README.md), [35-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
-and [OS-image routes](../definitions/nvke-os/README.md). The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
+[nine-output deploy example](../definitions/nvke-deploy/README.md), [37-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
+and [OS-image routes](../definitions/nvke-os/README.md). The separate
+[FDE-only diagnostic workflow](../definitions/nvke-fde/README.md) selects one native disk for branch iteration.
+The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
 Experimental [public OS source producers](../definitions/nvke-os-source/README.md) and the
 [OVN source-build option](../definitions/nvke-ovn-source/README.md) are separate candidates, not full OS

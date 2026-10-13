@@ -14,7 +14,39 @@ import (
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/urfave/cli/v2"
 )
+
+func TestGitHubFactoryCommandsKeepOperationDiagnosticsInLogs(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{name: "success"},
+		{name: "failure", err: e.New(e.CodeVerifyFailed, "controlled operation failure")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			summary := filepath.Join(t.TempDir(), "summary.md")
+			t.Setenv("GITHUB_STEP_SUMMARY", summary)
+			called := false
+			command := githubFactoryCommand("diagnostic-test", "", func(_ *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+				called = true
+				if plan == nil || options.Stdout != os.Stdout || options.Stderr != os.Stderr || options.SummaryPath != "" {
+					t.Fatalf("operation must receive its plan and logs without a per-step summary: %+v", options)
+				}
+				return test.err
+			})
+			app := &cli.App{Commands: []*cli.Command{command}}
+			err := app.RunContext(t.Context(), []string{"nvkr", "diagnostic-test", "--plan", filepath.Join("..", "..", factory.FactoryPlanPath)})
+			if !called || err != test.err {
+				t.Fatalf("operation result changed: called=%t, error=%v, want %v", called, err, test.err)
+			}
+			if _, err := os.Stat(summary); !os.IsNotExist(err) {
+				t.Fatalf("operation wrote a per-step summary: %v", err)
+			}
+		})
+	}
+}
 
 func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", factory.FactoryPlanPath))
