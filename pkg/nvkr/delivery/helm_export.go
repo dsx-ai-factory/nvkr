@@ -4,9 +4,7 @@
 package delivery
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 
 	"github.com/dsx-ai-factory/nvkr/internal/helmarchive"
@@ -81,31 +79,13 @@ func ReadHelmChart(ctx context.Context, root, manifestDigest, name, version stri
 	if identity.Name != name || identity.Version != version {
 		return HelmChartExport{}, nil, e.New(e.CodeVerifyFailed, "chart archive differs from selected name/version")
 	}
-	archive, err := helmChartMetadata(raw)
+	config, err := readHelmChartConfig(ctx, root, manifest)
 	if err != nil {
 		return HelmChartExport{}, nil, err
 	}
-	configBytes, err := readBlob(ctx, root, manifest.Config, 8<<20)
-	if err != nil {
+	if err := matchHelmChartConfig(raw, config); err != nil {
 		return HelmChartExport{}, nil, err
-	}
-	var config helmChartConfig
-	if err := json.Unmarshal(configBytes, &config); err != nil {
-		return HelmChartExport{}, nil, e.Wrap(e.CodeVerifyFailed, err, "decoding chart config")
-	}
-	// Re-encode the existing metadata model so omitted empty collections retain
-	// the same meaning as their empty Chart.yaml counterparts.
-	configProjection, err := json.Marshal(config)
-	if err != nil {
-		return HelmChartExport{}, nil, e.Wrap(e.CodeInternal, err, "encoding chart config projection")
-	}
-	archiveProjection, err := json.Marshal(archive)
-	if err != nil {
-		return HelmChartExport{}, nil, e.Wrap(e.CodeInternal, err, "encoding chart archive projection")
-	}
-	if !bytes.Equal(configProjection, archiveProjection) || archive.Name != name || archive.Version != version {
-		return HelmChartExport{}, nil, e.New(e.CodeVerifyFailed, "chart config/archive or selected name/version differ")
 	}
 	return HelmChartExport{ManifestDigest: descriptor.Digest, ArchiveDigest: manifest.Layers[0].Digest,
-		Size: int64(len(raw)), Name: archive.Name, Version: archive.Version}, raw, nil
+		Size: int64(len(raw)), Name: config.Name, Version: config.Version}, raw, nil
 }

@@ -33,6 +33,13 @@ _Avoid_: Producer, expected output, release
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
 Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
 signature or policy acceptance.
+A release description is a versioned, detached metadata view derived solely from a pinned publication;
+it is not another lifecycle object or a verified Release. It retains every named artifact, platform and
+bound source/evidence record, including aggregate image-index children. Source repository/commit belongs
+to its exact evidence subject rather than one release-wide revision; a normalized component version is
+not a Git tag. Consumers own deployment-role mapping, source compatibility and installation completeness.
+Export needs no separate Plan, mapping or producer workspace. Publisher-declared qualification is distinct
+from the description's metadata inspection scope, and the description adds no canonical identity.
 _Avoid_: Bundle, mutable tag, clearance
 
 **Verification Policy**:

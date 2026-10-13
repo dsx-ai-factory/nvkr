@@ -7,6 +7,40 @@ metadata:
   name: nvke-controller
   description: NVKE controller containers and helm chart.
 components:
+  nvkectl:
+    fromSource: true
+    source: nvke-cli
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: cli/bin/nkectl
+    writeDir: cli/bin
+    versionStamp:
+      NKECTL_VERSION: '{{.Commit}}'
+      NKECTL_COMMIT: '{{.Commit}}'
+      NKECTL_DATE: '{{.Date}}'
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        make -C cli build NKECTL_TREE=clean
+  nvke-controller-profiles-image:
+    fromSource: true
+    source: nvke
+    patches:
+      - name: patches/profiles-image.patch
+        sha256: sha256:e324612924f15eadeeb02f4ac73eeb9c265ae571fe781e0c741811c291dd9849
+    artifactPath: bin/nvke-controller-profiles-image-{{.Arch}}.oci.tar
+    writeDir: bin
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    outputType: oci-image
+    platforms: [linux/amd64, linux/arm64]
+    buildCommand:
+      - sh
+      - -ec
+      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src/nvkr-controller-profiles --opt platform=linux/{{.Arch}} --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nvke-controller-profiles-image-{{.Arch}}.oci.tar,oci-mediatypes=true
   nvke-controller-chart:
     helm:
       chart: .
@@ -108,6 +142,24 @@ components:
       evidence:
         none: true
 sources:
+  nvke-cli:
+    repo: https://github.com/dsx-ai-factory/nvke
+    constraint: v0.21.0
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        test ! -e controller/deploy/charts/go.sum
+        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod)"
+        cd cli
+        timeout --kill-after=10s 540s go mod download
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        cd ..
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        test ! -e controller/deploy/charts/go.sum
   nvke:
     pinSet:
       accounted:

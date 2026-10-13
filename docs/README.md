@@ -19,7 +19,7 @@ each concept to a worked example.
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
-[eight-output deploy example](../definitions/nvke-deploy/README.md), [35-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
+[nine-output deploy example](../definitions/nvke-deploy/README.md), [35-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
 and [OS-image routes](../definitions/nvke-os/README.md). The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
 Experimental [public OS source producers](../definitions/nvke-os-source/README.md) and the
@@ -33,7 +33,7 @@ records source availability and remaining gaps.
 |---|---|
 | Immutable attempts, completeness, consumer policy, and SDK | [Lifecycle](lifecycle.md) |
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
-| Registry/layout browsing, credentials, and metadata limits | [Release navigation](release-navigation.md) |
+| Registry/layout browsing, generic JSON export, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |

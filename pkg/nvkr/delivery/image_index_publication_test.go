@@ -154,6 +154,12 @@ func TestImageIndexPublicationHeldViewBindsChildrenAndEvidence(t *testing.T) {
 	if err != nil || len(artifacts) != 1 || subject != again.Metadata.ContentSubject {
 		t.Fatalf("held artifacts: %+v, %v", artifacts, err)
 	}
+	if artifacts[0].OS != "" || artifacts[0].Arch != "" {
+		t.Fatal("aggregate artifact invented a single native platform")
+	}
+	contradictory := artifacts[0]
+	contradictory.OS, contradictory.Arch = "linux", "amd64"
+	assertRegistryCode(t, contradictory.Validate(), e.CodeVerifyFailed)
 	artifacts[0].ImageIndex.Children = nil
 	fresh, _, err := publication.Artifacts(reference)
 	if err != nil || len(fresh[0].ImageIndex.Children) != 2 {

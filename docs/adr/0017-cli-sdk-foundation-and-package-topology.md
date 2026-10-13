@@ -117,7 +117,7 @@ these maintenance descriptions cannot grant execution or release authority.
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
 separating per-output Build Digest changes from execution and transport changes. It issues no authority.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse`, with
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse|export`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
@@ -146,6 +146,16 @@ by default; an explicit caller-owned workspace is retained while its private sta
 Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
 signature or policy verification, and cannot restore a verified Release capability. Explicit Release
 verification retains its full payload and policy checks. The existing compact local `release inspect` view remains.
+
+`lifecycle.ExportRelease(ctx, reference, options)` owns complete release-description export (ADR-19/20).
+It uses the same bounded inspection and versioned JSON description as `release browse --format json`.
+The `nvkr.dev/release-description/v1` schema is a detached read model, not another public lifecycle object.
+Export takes one immutable OCI reference; an optional local layout caches that exact publication. It needs
+no Plan, mapping, requested platform, producer checkout or build workspace. Every named output and platform
+is retained, including aggregate image-index children and exact evidence/source bindings. Consumer-specific
+roles, source compatibility and installation requirements remain outside this interface. The CLI writes the
+complete description after admission and metadata validation. Export creates no identity, Run completion,
+payload or signature acceptance, or publication authority. Unpublished workspace export is not an interface.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic

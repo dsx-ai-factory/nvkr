@@ -669,6 +669,48 @@ The root reader rejects extra blobs and bounds control/evidence to 512 MiB per r
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
 config-declared platforms and derived sibling locators, without reading payload layers or verifying policy.
 Filtering follows complete metadata validation; detached views establish no registry-availability claim.
+Artifact views also expose config-derived OS/architecture and Helm chart version (not appVersion), with
+native indexes retaining child platforms. Full Helm verification compares the config with Chart.yaml.
+Generic release export and JSON browsing share the explicit `nvkr.dev/release-description/v1` schema.
+Export requires only the immutable publication reference and preserves every named output, native platform,
+aggregate image-index digest/child membership and exact evidence/source binding. Source repository/commit
+descriptions come from output-bound source SBOM properties, without inferred Git tags or a release-wide
+source pin. Different revisions of one repository remain valid descriptive records. The inspection scope and
+individual checks performed are separate from publisher-declared qualification. No NVKE role dictionary,
+installer schema, separate Plan/mapping or unpublished workspace path remains. Consumer-owned code selects
+roles, compatible revisions, platforms and complete installation dependencies. The
+[release navigation reference](../release-navigation.md) owns the versioned contract. Targeted lifecycle,
+CLI, delivery and description tests cover complete membership, byte-identical unfiltered export/browse
+JSON, source binding, explicit inspection scope and admission. Before the namespace cutover, on 2026-10-10,
+the pinned Go 1.27.2 local completion gate passed with uncached tests, vet, lint, license, shell/Python checks
+and vulnerability scanning; the full uncached race suite also passed on macOS. Changed published documentation passed MDX and local-link
+checks; Fern site compilation was not run because Fern was unavailable.
+That pre-cutover validation does not validate the renamed reader. Those contracts do not establish a
+downstream consumer's acceptance of this wire schema. No complete offline installation or authenticated
+Release acceptance is established by export.
+
+On 2026-10-10, bounded inspection of retained metadata from
+[Run 37736529644](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37736529644) reproduced 34 outputs
+and five Helm chart versions: controller 0.1.1, PostgreSQL 18.5.15, SPIRE 0.30.1, SPIRE CRDs 0.6.1 and
+Temporal 0.74.0. The publication reference is
+`ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:2fef87f426734a4427f7694aaf5ac181ba11352ea37522349bbb9cda7d84dc42`.
+This was metadata inspection only; an earlier independent full-payload attempt authenticated the root and
+then failed downloading the ARM64 disk with an HTTP/2 `PROTOCOL_ERROR`. There is no successful full-release
+verification result from that attempt. The controller uses `33fb71b2f4224b470ebc628a9165fc4b92870406` and the
+CLI uses `ed9fb09b04fd40bf331d25df2222206ffaca593e` from the same NKE repository; matching ARM64 controller/CLI
+artifacts are absent. These are inventory facts. A downstream installer decides whether those revisions and
+platforms satisfy its requirements; generic export neither reconciles them nor requires an unpublished Plan.
+The generic CLI export was exercised against that exact retained metadata cache on 2026-10-10. It emitted
+`nkd.dev/release-description/v1` with all 34 outputs, 60 evidence entries and 23 source records: 16 native
+AMD64 outputs, 13 native ARM64 outputs and five charts without platform labels. It preserved both NKE
+revisions above and five distinct repository-spelling/commit pairs. This was a local-cache metadata export,
+not a fresh registry read, payload or signature verification, or installer-compatibility check. These are
+historical NKD namespace records: current NVKR readers reject their old schemas and digest families. The
+record does not establish current-schema external acceptance or authorize converting signed metadata.
+Separate direct Docker builds of the pinned profiles carrier passed the chart's `/bin/sh` and
+`cp -a /profiles/. /profiles-out/` operation with container networking disabled on ARM64 and emulated
+AMD64, plus the ARM64 local diagnostic profile. These checks establish the runnable carrier only, not
+NKD wrapped execution, publication, native AMD64 runtime, fleet profile validity or offline installation.
 [Registry browsing of the recorded candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
 retains the external scope and binary identity.
 
