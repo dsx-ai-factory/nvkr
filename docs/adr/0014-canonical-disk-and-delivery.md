@@ -147,8 +147,13 @@ the ciphertext still has only its exact per-artifact delivery identity.
 
 The authoring schema can represent the current NVKE `luks2` component without asserting that qualified boundary.
 The [current FDE design](https://github.com/dsx-ai-factory/nvke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/docs/full-disk-encryption.md#L14-L34)
-ships a shared unlock-capable passphrase in a LUKS slot and GRUB until first-boot TPM binding succeeds. ADR-20's
-no-secret rule therefore prohibits its publication unchanged. Schema validity is not publication acceptance.
+ships a shared unlock-capable passphrase in a LUKS slot and GRUB for first-boot TPM binding. ADR-10 admits
+the documented `changeit` value only as an explicitly public diagnostic input; it has no confidentiality
+requirement and is not a private credential smuggled through public variables. The raw build artifact is
+still not admitted for release publication. An actual private passphrase embedded in those files violates
+ADR-20's no-secret rule. Cloned disks also retain the original volume key after TPM keyslot enrollment,
+so the diagnostic image supplies no deployed confidentiality claim. Schema validity and diagnostic byte
+retention are not publication or firstboot acceptance.
 
 ### 4. Delivery follows explicit artifact formats
 

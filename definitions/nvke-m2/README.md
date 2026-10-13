@@ -47,7 +47,7 @@ admits only `main`; the temporary PR #97 branch-test exception has been removed 
 cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
-Packer pin for the nine selected AMD64 producers only, retaining the separate BuildKit pin.
+Packer pin for the nine M2 AMD64 producers plus the separately selectable FDE root, retaining the separate BuildKit pin.
 The OS catalog directly retains its published ARM64 Docker Packer pin.
 The two inspector profiles use measured executable hashes and published native image manifests.
 Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
@@ -131,8 +131,8 @@ budgets, not observed allocation or general runner-capacity guarantees. Docker u
 and producer-declared build-network controls; no ambient storage-driver workaround is selected.
 
 `os-catalog` directly retains the historical published ARM64 Docker Packer candidate.
-`native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine selected
-source-map consumers, preserving OVN's separate BuildKit pin. These historical images do not establish
+`native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine M2
+source-map consumers and the separately selectable FDE root, preserving OVN's separate BuildKit pin. These historical images do not establish
 reproduction of the current Dockerfile or bootstrap compiler. Internal Packer/inspector images were
 published under the user's scoped candidate exception. Their source locks retain unresolved general
 license/security approval gates; the exception does not mark those reviews complete. See

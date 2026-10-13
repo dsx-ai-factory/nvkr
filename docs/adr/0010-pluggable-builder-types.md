@@ -12,7 +12,8 @@
 - **Scope:** The numbered builder contract is for qualified execution; the later Decision sections define v1
   source lanes and disk compilation. Unencrypted direct-Packer execution is admitted locally and through
   ADR-18's explicit native ARC pipeline-attested route. Qualified Nix/VM execution, general hosted VM
-  adapters and general fused large-output wrapped jobs remain capability-gated. The BuildKit lane and
+  adapters and general fused large-output wrapped jobs remain capability-gated. A build-only diagnostic
+  exception admits direct-Packer LUKS2 with the explicit public bootstrap value described below. The BuildKit lane and
   strict/M2 disk evidence modes retain their separate contracts.
 
 ## Context
@@ -213,7 +214,8 @@ directory after the build returns and before private containers, volumes and wor
 file and aggregate byte counts are bounded. Missing, timed-out or oversized log collection records an incomplete
 diagnostic marker without discarding a separately verified successful disk. Absolute or traversing paths, links, devices, duplicate paths and
 replacement of an existing diagnostic set fail closed. These files are non-authoritative diagnostics, not Build,
-Artifact or qualification evidence. The supported route supplies no secret channel and rejects FDE before work;
+Artifact or qualification evidence. The supported route supplies no secret channel. Its FDE exception accepts
+only the explicitly public bootstrap value below; other encrypted inputs fail before work.
 the adapter does not retain the generated SSH key, environment, home, configuration, cache, HTTP or output
 directories. The [2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
 Docker/Packer/NVKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
@@ -310,9 +312,19 @@ establish disk reproduction. The root remains pipeline-attested unless ADR-07/08
 compare its exact qualified disk subject.
 
 Secret-valued Packer inputs are not public variables and may not be transported in process arguments, environment
-variables, manifests, logs or evidence. The plain-image direct contract needs no such input. FDE remains closed
-until its source-owned contract provides an authenticated file-path secret handoff or generates and removes an
-attempt-local bootstrap secret without exposing it through NVKR's public variable transport.
+variables, manifests, logs or evidence. The plain-image direct contract needs no such input. A diagnostic
+direct-Packer `luks2` producer may explicitly declare exactly one public `luks_passphrase: changeit` variable.
+That documented placeholder is a public logical input included in Build identity, not a secret reference.
+Omission, duplicate bindings and other values fail capability admission without echoing their contents.
+The shared pipeline admission owner enforces this before source, runtime or output work. This route grants
+raw artifact retention only, locally or in ADR-18's build-only native ARC workflow; encrypted publication,
+inspection and qualified reproduction remain closed.
+
+The public bootstrap disk makes no confidentiality claim, including after TPM enrollment: cloning its
+LUKS payload preserves the volume key, and changing unlock slots does not rotate that key. The source audit
+beside `definitions/nvke-fde` records retained bootstrap files, SSH key distinctions and firstboot limitations.
+Secret-valued FDE still requires an authenticated file-path handoff and source-owned lifetime/retention
+contract; injecting a GitHub secret cannot protect a value that upstream writes into GRUB and guest files.
 
 Runner capacity is not part of `vm-image`. A from-source component may declare generic `buildRequirements`
 using ADR-18's per-step execution contract. A `vm-image` producer must use that same generic type to declare a
@@ -356,7 +368,8 @@ not remove or invalidate the standalone Make entrypoint. Compiler lowering
 supports a direct-Packer producer with typed materials and a command producer without materials. A
 material-bearing `vm-image` command/Make producer remains capability-gated. Unencrypted direct-Packer
 execution and disk collection are connected locally; ADR-18/20 admit the explicit native ARC hosted
-publication route. General hosted VM, qualified and encrypted execution remain unavailable. Ordinary
+publication route. The explicit public-bootstrap FDE exception is build-only. General hosted VM, qualified
+and secret-valued encrypted execution remain unavailable. Ordinary
 `oci-hermetic` producers use the admitted fixed material mount described above.
 An override that changes NVKE's derived
 output filename must also change the catalog artifact path; NVKR never guesses it.

@@ -124,7 +124,10 @@ An optional future S3 object and CDN URL must project those same payload bytes, 
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
 before a consumer may accept that projection. Object-store schema, credentials, publication and consumption
 remain deferred. FDE publication and qualified disk reproduction remain capability-gated. An FDE payload
-containing an unlock credential cannot pass the existing no-secret publication rule.
+containing a private unlock credential cannot pass the existing no-secret publication rule. ADR-10's
+public `changeit` bootstrap value has no confidentiality requirement; its diagnostic Actions artifact
+route is separate from release publication and does not relax private-credential handling. FDE release
+publication remains closed independently of that public-value exception.
 
 ### 3. The emitted publish phase
 

@@ -352,7 +352,7 @@ func TestNativeRoutesPreserveARCDiskGrouping(t *testing.T) {
 }
 
 func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
 	if err != nil {
 		t.Fatal(err)
 	}

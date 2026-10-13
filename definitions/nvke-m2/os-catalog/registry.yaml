@@ -273,6 +273,55 @@ components:
           -cf /src/nvkr-output/nvke-kubeadm-distro.tar .
     writeDir: nvkr-output
     artifactPath: nvkr-output/nvke-kubeadm-distro.tar
+  nvke-node-fde-amd64:
+    platforms: [linux/amd64]
+    fromSource: true
+    source: nvke-os
+    builderType: vm-image
+    buildNetwork: default
+    outputType: disk-image
+    disk:
+      format: qcow2
+      encryption: luks2
+    buildRequirements:
+      resources:
+        cpuMillis: 8000
+        memoryMiB: 10240
+        ephemeralStorageMiB: 65536
+      allowedHostPlatforms: [linux/amd64]
+      capabilities:
+        - name: kvm
+          policy: required
+      timeoutSeconds: 21600
+    packer:
+      projectPath: os-image/packer
+      packerVersion: 1.15.4
+      buildName: nke-node-fde.qemu.nke-fde
+      architectureVariable: architecture
+      acceleratorVariable: accelerator
+      materialManifestVariable: material_manifest
+      materialManifest:
+        schemaVersion: nke.dev/os-image-materials/v1
+        kinds:
+          image-inputs: archive
+          installer-iso: disk-image
+      outputDirectoryVariable: output_directory
+      sshPrivateKeyVariable: ssh_private_key_file
+      sshPublicKeyVariable: ssh_public_key_file
+      buildLogDirectoryVariable: build_log_directory
+      acquisitionArchive: fde/apt-acquisitions.tar
+      variables:
+        capture_apt_acquisitions: "true"
+        efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
+        efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
+        # Public bootstrap fixture, deliberately included in Build identity.
+        # This image makes no deployed confidentiality or release claim.
+        luks_passphrase: changeit
+        ssh_timeout: 180m
+    materials:
+      image-inputs: nvke-image-inputs
+      installer-iso: nvke-patched-installer-iso-amd64
+    artifactPath: fde/nke-node.qcow2
   nvke-node-image:
     platforms: [linux/arm64]
     fromSource: true

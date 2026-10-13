@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -55,6 +54,11 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	}
 	if err := admitGitHubRequirements(plan, "GitHub generation"); err != nil {
 		return nil, err
+	}
+	if GitHubDiskBuildOnly(plan) {
+		if _, err := githubDiskBuildFinalizerRunner(plan); err != nil {
+			return nil, err
+		}
 	}
 	if err := admitGitHubPlatforms(plan); err != nil {
 		return nil, err
@@ -246,9 +250,13 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand("prepare-images", "stage", stage.ID))
 		}
 		if stage.DiskOutput != "" {
-			fmt.Fprintf(&body, "      - name: %s\n        id: run-disk\n        timeout-minutes: %d\n        run: %s\n", yamlSingle(stage.Name), int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes, githubRunnerCommand("run-disk", "output", stage.DiskOutput))
+			fmt.Fprintf(&body, "      - name: %s\n        id: run-disk\n", yamlSingle(stage.Name))
+			if minutes := githubDiskStepTimeoutMinutes(stage); minutes != 0 {
+				fmt.Fprintf(&body, "        timeout-minutes: %d\n", minutes)
+			}
+			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand("run-disk", "output", stage.DiskOutput))
 			writeGitHubPackerDiagnosticStep(&body, stage, actions)
-			if !diskBuildProvenance(plan) {
+			if githubDiskInspectionRequired(plan) {
 				// Diagnostics are short-lived descriptions, never planned evidence
 				// carriers. Preserve them even when the live inspection fails.
 				diagnostic := githubInspectionDiagnosticStep(actions, stage.DiskOutput)
@@ -291,12 +299,27 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				return nil, e.New(e.CodeEngineCapability, "finalizer has no admitted utility runner/helper")
 			}
 		}
+		runsOn := githubBootstrapRunner(runner)
+		if GitHubDiskBuildOnly(plan) {
+			runner, err = githubDiskBuildFinalizerRunner(plan)
+			if err != nil {
+				return nil, err
+			}
+			if bootstrapJobs[runner] == "" {
+				return nil, e.New(e.CodeEngineCapability, "build-only finalizer has no matching native helper")
+			}
+			runsOn = runner
+		}
 		fmt.Fprintln(&body, "  nvkr-lifecycle-run:")
 		fmt.Fprintln(&body, "    name: Finalize Run and check completeness")
-		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runner)))
-		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
+		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(runsOn))
+		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubFinalizerTimeoutMinutes(plan))
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(allNeeds, ", "))
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))
+		if GitHubDiskBuildOnly(plan) {
+			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubARCEnvironment))
+			fmt.Fprintln(&body, "    permissions:\n      contents: read")
+		}
 		if PerOutputPublication(plan) {
 			target := plan.Targets["release"]
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironment))

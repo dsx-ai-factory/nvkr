@@ -11,7 +11,6 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"sigs.k8s.io/yaml"
@@ -144,7 +143,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		expectedTimeouts[jobID] = githubSupportJobTimeoutMinutes
 	}
 	if len(plan.LifecycleOutputs) > 0 {
-		expectedTimeouts["nvkr-lifecycle-run"] = githubSupportJobTimeoutMinutes
+		expectedTimeouts["nvkr-lifecycle-run"] = githubFinalizerTimeoutMinutes(plan)
 	}
 	expectedJobCount := len(stages) + len(bootstrap)
 	if len(plan.LifecycleOutputs) > 0 {
@@ -257,7 +256,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub job %q permits checkout to persist ambient credentials", jobID)
 			}
 			if step.Uses == actions.Upload && step.With["if-no-files-found"] != "error" {
-				if stage, ok := byNodeForJob(stages, jobID); ok && stage.DiskOutput != "" && !diskBuildProvenance(plan) &&
+				if stage, ok := byNodeForJob(stages, jobID); ok && stage.DiskOutput != "" && githubDiskInspectionRequired(plan) &&
 					reflect.DeepEqual(step, githubInspectionDiagnosticStep(actions, stage.DiskOutput)) {
 					continue
 				}
@@ -621,7 +620,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		}
 		for i, step := range steps {
 			if step.ID == "run-disk" {
-				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != int((stage.diskExecutionBudget+time.Minute-1)/time.Minute)+githubDiskCleanupHeadroomMinutes {
+				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != githubDiskStepTimeoutMinutes(stage) {
 					return e.New(e.CodeEngineCapability, "disk stage requires its bounded unconditional live executor")
 				}
 				executors++

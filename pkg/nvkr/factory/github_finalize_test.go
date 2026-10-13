@@ -76,3 +76,61 @@ func TestGitHubFinalizerRejectsMergedCarrierNameCollisionsBeforeOutput(t *testin
 		t.Fatalf("colliding carrier names returned bytes=%d error=%v", rendered.Len(), err)
 	}
 }
+
+func TestGitHubDiskBuildFinalizerUsesSelectedNativePool(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		for _, buildOnly := range []bool{false, true} {
+			name := platform + "/publication"
+			if buildOnly {
+				name = platform + "/build-only"
+			}
+			t.Run(name, func(t *testing.T) {
+				plan := arcTestPlan(t, platform)
+				if buildOnly {
+					plan = githubDiskBuildPlan(t, platform, "luks2")
+				}
+				bundle, err := RenderGitHub(t.Context(), plan)
+				if err != nil {
+					t.Fatal(err)
+				}
+				job := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nvkr-lifecycle-run"]
+				wantRunner, wantTimeout, wantEnvironment := githubBootstrapRunner(githubARCRunner(platform)), githubSupportJobTimeoutMinutes, ""
+				if buildOnly {
+					wantRunner, wantTimeout, wantEnvironment = githubARCRunner(platform), githubDiskBuildFinalizerTimeoutMinutes, githubARCEnvironment
+					if len(job.Permissions) != 1 || job.Permissions["contents"] != "read" || len(job.Env) != 0 {
+						t.Fatalf("build-only finalizer has unnecessary permissions/environment: %+v", job)
+					}
+				}
+				if job.RunsOn != wantRunner || job.TimeoutMinutes != wantTimeout || job.Environment != wantEnvironment || job.If != "${{ always() && "+githubDispatchCondition(plan)+" }}" {
+					t.Fatalf("finalizer placement differs: runner=%s timeout=%d environment=%s if=%s", job.RunsOn, job.TimeoutMinutes, job.Environment, job.If)
+				}
+				if !stepDownloadsArtifact(plan, job.Steps, "nvkr-exec-"+shortStableName(githubARCRunner(platform))) {
+					t.Fatal("missing native helper")
+				}
+			})
+		}
+	}
+}
+
+func TestGitHubDiskBuildFinalizerRejectsAmbiguousClosure(t *testing.T) {
+	for _, mutation := range []string{"missing output", "multiple outputs", "non-disk output", "multiple builds"} {
+		t.Run(mutation, func(t *testing.T) {
+			plan := githubDiskBuildPlan(t, "linux/amd64", "none")
+			switch mutation {
+			case "missing output":
+				plan.LifecycleOutputs = nil
+			case "multiple outputs":
+				plan.LifecycleOutputs = append(plan.LifecycleOutputs, plan.LifecycleOutputs[0])
+			case "non-disk output":
+				plan.LifecycleOutputs[0].Kind = PackageBinaryBundle
+			case "multiple builds":
+				plan.Builds = append(plan.Builds, plan.Builds[0])
+			}
+			runner, err := githubDiskBuildFinalizerRunner(plan)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if runner != "" {
+				t.Fatalf("ambiguous closure selected runner %s", runner)
+			}
+		})
+	}
+}

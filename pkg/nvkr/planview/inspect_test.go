@@ -20,9 +20,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
+// maintainedPlan loads the recorded M2 Plan independently of workflow selection.
 func maintainedPlan(t *testing.T) *factory.Plan {
 	t.Helper()
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../testdata/plans/nvke-m2.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -64,7 +64,7 @@ func TestRunGraphFormats(t *testing.T) {
 	lifecycleCommandRepo(t)
 	for _, format := range []string{"json", "dot", "mermaid"} {
 		t.Run(format, func(t *testing.T) {
-			output, err := invokeLifecycleCLI(t, "run", "graph", "--plan", ".github/nvkr-run/plan.json", "--format", format)
+			output, err := invokeLifecycleCLI(t, "run", "graph", "--plan", "testdata/plans/nvke-m2.json", "--format", format)
 			if err != nil {
 				t.Fatal(err)
 			}
