@@ -54,7 +54,8 @@ func TestLocalAutoTUIDiagnosticsReplayAfterRestorationAndJoining(t *testing.T) {
 			var returned *lifecycle.Run
 			execute := func(ctx context.Context, prepared *lifecycle.PreparedRun, options lifecycle.LocalOptions) (*lifecycle.Run, error) {
 				if _, ok := options.Stdout.(*rundiagnostics.Buffer); !ok || options.Stdout != options.Stderr {
-					t.Fatal("TUI did not select one bounded private collector")
+					t.Error("TUI did not select one bounded private collector")
+					return nil, e.New(e.CodeInternal, "unexpected diagnostic collector")
 				}
 				_, _ = options.Stdout.Write([]byte("private-stdout-sentinel\n"))
 				_, _ = options.Stderr.Write([]byte("private-stderr-sentinel\n"))
@@ -78,9 +79,16 @@ func TestLocalAutoTUIDiagnosticsReplayAfterRestorationAndJoining(t *testing.T) {
 				var ownerErr error
 				if test.cancel {
 					done := make(chan error, 1)
-					go func() { done <- work(workCtx) }()
+					go func() {
+						defer close(done)
+						done <- work(workCtx)
+					}()
 					cancel()
-					ownerErr = <-done
+					var ok bool
+					ownerErr, ok = <-done
+					if !ok {
+						t.Fatal("work exited without returning")
+					}
 				} else {
 					ownerErr = work(workCtx)
 				}
