@@ -16,7 +16,7 @@ import (
 )
 
 func TestMetadataDescriptionExcludesPayloadVerification(t *testing.T) {
-	for _, kind := range []string{"executable", "disk-image"} {
+	for _, kind := range []string{"executable", "disk-image", outputFormatHelm} {
 		t.Run(kind, func(t *testing.T) {
 			root, pin := metadataDescriptionFixture(t, kind)
 			reference := "registry.example.test/product/releases@" + pin
@@ -28,9 +28,16 @@ func TestMetadataDescriptionExcludesPayloadVerification(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			artifacts, _, err := publication.Artifacts(reference)
+			if err != nil || len(artifacts) != 1 || artifacts[0].OS != "linux" || artifacts[0].Arch != "amd64" {
+				t.Fatalf("held artifacts lost checked platform: %+v, %v", artifacts, err)
+			}
 			want, err := publication.Description(reference)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if kind == outputFormatHelm && (artifacts[0].ChartVersion != "1.2.3" || want.Outputs[0].ChartVersion != "1.2.3") {
+				t.Fatalf("Helm projection lost chart version: %+v, %+v", artifacts, want)
 			}
 			if err := publication.Close(); err != nil {
 				t.Fatal(err)
@@ -309,6 +316,9 @@ func metadataDescriptionFixture(t *testing.T, kind string) (string, string) {
 	t.Helper()
 	if kind == "executable" {
 		return releasePublicationFixture(t)
+	}
+	if kind == outputFormatHelm {
+		return helmPublicationFixture(t, "amd64", "")
 	}
 	request, _ := diskPublicationRequest(t, "amd64")
 	root := filepath.Join(t.TempDir(), "publication")

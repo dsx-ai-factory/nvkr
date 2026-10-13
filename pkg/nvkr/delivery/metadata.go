@@ -135,7 +135,8 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 			return Inspection{}, err
 		}
 	}
-	if err := verifyReleaseEvidence(ctx, root, publication); err != nil {
+	sources := map[string]PublicationSource{}
+	if err := verifyReleaseEvidenceSources(ctx, root, publication, sources); err != nil {
 		return Inspection{}, err
 	}
 	outputs, err := MetadataOutputs(publication)
@@ -146,7 +147,7 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 	if err != nil || subject != publication.Release.ContentSubject {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "release metadata content subject differs")
 	}
-	return Inspection{Root: publication, RootDigest: digestBytes(raw), RootConfig: manifest.Config}, nil
+	return Inspection{Root: publication, RootDigest: digestBytes(raw), RootConfig: manifest.Config, sources: sources}, nil
 }
 
 // MetadataOutputs projects descriptions only. It never observes payload bytes.
@@ -161,6 +162,7 @@ func MetadataOutputs(root PublicationRoot) ([]Output, error) {
 		}
 		b := object.Output
 		o := Output{Name: object.Name, Kind: b.Format, Digest: object.DescriptorDigest, BuildDigest: b.BuildDigest, Components: append([]string(nil), b.Components...), Disk: cloneDiskOutput(b.Disk), ImageIndex: b.ImageIndex.Clone()}
+		o.OS, o.Arch = object.OS, object.Arch
 		if b.Format == "apt-repository" {
 			o.Digest = object.SemanticDigest
 		}
@@ -191,7 +193,8 @@ func metadataEvidence(ctx context.Context, root string, object PublishedObject) 
 }
 
 // VisitMetadataEvidence visits each exact subject/bundle after validating the
-// complete control-document closure once. The visitor owns cryptographic policy.
+// complete control-document closure and requiring attested evidence. Raw
+// preparation documents cannot reach the visitor, which owns cryptographic policy.
 func VisitMetadataEvidence(ctx context.Context, root, expectedRootDigest string, visit func(context.Context, string, []byte) error) error {
 	if visit == nil || !canonical.IsDigest(expectedRootDigest) {
 		return e.New(e.CodeUsage, "metadata evidence requires a visitor")
@@ -202,6 +205,9 @@ func VisitMetadataEvidence(ctx context.Context, root, expectedRootDigest string,
 	}
 	if inspected.RootDigest != expectedRootDigest {
 		return e.New(e.CodeVerifyFailed, "metadata evidence root changed")
+	}
+	if err := RequireAttestedEvidence(inspected); err != nil {
+		return err
 	}
 	for _, object := range inspected.Root.Objects {
 		if object.Evidence == nil {

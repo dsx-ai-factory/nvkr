@@ -102,6 +102,7 @@ type Inspection struct {
 	Root       PublicationRoot
 	RootDigest string
 	RootConfig Descriptor
+	sources    map[string]PublicationSource
 }
 
 type layoutWriter struct {

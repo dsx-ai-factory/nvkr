@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
 func dependencySubject(t *testing.T) *BOM {
@@ -229,6 +230,8 @@ func TestDependencyInspectionBindsArtifactBytes(t *testing.T) {
 	assertDependencyCode(t, err, e.CodeTimeout)
 }
 
+// TestPinnedScannerProtocol checks executable pins, isolated scanner inputs,
+// report validation, and rejection of a mutated subject with a controlled scanner.
 func TestPinnedScannerProtocol(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("held scanner execution is Linux-only")
@@ -272,6 +275,152 @@ func TestPinnedScannerProtocol(t *testing.T) {
 			}
 			if err != nil || len(got.Components) != 1 {
 				t.Fatalf("scanner result: %+v %v", got, err)
+			}
+		})
+	}
+}
+
+// TestPinnedScannerDiscoveryHint distinguishes explicit metadata diagnostics
+// from ordinary dependency inspection, independent of the caller's filename.
+func TestPinnedScannerDiscoveryHint(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("held scanner execution is Linux-only")
+	}
+	const inventory = `{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"type":"library","name":"dependency","version":"1.0.0","purl":"pkg:generic/dependency@1.0.0"}]}`
+	for _, tc := range []struct {
+		name, filename, snapshot, kind string
+		held, mutate, metadata         bool
+	}{
+		{"generic binary", "tool", "subject", "host-package", false, false, false},
+		{"ordinary Debian filename", "source-package.deb", "subject", "host-package", false, false, false},
+		{"Debian metadata diagnostic", "source-package.deb", "subject.deb", "host-package", false, false, true},
+		{"metadata diagnostic without extension", "package", "subject.deb", "host-package", false, false, true},
+		{"uppercase filename", "package.DEB", "subject", "host-package", false, false, false},
+		{"nonterminal extension", "package.deb.tmp", "subject", "host-package", false, false, false},
+		{"other extension", "package.rpm", "subject", "host-package", false, false, false},
+		{"held input has no filename hint", "package.deb", "subject", "host-package", true, false, false},
+		{"Debian snapshot mutation", "package.deb", "subject.deb", "host-package", false, true, true},
+		{"OCI path ignores Debian filename", "image.deb", "", "oci-image", false, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, tc.filename)
+			raw := []byte("fixture")
+			if err := os.WriteFile(file, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			body := "file=${2#file:}\n[ \"${file##*/}\" = " + tc.snapshot + " ] || { printf 'unexpected basename: %s\\n' \"${file##*/}\" >&2; exit 29; }\n"
+			if tc.kind == "oci-image" {
+				body = "case \"$2\" in oci-archive:*) ;; *) printf 'unexpected source: %s\\n' \"$2\" >&2; exit 29 ;; esac\n"
+			}
+			if tc.mutate {
+				body += "chmod u+w \"$file\"\nprintf changed > \"$file\"\n"
+			}
+			script := []byte("#!/bin/sh\n" + body + "printf '%s' '" + inventory + "'\n")
+			scannerPath := filepath.Join(dir, "scanner")
+			if err := os.WriteFile(scannerPath, script, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			scanner := Scanner{Path: scannerPath, Digest: fmt.Sprintf("sha256:%x", sha256.Sum256(script))}
+			digest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
+			var err error
+			var inventory DependencyInventory
+			if tc.held {
+				subject, openErr := heldfile.OpenContext(t.Context(), file, heldfile.Options{Label: "hint-test-subject", MaxBytes: 1024, ExpectedDigest: digest})
+				if openErr != nil {
+					t.Fatal(openErr)
+				}
+				defer subject.Close()
+				var receipt *DependencyScanReceipt
+				receipt, err = InspectHeldDependencies(t.Context(), subject, "host-package", scanner)
+				if err == nil {
+					inventory = receipt.Inventory()
+					observed, size, kind := receipt.Binding()
+					if observed != digest || size != int64(len(raw)) || kind != "host-package" {
+						t.Fatalf("held scan binding = %s/%d/%s", observed, size, kind)
+					}
+				}
+			} else if tc.metadata {
+				inventory, err = InspectDebianArchiveMetadata(t.Context(), file, digest, scanner)
+			} else {
+				inventory, err = InspectDependencies(t.Context(), file, digest, tc.kind, scanner)
+			}
+			if tc.mutate {
+				assertDependencyCode(t, err, e.CodeVerifyFailed)
+			} else if err != nil {
+				t.Fatal(err)
+			} else {
+				wantMethod := "syft-cyclonedx/v1"
+				if tc.metadata {
+					wantMethod = debianArchiveMetadataMethod
+				}
+				if inventory.Method != wantMethod {
+					t.Fatalf("inspection method = %q, want %q", inventory.Method, wantMethod)
+				}
+			}
+		})
+	}
+}
+
+// TestDebianMetadataAdmission checks capability inputs before file/scanner work.
+func TestDebianMetadataAdmission(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, tc := range []struct {
+		name    string
+		ctx     context.Context
+		digest  string
+		scanner Scanner
+		code    e.Code
+	}{
+		{"nil context", nil, "", Scanner{}, e.CodeUsage},
+		{"canceled context", ctx, "", Scanner{}, e.CodeTimeout},
+		{"missing subject digest", t.Context(), "", Scanner{}, e.CodeUnverifiedRef},
+		{"missing scanner pin", t.Context(), "sha256:" + strings.Repeat("a", 64), Scanner{Path: "missing-scanner"}, e.CodeProvenanceMissing},
+		{"missing scanner path", t.Context(), "sha256:" + strings.Repeat("a", 64), Scanner{Digest: "sha256:" + strings.Repeat("b", 64)}, e.CodeProvenanceMissing},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := InspectDebianArchiveMetadata(tc.ctx, "missing-subject", tc.digest, tc.scanner)
+			assertDependencyCode(t, err, tc.code)
+		})
+	}
+}
+
+// TestDebianArchiveMetadataCannotBecomeDependencies keeps diagnostic package
+// identity outside both dependency attachment and serialized BOM validation.
+func TestDebianArchiveMetadataCannotBecomeDependencies(t *testing.T) {
+	components := []Component{{Type: "library", Name: "package", Version: "1", PURL: "pkg:deb/package@1?arch=arm64"}}
+	pin := "sha256:" + strings.Repeat("b", 64)
+	_, err := WithDependencies(dependencySubject(t), components, debianArchiveMetadataMethod, pin)
+	assertDependencyCode(t, err, e.CodeUnsupported)
+	bom, err := WithDependencies(dependencySubject(t), components, "syft-cyclonedx/v1", pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		method, message string
+		code            e.Code
+	}{
+		{"", "dependency inventory omits its inspection method", e.CodeProvenanceMissing},
+		{debianArchiveMetadataMethod, "unsupported dependency inspection method", e.CodeUnsupported},
+		{"unknown/v1", "unsupported dependency inspection method", e.CodeUnsupported},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			candidate := cloneBOM(bom)
+			for i := range candidate.Metadata.Props {
+				if candidate.Metadata.Props[i].Name == "nvkr:dependencyInspection" {
+					if tc.method == "" {
+						candidate.Metadata.Props = slices.Delete(candidate.Metadata.Props, i, i+1)
+					} else {
+						candidate.Metadata.Props[i].Value = tc.method
+					}
+					break
+				}
+			}
+			err := candidate.Validate()
+			assertDependencyCode(t, err, tc.code)
+			if !strings.Contains(err.Error(), tc.message) || (tc.method != "" && !strings.Contains(err.Error(), tc.method)) {
+				t.Fatalf("method diagnostic = %v", err)
 			}
 		})
 	}

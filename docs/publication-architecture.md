@@ -97,7 +97,9 @@ Aggregate verification and finalization fetch manifests/configs and evidence, ne
 finalizer restores six carriers (metadata, reference, signing record, predicate, verification record and cosign),
 and still requires every provider job to succeed. Metadata readers reject extra blobs and enforce a 512 MiB
 control/evidence limit per root. Each output's full payload validation remains in its own publication route;
-independent consumers retain full payload validation. This mode is GitHub-only and requires production cosign
+independent consumers retain full payload validation under `artifact-publication` scope. The separate
+`authenticity` scope authenticates root/output signatures, provenance and required SBOM bundles using the
+metadata/evidence closure, and explicitly leaves payload integrity unchecked. This mode is GitHub-only and requires production cosign
 signing. Assembly and finalization receive registry-read access without OIDC or package-write permission.
 
 The SBOM-attestation job uses the same protected workflow identity and issuer as artifact signing. It needs

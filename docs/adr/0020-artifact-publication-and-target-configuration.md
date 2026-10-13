@@ -288,8 +288,8 @@ attempt of the same run under the same ordering and Plan checks.
 Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
 and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
 verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.
-Each output route still verifies its full payload closure. The independent Release consumer still retrieves
-and verifies full payloads through its existing held owner.
+Each output route still verifies its full payload closure. The independent Release consumer's
+`artifact-publication` scope retrieves and verifies full payloads through its existing held owner.
 
 In this mode finalization requires every provider job to succeed, then reauthenticates the aggregate root,
 exact Plan/invocation-bound production predicate, output signatures/provenance and SBOM bundles. Persisted
@@ -315,6 +315,14 @@ consumer. It contains sorted exact output names, kinds, artifact digests, Build 
 references are excluded. This ownership consolidation preserves existing canonical content bytes. The compiler
 still joins independently frozen output requirements to observed payloads before publication. The consumer does
 not reconstruct compiler records or derive both expectations and observations from release metadata.
+
+Consumer `authenticity` scope uses the bounded metadata/evidence reader, then authenticates the root and
+every required named output's signature and subject-bound production provenance under the external policy.
+It independently verifies every required SBOM bundle and enforces exact membership, subject/stage bindings
+and the policy's minimum disk evidence. Aggregate images retain native child manifests/configurations and
+platform-scoped evidence. It retrieves no artifact payload layers and issues only ADR-17's distinct
+authentication capability, which cannot authorize export or exact-input matching. A signed disk inventory
+authenticates the producer's inspection claim; this scope performs no consumer-side disk inspection.
 
 Consumer integrity checking opens an opaque delivery publication with an explicit lifetime. It snapshots the
 index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
@@ -352,11 +360,39 @@ Text, readable JSON and Mermaid explicitly label metadata inspection, leave payl
 policy unverified, and report qualification as a declaration. JSON escapes nonprinting Unicode without
 changing decoded string values, and empty build-subject collections are arrays. Output filtering occurs only
 after the whole metadata closure is checked. The diagram presents published relationships, not an inferred
-build graph. Navigation adds no canonical identity or publication authority and leaves explicit release
-verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
+build graph. Navigation adds no canonical identity or publication authority and leaves explicit
+artifact-publication verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
 payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nvkr/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md)
 separately records the earlier external inspection scope. Current readers require publication-root v4 and
 reject that v3 release; current-schema external acceptance is not established by the dated record.
+
+Artifact descriptions expose checked OS/architecture and Helm chart version in both bounded metadata and
+held full-payload projections. Chart version is read from the exact Helm config, separately from appVersion;
+full inspection also compares config metadata with the archive's Chart.yaml. Native image indexes retain
+their explicit child platform membership rather than a false single-platform label. Legacy chart outputs
+without a declared platform remain unlabeled. These descriptive additions do not change canonical release
+content bytes or substitute for the existing typed identities.
+
+Release description export projects the complete metadata closure into `nvkr.dev/release-description/v1`.
+It requires only the immutable publication reference as metadata input; an optional cached layout must match
+that exact root. No separate Plan, mapping, platform selection, producer checkout or unpublished workspace is
+accepted. Export and unfiltered JSON browsing share one explicit versioned wire description, backed by the
+same delivery-owned metadata reader. The schema does not directly serialize internal authority-bearing
+types or add a public lifecycle object, canonical identity or publication format.
+
+Every named output is retained, without a consumer-role dictionary or producer allowlist. Native artifacts
+keep their config-declared OS/architecture; aggregate images keep the published index digest and exact child
+platform membership. Helm chart version remains distinct from appVersion and says nothing about workload
+compatibility. Source repository/commit descriptions remain attached to their exact evidence/output/component
+bindings. There is no release-wide source pin, inferred Git tag or rule requiring all uses of one repository
+to share a revision. Missing or redacted source properties stay explicit descriptions, not invented pins.
+
+Metadata inspection scope and the publisher's declared qualification are separate fields. Export reads no
+artifact payload layers and authenticates no signatures or consumer policy. Its JSON cannot restore a held
+capability or become a verification receipt. Consumer-owned code selects deployment roles, target platforms,
+compatible source revisions and complete offline dependencies, then authenticates accepted artifacts under
+its policy. Full release verification retains its existing payload and policy checks. Unpublished packages
+remain Run artifacts and are not converted into a publication by this export interface.
 
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
 Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
@@ -384,8 +420,9 @@ same root. Signature/attestation attachments stay outside the signed index to av
 own repository for independent consumption. Signing processes deliverables before the root; hosted verification
 requires every child signature and attestation before recording success. The Release consumer still authenticates
 membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
-record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace, fetch every pinned manifest
-and verify its full payload/evidence closure before exposing accepted views. Metadata cannot redirect credentials
+record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.
+Artifact-publication acceptance additionally verifies the full payload closure; authenticity explicitly leaves
+payload integrity unchecked. Metadata cannot redirect credentials
 to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their
 repositories, then publishes the release index last; output-local and legacy hosted verification pull the full distributed closure.
 Per-output aggregate verification fetches only control documents and evidence. Plain `release inspect` is descriptive and exposes deliverables, not

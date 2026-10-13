@@ -230,11 +230,14 @@ The arrows are admission and verification boundaries. A failed or incomplete Run
 A signing dry-run creates no authenticated production claim. Release consumption requires an explicit policy;
 its pinned reference locates bytes and grants no authority by itself.
 
-Verification Policy also states the acceptance scope. Build-evidence verification authenticates the exact
-selected artifact publication, build identity, and production provenance. Full v1 release acceptance adds the
+Verification Policy also states the acceptance scope. Authenticity verifies signed release membership,
+root/output signatures and production provenance, and required SBOM bundles without retrieving artifact
+payload layers. Artifact-publication verification additionally checks the selected payload bytes. Full v1 release acceptance adds the
 separate qualification verdicts, identity, membership, and revocation requirements. Qualified acceptance retains
 its own authorization and lifecycle checks. An unavailable scope fails explicitly; it never falls back to
-build-evidence verification. The returned capability applies only to its exact reference and policy.
+weaker verification. The returned capability applies only to its exact reference and policy. Authenticity
+returns a distinct capability that records unchecked payload integrity and cannot authorize payload export
+or exact-input receipts.
 
 Each named output supplies its selection and format once. One compiler accepts admitted Definition and
 Environment values and returns a complete Plan, including the original input identities. It derives standard package envelopes,
@@ -287,9 +290,21 @@ downloads no artifact payload layers and accepts complete or metadata-only local
 payload bytes. Locators derive from the supplied root namespace; the detached description makes no
 registry-availability claim. Selecting an output changes the presentation only after all metadata is checked.
 These views explicitly label metadata inspection, leave payloads, signatures and consumer policy unverified,
-and cannot restore a live verification capability. Explicit Release verification retains its full payload and
-policy checks. [Release navigation](release-navigation.md) documents the registry and local entry points and
+and cannot restore a live verification capability. Artifact-publication verification retains its full payload
+and policy checks; authenticity applies signature/evidence policy to the metadata closure.
+[Release navigation](release-navigation.md) documents the registry and local entry points and
 their validation scope.
+
+Release export and JSON browsing share the versioned `nvkr.dev/release-description/v1` read model.
+The immutable publication reference supplies every artifact and evidence record; a cached layout may
+provide the same exact metadata closure. Export retains all named outputs and platforms, including aggregate
+image-index identity and child membership. Checked config metadata supplies native platforms and chart
+versions; output-bound source SBOM properties describe each source repository/commit without inventing a
+Git tag or a release-wide source pin. Publisher-declared qualification remains separate from metadata
+inspection scope and the explicit checks not performed. No Plan, mapping, platform selection, producer
+workspace, new identity or serialized verification capability is introduced. Consumers own role mapping,
+source compatibility, installation formats and offline completeness. Unpublished packages remain Run
+artifacts; this interface describes publications and does not assemble a release from a local workspace.
 
 Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
 unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
@@ -396,7 +411,9 @@ milestone specification.
 
 [Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
-`pipeline-attested` / `artifact-publication` consumer are implemented. Local unencrypted direct-Packer
+`pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
+does not check artifact payload integrity or grant qualification; its contract tests establish no external
+registry or signing-service acceptance. Local unencrypted direct-Packer
 execution retains exact QCOW2 bytes; local disk publication remains closed.
 
 The [recorded M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated hosted delivery,
@@ -628,8 +645,9 @@ For the M2 GitHub Environment, each output is published, signed and fully verifi
 assembly and finalization authenticate only bounded metadata and signed evidence from that same Plan and
 workflow run attempt. This avoids gathering all payloads on one runner while preserving one signed release
 entry point and exact output completeness. Failed provider jobs, mismatched attempt bindings or rejected
-signatures prevent completion. Independent consumption still verifies the complete payload closure
-(ADR-18/20); this does not add qualified reproduction or cross-run publication reuse.
+signatures prevent completion. Independent artifact-publication consumption still verifies the complete
+payload closure; authenticity checks only metadata and signed evidence under consumer policy (ADR-04/20).
+Neither adds qualified reproduction or cross-run publication reuse.
 
 Independent artifact consumption uses a signature and subject-bound production attestation on each deliverable
 manifest in its own repository. The release signature remains the authority for membership and SBOM coverage;

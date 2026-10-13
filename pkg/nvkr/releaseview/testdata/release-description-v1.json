@@ -1,0 +1,273 @@
+{
+  "schemaVersion": "nvkr.dev/release-description/v1",
+  "inspection": "metadata inspection; payloads, signatures and policy not verified",
+  "inspectionDetails": {
+    "scope": "metadata-only",
+    "metadataClosure": "complete",
+    "outputSelection": "all",
+    "checks": {
+      "metadataIntegrity": "checked",
+      "payloadIntegrity": "not-checked",
+      "signatures": "not-checked",
+      "consumerPolicy": "not-checked",
+      "registryAvailability": "not-checked",
+      "installationCompatibility": "not-checked"
+    }
+  },
+  "totalOutputs": 6,
+  "reference": "registry.example/product/releases@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "referenceScope": "derived from supplied root reference; no registry availability claim",
+  "rootDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "declaredQualification": "pipeline-attested",
+  "metadata": {
+    "invocationId": "workflow-run-42-attempt-1",
+    "definitionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "environmentDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "planDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "contentSubject": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "outputs": [
+    {
+      "name": "apt",
+      "kind": "apt-repository",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "reference": "registry.example/product/apt@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "components": [
+        "package"
+      ],
+      "artifactType": "application/vnd.nvkr.apt-repository.v1",
+      "buildSubjects": [
+        {
+          "component": "package",
+          "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    },
+    {
+      "name": "chart",
+      "kind": "helm-oci",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "reference": "registry.example/product/chart@sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "chartVersion": "8.2.1",
+      "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "components": [
+        "application-chart"
+      ],
+      "artifactType": "application/vnd.nvkr.helm-bundle.v1",
+      "buildSubjects": []
+    },
+    {
+      "name": "disk",
+      "kind": "disk-image",
+      "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "reference": "registry.example/product/disk@sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "os": "linux",
+      "arch": "arm64",
+      "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "components": [
+        "base-system"
+      ],
+      "disk": {
+        "evidenceMode": "build-provenance-v1",
+        "payloadDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "producer": "disk-builder",
+        "component": "base-system",
+        "format": "qcow2",
+        "encryption": "none",
+        "size": 4096,
+        "planDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "outcome": "succeeded"
+      },
+      "artifactType": "application/vnd.nvkr.disk-image.v1",
+      "buildSubjects": [
+        {
+          "component": "base-system",
+          "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      ]
+    },
+    {
+      "name": "image",
+      "kind": "oci",
+      "digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "reference": "registry.example/product/image@sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "os": "linux",
+      "arch": "arm64",
+      "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "components": [
+        "unfamiliar-service"
+      ],
+      "artifactType": "application/vnd.oci.image.manifest.v1+json",
+      "buildSubjects": [
+        {
+          "component": "unfamiliar-service",
+          "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ]
+    },
+    {
+      "name": "multi",
+      "kind": "oci",
+      "digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "reference": "registry.example/product/multi@sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "components": [
+        "multi-service"
+      ],
+      "imageIndex": {
+        "requiredPlatforms": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "children": [
+          {
+            "platform": "linux/amd64",
+            "manifestDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "size": 1024,
+            "buildDigest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "component": "multi-service",
+            "buildSubject": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          {
+            "platform": "linux/arm64",
+            "manifestDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 1025,
+            "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "component": "multi-service",
+            "buildSubject": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        ]
+      },
+      "artifactType": "application/vnd.oci.image.index.v1+json",
+      "buildSubjects": []
+    },
+    {
+      "name": "tools",
+      "kind": "executable",
+      "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "reference": "registry.example/product/tools@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "os": "linux",
+      "arch": "amd64",
+      "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "components": [
+        "cli",
+        "package"
+      ],
+      "artifactType": "application/vnd.nvkr.binary-bundle.v1",
+      "buildSubjects": [
+        {
+          "component": "cli",
+          "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
+          "component": "package",
+          "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "name": "sbom-image",
+      "kind": "sbom",
+      "reference": "registry.example/product/sbom-image@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "artifactType": "application/vnd.cyclonedx+json",
+      "manifestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "blobDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "semanticDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "binding": {
+        "platform": "linux/arm64",
+        "documentDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "outputs": [
+          "image"
+        ],
+        "component": "unfamiliar-service",
+        "stage": "build-output",
+        "subjectKind": "oci-manifest",
+        "subjectDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "inspectionInputDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "source": {
+        "repo": "https://example.org/product.git",
+        "commit": "1111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "sbom-multi-amd64",
+      "kind": "sbom",
+      "reference": "registry.example/product/sbom-multi-amd64@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "artifactType": "application/vnd.cyclonedx+json",
+      "manifestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "blobDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "semanticDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "binding": {
+        "platform": "linux/amd64",
+        "documentDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "outputs": [
+          "multi"
+        ],
+        "component": "multi-service",
+        "stage": "build-output",
+        "subjectKind": "oci-manifest",
+        "subjectDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "inspectionInputDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "source": {
+        "repo": "https://example.org/product.git",
+        "commit": "2222222222222222222222222222222222222222"
+      }
+    },
+    {
+      "name": "sbom-multi-arm64",
+      "kind": "sbom",
+      "reference": "registry.example/product/sbom-multi-arm64@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "artifactType": "application/vnd.cyclonedx+json",
+      "manifestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "blobDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "semanticDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "binding": {
+        "platform": "linux/arm64",
+        "documentDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "outputs": [
+          "multi"
+        ],
+        "component": "multi-service",
+        "stage": "build-output",
+        "subjectKind": "oci-manifest",
+        "subjectDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inspectionInputDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "source": {
+        "repo": "https://example.org/product.git",
+        "commit": "3333333333333333333333333333333333333333"
+      }
+    },
+    {
+      "name": "sbom-package",
+      "kind": "sbom",
+      "reference": "registry.example/product/sbom-package@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "artifactType": "application/vnd.cyclonedx+json",
+      "manifestDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "blobDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "semanticDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "binding": {
+        "platform": "linux/amd64",
+        "documentDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "outputs": [
+          "apt",
+          "tools"
+        ],
+        "component": "package",
+        "stage": "build-output",
+        "subjectKind": "file",
+        "subjectDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "inspectionInputDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "source": {
+        "repo": "https://example.org/dependency.git",
+        "commit": "4444444444444444444444444444444444444444"
+      }
+    }
+  ]
+}

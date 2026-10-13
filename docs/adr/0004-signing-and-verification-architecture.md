@@ -158,14 +158,28 @@ A Verification Policy explicitly selects lane and acceptance scope:
 
 | Lane / scope | Required acceptance |
 |---|---|
-| `pipeline-attested` / `artifact-publication` | Exact selected closure, accepted build signer identity and issuer, signature, and subject-bound production provenance |
+| `pipeline-attested` / `authenticity` | Exact metadata/evidence closure, root and every required named output's signature and subject-bound production provenance, and required SBOM bundles under the accepted build identity and issuer; artifact payload bytes unchecked |
+| `pipeline-attested` / `artifact-publication` | Exact selected payload/evidence closure, accepted build signer identity and issuer, signature, and subject-bound production provenance |
 | `pipeline-attested` / `release` | Artifact-publication checks plus ADR-16 qualification identity, verdicts, membership, and ADR-06 revocation checks |
 | `qualified` / `release` | Qualified authority, evidence, freshness, status, and publication contracts in ADR-05/06/16/20 |
 
+The `authenticity` scope fetches bounded manifests, configurations and evidence, including native child
+metadata for aggregate images, without retrieving artifact payload layers. Root authentication alone is
+insufficient: every required named output must satisfy the signature/provenance checks, and every required
+SBOM bundle must pass cryptographic verification and its exact subject/stage/membership checks. Missing or
+rejected evidence returns no successful result. Metadata navigation remains unauthenticated.
+
+Lifecycle issues a separate opaque `AuthenticatedRelease` capability for this scope. Its description states
+`payloadIntegrityVerified: false`; it cannot authorize payload export, satisfy full artifact-publication
+verification, or issue an exact-input receipt. The scope authenticates the producer's recorded evidence, not
+artifact availability, consumer-side disk inspection, qualification or revocation. Stock execution retains
+the Linux and pinned-verifier admission requirements.
+
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is part of the policy digest. Its omitted default is
-`strict`, which rejects the producer-only `build-provenance-v1` mode. A consumer may explicitly set the minimum
-to `build-provenance-v1` to accept that narrower evidence; a strictly inspected disk also satisfies that weaker
-minimum. Unknown values fail closed, and no producer-signed disk mode can weaken the consumer's policy.
+`build-provenance-v1` for pipeline-attested scopes; explicit `strict` requires inspected evidence. Qualified
+policy defaults to `strict` and rejects the producer-only minimum. A strictly inspected disk also satisfies
+the weaker minimum. Authenticity applies the same minimum to signed disk evidence without reading or
+reinspecting the disk. Unknown values fail closed, and no producer-signed disk mode can weaken consumer policy.
 
 Missing scope is an error. Unsupported scopes fail admission before dependent I/O, without falling back to a
 weaker scope. The returned opaque capability binds the exact reference and policy, including scope and the

@@ -122,7 +122,7 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 	}
 }
 
-// These are compiler contracts, not a four-output build or installation test.
+// These are compiler contracts, not a five-output build or installation test.
 func TestLaptopSiteArtifactContract(t *testing.T) {
 	const compiler = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -176,8 +176,8 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			for _, output := range plan.LifecycleOutputs {
 				names = append(names, output.Name)
 			}
-			if !slices.Equal(names, []string{"controller-chart", "cwe", "nktp", "nvkectl"}) {
-				t.Fatalf("not the declared four-output site subset: %v", names)
+			if !slices.Equal(names, []string{"controller-chart", "controller-profiles", "cwe", "nktp", "nvkectl"}) {
+				t.Fatalf("not the declared five-output site subset: %v", names)
 			}
 			for _, build := range plan.Builds {
 				if build.Platform != "linux/arm64" || len(build.Components) != 1 {
@@ -222,6 +222,10 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 							}
 							if strings.Count(command, "--opt build-arg:GOLANG_IMAGE=docker.io/library/"+compiler) != 1 {
 								t.Fatal("controller must bind the exact reviewed compiler through its source-owned build argument")
+							}
+						} else if build.Name == "controller-profiles" {
+							if node.BuilderType != ir.BuilderBuildKit || node.Network != ir.NetworkDefault || len(node.Patches) != 1 {
+								t.Fatal("profiles must use the authenticated diagnostic image producer")
 							}
 						} else if node.Network != ir.NetworkNone || !node.SourceReadOnly {
 							t.Fatal("CLI/chart producers must consume prepared sources offline and read-only")

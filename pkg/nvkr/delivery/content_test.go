@@ -22,6 +22,8 @@ func TestContentDigestPreservesFrozenCanonicalIdentity(t *testing.T) {
 		if withReferences {
 			outputs[0].Reference = "registry.example.test/tools@" + outputs[0].Digest
 			outputs[1].Reference = "registry.example.test/chart@" + outputs[1].Digest
+			outputs[0].OS, outputs[0].Arch = "linux", "arm64"
+			outputs[1].OS, outputs[1].Arch, outputs[1].ChartVersion = "linux", "amd64", "1.2.3+build.1"
 		}
 		got, err := ContentDigest(outputs)
 		if err != nil {
@@ -49,6 +51,10 @@ func TestContentDigestRejectsAmbiguousOutputs(t *testing.T) {
 		{name: "unsafe component", change: func(o *Output) { o.Components = []string{"../cli"} }, code: e.CodeVerifyFailed},
 		{name: "duplicate component", change: func(o *Output) { o.Components = []string{"cli", "cli"} }, code: e.CodeVerifyFailed},
 		{name: "missing digest", change: func(o *Output) { o.Digest = "" }, code: e.CodeVerifyFailed},
+		{name: "incomplete platform", change: func(o *Output) { o.OS = "linux" }, code: e.CodeVerifyFailed},
+		{name: "noncanonical platform", change: func(o *Output) { o.OS, o.Arch = "linux", " arm64" }, code: e.CodeVerifyFailed},
+		{name: "chart version on executable", change: func(o *Output) { o.ChartVersion = "1.2.3" }, code: e.CodeVerifyFailed},
+		{name: "invalid chart version", change: func(o *Output) { o.Kind, o.ChartVersion = outputFormatHelm, "invalid" }, code: e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			output := valid

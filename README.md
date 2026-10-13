@@ -48,18 +48,18 @@ See the [release quickstart](docs/release-quickstart.md) to apply your policy.
 
 ## Start here
 
-Start with the [quickstart](docs/quickstart.md) to validate the small three-output NVKE example and preview
-a Run. You need Git, Make, and the Go version in [.go-version](.go-version); these planning commands work
-on macOS and Linux without Docker, a registry, or an NVKE source checkout. From the repository root:
+Follow the [quickstart](docs/quickstart.md) from the core ideas to a tiny local build, then extend the
+workflow into the NVKE tenant demo. For the first artifact, you need Git, Make, Python 3, Docker,
+and the Go version in [.go-version](.go-version). From the repository root:
 
 ```sh
 GOTOOLCHAIN=local make build
-bin/nvkr definition validate --definition definitions/nvke-v1/definition.yaml
-bin/nvkr run plan --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml
+bash demos/demo-local.sh
 ```
 
-Planning does not build or publish artifacts. The [documentation map](docs/README.md) connects the next steps:
+The script builds and runs a greeting executable; it does not sign or publish it. Without Docker,
+use the quickstart's [NVKE planning preview](docs/quickstart.md#preview-the-nvke-outputs).
+The [documentation map](docs/README.md) connects the next steps:
 
 | Task | Guide |
 |---|---|

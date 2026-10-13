@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,6 +117,71 @@ func TestGitHubRunSummaryResults(t *testing.T) {
 			}
 			if bytes.Contains(raw, []byte("[Run record artifact]")) != (tc.upload == "success") {
 				t.Fatalf("artifact link differs from upload outcome: %s", raw)
+			}
+		})
+	}
+}
+
+func TestGitHubRunRenderedSummaryResults(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		plan func(*testing.T) *Plan
+	}{
+		{"default", githubTestPlan},
+		{"native platforms", func(t *testing.T) *Plan {
+			return nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
+		}},
+		{"metadata publication", referenceTestPlan},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := tc.plan(t)
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw := bundle.Files[GitHubWorkflowPath]
+			if PerOutputPublication(plan) && !bytes.Contains(raw, []byte("*nvkr_")) {
+				t.Fatal("publication fixture does not exercise compact workflow decoding")
+			}
+			workflow := decodeGitHubWorkflow(t, raw)
+			finalizer := workflow.Jobs["nvkr-lifecycle-run"]
+			if len(finalizer.Needs) == 0 || len(finalizer.Steps) == 0 {
+				t.Fatal("rendered finalizer has no dependencies or steps")
+			}
+			closing := finalizer.Steps[len(finalizer.Steps)-1]
+			if closing.ID != githubRunEndSummaryID || closing.Env["NVKR_JOB_RESULTS"] != "${{ join(needs.*.result, ' ') }}" {
+				t.Fatal("closing summary does not receive the rendered finalizer's dependency results")
+			}
+			for _, result := range []struct {
+				name, dependency, status string
+				failed, skipped          int
+			}{
+				{"all successful", "success", "Completed", 0, 0},
+				{"one failed", "failure", "Failed", 1, 0},
+				{"one skipped", "skipped", "Incomplete (skipped)", 0, 1},
+			} {
+				t.Run(result.name, func(t *testing.T) {
+					// Derive provider results from the emitted needs, independently of
+					// the expected count embedded in the emitted summary script.
+					results := make([]string, len(finalizer.Needs))
+					for index := range finalizer.Needs {
+						results[index] = "success"
+					}
+					results[len(results)-1] = result.dependency
+					sink := filepath.Join(t.TempDir(), "summary.md")
+					runGitHubSummaryScript(t, closing.Run, map[string]string{
+						"GITHUB_STEP_SUMMARY": sink, "NVKR_JOB_RESULTS": strings.Join(results, " "),
+						"NVKR_JOB_STATUS": "success", "NVKR_FINALIZE_OUTCOME": "success", "NVKR_UPLOAD_OUTCOME": "success",
+					})
+					summary, err := os.ReadFile(sink)
+					if err != nil {
+						t.Fatal(err)
+					}
+					counts := fmt.Sprintf("Upstream jobs: %d succeeded · %d failed · 0 cancelled · %d skipped · 0 unknown.", len(results)-result.failed-result.skipped, result.failed, result.skipped) //nolint:misspell // GitHub result enum spelling.
+					if !strings.Contains(string(summary), "## NVKR Run result: "+result.status+"\n") || !strings.Contains(string(summary), counts) {
+						t.Fatalf("wrong rendered summary for %d dependencies:\n%s", len(finalizer.Needs), summary)
+					}
+				})
 			}
 		})
 	}
