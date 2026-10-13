@@ -40,6 +40,9 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer, pre
 		Use: "nvke-e2e-staging", Short: "Stage inputs for the externally owned NVKE Go suite",
 		Args: cobra.NoArgs, SilenceUsage: true, SilenceErrors: true,
 		RunE: func(command *cobra.Command, _ []string) error {
+			if options.VerifyTimeout <= 0 {
+				return e.New(e.CodeUsage, "--verify-timeout must be a positive duration")
+			}
 			if options.PlanOnly == stage || options.CompileOnly && !stage {
 				return e.New(e.CodeUsage, "select exactly one of --plan-only or --stage; --compile-only requires --stage")
 			}
@@ -59,6 +62,7 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer, pre
 	flags.BoolVar(&options.PlanOnly, "plan-only", false, "check input mappings without source or publication access")
 	flags.BoolVar(&stage, "stage", false, "verify and stage inputs through the existing Go owners")
 	flags.BoolVar(&options.CompileOnly, "compile-only", false, "compile the pinned suite after staging without executing it")
+	flags.DurationVar(&options.VerifyTimeout, "verify-timeout", nvkee2estaging.DefaultVerifyTimeout, "timeout for complete publication verification and export")
 	for _, flag := range []struct {
 		name, help string
 		value      *string

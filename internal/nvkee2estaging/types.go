@@ -8,9 +8,13 @@ package nvkee2estaging
 
 import (
 	"io"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
+
+// DefaultVerifyTimeout bounds complete publication verification and export.
+const DefaultVerifyTimeout = 30 * time.Minute
 
 // Options selects exact inputs and an isolated preparation directory. PlanOnly
 // performs no source inspection, subprocess invocation or registry acquisition.
@@ -19,6 +23,7 @@ type Options struct {
 	Repository, RunID, RunAttempt, Reference, SourceNode          string
 	StreamName, GPU, K8s, Arch, Ubuntu, Versions, GitHubServerURL string
 	Cosign, CosignDigest, Identity, Issuer, MinimumDiskEvidence   string
+	VerifyTimeout                                                 time.Duration // Zero uses DefaultVerifyTimeout; negative values are invalid.
 	PlanOnly, CompileOnly                                         bool
 	Diagnostics                                                   io.Writer
 }

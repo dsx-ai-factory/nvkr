@@ -41,28 +41,17 @@ type PublishedImageExport struct {
 // the selected native digest. No manifest, config or layer bytes are converted.
 // Callers must authenticate the publication independently before consuming it.
 func ExportPublishedImage(ctx context.Context, root, objectName, reference, platform, out string) (PublishedImageExport, error) {
-	if err := deliveryContext(ctx); err != nil {
+	ref, err := admitImageExport(ctx, objectName, reference, platform, out)
+	if err != nil {
 		return PublishedImageExport{}, err
-	}
-	ref, err := name.NewDigest(reference, name.StrictValidation)
-	if err != nil || ref.Name() != reference || objectName == "" || strings.TrimSpace(out) == "" || strings.HasSuffix(out, string(filepath.Separator)) {
-		return PublishedImageExport{}, e.New(e.CodeUsage, "image export requires named output, canonical digest reference and new destination")
-	}
-	if platform != "" && platform != "linux/amd64" && platform != "linux/arm64" {
-		return PublishedImageExport{}, e.New(e.CodeEngineCapability, "image export platform %q is unsupported", platform)
 	}
 	inspection, err := Inspect(ctx, root)
 	if err != nil {
 		return PublishedImageExport{}, err
 	}
-	var object PublishedObject
-	for _, candidate := range inspection.Root.Objects {
-		if candidate.Name == objectName {
-			object = candidate
-		}
-	}
-	if object.Output == nil || object.Output.Format != "oci" {
-		return PublishedImageExport{}, e.New(e.CodeVerifyFailed, "publication has no named OCI image output %q", objectName)
+	object, err := publishedImageOutput(inspection, objectName)
+	if err != nil {
+		return PublishedImageExport{}, err
 	}
 	descriptor := Descriptor{Digest: object.DescriptorDigest, Size: object.Size, MediaType: object.ArtifactType}
 	var heldIndex *ImageIndex
@@ -133,17 +122,53 @@ func ExportPublishedImage(ctx context.Context, root, objectName, reference, plat
 		blobs[digest] = file
 		total += file.Size()
 	}
+	return exportHeldPublishedImage(ctx, ref, platform, out, descriptor, blobs)
+}
+
+func admitImageExport(ctx context.Context, objectName, reference, platform, out string) (name.Digest, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return name.Digest{}, err
+	}
+	ref, err := name.NewDigest(reference, name.StrictValidation)
+	if err != nil || ref.Name() != reference || objectName == "" || strings.TrimSpace(out) == "" || strings.HasSuffix(out, string(filepath.Separator)) {
+		return name.Digest{}, e.New(e.CodeUsage, "image export requires named output, canonical digest reference and new destination")
+	}
+	if platform != "" && platform != "linux/amd64" && platform != "linux/arm64" {
+		return name.Digest{}, e.New(e.CodeEngineCapability, "image export platform %q is unsupported", platform)
+	}
+	return ref, nil
+}
+
+func publishedImageOutput(inspection Inspection, objectName string) (PublishedObject, error) {
+	var object PublishedObject
+	for _, candidate := range inspection.Root.Objects {
+		if candidate.Name == objectName {
+			if object.Name != "" {
+				return PublishedObject{}, e.New(e.CodeVerifyFailed, "ambiguous published image %q", objectName)
+			}
+			object = candidate
+		}
+	}
+	if object.Output == nil || object.Output.Format != "oci" {
+		return PublishedObject{}, e.New(e.CodeVerifyFailed, "publication has no named OCI image output %q", objectName)
+	}
+	return object, nil
+}
+
+func exportHeldPublishedImage(ctx context.Context, ref name.Digest, platform, out string,
+	descriptor Descriptor, blobs map[string]*heldfile.File,
+) (PublishedImageExport, error) {
 	parent, _, err := securepath.OpenDirectory(filepath.Dir(out))
 	if err != nil {
 		return PublishedImageExport{}, e.Wrap(e.CodeVerifyFailed, err, "opening image export destination parent")
 	}
 	defer parent.Close()
-	descriptor.Annotations = map[string]string{ocispec.AnnotationRefName: reference}
+	descriptor.Annotations = map[string]string{ocispec.AnnotationRefName: ref.Name()}
 	archiveDigest, size, err := writePublishedImageArchive(ctx, parent, filepath.Base(out), descriptor, blobs)
 	if err != nil {
 		return PublishedImageExport{}, err
 	}
-	return PublishedImageExport{Reference: reference, Repository: ref.Context().Name(), ManifestDigest: descriptor.Digest, Platform: platform, ArchiveDigest: archiveDigest, Size: size}, nil
+	return PublishedImageExport{Reference: ref.Name(), Repository: ref.Context().Name(), ManifestDigest: descriptor.Digest, Platform: platform, ArchiveDigest: archiveDigest, Size: size}, nil
 }
 
 // The archive transaction uses only the held parent and anonymous blob snapshots.

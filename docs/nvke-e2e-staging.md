@@ -22,9 +22,11 @@ bin/nvkr release verify --help
 node, receipt path, Git commit/tree, clean tracked worktree and current closure against
 the restored unsigned receipt without fetching or writing. Index flags that hide tracked
 files from worktree checks are rejected. A rewritten unsigned receipt
-does not authenticate vendor or untracked source content. The description is a
-point-in-time observation; the operator owns the private checkout's lifetime.
-Authenticated restored source/vendor binding remains an activation gate.
+does not authenticate vendor or other untracked/ignored suite-source content.
+The description is a point-in-time observation; the operator owns the private
+checkout's lifetime.
+Authentication of vendor and all other untracked/ignored suite-source content remains
+an activation gate, including additional Go files that may be compiled by the suite.
 
 [NVKE PR #1580](https://github.com/dsx-ai-factory/nvke/pull/1580) supplies digest image
 inputs and optional chart overrides. Select a source containing those changes before
@@ -39,7 +41,7 @@ Metadata-only `release export` is useful for navigation but supplies no payload 
 signer-policy verification; it cannot replace this step.
 
 The Go adapter opens the exported publication with its authenticated root digest and
-uses held delivery descriptors for binary/chart extraction. Image archives preserve
+uses held delivery descriptors for binary/chart extraction and image export. Image archives preserve
 native manifest/config/layer bytes and select an explicit platform for aggregate images.
 Archive checksums remain separate from native OCI subjects. These are artifact-publication
 checks; they supply no runtime verdict or stronger release lane. For GitHub Enterprise,
@@ -63,6 +65,12 @@ delivery owners directly. Each invocation requires a fresh output directory.
 or `TestMain`. Compilation reinspects the checkout and uses an offline vendor environment
 with workspace and ambient Go configuration disabled. These checks do not confer source
 authentication. All modes allocate no hardware and report tests and cleanup as `not-run`.
+
+`--verify-timeout` accepts a positive Go duration, defaulting to `30m`; for a larger
+publication, use an explicit budget such as `--verify-timeout=60m`. One deadline covers
+complete exact-input publication verification, invocation-bound export and opening the
+exported closure. Verification still requires the complete output closure under the
+selected policy.
 
 The operator input JSON maps artifacts into existing NVKE suite configuration:
 
@@ -104,8 +112,9 @@ Share the source and delivery owner interfaces before combining the paths; retai
 suite's existing assertions. Select source revisions containing the required NVKE
 interfaces before integration. These links do not ratify additional qualification scope.
 
-Before external execution, establish authenticated restored source/vendor binding and
-checkout lifetime isolation, the complete QCOW2/EFI OCI-to-HTTPS byte handoff, installed
+Before external execution, authenticate vendor and all other untracked/ignored
+suite-source content and establish checkout lifetime isolation, the complete
+QCOW2/EFI OCI-to-HTTPS byte handoff, installed
 material/version/architecture bindings, reviewed fixtures and the accepted suite source.
 Generated source-carrier restoration requires renderer and validator changes; arbitrary
 jobs must not be appended to generated workflows.

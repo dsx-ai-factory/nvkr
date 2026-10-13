@@ -66,8 +66,29 @@ func openPublishedImageIndex(ctx context.Context, root string, object PublishedO
 			closure.close()
 		}
 	}()
+	children, err := populatePublishedImageIndex(ctx, object, closure, func(descriptor Descriptor, maximum int64) (*heldfile.File, error) {
+		return holdBlob(ctx, root, descriptor, maximum)
+	})
+	if err != nil {
+		return nil, err
+	}
+	complete = true
+	return newImageIndex(closure, children), nil
+}
+
+// The caller owns or borrows every captured file through the complete operation.
+// This shared verifier checks the complete aggregate before any child selection.
+func populatePublishedImageIndex(ctx context.Context, object PublishedObject, closure *imageIndexClosure,
+	open func(Descriptor, int64) (*heldfile.File, error),
+) ([]ImageIndexChild, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := validateImageIndexObject(object); err != nil {
+		return nil, err
+	}
 	var err error
-	closure.index, err = holdBlob(ctx, root, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+	closure.index, err = open(Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +114,7 @@ func openPublishedImageIndex(ctx context.Context, root string, object PublishedO
 		if len(closure.blobs) >= maxDeliveryObjects*8 || descriptor.Size < 0 || descriptor.Size > maxDeliveryFileBytes-closure.bytes {
 			return nil, e.New(e.CodeVerifyFailed, "publication image index closure exceeds its object or byte bound")
 		}
-		file, err := holdBlob(ctx, root, descriptor, maximum)
+		file, err := open(descriptor, maximum)
 		if err != nil {
 			return nil, err
 		}
@@ -134,10 +155,10 @@ func openPublishedImageIndex(ctx context.Context, root string, object PublishedO
 	if err != nil {
 		return nil, err
 	}
-	capability := newImageIndex(closure, children)
-	if err := validatePublishedImageIndex(object, capability.description); err != nil {
+	if err := validatePublishedImageIndex(object, ImageIndexDescription{
+		Digest: closure.index.Digest(), Size: closure.index.Size(), Children: children,
+	}); err != nil {
 		return nil, err
 	}
-	complete = true
-	return capability, nil
+	return children, nil
 }

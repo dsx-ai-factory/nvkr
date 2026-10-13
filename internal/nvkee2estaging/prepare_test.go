@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -108,6 +109,9 @@ func TestPlanOnlyDescribesFrozenRunWithoutSourceOrVerifier(t *testing.T) {
 	if !slices.Contains(report.GoTestCommand, "-ginkgo.fail-on-empty") || !slices.Contains(report.GoTestCommand, "-e2e.keep-site=false") {
 		t.Fatal("descriptive suite command loses safety flags")
 	}
+	if !slices.Contains(report.RemainingInputGates, "authenticated vendor and all other untracked/ignored suite-source content before execution") {
+		t.Fatal("report omits authentication of untracked or ignored suite source")
+	}
 	var persisted Report
 	if err := readDocument(t.Context(), filepath.Join(options.Out, "e2e-staging.json"), &persisted); err != nil {
 		t.Fatal(err)
@@ -123,7 +127,7 @@ func TestPlanOnlyDescribesFrozenRunWithoutSourceOrVerifier(t *testing.T) {
 }
 
 func TestAdmissionBeforeOutput(t *testing.T) {
-	for _, scenario := range []string{"nil context", "canceled", "compile plan", "unsupported stream", "invalid origin", "invalid run id", "stage platform"} {
+	for _, scenario := range []string{"nil context", "canceled", "negative verification timeout", "compile plan", "unsupported stream", "invalid origin", "invalid run id", "stage platform"} {
 		t.Run(scenario, func(t *testing.T) {
 			options, _ := testOptions(t)
 			ctx := t.Context()
@@ -138,6 +142,9 @@ func TestAdmissionBeforeOutput(t *testing.T) {
 				code = e.CodeTimeout
 			case "compile plan":
 				options.CompileOnly = true
+			case "negative verification timeout":
+				options.VerifyTimeout = -time.Second
+				options.Run = filepath.Join(t.TempDir(), "must-not-read")
 			case "unsupported stream":
 				options.GPU = "unknown"
 				code = e.CodeEngineCapability
@@ -159,6 +166,41 @@ func TestAdmissionBeforeOutput(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVerificationContextBudget(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		timeout, want  time.Duration
+		parentDeadline bool
+	}{
+		{name: "programmatic zero preserves default", want: 30 * time.Minute},
+		{name: "explicit larger closure budget", timeout: time.Hour, want: time.Hour},
+		{name: "parent deadline takes precedence", timeout: time.Hour, want: 5 * time.Minute, parentDeadline: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			parent := t.Context()
+			if test.parentDeadline {
+				bounded, cancel := context.WithTimeout(parent, test.want)
+				defer cancel()
+				parent = bounded
+			}
+			started := time.Now()
+			ctx, cancel := verificationContext(parent, test.timeout)
+			defer cancel()
+			deadline, exists := ctx.Deadline()
+			if !exists || deadline.Before(started.Add(test.want-time.Second)) || deadline.After(time.Now().Add(test.want)) {
+				t.Fatalf("verification deadline=%v, want budget %s", deadline, test.want)
+			}
+		})
+	}
+	// Exercise the real delivery owner with an expired operation budget; no
+	// fabricated publication/verification receipt or remote service is involved.
+	ctx, cancel := verificationContext(t.Context(), time.Nanosecond)
+	defer cancel()
+	<-ctx.Done()
+	_, err := delivery.OpenPublication(ctx, filepath.Join(t.TempDir(), "must-not-open"), testDigest)
+	requireCode(t, err, e.CodeTimeout)
 }
 
 func TestProtectedConfigRejectsGoCaseAliasesAndRetention(t *testing.T) {
@@ -539,7 +581,7 @@ func TestMaterializationUsesRealCLIAndHelmOwners(t *testing.T) {
 	}
 	defer held.Close()
 	report := Report{Artifacts: map[string]any{}}
-	if err := stageMaterials(t.Context(), Options{Out: out, Arch: "amd64"}, input, named, layout, held, &report); err != nil {
+	if err := stageMaterials(t.Context(), Options{Out: out, Arch: "amd64"}, input, named, held, &report); err != nil {
 		t.Fatal(err)
 	}
 	var config map[string]json.RawMessage

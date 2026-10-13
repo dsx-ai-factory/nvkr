@@ -9,6 +9,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/nvkee2estaging"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -35,6 +36,9 @@ func TestHelpAndInvalidModesDoNotReachPreparation(t *testing.T) {
 		{"both modes", append(requiredFlags(), "--stage", "--plan-only"), e.CodeUsage},
 		{"unstaged compile", append(requiredFlags(), "--plan-only", "--compile-only"), e.CodeUsage},
 		{"positional argument", append(requiredFlags(), "--plan-only", "extra"), e.CodeUsage},
+		{"malformed verification timeout", append(requiredFlags(), "--stage", "--verify-timeout=unknown"), e.CodeUsage},
+		{"zero verification timeout", append(requiredFlags(), "--stage", "--verify-timeout=0s"), e.CodeUsage},
+		{"negative verification timeout", append(requiredFlags(), "--plan-only", "--verify-timeout=-1s"), e.CodeUsage},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
@@ -52,6 +56,9 @@ func TestHelpAndInvalidModesDoNotReachPreparation(t *testing.T) {
 			if !errors.As(err, &coded) || coded.Code != test.code {
 				t.Fatalf("error = %v, want %s", err, test.code)
 			}
+			if out.Len() != 0 {
+				t.Fatalf("invalid flags produced output: %q", out.String())
+			}
 		})
 	}
 }
@@ -68,13 +75,32 @@ func TestPreparationFlagsAndOwningErrorArePreserved(t *testing.T) {
 			var out, diagnostics bytes.Buffer
 			err := execute(t.Context(), args, &out, &diagnostics, func(ctx context.Context, options nvkee2estaging.Options) (nvkee2estaging.Report, error) {
 				if ctx == nil || options.PlanOnly == stage || options.RunID != "123" || options.RunAttempt != "2" ||
-					options.GitHubServerURL != "https://github.example.test" || options.SourceNode != "fetch-exact" {
+					options.GitHubServerURL != "https://github.example.test" || options.SourceNode != "fetch-exact" || options.VerifyTimeout != 30*time.Minute {
 					t.Fatalf("flag mapping = %+v", options)
 				}
 				return nvkee2estaging.Report{}, want
 			})
 			if !errors.Is(err, want) || out.Len() != 0 {
 				t.Fatalf("owner error changed or success printed: %v %q", err, out.String())
+			}
+		})
+	}
+}
+
+func TestVerificationTimeoutOverrideReachesPreparation(t *testing.T) {
+	for _, duration := range []time.Duration{time.Second, 60 * time.Minute} {
+		t.Run(duration.String(), func(t *testing.T) {
+			args := append(requiredFlags(), "--stage", "--verify-timeout="+duration.String())
+			want := e.New(e.CodeTimeout, "owning verification reached its deadline")
+			var out, diagnostics bytes.Buffer
+			err := execute(t.Context(), args, &out, &diagnostics, func(_ context.Context, options nvkee2estaging.Options) (nvkee2estaging.Report, error) {
+				if options.VerifyTimeout != duration {
+					t.Fatalf("verification timeout=%s, want %s", options.VerifyTimeout, duration)
+				}
+				return nvkee2estaging.Report{}, want
+			})
+			if !errors.Is(err, want) || out.Len() != 0 {
+				t.Fatalf("owner timeout changed or success printed: %v %q", err, out.String())
 			}
 		})
 	}

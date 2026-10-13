@@ -54,6 +54,10 @@ type imageConfig struct {
 }
 
 func inspectPublishedContainerImage(ctx context.Context, root string, publication Inspection, name string) (ImageInspection, error) {
+	return inspectPublishedContainerImageFrom(ctx, publication, name, pathImageBlobs(root))
+}
+
+func inspectPublishedContainerImageFrom(ctx context.Context, publication Inspection, name string, open imageBlobOpener) (ImageInspection, error) {
 	var object PublishedObject
 	for _, candidate := range publication.Root.Objects {
 		if candidate.Name == name {
@@ -68,9 +72,14 @@ func inspectPublishedContainerImage(ctx context.Context, root string, publicatio
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "publication has no exact native image binding for %q", name)
 	}
 	descriptor := Descriptor{MediaType: object.ArtifactType, Digest: object.DescriptorDigest, Size: object.Size}
-	manifestRaw, err := readBlob(ctx, root, descriptor, 8<<20)
+	held, release, err := open(ctx, descriptor, 8<<20)
 	if err != nil {
 		return ImageInspection{}, err
+	}
+	manifestRaw, err := held.ReadAllContext(ctx, 8<<20)
+	release()
+	if err != nil {
+		return ImageInspection{}, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "reading published image manifest"))
 	}
 	if err := canonical.ValidateJSONDocument(manifestRaw); err != nil {
 		return ImageInspection{}, e.Wrap(e.CodeVerifyFailed, err, "validating published image manifest JSON")
@@ -85,7 +94,7 @@ func inspectPublishedContainerImage(ctx context.Context, root string, publicatio
 	if manifest.MediaType != descriptor.MediaType {
 		return ImageInspection{}, e.New(e.CodeVerifyFailed, "published image manifest differs from descriptor media type")
 	}
-	config, err := verifyImageManifest(ctx, root, manifest, map[string]bool{})
+	config, err := verifyImageManifestFrom(ctx, manifest, map[string]bool{}, open)
 	if err != nil {
 		return ImageInspection{}, err
 	}

@@ -23,7 +23,7 @@ import (
 
 // This helper receives only descriptions after Prepare has authenticated the
 // full publication. Every projection independently revalidates its local bytes.
-func stageMaterials(ctx context.Context, options Options, input mapping, named map[string]lifecycle.Artifact, layout string, publication *delivery.Publication, report *Report) error {
+func stageMaterials(ctx context.Context, options Options, input mapping, named map[string]lifecycle.Artifact, publication *delivery.Publication, report *Report) error {
 	site, err := section(input.SuiteConfig, "site", false)
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 		}
 		reference := repository + "@" + native
 		archive := filepath.Join(options.Out, role+".tar")
-		image, err := delivery.ExportPublishedImage(ctx, layout, output.Name, reference, "linux/"+options.Arch, archive)
+		image, err := publication.ExportImage(ctx, output.Name, reference, "linux/"+options.Arch, archive)
 		if err != nil {
 			return err
 		}

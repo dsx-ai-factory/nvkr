@@ -133,7 +133,7 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 			return report, err
 		}
 		policy := verificationPolicy(options)
-		bounded, cancel := context.WithTimeout(ctx, 30*time.Minute)
+		bounded, cancel := verificationContext(ctx, options.VerifyTimeout)
 		verified, receipt, err := consumer.VerifyExactInputs(bounded, options.Reference, policy, expectation)
 		if err != nil {
 			cancel()
@@ -168,13 +168,13 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 		}
 		defer func() { _ = held.Close() }()
 		report.MaterializationPhase = "publication-authenticated"
-		if err := stageMaterials(ctx, options, input, artifactMap, layout, held, &report); err != nil {
+		if err := stageMaterials(ctx, options, input, artifactMap, held, &report); err != nil {
 			return report, err
 		}
 		report.MaterializationOutcome = "core-artifacts-staged"
 		if options.CompileOnly {
 			// Recheck the owner-observed checkout immediately before compilation;
-			// this does not authenticate an unsigned vendored closure.
+			// this does not authenticate vendor or other untracked/ignored source.
 			current, err := factory.InspectRestoredSource(ctx, plan, options.SourceNode)
 			if err != nil {
 				report.ValidationOutcome = "failed"
@@ -197,7 +197,7 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 	report.GoTestCommand = suiteCommand(configPath, options.Versions, capabilities, out)
 	report.GoTestDirectory = filepath.Join(source.Path, "controller/test/e2e")
 	report.RuntimeAdmission = "pending live usable-capacity/access and owned-cleanup inventory"
-	report.RemainingInputGates = []string{"QCOW2/EFI HTTPS exact-byte read-back", "post-boot material compatibility", "reviewed fixtures and suite-source capability", "authenticated vendored source closure before execution", "rendered installed dependency closure"}
+	report.RemainingInputGates = []string{"QCOW2/EFI HTTPS exact-byte read-back", "post-boot material compatibility", "reviewed fixtures and suite-source capability", "authenticated vendor and all other untracked/ignored suite-source content before execution", "rendered installed dependency closure"}
 	if err := writeJSON(ctx, out, "e2e-staging.json", report); err != nil {
 		return report, err
 	}
@@ -210,6 +210,9 @@ func admitOptions(ctx context.Context, options Options) error {
 	}
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "preparation canceled")
+	}
+	if options.VerifyTimeout < 0 {
+		return e.New(e.CodeUsage, "verification timeout must be positive; omit it to use the default")
 	}
 	for _, value := range []string{options.Run, options.Plan, options.Definition, options.Environment, options.Inputs, options.Out, options.SourceNode, options.Versions} {
 		if strings.TrimSpace(value) == "" {
@@ -253,6 +256,13 @@ func admitOptions(ctx context.Context, options Options) error {
 
 func verificationPolicy(options Options) lifecycle.VerificationPolicy {
 	return lifecycle.VerificationPolicy{Lane: lifecycle.LanePipeline, Scope: lifecycle.ScopeArtifactPublication, IdentityRegexp: options.Identity, Issuer: options.Issuer, MinimumDiskEvidence: lifecycle.DiskEvidenceRequirement(options.MinimumDiskEvidence)}
+}
+
+func verificationContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout == 0 {
+		timeout = DefaultVerifyTimeout
+	}
+	return context.WithTimeout(ctx, timeout)
 }
 
 func compileSource(ctx context.Context, source string, options Options) error {
