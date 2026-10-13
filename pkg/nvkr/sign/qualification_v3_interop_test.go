@@ -23,9 +23,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 )
 
-// Local-key interoperability tests stock cosign transport only. Production v2
+// Local-key interoperability tests stock cosign transport only. Production v3
 // requires keyless certificate identity/issuer and never falls back to this key.
-func TestQualificationV2CosignInterop(t *testing.T) {
+func TestQualificationV3CosignInterop(t *testing.T) {
 	binary := os.Getenv("NVKR_TEST_COSIGN_BINARY")
 	if binary == "" {
 		t.Skip("set NVKR_TEST_COSIGN_BINARY for real local-key transport")
@@ -50,7 +50,7 @@ func TestQualificationV2CosignInterop(t *testing.T) {
 	require([]string{"generate-key-pair"})
 	server := httptest.NewServer(registry.New(registry.Logger(log.New(io.Discard, "", 0))))
 	defer server.Close()
-	ref, err := name.NewTag(strings.TrimPrefix(server.URL, "http://") + "/qualification:v2")
+	ref, err := name.NewTag(strings.TrimPrefix(server.URL, "http://") + "/qualification:v3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,38 +62,38 @@ func TestQualificationV2CosignInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 	subject := ref.Context().Digest(digest.String()).String()
-	raw := []byte(`{"schemaVersion":"nvkr.dev/qualification-evidence/v2","testFixture":true}`)
+	raw := []byte(`{"gateVersion":"nvkr.dev/qualification-gate/v3","schemaVersion":"nvkr.dev/qualification-evidence/v3","testFixture":true}`)
 	for path, document := range map[string][]byte{"predicate.json": raw, "trusted-root.json": []byte(`{"mediaType":"application/vnd.dev.sigstore.trustedroot+json;version=0.1","tlogs":[],"certificateAuthorities":[],"ctlogs":[],"timestampAuthorities":[]}`)} {
 		if err := os.WriteFile(filepath.Join(workspace, path), document, 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	args := qualificationAttestArgsV2(subject, "predicate.json")
+	args := qualificationAttestArgsV3(subject, "predicate.json")
 	args = append(args[:len(args)-1], "--key", "cosign.key", "--use-signing-config=false", "--tlog-upload=false", subject)
 	require(args)
-	bundles, err := decodeOCIBundles(require(ociDownloadBundleArgs(subject, QualificationPredicateTypeV2)))
+	bundles, err := decodeOCIBundles(require(ociDownloadBundleArgs(subject, QualificationPredicateTypeV3)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(bundles) != 1 {
-		t.Fatalf("v2 bundles=%d", len(bundles))
+		t.Fatalf("v3 bundles=%d", len(bundles))
 	}
 	path := filepath.Join(workspace, "bundle.json")
 	if err := os.WriteFile(path, bundles[0], 0600); err != nil {
 		t.Fatal(err)
 	}
-	args = ociVerifyBundleArgs(path, digest.String(), QualificationPredicateTypeV2, VerifyPolicy{})[:9]
+	args = ociVerifyBundleArgs(path, digest.String(), QualificationPredicateTypeV3, VerifyPolicy{})[:9]
 	args = append(args, "--key", "cosign.pub", "--insecure-ignore-tlog", "--offline", "--trusted-root", "trusted-root.json")
 	require(args)
 	wrong := append([]string(nil), args...)
 	wrong[4] = QualificationPredicateType
 	if _, err := run(wrong); err == nil {
-		t.Fatal("v2 attachment accepted as v1 qualification")
+		t.Fatal("v3 attachment accepted as v1 qualification")
 	}
 	wrong = append([]string(nil), args...)
 	wrong[6] = strings.Repeat("a", 64)
 	if _, err := run(wrong); err == nil {
-		t.Fatal("v2 attachment accepted for another subject")
+		t.Fatal("v3 attachment accepted for another subject")
 	}
 	var bundle map[string]any
 	if err := json.Unmarshal(bundles[0], &bundle); err != nil {
@@ -113,6 +113,6 @@ func TestQualificationV2CosignInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := run(args); err == nil {
-		t.Fatal("v2 attachment tampering accepted")
+		t.Fatal("v3 attachment tampering accepted")
 	}
 }

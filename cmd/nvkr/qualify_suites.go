@@ -4,17 +4,32 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"strings"
 
 	client "github.com/dsx-ai-factory/nvkr/client/v1"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 	"github.com/urfave/cli/v2"
 )
 
+type qualificationSuiteRunPublisher func(context.Context, string, string, lifecycle.QualificationRuntimeOptions) (*qualification.PublicationV3, error)
+
 func cmdRunQualifyTests() *cli.Command {
-	return &cli.Command{Name: "qualify-tests", Usage: "publish qualification v2 using complete artifact checks and authenticated required suites", Flags: append(qualificationFileFlags(), &cli.StringFlag{Name: "qualification-workflow", Required: true, Usage: "approved independent .github/workflows path for the active workflow_run invocation"}, &cli.StringFlag{Name: "suite-config", Required: true, Usage: "independent canonical suite policy and digest-pinned transport coordinates"}), Action: func(c *cli.Context) error {
-		files := qualificationFileOptions(c)
-		result, publishErr := client.New().QualifyWithSuiteConfiguration(c.Context, c.String("suite-config"), qualification.FilesOptionsV2{ArtifactFiles: files, QualificationWorkflow: c.String("qualification-workflow"), Signer: qualification.Options{CosignBinary: files.Consumer.CosignBinary, CosignDigest: files.Consumer.CosignDigest, Credential: files.Consumer.Credential}})
+	return cmdRunQualifyTestsWithPublisher(client.New().QualifyTriggeredWithSuites)
+}
+func cmdRunQualifyTestsWithPublisher(publish qualificationSuiteRunPublisher) *cli.Command {
+	return &cli.Command{Name: "qualify-tests", Usage: "qualify the authenticated triggering Run with mandatory native smoke and required suites (v3)", Flags: []cli.Flag{
+		&cli.StringFlag{Name: "policy", Usage: "independently selected native qualification policy YAML"},
+		&cli.StringFlag{Name: "suite-config", Usage: "independently selected canonical required-suite policy and pinned transport"},
+		&cli.StringFlag{Name: "workspace", Value: ".nvkr/qualification", Usage: "private qualification workspace"},
+	}, Action: func(c *cli.Context) error {
+		if c.Args().Present() || strings.TrimSpace(c.String("policy")) == "" || strings.TrimSpace(c.String("suite-config")) == "" || strings.TrimSpace(c.String("workspace")) == "" {
+			return e.New(e.CodeUsage, "qualify-tests requires --policy, --suite-config, a non-empty workspace, and no positional arguments")
+		}
+		result, publishErr := publish(c.Context, c.String("policy"), c.String("suite-config"), qualificationRuntimeOptions(c))
 		if result != nil {
 			return errors.Join(publishErr, evidenceJSON(c, result))
 		}

@@ -278,15 +278,17 @@ cancel causes remain coded. `review-junit.xml` intentionally retains the exact c
 from upstream's possibly incomplete download for explicit review. Declared wall-clock facts are diagnostic,
 not trusted time or release freshness authority.
 
-`qualification`/`sign` v2 add signature-origin-subject-policy-bound live suite receipts and a distinct
-qualification v2 predicate, including authenticated aggregate native-child joins. Suite closure and
-source/check closure invalidate the borrowed authority; failed or required-skipped cases prevent signing.
-Unselected skipped cases do not erase passing required coverage. Complete M3-A artifact membership and
-M3-B smoke gates remain mandatory. The file adapter and CLI reuse the existing source/invocation and
-artifact-check owners. Strong installed-deployment binding remains capability-rejected. Qualification v1
-is unchanged. Contract fixtures cover exact policy/origin/role, negative no-signing gates, late closure,
-version separation and actual local-key cosign v2 interoperability; hosted OIDC, real exact NVKE deployed
-subjects and production qualification acceptance remain unexercised. Passive reporting remains separately owned by the dependent reporting change.
+Required-suite v3 extends native v2 with signature-origin-subject-policy-bound live suite receipts
+and authenticated aggregate native-child joins. It retains the entire authenticated native smoke
+record and binds independently selected suite policy to the exact full native policy digest.
+Suite or source/check closure revokes borrowed authority; failed or required-skipped cases block signing.
+Triggered orchestration owns source, invocation, artifact checks and native smoke together. Raw-file
+publishing refuses before I/O. Native v2 interfaces and its generated worker/qualifier pair remain intact;
+generated v3 activation is deferred. The CLI/SDK accept policy, suite configuration and private workspace,
+without caller-authored source or candidate flags. Strong installed-deployment binding remains unavailable.
+Contract tests cover exact policy/origin/role, missing native smoke, full membership, lifetime/cancellation,
+version separation and local-key cosign v3 interoperability. Hosted OIDC v3, exact deployed NVKE subjects
+and production qualification acceptance remain unexercised. Passive reporting is separately owned.
 
 ## Support by owner
 

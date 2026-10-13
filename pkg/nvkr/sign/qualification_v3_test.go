@@ -14,7 +14,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func qualificationBundleV2(t *testing.T, digest, predicateType, identity, issuer string, predicate []byte) string {
+func qualificationBundleV3(t *testing.T, digest, predicateType, identity, issuer string, predicate []byte) string {
 	t.Helper()
 	var bundle map[string]any
 	if err := json.Unmarshal([]byte(testOCIBundle(t, digest, predicateType, identity, issuer)), &bundle); err != nil {
@@ -42,8 +42,8 @@ func qualificationBundleV2(t *testing.T, digest, predicateType, identity, issuer
 	return string(raw)
 }
 
-func TestQualificationV2AttestationUsesSeparateTypeAndVerifiesExactBytes(t *testing.T) {
-	const predicate = `{"schemaVersion":"nvkr.dev/qualification-evidence/v2","verdict":"pass"}`
+func TestQualificationV3AttestationUsesSeparateTypeAndVerifiesExactBytes(t *testing.T) {
+	const predicate = `{"gateVersion":"nvkr.dev/qualification-gate/v3","schemaVersion":"nvkr.dev/qualification-evidence/v3","verdict":"pass"}`
 	for _, tc := range []struct {
 		name, failure string
 		code          e.Code
@@ -59,7 +59,7 @@ func TestQualificationV2AttestationUsesSeparateTypeAndVerifiesExactBytes(t *test
 		{name: "wrong issuer", failure: "issuer", code: e.CodeUntrustedSigner},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			digest, typ, identity, issuer, document := ociTestDigest, QualificationPredicateTypeV2, ociObservedIdentity, ociTestIssuer, predicate
+			digest, typ, identity, issuer, document := ociTestDigest, QualificationPredicateTypeV3, ociObservedIdentity, ociTestIssuer, predicate
 			switch tc.failure {
 			case "predicate":
 				document = `{"verdict":"forged"}`
@@ -72,13 +72,13 @@ func TestQualificationV2AttestationUsesSeparateTypeAndVerifiesExactBytes(t *test
 			case "issuer":
 				issuer = "https://wrong.example"
 			}
-			stub := &cosignStub{stdout: map[string]string{"download": qualificationBundleV2(t, digest, typ, identity, issuer, []byte(document))}}
+			stub := &cosignStub{stdout: map[string]string{"download": qualificationBundleV3(t, digest, typ, identity, issuer, []byte(document))}}
 			stub.onCall = func(call recordedCall) error {
 				if call.args[0] == tc.failure {
 					return fmt.Errorf("injected failure")
 				}
 				if call.args[0] == "attest" {
-					if strings.Join(call.args[:6], " ") != "attest --yes --new-bundle-format --type "+QualificationPredicateTypeV2+" --predicate" || call.args[len(call.args)-1] != ociTestRef {
+					if strings.Join(call.args[:6], " ") != "attest --yes --new-bundle-format --type "+QualificationPredicateTypeV3+" --predicate" || call.args[len(call.args)-1] != ociTestRef {
 						t.Fatalf("bad qualification argv: %v", call.args)
 					}
 					raw, err := os.ReadFile(call.args[6])
@@ -92,15 +92,15 @@ func TestQualificationV2AttestationUsesSeparateTypeAndVerifiesExactBytes(t *test
 						return os.WriteFile(call.args[6], []byte("changed"), 0600)
 					}
 				}
-				if call.args[0] == "download" && call.args[3] != QualificationPredicateTypeV2 {
+				if call.args[0] == "download" && call.args[3] != QualificationPredicateTypeV3 {
 					t.Fatal("qualification downloaded another evidence type")
 				}
-				if call.args[0] == "verify-blob-attestation" && call.args[4] != QualificationPredicateTypeV2 {
+				if call.args[0] == "verify-blob-attestation" && call.args[4] != QualificationPredicateTypeV3 {
 					t.Fatal("qualification verified another evidence type")
 				}
 				return nil
 			}
-			err := newStubbedSigner(t, stub, Credential{}).AttestQualificationV2(t.Context(), ociSubject(), []byte(predicate))
+			err := newStubbedSigner(t, stub, Credential{}).AttestQualificationV3(t.Context(), ociSubject(), []byte(predicate))
 			if tc.code != "" {
 				requireSignCode(t, err, tc.code)
 			} else if err != nil {
@@ -118,11 +118,11 @@ func TestQualificationV2AttestationUsesSeparateTypeAndVerifiesExactBytes(t *test
 	}
 }
 
-func TestQualificationV2VerificationRequiresExpectedEvidence(t *testing.T) {
+func TestQualificationV3VerificationRequiresExpectedEvidence(t *testing.T) {
 	for _, raw := range [][]byte{nil, []byte(`{broken`)} {
 		t.Run(string(raw), func(t *testing.T) {
 			stub := &cosignStub{}
-			err := newStubbedSigner(t, stub, Credential{}).VerifyQualificationV2(t.Context(), ociSubject(), raw)
+			err := newStubbedSigner(t, stub, Credential{}).VerifyQualificationV3(t.Context(), ociSubject(), raw)
 			requireSignCode(t, err, e.CodeVerifyFailed)
 			if len(stub.calls) != 0 {
 				t.Fatalf("invalid evidence reached subprocess: %v", err)
@@ -131,19 +131,19 @@ func TestQualificationV2VerificationRequiresExpectedEvidence(t *testing.T) {
 	}
 }
 
-func TestQualificationV2InvalidPolicyCannotAttach(t *testing.T) {
+func TestQualificationV3InvalidPolicyCannotAttach(t *testing.T) {
 	stub := &cosignStub{}
 	signer := newStubbedSigner(t, stub, Credential{})
 	signer.identity = "["
-	err := signer.AttestQualificationV2(t.Context(), ociSubject(), []byte(`{"verdict":"pass"}`))
+	err := signer.AttestQualificationV3(t.Context(), ociSubject(), []byte(`{"gateVersion":"nvkr.dev/qualification-gate/v3","schemaVersion":"nvkr.dev/qualification-evidence/v3","verdict":"pass"}`))
 	requireSignCode(t, err, e.CodeTrustPolicyMissing)
 	if len(stub.calls) != 0 {
 		t.Fatal("invalid verification policy attached an attestation")
 	}
 }
 
-func TestQualificationV2PassiveVerificationFixedAuthority(t *testing.T) {
-	const predicate = `{"schemaVersion":"nvkr.dev/qualification-evidence/v2","verdict":"pass"}`
+func TestQualificationV3PassiveVerificationFixedAuthority(t *testing.T) {
+	const predicate = `{"gateVersion":"nvkr.dev/qualification-gate/v3","schemaVersion":"nvkr.dev/qualification-evidence/v3","verdict":"pass"}`
 	for _, tc := range []struct {
 		name, kind string
 		code       e.Code
@@ -156,7 +156,7 @@ func TestQualificationV2PassiveVerificationFixedAuthority(t *testing.T) {
 		{name: "wrong issuer", kind: "issuer", code: e.CodeUntrustedSigner},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			digest, typ, identity, issuer, document := ociTestDigest, QualificationPredicateTypeV2, ociObservedIdentity, ociTestIssuer, predicate
+			digest, typ, identity, issuer, document := ociTestDigest, QualificationPredicateTypeV3, ociObservedIdentity, ociTestIssuer, predicate
 			switch tc.kind {
 			case "type":
 				typ = QualificationPredicateType
@@ -169,8 +169,8 @@ func TestQualificationV2PassiveVerificationFixedAuthority(t *testing.T) {
 			case "issuer":
 				issuer = "https://wrong.example"
 			}
-			stub := &cosignStub{stdout: map[string]string{"download": qualificationBundleV2(t, digest, typ, identity, issuer, []byte(document))}}
-			err := newStubbedSigner(t, stub, Credential{}).VerifyQualificationV2(t.Context(), ociSubject(), []byte(predicate))
+			stub := &cosignStub{stdout: map[string]string{"download": qualificationBundleV3(t, digest, typ, identity, issuer, []byte(document))}}
+			err := newStubbedSigner(t, stub, Credential{}).VerifyQualificationV3(t.Context(), ociSubject(), []byte(predicate))
 			if tc.code != "" {
 				requireSignCode(t, err, tc.code)
 			} else if err != nil {

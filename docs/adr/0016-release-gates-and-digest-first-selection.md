@@ -16,7 +16,7 @@
   strict Inventory, ReleaseSet and PromotionPolicy documents, required-member/artifact completeness, and
   authenticated ReleaseSet/policy diagnostics. Section 5 governs evidence tiers and deferred v1 full-release
   acceptance. Section 6 governs the unsigned local conformance producer and independently authenticated
-  qualification v2 handoff.
+  qualification v3 required-suite handoff.
 
 ## Context
 
@@ -354,15 +354,21 @@ skips outside required selection remain visible. Closure or cancellation revokes
 Local-role observations cannot satisfy site/tenant qualification. A policy requiring authenticated
 installed-deployment binding is capability-rejected before work because that owner is not implemented.
 
-Qualification v2 uses distinct schema/predicate `nvkr.dev/qualification-evidence/v2` and gate v2,
-with no v1 fallback. It retains every complete artifact and smoke gate and adds exact observation references,
-semantic digests and independently selected suite requirements. Missing, wrong-subject, wrong-attempt,
-failed, untrusted or revoked suite evidence prevents all signing. Qualification v1 remains unchanged and
-continues rejecting required external suites. The unavailable M3-B smoke issuer and unsupported OCI/APT
-smoke applicability still block those outputs; suite evidence is not a bypass. Optional/outside-scope
-observations grant no required pass. M4 manifest consumption, qualified exhaustive release-set conformance,
-authenticated deployment and qualification reuse remain deferred; historical or local evidence grants no
-current operational acceptance or CNCF certification.
+Required-suite qualification uses distinct schema/predicate `nvkr.dev/qualification-evidence/v3`
+and gate v3, with no native v2 fallback. It retains the full native v2 evidence, authenticated
+`ToolSmokeDescription`, complete artifact membership and exact invocation. Its independently selected
+`nvkr.dev/qualification-policy/v2` binds the complete native policy digest and required-suite requirements.
+Native policy v1 remains unchanged and rejects nonempty required suites; the extension cannot upgrade
+its outside-scope declarations. Missing, wrong-subject, wrong-attempt, failed, untrusted or revoked
+suite receipts prevent every signing operation. Raw-file publishing cannot supply native smoke authority.
+
+The current generated pair remains native v2. Generated v3 activation requires a separately implemented
+policy/generator extension and is deferred; runtime policy checks retain exact generated native admission.
+The CLI derives its source from the authenticated triggering event and accepts only native policy,
+suite configuration and private workspace inputs. Contract tests and local-key interoperability do not
+establish hosted v3 execution. M4 manifest consumption, exhaustive release-set conformance, authenticated
+deployment and qualification reuse remain deferred. Historical or local evidence grants no current
+operational acceptance or CNCF certification.
 
 ## Consequences
 

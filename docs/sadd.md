@@ -588,8 +588,10 @@ even if earlier attachments remain. Smoke execution has no qualification credent
 The MVP keeps disk evidence producer-only. Embedded declarations are optional; omission is not applicable,
 while authored declarations must match their referenced pinned upstream metadata. This supplies no effective
 customized or installed composition claim and does not replace exact build-input/material evidence.
-External suites outside scope are explicitly not evaluated. Future required suites must supply authenticated
-subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
+External suites outside scope are explicitly not evaluated. Required-suite v3 preserves the entire native v2 smoke contract and joins authenticated
+subject-bound observations under independently selected policy bound to the full native policy digest.
+The generated pair remains native v2; generated v3 activation is deferred. An unsigned report or
+pass boolean cannot satisfy either gate. This supplies no runtime
 conformance or cluster qualification. M4 lists
 artifacts with passing qualification in a canonical release manifest, under an immutable definition/commit tag
 and one mutable channel tag. A failing verdict prevents manifest issuance. These gates remain proposed.

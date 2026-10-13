@@ -44,39 +44,17 @@ func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecyc
 	if err != nil {
 		return nil, err
 	}
-	provider := qualificationorigin.NewGitHub(options.GitHubToken)
-	source, err := provider.AuthenticateTriggeredSource(ctx, policy.Source)
+	run, diagnostic, err := authenticateTriggeredRun(ctx, policy, options)
 	if err != nil {
-		return nil, err
+		return diagnostic, err
 	}
-	defer func() { _ = source.Close() }()
-	invocation, err := provider.AuthenticateInvocation(ctx, source, policy.QualificationWorkflow)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = invocation.Close() }()
-	raw, err := provider.DownloadQualificationHandoff(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	checks, report, err := lifecycle.CheckQualificationHandoff(ctx, raw, source, policy, options)
-	if err != nil {
-		if report == nil {
-			return nil, err
-		}
-		return &Publication{ArtifactChecks: report, Verdicts: []Verdict{}, PublishedSubjects: []string{}}, err
-	}
-	defer func() { _ = checks.Close() }()
-	smoke, err := lifecycle.AuthenticateHostedToolSmoke(ctx, checks, invocation, policy, options.GitHubToken)
-	if err != nil {
-		return smokeFailurePublication(report, err)
-	}
-	defer func() { _ = smoke.Close() }()
+	defer run.close()
+
 	policyDigest, err := policy.Digest()
 	if err != nil {
 		return nil, err
 	}
-	return publisher.Publish(ctx, checks, invocation, smoke, Policy{QualificationPolicyDigest: policyDigest, OutsideMVPSuites: policy.OutsideMVPSuites, RequiredSuites: policy.RequiredSuites})
+	return publisher.Publish(ctx, run.checks, run.invocation, run.smoke, Policy{QualificationPolicyDigest: policyDigest, OutsideMVPSuites: policy.OutsideMVPSuites, RequiredSuites: policy.RequiredSuites})
 }
 
 // smokeFailurePublication preserves A's actual results and names the failed B
@@ -115,4 +93,67 @@ func admitRunPolicy(policy lifecycle.QualificationPolicy) error {
 	}
 	_, err := outsideSuites(policy.OutsideMVPSuites)
 	return err
+}
+
+// triggeredRun owns the same authenticated source, invocation, artifact checks
+// and native smoke for both predicate versions. It never signs an attachment.
+type triggeredRun struct {
+	source     *qualificationorigin.SourceRun
+	invocation *qualificationorigin.Invocation
+	checks     *lifecycle.ArtifactCheckReceipt
+	smoke      *lifecycle.ToolSmokeReceipt
+}
+
+func (run *triggeredRun) close() {
+	if run == nil {
+		return
+	}
+	if run.smoke != nil {
+		_ = run.smoke.Close()
+	}
+	if run.checks != nil {
+		_ = run.checks.Close()
+	}
+	if run.invocation != nil {
+		_ = run.invocation.Close()
+	}
+	if run.source != nil {
+		_ = run.source.Close()
+	}
+}
+func authenticateTriggeredRun(ctx context.Context, policy lifecycle.QualificationPolicy, options lifecycle.QualificationRuntimeOptions) (_ *triggeredRun, diagnostic *Publication, returned error) {
+	run := &triggeredRun{}
+	defer func() {
+		if returned != nil {
+			run.close()
+		}
+	}()
+	provider := qualificationorigin.NewGitHub(options.GitHubToken)
+	var err error
+	run.source, err = provider.AuthenticateTriggeredSource(ctx, policy.Source)
+	if err != nil {
+		return nil, nil, err
+	}
+	run.invocation, err = provider.AuthenticateInvocation(ctx, run.source, policy.QualificationWorkflow)
+	if err != nil {
+		return nil, nil, err
+	}
+	raw, err := provider.DownloadQualificationHandoff(ctx, run.source)
+	if err != nil {
+		return nil, nil, err
+	}
+	var report *lifecycle.ArtifactCheckDescription
+	run.checks, report, err = lifecycle.CheckQualificationHandoff(ctx, raw, run.source, policy, options)
+	if err != nil {
+		if report == nil {
+			return nil, nil, err
+		}
+		return nil, &Publication{ArtifactChecks: report, Verdicts: []Verdict{}, PublishedSubjects: []string{}}, err
+	}
+	run.smoke, err = lifecycle.AuthenticateHostedToolSmoke(ctx, run.checks, run.invocation, policy, options.GitHubToken)
+	if err != nil {
+		diagnostic, err = smokeFailurePublication(report, err)
+		return nil, diagnostic, err
+	}
+	return run, nil, nil
 }

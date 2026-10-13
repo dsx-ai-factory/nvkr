@@ -14,6 +14,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testobservation"
+	"github.com/google/go-containerregistry/pkg/name"
 )
 
 // SuiteRequirement is independently selected consumer policy, never evidence.
@@ -74,9 +75,9 @@ func (r *SuiteReceipt) Close() error {
 
 // AuthenticateSuite only accepts package-issued authenticated production receipts.
 func AuthenticateSuite(ctx context.Context, observation *testobservation.Verified, checks *lifecycle.ArtifactCheckReceipt, requirement SuiteRequirement) (*SuiteReceipt, error) {
-	return authenticateSuiteV2(ctx, observation, checks, requirement)
+	return authenticateSuiteV3(ctx, observation, checks, requirement)
 }
-func authenticateSuiteV2(ctx context.Context, observation suiteObservation, checks suiteChecks, requirement SuiteRequirement) (*SuiteReceipt, error) {
+func authenticateSuiteV3(ctx context.Context, observation suiteObservation, checks suiteChecks, requirement SuiteRequirement) (*SuiteReceipt, error) {
 	if err := suiteContext(ctx); err != nil {
 		return nil, err
 	}
@@ -119,88 +120,92 @@ func suiteContext(ctx context.Context) error {
 	}
 	return nil
 }
-func (r *SuiteReceipt) require(ctx context.Context, checks lifecycle.ArtifactCheckDescription) (SuiteEvidenceV2, error) {
+func (r *SuiteReceipt) require(ctx context.Context, checks lifecycle.ArtifactCheckDescription) (SuiteEvidenceV3, error) {
 	if err := suiteContext(ctx); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if r == nil || r.closed == nil || r.closed.Load() || r.observation == nil || r.checks == nil {
-		return SuiteEvidenceV2{}, e.New(e.CodeGateUnmet, "suite receipt is missing or closed")
+		return SuiteEvidenceV3{}, e.New(e.CodeGateUnmet, "suite receipt is missing or closed")
 	}
 	if err := suiteContext(r.lifetime); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	current, err := r.checks.Description()
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	raw, err := canonical.Marshal(current)
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	target, err := canonical.Marshal(checks)
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if string(raw) != r.binding || string(target) != r.binding {
-		return SuiteEvidenceV2{}, e.New(e.CodeGateUnmet, "suite receipt source changed or differs from qualification")
+		return SuiteEvidenceV3{}, e.New(e.CodeGateUnmet, "suite receipt source changed or differs from qualification")
 	}
 	if err := r.requirement.Validate(); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	identity, issuer, err := r.observation.Signer(ctx)
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if identity != r.requirement.Identity || issuer != r.requirement.Issuer {
-		return SuiteEvidenceV2{}, e.New(e.CodeUntrustedSigner, "suite observation signer differs from independent policy")
+		return SuiteEvidenceV3{}, e.New(e.CodeUntrustedSigner, "suite observation signer differs from independent policy")
 	}
 	observation, err := r.observation.Observation(ctx)
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if err := r.requirement.Expected.Check(observation); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	verified, err := r.observation.Description(ctx)
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if !verified.SignerAuthenticated || !verified.SelfConsistent || !verified.Passing || verified.ObservationDigest != r.requirement.Expected.ObservationDigest || observation.Summary.Total == 0 || observation.Summary.Failed != 0 || observation.Summary.Errors != 0 || observation.Summary.Passed < len(r.requirement.Expected.Suite.RequiredCases) || observation.Execution.Status != "completed" || observation.Execution.ExitCode != 0 || observation.Cleanup.Status != "completed" || observation.Cleanup.ExitCode != 0 {
-		return SuiteEvidenceV2{}, e.New(e.CodeGateUnmet, "suite requires complete authenticated passing execution and cleanup with complete required-case coverage")
+		return SuiteEvidenceV3{}, e.New(e.CodeGateUnmet, "suite requires complete authenticated passing execution and cleanup with complete required-case coverage")
 	}
 	reference, err := r.observation.Reference(ctx)
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	detached, err := canonical.Marshal(r.requirement)
 	if err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	var requirement SuiteRequirement
 	if err := canonical.UnmarshalExact(detached, &requirement); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
-	evidence := SuiteEvidenceV2{Reference: reference, Name: observation.Suite.Name, Requirement: requirement, Origin: observation.Origin, Role: observation.Environment.Role, Status: "pass"}
+	evidence := SuiteEvidenceV3{Reference: reference, Name: observation.Suite.Name, Requirement: requirement, Origin: observation.Origin, Role: observation.Environment.Role, Status: "pass"}
 	if err := evidence.validate(checks); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if err := suiteContext(ctx); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if r.closed.Load() {
-		return SuiteEvidenceV2{}, e.New(e.CodeGateUnmet, "suite receipt was revoked during admission")
+		return SuiteEvidenceV3{}, e.New(e.CodeGateUnmet, "suite receipt was revoked during admission")
 	}
 	if _, err := r.checks.Description(); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	if _, _, err := r.observation.Signer(ctx); err != nil {
-		return SuiteEvidenceV2{}, err
+		return SuiteEvidenceV3{}, err
 	}
 	return evidence, nil
 }
 
-func validateSuiteSubjectsV2(expected testobservation.Expected, checks lifecycle.ArtifactCheckDescription) error {
-	if expected.Inputs.DefinitionDigest != checks.Inputs.DefinitionDigest || expected.Inputs.EnvironmentDigest != checks.Inputs.EnvironmentDigest || expected.Inputs.PlanDigest != checks.Inputs.PlanDigest || expected.Inputs.PublicationDigest != checks.Inputs.ReleaseSubject {
+func validateSuiteSubjectsV3(expected testobservation.Expected, checks lifecycle.ArtifactCheckDescription) error {
+	publication, err := name.NewDigest(checks.Inputs.ReleaseSubject, name.StrictValidation)
+	if err != nil || publication.Name() != checks.Inputs.ReleaseSubject {
+		return e.New(e.CodeGateUnmet, "suite publication binding requires the exact immutable authenticated release subject")
+	}
+	if expected.Inputs.DefinitionDigest != checks.Inputs.DefinitionDigest || expected.Inputs.EnvironmentDigest != checks.Inputs.EnvironmentDigest || expected.Inputs.PlanDigest != checks.Inputs.PlanDigest || expected.Inputs.PublicationDigest != publication.DigestStr() {
 		return e.New(e.CodeGateUnmet, "suite input bindings differ from authenticated publication")
 	}
 	for _, subject := range expected.Subjects {
@@ -274,7 +279,7 @@ func validateSuiteSubjectsV2(expected testobservation.Expected, checks lifecycle
 	}
 	return nil
 }
-func originMatchesV2(origin testobservation.Origin, checks lifecycle.ArtifactCheckDescription) bool {
+func originMatchesV3(origin testobservation.Origin, checks lifecycle.ArtifactCheckDescription) bool {
 	source := checks.Origin
 	return origin.Status == "declared" && origin.Repository == source.Repository && origin.Commit == source.Commit && origin.Run == source.RunID && strconv.Itoa(origin.Attempt) == source.Attempt && origin.Workflow == source.Workflow
 }

@@ -15,15 +15,15 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// QualificationPredicateTypeV2 cannot substitute for production SLSA evidence.
-const QualificationPredicateTypeV2 = "https://nvkr.dev/qualification-evidence/v2"
+// QualificationPredicateTypeV3 cannot substitute for production SLSA evidence.
+const QualificationPredicateTypeV3 = "https://nvkr.dev/qualification-evidence/v3"
 
-// AttestQualificationV2 attaches one exact qualification predicate to an existing
+// AttestQualificationV3 attaches one exact qualification predicate to an existing
 // OCI subject, then independently downloads and verifies the attachment under
 // the configured qualification identity. It never rebuilds or signs build
 // provenance. The owning qualification module admits all verdicts before calling
 // this adapter. Failure may leave an attachment and never returns success.
-func (s *CosignOCISigner) AttestQualificationV2(ctx context.Context, subject Subject, predicate []byte) error {
+func (s *CosignOCISigner) AttestQualificationV3(ctx context.Context, subject Subject, predicate []byte) error {
 	if s == nil || s.runner == nil {
 		return e.New(e.CodeInternal, "qualification signer is unavailable")
 	}
@@ -36,13 +36,13 @@ func (s *CosignOCISigner) AttestQualificationV2(ctx context.Context, subject Sub
 	if err := subject.Validate(); err != nil {
 		return err
 	}
-	if err := requireQualificationPredicateV2(predicate); err != nil {
+	if err := requireQualificationPredicateV3(predicate); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	exact := append([]byte(nil), predicate...)
-	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: exact, exactPredicateBytes: true}, s.identity, s.issuer)
+	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: exact}, s.identity, s.issuer)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (s *CosignOCISigner) AttestQualificationV2(ctx context.Context, subject Sub
 		return err
 	}
 	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
-	args := qualificationAttestArgsV2(subject.Ref, path)
+	args := qualificationAttestArgsV3(subject.Ref, path)
 	if _, err := s.capture(ctx, args, environment); err != nil {
 		return err
 	}
@@ -70,20 +70,20 @@ func (s *CosignOCISigner) AttestQualificationV2(ctx context.Context, subject Sub
 	if err := assertPrivateFileUnchanged(path, exact); err != nil {
 		return err
 	}
-	_, _, _, err = s.verifyOCIBundles(ctx, subject, QualificationPredicateTypeV2, policy, workspace, observationVerificationEnvironment(environment))
+	_, _, _, err = s.verifyOCIBundles(ctx, subject, QualificationPredicateTypeV3, policy, workspace, observationVerificationEnvironment(environment))
 	if err != nil {
 		return err
 	}
 	return contextError(ctx)
 }
 
-func qualificationAttestArgsV2(reference, predicatePath string) []string {
-	return []string{"attest", "--yes", "--new-bundle-format", "--type", QualificationPredicateTypeV2, "--predicate", predicatePath, reference}
+func qualificationAttestArgsV3(reference, predicatePath string) []string {
+	return []string{"attest", "--yes", "--new-bundle-format", "--type", QualificationPredicateTypeV3, "--predicate", predicatePath, reference}
 }
 
-// VerifyQualificationV2 independently authenticates the exact expected predicate,
+// VerifyQualificationV3 independently authenticates the exact expected predicate,
 // subject, keyless certificate identity and issuer without signing permissions.
-func (s *CosignOCISigner) VerifyQualificationV2(ctx context.Context, subject Subject, predicate []byte) error {
+func (s *CosignOCISigner) VerifyQualificationV3(ctx context.Context, subject Subject, predicate []byte) error {
 	if s == nil || s.runner == nil {
 		return e.New(e.CodeInternal, "qualification verifier is unavailable")
 	}
@@ -96,10 +96,10 @@ func (s *CosignOCISigner) VerifyQualificationV2(ctx context.Context, subject Sub
 	if err := subject.Validate(); err != nil {
 		return err
 	}
-	if err := requireQualificationPredicateV2(predicate); err != nil {
+	if err := requireQualificationPredicateV3(predicate); err != nil {
 		return err
 	}
-	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: predicate, exactPredicateBytes: true}, s.identity, s.issuer)
+	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: predicate}, s.identity, s.issuer)
 	if err != nil {
 		return err
 	}
@@ -114,20 +114,27 @@ func (s *CosignOCISigner) VerifyQualificationV2(ctx context.Context, subject Sub
 	if err != nil {
 		return err
 	}
-	_, _, _, err = s.verifyOCIBundles(ctx, subject, QualificationPredicateTypeV2, policy, workspace, observationVerificationEnvironment(ociCosignEnvironment(os.Environ(), dockerConfig)))
+	_, _, _, err = s.verifyOCIBundles(ctx, subject, QualificationPredicateTypeV3, policy, workspace, observationVerificationEnvironment(ociCosignEnvironment(os.Environ(), dockerConfig)))
 	if err != nil {
 		return err
 	}
 	return contextError(ctx)
 }
 
-func requireQualificationPredicateV2(predicate []byte) error {
-	if err := requireOCIPredicateWithLimit(predicate, maxOCIPredicateBytes, e.CodeVerifyFailed, "qualification v2 predicate"); err != nil {
+func requireQualificationPredicateV3(predicate []byte) error {
+	if err := requireOCIPredicateWithLimit(predicate, maxOCIPredicateBytes, e.CodeVerifyFailed, "qualification v3 predicate"); err != nil {
 		return err
+	}
+	var version struct {
+		SchemaVersion string `json:"schemaVersion"`
+		GateVersion   string `json:"gateVersion"`
+	}
+	if err := json.Unmarshal(predicate, &version); err != nil || version.SchemaVersion != "nvkr.dev/qualification-evidence/v3" || version.GateVersion != "nvkr.dev/qualification-gate/v3" {
+		return e.New(e.CodeVerifyFailed, "qualification v3 requires its exact schema and gate version")
 	}
 	raw, err := canonical.Marshal(json.RawMessage(predicate))
 	if err != nil || !bytes.Equal(raw, predicate) {
-		return e.New(e.CodeVerifyFailed, "qualification v2 requires exact canonical predicate bytes")
+		return e.New(e.CodeVerifyFailed, "qualification v3 requires exact canonical predicate bytes")
 	}
 	return nil
 }

@@ -224,24 +224,32 @@ nonpassing and never fabricate a successful case.
 
 ## Qualify authenticated required suites
 
-`run qualify-tests` is the distinct qualification v2 surface; existing `run qualify` retains v1 behavior.
-Use its existing artifact/source/verifier flags plus `--qualification-workflow` and `--suite-config`.
-The bounded canonical `qualification.SuiteConfigurationV2` selects schema
-`nvkr.dev/qualification-suite-configuration/v2`, independent `PolicyV2` requirements and exact suite
-locators with registry options. Generate the JSON with the canonical codec from the typed configuration;
-existing nested transport/credential option field names retain their current Go serialization names.
-The suite configuration source must be a regular private file with no group/other permissions (use
-mode `0600`); this is checked on the held source descriptor before capture. Do not place secrets in public
-summaries or copy consumer policy from a locator.
+`run qualify-tests` selects the required-suite v3 extension; `run qualify` keeps the native v2
+contract. The extension preserves mandatory authenticated native smoke and the complete native policy.
 
-Each required suite selects exact observation digest/inputs/tested subjects/suite policy, literal signer
-and issuer, and required site/tenant role. The file adapter independently authenticates source and active
-qualifier invocation, verifies complete artifact membership, verifies the suite and issues a live opaque
-receipt. Each required suite must cover every exact named output and every required native child of an aggregate
-image output with its actual native manifest/Build identity. Partial platform or sibling coverage fails
-before signing.
-A closed/canceled receipt or wrong Run/attempt/policy/subject cannot sign. Strong authenticated installed
-binding is currently unsupported and fails admission. Local kind observations cannot satisfy site/tenant
-policy. The missing M3-B smoke issuer and current OCI/APT applicability limitations still block those
-qualification outputs; conformance is not a substitute. Passing required coverage tolerates upstream
-skips outside required selection, while skipped required cases always block.
+```sh
+nvkr run qualify-tests --policy independently-selected-native-policy.yaml \
+  --suite-config independently-selected-suites.json --workspace private-qualification
+```
+
+The bounded canonical `qualification.SuiteConfigurationV3` uses
+`nvkr.dev/qualification-suite-configuration/v3`. Its `PolicyV3` uses
+`nvkr.dev/qualification-policy/v2`, binds the complete native policy digest and selects required suites.
+Native `nvkr.dev/qualification-policy/v1` remains unchanged; its own `requiredSuites` must stay empty.
+The extension cannot upgrade a suite declared outside scope by that native policy.
+Generate JSON with the owning canonical codec. Nested transport/credential options retain their owning
+serialization names. The configuration must be a regular private file with no group/other permissions
+(use mode `0600`); admission checks the held descriptor. Keep credentials out of public summaries.
+
+Each requirement selects exact observation digest, inputs, tested subjects and suite policy, literal signer
+and issuer, and a site/tenant role. The qualifier authenticates its triggering hosted Run and invocation,
+complete artifact membership and native workers before joining independently verified suite receipts.
+Each suite must cover every exact named output and every required native child, including its native
+manifest and Build identity. Closed, canceled, wrong-attempt or incomplete receipts cannot sign.
+Local kind observations cannot satisfy site/tenant policy. Required-case skips always block; skips outside
+required selection remain visible. Authenticated installed-deployment binding is unsupported.
+
+The generated qualifier/worker pair still emits native v2. Generated v3 activation is deferred;
+changing its final command requires an explicit generator/policy extension and regeneration. The v3
+API and CLI contracts are tested, but no hosted v3 qualification or production acceptance is recorded.
+Raw-file publishing refuses before I/O because it cannot authenticate native smoke completion.

@@ -162,6 +162,10 @@ observations; authentication never converts them into passing qualification. Cal
 signer identity and issuer are exact literals independently selected by consumer policy.
 The verifier does not enforce inequality with build or qualifier identities.
 An OCI locator and its semantic observation digest are coordinates, not consumer trust policy.
+Required-suite qualification uses `https://nvkr.dev/qualification-evidence/v3`; native v2 retains
+its own predicate. The qualification owner validates full native smoke plus independently selected
+required-suite coverage before requesting signatures. A decoded predicate or observation signature
+cannot reconstruct that authority. Hosted v3 activation remains deferred in the pipeline-attested lane.
 
 The consumer authenticates the statement's exact OCI transport subject and predicate type, then
 compares the authenticated predicate to the exact canonical configuration and verifies all covered

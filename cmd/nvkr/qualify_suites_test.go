@@ -5,34 +5,45 @@ package main
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
-	"strings"
+	"context"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 	"github.com/urfave/cli/v2"
 )
 
-func TestQualifySuitesCLIRejectsConfigurationBeforeExternalWork(t *testing.T) {
-	for _, tc := range []struct{ name, raw string }{
-		{"malformed", "{"},
-		{"unknown schema", `{"policy":{"outsideMvpSuites":[],"requiredSuites":[]},"schemaVersion":"future","suites":[]}`},
+func TestQualifySuitesCLIDelegatesOnlyIndependentPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		args  []string
+		calls int
+	}{
+		{"selected", []string{"--policy", "native.yaml", "--suite-config", "suite.json"}, 1},
+		{"missing native", []string{"--suite-config", "suite.json"}, 0},
+		{"missing suites", []string{"--policy", "native.yaml"}, 0},
+		{"empty workspace", []string{"--policy", "native.yaml", "--suite-config", "suite.json", "--workspace", ""}, 0},
+		{"positional source", []string{"--policy", "native.yaml", "--suite-config", "suite.json", "12"}, 0},
+		{"caller source flag", []string{"--policy", "native.yaml", "--suite-config", "suite.json", "--source-run", "12"}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "private-policy.json")
-			if err := os.WriteFile(path, []byte(tc.raw), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			calls := 0
 			var output bytes.Buffer
-			app := &cli.App{Writer: &output, ErrWriter: &output, Commands: []*cli.Command{cmdRunQualifyTests()}}
-			args := []string{"nvkr", "qualify-tests", "--definition", "/not-opened/definition.yaml", "--environment", "/not-opened/environment.yaml", "--plan", "/not-opened/plan.json", "--candidate", "/not-opened/candidate.json", "--source-repository", "example/nvkr", "--source-run", "12", "--source-attempt", "1", "--source-commit", strings.Repeat("a", 40), "--source-workflow", ".github/workflows/build.yml", "--default-branch", "main", "--cosign", "/not-executed/cosign", "--cosign-digest", "sha256:" + strings.Repeat("b", 64), "--qualification-workflow", ".github/workflows/qualify.yml", "--suite-config", path}
-			err := app.RunContext(t.Context(), args)
-			if cliErrorCode(err) != e.CodeVerifyFailed {
-				t.Fatalf("configuration rejection lost its code: %v", err)
+			publish := func(_ context.Context, policy, configuration string, options lifecycle.QualificationRuntimeOptions) (*qualification.PublicationV3, error) {
+				calls++
+				if policy != "native.yaml" || configuration != "suite.json" || options.WorkspaceRoot != ".nvkr/qualification" {
+					t.Fatal("independent inputs changed")
+				}
+				return nil, e.New(e.CodeEngineCapability, "fixture refusal")
 			}
-			if output.Len() != 0 {
-				t.Fatalf("rejected configuration emitted a partial result: %q", output.String())
+			app := &cli.App{Writer: &output, ErrWriter: &output, Commands: []*cli.Command{cmdRunQualifyTestsWithPublisher(publish)}}
+			err := app.RunContext(t.Context(), append([]string{"nvkr", "qualify-tests"}, tc.args...))
+			if err == nil || calls != tc.calls {
+				t.Fatalf("calls=%d error=%v", calls, err)
+			}
+			if tc.calls == 1 && cliErrorCode(err) != e.CodeEngineCapability {
+				t.Fatal(err)
 			}
 		})
 	}
