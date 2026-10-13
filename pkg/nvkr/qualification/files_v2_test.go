@@ -55,8 +55,9 @@ func TestFilesV2CompleteAdmissionBeforeExternalWork(t *testing.T) {
 		{"malformed qualification workflow", func(o *FilesOptionsV2) { o.QualificationWorkflow = "../../unapproved" }, e.CodeTrustPolicyMissing},
 		{"missing original candidate", func(o *FilesOptionsV2) { o.ArtifactFiles.CandidatePath = "" }, e.CodeUsage},
 		{"invalid source commit", func(o *FilesOptionsV2) { o.ArtifactFiles.Source.Commit = "latest" }, e.CodeTrustPolicyMissing},
+		{"implicit credential helper unavailable", func(o *FilesOptionsV2) { o.Suites[0].Registry.Transport.Anonymous = false }, e.CodeTrustPolicyMissing},
 		{"credential host substitution", func(o *FilesOptionsV2) {
-			o.Suites[0].Registry.Transport.Anonymous = false
+			o.Suites[0].Registry.Transport = delivery.RegistryOptions{Username: "fixture", Password: "fixture"}
 			o.Suites[0].Registry.Credential = sign.Credential{Registry: "wrong.example", Username: "fixture", Password: "fixture"}
 		}, e.CodeUsage},
 		{"anonymous credential contradiction", func(o *FilesOptionsV2) {
@@ -135,7 +136,7 @@ func TestLoadSuiteConfigurationV2StrictHeldInput(t *testing.T) {
 func TestLoadSuiteConfigurationV2RejectsSignerMismatchWithoutPrintingCredential(t *testing.T) {
 	options := filesOptionsV2Fixture(t)
 	const secret = "PRIVATE_CREDENTIAL_VALUE_MUST_NOT_APPEAR"
-	options.Suites[0].Registry.Transport.Anonymous = false
+	options.Suites[0].Registry.Transport = delivery.RegistryOptions{Username: "fixture", Password: secret}
 	options.Suites[0].Registry.Credential = sign.Credential{Registry: "registry.example.test", Username: "fixture", Password: secret}
 	options.Suites[0].Registry.Identity = "different"
 	configuration := SuiteConfigurationV2{SchemaVersion: SuiteConfigurationSchemaV2, Policy: options.Policy, Suites: options.Suites}
