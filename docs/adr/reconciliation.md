@@ -68,6 +68,10 @@ Plan/provenance substitution and per-output evidence failures; they do not estab
 Additional contracts cover the embedded check's 1,024-selected-producer boundary, exact signer admission
 under literal substring policies, and canceled evidence traversal with retained slot-specific errors and
 complete-set refusal. Traversal failures are explicitly labeled in each output's evidence diagnostic.
+Late source-receipt revocation is reported by a separate failed `source-lifetime` check for each output,
+with its overall verdict failed and no check receipt. Previously completed artifact checks retain their
+actual results; successful reports keep their existing six-check shape. First/final evidence-callback
+revocation fixtures cover this diagnostic boundary, not external provider acceptance.
 
 All root/output production predicates must name the exact authenticated source attempt. If output metadata
 carries publication origin, its preparation and signing invocations must both match. Earlier-attempt output

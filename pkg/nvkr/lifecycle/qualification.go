@@ -303,6 +303,14 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		return nil, report, err
 	}
 	if err := source.Require(); err != nil {
+		// Retain completed artifact checks as facts while making the final
+		// source-lifetime refusal explicit for every output awaiting a receipt.
+		for i := range report.Outputs {
+			output := &report.Outputs[i]
+			output.Checks = append(output.Checks, qualificationCheck("source-lifetime", err))
+			sort.Slice(output.Checks, func(i, j int) bool { return output.Checks[i].Name < output.Checks[j].Name })
+			output.Overall = "fail"
+		}
 		return nil, report, err
 	}
 	raw, err = canonical.Marshal(report)

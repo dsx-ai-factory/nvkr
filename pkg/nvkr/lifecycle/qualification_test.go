@@ -27,12 +27,16 @@ import (
 )
 
 type qualificationFixtureSource struct {
-	value  qualificationorigin.Description
-	closed bool
+	value     qualificationorigin.Description
+	closed    bool
+	closedErr error
 }
 
 func (s *qualificationFixtureSource) Require() error {
 	if s.closed {
+		if s.closedErr != nil {
+			return s.closedErr
+		}
 		return e.New(e.CodeProvenanceMissing, "fixture source closed")
 	}
 	return nil
@@ -299,6 +303,62 @@ func TestQualificationChecksCompleteSetAndOpaqueReceipt(t *testing.T) {
 	assertCode(t, err, e.CodeProvenanceMissing)
 	_, err = (&ArtifactCheckReceipt{}).Description()
 	assertCode(t, err, e.CodeGateUnmet)
+}
+
+func TestQualificationReportsLateSourceRevocation(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		revokeAfter int
+	}{
+		{name: "first evidence", revokeAfter: 1},
+		{name: "final evidence", revokeAfter: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, consumer, verifier := newQualificationFixture(t)
+			cause := errors.New("source lifetime revoked")
+			revokedErr := e.Wrap(e.CodeProvenanceMissing, cause, "fixture source closed")
+			verifier.source.closedErr = revokedErr
+			verifier.afterEvidence = func() {
+				if verifier.evidence == tc.revokeAfter {
+					verifier.source.closed = true
+				}
+			}
+			receipt, report, err := consumer.checkQualification(t.Context(), request, verifier.source)
+			assertCode(t, err, e.CodeProvenanceMissing)
+			if err != revokedErr || !errors.Is(err, cause) {
+				t.Fatalf("final source refusal lost its error or cause: %v", err)
+			}
+			if receipt != nil || report == nil || len(report.Outputs) != 2 || len(verifier.verified) != 4 || verifier.evidence != 2 {
+				t.Fatalf("source revocation skipped checks or issued authority: receipt=%v report=%+v signatures=%v evidence=%d", receipt, report, verifier.verified, verifier.evidence)
+			}
+			wantChecks := map[string]string{
+				"build-signature-and-provenance": "pass", "embedded-declarations": "not-applicable",
+				"payload-pins": "pass", "run-and-inputs": "pass", "schema-and-membership": "pass", "signed-evidence": "pass",
+			}
+			for _, output := range report.Outputs {
+				if output.Overall != "fail" || len(output.Checks) != len(wantChecks)+1 {
+					t.Fatalf("source refusal missing from output verdict: %+v", output)
+				}
+				previous := ""
+				for _, check := range output.Checks {
+					if check.Name <= previous {
+						t.Fatalf("checks are not sorted and unique: %+v", output.Checks)
+					}
+					previous = check.Name
+					if check.Name == "source-lifetime" {
+						if check.Status != "fail" || check.Code != string(e.CodeProvenanceMissing) || check.Message != revokedErr.Error() {
+							t.Fatalf("source refusal diagnostic lost the actual failure: %+v", check)
+						}
+						continue
+					}
+					status, found := wantChecks[check.Name]
+					if !found || check != (ArtifactCheckResult{Name: check.Name, Status: status}) {
+						t.Fatalf("source refusal changed a completed artifact check: %+v", check)
+					}
+				}
+			}
+		})
+	}
 }
 
 func TestQualificationCollectsEveryOutputFailureBeforeReceipt(t *testing.T) {
