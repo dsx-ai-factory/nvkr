@@ -80,7 +80,7 @@ func (progress *githubStepProgress) finish(err error) {
 	status := GitHubStepExitCode(err)
 	result := "completed"
 	if err == nil {
-		progress.log(fmt.Sprintf("Completed: %s (%ds)", progress.label, elapsed))
+		progress.log(fmt.Sprintf("Completed: %s (%ds), last phase: %s", progress.label, elapsed, progress.current))
 	} else {
 		result = "failed"
 		_, _ = fmt.Fprintf(progress.options.Stderr, "Failed: %s at %s (exit %d, %ds)\n", githubDisplayText(progress.label), githubDisplayText(progress.current), status, elapsed)

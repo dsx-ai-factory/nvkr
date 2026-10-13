@@ -204,6 +204,21 @@ contains the retained three-output NVKE inputs; `definitions/nvke-m2/` supplies 
 selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
+`.agents/skills/nvkr-operator/` is the customer agent entry point; maintainers keep it consistent with
+`CONTEXT.md`, reconciliation, current task guides and CLI help when those contracts change.
+
+After renaming a linked guide, audit the skill's relative links from each containing Markdown file.
+From the repository root, inventory links using standard `grep`:
+
+```sh
+grep -nF '](' .agents/skills/nvkr-operator/SKILL.md \
+  .agents/skills/nvkr-operator/references/*.md README.md docs/README.md
+```
+
+Review each local target against the current tree and each section against its target document. This is a
+manual audit, not a Markdown parser or automated broken-link gate. `make docs-check` covers only the Fern
+pages listed in `docs/index.yml`, which do not include this skill or the documentation map.
+
 ## Completion gate
 
 Run checks proportionate to the change, with the full release-blocking gate before claiming repository-wide

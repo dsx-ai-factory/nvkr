@@ -6,6 +6,7 @@ package planview
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -22,6 +23,20 @@ func TestGraphsCoverEveryDeclaredNodeEdgeAndJoin(t *testing.T) {
 			var graph Graph
 			if err := json.Unmarshal(raw, &graph); err != nil {
 				t.Fatal(err)
+			}
+			typed, err := doc.GraphSnapshot(view)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(typed, graph) {
+				t.Fatal("typed graph differs from owning rendered graph")
+			}
+			if len(typed.Vertices) > 0 {
+				typed.Vertices[0].Key = "mutated"
+				fresh, err := doc.GraphSnapshot(view)
+				if err != nil || fresh.Vertices[0].Key == "mutated" {
+					t.Fatal("typed graph aliases owner")
+				}
 			}
 			if graph.PlanDigest != doc.digest || graph.Authority != "description-only" {
 				t.Fatal("graph lost descriptive subject")

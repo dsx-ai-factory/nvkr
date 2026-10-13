@@ -66,11 +66,26 @@ bin/nvkr release verify --reference "$RELEASE_REF" \
   --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST"
 ```
 
-This scope checks artifact bytes, signatures, and production attestations under that policy. It does not
-provide qualified acceptance or the capability-gated full `release` scope.
+This scope downloads and checks artifact bytes, signatures, and production attestations under that policy.
+For a faster check that skips artifact payload layers, including disk images, use the same accepted policy
+with `--scope authenticity`:
+
+```sh
+bin/nvkr release verify --reference "$RELEASE_REF" \
+  --lane pipeline-attested --scope authenticity \
+  --identity "$ACCEPTED_BUILD_IDENTITY_REGEXP" --issuer "$ACCEPTED_OIDC_ISSUER" \
+  --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST"
+```
+
+Authenticity verifies the root and every required output's signatures and production provenance, plus
+required signed SBOMs and their metadata membership. Its result explicitly reports
+`payloadIntegrityVerified: false`: **authenticity verified; payload integrity not checked**. It cannot
+authorize payload export or exact-input matching. Both scopes enforce the selected disk-evidence minimum;
+`--minimum-disk-evidence strict` requires signed inspected-disk evidence, but authenticity does not inspect
+the disk itself. Neither scope provides qualification or the capability-gated full `release` scope.
 
 From macOS, use the [consumer script](https://github.com/dsx-ai-factory/nvkr/blob/main/scripts/demo-release-consumer.sh) to run the
-same verification inside its pinned Linux Docker image. It builds a Linux amd64 `nvkr`
+artifact-publication verification inside its pinned Linux Docker image. It builds a Linux amd64 `nvkr`
 helper with the repository's pinned Go toolchain; supply a static Linux amd64 cosign
 executable and its trusted digest:
 

@@ -103,13 +103,13 @@ func githubCatalogSourceEnvironment(plan *Plan) map[string]string {
 }
 
 func writeCatalogValidationStep(out *bytes.Buffer, plan *Plan, name, id, command string) {
-	fmt.Fprintf(out, "      - name: %s\n", name)
+	fmt.Fprintf(out, "      - name: %s\n        id: %s\n", name, id)
 	env := githubCatalogSourceEnvironment(plan)
 	if len(env) == 0 {
 		fmt.Fprintf(out, "        run: %s\n", command)
 		return
 	}
-	fmt.Fprintf(out, "        id: %s\n        env:\n", id)
+	fmt.Fprintln(out, "        env:")
 	for _, key := range sortedKeys(env) {
 		fmt.Fprintf(out, "          %s: %s\n", key, yamlSingle(env[key]))
 	}

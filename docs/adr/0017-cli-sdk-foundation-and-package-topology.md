@@ -138,7 +138,47 @@ these maintenance descriptions cannot grant execution or release authority.
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
 separating per-output Build Digest changes from execution and transport changes. It issues no authority.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate|check-artifacts`, and `release verify|inspect|browse|export`, with
+`progress` owns bounded descriptive snapshots of admitted operations and named
+outputs, supplied by factory scheduling and lifecycle output-observation boundaries.
+It also carries detached public command-result descriptions (titles, fields, items
+and navigation links). These values are presentation contracts, not additional
+Run membership or SDK inspection methods; CLI adapters project recorded metadata.
+It calls no renderer or caller-controlled writer from producer updates. Lossy
+wakeups and bounded public activity cannot change frozen membership or finalization.
+`internal/runpresenter` owns terminal admission, rendering, cancellation requests and
+joined screen/event/worker lifetimes. It has no receipt or deployment ownership.
+Live CLI result/error pairs independently select final reporting and exit status;
+complete retained output plus cleanup failure remains a complete Run and a failed
+command. These transient descriptions add no field to signed/canonical identities.
+The CLI captures a bounded tail of interactive producer stdout/stderr in memory,
+without producer-side filesystem or renderer callbacks. A failed command replays
+that tail to ordinary stderr after terminal restoration and owner joining, with
+truncation marked. Raw diagnostics never enter safe snapshots or panes. This
+does not create durable general-purpose logs or replay successful console output;
+existing Packer diagnostic retention remains separately owned.
+
+Lifecycle's `InspectRun` owns bounded, no-follow canonical record inspection and
+projects safe file-recorded metadata and attempt-marker descriptions through the
+SDK. A record must exist and name its containing attempt directory; absence
+fails with a coded verification error and never establishes interruption or
+excludes a live owner. Inspection admits only currently producible lanes, not
+qualified lifecycle records. It validates the existing output slot bindings, without opening payload
+locators, restoring execution authority or inferring current availability/health.
+The CLI may show these views as plain/JSON or an explicitly selected read-only
+terminal explorer. The interactive public command leaves additionally admit an explicitly
+selected result browser; `run check-artifacts` retains canonical machine-readable diagnostics.
+Owning operations, including maintenance transactions
+and verification, finish and release receipts before this read-only view opens.
+Typed names, identity fields, counts and navigation links are descriptions; they
+exclude transport locations, private paths and raw error/value text. Closing a
+result view neither repeats nor reverses the operation, and owning status codes
+remain authoritative; Ctrl+C closes a read-only viewer and cancels only live work.
+Existing non-interactive and explicitly plain output bytes, including exact Plan
+JSON, are preserved. Interactive `run local` defaults to the dashboard and does
+not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
+terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
+
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts`, and `release verify|inspect|browse|export`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
@@ -153,6 +193,15 @@ to `build-provenance-v1`; explicitly selecting `strict` requires inspected evide
 to strict and rejects the producer-only minimum. Inspected evidence satisfies either minimum; producer metadata
 cannot weaken the selected consumer policy. The signed mode remains
 descriptive and does not grant authority.
+
+`Consumer.Authenticate` admits only pipeline-attested `authenticity` policy and issues a distinct opaque
+`AuthenticatedRelease` after checking the complete metadata/evidence closure and its required signatures,
+production provenance and SBOM bundles. It never opens the full-payload publication owner. Its description
+explicitly reports `payloadIntegrityVerified: false`; it supplies no payload export or exact-input receipt.
+`Consumer.Verify` retains the full-payload artifact-publication contract. These capabilities cannot substitute
+for one another, and their serialized descriptions cannot restore live authority. The CLI selects the narrow
+operation through `release verify --scope authenticity`; exact-input flags are rejected at admission.
+
 Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
@@ -165,8 +214,9 @@ render text, JSON, or Mermaid; platform labels describe checked config metadata.
 admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
 by default; an explicit caller-owned workspace is retained while its private staging child is removed.
 Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
-signature or policy verification, and cannot restore a verified Release capability. Explicit Release
-verification retains its full payload and policy checks. The existing compact local `release inspect` view remains.
+signature or policy verification, and cannot restore an authenticated or verified Release capability. Explicit
+`artifact-publication` verification retains its full payload and policy checks; `authenticity` adds policy-bound
+signature/evidence checks to metadata acquisition. The existing compact local `release inspect` view remains.
 
 `lifecycle.ExportRelease(ctx, reference, options)` owns complete release-description export (ADR-19/20).
 It uses the same bounded inspection and versioned JSON description as `release browse --format json`.

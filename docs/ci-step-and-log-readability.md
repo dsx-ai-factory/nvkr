@@ -1,7 +1,7 @@
 # Generated CI steps and logs
 
-The GitHub renderer names each logical operation and identifies its exact Plan node in the log and job
-summary. A build also names the component, selected output, producer instruction, platform, network and source
+The GitHub renderer names each logical operation and identifies its exact Plan node in the job log.
+A build also names the component, selected output, producer instruction, platform, network and source
 commit where present. Utility operations identify their package format or publication route and list their
 exact declared input and expected output artifacts, including producers.
 
@@ -19,7 +19,8 @@ These diagnostic messages support investigation; authenticated records establish
 
 ## Finding a failure
 
-Start with the failed job's summary. Each executed operation records its result, exit status, elapsed seconds
+Start with the closing Run summary for required-job counts and the finalization outcome, then open the failed
+job's named step. Each executed operation logs its result, exit status, elapsed seconds
 and last phase. For example, `execute package/controller-chart` identifies the failed logical operation;
 `restore sbom/cwe` identifies a transport failure before the consumer could execute. Expected outputs are
 explicitly labeled; only a successful operation prints `Produced` for its outputs.
@@ -34,9 +35,16 @@ contents. Raw arguments can contain literal authentication values; the canonical
 instructions for deliberate local inspection. Safe compiled context explains which instruction ran without
 dumping its execution environment. Runtime descriptions never become provider expressions or shell commands; summaries escape control text and Markdown.
 
-Summaries are optional diagnostics. If GitHub does not provide a summary path, or that file cannot be written,
-the original operation status remains authoritative for the step. A job that never starts, is canceled or
-loses its runner may have no summary. A successful summary is not an authenticated Run or Release verdict.
+Generated workflows write at most two optional summaries per attempt. A brief opening appears in one
+deterministically selected runner-bootstrap job after native admission and before checkout. The closing
+summary is the final step of the existing always-run lifecycle finalizer, after the final Run record upload.
+It counts required jobs by `success`, `failure`, `cancelled` and `skipped`, reports the finalization outcome,
+and uses provider statuses without requiring a checkout or helper. Detailed operation and transfer results
+remain in job logs.
+
+Missing or unwritable summary files cannot change execution status. Runner loss, force cancellation or a
+pending deployment environment may prevent the closing step from running; use the job statuses and logs
+when no closing summary exists. These summaries are diagnostics, not authenticated Run or Release verdicts.
 
 ## Understanding transfers and recovery
 
@@ -50,11 +58,12 @@ Each operation archives its declared outputs in one step, then uploads each carr
 carrier names, paths, payload verification, evidence bindings and upload failure behavior remain intact.
 If preparing one output fails, that operation's subsequent upload steps do not run.
 
-The finalizer uses one exact all-carrier download followed by one recovery helper. Its summary records each
+The legacy finalizer uses one exact all-carrier download followed by one recovery helper. Its log records each
 artifact as `job-failed`, `missing`, `restore-failed` or `restored:success`. It continues recording outcomes
 after returned restore failures. These are the same per-carrier files consumed by the finalizer: a batch
 helper's success does not establish completeness, and a carrier from a failed grouped job cannot become a
 successful output. The finalization gate still authenticates output membership, observations and evidence.
+Per-output publication uses metadata-only finalization carriers under the same provider-result admission.
 
 ## Compact workflow commands
 
@@ -65,7 +74,7 @@ There is no new authored transport manifest. Source-fetch credentials stay on `r
 `pack-outputs` remains a separate step.
 
 These excerpts illustrate a controller-chart operation and finalizer. Exact names and node IDs come from
-the selected Plan; the repository currently generates the 34-output M2 workflow.
+the selected Plan; the repository currently generates the 35-output M2 workflow.
 
 ```yaml
       - name: 'Build nvke-controller-chart (controller-chart)'
@@ -113,6 +122,8 @@ Workflow and manifest bytes change; the Plan digest and bytes remain unchanged. 
 size are unchanged by this refactor, including the remaining work to minimize OS-image transfer.
 
 Current contracts live in [compact-helper tests](../pkg/nvkr/factory/github_compact_test.go),
-[reporter tests](../pkg/nvkr/factory/github_reporter_test.go), and
+[reporter tests](../pkg/nvkr/factory/github_reporter_test.go),
+[Run summary tests](../pkg/nvkr/factory/github_run_summary_test.go),
+[CLI summary tests](../cmd/nvkr/factory_github_test.go), and
 [finalization tests](../pkg/nvkr/factory/github_finalize_test.go). They cover generated commands and failure
 handling; neither these tests nor the historical static counts establish hosted duration or Release acceptance.

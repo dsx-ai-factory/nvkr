@@ -23,6 +23,9 @@ _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
 One execution attempt against frozen inputs and required outputs, recording progress, observed artifacts, evidence, and failures.
+Live progress and file-recorded inspection are descriptive views. Producer completion,
+activity and terminal presentation do not establish retained output membership,
+release verification or runtime health; the owning result and error remain separate.
 _Avoid_: Plan, release, proof of qualification
 
 **Artifact**:
@@ -120,6 +123,10 @@ An Artifact format containing exact executable files and their installation meta
 _Avoid_: Release, arbitrary archive
 
 ## Evidence and authority
+
+**Release authenticity**:
+Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.
+_Avoid_: Payload verification, deployment readiness, full release acceptance
 
 **Evidence lane**:
 The contract governing an artifact's evidence: pipeline-attested production or qualified reproduction and release authorization. Static or dry-run output is unqualified.

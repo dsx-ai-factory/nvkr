@@ -114,6 +114,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if err := writeGitHubPlatformCheck(&body, plan, runner); err != nil {
 			return nil, err
 		}
+		if runner == sortedKeys(bootstrapJobs)[0] {
+			writeGitHubRunSummary(&body, githubRunStartSummary(plan))
+		}
 		actions.writeCheckoutStep(&body)
 		actions.writeSetupGoStep(&body)
 		helperEnvironment := "CGO_ENABLED=0"
@@ -322,10 +325,11 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			finalize += " --handoff " + githubQualificationHandoffPath
 		}
 		writeCatalogValidationStep(&body, plan, "Finalize Run and check completeness", "finalize-catalog", finalize)
-		fmt.Fprintf(&body, "      - name: Upload final Run record\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nvkr-lifecycle-run\n          path: .nvkr/run.json\n          if-no-files-found: error\n", actions.Upload)
+		fmt.Fprintf(&body, "      - name: Upload final Run record\n        id: %s\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nvkr-lifecycle-run\n          path: .nvkr/run.json\n          if-no-files-found: error\n", githubRunUploadID, actions.Upload)
 		if githubQualificationHandoffEnabled(plan) {
 			writeGitHubQualificationHandoffStep(&body, actions)
 		}
+		writeGitHubRunSummary(&body, githubRunEndSummary(len(allNeeds)))
 	}
 	workflow := body.Bytes()
 	if PerOutputPublication(plan) {

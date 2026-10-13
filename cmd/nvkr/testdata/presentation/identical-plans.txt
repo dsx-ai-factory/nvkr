@@ -1,0 +1,4 @@
+before: sha256:b78af71bd90ff303a7c6764967ea0a8741be6fe2572cd11b5c15b159bd082ead
+after:  sha256:b78af71bd90ff303a7c6764967ea0a8741be6fe2572cd11b5c15b159bd082ead
+Logical input changes only; output bytes and release acceptance are not observed.
+No changes.

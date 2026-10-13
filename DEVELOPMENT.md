@@ -103,6 +103,27 @@ restored and an updated cache saved only after successful checks. Other jobs can
 [CI test performance](docs/ci-test-performance.md) owns the measured Merge Gate follow-up and focused
 profiling commands.
 
+## Opt-in terminal presentation checks
+
+The ordinary presenter suite uses simulated screens. Real terminal fixtures must
+run in an isolated interactive TTY with usable `TERM`, never against the user's
+active shell input. Use the pinned Go version:
+
+```sh
+NVKR_TEST_RUNPRESENTER_TTY=1 go test ./internal/runpresenter \
+  -run '^TestPresenterRealTTYRestoresFlags$' -count=1 -v
+NVKR_TEST_RUNPRESENTER_HUP=1 go test ./internal/runpresenter \
+  -run '^TestPresenterRealTTYHangupJoinsOwner$' -count=1 -v
+go test -race ./internal/runpresenter ./internal/rundiagnostics ./pkg/nvkr/progress \
+  -count=1
+```
+
+The HUP fixture sends SIGHUP and verifies restoration and joined work; it does not
+establish physical PTY-master disconnection behavior. These controlled fixtures
+do not execute NVKE producers, qualify outputs, or prove human usability. Run the
+same opt-in fixture on native Linux for Linux terminal evidence; cross-compilation
+alone establishes build compatibility. A skipped fixture supplies no TTY evidence.
+
 ## Opt-in integration checks
 
 The ordinary suite skips integrations requiring external tools, private source, or exceptional host capacity.
@@ -130,6 +151,33 @@ NVKR_TEST_DISK_EVIDENCE_RUNTIME=1 go test -race ./pkg/nvkr/factory \
 An opted-in run fails on inadequate capacity rather than skipping its positive case. It checks public
 owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NVKE image.
 Actual native disk build/inspection evidence remains separately scoped in the evidence index.
+
+The independent Debian inspector API regression requires native Linux amd64 or arm64. Use the Syft
+v1.51.1 archive pins and executable measurement procedure in
+[`toolchains/nvkr-disk-inspect`](toolchains/nvkr-disk-inspect/README.md) as the source for the selected tools.
+Export `NVKR_SBOM_SCANNER` with the selected Syft executable path and `NVKR_SBOM_SCANNER_DIGEST` with
+its measured `sha256:` executable digest. `NVKR_SBOM_PACKAGE_READER_DIGEST` must match the actual
+`/usr/bin/dpkg-deb` executable in the test runtime, not a compressed archive hash. The diagnostic toolchain
+source is not an approved production runtime. Opting in with missing or mismatched pins fails rather than skipping:
+
+```sh
+NVKR_SBOM_DEBIAN_INTEGRATION=1 \
+go test ./pkg/nvkr/sbom -run '^TestRealDebianArtifactDependencies$' -count=1 -v
+```
+
+It builds controlled gzip/xz fixture packages and inspects them through the separate
+`InspectDebianArchiveMetadata` diagnostic. That API always uses the fixed private snapshot name
+`subject.deb`, independent of the caller's filename. It checks exact package metadata, pre-scan digest binding,
+original-fixture size stability, and rejection of non-archive bytes. The same fixture bytes supplied to ordinary
+`InspectDependencies` receive no filename hint and must return `CodeProvenanceMissing`, with no accepted
+inventory, under the selected Syft version. It does not test corrupted payload members. The diagnostic method
+is rejected by dependency SBOM attachment and serialized BOM validation. Factory callers retain the ordinary
+dependency API; no maintained factory output invokes this separate diagnostic. This is not delivered-package
+inspection, payload dependency coverage, installation, signing or publication.
+See [the dependency SBOM reference](docs/dependency-sboms.md) and the
+[dated local fixture observation](docs/adr/reconciliation.md#external-run-references). Native amd64 execution
+has not been recorded. Rerun the opt-in regression when changing either the factory catalog Syft pin or the
+Syft pin in `toolchains/nvkr-disk-inspect`; record which selected native executable was exercised.
 
 ## Repository layout
 

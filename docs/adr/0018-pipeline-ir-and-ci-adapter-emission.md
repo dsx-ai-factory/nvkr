@@ -708,13 +708,22 @@ packaged outputs and disclose Helm image binding when present; stable execution 
 retain the graph binding independently of display names. Each execution step logs its operation, node and
 producer instruction, component and selected output where applicable, platform/network, declared inputs and
 expected outputs. The host helper reports successful outputs, elapsed seconds, primary exit
-status and the last phase; failed execution cannot print a successful completion. Job summaries show the same diagnostic context and
-outcome without requiring every transfer step to be expanded. Closed log streams and an absent or unwritable summary cannot change the
-operation's exit status. Descriptions are emitted as one-line runtime data and escaped for control lines and Markdown;
+status and the last phase; failed execution cannot print a successful completion. Per-operation details stay in
+job logs. Closed log streams cannot change the operation's exit status. Descriptions are emitted as one-line
+runtime data and escaped for control lines and Markdown;
 arbitrary recipe arguments, source/destination URLs, file contents and environment values are not dumped.
 The exact producer argv remains in the canonical Plan for deliberate local inspection. Packaging reports the
 actual bound image digest, and publication reports its persisted immutable reference. Logs and summaries remain
 diagnostics, not authority receipts, completion evidence or qualification.
+
+Generated workflows write at most two optional summaries per Run attempt. One deterministic runner-bootstrap
+job writes a brief opening after native admission and before checkout. The existing always-run lifecycle
+finalizer writes the closing summary as its last step, after the final Run record upload. Its standalone shell
+uses provider job and step outcomes without requiring a checkout or helper. It counts required jobs by
+`success`, `failure`, `cancelled` and `skipped`, and reports the finalization outcome without claiming an
+authenticated Run or Release verdict. Missing or unwritable summary files cannot change the result. Runner
+loss, force cancellation or a pending deployment environment may prevent the final summary from running;
+two summaries are a ceiling, not an availability guarantee.
 
 Strict native disk inspection retains the sanitized bounded progress log in one atomically published, no-replace regular file beneath
 the original held workspace. The helper drains progress into a package-owned memory collector and writes to
@@ -724,7 +733,7 @@ evidence and payload uploads remain mandatory. Retention failure is reported wit
 Temporary siblings are not upload targets; publication happens only after complete writing and file sync.
 An existing destination is rejected, not overwritten or authenticated as this attempt's log; operators must
 retain the ephemeral, single-job workspace policy. Failure snapshots are folded in job logs with the same
-truncation marker as retained files, and summaries show the last accepted inspection phase. Successful operations
+truncation marker as retained files, and logs show the last accepted inspection phase. Successful operations
 do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit M2
 build-provenance mode emits neither inspection work nor its diagnostic upload. Changing the helper requires
 rebuilding and repinning its complete inspection image before claiming hosted operation.
@@ -740,7 +749,8 @@ closure to be uploaded or published.
 Generated steps invoke `factory github run-node`, `restore-inputs`, `pack-outputs`, or `recover` against
 the complete canonical Plan and an exact node or derived stage selector. The factory module admits the
 complete graph and capabilities before work, derives carrier membership and paths, and owns progress,
-optional summaries and utility-container launch. Utility nodes share a launcher with local execution; the
+optional per-operation summaries for explicit API callers and utility-container launch. Generated CLI
+operations do not write per-operation summaries. Utility nodes share a launcher with local execution; the
 inner helper checks the outer helper's exact Plan digest before executing. Provider YAML retains topology,
 permissions, source credential scope, pinned actions and explicit operator setup. Packing remains a separate
 step from source fetch so it receives no source credential. No authored transport manifest or arbitrary
@@ -756,7 +766,7 @@ artifacts. Logical commands, transport authentication and isolation remain uncha
 
 The legacy finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits
 every carrier and records its producer and restore outcome separately; it continues after missing carriers,
-failed producer jobs and returned restore failures. A diagnostic summary names every outcome. A successful batch
+failed producer jobs and returned restore failures. The recovery log names every outcome. A successful batch
 download or recovery step proves no completeness: the finalizer consumes those unchanged per-carrier records
 and authenticates the complete output and evidence closure. The helper accepts bounded `toJSON(needs)` data
 through a step environment value, with an exact stage/bootstrap job set, known statuses, duplicate rejection

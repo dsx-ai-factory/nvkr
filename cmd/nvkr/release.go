@@ -31,6 +31,24 @@ type releaseVerificationResult struct {
 type releaseVerifyOperation func(context.Context, string, lifecycle.VerificationPolicy,
 	lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error)
 
+type releaseAuthenticateOperation func(context.Context, string, lifecycle.VerificationPolicy,
+	lifecycle.ConsumerOptions) (lifecycle.AuthenticityDescription, error)
+
+func executeReleaseAuthentication(ctx context.Context, reference string, policy lifecycle.VerificationPolicy,
+	options lifecycle.ConsumerOptions,
+) (lifecycle.AuthenticityDescription, error) {
+	consumer, err := lifecycle.NewConsumer(options)
+	if err != nil {
+		return lifecycle.AuthenticityDescription{}, err
+	}
+	authenticated, err := consumer.Authenticate(ctx, reference, policy)
+	if err != nil {
+		return lifecycle.AuthenticityDescription{}, err
+	}
+	defer func() { _ = authenticated.Close() }()
+	return authenticated.Description()
+}
+
 func executeReleaseVerification(ctx context.Context, reference string, policy lifecycle.VerificationPolicy,
 	options lifecycle.ConsumerOptions, expectation *lifecycle.ExactInputExpectation,
 ) (releaseVerificationResult, error) {
@@ -72,6 +90,10 @@ func cmdRelease() *cli.Command {
 }
 
 func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
+	return cmdReleaseWithOperations(verify, executeReleaseAuthentication)
+}
+
+func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releaseAuthenticateOperation) *cli.Command {
 	legacy := []*cli.Command{
 		{
 			Name:    "promote",
@@ -118,11 +140,25 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 			releaseExportCmd(),
 			{
 				Name: "inspect", Usage: "inspect an exact local OCI release layout without granting authority",
-				Flags: []cli.Flag{&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "layout", Required: true}},
-				Action: func(c *cli.Context) error {
+				Flags: append([]cli.Flag{&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "layout", Required: true}}, commandPresentationFlags()...),
+				Action: func(c *cli.Context) (returnedErr error) {
+					view, err := selectCommandPresentation(c)
+					if err != nil {
+						return err
+					}
+					shown := false
+					defer func() {
+						if returnedErr != nil && view.tui && !shown {
+							returnedErr = showCommandResult(c, view, releaseFailureDisplay("Release inspection"), returnedErr)
+						}
+					}()
 					artifacts, err := lifecycle.InspectReleaseLayout(c.Context, c.String("reference"), c.String("layout"))
 					if err != nil {
 						return err
+					}
+					if view.tui {
+						shown = true
+						return showCommandResult(c, view, releaseArtifactsDisplay("Release inspection", "Local closure membership and payload integrity checked; signatures and policy were not verified.", artifacts), nil)
 					}
 					raw, err := canonical.Marshal(artifacts)
 					if err != nil {
@@ -134,20 +170,35 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 			},
 			{
 				Name: "verify", Usage: "verify one pinned reference under an explicit Verification Policy scope",
-				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true}, &cli.StringFlag{Name: "scope", Required: true},
+				Flags: append([]cli.Flag{
+					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true},
+					&cli.StringFlag{Name: "scope", Required: true, Usage: "authenticity (signatures and evidence; payload integrity not checked), artifact-publication (includes payload integrity), or release (capability-gated)"},
 					&cli.StringFlag{Name: "minimum-disk-evidence", Usage: "minimum accepted disk evidence: strict or build-provenance-v1 (default: build-provenance-v1 for pipeline-attested; strict for qualified)"},
 					&cli.StringFlag{Name: "identity"}, &cli.StringFlag{Name: "issuer"}, &cli.StringFlag{Name: "cosign"}, &cli.StringFlag{Name: "cosign-digest"},
 					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require with --environment and --plan"},
 					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require with --definition and --plan"},
 					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment; unreadable or undecodable Plan bytes report pipeline drift, while validation errors keep their code"},
 					&cli.StringFlag{Name: "workspace", Value: ".nvkr/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
-				},
-				Action: func(c *cli.Context) error {
+				}, commandPresentationFlags()...),
+				Action: func(c *cli.Context) (returnedErr error) {
+					view, err := selectCommandPresentation(c)
+					if err != nil {
+						return err
+					}
+					shown := false
+					defer func() {
+						if returnedErr != nil && view.tui && !shown {
+							returnedErr = showCommandResult(c, view, releaseFailureDisplay("Release verification"), returnedErr)
+						}
+					}()
 					exactInputCount := 0
 					for _, name := range []string{"definition", "environment", "plan"} {
 						if !c.IsSet(name) {
 							continue
+						}
+						if c.String("scope") == lifecycle.ScopeAuthenticity {
+							return e.New(e.CodeEngineCapability,
+								"authenticity verification cannot verify exact inputs; --definition, --environment, and --plan require artifact-publication scope")
 						}
 						exactInputCount++
 						if strings.TrimSpace(c.String(name)) == "" {
@@ -161,6 +212,30 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 						MinimumDiskEvidence: lifecycle.DiskEvidenceRequirement(c.String("minimum-disk-evidence"))}
 					if err := policy.Validate(); err != nil {
 						return err
+					}
+					options := lifecycle.ConsumerOptions{
+						CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"),
+						Registry:      delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
+						WorkspaceRoot: c.String("workspace"),
+					}
+					if policy.Scope == lifecycle.ScopeAuthenticity {
+						description, err := authenticate(c.Context, c.String("reference"), policy, options)
+						if err != nil {
+							return err
+						}
+						if view.tui {
+							shown = true
+							return showCommandResult(c, view, authenticatedReleaseDisplay(description), nil)
+						}
+						raw, err := canonical.Marshal(description)
+						if err != nil {
+							return err
+						}
+						_, err = os.Stdout.Write(append(raw, '\n'))
+						if err != nil {
+							return e.Wrap(e.CodeInternal, err, "writing release authenticity result")
+						}
+						return nil
 					}
 					if policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication {
 						if exactInputCount != 0 {
@@ -193,13 +268,13 @@ func cmdReleaseWithVerify(verify releaseVerifyOperation) *cli.Command {
 							return err
 						}
 					}
-					result, err := verify(c.Context, c.String("reference"), policy, lifecycle.ConsumerOptions{
-						CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"),
-						Registry:      delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
-						WorkspaceRoot: c.String("workspace"),
-					}, expectation)
+					result, err := verify(c.Context, c.String("reference"), policy, options, expectation)
 					if err != nil {
 						return err
+					}
+					if view.tui {
+						shown = true
+						return showCommandResult(c, view, verifiedReleaseDisplay(result), nil)
 					}
 					var raw []byte
 					if result.ExactInputs != nil {

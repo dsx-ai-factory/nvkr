@@ -103,7 +103,7 @@ func TestRunLocalPrintsRetainedDiskOutputWhenCommitCleanupFails(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		return &run, sentinel
+		return &run, e.Wrap(e.CodeImmutableViolation, sentinel, "completing local disk commit transaction")
 	}
 
 	oldStdout := os.Stdout

@@ -95,6 +95,158 @@ selected attempts root; the default root is `.nvkr/runs`. The attempts root must
 path under `.nvkr`. Publication is a separately enabled operation. The
 implementation record distinguishes contract tests from external execution.
 
+### Choose local Run presentation
+
+`run local --ui=auto` selects a terminal dashboard only with interactive standard
+input/output, a usable terminal and no nonempty `CI` environment variable.
+Pipes, redirected output, CI auto mode and `--ui=plain`
+retain scrolling output. The dashboard lists required named outputs, selected
+producer operations and dependencies, observation counts and bounded public
+activity. Producer completion and fresh activity do not establish output
+observation, finalization, release verification or runtime health.
+
+```sh
+bin/nvkr run local \
+  --definition definitions/nvke-v1/definition.yaml \
+  --environment definitions/nvke-v1/environment-local.yaml \
+  --attempt build-001 --ui=plain
+```
+
+Choose `--ui=tui` explicitly to require an interactive dashboard; incompatible
+terminal/JSON choices fail before input or execution work. `--no-color` or a
+nonempty `NO_COLOR` selects monochrome presentation with terminal-default colors.
+NVKR and `nvke-demo` share a dark blue canvas, pale text and cyan pane titles and
+focus borders. A tab strip identifies Outputs, Details and Activity; named frames
+distinguish their contents. Tab
+or 1/2/3 changes panes, arrows navigate the focused pane, Enter opens details,
+Esc goes back, `/` searches output names, `f` changes the filter and `?` shows help.
+The initial screen uses one row per output. Details and Activity open when
+selected; a wide terminal pairs the list with Details only after inspection is
+requested. Selection stays bound to the same named output while execution updates. Activity scrolling pauses following new
+entries; End resumes it. On a small terminal the view uses one pane at a time.
+
+During a live Run, q opens a cancellation confirmation. Press y to cancel;
+n, Esc or Enter keeps the Run open. Ctrl+C requests cancellation immediately.
+Cancellation waits for owned work to stop. Esc otherwise navigates. The dashboard
+has no force-exit or implicit deployment cleanup action. A successful or failed
+command restores the terminal and returns to the shell with its original owning
+outcome; a reporting failure can separately
+fail the command. A complete retained Run with incomplete cleanup keeps its
+observed outputs while returning the coded failure.
+
+While the dashboard is open, a shared memory buffer retains the last 128 KiB of
+producer stdout and stderr. If the command fails, the captured bytes are replayed
+to ordinary stderr after terminal restoration, owned-work joining and the safe
+final summary. Recovered presenter/worker panic diagnostics use the same private
+bounded sink. A marker
+identifies truncation. Raw producer text never enters the safe dashboard panes.
+This failure replay does not create a durable general-purpose log; successful
+Run output is not replayed. Existing Packer diagnostic retention is separate.
+
+`run local --json` emits one deterministic, safe final-result document on stdout
+under `nvkr.dev/local-run-result/v1`. It includes frozen required outputs, observed
+membership, status, lane, code, exit status and record/cleanup availability.
+Producer diagnostics go to stderr. It omits private paths, transport references
+and raw failure messages; it is a description, not a resumable Run or verification
+receipt. Existing `run plan --json` still emits exact canonical Plan bytes.
+
+Auto presentation stays plain for `--dry-run`. Explicit `--dry-run --ui=tui` first
+admits the normal dry-run, then opens a static read-only view; it executes no
+producers and creates no attempt. Closing that view does not cancel another Run.
+
+### Browse public command results
+
+The following public commands accept `--ui=tui` and `--no-color`: Definition validation
+and inspection; Run planning, graph, comparison, inspection, generation and local
+execution; producer resolution; all catalog inspection and maintenance commands;
+and Release inspection, browsing, export and verification. Other than the interactive
+local Run default described above, commands default to `--ui=plain` and keep their
+existing text, canonical JSON or diagram output. On commands with a result
+browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
+and `--ui=tui` are incompatible and fail before input, network or write work.
+`run check-artifacts` retains canonical machine-readable diagnostics and does not offer presentation flags.
+
+```sh
+bin/nvkr definition inspect --definition definitions/nvke-v1/definition.yaml --ui=tui
+bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
+bin/nvkr catalog list --data definitions/nvke-v1/catalog --ui=tui
+```
+
+Graph and release browsers start with an output overview when their supplied
+results also contain internal nodes or evidence entries. Press `g` to toggle all
+supplied entries; `/` searches the complete supplied set. Producer-only graph
+views keep their supplied producers. The default list uses one row per entry,
+with readable output names; repeated static states are omitted. Full digests and command context live in
+Details.
+
+Results and Details show projected names, identities, counts and dependencies;
+`/` searches names and `f` cycles the available All, Changed and Failed filters.
+Static views offer Activity only when activity is supplied; live Runs retain it.
+Tab cycles the available panes, and 1/2/3 selects a pane when available.
+Details group navigable dependencies before item metadata and command context.
+A path shows each drill-down step; Esc returns to the exact previous selection.
+A pinned hint
+identifies the dependency Enter will follow even when its row is scrolled away.
+Enter follows an available dependency and Esc returns. q asks before
+closing; y closes, while n, Esc or Enter stays. Small terminals use one pane.
+Below 40 columns or 12 rows, browsing pauses until the terminal is resized;
+close confirmation and Ctrl+C remain available.
+
+The result browser opens after the command's existing operation finishes. Catalog
+maintenance and generation retain their normal write/check behavior; closing the
+browser neither repeats nor undoes it. Ctrl+C closes this read-only browser and
+preserves the completed operation's owning result. Verification results reflect only the
+owning verifier's accepted lane and scope. Authenticity results explicitly state
+that signatures and evidence were authenticated while payload integrity was not
+checked; artifact rows describe authenticated publisher metadata. Release browsing checks metadata;
+local Release inspection additionally checks closure membership and payload
+integrity. Neither operation authenticates signatures or consumer policy. Differences still return status 3 when requested. Raw changed
+values, source URLs, private paths, signer expressions and error messages are
+excluded from safe result panes; use existing plain output for the complete
+machine or diagram representation. Hidden execution and CI helpers keep their
+existing interface.
+
+### Dashboard screenshots
+
+These controlled Plan views show the shared NVKR/NVKE demo styling; they do not
+represent executed producers or human usability acceptance.
+
+![Named output overview](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/overview.png)
+
+![Selected output details](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/details.png)
+
+![Exact dependency drill-down](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/drilldown.png)
+
+![Quit confirmation defaults to staying](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/quit.png)
+
+![Wide terminal details](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/wide-details.png)
+
+![Monochrome presentation](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/monochrome.png)
+
+### Inspect a recorded attempt
+
+```sh
+bin/nvkr run inspect --record .nvkr/runs/build-001/lifecycle.json
+bin/nvkr run inspect --record .nvkr/runs/build-001/lifecycle.json --json
+bin/nvkr run inspect --record .nvkr/runs/build-001/lifecycle.json --ui=tui
+```
+
+Inspection defaults to plain output. The bounded lifecycle-owned loader rejects
+symlinks in every path component, malformed canonical bytes, inconsistent named
+output metadata, unavailable qualified lanes and an attempt name that does not
+match its containing directory. Use a physical path (for example, start from
+`pwd -P`); macOS `/tmp` is a symlink, so use its physical `/private/tmp` path.
+A missing directory or record returns a coded verification failure. A disk marker
+without a record cannot distinguish unfinished live work from interruption; no
+interrupted Run is inferred. A present record describes its sibling disk-commit
+marker separately, without performing cleanup.
+
+q asks before closing a read-only viewer; y or Ctrl+C closes it, while n, Esc or
+Enter keeps it open. Closure does not execute, change a record, or perform cleanup.
+Stored observations establish no current payload availability, signature
+verification or health; file modification times are not live freshness. The SDK
+exposes the same detached description through `Client.InspectRun`.
+
 For a completed local `disk-image` output, lifecycle retains the exact observed QCOW2 as
 `<attempts-root>/<attempt>/outputs/<output-name>.qcow2` and prints that path. The file is read-only, is committed
 only after held-source digest/size revalidation and successful Run binding, and remains local unqualified output.
@@ -116,16 +268,18 @@ takes that reference and a Verification Policy and authenticates the complete se
 names the accepted evidence lane and identities. Qualified authorization, v1 pipeline evidence, and dry-run
 descriptions remain distinct. Unsupported authority adapters return a coded capability error.
 
-The policy explicitly selects what acceptance means. Authenticating build evidence for a selected artifact
-publication checks its exact bytes, build identity, and production provenance. Full v1 release acceptance adds
-qualification and revocation requirements. A result for the first scope cannot satisfy the second, and an
-unavailable stronger scope never falls back to weaker verification.
+The policy explicitly selects what acceptance means. `authenticity` checks signed membership, the root and
+every required output's signatures and production provenance, and required signed SBOMs without downloading
+artifact payload layers. `artifact-publication` checks the selected payload bytes as well as evidence.
+Full v1 release acceptance adds qualification and revocation requirements. Each result retains its scope;
+an unavailable stronger scope never falls back to weaker verification.
 
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is included in the policy digest. Pipeline-attested
 verification defaults to `build-provenance-v1`, accepting signed producer/material evidence without an inspected
 disk inventory. Use `--minimum-disk-evidence strict` to require inspected evidence. The
 SDK exposes `DiskEvidenceStrict` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
-and cannot opt into the producer-only mode.
+and cannot opt into the producer-only mode. Authenticity enforces the same minimum against signed evidence
+and metadata; it does not inspect or re-hash the disk.
 
 The CLI expresses build-evidence acceptance as `--scope artifact-publication`. On Linux, with a pinned cosign
 executable and an existing signed publication in a public registry, the consumer invocation is:
@@ -139,8 +293,24 @@ bin/nvkr release verify \
   --anonymous
 ```
 
+To authenticate release evidence without downloading artifact payloads, change the scope to `authenticity`:
+
+```sh
+bin/nvkr release verify \
+  --reference "$RELEASE_REF" \
+  --lane pipeline-attested --scope authenticity \
+  --identity "$BUILD_IDENTITY_REGEXP" --issuer "$OIDC_ISSUER" \
+  --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST" \
+  --anonymous
+```
+
+The result reports `payloadIntegrityVerified: false`. It authenticates the complete metadata/evidence
+closure, including each required output and SBOM bundle, but cannot authorize payload export or exact-input
+matching. `--definition`, `--environment`, and `--plan` are rejected with this scope before external work.
+Stock verification remains Linux-only with the same pinned cosign requirement.
+
 An independent consumer can additionally require the publication to realize
-exact authored and compiled inputs by supplying all three paths:
+exact authored and compiled inputs under `artifact-publication` by supplying all three paths:
 
 ```sh
 bin/nvkr release verify \
@@ -161,12 +331,12 @@ The Plan is generated pipeline state; an unreadable or undecodable Plan reports
 pipeline drift, while a decoded Plan that fails validation preserves its validation
 error rather than being reclassified by the command adapter.
 
-Without the three exact-input flags, `release verify` writes the verified `Release`
+For `artifact-publication` without the three exact-input flags, `release verify` writes the verified `Release`
 description directly:
 
 ```json
 {
-  "schemaVersion": "nvkr.dev/release/v3",
+  "schemaVersion": "nvkr.dev/release/v4",
   "subject": "registry.example/releases@sha256:<release-digest>",
   "lane": "pipeline-attested",
   "scope": "artifact-publication",
@@ -192,7 +362,7 @@ verified `Release` description and the defensive exact-input description:
 {
   "schemaVersion": "nvkr.dev/release-verification-result/v1",
   "release": {
-    "schemaVersion": "nvkr.dev/release/v3",
+    "schemaVersion": "nvkr.dev/release/v4",
     "subject": "registry.example/releases@sha256:<release-digest>",
     "lane": "pipeline-attested",
     "scope": "artifact-publication",
@@ -227,7 +397,8 @@ live and process-local and is never serialized by the CLI.
 
 `RELEASE_REF` is a registry reference pinned with `@sha256:…`; the identity and issuer belong to the
 consumer's trusted build policy. Signature and production-attestation verification are both required by this
-scope. The SDK retains a live, policy-bound capability until closed.
+scope. Authenticity separately requires these checks for the root and every required named output, along
+with cryptographic SBOM verification. The SDK retains a live, policy-bound capability until closed.
 The stock verifier remains Linux-only, and unit tests do not establish live signing-service
 acceptance. Full v1 release scope (`--scope release`) and qualified acceptance remain capability-gated.
 
@@ -385,6 +556,10 @@ func inspectRelease(ctx context.Context, c *client.Client, reference, identity, 
 }
 ```
 
+Use `AuthenticateRelease` with an `authenticity` policy for the metadata/evidence-only operation. It returns
+a distinct closeable `AuthenticatedRelease`; its description records that payload integrity is unchecked.
+It exposes no payload export or exact-input receipt and cannot be passed as a fully verified Release.
+
 The returned Release is a description of the accepted contents. Its serialized form does not
 recreate the live verified capability. Verification still requires the supported platform, pinned tool, and
 evidence described above; compiling this example does not exercise those external dependencies.
@@ -398,6 +573,6 @@ normal product authors do not construct and join them manually.
 
 Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
-The direct-output model uses Definition v4, catalog v3 and generated IR v4. Run and Release use v3. Older recipe layouts and cluster/placement fields
+The direct-output model uses Definition v5, catalog v3 and producer IR v4. Generated Run Plans use v5; Run and Release use v4. Older recipe layouts and cluster/placement fields
 are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;
 historical Runs retain the authoring and wire contracts exercised at the time.
