@@ -83,7 +83,7 @@ func main() {
 		if strings.HasPrefix(mode, "cancel") {
 			time.Sleep(30 * time.Second)
 		}
-		if mode != "missing" && mode != "deploy-failure" && mode != "interrupted-retrievable" {
+		if mode != "missing" && mode != "deploy-failure" && mode != "interrupted-retrievable" && mode != "empty-inpod" && mode != "malformed-inpod" {
 			raw := `<testsuite name="Kubernetes e2e suite" tests="1" failures="0"><testcase classname="Kubernetes e2e suite" name="[It] required"/></testsuite>`
 			if mode == "large-retrievable" {
 				raw = ""
@@ -232,6 +232,13 @@ func main() {
 		save(m)
 		output(map[string]string{"status": "Success"})
 	case "exec":
+		if mode == "empty-inpod" {
+			return
+		}
+		if mode == "malformed-inpod" {
+			fmt.Fprint(os.Stdout, "<testsuite")
+			return
+		}
 		if strings.HasSuffix(mode, "retrievable") {
 			if mode == "large-retrievable" {
 				fmt.Fprint(os.Stdout, `<testsuite name="Kubernetes e2e suite" tests="1" failures="0"><system-out>`)

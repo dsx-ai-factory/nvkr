@@ -574,3 +574,21 @@ func TestKubeconfigPrivateModeAdmission(t *testing.T) {
 		t.Fatalf("result=%v err=%v", r, err)
 	}
 }
+
+func TestFallbackRejectsEmptyAndMalformedPodResults(t *testing.T) {
+	for _, tt := range []struct{ mode, raw string }{{"empty-inpod", ""}, {"malformed-inpod", "<testsuite"}} {
+		t.Run(tt.mode, func(t *testing.T) {
+			r, err := Run(t.Context(), buildFixture(t, tt.mode))
+			var coded *e.Error
+			if r == nil || !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
+				t.Fatalf("result=%v error=%v", r, err)
+			}
+			if r.Observation.Execution.Status != "infrastructure-error" || r.Observation.Cleanup.Status != "completed" {
+				t.Fatalf("execution=%v cleanup=%v", r.Observation.Execution, r.Observation.Cleanup)
+			}
+			if string(r.RawJUnit()) != tt.raw {
+				t.Fatalf("original fallback changed: %q", r.RawJUnit())
+			}
+		})
+	}
+}

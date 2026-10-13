@@ -156,16 +156,14 @@ func runWithClock(ctx context.Context, o Options, now func() time.Time) (*Result
 	if readErr != nil && r.Observation.Execution.Status != "canceled" {
 		r.Observation.Execution.Status = "infrastructure-error"
 	}
-	parseErr := error(nil)
-	if len(r.rawJUnit) > 0 {
-		var report testresults.Report
-		report, parseErr = testresults.ParseJUnit(cleanupCtx, r.rawJUnit)
-		if parseErr == nil && report.Summary.Total == 0 {
-			parseErr = failure("upstream report contains zero cases")
-		}
-		if parseErr != nil && r.Observation.Execution.Status != "canceled" {
-			r.Observation.Execution.Status = "infrastructure-error"
-		}
+	// Successful transport is not a usable suite result: validate even empty
+	// fallback bytes, while preserving the original bytes and cancellation cause.
+	report, parseErr := testresults.ParseJUnit(cleanupCtx, r.rawJUnit)
+	if parseErr == nil && report.Summary.Total == 0 {
+		parseErr = failure("upstream report contains zero cases")
+	}
+	if parseErr != nil && r.Observation.Execution.Status != "canceled" {
+		r.Observation.Execution.Status = "infrastructure-error"
 	}
 	// Collect exact UIDs and verify that each upstream binding references this
 	// fresh namespace before the wrapper performs any destructive operation.
