@@ -141,7 +141,7 @@ func TestIngestVerifiesEveryInputThenRetainsAttemptsFailuresSources(t *testing.T
 	third, c := fixture(t, "run-1", "pass", "other/workflow", FirstParty)
 	inputs := []Input{first, first, second, third}
 	calls := 0
-	report, err := ingestWith(t.Context(), inputs, testobservation.RegistryOptions{}, verifier([]Input{first, second, third}, []*fakeReceipt{a, b, c}, &calls))
+	report, err := ingestWith(t.Context(), inputs, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, verifier([]Input{first, second, third}, []*fakeReceipt{a, b, c}, &calls))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestIngestVerifiesEveryInputThenRetainsAttemptsFailuresSources(t *testing.T
 func TestCommunityRequiresAuthenticatedSignerProjectionAndDefinition(t *testing.T) {
 	input, verified := fixture(t, "community-run", "pass", "ignored", Community)
 	calls := 0
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, verifier([]Input{input}, []*fakeReceipt{verified}, &calls))
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, verifier([]Input{input}, []*fakeReceipt{verified}, &calls))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestCommunityRequiresAuthenticatedSignerProjectionAndDefinition(t *testing.
 				bad.Locator.Reference = "ghcr.io/other/source@" + pin("transport")
 			}
 			calls := 0
-			got, err := ingestWith(t.Context(), []Input{bad}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { calls++; return r, nil })
+			got, err := ingestWith(t.Context(), []Input{bad}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { calls++; return r, nil })
 			if got != nil || err == nil {
 				t.Fatal("unadmitted community source accepted")
 			}
@@ -229,7 +229,7 @@ func TestReportRevokedLifetimeAndStockAdmission(t *testing.T) {
 	input, verified := fixture(t, "lifetime", "pass", "workflow/main", FirstParty)
 	ctx, cancel := context.WithCancel(t.Context())
 	verified.ctx = ctx
-	report, err := ingestWith(ctx, []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
+	report, err := ingestWith(ctx, []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestReportRevokedLifetimeAndStockAdmission(t *testing.T) {
 	}
 	_, err = report.Index(t.Context())
 	code(t, err, e.CodeVerifyFailed)
-	_, err = Ingest(t.Context(), []Input{input}, testobservation.RegistryOptions{})
+	_, err = Ingest(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}})
 	code(t, err, e.CodeTrustPolicyMissing)
 	var forged Report
 	_, err = forged.Index(t.Context())
@@ -251,7 +251,7 @@ func TestIngestClosesPriorReceiptsWhenAuthenticationFails(t *testing.T) {
 	first, a := fixture(t, "a", "pass", "workflow/main", FirstParty)
 	second, _ := fixture(t, "b", "pass", "workflow/main", FirstParty)
 	calls := 0
-	got, err := ingestWith(t.Context(), []Input{first, second}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) {
+	got, err := ingestWith(t.Context(), []Input{first, second}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) {
 		calls++
 		if calls == 1 {
 			return a, nil
@@ -265,7 +265,7 @@ func TestIngestClosesPriorReceiptsWhenAuthenticationFails(t *testing.T) {
 }
 func TestTestGridExactProjectionAndGates(t *testing.T) {
 	input, r := fixture(t, "grid-run", "failed", "workflow/main", FirstParty)
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return r, nil })
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return r, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +306,7 @@ func TestTestGridExactProjectionAndGates(t *testing.T) {
 }
 func TestGeneratedIndexImmutableAndNoCachedAuthority(t *testing.T) {
 	input, r := fixture(t, "index", "pass", "workflow/main", FirstParty)
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return r, nil })
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return r, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +380,7 @@ func TestTestGridMultipleOriginalJUnitAndImmutableLocalExport(t *testing.T) {
 	second := []byte(strings.Replace(string(first), `name="case"`, `name="second"`, 1))
 	original := map[string][]byte{"first/results.xml": first, "second/results.xml": second}
 	replaceResults(t, &input, verified, verified.observed, original)
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +434,7 @@ func TestTestGridNoResultsPreservesFailureWithoutFabricatedCases(t *testing.T) {
 	o.Execution = testobservation.Outcome{Status: "not-run"}
 	o.Cleanup = testobservation.Outcome{Status: "not-run"}
 	replaceResults(t, &input, verified, o, map[string][]byte{})
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -463,7 +463,7 @@ func TestTestGridNoResultsPreservesFailureWithoutFabricatedCases(t *testing.T) {
 }
 func TestTestGridLocalWriteFailureDoesNotBecomePublicationOrPass(t *testing.T) {
 	input, verified := fixture(t, "write-failed", "failed", "workflow/main", FirstParty)
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func TestEquivalentObservationDedupeIsDeterministicAcrossInputOrder(t *testing.T
 	second.Locator.Reference = first.Admission.Namespace + "/" + first.Admission.SourcePath + "@" + pin("alternate transport")
 	_, b := fixture(t, "alias", "pass", "workflow/main", FirstParty)
 	calls := 0
-	report, err := ingestWith(t.Context(), []Input{first, second}, testobservation.RegistryOptions{}, verifier([]Input{first, second}, []*fakeReceipt{a, b}, &calls))
+	report, err := ingestWith(t.Context(), []Input{first, second}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, verifier([]Input{first, second}, []*fakeReceipt{a, b}, &calls))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +500,7 @@ func TestEquivalentObservationDedupeIsDeterministicAcrossInputOrder(t *testing.T
 	}
 	_, c := fixture(t, "alias", "pass", "workflow/main", FirstParty)
 	_, d := fixture(t, "alias", "pass", "workflow/main", FirstParty)
-	reversed, err := ingestWith(t.Context(), []Input{second, first}, testobservation.RegistryOptions{}, verifier([]Input{first, second}, []*fakeReceipt{c, d}, &calls))
+	reversed, err := ingestWith(t.Context(), []Input{second, first}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, verifier([]Input{first, second}, []*fakeReceipt{c, d}, &calls))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,7 +527,7 @@ func TestMarkdownEscapesDisplayControlsWithoutChangingObservation(t *testing.T) 
 
 func TestConcurrentReportProjectionAndClosure(t *testing.T) {
 	input, verified := fixture(t, "concurrent", "pass", "workflow/main", FirstParty)
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -580,7 +580,7 @@ func TestIngestBoundsCumulativeAuthenticatedInventoryBytes(t *testing.T) {
 		verified = append(verified, r)
 	}
 	calls := 0
-	got, err := ingestWith(t.Context(), inputs, testobservation.RegistryOptions{}, verifier(inputs, verified, &calls))
+	got, err := ingestWith(t.Context(), inputs, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, verifier(inputs, verified, &calls))
 	if got != nil {
 		t.Fatal("cumulative inventory overflow returned report")
 	}

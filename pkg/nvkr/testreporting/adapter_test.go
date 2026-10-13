@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testobservation"
 )
@@ -81,7 +82,7 @@ func TestReportingExportAdmissionAndCancellationBeforeInputs(t *testing.T) {
 		{"json", "", "", nil, e.CodeUsage},
 	} {
 		out := filepath.Join(t.TempDir(), "report.json")
-		got, err := ExportFiles(tc.ctx, "/nonexistent-input", tc.format, out, tc.target, tc.gridOut, testobservation.RegistryOptions{})
+		got, err := ExportFiles(tc.ctx, "/nonexistent-input", tc.format, out, tc.target, tc.gridOut, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}})
 		if got != nil {
 			t.Fatal("admission returned partial success")
 		}
@@ -93,7 +94,7 @@ func TestReportingExportAdmissionAndCancellationBeforeInputs(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	out := filepath.Join(t.TempDir(), "report.json")
-	got, err := ExportFiles(ctx, "/nonexistent-input", "json", out, "", "", testobservation.RegistryOptions{})
+	got, err := ExportFiles(ctx, "/nonexistent-input", "json", out, "", "", testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}})
 	if got != nil {
 		t.Fatal("canceled export returned result")
 	}
@@ -101,7 +102,7 @@ func TestReportingExportAdmissionAndCancellationBeforeInputs(t *testing.T) {
 }
 func TestReportingImmutableMarkdownExport(t *testing.T) {
 	input, verified := fixture(t, "markdown", "pass", "workflow/main", FirstParty)
-	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
+	report, err := ingestWith(t.Context(), []Input{input}, testobservation.RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}}, func(context.Context, Input, testobservation.RegistryOptions) (receipt, error) { return verified, nil })
 	if err != nil {
 		t.Fatal(err)
 	}
