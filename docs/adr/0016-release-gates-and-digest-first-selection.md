@@ -203,6 +203,16 @@ policy. The source build's successful default-branch invocation is authenticated
 qualification invocation (ADR-18); a green build or the publisher's own identity alone is insufficient.
 Smoke execution receives no qualification signing authority.
 
+Before enabling hosted qualification for production, external acceptance must retain immutable Run/artifact
+references for a real `workflow_run` exercise: the certificate SAN and OIDC issuer from the verified bundle,
+the exact source and qualification invocations, subject-bound attachment/read-back results, and rejection
+under a wrong expected signer identity. The observed certificate identity must match the independently
+authenticated qualification workflow identity. [Fulcio's GitHub identity mapping](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md#github)
+uses `job_workflow_ref` for the SAN; a reusable signing workflow can therefore differ from its caller.
+Any future reusable signer must establish this exact identity binding before admission. A mismatch remains
+a rejection; broadening the identity expression does not satisfy acceptance. Local fixtures do not establish
+the hosted certificate identity or complete this external acceptance requirement.
+
 Qualification evidence binds its schema and gate version, exact subject membership, producing Run/attempt/commit,
 Definition and relevant input identities, source build identity, qualification invocation and per-check results.
 Its canonical schema and family are registered in ADR-01 before use. Signing and attachment use the admitted

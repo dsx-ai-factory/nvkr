@@ -117,6 +117,13 @@ transcript or independent complete-set consumer verification is recorded here. T
 tests do not establish those external boundaries. [M3-D](https://nvidia.atlassian.net/browse/NKX-18046) retains
 positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy it.
 
+The outstanding hosted identity acceptance must retain the verified certificate SAN/issuer, exact source and
+qualification invocation identities, subject-bound attachment/read-back transcript and wrong-identity
+rejection required by ADR-16. The publisher currently requires the exact authenticated qualifier identity;
+no reusable qualifier is configured and no hosted SAN mismatch has been demonstrated. A future reusable
+signer must establish its `job_workflow_ref` certificate identity without widening that admission. Current
+fixture identities and local-key transcripts do not satisfy this criterion.
+
 The M3-A catalog check uses an authored `embeds` declaration selecting an exact component map from a bounded
 YAML/JSON manifest read at the producer's pinned commit/tree. `pkg/nvkr/catalog/embedded_test.go` supplies
 positive and corruption fixtures for complete membership, exact versions/source pins, strict shapes, pinned
