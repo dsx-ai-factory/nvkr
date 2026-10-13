@@ -39,6 +39,9 @@ func (w *restoredDiagnosticWriter) Write(raw []byte) (int, error) {
 
 func TestLocalAutoTUIDiagnosticsReplayAfterRestorationAndJoining(t *testing.T) {
 	lifecycleCommandRepo(t)
+	// This fixture exercises interactive auto selection outside CI. CI fallback
+	// and explicit TUI admission are covered independently by selection tests.
+	t.Setenv("CI", "")
 	for _, test := range []struct {
 		name, status string
 		ownerCode    e.Code

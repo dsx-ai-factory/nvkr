@@ -12,6 +12,13 @@ import (
 )
 
 func TestTerminalEligibility(t *testing.T) {
+	// Go's JSON test runner aliases os.Stderr to os.Stdout. An owned, distinct
+	// file keeps the non-stdout fixture valid under the same runner used by CI.
+	otherOutput, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer otherOutput.Close()
 	stdinFD, stdoutFD := int(os.Stdin.Fd()), int(os.Stdout.Fd())
 	for _, test := range []struct {
 		name, terminal string
@@ -24,7 +31,7 @@ func TestTerminalEligibility(t *testing.T) {
 		{"unset TERM", "", os.Stdout, true, true, false, nil},
 		{"dumb TERM", "dumb", os.Stdout, true, true, false, nil},
 		{"injected writer", "xterm", &bytes.Buffer{}, true, true, false, nil},
-		{"stderr writer", "xterm", os.Stderr, true, true, false, nil},
+		{"other file writer", "xterm", otherOutput, true, true, false, nil},
 		{"redirected stdin", "xterm", os.Stdout, false, true, false, []int{stdinFD}},
 		{"redirected stdout", "xterm", os.Stdout, true, false, false, []int{stdinFD, stdoutFD}},
 	} {
