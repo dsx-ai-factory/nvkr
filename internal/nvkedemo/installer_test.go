@@ -78,7 +78,7 @@ fi
 set -eu
 while [ "$#" -gt 0 ]; do
 case "$1" in
---no-replace-objects|--literal-pathspecs|--no-pager) shift ;;
+--no-replace-objects|--literal-pathspecs|--no-pager|--no-optional-locks) shift ;;
 -C|-c) shift 2 ;;
 *) break ;;
 esac
