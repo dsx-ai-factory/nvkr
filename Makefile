@@ -7,6 +7,7 @@
 BIN         := bin/nvkr
 DEMO_BIN    ?= bin/nvke-demo
 DEMO_TEST_BIN ?= bin/nvke-demo.test
+QUALIFICATION_BIN ?= bin/nvke-qualification
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
@@ -52,6 +53,10 @@ demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvk
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
 	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
+
+.PHONY: nvke-qualification
+nvke-qualification: go-version-check ## Build the downstream Go NVKE input-preparation command.
+	go build -o $(QUALIFICATION_BIN) ./cmd/nvke-qualification
 
 .PHONY: install
 install: ## Install nvkr into $$(go env GOBIN).

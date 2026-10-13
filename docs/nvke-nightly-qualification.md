@@ -33,7 +33,7 @@ owns the private source directory's lifetime through compilation/execution.
 The maintained OS source `ff21ba8c07cafff74b68e238a8876af11e5beded` already contains
 the site-controller Go suite and existing input flags. The staged-image
 digest/chart-override changes are proposed in [NVKE PR #1580](https://github.com/dsx-ai-factory/nvke/pull/1580),
-with source head `0691b2649a2e088b7ff0e32ea6276e0a8e878fff`; they are not part of that older source pin.
+with source head `6566248f49484aaa7c443a1df9b6e26b18fa28d7`; they are not part of that older source pin.
 Review and select a source containing those changes before activating that path;
 no production locks have been silently updated.
 
@@ -45,17 +45,25 @@ then uses `publish extract`, `publish get`, and `publish image-export`.
 Image export preserves native manifest/config/layer bytes, selects an explicit
 platform for an aggregate image, and separates OCI subject from archive checksum.
 This remains artifact-publication verification, not M3/M4 or runtime acceptance.
+For a GitHub Enterprise producer, pass the explicit HTTPS origin using
+`--github-server-url`; it defaults to `https://github.com` and is not inferred
+from ambient credentials or environment settings.
 
 ## Local post-publication adapter
 
 ```sh
-python3 scripts/nvke-qualification.py --help
+make nvke-qualification
+bin/nvke-qualification --help
 ```
 
-The driver supports `--plan-only` without executing commands or contacting
+The Go adapter supports `--plan-only` without executing commands or contacting
 services, and `--stage` for authenticated read/extraction only. `--compile-only`
-adds `go test -run '^$' -count=1 .` to the staged path. All modes allocate no
+adds `go test -c -o <private-cycle>/nvke-e2e.test .` to the staged path, without
+executing test initialization or `TestMain`. All modes allocate no
 hardware and report runtime and cleanup as `not-run`. No TestGrid inputs are required.
+The command delegates to the existing Go source, verification and delivery
+owners directly. Its preparation implementation and regression tests are in
+`internal/nvkequalification`; the command maps flags and displays results.
 Each invocation needs a fresh output directory. Failure records retain the
 originating Run/publication and completed materialization phase.
 
@@ -63,8 +71,8 @@ The operator input JSON is a mapping into the existing suite configuration:
 
 | Field | Required binding |
 | --- | --- |
-| `suite_config` | Existing NVKE config as JSON; explicit `site.deployPathRef`; preservation/reuse disabled |
-| `bindings.cli` | `output` from the complete producing Run and exact bundle `install_path` |
+| `suite_config` | Existing NVKE config as JSON; canonical casing for guarded sections/fields, explicit `site.deployPathRef`; preservation/reuse disabled; duplicate JSON fields rejected |
+| `bindings.cli` | `output` from the complete producing Run and exact bundle `install_path`; selects one verified bundle entry and uses its flat extraction name |
 | `bindings.images` | Exactly controller, capi-provisioned and profiles; each has an output or explicit fixture |
 | `bindings.charts` | Exactly controller, postgresql, temporal, spire, spire-crds and nktp; each has an output or fixture |
 | Fixture | `identity`, regular local `path` and `sha256`; image fixtures also declare `repository` and native `digest` |
@@ -74,6 +82,11 @@ Fixtures are reported separately from produced outputs. Their declaration and
 checksum do not prove provenance or organizational acceptance. The CLI must come
 from the producing Run. The complete selected output set remains mandatory even
 when one runtime stream consumes a subset.
+Fixture bytes are copied into the private cycle directory while hashing the same
+opened regular file; symlink inputs are rejected. Suite configuration points at
+these copies so later replacement of the operator's original cannot change them.
+Owning errors retain their stable codes; optional compilation uses the existing
+bounded Go subprocess owner with a tooling-only environment.
 
 The driver bypasses `make site-inputs`: that route builds profiles and can build or
 select unrelated CLI/controller inputs. It writes the existing Go command with

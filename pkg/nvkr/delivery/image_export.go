@@ -65,6 +65,7 @@ func ExportPublishedImage(ctx context.Context, root, objectName, reference, plat
 		return PublishedImageExport{}, e.New(e.CodeVerifyFailed, "publication has no named OCI image output %q", objectName)
 	}
 	descriptor := Descriptor{Digest: object.DescriptorDigest, Size: object.Size, MediaType: object.ArtifactType}
+	var heldIndex *ImageIndex
 	if object.Output.ImageIndex != nil {
 		if platform == "" {
 			return PublishedImageExport{}, e.New(e.CodeUsage, "aggregate image export requires an explicit platform")
@@ -74,6 +75,7 @@ func ExportPublishedImage(ctx context.Context, root, objectName, reference, plat
 			return PublishedImageExport{}, err
 		}
 		defer func() { _ = index.Close() }()
+		heldIndex = index
 		description, err := index.Description()
 		if err != nil {
 			return PublishedImageExport{}, err
@@ -107,15 +109,26 @@ func ExportPublishedImage(ctx context.Context, root, objectName, reference, plat
 	}
 	blobs := make(map[string]*heldfile.File, len(visited))
 	defer func() {
+		if heldIndex != nil {
+			return // The complete index owner retains and closes borrowed blobs.
+		}
 		for _, file := range blobs {
 			_ = file.Close()
 		}
 	}()
 	var total int64
 	for digest := range visited {
-		file, err := heldfile.OpenContext(ctx, filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(digest, "sha256:")), heldfile.Options{Label: "selected image blob", ExpectedDigest: digest, MaxBytes: maxDeliveryFileBytes - total})
-		if err != nil {
-			return PublishedImageExport{}, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "capturing selected image closure"))
+		var file *heldfile.File
+		if heldIndex != nil {
+			file = heldIndex.closure.blobs[digest]
+			if file == nil {
+				return PublishedImageExport{}, e.New(e.CodeVerifyFailed, "selected blob is absent from the held complete image index")
+			}
+		} else {
+			file, err = heldfile.OpenContext(ctx, filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(digest, "sha256:")), heldfile.Options{Label: "selected image blob", ExpectedDigest: digest, MaxBytes: maxDeliveryFileBytes - total})
+			if err != nil {
+				return PublishedImageExport{}, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "capturing selected image closure"))
+			}
 		}
 		blobs[digest] = file
 		total += file.Size()
@@ -163,7 +176,7 @@ func writePublishedImageArchive(ctx context.Context, parent *os.File, name strin
 		if err := deliveryContext(ctx); err != nil {
 			return err
 		}
-		if err := writer.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: size, Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}); err != nil {
+		if err := writer.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: size, Typeflag: tar.TypeReg, Format: tar.FormatPAX}); err != nil {
 			return e.Wrap(e.CodeInternal, err, "writing image archive header")
 		}
 		if err := copy(writer); err != nil {

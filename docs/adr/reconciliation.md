@@ -822,7 +822,8 @@ can export a verified publication's held closure only for the expected aggregate
 invocation. Named binary/chart extraction and native image archive export reuse
 delivery owners; tests cover byte preservation, origin mismatch and no-replace
 failures. The [NVKE qualification integration](../nvke-nightly-qualification.md)
-stages core artifacts and optionally compiles the existing Go suite. The special
+uses a Go adapter and Go regression tests to stage core artifacts and optionally
+compile the existing Go suite through the established Go owners. The special
 TestGrid integration is deferred. Local contracts do not prove runtime execution,
 full hardware input closure, live IAM/capacity, result publication or nightly operation. Generated activation and OCI-to-HTTPS
 disk delivery remain unimplemented, with no production pin or runner-policy changes.
