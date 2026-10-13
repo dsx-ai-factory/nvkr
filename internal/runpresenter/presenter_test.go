@@ -226,8 +226,8 @@ func TestTabsSeparatorsAndConfirmationContinueDuringResize(t *testing.T) {
 						t.Fatalf("tab missing %q: %s", tab, got)
 					}
 				}
-				if !strings.Contains(got, "-----") {
-					t.Fatal("pane separation absent")
+				if !strings.Contains(got, "┌") || !strings.Contains(got, "└") {
+					t.Fatal("pane frame absent")
 				}
 			}
 			v.Input(key(tcell.KeyRune, '2'))
@@ -269,6 +269,33 @@ func TestTabsSeparatorsAndConfirmationContinueDuringResize(t *testing.T) {
 				t.Fatal("external cancellation retained modal")
 			}
 		})
+	}
+}
+
+func TestPlanConfirmationKeepsDefaultStayVisibleAtMinimumSize(t *testing.T) {
+	state := overviewFixture()
+	state.Title = "Planned outputs"
+	state.Note = "Plan loaded; execution and verification were not performed."
+	for i := 1; i < 35; i++ {
+		state.Items = append(state.Items, progress.Item{ID: fmt.Sprintf("output/%02d", i), Name: fmt.Sprintf("output-%02d", i), Primary: true})
+	}
+	for _, size := range [][2]int{{40, 12}, {40, 13}, {60, 16}, {80, 24}} {
+		for _, noColor := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%dx%d/monochrome%t", size[0], size[1], noColor), func(t *testing.T) {
+				view := NewView(false, noColor)
+				screen := sim(t, size[0], size[1])
+				view.Draw(screen, state, time.Now(), false)
+				view.Input(key(tcell.KeyRune, 'q'))
+				view.Draw(screen, state, time.Now(), false)
+				screen.Show()
+				if got := text(screen); !strings.Contains(got, "Stay (default)") || !strings.Contains(got, "Confirmation") {
+					t.Fatalf("confirmation clipped its safe default: %s", got)
+				}
+				if view.Input(key(tcell.KeyEnter, 0)) != None || view.confirmQuit {
+					t.Fatal("minimum-size default did not stay in the viewer")
+				}
+			})
+		}
 	}
 }
 

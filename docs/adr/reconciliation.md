@@ -424,8 +424,11 @@ terminal restoration and joining, with truncation marked. They never enter safe
 snapshots or panes. This is failure-console preservation, not durable general
 producer-log retention. Successful console output is not replayed.
 unsupported diagnostic placeholders are omitted. Existing Packer metadata transport remains separate.
-The tab strip identifies Outputs/Overview, Details and available Activity; separator lines
-divide the panes. Default browsing uses compact rows and owning-projected
+The tab strip identifies Outputs/Overview, Details and available Activity; named frames
+divide the panes. NVKR and the downstream NVKE demo share presentation colors;
+their progress sources, navigation and execution policies remain independently owned.
+Monochrome NVKR rendering preserves terminal-default foreground/background colors.
+Default browsing uses compact rows and owning-projected
 overview entries; complete nodes remain available through search, the all-entry
 toggle and exact dependency navigation. Details and Activity are disclosed on
 focus; dependency links precede selected metadata and technical context. A path

@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/dsx-ai-factory/nvkr/internal/tuitheme"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -722,6 +723,19 @@ func (v *View) helpLines() []string {
 	return append(lines, "Observations are descriptions, not Release verification")
 }
 
+func (v *View) listTitle() string {
+	if !v.commandMode() {
+		return "Outputs · ↑/↓ select"
+	}
+	if v.overview() {
+		return "Overview · ↑/↓ select"
+	}
+	if v.hasOverview() {
+		return "All entries · ↑/↓ select"
+	}
+	return "Results · ↑/↓ select"
+}
+
 func (v *View) tabs(width int) string {
 	labels := []string{"1 Outputs", "2 Details", "3 Activity"}
 	if v.commandMode() {
@@ -756,30 +770,62 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 	if width <= 0 || height <= 0 {
 		return
 	}
+	palette := tuitheme.Colors(v.noColor)
+	screen.SetStyle(tcell.StyleDefault.Background(palette.Background).Foreground(palette.Foreground))
 	screen.Clear()
-	color := tcell.ColorDefault
-	if !v.noColor {
-		color = tcell.ColorLightCyan
-	}
-	draw := func(lines []string, x, y, w, h int, scroll int, wrap bool) int {
+	color := palette.Accent
+	paint := func(lines []string, x, y, w, h int, scroll int, wrap bool, title string, focused bool) int {
 		if w <= 0 || h <= 0 {
 			return 0
 		}
-		view := tview.NewTextView().SetDynamicColors(true).SetTextColor(tcell.ColorDefault).SetWrap(wrap)
+		view := tview.NewTextView().SetDynamicColors(true).SetTextColor(palette.Foreground).SetWrap(wrap)
 		// TextView overrides Box.SetBackgroundColor to reset both the pane
 		// fill and its text style; neither should inherit tview's black theme.
-		view.SetBackgroundColor(tcell.ColorDefault)
+		view.SetBackgroundColor(palette.Background)
+		if title != "" && w >= 4 && h >= 4 {
+			border := palette.Border
+			if focused {
+				border = palette.Accent
+			}
+			view.SetBorder(true).SetBorderColor(border).SetTitle(" " + tview.Escape(title) + " ").SetTitleColor(palette.Accent)
+		}
 		var escaped []string
 		for _, line := range lines {
-			escaped = append(escaped, tview.Escape(line))
+			text := tview.Escape(line)
+			if !v.noColor {
+				var tint tcell.Color
+				switch {
+				case strings.HasPrefix(line, "NVKR "), strings.HasPrefix(line, "> "):
+					tint = palette.Accent
+				case strings.HasPrefix(line, "Code: "):
+					tint = palette.Failure
+				case strings.HasPrefix(line, "Lane: "), strings.HasPrefix(line, "Recorded observations;"), snapshot.Note != "" && line == safeText(snapshot.Note):
+					tint = palette.Warning
+				}
+				if tint != 0 {
+					emphasis := ""
+					if tint == palette.Accent || tint == palette.Failure {
+						emphasis = "b"
+					}
+					text = fmt.Sprintf("[%s::%s]%s[-::-]", tint.String(), emphasis, text)
+				}
+			}
+			escaped = append(escaped, text)
 		}
 		view.SetText(strings.Join(escaped, "\n"))
 		view.SetRect(x, y, w, h)
-		wrapped := tview.WordWrap(strings.Join(escaped, "\n"), w)
-		view.ScrollTo(min(max(0, scroll), max(0, len(wrapped)-h)), 0)
+		_, _, innerWidth, innerHeight := view.GetInnerRect()
+		wrapped := tview.WordWrap(strings.Join(escaped, "\n"), innerWidth)
+		view.ScrollTo(min(max(0, scroll), max(0, len(wrapped)-innerHeight)), 0)
 		view.Draw(screen)
 		actual, _ := view.GetScrollOffset()
 		return actual
+	}
+	draw := func(lines []string, x, y, w, h int, scroll int, wrap bool) int {
+		return paint(lines, x, y, w, h, scroll, wrap, "", false)
+	}
+	pane := func(lines []string, title string, focused bool, x, y, w, h int, scroll int, wrap bool) int {
+		return paint(lines, x, y, w, h, scroll, wrap, title, focused)
 	}
 	header := v.header(now, canceling)
 	if (width < 40 || height < 12) && !v.commandMode() {
@@ -820,7 +866,20 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 		draw(header, 0, 0, width, headerHeight, 0, true)
 	} else {
 		for y, line := range header[:min(len(header), headerHeight)] {
-			tview.Print(screen, tview.Escape(line), 0, y, width, tview.AlignLeft, color)
+			text, tint := tview.Escape(line), palette.Foreground
+			switch y {
+			case 0:
+				tint = palette.Accent
+				if !v.noColor {
+					text = "[::b]" + text + "[::-]"
+				}
+			case 2:
+				tint = palette.Warning
+				if snapshot.FailureCode != "" {
+					tint = palette.Failure
+				}
+			}
+			tview.Print(screen, text, 0, y, width, tview.AlignLeft, tint)
 		}
 	}
 	quit := "q confirm close"
@@ -884,10 +943,6 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 		tview.Print(screen, tview.Escape(v.tabs(width)), 0, contentTop, width, tview.AlignLeft, color)
 		contentTop++
 	}
-	if width >= 40 && height >= 12 && contentTop < height-1 {
-		tview.Print(screen, strings.Repeat("-", width), 0, contentTop, width, tview.AlignLeft, tcell.ColorDefault)
-		contentTop++
-	}
 	hintHeight := 0
 	var linkHint []string
 	if v.focus == 1 && width >= 40 && height >= 12 && !v.confirmQuit && !v.searching && !v.help {
@@ -899,6 +954,10 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 		}
 	}
 	available := max(0, height-contentTop-1-hintHeight)
+	innerAvailable := available
+	if available >= 4 {
+		innerAvailable -= 2 // Frame rows are not selectable or scrollable content.
+	}
 	v.rows = max(1, available-4)
 	confirmation := func() {
 		if !v.confirmQuit || available <= 0 {
@@ -910,7 +969,19 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 			title = "Cancel the current Run?"
 			explanation = "Request cancellation and wait for the owner to stop."
 		}
-		lines := []string{strings.Repeat("-", width), title, explanation, "y: confirm | N / Enter / Esc: Stay (default)"}
+		choices := "y confirm | N/Enter/Esc Stay (default)"
+		lines := []string{strings.Repeat("-", width), title, explanation, choices}
+		if available >= 6 && width >= 40 {
+			lines = lines[1:]
+			h := len(tview.WordWrap(tview.Escape(strings.Join(lines, "\n")), width-2)) + 2
+			if h > available {
+				// Keep all consent choices visible before optional explanation.
+				lines = []string{title, choices}
+				h = len(tview.WordWrap(tview.Escape(strings.Join(lines, "\n")), width-2)) + 2
+			}
+			pane(lines, "Confirmation", true, 0, contentTop+available-h, width, h, 0, true)
+			return
+		}
 		if available < 4 {
 			title = "Close viewer?"
 			if v.live {
@@ -927,35 +998,32 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 		return
 	}
 	if v.help {
-		v.rows = max(1, available)
-		v.helpOffset = draw(v.helpLines(), 0, contentTop, width, available, v.helpOffset, true)
+		v.rows = max(1, innerAvailable)
+		v.helpOffset = pane(v.helpLines(), "Help · Esc returns", true, 0, contentTop, width, available, v.helpOffset, true)
 		confirmation()
 		return
 	}
 	if width >= 120 && height >= 30 && v.focus == 1 {
 		left := (width - 1) / 3
 		right := left + 1
-		v.rows = v.commandRowCapacity(available)
+		v.rows = v.commandRowCapacity(innerAvailable)
 		if !v.commandMode() {
-			v.rows = max(1, available-3)
+			v.rows = max(1, innerAvailable-3)
 		}
-		draw(v.outputLines(left), 0, contentTop, left, available, 0, false)
-		v.detailOffset = draw(v.detailLines(now), right, contentTop, width-right, available, v.detailOffset, true)
-		for row := contentTop; row < contentTop+available; row++ {
-			screen.SetContent(left, row, '|', nil, tcell.StyleDefault)
-		}
+		pane(v.outputLines(left-2), v.listTitle(), false, 0, contentTop, left, available, 0, false)
+		v.detailOffset = pane(v.detailLines(now), "Details · Enter follows, Esc back", true, right, contentTop, width-right, available, v.detailOffset, true)
 	} else {
-		v.rows = v.commandRowCapacity(available)
+		v.rows = v.commandRowCapacity(innerAvailable)
 		if !v.commandMode() {
-			v.rows = max(1, available-3)
+			v.rows = max(1, innerAvailable-3)
 		}
 		switch v.focus {
 		case 0:
-			draw(v.outputLines(width), 0, contentTop, width, available, 0, false)
+			pane(v.outputLines(width-2), v.listTitle(), true, 0, contentTop, width, available, 0, false)
 		case 1:
-			v.detailOffset = draw(v.detailLines(now), 0, contentTop, width, available, v.detailOffset, true)
+			v.detailOffset = pane(v.detailLines(now), "Details · Enter follows, Esc back", true, 0, contentTop, width, available, v.detailOffset, true)
 		case 2:
-			draw(v.activityLines(), 0, contentTop, width, available, 0, true)
+			pane(v.activityLines(), "Activity · public descriptions", true, 0, contentTop, width, available, 0, true)
 		}
 	}
 	// The selected dependency is pinned above the controls, so scrolling a

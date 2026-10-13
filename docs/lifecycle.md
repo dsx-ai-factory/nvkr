@@ -113,8 +113,10 @@ bin/nvkr run local \
 
 Choose `--ui=tui` explicitly to require an interactive dashboard; incompatible
 terminal/JSON choices fail before input or execution work. `--no-color` or a
-nonempty `NO_COLOR` selects monochrome presentation. A tab strip identifies
-Outputs, Details and Activity; separator lines distinguish their contents. Tab
+nonempty `NO_COLOR` selects monochrome presentation with terminal-default colors.
+NVKR and `nvke-demo` share a dark blue canvas, pale text and cyan pane titles and
+focus borders. A tab strip identifies Outputs, Details and Activity; named frames
+distinguish their contents. Tab
 or 1/2/3 changes panes, arrows navigate the focused pane, Enter opens details,
 Esc goes back, `/` searches output names, `f` changes the filter and `?` shows help.
 The initial screen uses one row per output. Details and Activity open when
