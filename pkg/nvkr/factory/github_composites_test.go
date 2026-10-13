@@ -54,14 +54,30 @@ jobs:
         id: fetch-source
         env:
           NVKR_SOURCE_TOKEN: ${{ secrets.SOURCE_TOKEN }}
-          GIT_CONFIG_COUNT: '1'
-        run: ./nvkr-exec factory github run-node --plan plan.json --node fetch
+          GIT_TERMINAL_PROMPT: '0'
+          GIT_CONFIG_NOSYSTEM: '1'
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_COUNT: '4'
+          GIT_CONFIG_KEY_0: url.https://mirror.example/source.insteadOf
+          GIT_CONFIG_VALUE_0: https://source.example/repository
+          GIT_CONFIG_KEY_1: credential.helper
+          GIT_CONFIG_VALUE_1: ''
+          GIT_CONFIG_KEY_2: credential.https://mirror.example/source.helper
+          GIT_CONFIG_VALUE_2: SOURCE_HELPER
+          GIT_CONFIG_KEY_3: credential.useHttpPath
+          GIT_CONFIG_VALUE_3: 'true'
+        run: ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node fetch
       - name: Pack source
-        run: ./nvkr-exec factory github pack-outputs --plan plan.json --node fetch
+        run: ./nvkr-exec factory github pack-outputs --plan .github/nvkr-run/plan.json --node fetch
+      - name: Upload source carrier
+        uses: UPLOAD
+        with:
+          name: source-carrier
+          path: .nvkr/carriers/source.tar
       - name: Run disk
         id: run-disk
         timeout-minutes: 45
-        run: ./nvkr-exec factory github run-disk --plan plan.json --output disk
+        run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run/plan.json --output disk
       - name: Upload failed disk diagnostics
         if: ${{ failure() && steps.run-disk.outputs.packer_diagnostics != '' }}
         timeout-minutes: 5
@@ -82,12 +98,12 @@ jobs:
         continue-on-error: true
         uses: DOWNLOAD
         with:
-          name: optional-diagnostic
+          pattern: optional-diagnostic
       - name: Recover planned carriers
         id: recover-artifacts
         env:
           NVKR_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: ./nvkr-exec factory github recover --plan plan.json
+        run: ./nvkr-exec factory github recover --plan .github/nvkr-run/plan.json
   consumer:
     name: Process source
     runs-on: ubuntu-24.04
@@ -107,13 +123,15 @@ jobs:
           path: '.'
       - name: Prepare helper
         run: chmod +x ./nvkr-exec
-      - name: Preserve default shell semantics
+      - name: Configure build environment
         run: false | true
+      - name: Execute consumer
+        run: ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node consumer
 `
 	if container {
 		raw = strings.ReplaceAll(raw, "    runs-on: ubuntu-24.04\n", "    runs-on: ubuntu-24.04\n    container: ubuntu:24.04\n")
 	}
-	return []byte(strings.NewReplacer("CHECKOUT", actions.Checkout, "DOWNLOAD", actions.Download, "UPLOAD", actions.Upload).Replace(raw))
+	return []byte(strings.NewReplacer("CHECKOUT", actions.Checkout, "DOWNLOAD", actions.Download, "UPLOAD", actions.Upload, "SOURCE_HELPER", yamlSingle(sourceCredentialHelper)).Replace(raw))
 }
 
 func TestGitHubCompositesPreserveExpandedSemanticsAndProviderControls(t *testing.T) {
@@ -128,11 +146,15 @@ func TestGitHubCompositesPreserveExpandedSemanticsAndProviderControls(t *testing
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			raw := githubCompositeContractFixture(actions, test.container)
-			workflow, files, err := lowerGitHubActions(raw, actions)
+			workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
 			if err != nil {
 				t.Fatal(err)
 			}
-			expanded, err := expandGitHubActions(workflow, files)
+			workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +166,11 @@ func TestGitHubCompositesPreserveExpandedSemanticsAndProviderControls(t *testing
 			if err != nil || !bytes.Equal(got, want) {
 				t.Fatalf("expanded workflow semantics changed: %v\nwant: %s\ngot: %s", err, want, got)
 			}
-			second, secondFiles, err := lowerGitHubActions(raw, actions)
+			second, secondFiles, err := lowerGitHubActions(&Plan{}, raw, actions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			second, err = shareGitHubActions(&Plan{}, second, secondFiles, actions)
 			if err != nil || !bytes.Equal(workflow, second) || !reflect.DeepEqual(files, secondFiles) {
 				t.Fatalf("action lowering is not deterministic: %v", err)
 			}
@@ -172,6 +198,12 @@ func TestGitHubCompositesPreserveExpandedSemanticsAndProviderControls(t *testing
 				}
 				if bytes.Contains(body, []byte("secrets.")) || bytes.Contains(body, []byte("toJSON(needs)")) {
 					t.Errorf("caller-only context leaked into %s", name)
+				}
+				if name == GitHubActionDataPath {
+					continue
+				}
+				if strings.Contains(name, "/jobs/") {
+					t.Fatalf("job-specific action bypassed semantic sharing: %s", name)
 				}
 				var action struct {
 					Runs struct {
@@ -264,7 +296,11 @@ func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte) {
 
 func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 	actions := testActionRefs(t, githubTestPlan(t))
-	workflow, files, err := lowerGitHubActions(githubCompositeContractFixture(actions, false), actions)
+	workflow, files, err := lowerGitHubActions(&Plan{}, githubCompositeContractFixture(actions, false), actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +316,20 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 		if len(step.Env) != 0 {
 			t.Fatal("composite call has a broad credential environment")
 		}
-		maps.Copy(inputs, step.With)
+		for name, value := range step.With {
+			switch name {
+			case "parameters", "action", "runner-artifact":
+				continue
+			case "with-path":
+				if value == "" {
+					continue
+				}
+			}
+			if prior, exists := inputs[name]; exists && prior != value {
+				t.Fatalf("caller input %q changed binding between operations", name)
+			}
+			inputs[name] = value
+		}
 	}
 	want := map[string]string{"nvkr-source-token": "${{ secrets.SOURCE_TOKEN }}", "nvkr-job-results": "${{ toJSON(needs) }}",
 		"with-path": "${{ steps.run-disk.outputs.packer_diagnostics }}"}
@@ -322,7 +371,7 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 				t.Fatalf("controlled transfer %q changed its inner cancellation guard or moved caller controls or step-output context into its action", call.Name)
 			}
 			if call.Name == "Upload failed disk diagnostics" &&
-				(call.With["with-path"] != want["with-path"] || inner.With["path"] != "${{ inputs.with-path }}") {
+				(call.With["with-path"] != want["with-path"] || inner.With["path"] != "${{ inputs.with-path || fromJSON(inputs.parameters).upload_with_path }}") {
 				t.Fatal("diagnostic path did not cross the action boundary as an explicit caller input")
 			}
 			if wantInnerCondition != "" {
@@ -338,7 +387,7 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 				}
 				changedFiles := maps.Clone(files)
 				changedFiles[strings.TrimPrefix(call.Uses, "./")+"/action.yml"] = changedRaw
-				_, err = expandGitHubActions(workflow, changedFiles)
+				_, err = expandGitHubActions(&Plan{}, workflow, changedFiles)
 				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 			}
 		}
@@ -348,6 +397,9 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 	}
 	foundSource, foundRecovery := false, false
 	for name, raw := range files {
+		if name == GitHubActionDataPath {
+			continue
+		}
 		var action struct {
 			Runs struct {
 				Steps []githubStep `json:"steps"`
@@ -358,13 +410,13 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 		}
 		for _, step := range action.Runs.Steps {
 			if token := step.Env["NVKR_SOURCE_TOKEN"]; token != "" {
-				if step.Name != "Fetch source" || token != "${{ inputs.nvkr-source-token }}" {
+				if name != githubSharedDirectory+"execute-source/action.yml" || step.ID != "operation_execute" || token != "${{ inputs.nvkr-source-token }}" {
 					t.Fatalf("source credential moved to %s / %s", name, step.Name)
 				}
 				foundSource = true
 			}
 			if results := step.Env["NVKR_JOB_RESULTS"]; results != "" {
-				if step.ID != "recover-artifacts" || results != "${{ inputs.nvkr-job-results }}" {
+				if name != githubSharedDirectory+"recover-inputs/action.yml" || step.ID != "operation_recover" || results != "${{ inputs.nvkr-job-results }}" {
 					t.Fatalf("provider results moved to %s / %s", name, step.Name)
 				}
 				foundRecovery = true
@@ -401,7 +453,7 @@ func TestGitHubCompositesKeepReferencedTransferOutputsInCaller(t *testing.T) {
       - name: Consume transfer output
         run: printf '%s\n' '${{ steps.transfer.outputs.OUTPUT }}'
 `))
-			workflow, files, err := lowerGitHubActions(raw, actions)
+			workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -413,7 +465,7 @@ func TestGitHubCompositesKeepReferencedTransferOutputsInCaller(t *testing.T) {
 			if after[1].Uses != test.uses || after[1].ID != "transfer" {
 				t.Fatal("transfer output producer was hidden behind a composite without declared outputs")
 			}
-			expanded, err := expandGitHubActions(workflow, files)
+			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -428,7 +480,7 @@ func TestGitHubCompositesRejectConflictingCredentialInputs(t *testing.T) {
 	actions := testActionRefs(t, githubTestPlan(t))
 	raw := githubCompositeContractFixture(actions, false)
 	raw = bytes.Replace(raw, []byte("      - name: Pack source\n"), []byte("      - name: Pack source\n        env:\n          NVKR_SOURCE_TOKEN: ${{ secrets.OTHER_SOURCE_TOKEN }}\n"), 1)
-	_, _, err := lowerGitHubActions(raw, actions)
+	_, _, err := lowerGitHubActions(&Plan{}, raw, actions)
 	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 }
 

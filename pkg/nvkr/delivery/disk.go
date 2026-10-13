@@ -39,7 +39,7 @@ const (
 
 // DiskArtifactRequest describes a local transport operation. Digest and
 // Size are expectations checked against the exact stream, not producer authority.
-// Only a declared unencrypted QCOW2 on Linux amd64/arm64 is admitted. This does
+// Declared plain or LUKS2 QCOW2 on Linux amd64/arm64 is admitted. This does
 // not inspect the filesystem, detect LUKS, reproduce RAW or authorize publication.
 type DiskArtifactRequest struct {
 	Path         string
@@ -90,8 +90,8 @@ func BuildDiskArtifact(ctx context.Context, out string, request DiskArtifactRequ
 	if err != nil {
 		return Result{}, err
 	}
-	if request.Format != "qcow2" || request.Encryption != "none" {
-		return Result{}, e.New(e.CodeEngineCapability, "disk transport requires declared unencrypted QCOW2")
+	if request.Format != "qcow2" || !supportedDiskEncryption(request.Encryption) {
+		return Result{}, e.New(e.CodeEngineCapability, "disk transport requires QCOW2 with declared none or luks2 encryption")
 	}
 	if !validDiskArtifactType(request.ArtifactType) || !isDigest(request.Digest) || request.Size <= 0 || request.Size > maxDeliveryFileBytes {
 		return Result{}, e.New(e.CodeVerifyFailed, "disk transport requires exact bounded payload and artifact type")
@@ -133,7 +133,7 @@ func BuildDiskArtifact(ctx context.Context, out string, request DiskArtifactRequ
 	if err != nil {
 		return Result{}, err
 	}
-	manifest := standardDiskManifest(config, request.Digest, request.Size, request.ArtifactType)
+	manifest := standardDiskManifest(config, request.Digest, request.Size, request.ArtifactType, request.Encryption)
 	descriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
 	if err != nil {
 		return Result{}, err
@@ -287,7 +287,7 @@ func inspectDiskMetadata(ctx context.Context, root string, descriptor Descriptor
 		return ocispec.Manifest{}, ocispec.Platform{}, e.New(e.CodeEngineCapability, "disk transport format %q is unsupported", format)
 	}
 	encryption := manifest.Annotations[diskEncryptionAnnotation]
-	if encryption != "" && encryption != "none" {
+	if encryption != "" && !supportedDiskEncryption(encryption) {
 		return ocispec.Manifest{}, ocispec.Platform{}, e.New(e.CodeEngineCapability, "disk transport encryption %q is unsupported", encryption)
 	}
 	config := Descriptor{MediaType: manifest.Config.MediaType, Digest: manifest.Config.Digest.String(), Size: manifest.Config.Size}
@@ -352,21 +352,25 @@ func (artifact *DiskArtifact) RequireStandardProfile(ctx context.Context) error 
 		return e.Wrap(e.CodeInternal, err, "encoding standard disk platform")
 	}
 	config := Descriptor{MediaType: MediaImageConfig, Digest: digestBytes(configRaw), Size: int64(len(configRaw))}
-	raw, err := json.Marshal(standardDiskManifest(config, observed.PayloadDigest, observed.Size, observed.ArtifactType))
+	raw, err := json.Marshal(standardDiskManifest(config, observed.PayloadDigest, observed.Size, observed.ArtifactType, observed.Encryption))
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "encoding standard disk manifest")
 	}
-	if observed.Encryption != "none" || digestBytes(raw) != observed.ManifestDigest {
+	if !supportedDiskEncryption(observed.Encryption) || digestBytes(raw) != observed.ManifestDigest {
 		return e.New(e.CodeVerifyFailed, "disk wrapper differs from the exact standard transport profile")
 	}
 	return nil
 }
 
-func standardDiskManifest(config Descriptor, payload string, size int64, artifactType string) ociManifest {
+func supportedDiskEncryption(encryption string) bool {
+	return encryption == "none" || encryption == "luks2"
+}
+
+func standardDiskManifest(config Descriptor, payload string, size int64, artifactType, encryption string) ociManifest {
 	return ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: artifactType,
 		Config: config, Layers: []Descriptor{{MediaType: MediaQCOW2, Digest: payload, Size: size,
 			Annotations: map[string]string{ocispec.AnnotationTitle: "disk.qcow2"}}},
-		Annotations: map[string]string{diskFormatAnnotation: "qcow2", diskEncryptionAnnotation: "none"}}
+		Annotations: map[string]string{diskFormatAnnotation: "qcow2", diskEncryptionAnnotation: encryption}}
 }
 
 // WriteToContext emits only the held inode and checks its exact bytes and size.

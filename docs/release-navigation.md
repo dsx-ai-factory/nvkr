@@ -1,10 +1,11 @@
-# Navigate release artifacts and evidence
+# Browse and export release metadata
 
 `nvkr release browse` reads the bounded metadata and evidence of an exact release publication root and
-shows its declared artifacts and memberships. It validates the complete metadata closure before displaying
-any output, without downloading or reading artifact payload layers. It can read a registry or an existing
-local OCI layout, and runs on macOS as well as Linux. Metadata inspection does not verify payload bytes,
-signatures or consumer policy; use `release verify` for authenticated consumption.
+shows its declared artifacts and memberships. `release export` writes that complete description as versioned
+JSON for other tools. Both validate the complete metadata closure before writing a result, without downloading
+or reading artifact payload layers. They can read a registry or an existing local OCI layout, and run on
+macOS as well as Linux. Metadata inspection does not verify payload bytes, signatures or consumer policy;
+use `release verify` for authenticated consumption.
 
 ## Start with the publication root
 
@@ -48,7 +49,70 @@ metadata or missing evidence. Payload integrity remains outside browsing's scope
 Shared evidence keeps its complete list of output memberships in text and JSON even when only one output is
 shown. Evidence references identify the exact manifest under the derived owning output repository.
 
-## Export readable data or a diagram
+## Export a complete release description
+
+Supply the immutable publication reference as the only metadata input:
+
+```sh
+bin/nvkr release export --reference "$RELEASE_REF" > release-description.json
+```
+
+The result uses `schemaVersion: nvkr.dev/release-description/v1`. It preserves every named output and every
+platform in the publication, including components unfamiliar to a particular consumer. Export needs no Plan,
+mapping file, platform selection, producer checkout or build workspace. It does not accept an unpublished
+workspace as a release. An optional `--layout` supplies a cached copy of the exact referenced publication;
+the local-layout integrity and reference rules below still apply.
+
+Unfiltered `release browse --format json` and `release export` use the same versioned wire description. A
+browse selection remains a filtered view of that schema; export always emits the complete description.
+The [checked-in JSON example](https://github.com/dsx-ai-factory/nvkr/blob/main/pkg/nvkr/releaseview/testdata/release-description-v1.json) illustrates all
+supported artifact kinds and multiple source revisions with synthetic identities.
+
+Consumers must require an exact supported `schemaVersion` before interpreting the description. Incompatible
+changes to field shape or meaning require a new schema version. The naming cutover is a breaking namespace
+change: current readers reject historical `nkd.dev` publication records and digest families. Old signed
+records cannot be renamed into an NVKR release or used to validate the renamed reader.
+Output and evidence names, component and output memberships, build subjects, required platforms and image
+children are sorted deterministically.
+Stable ordering makes comparisons repeatable; the JSON bytes still do not define release identity.
+
+| Field | Meaning |
+| --- | --- |
+| `schemaVersion` | `nvkr.dev/release-description/v1`, the version of this descriptive JSON contract |
+| `reference`, `rootDigest` | Supplied immutable publication locator and its exact root digest |
+| `referenceScope` | Locators derive from the supplied root reference; availability is not established |
+| `declaredQualification` | Publisher-declared qualification, separate from this inspection's result |
+| `inspection`, `inspectionDetails` | Human-readable inspection scope and explicit machine-readable checks |
+| `totalOutputs`, optional `selectedOutput` | Complete publication output count and any browse-only selection |
+| `metadata` | Recorded Definition, Environment, Plan and content identities, with invocation ID when present |
+| `outputs` | Every named artifact's exact kind, digest, reference, Build Digest, components and kind-specific metadata |
+| `evidence` | Exact evidence references/digests, output/component/stage/subject bindings and available source descriptions |
+
+`inspectionDetails.scope` is `metadata-only`, `metadataClosure` is `complete`, and `outputSelection` is
+`all` for export or an unfiltered browse. A selected browse uses `filtered` after checking the complete
+metadata closure. Under `inspectionDetails.checks`, `metadataIntegrity` is `checked`; `payloadIntegrity`,
+`signatures`, `consumerPolicy`, `registryAvailability` and `installationCompatibility` are `not-checked`.
+These values report the work this operation performed; they do not downgrade or authenticate the publisher's
+declared qualification.
+
+Native artifact `os` and `arch` fields describe checked config metadata where available. An aggregate
+image's `imageIndex` retains its exact required platform set, child manifests and build subjects; the output
+digest remains the published index digest. Helm `chartVersion` comes from the exact chart config and is
+distinct from `appVersion`. A chart package's version or platform label does not establish the compatibility
+of its rendered workloads.
+
+Source-built evidence may carry `source.repo` and `source.commit` alongside its exact `binding`. Source
+metadata is not collapsed into one release-wide repository or revision, and uses of one repository at
+different commits remain distinct records. Missing or redacted properties remain absent or partial; a
+normalized component version does not reconstruct an original Git tag. Consumers join sources to outputs
+through evidence bindings and decide which revisions are compatible with their own use.
+
+NVKR does not rename components into installer roles or create consumer-specific installation formats.
+Consumers own role mapping, target selection, deployment topology, compatibility and complete offline
+dependency inventories. JSON export does not create a new lifecycle input or canonical identity, and a
+description cannot restore a held verification capability.
+
+## Export a filtered view or diagram
 
 ```sh
 bin/nvkr release browse --reference "$RELEASE_REF" --format json > release-view.json
@@ -59,8 +123,8 @@ JSON retains full artifact, manifest, blob, evidence-document and subject identi
 output count and optional selected output, making a filtered view explicit. `referenceScope` labels locators as
 derived from the supplied root reference, without claiming registry availability. Empty component build-subject
 collections are arrays. Nonprinting Unicode, including bidirectional controls, is escaped for terminal display;
-decoding the JSON preserves the exact string values. This indented JSON is presentation, not a canonical
-identity document or a verification receipt.
+decoding the JSON preserves the exact string values. The versioned JSON description is indented for
+readability; its serialized bytes are not a canonical identity document or a verification receipt.
 
 The Mermaid diagram shows release membership, output components, and evidence-to-output and evidence-to-subject
 relationships. It abbreviates digest labels for readability; use text or JSON for exact locators. This is the
@@ -71,6 +135,7 @@ the publication metadata. Registry-provided labels are escaped before rendering.
 
 ```sh
 bin/nvkr release browse --reference "$RELEASE_REF" --layout /path/to/release-layout
+bin/nvkr release export --reference "$RELEASE_REF" --layout /path/to/release-layout
 ```
 
 The layout may contain the complete publication or only its metadata and evidence; browsing does not open
@@ -87,13 +152,19 @@ For authenticated consumption, follow [the lifecycle verification guide](lifecyc
 the same pinned reference to `release verify` with the consumer's accepted identity, issuer and evidence scope.
 Browsing invokes neither cosign nor a signer, and does not treat a raw preparation SBOM as a signed attestation.
 The existing Linux and capability requirements for policy verification still apply.
+Select `--scope authenticity` to authenticate signatures, provenance and required signed evidence without
+artifact payload downloads, or `--scope artifact-publication` to include payload integrity checks.
 
 ## Implementation and validation scope
 
 Delivery owns the bounded metadata reader and the output/evidence projection. Lifecycle admits the reference
 and options, bounds the operation, reads or pulls the metadata, obtains its detached description and removes
-temporary resources. Presentation filters and formats only that description. No new release identity or
-publication format is introduced. Explicit release verification retains its full payload and policy checks.
+temporary resources. Presentation owns the explicit versioned wire description and filters and formats only
+that description. No new release identity or publication format is introduced. Artifact-publication verification
+retains its full payload and policy checks. The pre-cutover exporter passed targeted tests, the full local
+completion gate with uncached tests, and the uncached race suite on pinned Go 1.27.2 on 2026-10-10. That
+validation and the existing inspection evidence below retain their original namespace and scope; they do
+not establish external acceptance of the renamed reader.
 
 Contract tests cover anonymous and authenticated loopback registries, identical local/remote descriptions,
 exact sibling references and evidence subjects, config-declared platforms, zero artifact payload-layer

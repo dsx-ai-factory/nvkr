@@ -152,16 +152,20 @@ closure. These documents have no inspected dependency inventory and explicitly b
 to `build-provenance-v1` and `nvkr:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
-The October 7, 2026 PR #97 task chat contains Ilya Kislenko's instruction:
-"Preserve main/#106: producer provenance for M2, inspection for M3". This records the task-chat instruction,
-not an independently published decider approval; no such approval record is supplied here.
-It supersedes the task's October 6 proposed strict M2 target while retaining main/#106's AMD64-only product
-acceptance floor. Deep disk/content inspection and material-to-filesystem reconciliation belong to M3.
+The [approved October 12 M3 MVP scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+retains this producer-only disk evidence. Deep disk/content inspection and material-to-filesystem reconciliation
+are deferred hardening under [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052), outside MVP completion.
+
+Under the current scope directed by the user, embedded-component declarations are optional: omission is not
+applicable, while any authored declaration must match its referenced upstream manifest at the pinned commit. This checks source-metadata consistency only;
+it does not account for effective build customizations or inspect installed disk contents. Source, patch,
+configuration and material bindings remain mandatory in the producer-evidence contract.
 The native ARM64 route and authored outputs are an implementation extension, not a milestone-scope approval.
 Every disk actually selected by a Definition retains exact producer/material, delivery and evidence obligations;
 the AMD64 product floor cannot waive ARM64 completeness. Organizational ratification of the ADR set remains separate.
 Historical signed documents may retain the earlier `deferred-m3` scope token; do not rewrite those bytes or
-interpret that token as inspection evidence. M3 qualification requires the strict inspected evidence below.
+interpret that token as inspection evidence. The strict inspected-evidence contract below remains available
+only under its separately admitted capability and evidence policy; M3 success cannot imply it was exercised.
 Unknown modes fail closed; an omitted producer mode retains the strict contract. Document validators check the
 declared mode and reject invented inspection claims. Consumer acceptance is separately controlled by
 `VerificationPolicy.minimumDiskEvidence`, included in the policy digest. For `pipeline-attested`, an omitted
@@ -383,6 +387,25 @@ materials instead use the complete-closure/private-projection contract above. Sc
 isolated. The report is projected into deterministic component names, versions and package URLs. File-location
 records, temporary paths, timestamps and scanner-generated IDs are excluded. Scanner executable identity is
 recorded separately. Unknown versions remain unknown; they are never filled from unrelated module tags.
+
+The separate `InspectDebianArchiveMetadata` diagnostic always uses the constant private snapshot name
+`subject.deb`, independent of the caller's filename. The caller's basename is not copied, and the extension
+supplies no format or identity proof. Syft parses a private read-only copy of the held bytes, rechecked against
+the digest after scanning. Its result uses the diagnostic method `syft-debian-archive-metadata/v1`, which
+dependency SBOM attachment and serialized BOM validation reject. Package/control metadata cannot become
+payload dependency evidence. The ordinary path-based `InspectDependencies` and held-only
+`InspectHeldDependencies` APIs retain hint-free host-file scanning; OCI scanning is unaffected.
+The Syft v1.51.1 discovery premise is version-specific: rerun the opt-in regression when changing either
+the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
+
+Factory callers retain the ordinary dependency API; no maintained factory output invokes the separate
+Debian metadata diagnostic. Factory SBOM nodes inspect producer bytes before APT wrapping, and the existing
+executable/APT routes do not preserve a source-created Debian package. The diagnostic does not admit such
+a delivery route. The authoritative Debian material reader remains digest-pinned
+`dpkg-deb`, with platform checks and bounded payload expansion in the disk owner. A standalone Debian
+delivery format, declared-format propagation through path and held APIs, and payload coverage through that
+owner remain deferred. This diagnostic does not validate target architecture, preserve a source package,
+enable direct APT publication, or prove installation.
 
 For Helm source archives and exact acquired archives selected as Helm outputs, a generic manifest reader inventories bundled `Chart.yaml` declarations and chart
 dependency declarations/locks. It never executes

@@ -104,6 +104,11 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	layout := githubLayoutFor(plan)
+	if bundle.Engine != EngineGitHub || bundle.WorkflowPath != layout.workflowPath ||
+		bundle.ManifestPath != layout.manifestPath || bundle.PlanPath != layout.planPath {
+		return nil, e.New(e.CodePipelineDrift, "generated bundle paths do not match the admitted Environment")
+	}
 	if err := admitGitHubRequirements(plan, bundle.Engine+" bundle validation"); err != nil {
 		return nil, err
 	}
@@ -114,9 +119,6 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if bundle.PlanDigest != expectedPlanDigest {
 		return nil, e.New(e.CodePipelineDrift,
 			"%s bundle planDigest does not match the authoritative plan", bundle.Engine)
-	}
-	if bundle.Engine != EngineGitHub || bundle.WorkflowPath != GitHubWorkflowPath || bundle.PlanPath != FactoryPlanPath || bundle.ManifestPath != GeneratedManifestPath {
-		return nil, e.New(e.CodePipelineDrift, "generated Run bundle layout differs from the admitted GitHub layout")
 	}
 	workflow, ok := bundle.Files[bundle.WorkflowPath]
 	if !ok || pipeline.FileDigest(workflow) != bundle.WorkflowDigest {

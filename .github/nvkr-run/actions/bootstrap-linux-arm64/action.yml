@@ -49,3 +49,4 @@ runs:
         name: ${{ inputs.runner-artifact }}
         path: 'nvkr-exec'
         if-no-files-found: error
+        retention-days: 7

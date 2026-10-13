@@ -35,7 +35,7 @@ func githubActionInterfaceFixture(actions githubActionRefs, fixtures []githubInt
 		writePrepareHelperStep(&source)
 		if fixture.inputs {
 			fmt.Fprintf(&source, "      - name: Download required inputs\n        uses: %s\n        with:\n          pattern: fixture-input\n          path: .nvkr/carriers\n          merge-multiple: 'true'\n", actions.Download)
-			writeGitHubShellStep(&source, "Restore required inputs", []string{githubRunnerCommand("restore-inputs", "stage", fixture.name)})
+			writeGitHubShellStep(&source, "Restore required inputs", []string{githubRunnerCommand(&Plan{}, "restore-inputs", "stage", fixture.name)})
 		}
 		if fixture.setup {
 			writeGitHubShellStep(&source, "Configure build environment", []string{"printf setup"})
@@ -45,20 +45,20 @@ func githubActionInterfaceFixture(actions githubActionRefs, fixtures []githubInt
 			for _, key := range sortedKeys(githubImageEnvironment()) {
 				fmt.Fprintf(&source, "          %s: %s\n", key, yamlSingle(githubImageEnvironment()[key]))
 			}
-			fmt.Fprintf(&source, "        run: %s\n", githubRunnerCommand("prepare-images", "stage", fixture.name))
+			fmt.Fprintf(&source, "        run: %s\n", githubRunnerCommand(&Plan{}, "prepare-images", "stage", fixture.name))
 		}
 		for index := 0; index < fixture.nodes; index++ {
 			selector := fmt.Sprintf("%s/node-%d", fixture.name, index)
 			if !fixture.collectOnly {
-				fmt.Fprintf(&source, "      - name: Execute node %d\n        id: execute-%d\n        run: %s\n", index, index, githubRunnerCommand("run-node", "node", selector))
+				fmt.Fprintf(&source, "      - name: Execute node %d\n        id: execute-%d\n        run: %s\n", index, index, githubRunnerCommand(&Plan{}, "run-node", "node", selector))
 			}
 			if fixture.carriers == 0 {
 				continue
 			}
-			writeGitHubShellStep(&source, fmt.Sprintf("Collect node %d", index), []string{githubRunnerCommand("pack-outputs", "node", selector)})
+			writeGitHubShellStep(&source, fmt.Sprintf("Collect node %d", index), []string{githubRunnerCommand(&Plan{}, "pack-outputs", "node", selector)})
 			for carrier := 0; carrier < fixture.carriers; carrier++ {
 				label := fmt.Sprintf("%s-node-%d-carrier-%d", fixture.name, index, carrier)
-				actions.writeUploadStep(&source, label, label, ".nvkr/carriers/"+label+".tar")
+				actions.writeUploadStep(&source, &Plan{}, label, label, ".nvkr/carriers/"+label+".tar")
 			}
 		}
 	}
@@ -79,11 +79,11 @@ func TestGitHubSemanticInterfacesReuseAcrossNodeAndCarrierCounts(t *testing.T) {
 		{name: "collect-additional-carriers", nodes: 3, carriers: 6, collectOnly: true},
 	}
 	raw := githubActionInterfaceFixture(actions, fixtures)
-	workflow, files, err := lowerGitHubActions(raw, actions)
+	workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(workflow, files, actions)
+	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestGitHubSemanticInterfacesReuseAcrossNodeAndCarrierCounts(t *testing.T) {
 			t.Fatalf("fixture did not exercise %s", family)
 		}
 	}
-	expanded, err := expandGitHubActions(workflow, files)
+	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,11 +165,11 @@ func TestGitHubExecutionInterfaceHasSemanticOptionalRoles(t *testing.T) {
 		{name: "inputs-and-images", nodes: 1, carriers: 2, inputs: true, images: true},
 		{name: "authored-setup-boundary", nodes: 1, carriers: 2, inputs: true, images: true, setup: true},
 	}
-	workflow, files, err := lowerGitHubActions(githubActionInterfaceFixture(actions, fixtures), actions)
+	workflow, files, err := lowerGitHubActions(&Plan{}, githubActionInterfaceFixture(actions, fixtures), actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(workflow, files, actions)
+	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,11 +250,11 @@ func TestGitHubExecutionInterfaceHasSemanticOptionalRoles(t *testing.T) {
 func TestGitHubExecutionInterfaceRespectsAuthoredSetupBoundary(t *testing.T) {
 	actions := testActionRefs(t, githubTestPlan(t))
 	fixture := githubInterfaceFixture{name: "with-setup", nodes: 1, carriers: 2, inputs: true, images: true, setup: true}
-	workflow, files, err := lowerGitHubActions(githubActionInterfaceFixture(actions, []githubInterfaceFixture{fixture}), actions)
+	workflow, files, err := lowerGitHubActions(&Plan{}, githubActionInterfaceFixture(actions, []githubInterfaceFixture{fixture}), actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(workflow, files, actions)
+	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,6 +273,52 @@ func TestGitHubExecutionInterfaceRespectsAuthoredSetupBoundary(t *testing.T) {
 	want := []string{"prepare-inputs", "setup", "execute-node"}
 	if !reflect.DeepEqual(order, want) {
 		t.Fatalf("authored setup boundary order=%v, want %v", order, want)
+	}
+}
+
+func TestGitHubInputAndImagePreparationWithoutFollowingNode(t *testing.T) {
+	actions := testActionRefs(t, githubTestPlan(t))
+	fixture := githubInterfaceFixture{name: "preparation-only", inputs: true, images: true}
+	raw := githubActionInterfaceFixture(actions, []githubInterfaceFixture{fixture})
+	workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := sharedGitHubActionData(t, &GeneratedBundle{Files: files})
+	var order []string
+	for _, step := range decodeGitHubWorkflow(t, workflow).Jobs[fixture.name].Steps {
+		if step.With["parameters"] == "" {
+			continue
+		}
+		family := strings.TrimPrefix(step.Uses, "./"+githubSharedDirectory)
+		order = append(order, family)
+		parameters := githubInterfaceParameters(t, data, fixture.name, step)
+		switch family {
+		case "prepare-inputs":
+			if parameters["download_present"] != "true" || parameters["restore_present"] != "true" || parameters["restore_selector"] != fixture.name {
+				t.Fatal("standalone input preparation lost its download or exact restore selector")
+			}
+		case "prepare-images":
+			if parameters["images_present"] != "true" || parameters["images_selector"] != fixture.name {
+				t.Fatal("standalone image preparation lost its exact selector")
+			}
+		default:
+			t.Fatalf("preparation-only job acquired an execution interface: %s", family)
+		}
+	}
+	if want := []string{"prepare-inputs", "prepare-images"}; !reflect.DeepEqual(order, want) {
+		t.Fatalf("preparation order=%v, want %v", order, want)
+	}
+	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(decodeGitHubWorkflow(t, expanded), decodeGitHubWorkflow(t, raw)) {
+		t.Fatal("standalone preparation changed download, restore or credentialed image preparation semantics")
 	}
 }
 

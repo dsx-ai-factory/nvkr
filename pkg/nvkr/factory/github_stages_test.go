@@ -373,7 +373,7 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 			if test.entrypoint {
 				header := "# qualification: " + plan.Qualification.String() + "\n# plan: " + bundle.PlanPath + "\n# manifest: " + bundle.ManifestPath + "\n"
 				workflow = append([]byte(header), workflow...)
-				mutated = replaceGitHubBundleBytes(t, bundle, bundle.Files[GitHubWorkflowPath], workflow)
+				mutated = mutateGitHubBundleFile(t, bundle, bundle.WorkflowPath, func([]byte) []byte { return workflow })
 			} else {
 				mutated = relowerGitHubTestBundle(t, plan, bundle, workflow)
 			}

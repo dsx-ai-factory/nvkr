@@ -102,6 +102,7 @@ type Inspection struct {
 	Root       PublicationRoot
 	RootDigest string
 	RootConfig Descriptor
+	sources    map[string]PublicationSource
 }
 
 type layoutWriter struct {
@@ -145,8 +146,11 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		}
 		if root.Release == nil || !input.Layout || input.Output == nil || input.Output.Format != "disk-image" || input.Output.Disk == nil ||
 			input.ArtifactType != MediaDiskImage || !isDigest(input.Output.Disk.PayloadDigest) ||
-			input.Output.Disk.Encryption != "none" || input.Output.Disk.Size > maxDeliveryFileBytes || input.Output.TransportPath != "" {
-			return Result{}, e.New(e.CodeVerifyFailed, "disk release input requires exact bounded unencrypted wrapper and payload binding")
+			input.Output.Disk.Size > maxDeliveryFileBytes || input.Output.TransportPath != "" {
+			return Result{}, e.New(e.CodeVerifyFailed, "disk release input requires exact bounded wrapper and payload binding")
+		}
+		if err := input.Output.Disk.validatePublicationEncryption(); err != nil {
+			return Result{}, err
 		}
 		if err := (Output{Name: input.Name, Kind: "disk-image", Digest: input.SemanticDigest, BuildDigest: input.Output.BuildDigest,
 			Components: input.Output.Components, Disk: input.Output.Disk}).Validate(); err != nil {

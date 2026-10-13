@@ -53,6 +53,9 @@ func diskMaterialTraceFixtureWithPublicationMode(t *testing.T, sibling, networke
 	base := fixture.plan.CatalogSnapshot
 	image := base.Components["image"]
 	image.Disk.Encryption = encryption
+	if encryption == "luks2" && buildProvenance {
+		image.Packer.Variables = map[string]string{"luks_passphrase": "changeit"}
+	}
 	if capture != "" {
 		packer := *image.Packer
 		packer.AcquisitionArchive = capture

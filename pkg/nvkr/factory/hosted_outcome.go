@@ -300,6 +300,19 @@ func validateHostedProductionPredicate(raw []byte, plan *Plan, signing *definiti
 	if err != nil || !identity.MatchString(predicate.RunDetails.Builder.ID) {
 		return e.New(e.CodeVerifyFailed, "hosted production predicate builder does not match the signing identity policy")
 	}
+	if plan.Environment.GitHubDevelopment {
+		digest, err := plan.IdentityDigest()
+		if err != nil {
+			return err
+		}
+		run, err := publicationRunContext(plan, digest, time.Now().UTC(), time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		if predicate.RunDetails.Builder.ID != run.BuilderID() || predicate.RunDetails.Metadata["invocationId"] != run.InvocationID() {
+			return e.New(e.CodeVerifyFailed, "development provenance belongs to another workflow or run attempt")
+		}
+	}
 	startedOn, err := time.Parse(time.RFC3339Nano, predicate.RunDetails.Metadata["startedOn"])
 	if err != nil {
 		return e.Wrap(e.CodeProvenanceMissing, err, "decoding hosted production predicate start time")

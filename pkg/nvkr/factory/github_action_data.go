@@ -29,7 +29,7 @@ func WriteGitHubActionData(ctx context.Context, plan *Plan, selector, outputPath
 	if err != nil {
 		return err
 	}
-	raw, ok := bundle.Files[GitHubActionDataPath]
+	raw, ok := bundle.Files[githubActionDataPathFor(plan)]
 	if !ok {
 		return e.New(e.CodePipelineDrift, "generated GitHub bundle omits shared action data")
 	}
@@ -41,7 +41,11 @@ func WriteGitHubActionData(ctx context.Context, plan *Plan, selector, outputPath
 	if !ok || entry.Template == "" || entry.Values == nil {
 		return e.New(e.CodePipelineDrift, "GitHub action selector %q has no admitted shared action data", selector)
 	}
-	data, err := canonical.Marshal(entry.Values)
+	return writeGitHubActionValues(ctx, entry.Values, outputPath)
+}
+
+func writeGitHubActionValues(ctx context.Context, values map[string]string, outputPath string) error {
+	data, err := canonical.Marshal(values)
 	if err != nil {
 		return e.Wrap(e.CodePipelineDrift, err, "encode generated GitHub action values")
 	}

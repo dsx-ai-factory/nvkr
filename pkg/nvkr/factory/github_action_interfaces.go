@@ -26,17 +26,21 @@ type githubInterfaceRole struct {
 	kind     string
 }
 
+const githubAttemptUploadNameSuffix = "-${{ github.run_id }}-${{ github.run_attempt }}"
+
+const githubStandaloneUploadNameExpression = "${{ fromJSON(inputs.parameters).upload_name_attempt == 'true' && format('{0}-{1}-{2}', fromJSON(inputs.parameters).upload_with_name, github.run_id, github.run_attempt) || fromJSON(inputs.parameters).upload_with_name }}"
+
 // projectGitHubActionInterfaces recognizes the generator's closed operations.
 // Families are deliberate interfaces, independent of YAML shape, source pins or
 // output cardinality. Extra uploads stay ordered before the next node executes.
-func projectGitHubActionInterfaces(body, call *yamlv3.Node, actions githubActionRefs) ([]githubActionInvocation, error) {
+func projectGitHubActionInterfaces(plan *Plan, body, call *yamlv3.Node, actions githubActionRefs) ([]githubActionInvocation, error) {
 	steps := githubYAMLField(githubYAMLField(body, "runs"), "steps")
 	if steps == nil || steps.Kind != yamlv3.SequenceNode {
 		return nil, e.New(e.CodeEngineCapability, "semantic GitHub action requires composite steps")
 	}
 	var invocations []githubActionInvocation
 	appendInterface := func(family, name string, roles ...githubInterfaceRole) error {
-		invocation, err := githubBuildActionInterface(body, call, actions, family, name, roles)
+		invocation, err := githubBuildActionInterface(plan, body, call, actions, family, name, roles)
 		if err == nil {
 			invocations = append(invocations, invocation)
 		}
@@ -45,21 +49,21 @@ func projectGitHubActionInterfaces(body, call *yamlv3.Node, actions githubAction
 	for index := 0; index < len(steps.Content); {
 		step := steps.Content[index]
 		var download, restore, images *yamlv3.Node
-		if githubYAMLValue(step, "uses") == actions.Download && index+2 < len(steps.Content) && githubInterfaceOperation(steps.Content[index+1]) == "restore-inputs" {
+		if githubYAMLValue(step, "uses") == actions.Download && index+2 < len(steps.Content) && githubInterfaceOperation(plan, steps.Content[index+1]) == "restore-inputs" {
 			next := index + 2
-			if githubInterfaceOperation(steps.Content[next]) == "prepare-images" {
+			if githubInterfaceOperation(plan, steps.Content[next]) == "prepare-images" {
 				next++
 			}
-			if next < len(steps.Content) && githubInterfaceOperation(steps.Content[next]) == "run-node" {
+			if next < len(steps.Content) && githubInterfaceOperation(plan, steps.Content[next]) == "run-node" {
 				download, restore = step, steps.Content[index+1]
 				index += 2
 				step = steps.Content[index]
 			}
 		}
-		if githubInterfaceOperation(step) == "prepare-images" {
+		if githubInterfaceOperation(plan, step) == "prepare-images" {
 			images = step
 			index++
-			if index == len(steps.Content) || githubInterfaceOperation(steps.Content[index]) != "run-node" {
+			if index == len(steps.Content) || githubInterfaceOperation(plan, steps.Content[index]) != "run-node" {
 				if err := appendInterface("prepare-images", githubYAMLValue(images, "name"), githubInterfaceRole{"images", images, false, "prepare-images"}); err != nil {
 					return nil, err
 				}
@@ -67,7 +71,7 @@ func projectGitHubActionInterfaces(body, call *yamlv3.Node, actions githubAction
 			}
 			step = steps.Content[index]
 		}
-		switch operation := githubInterfaceOperation(step); {
+		switch operation := githubInterfaceOperation(plan, step); {
 		case operation == "run-node" || operation == "pack-outputs":
 			family, name := "execute-node", githubYAMLValue(step, "name")
 			var execute, pack *yamlv3.Node
@@ -77,10 +81,10 @@ func projectGitHubActionInterfaces(body, call *yamlv3.Node, actions githubAction
 					family = "execute-source"
 				}
 				index++
-				if index < len(steps.Content) && githubInterfaceOperation(steps.Content[index]) == "pack-outputs" {
+				if index < len(steps.Content) && githubInterfaceOperation(plan, steps.Content[index]) == "pack-outputs" {
 					pack = steps.Content[index]
-					_, producer, _, err := githubInterfaceCommand(execute)
-					_, collector, _, packErr := githubInterfaceCommand(pack)
+					_, producer, _, err := githubInterfaceCommand(plan, execute)
+					_, collector, _, packErr := githubInterfaceCommand(plan, pack)
 					if err != nil || packErr != nil || producer != collector {
 						return nil, e.New(e.CodeEngineCapability, "semantic GitHub execution must collect its own node")
 					}
@@ -123,7 +127,7 @@ func projectGitHubActionInterfaces(body, call *yamlv3.Node, actions githubAction
 			index++
 			roles := []githubInterfaceRole{{"download", step, false, "download"}}
 			family := "download-carriers"
-			if index < len(steps.Content) && githubInterfaceOperation(steps.Content[index]) == "restore-inputs" {
+			if index < len(steps.Content) && githubInterfaceOperation(plan, steps.Content[index]) == "restore-inputs" {
 				family = "prepare-inputs"
 				roles = append(roles, githubInterfaceRole{"restore", steps.Content[index], false, "restore-inputs"})
 				index++
@@ -143,7 +147,13 @@ func projectGitHubActionInterfaces(body, call *yamlv3.Node, actions githubAction
 		case operation == "recover":
 			if index+1 >= len(steps.Content) || githubYAMLValue(steps.Content[index+1], "name") != "Finalize Run and check completeness" ||
 				!strings.Contains(githubYAMLValue(steps.Content[index+1], "run"), "./nvkr-exec run finalize --definition ") {
-				return nil, e.New(e.CodeEngineCapability, "semantic GitHub finalization requires recovery followed by finalization")
+				// The Run summary observes finalization in the caller's step
+				// namespace, leaving recovery as its own semantic operation.
+				if err := appendInterface("recover-inputs", githubYAMLValue(step, "name"), githubInterfaceRole{"recover", step, false, "recover"}); err != nil {
+					return nil, err
+				}
+				index++
+				continue
 			}
 			if err := appendInterface("finalize-run", "Finalize Run and check completeness", githubInterfaceRole{"recover", step, false, "recover"},
 				githubInterfaceRole{"finalize", steps.Content[index+1], false, "finalize"}); err != nil {
@@ -164,20 +174,20 @@ func projectGitHubActionInterfaces(body, call *yamlv3.Node, actions githubAction
 	return invocations, nil
 }
 
-func githubInterfaceOperation(step *yamlv3.Node) string {
-	operation, _, _, err := githubInterfaceCommand(step)
+func githubInterfaceOperation(plan *Plan, step *yamlv3.Node) string {
+	operation, _, _, err := githubInterfaceCommand(plan, step)
 	if err != nil {
 		return ""
 	}
 	return operation
 }
 
-func githubInterfaceCommand(step *yamlv3.Node) (string, string, bool, error) {
+func githubInterfaceCommand(plan *Plan, step *yamlv3.Node) (string, string, bool, error) {
 	run := githubYAMLValue(step, "run")
 	newline := strings.HasSuffix(run, "\n")
 	run = strings.TrimSuffix(run, "\n")
 	for _, operation := range []struct{ name, flag string }{{"run-node", "node"}, {"pack-outputs", "node"}, {"restore-inputs", "stage"}, {"prepare-images", "stage"}} {
-		prefix := githubRunnerCommand(operation.name, "", "") + " --" + operation.flag + " "
+		prefix := githubRunnerCommand(plan, operation.name, "", "") + " --" + operation.flag + " "
 		if !strings.HasPrefix(run, prefix) {
 			continue
 		}
@@ -191,13 +201,13 @@ func githubInterfaceCommand(step *yamlv3.Node) (string, string, bool, error) {
 		}
 		return operation.name, selector, newline, nil
 	}
-	if run == githubRunnerCommand("recover", "", "") {
+	if run == githubRunnerCommand(plan, "recover", "", "") {
 		return "recover", "", newline, nil
 	}
 	return "", "", false, e.New(e.CodeEngineCapability, "semantic GitHub action contains an unknown command")
 }
 
-func githubBuildActionInterface(original, call *yamlv3.Node, actions githubActionRefs, family, name string, roles []githubInterfaceRole) (githubActionInvocation, error) {
+func githubBuildActionInterface(plan *Plan, original, call *yamlv3.Node, actions githubActionRefs, family, name string, roles []githubInterfaceRole) (githubActionInvocation, error) {
 	invocation := githubActionInvocation{Family: family, Name: name, Values: map[string]string{}, Arguments: githubYAMLMap()}
 	inputs := githubYAMLMap("parameters", githubActionInput("Plan-derived parameters for this operation; never shell source"))
 	shell := ""
@@ -216,7 +226,7 @@ func githubBuildActionInterface(original, call *yamlv3.Node, actions githubActio
 	}
 	var projected []*yamlv3.Node
 	for _, role := range roles {
-		step, err := githubProjectInterfaceRole(original, call, actions, &invocation, inputs, role, shell)
+		step, err := githubProjectInterfaceRole(plan, original, call, actions, &invocation, inputs, role, shell)
 		if err != nil {
 			return invocation, err
 		}
@@ -229,7 +239,7 @@ func githubBuildActionInterface(original, call *yamlv3.Node, actions githubActio
 	return invocation, nil
 }
 
-func githubProjectInterfaceRole(original, call *yamlv3.Node, actions githubActionRefs, invocation *githubActionInvocation,
+func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions githubActionRefs, invocation *githubActionInvocation,
 	inputs *yamlv3.Node, role githubInterfaceRole, shell string,
 ) (*yamlv3.Node, error) {
 	values, prefix := invocation.Values, role.name+"_"
@@ -268,7 +278,7 @@ func githubProjectInterfaceRole(original, call *yamlv3.Node, actions githubActio
 			return nil, e.New(e.CodeEngineCapability, "semantic GitHub command cannot include an action transport")
 		}
 		if role.kind != "finalize" {
-			actual, selector, newline, err := githubInterfaceCommand(role.step)
+			actual, selector, newline, err := githubInterfaceCommand(plan, role.step)
 			if err != nil || actual != operation {
 				return nil, e.New(e.CodeEngineCapability, "semantic GitHub role %q has an incompatible command", role.name)
 			}
@@ -330,10 +340,10 @@ func githubProjectInterfaceRole(original, call *yamlv3.Node, actions githubActio
 		if operation == "restore-inputs" || operation == "prepare-images" {
 			flag = "stage"
 		}
-		run = githubRunnerCommand(operation, "", "") + " --" + flag + ` "$` + githubSelectorEnvironment + `"`
+		run = githubRunnerCommand(plan, operation, "", "") + " --" + flag + ` "$` + githubSelectorEnvironment + `"`
 		githubYAMLSet(env, githubSelectorEnvironment, githubYAMLString(githubParameterExpression(prefix+"selector")))
 	case "recover":
-		run = githubRunnerCommand("recover", "", "")
+		run = githubRunnerCommand(plan, "recover", "", "")
 	case "finalize":
 		run = strings.TrimSuffix(githubYAMLValue(role.step, "run"), "\n")
 	}
@@ -371,6 +381,7 @@ func githubProjectInterfaceTransfer(call *yamlv3.Node, actions githubActionRefs,
 		}
 	}
 	with := githubYAMLMap()
+	attemptName := false
 	for _, key := range sortedKeys(defaults) {
 		field := prefix + "with_" + strings.ReplaceAll(key, "-", "_")
 		value := githubYAMLField(originalWith, key)
@@ -382,12 +393,23 @@ func githubProjectInterfaceTransfer(call *yamlv3.Node, actions githubActionRefs,
 			}
 			values[field] = value.Value
 		}
-		if strings.Contains(values[field], "${{") && !(role.kind == "upload-standalone" && key == "path" && values[field] == "${{ inputs.with-path }}") {
-			return nil, e.New(e.CodeEngineCapability, "semantic GitHub transport has an unsupported provider expression")
+		if strings.Contains(values[field], "${{") {
+			base, attempt := githubAttemptUploadName(values[field], githubYAMLValue(originalWith, "path"))
+			switch {
+			case role.kind == "upload-standalone" && key == "name" && attempt:
+				values[field], attemptName = base, true
+			case role.kind == "upload-standalone" && key == "path" && values[field] == "${{ inputs.with-path }}":
+			default:
+				return nil, e.New(e.CodeEngineCapability, "semantic GitHub transport has an unsupported provider expression")
+			}
 		}
 		githubYAMLSet(with, key, githubYAMLString(githubParameterExpression(field)))
 	}
 	if role.kind == "upload-standalone" {
+		// Provider expressions remain literal action code. The descriptor holds
+		// only the admitted name prefix and a flag; returned JSON is never eval.
+		values[prefix+"name_attempt"] = strconv.FormatBool(attemptName)
+		githubYAMLSet(with, "name", githubYAMLString(githubStandaloneUploadNameExpression))
 		input := githubYAMLMap("description", githubYAMLString("Caller diagnostic path, or empty for the Plan-derived path"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}, "default", githubYAMLString(""))
 		githubYAMLSet(inputs, "with-path", input)
 		argument := githubYAMLString("")
@@ -406,6 +428,28 @@ func githubProjectInterfaceTransfer(call *yamlv3.Node, actions githubActionRefs,
 	githubYAMLSet(step, "uses", githubYAMLString(uses))
 	githubYAMLSet(step, "with", with)
 	return step, nil
+}
+
+// Only these owned diagnostic/handoff routes use provider attempt names.
+// All other expressions remain outside the descriptive parameter interface.
+func githubAttemptUploadName(name, path string) (string, bool) {
+	base, ok := strings.CutSuffix(name, githubAttemptUploadNameSuffix)
+	if !ok {
+		return "", false
+	}
+	if base == "nvkr-qualification" && path == githubQualificationHandoffPath {
+		return base, true
+	}
+	output, ok := strings.CutPrefix(base, "nvkr-inspection-")
+	if !ok || output == "" || path != ".nvkr/diagnostics/inspection/"+output+".jsonl" {
+		return "", false
+	}
+	for _, character := range output {
+		if !((character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || character == '-') {
+			return "", false
+		}
+	}
+	return base, true
 }
 
 func githubInterfaceBindInput(original, call, arguments, inputs *yamlv3.Node, expression string) error {

@@ -80,7 +80,12 @@ Environment may also map a canonical source URL to an HTTPS fetch mirror and a G
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
 commit/tree, or build identity. The current adapter binds credentials to the matching GitHub fetch execution step and, for private
 pin-set sources, the bootstrap regeneration and Run finalization steps that re-read pinned Git trees.
-Those jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18). Git configuration is transient and repository-scoped. Secret values never enter a remote URL,
+Production jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18).
+The separate development mode admits manual branch dispatch with the same fixed source-read steps.
+Signed development uses the explicit isolated publication contract below; arbitrary job setup and variables
+remain rejected. Branch code
+participates in source retrieval and must be reviewed before using that credentialed mode. Git configuration
+is transient and repository-scoped. Secret values never enter a remote URL,
 serialized plan or transported source tree. Local and GitLab execution reject this configuration until those
 adapters support equivalent credential isolation.
 
@@ -92,7 +97,8 @@ Transport settings stay replaceable by environment owners.
 The pipeline-attested disk transport uses a distinct OCI manifest over the unchanged QCOW2 payload. Its one
 `application/vnd.qemu.qcow2` layer binds the exact payload digest and size. The checked config declares the
 guest platform; the layer media type and manifest annotations declare the QCOW2 format and encryption.
-Production consumption requires the explicit unencrypted declaration to match the release binding;
+Production consumption requires the explicit encryption declaration to match the release binding: `none`, or
+`luks2` only with signed `build-provenance-v1` evidence. Unknown, missing or substituted declarations fail closed;
 the diagnostic reader keeps a missing encryption declaration unknown. Manifest identity and payload identity are separate.
 An importing descriptor walk retains its verified disk owner through the same phase's payload copy instead
 of reopening and hashing that inode again for selection. A standalone producer wrapper is selected and
@@ -112,8 +118,8 @@ and rejects producer-only acceptance. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. Producer provenance is the M2 acceptance scope; full inspection
-and material reconciliation belong to M3 (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
+the original producer/material owners instead. Producer provenance is the M2 and M3 MVP disk acceptance scope;
+full inspection and material reconciliation are deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
@@ -123,8 +129,13 @@ composition or authorize release.
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
 before a consumer may accept that projection. Object-store schema, credentials, publication and consumption
-remain deferred. FDE publication and qualified disk reproduction remain capability-gated. An FDE payload
-containing an unlock credential cannot pass the existing no-secret publication rule.
+remain deferred. Qualified disk reproduction and strict FDE publication remain capability-gated. An FDE payload
+containing a private unlock credential cannot pass the existing no-secret publication rule. ADR-10's
+public `changeit` bootstrap value has no confidentiality requirement. Its native ARC publication route requires
+explicit `build-provenance-v1`, retains the exact producer encryption declaration through wrapper and signed
+metadata, and makes no inspected-content, secure-deployment or confidentiality claim. The consumer's existing
+minimum evidence policy still rejects producer-only evidence when strict is required; no separate confidentiality
+policy is implied by accepting a disk. The separate raw diagnostic route remains build-only.
 
 ### 3. The emitted publish phase
 
@@ -288,19 +299,21 @@ attempt of the same run under the same ordering and Plan checks.
 Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
 and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
 verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.
-Each output route still verifies its full payload closure. The independent Release consumer still retrieves
-and verifies full payloads through its existing held owner.
+Each output route still verifies its full payload closure. The independent Release consumer's
+`artifact-publication` scope retrieves and verifies full payloads through its existing held owner.
 
 In this mode finalization requires every provider job to succeed, then reauthenticates the aggregate root,
 exact Plan/invocation-bound production predicate, output signatures/provenance and SBOM bundles. Persisted
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
 read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
-GitHub per-output publication admits only anonymous access or the job-scoped `github:GITHUB_TOKEN`;
-custom static publication credentials are rejected because job permissions cannot narrow their authority.
-Legacy publication without this mode retains its full-closure assembly/finalization path. Local execution and
-dry-run signing do not admit the new mode. Interrupted runs can leave independently published outputs; no
-cross-run reuse, rollback, retention protocol or atomic multi-repository transaction is added.
+Production GitHub per-output publication admits only anonymous access or the job-scoped
+`github:GITHUB_TOKEN`; arbitrary static credentials are rejected because job permissions cannot narrow their
+authority. The explicit signed-development contract below instead requires separately scoped read/write
+credentials. Legacy publication without this mode retains its full-closure assembly/finalization path. Local
+execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
+published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository
+transaction is added.
 
 One canonical release metadata config, carried by one manifest because an OCI index has no config, owns
 the Definition, Environment and compiled Plan identities, output names, sibling repository locators, descriptor
@@ -315,6 +328,14 @@ consumer. It contains sorted exact output names, kinds, artifact digests, Build 
 references are excluded. This ownership consolidation preserves existing canonical content bytes. The compiler
 still joins independently frozen output requirements to observed payloads before publication. The consumer does
 not reconstruct compiler records or derive both expectations and observations from release metadata.
+
+Consumer `authenticity` scope uses the bounded metadata/evidence reader, then authenticates the root and
+every required named output's signature and subject-bound production provenance under the external policy.
+It independently verifies every required SBOM bundle and enforces exact membership, subject/stage bindings
+and the policy's minimum disk evidence. Aggregate images retain native child manifests/configurations and
+platform-scoped evidence. It retrieves no artifact payload layers and issues only ADR-17's distinct
+authentication capability, which cannot authorize export or exact-input matching. A signed disk inventory
+authenticates the producer's inspection claim; this scope performs no consumer-side disk inspection.
 
 Consumer integrity checking opens an opaque delivery publication with an explicit lifetime. It snapshots the
 index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
@@ -352,11 +373,39 @@ Text, readable JSON and Mermaid explicitly label metadata inspection, leave payl
 policy unverified, and report qualification as a declaration. JSON escapes nonprinting Unicode without
 changing decoded string values, and empty build-subject collections are arrays. Output filtering occurs only
 after the whole metadata closure is checked. The diagram presents published relationships, not an inferred
-build graph. Navigation adds no canonical identity or publication authority and leaves explicit release
-verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
+build graph. Navigation adds no canonical identity or publication authority and leaves explicit
+artifact-publication verification's full payload and policy checks unchanged. Loopback-registry, admission, cancellation and zero
 payload-layer download contracts include disk releases; the [historical v3 metadata browsing validation record](https://github.com/dsx-ai-factory/nvkr/blob/a00a6b11ddf711268bc10a7ea2baa33f839ccec9/docs/evidence/2026-10-06-release-browse-metadata.md)
 separately records the earlier external inspection scope. Current readers require publication-root v4 and
 reject that v3 release; current-schema external acceptance is not established by the dated record.
+
+Artifact descriptions expose checked OS/architecture and Helm chart version in both bounded metadata and
+held full-payload projections. Chart version is read from the exact Helm config, separately from appVersion;
+full inspection also compares config metadata with the archive's Chart.yaml. Native image indexes retain
+their explicit child platform membership rather than a false single-platform label. Legacy chart outputs
+without a declared platform remain unlabeled. These descriptive additions do not change canonical release
+content bytes or substitute for the existing typed identities.
+
+Release description export projects the complete metadata closure into `nvkr.dev/release-description/v1`.
+It requires only the immutable publication reference as metadata input; an optional cached layout must match
+that exact root. No separate Plan, mapping, platform selection, producer checkout or unpublished workspace is
+accepted. Export and unfiltered JSON browsing share one explicit versioned wire description, backed by the
+same delivery-owned metadata reader. The schema does not directly serialize internal authority-bearing
+types or add a public lifecycle object, canonical identity or publication format.
+
+Every named output is retained, without a consumer-role dictionary or producer allowlist. Native artifacts
+keep their config-declared OS/architecture; aggregate images keep the published index digest and exact child
+platform membership. Helm chart version remains distinct from appVersion and says nothing about workload
+compatibility. Source repository/commit descriptions remain attached to their exact evidence/output/component
+bindings. There is no release-wide source pin, inferred Git tag or rule requiring all uses of one repository
+to share a revision. Missing or redacted source properties stay explicit descriptions, not invented pins.
+
+Metadata inspection scope and the publisher's declared qualification are separate fields. Export reads no
+artifact payload layers and authenticates no signatures or consumer policy. Its JSON cannot restore a held
+capability or become a verification receipt. Consumer-owned code selects deployment roles, target platforms,
+compatible source revisions and complete offline dependencies, then authenticates accepted artifacts under
+its policy. Full release verification retains its existing payload and policy checks. Unpublished packages
+remain Run artifacts and are not converted into a publication by this export interface.
 
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
 Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
@@ -384,8 +433,9 @@ same root. Signature/attestation attachments stay outside the signed index to av
 own repository for independent consumption. Signing processes deliverables before the root; hosted verification
 requires every child signature and attestation before recording success. The Release consumer still authenticates
 membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
-record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace, fetch every pinned manifest
-and verify its full payload/evidence closure before exposing accepted views. Metadata cannot redirect credentials
+record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.
+Artifact-publication acceptance additionally verifies the full payload closure; authenticity explicitly leaves
+payload integrity unchecked. Metadata cannot redirect credentials
 to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their
 repositories, then publishes the release index last; output-local and legacy hosted verification pull the full distributed closure.
 Per-output aggregate verification fetches only control documents and evidence. Plain `release inspect` is descriptive and exposes deliverables, not
@@ -442,6 +492,65 @@ signature verification nor qualification. Dependency scanning of acquired `raw` 
 Push, sign and pull-back verification are separate effects: later failure may leave bytes or partial evidence in
 the registry. No atomic remote rollback or cross-run resume is claimed. A complete local Run does not establish
 the deferred qualification/manifest acceptance in ADR-16. Retention and recovery require deployment ownership.
+
+### Disposable signed development publications
+
+The explicit GitHub development Environment can exercise the complete pipeline-attested publication graph,
+including the admitted native ARC disks. It requires `per-output-v1`, real cosign signing and the GitHub OIDC
+issuer. Its namespace is exactly `ghcr.io/<owner>/<repo>/development`, bound to that source repository's
+`.github/workflows/nvkr-dev.yml@refs/heads/…` certificate identities with an anchored prescribed regexp.
+Production workflow identities, arbitrary registry hosts/prefixes, anonymous/plain-HTTP access, mutable
+image-tag configuration and arbitrary credential references fail admission before work. This is a distinct
+trust policy within the existing evidence lane, not a new evidence tier or production authorization.
+
+`pkg/nvkr/development` owns the canonical namespace grammar. The factory owner derives each actual target
+as `<prefix>/runs/<run-id>/attempts/<attempt>/<repository-leaf>` from the admitted hosted invocation,
+revalidating source repository, dev workflow identity and canonical positive run/attempt IDs. No GitHub
+expression is interpolated into the committed Plan. The Plan binds the policy and route leaves; the runtime
+projection changes only transport location. Every publication, signing and verification boundary checks the
+same projection, and metadata authentication rejects another run or attempt's root. Existing subject,
+Plan, invocation, SBOM and signature checks remain mandatory. Native output digests and logical Build identity
+are unchanged. Helm aliases remain scoped inside that attempt's output repository.
+
+Full development retries rerun all jobs or start a fresh dispatch. They intentionally cannot reuse an
+older attempt's disposable roots, unlike the existing production same-run recovery rule. Each attempt owns
+its output roots, aggregate root, output bytes, signatures and referrers in separate packages. Partial or
+cancelled attempts therefore leave bounded, independently discoverable cleanup scope without requiring a
+successful final Run record.
+
+The fixed `github:NVKR_DEV_REGISTRY_WRITE` reference selects only the dedicated development publisher.
+Generated publishing/signing jobs use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
+assembly and finalization instead receive `NVKR_DEV_REGISTRY_READ` and `NVKR_DEV_REGISTRY_READ_USER`.
+The usernames are provider variables. No development job gets repository-token package-write permission.
+The operator must configure token scopes and package ACLs so these development principals cannot modify
+production packages. The same development account may hold separate write, read-only and cleanup tokens;
+token scope still differs by phase. Provider ACLs are external prerequisites, never inferred from a prefix.
+Only artifact signing and SBOM attestation receive OIDC. The distinct default-branch cleanup environment
+holds the cleanup token; branch execution receives no deletion credential.
+
+The development cleanup owner supports read-only preview by default and explicit apply. It inventories
+private GHCR container packages under only the exact reserved namespace, authenticates account/package identity
+and the matching `nvkr-dev.yml` manual-dispatch attempt, and requires completion plus at least 24 hours
+of age for that attempt, its package and every version. Source-repository linkage on package metadata is
+not proof of ownership and is not required: preserved native images can carry upstream annotations.
+The reserved namespace policy plus authenticated provider account, package and attempt checks determine
+cleanup scope. Ambiguous names, malformed/unknown run records, incomplete inventories or API errors fail
+closed. Active or young attempts are retained. All candidate admission precedes deletion; each candidate's
+package/version metadata and run eligibility are rechecked immediately before deleting that whole package.
+
+The handwritten repository cleanup workflow uses only default-branch code, a separate protected
+`nvkr-dev-cleanup` Environment and dedicated `NVKR_DEV_REGISTRY_CLEANUP` credential. Its daily schedule
+applies cleanup; manual dispatch defaults to preview. It never executes producer artifacts or feature-branch
+code. Whole-package deletion removes its versions and referrers without guessing reachability from tags.
+A report records candidates and API-confirmed deletions even on partial failure. Mutation is not retried
+after an ambiguous outcome. Calls, response sizes and pagination are bounded and cancellation-aware.
+
+The 24-hour age is eligibility, not an exact expiry SLA. GitHub's deletion/restoration and physical garbage
+collection remain provider behavior; Sigstore transparency records remain external and are not erased.
+Production packages, old shared prefixes and arbitrary registries are outside this protocol. The protocol
+assumes completed attempt namespaces are never repopulated by an external writer; development retries
+always obtain a new attempt namespace. Provider ACL enforcement and successful real deletion require
+separate external evidence.
 
 ### 7. Operator release registration — deferred
 

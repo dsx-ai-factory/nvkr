@@ -24,6 +24,12 @@ func evidenceSlot(output string, binding EvidenceBinding) releaseEvidenceSlot {
 // Inspect. Every declared output derives its required evidence slots; metadata
 // cannot waive a slot or substitute a document for another stage or subject.
 func verifyReleaseEvidence(ctx context.Context, root string, publication PublicationRoot) error {
+	return verifyReleaseEvidenceSources(ctx, root, publication, nil)
+}
+
+// sources receives descriptions from the same exact subject documents checked
+// for release membership. Nothing escapes an inspection unless every slot passes.
+func verifyReleaseEvidenceSources(ctx context.Context, root string, publication PublicationRoot, sources map[string]PublicationSource) error {
 	if publication.Release == nil {
 		return nil
 	}
@@ -238,6 +244,15 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 		}
 		if binding.Stage == "packaging" && (len(bom.Components) == 0 || props["nvkr:dependencyInspection"] != "helm-manifests/v1") {
 			return e.New(e.CodeProvenanceMissing, "final Helm package requires an inspected inventory")
+		}
+		if sources != nil {
+			componentProperties := map[string]string{}
+			for _, property := range bom.Metadata.Component.Properties {
+				componentProperties[property.Name] = property.Value
+			}
+			if componentProperties["nvkr:fromSource"] == "true" {
+				sources[object.Name] = PublicationSource{Repo: componentProperties["nvkr:repo"], Commit: componentProperties["nvkr:commit"]}
+			}
 		}
 	}
 	if len(seen) != len(expected) {

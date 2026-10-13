@@ -48,18 +48,18 @@ See the [release quickstart](docs/release-quickstart.md) to apply your policy.
 
 ## Start here
 
-Start with the [quickstart](docs/quickstart.md) to validate the small three-output NVKE example and preview
-a Run. You need Git, Make, and the Go version in [.go-version](.go-version); these planning commands work
-on macOS and Linux without Docker, a registry, or an NVKE source checkout. From the repository root:
+Follow the [quickstart](docs/quickstart.md) from the core ideas to a tiny local build, then extend the
+workflow into the NVKE tenant demo. For the first artifact, you need Git, Make, Python 3, Docker,
+and the Go version in [.go-version](.go-version). From the repository root:
 
 ```sh
 GOTOOLCHAIN=local make build
-bin/nvkr definition validate --definition definitions/nvke-v1/definition.yaml
-bin/nvkr run plan --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml
+bash demos/demo-local.sh
 ```
 
-Planning does not build or publish artifacts. The [documentation map](docs/README.md) connects the next steps:
+The script builds and runs a greeting executable; it does not sign or publish it. Without Docker,
+use the quickstart's [NVKE planning preview](docs/quickstart.md#preview-the-nvke-outputs).
+The [documentation map](docs/README.md) connects the next steps:
 
 | Task | Guide |
 |---|---|
@@ -72,6 +72,21 @@ Planning does not build or publish artifacts. The [documentation map](docs/READM
 The [tutorial Definition](definitions/nvke-v1/README.md) selects the CLI, CWE image, and Helm bundle.
 The [combined NVKE candidate](definitions/nvke-m2/README.md) selects 34 outputs, including AMD64 and ARM64
 container and node images, and supplies the repository's generated GitHub workflow.
+
+## Use NVKR with your AI agent
+
+Give a terminal-capable agent this repository URL and a concrete task, for example:
+
+> Use https://github.com/dsx-ai-factory/nvkr to create inputs for a Linux ARM64 NVKE CLI
+> executable. Show the Plan and changes before running anything.
+
+The [NVKR operator skill](.agents/skills/nvkr-operator/SKILL.md) guides the agent through
+safe repository acquisition, the pinned CLI build, customer input authoring, and supported
+operations. It can create or update Definitions, Environments, catalog producers, pins and
+overlays, then validate and explain their effects through the CLI. Codex supports discovery
+at this repository skill location after checkout. Claude Code uses a different project-skill
+location; it and other agents can read this linked file directly.
+No global installation is necessary. A URL alone does not request an artifact build or publication.
 
 ## Current scope
 

@@ -26,6 +26,9 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 	sort.Strings(componentNames)
 	for _, name := range componentNames {
 		c := reg.Components[name]
+		if err := validateEmbeddedDeclaration(c.Embeds, c.FromSource); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "component %q embeds", name)
+		}
 		if c.Prebuilt != nil && c.Prebuilt.ImageParentDigest != "" {
 			return e.New(e.CodeInvalidCatalog, "component %q must retain image parents only in %s", name, LockFile)
 		}
@@ -164,6 +167,9 @@ func validateComponentTargets(name string, platforms []string) error {
 }
 
 func validateComponent(name string, c Component) error {
+	if err := validateEmbeddedDeclaration(c.Embeds, c.FromSource); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err, "component %q embeds", name)
+	}
 	if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
 		return err
 	}

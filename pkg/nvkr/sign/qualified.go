@@ -168,6 +168,12 @@ func (v *CosignVerifier) VerifyDocument(ctx context.Context, req trust.DocumentV
 		return trust.VerificationEvidence{}, e.Wrap(e.CodeTimeout, err,
 			"qualified cosign verification canceled")
 	}
+	invocation, err := snapshotGitHubInvocationConstraints(req)
+	if err != nil {
+		return trust.VerificationEvidence{}, err
+	}
+	req.GitHubInvocation = invocation
+	req.AllowedIdentities = append([]string(nil), req.AllowedIdentities...)
 	if err := validateTrustedRootPinConfiguration(req.Signature, req.TrustedRootDigest, req.Offline); err != nil {
 		return trust.VerificationEvidence{}, err
 	}
@@ -222,7 +228,7 @@ func (v *CosignVerifier) verifyDocumentHeld(ctx context.Context, req trust.Docum
 	if err := material.assertUnchangedContext(ctx); err != nil {
 		return trust.VerificationEvidence{}, err
 	}
-	return verificationEvidenceFromCertificate(req, material.certificate, material.signature,
+	return verificationEvidenceFromCertificate(ctx, req, material.certificate, material.signature,
 		material.certificateBlob, material.bundle, material.trustedRoot)
 }
 
@@ -278,11 +284,11 @@ func (v *CosignVerifier) verifyDocumentInjected(ctx context.Context, req trust.D
 		return trust.VerificationEvidence{}, err
 	}
 
-	return verificationEvidenceFromCertificate(req, material.certificate, material.signature,
+	return verificationEvidenceFromCertificate(ctx, req, material.certificate, material.signature,
 		material.certificateBlob, material.bundle, material.trustedRoot)
 }
 
-func verificationEvidenceFromCertificate(req trust.DocumentVerificationRequest, certificate, signature,
+func verificationEvidenceFromCertificate(ctx context.Context, req trust.DocumentVerificationRequest, certificate, signature,
 	certificateBlob, bundle, trustedRoot []byte,
 ) (trust.VerificationEvidence, error) {
 	cert, err := parseCertificate(certificate)
@@ -304,8 +310,22 @@ func verificationEvidenceFromCertificate(req trust.DocumentVerificationRequest, 
 			"certificate cosign verified has OIDC issuer %q, expected %q for %s",
 			issuer, req.OIDCIssuer, req.Role)
 	}
+	if req.GitHubInvocation != nil {
+		var workflowIdentities []string
+		for _, uri := range cert.URIs {
+			workflowIdentities = append(workflowIdentities, uri.String())
+		}
+		if !containsAny(workflowIdentities, req.AllowedIdentities) {
+			return trust.VerificationEvidence{}, untrustedCertificateError(req.Role,
+				"verified GitHub invocation requires an allowed workflow URI SAN")
+		}
+	}
+	invocation, err := verifiedGitHubInvocation(cert, req.GitHubInvocation)
+	if err != nil {
+		return trust.VerificationEvidence{}, err
+	}
 	certSum := sha256.Sum256(cert.Raw)
-	return trust.VerificationEvidence{
+	evidence := trust.VerificationEvidence{
 		CertificateIdentities: identities,
 		OIDCIssuer:            issuer,
 		CertificateSHA256:     "sha256:" + hex.EncodeToString(certSum[:]),
@@ -313,7 +333,12 @@ func verificationEvidenceFromCertificate(req trust.DocumentVerificationRequest, 
 		CertificateBlobSHA256: digestOptionalMaterial(certificateBlob),
 		BundleSHA256:          digestOptionalMaterial(bundle),
 		TrustedRootBlobSHA256: digestOptionalMaterial(trustedRoot),
-	}, nil
+		GitHubInvocation:      invocation,
+	}
+	if err := ctx.Err(); err != nil {
+		return trust.VerificationEvidence{}, e.Wrap(e.CodeTimeout, err, "qualified cosign verification canceled")
+	}
+	return evidence, nil
 }
 
 func digestOptionalMaterial(raw []byte) string {

@@ -230,11 +230,14 @@ The arrows are admission and verification boundaries. A failed or incomplete Run
 A signing dry-run creates no authenticated production claim. Release consumption requires an explicit policy;
 its pinned reference locates bytes and grants no authority by itself.
 
-Verification Policy also states the acceptance scope. Build-evidence verification authenticates the exact
-selected artifact publication, build identity, and production provenance. Full v1 release acceptance adds the
+Verification Policy also states the acceptance scope. Authenticity verifies signed release membership,
+root/output signatures and production provenance, and required SBOM bundles without retrieving artifact
+payload layers. Artifact-publication verification additionally checks the selected payload bytes. Full v1 release acceptance adds the
 separate qualification verdicts, identity, membership, and revocation requirements. Qualified acceptance retains
 its own authorization and lifecycle checks. An unavailable scope fails explicitly; it never falls back to
-build-evidence verification. The returned capability applies only to its exact reference and policy.
+weaker verification. The returned capability applies only to its exact reference and policy. Authenticity
+returns a distinct capability that records unchecked payload integrity and cannot authorize payload export
+or exact-input receipts.
 
 Each named output supplies its selection and format once. One compiler accepts admitted Definition and
 Environment values and returns a complete Plan, including the original input identities. It derives standard package envelopes,
@@ -262,9 +265,9 @@ for exact delivery bytes and producer/Plan bindings; it grants no execution auth
 verdict. Production VM execution and held-result population use the separately admitted native ARC route;
 direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
 live producer/material evidence and reports inspection as not performed, satisfying the M2 disk-evidence floor.
-M2 still requires the remaining delivery and consumer gates. ADR-13's strict mode requires a full inventory
-reconciling traced materials with read-only inspection of each native AMD64 and ARM64 disk; these are M3
-qualification requirements under Ilya Kislenko's October 7 scope decision. That composition claim does not
+M2 still requires the remaining delivery and consumer gates. The approved M3 MVP retains producer-only disk
+evidence and source-metadata consistency. ADR-13's strict mode requires a full inventory reconciling traced
+materials with read-only inspection of each selected disk; this is deferred hardening. That composition claim does not
 establish NVKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
@@ -275,6 +278,17 @@ records carry exact output/node references; container, network, platform and exe
 only in the referenced instruction. Rendering and local execution resolve those references through the same
 operation. Lifecycle owns attempts and persistence without constructing another compiler-input document or
 completing a returned Plan.
+
+Factory and lifecycle also project typed operation and named-output updates into
+bounded descriptive progress snapshots. The terminal presenter never parses log
+strings into completion or blocks producers on rendering. Final command reporting
+uses the returned Run/error pair; a retained complete Run can coexist with cleanup
+or reporting failure. Read-only Run inspection validates bounded canonical metadata
+and describes attempt markers without opening payloads or restoring authority.
+Public command result browsers also consume typed projections after their owning
+operations return and release receipts. Maintenance transactions and verifier
+scope remain with their existing owners; closing a view neither repeats nor
+reverses an operation. These presentation records are outside artifact/Plan/Run identity.
 
 A named Artifact keeps its payload digest across Run and Release views. The enclosing publication root has a
 separate identity. Release content binds the exact named payload membership, and the outer publication carries
@@ -287,9 +301,21 @@ downloads no artifact payload layers and accepts complete or metadata-only local
 payload bytes. Locators derive from the supplied root namespace; the detached description makes no
 registry-availability claim. Selecting an output changes the presentation only after all metadata is checked.
 These views explicitly label metadata inspection, leave payloads, signatures and consumer policy unverified,
-and cannot restore a live verification capability. Explicit Release verification retains its full payload and
-policy checks. [Release navigation](release-navigation.md) documents the registry and local entry points and
+and cannot restore a live verification capability. Artifact-publication verification retains its full payload
+and policy checks; authenticity applies signature/evidence policy to the metadata closure.
+[Release navigation](release-navigation.md) documents the registry and local entry points and
 their validation scope.
+
+Release export and JSON browsing share the versioned `nvkr.dev/release-description/v1` read model.
+The immutable publication reference supplies every artifact and evidence record; a cached layout may
+provide the same exact metadata closure. Export retains all named outputs and platforms, including aggregate
+image-index identity and child membership. Checked config metadata supplies native platforms and chart
+versions; output-bound source SBOM properties describe each source repository/commit without inventing a
+Git tag or a release-wide source pin. Publisher-declared qualification remains separate from metadata
+inspection scope and the explicit checks not performed. No Plan, mapping, platform selection, producer
+workspace, new identity or serialized verification capability is introduced. Consumers own role mapping,
+source compatibility, installation formats and offline completeness. Unpublished packages remain Run
+artifacts; this interface describes publications and does not assemble a release from a local workspace.
 
 Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
 unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
@@ -396,8 +422,16 @@ milestone specification.
 
 [Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
-`pipeline-attested` / `artifact-publication` consumer are implemented. Local unencrypted direct-Packer
-execution retains exact QCOW2 bytes; local disk publication remains closed.
+`pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
+does not check artifact payload integrity or grant qualification; its contract tests establish no external
+registry or signing-service acceptance. Local unencrypted direct-Packer
+execution retains exact QCOW2 bytes; local disk publication remains closed. ADR-10 also admits an explicit
+public-bootstrap FDE diagnostic producer. ADR-18's native build-only workflow retains raw disk bytes and
+a static-unqualified Run without publication, signing or inspection. It makes no deployed confidentiality claim.
+The maintained M2 Definition also selects public-bootstrap FDE outputs for both native architectures with
+`build-provenance-v1` publication. Exact encryption metadata and payload identity are bound through delivery
+and signed release metadata; strict FDE inspection and qualified reproduction remain closed. The recorded
+AMD64 diagnostic bake does not establish FDE publication or ARM64 FDE operational acceptance.
 
 The [recorded M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated hosted delivery,
 signing, verification and finalization for all 34 outputs, including AMD64 and ARM64 disks. It used the
@@ -407,7 +441,7 @@ main-only execution, independent full-payload disk consumption, strict inventory
 organizational approval or complete M1–M4 acceptance.
 
 Full v1 release qualification/tag automation, qualified release authorization and air-gap execution
-remain unavailable. M3 owns full disk inventory and material-to-filesystem reconciliation. Subject-bound
+remain unavailable. Full disk inventory and material-to-filesystem reconciliation are outside the M3 MVP. Subject-bound
 producer evidence, diagnostic installed-package inspection and full inspected evidence retain separate
 contracts. Passing tests or historical operational success cannot be transferred to another source,
 schema, policy or output.
@@ -462,10 +496,14 @@ Pin sets and values bindings share strict document traversal. Packaging writes v
 values without rewriting templates. Deployment values supply repositories, keeping chart bytes independent
 of Environment publication namespaces. Helm digest overrides remain possible; deployment enforcement is separate.
 
-`curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
-An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate
-strict inspection and material-reconciliation contract in ADR-13; runtime correctness remains with NVKE. Any deferred
-registration transport must consume accepted artifact references without adding a topology model.
+`curatedBy` graph binding and aggregate SBOM curation edges remain deferred. ADR-10's optional `embeds`
+metadata check compares authored membership with the complete selected map in the pinned upstream manifest.
+Omission is `not-applicable`; any authored declaration must pass the strict check. It reads raw upstream
+metadata without applying patches, configuration or material substitutions, so it establishes neither effective
+customized composition nor observed image contents. Build/evidence checks retain those exact input bindings.
+Disk inventory requires the separate strict inspection and material-reconciliation contract in ADR-13;
+runtime correctness remains with NVKE. Any deferred registration transport must consume accepted artifact
+references without adding a topology model.
 
 ### External Interface and Specification {#external-interface-and-specification}
 
@@ -506,13 +544,22 @@ invocation-data member holds parameters with named operation roles. The runtime 
 recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
 with no executable script inputs. Controlled transport
 wrappers contain one upload/download and retain their
-provider controls on the caller; native preflight, checkout, operator setup, timed producers and referenced
-transfer outputs stay inline. Static Plan/manifest references and source scheduling by target/consumer cohort
+provider controls on the caller; native preflight, checkout, operator setup, timed producers and steps with
+referenced outcomes/outputs stay inline. This includes finalization and the final Run upload used by the
+closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
-while topology, labels/interfaces and visible policy stay unchanged; every input change still requires
+while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
-bytes, preserving credential scope and per-job finalizer results; matrix and callable scheduling remain
-deferred (ADR-18 §8).
+bytes, preserving credential scope and per-job finalizer results. Producer matrix and general callable
+scheduling remain deferred (ADR-18 §8); ADR-21 admits only the separate fixed native qualification worker
+and its selected-platform matrix.
+
+An explicit GitHub development Environment selects a separate fixed bundle. It shares the
+compiler, helper and complete output checks with production, while keeping its Plan, workflow and
+ownership manifest separate. Branch testing therefore does not replace the maintained publication bundle.
+Signed development retains the full publication and admitted disk graph, using separate credentials,
+signer policy and run-attempt registry destinations. Its runtime transport projection preserves Plan and
+Build identity; a default-branch cleanup owner expires only eligible disposable packages (ADR-20).
 `catalogmaintenance` composes atomic source/pin-set updates with that generator for disposable review
 candidates. Explicit schedules and optional complete local diagnostic execution do not change the public
 lifecycle or grant release acceptance. Lock and bundle writes retain separate failure/recovery boundaries;
@@ -561,8 +608,36 @@ need not traverse job storage repeatedly. Fetching precedes the build; publicati
 after the build exits and the run record is written. The mechanism enforcing this phase separation is part of
 wrapped-job acceptance, not implied by putting steps in sequence.
 
-M3 is a build/evidence gate covering schema, pins, evidence and a tooling smoke test. Its separate workflow
-signs qualification evidence; it does not supply runtime conformance or cluster qualification. M4 lists
+M3 authenticates the complete selected set against its exact producing Run, attempt, commit and inputs. It
+checks schemas, applicable pins and sources, build signatures/provenance and delivered-tool smoke. The
+implemented M3-A diagnostic takes an exact Run attempt URL and independently selected policy through
+`run check-artifacts --run <URL> --policy <path>`. The provider discovers the commit and authenticates the
+successful attempt against the approved repository, workflow and actual default branch. The real-signing
+producer generates a bounded handoff containing original Plan bytes, compiler-read authored inputs and
+original publication predicates. Replay preserves logical paths and recompiles from captured files without a
+checkout fallback; catalog-owned pinned Git authentication still runs, so this is not offline replay.
+Downloaded records cannot select consumer policy or replace missing evidence.
+
+The lifecycle owner issues an opaque check receipt retaining the verified publication and frozen Plan.
+Closing it revokes copies, cancels and joins registered operations, then releases held bytes and any owned
+source receipt. The receipt grants neither smoke-execution nor signing authority. Fixed native smoke workers
+consume its held executable members in nonroot network-disabled containers and compare versions with the
+frozen producer inputs. Their distinct signatures bind exact member observations, full policy and the current
+qualifier invocation. The final owner requires successful exact-attempt jobs, authenticates those signatures
+and certificate invocation claims, and recomputes complete native coverage before issuing a B receipt.
+The independently configured `run qualify --policy <path>` derives its source from the authenticated hosted
+event, consumes live A/B/invocation receipts and signs for every selected subject. The generator owns the
+same-commit worker pair and its secret/permission routing. These implementation contracts and local native
+execution do not establish hosted acceptance; reconciliation owns the remaining candidate and external gaps.
+Any failed verdict prevents all attestations; later signing/attachment failure marks qualification unsuccessful
+even if earlier attachments remain. Smoke execution has no qualification credentials.
+
+The MVP keeps disk evidence producer-only. Embedded declarations are optional; omission is not applicable,
+while authored declarations must match their referenced pinned upstream metadata. This supplies no effective
+customized or installed composition claim and does not replace exact build-input/material evidence.
+External suites outside scope are explicitly not evaluated. Future required suites must supply authenticated
+subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
+conformance or cluster qualification. M4 lists
 artifacts with passing qualification in a canonical release manifest, under an immutable definition/commit tag
 and one mutable channel tag. A failing verdict prevents manifest issuance. These gates remain proposed.
 
@@ -643,8 +718,9 @@ For the M2 GitHub Environment, each output is published, signed and fully verifi
 assembly and finalization authenticate only bounded metadata and signed evidence from that same Plan and
 workflow run attempt. This avoids gathering all payloads on one runner while preserving one signed release
 entry point and exact output completeness. Failed provider jobs, mismatched attempt bindings or rejected
-signatures prevent completion. Independent consumption still verifies the complete payload closure
-(ADR-18/20); this does not add qualified reproduction or cross-run publication reuse.
+signatures prevent completion. Independent artifact-publication consumption still verifies the complete
+payload closure; authenticity checks only metadata and signed evidence under consumer policy (ADR-04/20).
+Neither adds qualified reproduction or cross-run publication reuse.
 
 Independent artifact consumption uses a signature and subject-bound production attestation on each deliverable
 manifest in its own repository. The release signature remains the authority for membership and SBOM coverage;
@@ -705,12 +781,15 @@ observed identity when available. Production predicates and run records provide 
 qualified EvidenceBundle is diagnostic and cannot stand in for an authenticated receipt (ADR-03/05/17).
 
 Generated GitHub operations include safe compiled node/component/output context, declared inputs and expected
-outputs, with elapsed time, primary exit status and exact failed phase in logs and diagnostic job summaries.
+outputs, with elapsed time, primary exit status and exact failed phase in job logs.
 The host helper owns logging, Plan-bound utility launch and exact carrier preparation/recovery; generated
 steps retain node selectors, provider actions, permissions and credential scope. Transfer steps batch exact
 carrier selections while retaining every mandatory restore and independent upload.
-Finalization records each carrier's producer/restore outcome even after returned recovery failures. Summary
-availability cannot authorize a result or replace authenticated Run finalization; see the
+Finalization logs each carrier's producer/restore outcome even after returned recovery failures. Generated
+workflows emit at most two optional summaries per attempt: a brief bootstrap opening and a finalizer closing
+with required-job counts and the finalization outcome. The closing step needs no helper or checkout; provider
+interruption or a pending environment can still prevent it. Summary availability cannot alter execution status,
+authorize a result or replace authenticated Run finalization; see the
 [CI log guide](ci-step-and-log-readability.md).
 
 Operational retention must preserve enough run, plan and subject information to investigate a partial publication.
@@ -788,12 +867,23 @@ ADR-18 §8's event policy is the admission contract for production rendering:
 | In-repository pull request | Build and package | Read-only credential on fetch steps; no publish or OIDC access |
 | Default-branch push / manual dispatch on default ref | Publish, sign, attest and verify in a protected environment | Phase-scoped registry and OIDC access |
 | Explicitly allowed branch manual dispatch | Full publication after branch-policy admission | Same scoped credentials; exact workflow identity |
+| Development Environment branch manual dispatch | Unsigned build-only, or full signed development including admitted native disks | Separate development environments, phase-scoped dev registry credentials and development workflow identity; OIDC only for signing/attestation |
 | Git tag | No v1 signing trigger | No signing authorization from the tag |
 
-The current generated Run workflow is manual-only. It admits the default branch and optional exact branch
+Generated Run workflows are manual-only. Production admits the default branch and optional exact branch
 exceptions in `Environment.githubDispatchBranches`; publication also requires deployment-environment and
-signing-identity policies that admit the selected workflow ref. Other branches and tag/PR refs remain closed.
-Repository Merge Gate performs PR regeneration checks when generator inputs or outputs change.
+signing-identity policies that admit the selected workflow ref. Other production branches and tag/PR refs remain closed.
+Development admits branch dispatch and supports the same native ARC route only with its explicit signed
+publication contract. Generic hosted runners retain bootstrap, source retrieval, publication, signing and
+finalization. The development account must lack production-package write/admin access; namespace names
+cannot enforce provider ACLs. Unsigned development cancels superseded Runs and retains transfers for one day.
+Signed development and production remain non-canceling with seven-day transfers; final Run records retain
+seven days and disk diagnostics one day. Development registry packages are isolated per run attempt and
+become cleanup candidates after completion and 24 hours of inactivity. A default-branch-only owner
+rechecks authenticated provider metadata before whole-package deletion; it never executes branch artifacts.
+Expired transfers or a development retry require a complete attempt; cancellation can prevent finalization.
+These are contract-tested behaviors pending external execution, access-policy and deletion evidence.
+Repository Merge Gate checks both producer bundles and the qualification pair for PR drift.
 
 A renderer unable to express the required guards must reject the affected lane. This table states the contract;
 it is not proof that an unexercised workflow or the proposed fused job already enforces it in production.
@@ -859,7 +949,7 @@ selected KVM handles for one deadline-scoped callback, re-observes capacity befo
 handles. CPU is capped by affinity and cgroup ancestry; memory by availability and cgroup headroom.
 These are current-availability checks, not resource reservations or provider allocation proof.
 
-The unencrypted direct-Packer driver consumes that capability. Its run-owned resolver binds source,
+The direct-Packer driver for plain or explicitly public-bootstrap disks consumes that capability. Its run-owned resolver binds source,
 Plan, runtime/daemon and already-local pinned native toolchain before mutation. It transports an
 authenticated input archive into private named volumes, mounts consumer inputs read-only, fixes the
 execution environment, validates one exact Packer selector and returns one held QCOW2. It performs no
@@ -878,7 +968,9 @@ temporary credential configuration is removed before source/producer execution.
 
 The retained KVM descriptor proves availability during the callback, not consumption by QEMU. Docker's
 fixed device projection additionally checks kernel boot identity and device numbers. Command/Make,
-encrypted-disk, general hosted and qualified VM adapters remain closed. Arbitrary devices, nested
+secret-valued encrypted-disk, general hosted and qualified VM adapters remain closed. Public-bootstrap FDE
+admits raw retention and native build-provenance publication; encrypted inspection and strict publication remain
+unavailable. Arbitrary devices, nested
 virtualization, NUMA, accelerators and additional provider-specific lowering are deferred. In-process
 cleanup owns success, failure and cancellation; authenticated orphan recovery after hard process/host
 failure is also deferred. ADR-10/18 own the detailed admission and driver contracts;
@@ -907,8 +999,8 @@ Incremental equality identifies candidates for reuse. Required named outputs rem
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
 rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
-when selected by the Definition. M2 requires producer provenance; M3 adds strict inspection and material
-reconciliation (ADR-13 §6). Organizational ratification remains separate.
+when selected by the Definition. M2 and the M3 MVP retain producer-only disk evidence; strict inspection and
+material reconciliation are deferred hardening (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios
 
@@ -937,7 +1029,7 @@ already obtained.
 | Default-branch production/PR trigger exercises, source access and protected-environment policy | CI/release engineering and NVKE source owners | Remaining M1 acceptance beyond recorded manual candidate runs |
 | Transparency disclosure approval, Fulcio/Rekor operations and deletion protection | Product security and service owners | Organizational approval and sustainable consumer verification |
 | Native route approval, measured capacity envelope and independent full-payload disk consumption | NVKE build owner and CI engineering | M2 acceptance beyond the scoped candidate delivery |
-| `curatedBy`, aggregate SBOM curation edges and `embeds` consistency | Catalog/build owners | Upstream composition binding beyond catalog pin validation |
+| `curatedBy` and aggregate SBOM curation edges | Catalog/build owners | Deferred curated composition binding beyond optional upstream metadata checks |
 | M3 role policy and qualification implementation | Qualification owner | Build/evidence verdicts |
 | M4 concurrency, partial-write reconciliation, tag and retention protocol | Release engineering and registry owner | Reliable repeated and interrupted release publication |
 | Qualified provider observation, Nix, authority/discovery adapters and operational exercises | Qualified-lane module owners | Qualified production acceptance |

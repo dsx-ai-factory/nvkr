@@ -283,6 +283,9 @@ func reconciledDiskPackageBinding(plan *Plan, expected LifecycleOutputPlan, outp
 	if !matchedOutput || !matchedRequirement || !linkedProducer {
 		return invalid()
 	}
+	if _, err := plannedDiskPublicationEncryption(plan, expected); err != nil {
+		return "", definition.DiskInspectionProfile{}, err
+	}
 	for _, build := range plan.Builds {
 		if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest {
 			continue

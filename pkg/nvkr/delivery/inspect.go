@@ -166,7 +166,8 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 			return Inspection{}, err
 		}
 	}
-	if err := verifyReleaseEvidence(ctx, root, publication); err != nil {
+	sources := map[string]PublicationSource{}
+	if err := verifyReleaseEvidenceSources(ctx, root, publication, sources); err != nil {
 		return Inspection{}, err
 	}
 	semantic, err := publication.Digest()
@@ -176,7 +177,7 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 	if index.Annotations["dev.nvkr.semantic.digest"] != semantic {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "publication index semantic digest does not match root config")
 	}
-	return Inspection{Root: publication, RootDigest: rootDigest, RootConfig: rootConfig}, nil
+	return Inspection{Root: publication, RootDigest: rootDigest, RootConfig: rootConfig, sources: sources}, nil
 }
 
 func verifyPublishedObjectBinding(ctx context.Context, root string, object PublishedObject, descriptor Descriptor, disks map[string]DiskArtifactInspection) error {

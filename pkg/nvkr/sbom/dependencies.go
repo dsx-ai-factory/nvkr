@@ -25,7 +25,7 @@ func WithDependencies(bom *BOM, components []Component, method, scannerDigest st
 		return nil, e.New(e.CodeProvenanceMissing, "dependency inventory requires a per-artifact subject")
 	}
 	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" {
-		return nil, e.New(e.CodeUnsupported, "unsupported dependency inspection method")
+		return nil, e.New(e.CodeUnsupported, "unsupported dependency inspection method %q", method)
 	}
 	if method != "helm-manifests/v1" && !canonical.IsDigest(scannerDigest) {
 		return nil, e.New(e.CodeUnverifiedRef, "dependency inventory requires the scanner executable digest")
@@ -135,8 +135,11 @@ func validateDependencies(bom *BOM) error {
 		}
 		return nil
 	}
-	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" {
+	if method == "" {
 		return e.New(e.CodeProvenanceMissing, "dependency inventory omits its inspection method")
+	}
+	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" {
+		return e.New(e.CodeUnsupported, "unsupported dependency inspection method %q", method)
 	}
 	if method != "helm-manifests/v1" && !canonical.IsDigest(scanner) {
 		return e.New(e.CodeUnverifiedRef, "dependency inventory has no scanner pin")

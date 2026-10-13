@@ -85,9 +85,9 @@ jobs:
           set -euo pipefail
           "$RUNNER_TEMP/nvkr" run generate --definition '[[.Config.Definition]]' --environment '[[.Config.Environment]]' --engine github --root . --check
           git diff --check
-          git add -- '[[.Config.Catalog]]/pins.lock.yaml' '.github/nvkr-run' '.github/workflows/nvkr-run.yml'
+          git add -- '[[.Config.Catalog]]/pins.lock.yaml' '[[.RunDirectory]]' '[[.RunWorkflowPath]]'
           git diff --cached --check
-          git diff --cached --binary -- '[[.Config.Catalog]]/pins.lock.yaml' '.github/nvkr-run' '.github/workflows/nvkr-run.yml' > "$RUNNER_TEMP/catalog-candidate.patch"
+          git diff --cached --binary -- '[[.Config.Catalog]]/pins.lock.yaml' '[[.RunDirectory]]' '[[.RunWorkflowPath]]' > "$RUNNER_TEMP/catalog-candidate.patch"
           test -s "$RUNNER_TEMP/catalog-candidate.patch"
       - name: Retain the validated review candidate
         if: steps.refresh.outputs.changed == 'true'

@@ -55,6 +55,12 @@ func writeRunRecordStateWithSync(ctx context.Context, path string, run *Run,
 	if err != nil {
 		return false, err
 	}
+	return writeLifecycleRecordState(ctx, path, raw, syncDirectory)
+}
+
+// writeLifecycleRecordState commits generated descriptive records without
+// replacing an earlier record, using the same durability as the Run owner.
+func writeLifecycleRecordState(ctx context.Context, path string, raw []byte, syncDirectory func(*os.File) error) (linked bool, returnErr error) {
 	file, err := os.CreateTemp(filepath.Dir(path), ".lifecycle-*.json")
 	if err != nil {
 		return false, e.Wrap(e.CodeImmutableViolation, err, "staging immutable run record")

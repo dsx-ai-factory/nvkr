@@ -45,7 +45,7 @@ func admitExecuteNodeRequirements(plan *Plan, nodeID string) error {
 	default:
 		return e.New(e.CodeEngineCapability, "%s cannot execute mixed-Plan operation %q", adapter, nodeID)
 	}
-	if len(plan.Environment.SourceAccess) != 0 || len(plan.Environment.GitHubDispatchBranches) != 0 {
+	if plan.Environment.GitHubDevelopment || len(plan.Environment.SourceAccess) != 0 || len(plan.Environment.GitHubDispatchBranches) != 0 {
 		return e.New(e.CodeEngineCapability, "%s local utilities cannot admit hosted credentials or dispatch policy", adapter)
 	}
 	if err := rejectUnsupportedLocalPlanRequirements(plan, adapter); err != nil {

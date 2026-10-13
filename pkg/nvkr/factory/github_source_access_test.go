@@ -78,13 +78,48 @@ func TestGitHubSourceCredentialIsFetchStepOnly(t *testing.T) {
 	if found != 1 {
 		t.Fatalf("expected one credential-bearing step, got %d", found)
 	}
-	for _, test := range []struct{ name, old, replacement string }{
-		{"wrong-secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER_TOKEN"},
-		{"bypassed-token-check", "factory github run-node --plan", "factory execute-node --plan"},
-		{"wrong-mirror", "url.https://github.com/test-owner/private-source.insteadOf", "url.https://github.com/other/source.insteadOf"},
+	_, nodeJobs, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobID := nodeJobs[fetch.ID]
+	member, part := githubTestSharedInvocation(t, bundle, jobID, "execute", fetch.ID)
+	for _, test := range []struct {
+		name   string
+		mutate func(*testing.T) *GeneratedBundle
+	}{
+		{"wrong-secret", func(t *testing.T) *GeneratedBundle {
+			return mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+				call := githubTestYAMLStep(t, githubTestYAMLField(t, root, "jobs", jobID, "steps"), "uses", "./"+strings.TrimSuffix(member, "/action.yml"))
+				token := githubTestYAMLField(t, call, "with", "nvkr-source-token")
+				if token.Value != "${{ secrets.NKE_SOURCE_TOKEN }}" {
+					t.Fatal("fixture lost its source credential binding")
+				}
+				token.Value = "${{ secrets.OTHER_TOKEN }}"
+			})
+		}},
+		{"bypassed-token-check", func(t *testing.T) *GeneratedBundle {
+			return mutateGitHubBundleYAML(t, bundle, member, func(root *yamlv3.Node) {
+				step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_execute")
+				run := githubTestYAMLField(t, step, "run")
+				if strings.Count(run.Value, "factory github run-node --plan") != 1 {
+					t.Fatal("fixture source execution omits the admitted helper")
+				}
+				run.Value = strings.Replace(run.Value, "factory github run-node --plan", "factory execute-node --plan", 1)
+			})
+		}},
+		{"wrong-mirror", func(t *testing.T) *GeneratedBundle {
+			return mutateGitHubActionParameters(t, bundle, jobID, part, func(values map[string]string) {
+				const key = "execute_env_GIT_CONFIG_KEY_0"
+				if values[key] != "url.https://github.com/test-owner/private-source.insteadOf" {
+					t.Fatal("fixture source execution omits its exact mirror")
+				}
+				values[key] = "url.https://github.com/other/source.insteadOf"
+			})
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			changed := replaceGitHubBundleBytes(t, bundle, []byte(test.old), []byte(test.replacement))
+			changed := test.mutate(t)
 			var coded *e.Error
 			if err := ValidateGitHubBundle(context.Background(), plan, changed); !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 				t.Fatalf("expected credential isolation rejection, got %v", err)

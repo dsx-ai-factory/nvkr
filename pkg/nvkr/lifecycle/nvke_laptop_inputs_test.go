@@ -53,7 +53,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 		{"definition-tools.json", 1, false},
 		{"definition-profiles.json", 1, false},
 		// Installer-aligned selections replace the three older component slots.
-		{"definition-site.json", 4, false},
+		{"definition-site.json", 5, false},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			d, err := authored.LoadDefinition(t.Context(), filepath.Join(root, tc.file))
@@ -76,6 +76,12 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 					all[output.Name] = output
 				} else {
 					if _, exists := parts[output.Name]; exists {
+						if tc.file == "definition-site.json" && output.Name == "controller-profiles" {
+							if !reflect.DeepEqual(parts[output.Name], output) {
+								t.Fatal("site profile differs from the standalone diagnostic profile")
+							}
+							continue
+						}
 						if tc.file != "definition-site.json" || (output.Name != "cwe" && output.Name != "controller-chart" && output.Name != "nvkectl") {
 							t.Fatalf("unexpected duplicate split output %s", output.Name)
 						}

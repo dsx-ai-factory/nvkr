@@ -17,14 +17,21 @@ func cmdResolve() *cli.Command {
 	return &cli.Command{
 		Name:  "resolve",
 		Usage: "resolve selected producers and print the pinned build graph",
-		Flags: append(selectionFlags(),
+		Flags: append(append(selectionFlags(), commandPresentationFlags()...),
 			&cli.StringFlag{Name: "output", Aliases: []string{"o"}, Value: "ir",
 				Usage: "ir | canonical | nodes | digest | components"},
 		),
 		Action: func(c *cli.Context) error {
-			g, digest, err := resolveGraph(c)
+			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
+			}
+			g, digest, err := resolveGraph(c)
+			if err != nil {
+				return showCommandResult(c, view, commandDisplay{Title: "Resolved producers", Note: "Resolution failed; no execution."}, err)
+			}
+			if view.tui {
+				return showCommandResult(c, view, resolutionDisplay(g, digest), nil)
 			}
 			switch c.String("output") {
 			case "digest":

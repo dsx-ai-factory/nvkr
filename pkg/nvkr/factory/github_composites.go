@@ -14,11 +14,15 @@ import (
 
 const githubActionsDirectory = ".github/nvkr-run/actions/"
 
+func githubActionsDirectoryFor(plan *Plan) string {
+	return strings.TrimSuffix(githubLayoutFor(plan).planPath, "plan.json") + "actions/"
+}
+
 // lowerGitHubActions changes step presentation only. Jobs, provider outcome IDs,
 // dependencies and authority stay in the entry workflow. Provider controls stay
 // on the caller; single-step transport actions can carry their implementation.
 // Referenced outputs remain inline to preserve the caller's step namespace.
-func lowerGitHubActions(raw []byte, actions githubActionRefs) ([]byte, map[string][]byte, error) {
+func lowerGitHubActions(plan *Plan, raw []byte, actions githubActionRefs) ([]byte, map[string][]byte, error) {
 	var document yamlv3.Node
 	if err := yamlv3.Unmarshal(raw, &document); err != nil {
 		return nil, nil, e.Wrap(e.CodePipelineDrift, err, "parse GitHub workflow for action lowering")
@@ -26,6 +30,13 @@ func lowerGitHubActions(raw []byte, actions githubActionRefs) ([]byte, map[strin
 	if len(document.Content) != 1 {
 		return nil, nil, e.New(e.CodePipelineDrift, "GitHub action lowering requires a workflow document")
 	}
+	// Extracted actions are separate YAML documents. Materialize existing aliases
+	// before splitting so credentials and controls cannot retain external anchors.
+	resolved, err := githubResolveAliases(&document, map[*yamlv3.Node]bool{})
+	if err != nil {
+		return nil, nil, err
+	}
+	document = *resolved
 	files := map[string][]byte{}
 	jobs := githubYAMLField(document.Content[0], "jobs")
 	if jobs == nil || jobs.Kind != yamlv3.MappingNode {
@@ -54,7 +65,7 @@ func lowerGitHubActions(raw []byte, actions githubActionRefs) ([]byte, map[strin
 			if segment > 1 {
 				name = fmt.Sprintf("%s (part %d)", name, segment)
 			}
-			path := fmt.Sprintf("%sjobs/%s/part-%d", githubActionsDirectory, id, segment)
+			path := fmt.Sprintf("%sjobs/%s/part-%d", githubActionsDirectoryFor(plan), id, segment)
 			call, err := githubComposite(files, path, name, pending, shell)
 			if err != nil {
 				return err
@@ -84,7 +95,7 @@ func lowerGitHubActions(raw []byte, actions githubActionRefs) ([]byte, map[strin
 				uses := githubYAMLValue(step, "uses")
 				if checkedOut && !referenced && (uses == actions.Upload || uses == actions.Download) {
 					transfer++
-					path := fmt.Sprintf("%sjobs/%s/transfer-%d", githubActionsDirectory, id, transfer)
+					path := fmt.Sprintf("%sjobs/%s/transfer-%d", githubActionsDirectoryFor(plan), id, transfer)
 					call, err := githubControlledTransfer(files, path, step, shell)
 					if err != nil {
 						return nil, nil, err
@@ -105,7 +116,7 @@ func lowerGitHubActions(raw []byte, actions githubActionRefs) ([]byte, map[strin
 				value := *artifact
 				artifact.Value = "${{ inputs.runner-artifact }}"
 				artifact.Style = 0
-				path := githubActionsDirectory + "prepare-runner"
+				path := githubActionsDirectoryFor(plan) + "prepare-runner"
 				if shell == "sh -e {0}" {
 					path += "-container"
 				}
@@ -135,17 +146,39 @@ func lowerGitHubActions(raw []byte, actions githubActionRefs) ([]byte, map[strin
 		}
 		steps.Content = lowered
 	}
-	if err := anchorGitHubPreflight(jobs, actions); err != nil {
+	if err := anchorGitHubPreflight(plan, jobs, actions); err != nil {
 		return nil, nil, err
 	}
 	workflow, err := encodeGitHubYAML(&document)
 	return workflow, files, err
 }
 
+func githubResolveAliases(node *yamlv3.Node, active map[*yamlv3.Node]bool) (*yamlv3.Node, error) {
+	if node == nil || active[node] {
+		return nil, e.New(e.CodePipelineDrift, "generated workflow contains an invalid or recursive YAML alias")
+	}
+	active[node] = true
+	defer delete(active, node)
+	if node.Kind == yamlv3.AliasNode {
+		return githubResolveAliases(node.Alias, active)
+	}
+	copyOfNode := *node
+	copyOfNode.Anchor = ""
+	copyOfNode.Content = make([]*yamlv3.Node, len(node.Content))
+	for index, child := range node.Content {
+		resolved, err := githubResolveAliases(child, active)
+		if err != nil {
+			return nil, err
+		}
+		copyOfNode.Content[index] = resolved
+	}
+	return &copyOfNode, nil
+}
+
 // Only fixed preflight and runner preparation get human-readable aliases. Job
 // policy, dependencies and operation calls stay explicit; no generic value
 // compression turns the workflow into a dictionary of numbered references.
-func anchorGitHubPreflight(jobs *yamlv3.Node, actions githubActionRefs) error {
+func anchorGitHubPreflight(plan *Plan, jobs *yamlv3.Node, actions githubActionRefs) error {
 	first := map[string]*yamlv3.Node{}
 	for index := 1; index < len(jobs.Content); index += 2 {
 		steps := githubYAMLField(jobs.Content[index], "steps")
@@ -155,7 +188,7 @@ func anchorGitHubPreflight(jobs *yamlv3.Node, actions githubActionRefs) error {
 			}
 			name := ""
 			switch {
-			case strings.HasPrefix(githubYAMLValue(step, "uses"), "./"+githubSharedDirectory+"prepare-stage"):
+			case strings.HasPrefix(githubYAMLValue(step, "uses"), "./"+githubActionsDirectoryFor(plan)+"shared/prepare-stage"):
 				name = "prepare-stage-" + shortStableName(githubYAMLValue(githubYAMLField(step, "with"), "runner-artifact"))
 				if strings.HasSuffix(githubYAMLValue(step, "uses"), "-container") {
 					name += "-container"
@@ -303,9 +336,9 @@ func githubActionInput(description string) *yamlv3.Node {
 // expandGitHubActions restores the concrete step graph for semantic admission.
 // This is a deliberately closed macro format, not a general Actions interpreter.
 // Exact regeneration additionally authenticates every action and its call sites.
-func expandGitHubActions(raw []byte, files map[string][]byte) ([]byte, error) {
+func expandGitHubActions(plan *Plan, raw []byte, files map[string][]byte) ([]byte, error) {
 	var err error
-	raw, files, err = materializeGitHubSharedActions(raw, files)
+	raw, files, err = materializeGitHubSharedActions(plan, raw, files)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +363,7 @@ func expandGitHubActions(raw []byte, files map[string][]byte) ([]byte, error) {
 		if githubYAMLField(job, "container") != nil {
 			shell = "sh -e {0}"
 		}
-		expanded, err := expandGitHubSteps(steps.Content, files, shell, 0)
+		expanded, err := expandGitHubSteps(plan, steps.Content, files, shell, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -339,7 +372,7 @@ func expandGitHubActions(raw []byte, files map[string][]byte) ([]byte, error) {
 	return encodeGitHubYAML(&document)
 }
 
-func expandGitHubSteps(steps []*yamlv3.Node, files map[string][]byte, shell string, depth int) ([]*yamlv3.Node, error) {
+func expandGitHubSteps(plan *Plan, steps []*yamlv3.Node, files map[string][]byte, shell string, depth int) ([]*yamlv3.Node, error) {
 	if depth > 2 {
 		return nil, e.New(e.CodeEngineCapability, "generated actions exceed the two-level nesting contract")
 	}
@@ -365,7 +398,7 @@ func expandGitHubSteps(steps []*yamlv3.Node, files map[string][]byte, shell stri
 			continue
 		}
 		path := strings.TrimPrefix(uses, "./") + "/action.yml"
-		if !strings.HasPrefix(path, githubActionsDirectory) || !safeGeneratedPath(path) || len(files[path]) == 0 {
+		if !strings.HasPrefix(path, githubActionsDirectoryFor(plan)) || !safeGeneratedPath(path) || len(files[path]) == 0 {
 			return nil, e.New(e.CodePipelineDrift, "generated action %q is missing or outside the owned bundle", uses)
 		}
 		for index := 0; index < len(step.Content); index += 2 {
@@ -404,7 +437,7 @@ func expandGitHubSteps(steps []*yamlv3.Node, files map[string][]byte, shell stri
 		if githubYAMLContains(inner, "${{ inputs.") {
 			return nil, e.New(e.CodeEngineCapability, "generated action %q has unresolved inputs", path)
 		}
-		expanded, err := expandGitHubSteps(inner.Content, files, shell, depth+1)
+		expanded, err := expandGitHubSteps(plan, inner.Content, files, shell, depth+1)
 		if err != nil {
 			return nil, err
 		}
@@ -505,6 +538,23 @@ func githubYAMLSubstitute(node *yamlv3.Node, expression string, value *yamlv3.No
 }
 
 func encodeGitHubYAML(node *yamlv3.Node) ([]byte, error) {
+	// yaml.v3's Node encoder resolves plain scalars using YAML 1.2. Retain
+	// string semantics for the boolean words also recognized by YAML 1.1
+	// consumers without changing authored quotes or multiline script styles.
+	var quoteBooleanWords func(*yamlv3.Node)
+	quoteBooleanWords = func(current *yamlv3.Node) {
+		if current.Kind == yamlv3.ScalarNode && current.Tag == "!!str" &&
+			current.Style&(yamlv3.SingleQuotedStyle|yamlv3.DoubleQuotedStyle|yamlv3.LiteralStyle|yamlv3.FoldedStyle) == 0 {
+			switch strings.ToLower(current.Value) {
+			case "y", "yes", "n", "no", "on", "off":
+				current.Style |= yamlv3.SingleQuotedStyle
+			}
+		}
+		for _, child := range current.Content {
+			quoteBooleanWords(child)
+		}
+	}
+	quoteBooleanWords(node)
 	var output bytes.Buffer
 	encoder := yamlv3.NewEncoder(&output)
 	encoder.SetIndent(2)

@@ -190,6 +190,7 @@ func DiskRootName(components []catalog.NamedComponent) (string, error) {
 // cloneComponent preserves exact strings, including malformed bytes that downstream
 // graph validation must reject. A JSON round-trip would repair invalid UTF-8.
 func cloneComponent(component catalog.Component) catalog.Component {
+	component.Embeds = catalog.CloneEmbeddedComponents(component.Embeds)
 	component.Platforms = slices.Clone(component.Platforms)
 	if component.Helm != nil {
 		copy := *component.Helm

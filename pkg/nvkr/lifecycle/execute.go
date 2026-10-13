@@ -16,6 +16,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
@@ -31,6 +32,8 @@ type LocalOptions struct {
 	Stderr       io.Writer
 	// Activity is optional descriptive telemetry, never an execution receipt.
 	Activity *buildactivity.Sink
+	// Progress carries bounded descriptions, never execution or output authority.
+	Progress *progress.Monitor
 	// DiskInspection opts into diagnostic installed-package inspection. The
 	// caller owns this already-admitted runtime and keeps it open for execution.
 	// Omitting it preserves the existing build-only path, not an inspection claim.
@@ -92,10 +95,14 @@ func executeLocalWithFactoryRunner(ctx context.Context, prepared *PreparedRun, o
 
 func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, options LocalOptions,
 	deps localExecutionDependencies,
-) (*Run, error) {
+) (returnedRun *Run, returnedErr error) {
 	if prepared == nil || prepared.plan == nil || prepared.run == nil {
 		return nil, e.New(e.CodeUsage, "local execution requires a prepared run")
 	}
+	if !options.Progress.Matches(prepared.run.Attempt, prepared.run.PlanDigest) {
+		options.Progress = nil
+	}
+	defer func() { finishProgress(options.Progress, returnedRun, returnedErr, options.DryRun) }()
 	if deps.admitLocal == nil || deps.runFactory == nil || deps.writeRecordState == nil || deps.beginDiskCommit == nil {
 		return nil, e.New(e.CodeInternal, "local execution dependencies are incomplete")
 	}
@@ -116,13 +123,18 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	recordPath := filepath.Join(workspace, "lifecycle.json")
 	factoryOptions := factory.LocalRunOptions{Workspace: workspace, RunnerSource: options.RunnerSource,
 		Jobs: options.Jobs, Runtime: options.Runtime, Go: options.Go, Publish: options.Publish,
-		DryRun: options.DryRun, Stdout: options.Stdout, Stderr: options.Stderr, Activity: options.Activity}
+		DryRun: options.DryRun, Stdout: options.Stdout, Stderr: options.Stderr, Activity: options.Activity, Progress: options.Progress}
 	// Workspace-independent admission always precedes immutable attempt
 	// reservation. RunLocal owns only the later held-workspace, capacity, and
 	// KVM admission for disk plans.
 	if err := deps.admitLocal(ctx, prepared.plan, factoryOptions); err != nil {
 		return nil, err
 	}
+	mode := "local"
+	if options.DryRun {
+		mode = "dry-run"
+	}
+	options.Progress.Start(mode)
 	if options.DryRun {
 		if _, err := deps.runFactory(ctx, prepared.plan, factoryOptions); err != nil {
 			return nil, err
@@ -187,6 +199,7 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	defer func() { _ = result.Close() }()
 	runForObservation := prepared.Description()
 	runForObservation.Lane = result.QualificationLane()
+	options.Progress.SetPhase("observation")
 	if options.DiskInspection != nil {
 		installed, err := deps.inspectDisks(ctx, prepared.plan, result, options.DiskInspection)
 		if err == nil && len(installed) == 0 {
@@ -205,7 +218,7 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	}
 	diskExports := newDiskExportTransaction(workspace)
 	observed, err := observeOutputsWithDiskStaging(ctx, workspace, prepared.run.Expected,
-		artifacts, prepared.plan, result, diskExports.observe)
+		artifacts, prepared.plan, result, diskExports.observe, options.Progress)
 	if err != nil {
 		cause := closeLocalExecutionResult(result, err)
 		if cleanupErr := cleanupDiskExports(diskExports.stages, false); cleanupErr != nil {
@@ -213,6 +226,7 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 		}
 		return recordRunFailure(ctx, recordPath, &runForObservation, cause, "recording failed run attempt")
 	}
+	options.Progress.SetPhase("finalization")
 	bound, err := bindObserved(&runForObservation, observed)
 	if err != nil {
 		cause := closeLocalExecutionResult(result, err)

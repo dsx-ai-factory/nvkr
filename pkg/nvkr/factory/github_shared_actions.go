@@ -15,6 +15,10 @@ import (
 
 const GitHubActionDataPath = ".github/nvkr-run/action-data.json"
 
+func githubActionDataPathFor(plan *Plan) string {
+	return strings.TrimSuffix(githubLayoutFor(plan).planPath, "plan.json") + "action-data.json"
+}
+
 const githubSharedDirectory = githubActionsDirectory + "shared/"
 const githubContextStepID = "nvkr-context"
 const githubSelectorEnvironment = "NVKR_ACTION_SELECTOR"
@@ -31,7 +35,7 @@ type githubActionDataEntry struct {
 // shareGitHubActions projects generated operations onto named action interfaces.
 // The Plan remains execution authority. The descriptor contains only literal
 // labels, selectors and transport settings; no run programs or credentials.
-func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActionRefs) ([]byte, error) {
+func shareGitHubActions(plan *Plan, raw []byte, files map[string][]byte, actions githubActionRefs) ([]byte, error) {
 	var document yamlv3.Node
 	if err := yamlv3.Unmarshal(raw, &document); err != nil {
 		return nil, e.Wrap(e.CodePipelineDrift, err, "parse workflow for shared actions")
@@ -59,14 +63,14 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 				return nil, e.New(e.CodeEngineCapability, "job %q uses reserved action context ID", jobID)
 			}
 			uses := githubYAMLValue(call, "uses")
-			prefix := "./" + githubActionsDirectory + "jobs/" + jobID + "/"
+			prefix := "./" + githubActionsDirectoryFor(plan) + "jobs/" + jobID + "/"
 			if !strings.HasPrefix(uses, prefix) {
 				rewritten = append(rewritten, call)
 				continue
 			}
 			path := strings.TrimPrefix(uses, "./") + "/action.yml"
 			if strings.HasPrefix(jobID, "build-runner-") {
-				if err := shareGitHubBootstrap(files, path, call); err != nil {
+				if err := shareGitHubBootstrap(plan, files, path, call); err != nil {
 					return nil, err
 				}
 				rewritten = append(rewritten, call)
@@ -81,11 +85,11 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 			if inner == nil || inner.Kind != yamlv3.SequenceNode {
 				return nil, e.New(e.CodePipelineDrift, "generated action %q requires steps", path)
 			}
-			if len(inner.Content) > 0 && strings.HasPrefix(githubYAMLValue(inner.Content[0], "uses"), "./"+githubActionsDirectory+"prepare-runner") {
+			if len(inner.Content) > 0 && strings.HasPrefix(githubYAMLValue(inner.Content[0], "uses"), "./"+githubActionsDirectoryFor(plan)+"prepare-runner") {
 				if prepared {
 					return nil, e.New(e.CodeEngineCapability, "job %q prepares its helper twice", jobID)
 				}
-				prepare, err := githubPrepareStage(files, inner.Content[0])
+				prepare, err := githubPrepareStage(plan, files, inner.Content[0])
 				if err != nil {
 					return nil, err
 				}
@@ -100,7 +104,7 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 			if len(inner.Content) == 0 {
 				continue
 			}
-			invocations, err := projectGitHubActionInterfaces(body, call, actions)
+			invocations, err := projectGitHubActionInterfaces(plan, body, call, actions)
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +128,7 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 					return nil, err
 				}
 				entry.Values[key] = string(parameters)
-				path := githubSharedDirectory + invocation.Family
+				path := githubActionsDirectoryFor(plan) + "shared/" + invocation.Family
 				templateRaw, err := encodeGitHubYAML(invocation.Body)
 				if err != nil {
 					return nil, err
@@ -160,11 +164,11 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 		}
 	}
 	var err error
-	files[GitHubActionDataPath], err = canonical.Marshal(data)
+	files[githubActionDataPathFor(plan)], err = canonical.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
-	if err := anchorGitHubPreflight(jobs, actions); err != nil {
+	if err := anchorGitHubPreflight(plan, jobs, actions); err != nil {
 		return nil, err
 	}
 	return encodeGitHubYAML(&document)
@@ -178,9 +182,9 @@ func githubParameterExpression(key string) string {
 	return "${{ fromJSON(inputs.parameters)." + key + " }}"
 }
 
-func githubPrepareStage(files map[string][]byte, helper *yamlv3.Node) (*yamlv3.Node, error) {
+func githubPrepareStage(plan *Plan, files map[string][]byte, helper *yamlv3.Node) (*yamlv3.Node, error) {
 	container := strings.HasSuffix(githubYAMLValue(helper, "uses"), "-container")
-	path, shell := githubSharedDirectory+"prepare-stage", "bash -e {0}"
+	path, shell := githubActionsDirectoryFor(plan)+"shared/prepare-stage", "bash -e {0}"
 	if container {
 		path, shell = path+"-container", "sh -e {0}"
 	}
@@ -198,7 +202,7 @@ func githubPrepareStage(files map[string][]byte, helper *yamlv3.Node) (*yamlv3.N
 			helper,
 			githubYAMLMap("name", githubYAMLString("Resolve job parameters from the admitted Plan"), "id", githubYAMLString("describe"),
 				"env", githubYAMLMap("NVKR_ACTION", githubYAMLString("${{ inputs.action }}")), "shell", githubYAMLString(shell),
-				"run", githubYAMLString(githubRunnerCommand("describe-action", "", "")+` --action "$NVKR_ACTION"`)),
+				"run", githubYAMLString(githubRunnerCommand(plan, "describe-action", "", "")+` --action "$NVKR_ACTION"`)),
 		}}))
 	action.HeadComment = "SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\nSPDX-License-Identifier: Apache-2.0\n\nGENERATED BY nvkr run generate — DO NOT EDIT"
 	raw, err := encodeGitHubYAML(action)

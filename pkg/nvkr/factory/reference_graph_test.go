@@ -56,7 +56,7 @@ func TestReferenceReleaseGraphHasNoAggregatePayloadEdges(t *testing.T) {
 			count++
 		}
 	}
-	if count != 6 {
+	if count != 6+3*len(plan.LifecycleOutputs) {
 		t.Fatalf("finalizer downloads %d artifacts", count)
 	}
 	for _, output := range plan.LifecycleOutputs {

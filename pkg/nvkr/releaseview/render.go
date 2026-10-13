@@ -43,8 +43,10 @@ type view struct {
 	delivery.PublicationDescription
 }
 
-// Render selects a presentation only after the owner checked all metadata.
-// JSON is readable presentation, not canonical identity input or a receipt.
+// Render selects a presentation only after the owner checked all metadata. Its
+// inspection labels describe that prerequisite; rendering does not authenticate
+// caller-composed values. JSON follows DescriptionSchemaVersion and is readable
+// presentation, not canonical identity input or a receipt.
 func Render(description delivery.PublicationDescription, options Options) ([]byte, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
@@ -70,7 +72,7 @@ func Render(description delivery.PublicationDescription, options Options) ([]byt
 	}
 	switch options.Format {
 	case "json":
-		raw, err := json.MarshalIndent(selected, "", "  ")
+		raw, err := json.MarshalIndent(describe(selected), "", "  ")
 		if err != nil {
 			return nil, e.Wrap(e.CodeVerifyFailed, err, "encoding release view")
 		}

@@ -80,3 +80,16 @@ func (c *Client) VerifyRelease(ctx context.Context, reference string, policy Ver
 	}
 	return c.lifecycleConsumer.Verify(ctx, reference, policy)
 }
+
+// AuthenticateRelease verifies the signed metadata and evidence closure without
+// downloading artifact payloads. The returned capability cannot authorize payload
+// export or exact-input verification. Its caller owns the obligation to Close it.
+func (c *Client) AuthenticateRelease(ctx context.Context, reference string, policy VerificationPolicy) (*lifecycle.AuthenticatedRelease, error) {
+	if err := c.ready(ctx, "release authentication"); err != nil {
+		return nil, err
+	}
+	if c.lifecycleConsumer == nil {
+		return nil, e.New(e.CodeEngineCapability, "release authentication requires a configured consumer")
+	}
+	return c.lifecycleConsumer.Authenticate(ctx, reference, policy)
+}

@@ -146,8 +146,13 @@ successful signing or verification record. Registry credentials use a private re
 never argv. Dry-run executes no signer and contacts no registry for signing; it records intended argv and
 `dryRun: true`, retaining `static-unqualified` evidence.
 
-The build signer's identity is a fixed committed workflow path and default-branch ref under an explicit issuer.
-It authenticates who produced the artifact; Build Digest separately identifies the selected logical graph. The separate
+The production build signer's identity is a fixed committed workflow path and admitted branch ref under an explicit issuer.
+Signed development uses the separate `nvkr-dev.yml` branch identity and reserved disposable namespace
+specified by ADR-18/20. It performs the same signature, provenance and SBOM checks under that development
+trust policy. A production consumer pinned to `nvkr-run.yml` does not accept those certificates; selecting
+development signing grants no production or qualified acceptance. Registry cleanup does not erase public
+transparency records or relax the existing disclosure/identity-service prerequisites.
+Signer identity authenticates who produced the artifact; Build Digest separately identifies the selected logical graph. The separate
 build/evidence qualification workflow has its own identity; build provenance and qualification evidence cannot
 substitute for one another. Consumer instructions publish both identities and use stock
 `cosign verify-attestation` with the explicit signature or SLSA predicate type. Downloaded bundles are also
@@ -158,14 +163,28 @@ A Verification Policy explicitly selects lane and acceptance scope:
 
 | Lane / scope | Required acceptance |
 |---|---|
-| `pipeline-attested` / `artifact-publication` | Exact selected closure, accepted build signer identity and issuer, signature, and subject-bound production provenance |
+| `pipeline-attested` / `authenticity` | Exact metadata/evidence closure, root and every required named output's signature and subject-bound production provenance, and required SBOM bundles under the accepted build identity and issuer; artifact payload bytes unchecked |
+| `pipeline-attested` / `artifact-publication` | Exact selected payload/evidence closure, accepted build signer identity and issuer, signature, and subject-bound production provenance |
 | `pipeline-attested` / `release` | Artifact-publication checks plus ADR-16 qualification identity, verdicts, membership, and ADR-06 revocation checks |
 | `qualified` / `release` | Qualified authority, evidence, freshness, status, and publication contracts in ADR-05/06/16/20 |
 
+The `authenticity` scope fetches bounded manifests, configurations and evidence, including native child
+metadata for aggregate images, without retrieving artifact payload layers. Root authentication alone is
+insufficient: every required named output must satisfy the signature/provenance checks, and every required
+SBOM bundle must pass cryptographic verification and its exact subject/stage/membership checks. Missing or
+rejected evidence returns no successful result. Metadata navigation remains unauthenticated.
+
+Lifecycle issues a separate opaque `AuthenticatedRelease` capability for this scope. Its description states
+`payloadIntegrityVerified: false`; it cannot authorize payload export, satisfy full artifact-publication
+verification, or issue an exact-input receipt. The scope authenticates the producer's recorded evidence, not
+artifact availability, consumer-side disk inspection, qualification or revocation. Stock execution retains
+the Linux and pinned-verifier admission requirements.
+
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is part of the policy digest. Its omitted default is
-`strict`, which rejects the producer-only `build-provenance-v1` mode. A consumer may explicitly set the minimum
-to `build-provenance-v1` to accept that narrower evidence; a strictly inspected disk also satisfies that weaker
-minimum. Unknown values fail closed, and no producer-signed disk mode can weaken the consumer's policy.
+`build-provenance-v1` for pipeline-attested scopes; explicit `strict` requires inspected evidence. Qualified
+policy defaults to `strict` and rejects the producer-only minimum. A strictly inspected disk also satisfies
+the weaker minimum. Authenticity applies the same minimum to signed disk evidence without reading or
+reinspecting the disk. Unknown values fail closed, and no producer-signed disk mode can weaken consumer policy.
 
 Missing scope is an error. Unsupported scopes fail admission before dependent I/O, without falling back to a
 weaker scope. The returned opaque capability binds the exact reference and policy, including scope and the

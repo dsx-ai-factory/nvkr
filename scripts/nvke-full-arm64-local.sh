@@ -20,7 +20,7 @@ usage() {
     'all: one Run with 29 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
     'simulator bootstraps the same pinned Go/GCC Docker toolchain.' \
-    'site: four source-aligned installer outputs (controller, CLI, controller chart and NKTP chart).' \
+    'site: five source-aligned installer outputs (controller, profiles image, CLI, controller chart and NKTP chart).' \
     'tools: one source-built Linux ARM64 bundle (Helm, kubectl, clusterctl, ORAS and Kind).' \
     'profiles: one native OCI image containing diagnostic ARM64 plain Ubuntu 26.04 NICoSim profiles, not fleet profiles.' \
     'This subset is NOT a full source-built NVKE distribution.' \
@@ -322,7 +322,7 @@ preview_command=("${runner}" run local --definition "${definition}" --environmen
 print_nvkr_command "${preview_command[@]}"
 "${preview_command[@]}"
 build_command=("${runner}" run local --definition "${definition}" --environment "${environment}" \
-  --attempt "${attempt}" --attempts-root .nvkr/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}")
+  --attempt "${attempt}" --attempts-root .nvkr/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}" --ui=plain)
 if [[ "${prepare_only}" == 1 ]]; then
   # This is a private description, not executable authority or source evidence.
   # Preserve the exact final argv selected above; never pass it through eval.

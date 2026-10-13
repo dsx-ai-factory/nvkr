@@ -5,16 +5,14 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 	"github.com/urfave/cli/v2"
 )
 
@@ -27,22 +25,40 @@ func lifecycleInputFlags() []cli.Flag {
 
 func cmdDefinition() *cli.Command {
 	return &cli.Command{Name: "definition", Usage: "validate and inspect authored product definitions", Subcommands: []*cli.Command{
-		{Name: "validate", Usage: "validate a Definition and print its exact identity", Flags: []cli.Flag{&cli.StringFlag{Name: "definition", Required: true}}, Action: func(c *cli.Context) error {
-			definition, err := lifecycle.LoadDefinition(c.Context, c.String("definition"))
+		{Name: "validate", Usage: "validate a Definition and print its exact identity", Flags: append(commandPresentationFlags(), &cli.StringFlag{Name: "definition", Required: true}), Action: func(c *cli.Context) error {
+			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
+			}
+			definition, err := lifecycle.LoadDefinition(c.Context, c.String("definition"))
+			if err != nil {
+				return showCommandResult(c, view, commandDisplay{Title: "Definition", Note: "Definition admission failed."}, err)
 			}
 			digest, err := definition.Digest()
 			if err != nil {
 				return err
 			}
+			if view.tui {
+				return showCommandResult(c, view, definitionDisplay(definition, digest), nil)
+			}
 			fmt.Printf("definition: %s\ndigest: %s\noutputs: %d\n", definition.Metadata.Name, digest, len(definition.Outputs))
 			return nil
 		}},
-		{Name: "inspect", Usage: "emit the validated Definition as canonical JSON", Flags: []cli.Flag{&cli.StringFlag{Name: "definition", Required: true}}, Action: func(c *cli.Context) error {
-			definition, err := lifecycle.LoadDefinition(c.Context, c.String("definition"))
+		{Name: "inspect", Usage: "emit the validated Definition as canonical JSON", Flags: append(commandPresentationFlags(), &cli.StringFlag{Name: "definition", Required: true}), Action: func(c *cli.Context) error {
+			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
+			}
+			definition, err := lifecycle.LoadDefinition(c.Context, c.String("definition"))
+			if err != nil {
+				return showCommandResult(c, view, commandDisplay{Title: "Definition", Note: "Definition admission failed."}, err)
+			}
+			if view.tui {
+				digest, err := definition.Digest()
+				if err != nil {
+					return err
+				}
+				return showCommandResult(c, view, definitionDisplay(definition, digest), nil)
 			}
 			raw, err := canonical.Marshal(definition)
 			if err != nil {
@@ -61,12 +77,19 @@ func cmdRun() *cli.Command {
 type localLifecycleExecutor func(context.Context, *lifecycle.PreparedRun, lifecycle.LocalOptions) (*lifecycle.Run, error)
 
 func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
-	generationFlags := append(lifecycleInputFlags(), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "hosted CI adapter: github"})
+	generationFlags := append(append(lifecycleInputFlags(), commandPresentationFlags()...), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "hosted CI adapter: github"})
 	return &cli.Command{Name: "run", Usage: "plan, generate, and execute Definition runs", Subcommands: []*cli.Command{
 		{Name: "finalize", Hidden: true, Usage: "finalize one generated hosted Run from restored carriers", Flags: append(lifecycleInputFlags(),
 			&cli.StringFlag{Name: "plan", Required: true}, &cli.StringFlag{Name: "attempt", Required: true},
-			&cli.StringFlag{Name: "workspace", Value: ".nvkr/factory"}, &cli.StringFlag{Name: "out", Value: ".nvkr/run.json"}), Action: func(c *cli.Context) error {
-			run, err := lifecycle.FinalizeGenerated(c.Context, c.String("definition"), c.String("environment"), c.String("plan"), factoryGeneratorVersion(), c.String("attempt"), c.String("workspace"), c.String("out"))
+			&cli.StringFlag{Name: "workspace", Value: ".nvkr/factory"}, &cli.StringFlag{Name: "out", Value: ".nvkr/run.json"},
+			&cli.StringFlag{Name: "handoff", Hidden: true, Usage: "generated qualification handoff output"}), Action: func(c *cli.Context) error {
+			var run *lifecycle.Run
+			var err error
+			if c.IsSet("handoff") {
+				run, err = lifecycle.FinalizeGeneratedWithHandoff(c.Context, c.String("definition"), c.String("environment"), c.String("plan"), factoryGeneratorVersion(), c.String("attempt"), c.String("workspace"), c.String("out"), c.String("handoff"))
+			} else {
+				run, err = lifecycle.FinalizeGenerated(c.Context, c.String("definition"), c.String("environment"), c.String("plan"), factoryGeneratorVersion(), c.String("attempt"), c.String("workspace"), c.String("out"))
+			}
 			if err != nil {
 				return err
 			}
@@ -76,12 +99,33 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		cmdRunPlan(),
 		cmdRunGraph(),
 		cmdRunDiff(),
+		cmdRunInspect(),
+		cmdRunCheckArtifacts(),
+		cmdRunQualify(),
+		cmdRunSmokeWorker(),
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
+			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {
-			digest, err := lifecycle.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
+			}
+			var digest string
+			if c.IsSet("qualification-policy") {
+				digest, err = qualification.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), c.String("qualification-policy"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			} else {
+				digest, err = lifecycle.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			}
+			if err != nil {
+				return showCommandResult(c, view, commandDisplay{Title: "Run generation", Note: "Generation failed; no execution or release acceptance."}, err)
+			}
+			if view.tui {
+				state := "written"
+				if c.Bool("check") {
+					state = "current"
+				}
+				return showCommandResult(c, view, commandDisplay{Title: "Run generation", Note: "Static generation; no execution or release acceptance.", Fields: commandFields("Engine", c.String("engine"), "Plan digest", digest, "Files", state)}, nil)
 			}
 			if c.Bool("check") {
 				fmt.Printf("generated run is current: %s\n", digest)
@@ -95,58 +139,13 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "attempts-root", Value: ".nvkr/runs"}, &cli.StringFlag{Name: "runner-source", Value: "."},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
 			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
-			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1}), Action: func(c *cli.Context) error {
-			var activity *buildactivity.Sink
-			if c.IsSet("build-activity-fd") {
-				if c.Bool("dry-run") || c.Bool("publish") {
-					return e.New(e.CodeUsage, "build activity is available only for local execution")
-				}
-				var err error
-				activity, err = buildactivity.AdoptFD(c.Context, c.Int("build-activity-fd"))
-				if err != nil {
-					return err
-				}
-				defer func() { _ = activity.Close() }()
-			}
-			prepared, err := lifecycle.PrepareFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
-			if err != nil {
-				return err
-			}
-			result, err := executeLocal(c.Context, prepared, lifecycle.LocalOptions{AttemptsRoot: c.String("attempts-root"), RunnerSource: c.String("runner-source"), Jobs: c.Int("jobs"), Runtime: c.String("runtime"), Go: c.String("go"), Publish: c.Bool("publish"), DryRun: c.Bool("dry-run"), Stdout: os.Stdout, Stderr: os.Stderr, Activity: activity})
-			if err != nil {
-				if result != nil && result.Status == lifecycle.RunComplete {
-					if reportErr := printLocalRunResult(c, result); reportErr != nil {
-						return e.Wrap(e.CodeImmutableViolation, errors.Join(err, reportErr),
-							"completed local Run was retained, but reporting its outputs and commit cleanup both failed")
-					}
-					return e.Wrap(e.CodeImmutableViolation, err,
-						"completed local Run and outputs were retained, but commit cleanup is incomplete")
-				}
-				return err
-			}
-			return printLocalRunResult(c, result)
+			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1},
+			&cli.StringFlag{Name: "ui", Value: "auto", Usage: "auto, plain, or tui presentation"},
+			&cli.BoolFlag{Name: "json", Usage: "emit one safe descriptive local Run result"},
+			&cli.BoolFlag{Name: "no-color", Usage: "disable terminal colors (also honors NO_COLOR)"}), Action: func(c *cli.Context) error {
+			return runLocalCommand(c, executeLocal)
 		}},
 	}}
-}
-
-func printLocalRunResult(c *cli.Context, result *lifecycle.Run) error {
-	workspace := filepath.Join(c.String("attempts-root"), c.String("attempt"))
-	fmt.Printf("\nattempt: %s\nrun: %s\nlane: %s\nstatus: %s\nobserved outputs: %d\n", result.Attempt, result.PlanDigest, result.Lane, result.Status, len(result.Observed))
-	if c.Bool("dry-run") {
-		return nil
-	}
-	fmt.Printf("record: %s\n", filepath.Join(workspace, "lifecycle.json"))
-	for _, observed := range result.Observed {
-		if observed.Kind != lifecycle.OutputDiskImage {
-			continue
-		}
-		path, err := lifecycle.LocalDiskOutputPath(workspace, observed.Name)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("disk: %s\n", path)
-	}
-	return nil
 }
 
 func compileLifecycleInput(c *cli.Context) (*factory.Plan, error) {

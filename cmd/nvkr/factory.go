@@ -76,6 +76,7 @@ func cmdFactoryGitHub() *cli.Command {
 		githubFactoryCommand("describe-action", "action", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
 			return factory.WriteGitHubActionData(c.Context, plan, c.String("action"), os.Getenv("GITHUB_OUTPUT"))
 		}),
+		cmdFactoryCleanupDevelopment(),
 		githubFactoryCommand("prepare-images", "stage", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
 			return factory.PrepareGitHubImages(c.Context, plan, c.String("stage"), options)
 		}),
@@ -113,6 +114,8 @@ func githubFactoryCommand(name, selector string, action func(*cli.Context, *fact
 		if err != nil {
 			return err
 		}
-		return action(c, plan, factory.GitHubStepOptions{Stdout: os.Stdout, Stderr: os.Stderr, SummaryPath: os.Getenv("GITHUB_STEP_SUMMARY")})
+		// The generated workflow owns opening and final Run summaries. Individual
+		// operations retain their full diagnostics in job logs.
+		return action(c, plan, factory.GitHubStepOptions{Stdout: os.Stdout, Stderr: os.Stderr})
 	}}
 }

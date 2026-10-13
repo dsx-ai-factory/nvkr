@@ -16,12 +16,13 @@ import (
 // Materialize only the generator's closed parameter projection for static
 // admission. Runtime obtains the same values by rendering the admitted Plan.
 // Exact all-member comparison also covers the descriptor and preparation code.
-func materializeGitHubSharedActions(raw []byte, files map[string][]byte) ([]byte, map[string][]byte, error) {
-	if !strings.Contains(string(raw), "./"+githubSharedDirectory) {
+func materializeGitHubSharedActions(plan *Plan, raw []byte, files map[string][]byte) ([]byte, map[string][]byte, error) {
+	sharedDirectory := githubActionsDirectoryFor(plan) + "shared/"
+	if !strings.Contains(string(raw), "./"+sharedDirectory) {
 		return raw, files, nil
 	}
 	var data githubActionDataDocument
-	if err := canonical.UnmarshalExact(files[GitHubActionDataPath], &data); err != nil {
+	if err := canonical.UnmarshalExact(files[githubActionDataPathFor(plan)], &data); err != nil {
 		return nil, nil, e.Wrap(e.CodePipelineDrift, err, "decode shared GitHub action data")
 	}
 	var document yamlv3.Node
@@ -45,7 +46,7 @@ func materializeGitHubSharedActions(raw []byte, files map[string][]byte) ([]byte
 				call = call.Alias
 			}
 			uses := githubYAMLValue(call, "uses")
-			if !strings.HasPrefix(uses, "./"+githubSharedDirectory) {
+			if !strings.HasPrefix(uses, "./"+sharedDirectory) {
 				continue
 			}
 			entry, exists := data.Entries[jobID]
@@ -66,9 +67,9 @@ func materializeGitHubSharedActions(raw []byte, files map[string][]byte) ([]byte
 				return nil, nil, e.New(e.CodePipelineDrift, "shared action %q requires composite steps", path)
 			}
 			with := githubYAMLField(call, "with")
-			if uses == "./"+githubSharedDirectory+"prepare-stage" || uses == "./"+githubSharedDirectory+"prepare-stage-container" {
+			if uses == "./"+sharedDirectory+"prepare-stage" || uses == "./"+sharedDirectory+"prepare-stage-container" {
 				if prepared || githubYAMLValue(call, "id") != githubContextStepID || githubYAMLValue(with, "action") != "${{ github.job }}" ||
-					len(inner.Content) != 2 || githubYAMLValue(inner.Content[1], "run") != githubRunnerCommand("describe-action", "", "")+` --action "$NVKR_ACTION"` {
+					len(inner.Content) != 2 || githubYAMLValue(inner.Content[1], "run") != githubRunnerCommand(plan, "describe-action", "", "")+` --action "$NVKR_ACTION"` {
 					return nil, nil, e.New(e.CodeEngineCapability, "job %q changes shared action preparation", jobID)
 				}
 				artifact := githubYAMLField(with, "runner-artifact")
@@ -109,7 +110,7 @@ func materializeGitHubSharedActions(raw []byte, files map[string][]byte) ([]byte
 			if len(with.Content) == 0 {
 				githubYAMLRemove(call, "with")
 			}
-			localPath := githubActionsDirectory + "jobs/" + jobID + "/" + part
+			localPath := githubActionsDirectoryFor(plan) + "jobs/" + jobID + "/" + part
 			var err error
 			materialized[localPath+"/action.yml"], err = encodeGitHubYAML(body)
 			if err != nil {
@@ -150,6 +151,24 @@ func materializeGitHubInterfaceSteps(steps *yamlv3.Node, values map[string]strin
 			githubYAMLRemove(step, "if")
 		} else if condition != "" && condition != githubAlwaysCondition {
 			return e.New(e.CodeEngineCapability, "shared action changes operation %q condition", role)
+		}
+		if role == "upload" && values["upload_name_attempt"] != "" {
+			name := githubYAMLField(githubYAMLField(step, "with"), "name")
+			if name == nil || name.Value != githubStandaloneUploadNameExpression {
+				return e.New(e.CodeEngineCapability, "shared upload changes its provider-attempt name interface")
+			}
+			switch values["upload_name_attempt"] {
+			case "true":
+				original := values["upload_with_name"] + githubAttemptUploadNameSuffix
+				if _, ok := githubAttemptUploadName(original, values["upload_with_path"]); !ok {
+					return e.New(e.CodeEngineCapability, "shared upload has an unsupported provider-attempt name")
+				}
+				*name = *githubYAMLString(original)
+			case "false":
+				*name = *githubYAMLString(githubParameterExpression("upload_with_name"))
+			default:
+				return e.New(e.CodePipelineDrift, "shared upload has invalid provider-attempt name metadata")
+			}
 		}
 		if role == "upload" && values["upload_path_input"] != "" {
 			path := githubYAMLField(githubYAMLField(step, "with"), "path")

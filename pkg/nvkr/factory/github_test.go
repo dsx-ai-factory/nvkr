@@ -6,7 +6,7 @@ package factory
 import (
 	"bytes"
 	"context"
-	"errors"
+	"path"
 	"strings"
 	"testing"
 
@@ -16,6 +16,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -77,39 +78,70 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
+	bootstrapJob, bootstrapMember := githubTestBootstrap(t, bundle)
+	stages, _, err := githubStages(plan)
+	if err != nil || len(stages) == 0 {
+		t.Fatalf("fixture has no stages: %v", err)
+	}
+	stage := stages[0]
+	executeMember, _ := githubTestSharedInvocation(t, bundle, stage.ID, "execute", stage.Nodes[0].ID)
+	set := func(value string, fields ...string) func(*testing.T, *yamlv3.Node) {
+		return func(t *testing.T, root *yamlv3.Node) { githubTestYAMLField(t, root, fields...).Value = value }
+	}
+	step := func(t *testing.T, root *yamlv3.Node, field, value string) *yamlv3.Node {
+		return githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), field, value)
+	}
+	setup := func(t *testing.T, root *yamlv3.Node) *yamlv3.Node {
+		return githubTestYAMLField(t, step(t, root, "uses", plan.Actions["setup-go"].Uses()), "with")
+	}
+	rewriteRun := func(field, value, before, after string) func(*testing.T, *yamlv3.Node) {
+		return func(t *testing.T, root *yamlv3.Node) {
+			run := githubTestYAMLField(t, step(t, root, field, value), "run")
+			if strings.Count(run.Value, before) != 1 {
+				t.Fatalf("fixture command does not uniquely contain %q", before)
+			}
+			run.Value = strings.Replace(run.Value, before, after, 1)
+		}
+	}
 	tests := []struct {
-		name string
-		old  []byte
-		new  []byte
-		code e.Code
+		name, member string
+		mutate       func(*testing.T, *yamlv3.Node)
+		code         e.Code
+		reason       string
 	}{
-		{name: "execution-event", code: e.CodeEngineCapability, old: []byte(githubExecutionCondition), new: []byte("true")},
-		{name: "job-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 15"), new: []byte("timeout-minutes: 0")},
-		{name: "stage-timeout", code: e.CodeEngineCapability, old: []byte("timeout-minutes: 60"), new: []byte("timeout-minutes: 59")},
-		{name: "cancel-running-publication", code: e.CodeEngineCapability, old: []byte("cancel-in-progress: false"), new: []byte("cancel-in-progress: true")},
-		{name: "unplanned-launch-argument", code: e.CodeEngineCapability, old: []byte("factory github run-node --plan"), new: []byte("factory github run-node --network bridge --plan")},
-		{name: "node-dispatch", code: e.CodeEngineCapability, old: []byte("factory github run-node --plan"), new: []byte("factory execute-node --plan")},
-		{name: "setup-go-version", old: []byte("go-version-file: '.go-version'"), new: []byte("go-version-file: 'go.mod'")},
-		{name: "setup-go-cache", code: e.CodeInvalidCatalog, old: []byte("cache: 'false'"), new: []byte("cache: 'true'")},
-		{name: "setup-go-cache-removed", code: e.CodeInvalidCatalog, old: []byte("cache: 'false'"), new: nil},
-		{name: "output", old: []byte("if-no-files-found: error"), new: []byte("if-no-files-found: ignore")},
-		{name: "checkout-credential", old: []byte("persist-credentials: 'false'"), new: []byte("persist-credentials: 'true'")},
-		{name: "pull-request-trigger", code: e.CodeEngineCapability, old: []byte("workflow_dispatch: {}"), new: []byte("workflow_dispatch: {}\n  pull_request: {}")},
-		{name: "push-trigger", code: e.CodeEngineCapability, old: []byte("workflow_dispatch: {}"), new: []byte("workflow_dispatch: {}\n  push: {}")},
-		{name: "regeneration-gate", old: []byte("--root . --check"), new: []byte("--root . --dry-run")},
+		{"execution-event", bundle.WorkflowPath, set("true", "jobs", stage.ID, "if"), e.CodeEngineCapability, "admitted branch"},
+		{"job-timeout", bundle.WorkflowPath, set("0", "jobs", bootstrapJob, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
+		{"stage-timeout", bundle.WorkflowPath, set("59", "jobs", stage.ID, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
+		{"cancel-running-publication", bundle.WorkflowPath, set("true", "concurrency", "cancel-in-progress"), e.CodeEngineCapability, "concurrency"},
+		{"unplanned-launch-argument", executeMember, rewriteRun("id", "operation_execute", "factory github run-node --plan", "factory github run-node --network bridge --plan"), e.CodeEngineCapability, ""},
+		{"node-dispatch", executeMember, rewriteRun("id", "operation_execute", "factory github run-node --plan", "factory execute-node --plan"), e.CodeEngineCapability, ""},
+		{"setup-go-version", bootstrapMember, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, setup(t, root), "go-version-file").Value = "go.mod"
+		}, e.CodeInvalidCatalog, "pinned Go toolchain"},
+		{"setup-go-cache", bootstrapMember, func(t *testing.T, root *yamlv3.Node) { githubTestYAMLField(t, setup(t, root), "cache").Value = "true" }, e.CodeInvalidCatalog, "pinned Go toolchain"},
+		{"setup-go-cache-removed", bootstrapMember, func(t *testing.T, root *yamlv3.Node) { githubYAMLRemove(setup(t, root), "cache") }, e.CodeInvalidCatalog, "pinned Go toolchain"},
+		{"output", bootstrapMember, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, step(t, root, "name", "Upload NVKR runner"), "with", "if-no-files-found").Value = "ignore"
+		}, e.CodeEngineCapability, "missing declared output"},
+		{"checkout-credential", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			checkout := githubTestYAMLStep(t, githubTestYAMLField(t, root, "jobs", bootstrapJob, "steps"), "uses", plan.Actions["checkout"].Uses())
+			githubTestYAMLField(t, checkout, "with", "persist-credentials").Value = "true"
+		}, e.CodeEngineCapability, "ambient credentials"},
+		{"pull-request-trigger", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubYAMLSet(githubTestYAMLField(t, root, "on"), "pull_request", githubYAMLMap())
+		}, e.CodeEngineCapability, "manual dispatch"},
+		{"push-trigger", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubYAMLSet(githubTestYAMLField(t, root, "on"), "push", githubYAMLMap())
+		}, e.CodeEngineCapability, "manual dispatch"},
+		{"regeneration-gate", bootstrapMember, rewriteRun("id", "validate-catalog", "--root . --check", "--root . --dry-run"), e.CodeInvalidCatalog, "build and transport the runner"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mutated := replaceGitHubBundleBytes(t, bundle, test.old, test.new)
+			mutated := mutateGitHubBundleYAML(t, bundle, test.member, func(root *yamlv3.Node) { test.mutate(t, root) })
 			err := ValidateGitHubBundle(context.Background(), plan, mutated)
-			if err == nil {
-				t.Fatal("tampered workflow passed static validation")
-			}
-			if test.code != "" {
-				var coded *e.Error
-				if !errors.As(err, &coded) || coded.Code != test.code {
-					t.Fatalf("want %s, got %v", test.code, err)
-				}
+			assertFactoryErrorCode(t, err, test.code)
+			if test.reason != "" && !strings.Contains(err.Error(), test.reason) {
+				t.Fatalf("wrong guard rejected mutation: %v", err)
 			}
 		})
 	}
@@ -212,44 +244,190 @@ func testActionRefs(t *testing.T, plan *Plan) githubActionRefs {
 // Expand the generated local actions before asserting the logical job contract.
 func expandedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
 	t.Helper()
-	raw, err := expandGitHubActions(bundle.Files[GitHubWorkflowPath], bundle.Files)
+	var plan Plan
+	if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := expandGitHubActions(&plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return raw
 }
 
-// Mutate executable bundle bytes while retaining every other member. This avoids
-// accidentally testing a no-op when a step moves between the workflow and an action.
-func replaceGitHubBundleBytes(t *testing.T, bundle *GeneratedBundle, old, replacement []byte) *GeneratedBundle {
+// Mutation fixtures name the exact member instead of searching unrelated jobs,
+// templates or serialized strings for the first coincidental match.
+func mutateGitHubBundleFile(t *testing.T, bundle *GeneratedBundle, member string, mutate func([]byte) []byte) *GeneratedBundle {
 	t.Helper()
+	original, exists := bundle.Files[member]
+	if !exists || len(original) == 0 {
+		t.Fatalf("mutation member %q is missing", member)
+	}
+	raw := mutate(append([]byte(nil), original...))
+	if bytes.Equal(raw, original) {
+		t.Fatalf("mutation did not change %q", member)
+	}
 	changed := *bundle
 	changed.Files = make(map[string][]byte, len(bundle.Files))
-	for name, raw := range bundle.Files {
-		changed.Files[name] = append([]byte(nil), raw...)
+	for name, previous := range bundle.Files {
+		changed.Files[name] = previous
 	}
-	for _, name := range sortedKeys(changed.Files) {
-		if !strings.HasSuffix(name, ".yml") || !bytes.Contains(changed.Files[name], old) {
-			continue
-		}
-		changed.Files[name] = bytes.Replace(changed.Files[name], old, replacement, 1)
-		if name == GitHubWorkflowPath {
-			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[name])
-		}
-		return &changed
+	changed.Files[member] = raw
+	if member == bundle.WorkflowPath {
+		changed.WorkflowDigest = pipeline.FileDigest(raw)
 	}
-	// Literal transport settings can now live in structured parameter data.
-	// Mutate their expanded semantic field and regenerate the shared boundary.
-	expanded := expandedGitHubWorkflow(t, bundle)
-	if bytes.Contains(expanded, old) {
-		var plan Plan
-		if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
+	return &changed
+}
+
+func mutateGitHubBundleYAML(t *testing.T, bundle *GeneratedBundle, member string, mutate func(*yamlv3.Node)) *GeneratedBundle {
+	t.Helper()
+	return mutateGitHubBundleFile(t, bundle, member, func(raw []byte) []byte {
+		var document yamlv3.Node
+		if err := yamlv3.Unmarshal(raw, &document); err != nil || len(document.Content) != 1 {
+			t.Fatalf("decode mutation member %q: %v", member, err)
+		}
+		before, err := encodeGitHubYAML(&document)
+		if err != nil {
 			t.Fatal(err)
 		}
-		return relowerGitHubTestBundle(t, &plan, bundle, bytes.Replace(expanded, old, replacement, 1))
+		mutate(document.Content[0])
+		after, err := encodeGitHubYAML(&document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Equal(before, after) {
+			t.Fatalf("mutation did not change a field in %q", member)
+		}
+		return after
+	})
+}
+
+func githubTestYAMLField(t *testing.T, node *yamlv3.Node, fields ...string) *yamlv3.Node {
+	t.Helper()
+	for _, field := range fields {
+		if node != nil && node.Kind == yamlv3.AliasNode {
+			node = node.Alias
+		}
+		node = githubYAMLField(node, field)
+		if node == nil {
+			t.Fatalf("fixture omits YAML field %q in %v", field, fields)
+		}
 	}
-	t.Fatalf("mutation did not match any executable bundle member: %q", old)
-	return nil
+	if node.Kind == yamlv3.AliasNode {
+		node = node.Alias
+	}
+	return node
+}
+
+func githubTestYAMLStep(t *testing.T, steps *yamlv3.Node, field, value string) *yamlv3.Node {
+	t.Helper()
+	if steps.Kind != yamlv3.SequenceNode {
+		t.Fatal("fixture steps are not a sequence")
+	}
+	var found *yamlv3.Node
+	for _, step := range steps.Content {
+		if step.Kind == yamlv3.AliasNode {
+			step = step.Alias
+		}
+		if githubYAMLValue(step, field) == value {
+			if found != nil {
+				t.Fatalf("fixture repeats step %s=%q", field, value)
+			}
+			found = step
+		}
+	}
+	if found == nil {
+		t.Fatalf("fixture omits step %s=%q", field, value)
+	}
+	return found
+}
+
+func githubTestBootstrap(t *testing.T, bundle *GeneratedBundle) (jobID, member string) {
+	t.Helper()
+	document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+	for _, id := range sortedKeys(document.Jobs) {
+		if !strings.HasPrefix(id, "build-runner-") {
+			continue
+		}
+		for _, step := range document.Jobs[id].Steps {
+			if !strings.HasPrefix(step.Uses, "./") || !strings.Contains(step.Uses, "/bootstrap-") {
+				continue
+			}
+			if member != "" {
+				t.Fatalf("fixture bootstrap %q has more than one implementation", id)
+			}
+			jobID, member = id, strings.TrimPrefix(step.Uses, "./")+"/action.yml"
+		}
+		if member != "" && len(bundle.Files[member]) > 0 {
+			return jobID, member
+		}
+	}
+	t.Fatal("fixture has no referenced bootstrap implementation")
+	return "", ""
+}
+
+func githubTestSharedInvocation(t *testing.T, bundle *GeneratedBundle, jobID, role, selector string) (member, part string) {
+	t.Helper()
+	var data githubActionDataDocument
+	if err := canonical.UnmarshalExact(bundle.Files[path.Join(path.Dir(bundle.PlanPath), "action-data.json")], &data); err != nil {
+		t.Fatal(err)
+	}
+	job, exists := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs[jobID]
+	if !exists {
+		t.Fatalf("fixture omits job %q", jobID)
+	}
+	for _, step := range job.Steps {
+		binding := step.With["parameters"]
+		if binding == "" {
+			continue
+		}
+		prefix := "${{ fromJSON(steps." + githubContextStepID + ".outputs.data)['"
+		key := strings.TrimSuffix(strings.TrimPrefix(binding, prefix), "'] }}")
+		if binding != githubParametersExpression(key) {
+			t.Fatalf("fixture job %q has an unknown parameter binding", jobID)
+		}
+		var values map[string]string
+		if err := canonical.UnmarshalExact([]byte(data.Entries[jobID].Values[key]), &values); err != nil {
+			t.Fatal(err)
+		}
+		if values[role+"_present"] != "true" || (selector != "" && values[role+"_selector"] != selector) {
+			continue
+		}
+		if member != "" {
+			t.Fatalf("fixture job %q repeats role %q selector %q", jobID, role, selector)
+		}
+		member, part = strings.TrimPrefix(step.Uses, "./")+"/action.yml", key
+	}
+	if member == "" || len(bundle.Files[member]) == 0 {
+		t.Fatalf("fixture job %q omits role %q selector %q", jobID, role, selector)
+	}
+	return member, part
+}
+
+func mutateGitHubActionParameters(t *testing.T, bundle *GeneratedBundle, jobID, part string, mutate func(map[string]string)) *GeneratedBundle {
+	t.Helper()
+	return mutateGitHubBundleFile(t, bundle, path.Join(path.Dir(bundle.PlanPath), "action-data.json"), func(raw []byte) []byte {
+		var data githubActionDataDocument
+		if err := canonical.UnmarshalExact(raw, &data); err != nil {
+			t.Fatal(err)
+		}
+		entry := data.Entries[jobID]
+		var values map[string]string
+		if err := canonical.UnmarshalExact([]byte(entry.Values[part]), &values); err != nil {
+			t.Fatal(err)
+		}
+		mutate(values)
+		parameters, err := canonical.Marshal(values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry.Values[part] = string(parameters)
+		changed, err := canonical.Marshal(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return changed
+	})
 }
 
 // Lower a deliberately hostile logical workflow through the same action boundary
@@ -257,11 +435,11 @@ func replaceGitHubBundleBytes(t *testing.T, bundle *GeneratedBundle, old, replac
 func relowerGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, raw []byte) *GeneratedBundle {
 	t.Helper()
 	changed := unsharedGitHubTestBundle(t, plan, bundle, raw)
-	workflow, err := shareGitHubActions(changed.Files[GitHubWorkflowPath], changed.Files, testActionRefs(t, plan))
+	workflow, err := shareGitHubActions(plan, changed.Files[bundle.WorkflowPath], changed.Files, testActionRefs(t, plan))
 	if err != nil {
 		t.Fatal(err)
 	}
-	changed.Files[GitHubWorkflowPath] = workflow
+	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return changed
 }
@@ -273,14 +451,14 @@ func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle,
 	if !bytes.Contains(raw, []byte("# plan: ")) {
 		raw = append([]byte("# qualification: "+plan.Qualification.String()+"\n# plan: "+bundle.PlanPath+"\n# manifest: "+bundle.ManifestPath+"\n"), raw...)
 	}
-	workflow, files, err := lowerGitHubActions(raw, testActionRefs(t, plan))
+	workflow, files, err := lowerGitHubActions(plan, raw, testActionRefs(t, plan))
 	if err != nil {
 		t.Fatal(err)
 	}
 	changed := *bundle
 	changed.Files = files
 	changed.Files[bundle.PlanPath] = append([]byte(nil), bundle.Files[bundle.PlanPath]...)
-	changed.Files[GitHubWorkflowPath] = workflow
+	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return &changed
 }

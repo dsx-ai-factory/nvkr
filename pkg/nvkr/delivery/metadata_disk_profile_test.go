@@ -36,6 +36,7 @@ func TestInspectMetadataEnforcesDiskBindingWithoutPayloads(t *testing.T) {
 			}{
 				{"valid", nil},
 				{"size contradiction", func(object *PublishedObject) { object.Output.Disk.Size++ }},
+				{"LUKS2 with strict evidence", func(object *PublishedObject) { object.Output.Disk.Encryption = "luks2" }},
 				{"platform contradiction", func(object *PublishedObject) {
 					object.Arch = map[string]string{"amd64": "arm64", "arm64": "amd64"}[object.Arch]
 				}},

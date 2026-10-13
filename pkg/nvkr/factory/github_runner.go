@@ -81,9 +81,10 @@ func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHu
 	}
 	defer cancel()
 	ctx = bounded
-	// The generated hosted layout is fixed. Bind its live Plan to the caller's
-	// admitted object before launch and require the inner helper to check it again.
-	diskPlan, err := LoadPlanContext(ctx, FactoryPlanPath)
+	// The admitted Environment selects one fixed hosted layout. Bind its live Plan
+	// before launch and require the inner helper to check it again.
+	planPath := githubLayoutFor(plan).planPath
+	diskPlan, err := LoadPlanContext(ctx, planPath)
 	if err != nil {
 		return err
 	}
@@ -102,9 +103,11 @@ func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHu
 	if err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "resolve GitHub utility workspace")
 	}
+	developmentContext := plan.Environment.GitHubDevelopment && plan.Environment.Publication != nil
 	location := utilityRunnerLocation{runtime: plan.Environment.RuntimeBinary(), mountSource: root, mountTarget: "/workspace",
-		helper: "/workspace/nvkr-exec", plan: FactoryPlanPath, planDigest: expected,
-		publicationRunContext: PerOutputPublication(plan) && node.PackageKind == PackageOCI}
+		helper: "/workspace/nvkr-exec", plan: planPath, planDigest: expected,
+		publicationRunContext: developmentContext || (PerOutputPublication(plan) && node.PackageKind == PackageOCI),
+		developmentRunContext: developmentContext}
 	if location.runtime == "docker" {
 		location.user, location.home = localContainerUser(), true
 	}
@@ -211,6 +214,9 @@ func admitGitHubPlan(ctx context.Context, plan *Plan) error {
 		return e.New(e.CodeUsage, "GitHub execution requires a Plan")
 	}
 	if err := plan.Validate(); err != nil {
+		return err
+	}
+	if err := admitDevelopmentHostedContext(plan); err != nil {
 		return err
 	}
 	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub execution"); err != nil {

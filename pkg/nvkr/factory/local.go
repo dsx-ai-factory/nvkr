@@ -26,6 +26,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 )
 
 const (
@@ -51,6 +52,7 @@ type LocalRunOptions struct {
 	Stdout       io.Writer
 	Stderr       io.Writer
 	Activity     *buildactivity.Sink // Optional descriptive log metadata only.
+	Progress     *progress.Monitor   // Optional descriptive latest state only.
 	// Diagnostics is an opaque lifecycle-issued attempt-directory capability.
 	// A path or serialized description cannot substitute for it.
 	Diagnostics   *pipeline.PackerDiagnosticSink
@@ -227,6 +229,14 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err != nil {
 		return nil, err
 	}
+	if !options.Progress.Matches("", planDigest) {
+		options.Progress = nil
+	}
+	progressMode := "local"
+	if options.DryRun {
+		progressMode = "dry-run"
+	}
+	options.Progress.Start(progressMode)
 	result = &LocalRunResult{SchemaVersion: LocalRunSchemaVersion,
 		Qualification: TierLocalExecution, PlanDigest: planDigest,
 		Workspace: filepath.ToSlash(options.Workspace)}
@@ -248,6 +258,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 				status = "skipped"
 			}
 			result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: status})
+			if status == "skipped" {
+				options.Progress.SetOperation(node.ID, "skipped", "")
+			}
 			fmt.Fprintf(options.Stdout, "[%s] %s (%s)\n", status, node.ID, node.Kind)
 		}
 		completed = true
@@ -324,6 +337,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	// One scheduling pass covers producers and utility work. A batch contains only
 	// ready operations; cancel and join the whole batch before returning failure.
 	status := make(map[string]string, len(ordered))
+	options.Progress.SetPhase("execution")
 	for len(status) < len(ordered) {
 		var ready []Node
 		for _, node := range ordered {
@@ -332,6 +346,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 			}
 			if requiresPublication(node.Kind) && !options.Publish {
 				status[node.ID] = "skipped"
+				options.Progress.SetOperation(node.ID, "skipped", "")
 				result.Nodes = append(result.Nodes, LocalNodeResult{ID: node.ID, Kind: node.Kind, Status: "skipped"})
 				continue
 			}
@@ -468,8 +483,24 @@ func (w lockedLocalWriter) Write(p []byte) (int, error) {
 
 func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string,
 	owner *LocalRunResult, deps localRunDeps,
-) (LocalNodeResult, error) {
-	result := LocalNodeResult{ID: node.ID, Kind: node.Kind}
+) (result LocalNodeResult, returnErr error) {
+	result = LocalNodeResult{ID: node.ID, Kind: node.Kind}
+	defer func() {
+		state, code := "completed", ""
+		if returnErr != nil {
+			state, code = "failed", string(e.CodeInternal)
+			var coded *e.Error
+			if errors.As(returnErr, &coded) {
+				code = string(coded.Code)
+			}
+			if code == string(e.CodeTimeout) {
+				state = "canceled"
+			}
+		} else if result.Status == "cached" {
+			state = "cached"
+		}
+		options.Progress.SetOperation(node.ID, state, code)
+	}()
 	if err := ctx.Err(); err != nil {
 		return result, e.Wrap(e.CodeTimeout, err, "local node canceled")
 	}
@@ -499,6 +530,7 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 		}
 	}
 	fmt.Fprintf(options.Stdout, "[start] %s (%s)\n", node.ID, node.Kind)
+	options.Progress.SetOperation(node.ID, "running", "")
 	if directPacker {
 		err = populateDiskProducerCompletion(ctx, plan, node.ID, owner, deps.executeDisk)
 	} else if node.Kind == NodeVerify {
@@ -587,6 +619,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	}
 	if len(plan.Environment.GitHubRunners) > 0 {
 		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubRunners")
+	}
+	if plan.Environment.GitHubDevelopment {
+		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubDevelopment")
 	}
 	if len(plan.Environment.GitHubDispatchBranches) > 0 {
 		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubDispatchBranches")

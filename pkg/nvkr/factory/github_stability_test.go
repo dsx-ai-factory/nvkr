@@ -58,15 +58,16 @@ func nextGitHubStabilityPin(t *testing.T, value string) string {
 	return value[:index] + string(next) + value[index+1:]
 }
 
-func TestGitHubWorkflowStableAcrossRoutinePinUpdates(t *testing.T) {
+func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 	for _, test := range []struct {
-		name        string
-		fixture     func(*testing.T) *Plan
-		mutate      func(*testing.T, *githubStabilityInputs)
-		wantActions bool
-		wantData    bool
-		spliceCode  e.Code
-		spliceMatch func(string, []byte) bool
+		name         string
+		fixture      func(*testing.T) *Plan
+		mutate       func(*testing.T, *githubStabilityInputs)
+		wantActions  bool
+		wantData     bool
+		wantWorkflow bool
+		spliceCode   e.Code
+		spliceMatch  func(string, []byte) bool
 	}{
 		{
 			name: "source commits and trees", fixture: githubTestPlan, wantData: true,
@@ -132,7 +133,7 @@ func TestGitHubWorkflowStableAcrossRoutinePinUpdates(t *testing.T) {
 			},
 		},
 		{
-			name: "upload action pin", fixture: githubTestPlan, wantActions: true, spliceCode: e.CodeEngineCapability,
+			name: "summary-referenced upload action pin", fixture: githubTestPlan, wantActions: true, wantWorkflow: true, spliceCode: e.CodeEngineCapability,
 			mutate: func(t *testing.T, inputs *githubStabilityInputs) {
 				pin := inputs.catalog.Actions["upload-artifact"]
 				pin.SHA = nextGitHubStabilityPin(t, pin.SHA)
@@ -157,8 +158,17 @@ func TestGitHubWorkflowStableAcrossRoutinePinUpdates(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !bytes.Equal(before.Files[GitHubWorkflowPath], after.Files[GitHubWorkflowPath]) || before.WorkflowDigest != after.WorkflowDigest {
-				t.Fatal("routine pin update changed the top-level workflow")
+			workflowChanged := !bytes.Equal(before.Files[GitHubWorkflowPath], after.Files[GitHubWorkflowPath])
+			if workflowChanged != test.wantWorkflow || (before.WorkflowDigest != after.WorkflowDigest) != test.wantWorkflow {
+				t.Fatalf("pin update changed the top-level workflow = %t, want %t", workflowChanged, test.wantWorkflow)
+			}
+			if test.wantWorkflow {
+				// The closing summary consumes this upload's outputs and outcome,
+				// so its pinned external action must remain in the caller's scope.
+				want := bytes.ReplaceAll(before.Files[GitHubWorkflowPath], []byte(beforePlan.Actions["upload-artifact"].Uses()), []byte(afterPlan.Actions["upload-artifact"].Uses()))
+				if !bytes.Equal(want, after.Files[GitHubWorkflowPath]) {
+					t.Fatal("upload pin update changed more than the visible pinned action")
+				}
 			}
 			if !slices.Equal(sortedFileNames(before.Files), sortedFileNames(after.Files)) {
 				t.Fatal("routine pin update changed generated member paths")
@@ -174,8 +184,8 @@ func TestGitHubWorkflowStableAcrossRoutinePinUpdates(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if bytes.Equal(beforeManifest, afterManifest) || manifest.PlanDigest != after.PlanDigest || manifest.WorkflowDigest != before.WorkflowDigest {
-				t.Fatal("manifest does not bind the new Plan to the stable workflow")
+			if bytes.Equal(beforeManifest, afterManifest) || manifest.PlanDigest != after.PlanDigest || manifest.WorkflowDigest != after.WorkflowDigest {
+				t.Fatal("manifest does not bind the new Plan to its exact workflow")
 			}
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), afterPlan, before), e.CodePipelineDrift)
 			changedActions := 0

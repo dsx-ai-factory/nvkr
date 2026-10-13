@@ -23,6 +23,10 @@ import (
 const maxInspectionBytes int64 = 2 << 30
 const maxScannerOutput = 32 << 20
 
+// debianArchiveMetadataMethod describes diagnostic control metadata only. It is
+// deliberately excluded from the dependency SBOM owner's admitted methods.
+const debianArchiveMetadataMethod = "syft-debian-archive-metadata/v1"
+
 type Scanner struct{ Path, Digest string }
 
 type DependencyInventory struct {
@@ -66,6 +70,20 @@ func (receipt *DependencyScanReceipt) Inventory() DependencyInventory {
 // digest-pinned executable; it receives a held artifact descriptor and a minimal
 // environment. The workflow runs this node with networking disabled.
 func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind string, scanner Scanner) (DependencyInventory, error) {
+	return inspectPathDependencies(ctx, artifactPath, artifactDigest, kind, scanner, false)
+}
+
+// InspectDebianArchiveMetadata is a diagnostic API for package/control metadata,
+// not payload dependencies or target-platform verification. It selects a fixed
+// private archive snapshot name independent of the caller's filename. Its method
+// is rejected by dependency SBOM attachment and serialized BOM validation.
+func InspectDebianArchiveMetadata(ctx context.Context, artifactPath, artifactDigest string, scanner Scanner) (DependencyInventory, error) {
+	return inspectPathDependencies(ctx, artifactPath, artifactDigest, "host-package", scanner, true)
+}
+
+// inspectPathDependencies authenticates the exact path bytes and scanner before
+// dispatching either ordinary dependency inspection or explicit diagnostics.
+func inspectPathDependencies(ctx context.Context, artifactPath, artifactDigest, kind string, scanner Scanner, debianArchiveMetadata bool) (DependencyInventory, error) {
 	if ctx == nil {
 		return DependencyInventory{}, e.New(e.CodeUsage, "dependency inspection requires context")
 	}
@@ -96,7 +114,7 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 	if subject.Digest() != artifactDigest {
 		return DependencyInventory{}, e.New(e.CodeVerifyFailed, "SBOM subject bytes differ from producer digest")
 	}
-	return inspectHeldDependencies(ctx, subject, kind, scanner)
+	return inspectHeldDependencies(ctx, subject, kind, scanner, debianArchiveMetadata)
 }
 
 // InspectHeldDependencies consumes the existing held capability without opening
@@ -123,7 +141,7 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	inventory, err := inspectHeldDependencies(ctx, subject, kind, scanner)
+	inventory, err := inspectHeldDependencies(ctx, subject, kind, scanner, false)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +151,10 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	return &DependencyScanReceipt{subject: subject.Digest(), size: subject.Size(), kind: kind, inventory: inventory}, nil
 }
 
-func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner) (DependencyInventory, error) {
+// inspectHeldDependencies scans the held bytes with the pinned scanner and
+// authenticates any private snapshot before returning its inventory. Explicit
+// Debian metadata diagnostics select archive discovery without supplying byte authority.
+func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, debianArchiveMetadata bool) (DependencyInventory, error) {
 	artifactDigest := subject.Digest()
 	if kind == "tarball" {
 		components, err := inspectHelmArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
@@ -166,7 +187,11 @@ func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	// then recheck it before accepting the inventory. OCI scans use the held FD.
 	var snapshot string
 	if kind == "host-package" {
-		snapshot = filepath.Join(workdir, "subject")
+		name := "subject"
+		if debianArchiveMetadata {
+			name = "subject.deb"
+		}
+		snapshot = filepath.Join(workdir, name)
 		file, err := os.OpenFile(snapshot, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o400)
 		if err != nil {
 			return DependencyInventory{}, e.Wrap(e.CodeInternal, err, "staging scanner subject")
@@ -221,6 +246,9 @@ func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 		return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "scanner returned unsupported inventory schema")
 	}
 	result := DependencyInventory{Method: "syft-cyclonedx/v1", ScannerDigest: scanner.Digest}
+	if kind == "host-package" && debianArchiveMetadata {
+		result.Method = debianArchiveMetadataMethod
+	}
 	for _, component := range scanned.Components {
 		// CycloneDX file entries are scanner evidence locations, not package
 		// dependencies. Their temporary paths must not enter artifact identity.

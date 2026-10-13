@@ -3,8 +3,9 @@
 
 // Package lifecycle owns the Definition-to-Run-to-Release workflow.
 // PrepareFiles freezes a Run attempt for ExecuteLocal; GenerateFiles prepares
-// hosted execution, and Consumer.Verify authenticates a published Release under
-// consumer policy. This package owns frozen output requirements, attempt state,
+// hosted execution, and Consumer.Verify verifies published Release payloads under
+// consumer policy. Consumer.Authenticate checks signed claims without payloads.
+// This package owns frozen output requirements, attempt state,
 // outer publication membership and public projections. Definition owns authored
 // admission, factory owns compilation and typed payload observation, and delivery
 // owns publication bytes.
@@ -40,6 +41,7 @@ const (
 	LaneQualified            = "qualified"
 	LanePipeline             = "pipeline-attested"
 	LaneUnqualified          = "static-unqualified"
+	ScopeAuthenticity        = "authenticity"
 	ScopeArtifactPublication = "artifact-publication"
 	ScopeRelease             = "release"
 )
@@ -146,8 +148,8 @@ func (policy VerificationPolicy) Validate() error {
 		}
 		return nil
 	case LanePipeline:
-		if policy.Scope != ScopeArtifactPublication && policy.Scope != ScopeRelease {
-			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires an explicit artifact-publication or release scope")
+		if policy.Scope != ScopeAuthenticity && policy.Scope != ScopeArtifactPublication && policy.Scope != ScopeRelease {
+			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires an explicit authenticity, artifact-publication or release scope")
 		}
 		if strings.TrimSpace(policy.IdentityRegexp) == "" || strings.TrimSpace(policy.Issuer) == "" {
 			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires identity and issuer")

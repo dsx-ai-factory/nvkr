@@ -24,7 +24,11 @@ import (
 func sharedGitHubActionData(t *testing.T, bundle *GeneratedBundle) githubActionDataDocument {
 	t.Helper()
 	var data githubActionDataDocument
-	if err := canonical.UnmarshalExact(bundle.Files[GitHubActionDataPath], &data); err != nil {
+	dataPath := GitHubActionDataPath
+	if bundle.PlanPath != "" {
+		dataPath = filepath.ToSlash(filepath.Join(filepath.Dir(bundle.PlanPath), "action-data.json"))
+	}
+	if err := canonical.UnmarshalExact(bundle.Files[dataPath], &data); err != nil {
 		t.Fatal(err)
 	}
 	if len(data.Entries) == 0 {
@@ -34,7 +38,8 @@ func sharedGitHubActionData(t *testing.T, bundle *GeneratedBundle) githubActionD
 }
 
 func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
-	actions := testActionRefs(t, githubTestPlan(t))
+	plan := githubTestPlan(t)
+	actions := testActionRefs(t, plan)
 	var firstTemplates map[string][]byte
 	var executionTemplate string
 	for _, count := range []int{1, 3, 8} {
@@ -47,15 +52,15 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				fmt.Fprintf(&source, "      - name: Download NVKR runner\n        uses: %s\n        with:\n          name: nvkr-exec-linux-amd64\n          path: '.'\n", actions.Download)
 				fmt.Fprintf(&source, "      - name: %s\n        run: %s\n", prepareHelperStepName, prepareHelperRun)
 				selector := fmt.Sprintf("producer-node-%d", index)
-				fmt.Fprintf(&source, "      - name: Execute producer %d\n        id: producer-%d\n        run: %s\n", index, index, githubRunnerCommand("run-node", "node", selector))
-				fmt.Fprintf(&source, "      - name: Collect producer %d\n        run: %s\n", index, githubRunnerCommand("pack-outputs", "node", selector))
-				actions.writeUploadStep(&source, fmt.Sprintf("producer %d", index), fmt.Sprintf("producer-carrier-%d", index), fmt.Sprintf("producer-%d.tar", index))
+				fmt.Fprintf(&source, "      - name: Execute producer %d\n        id: producer-%d\n        run: %s\n", index, index, githubRunnerCommand(plan, "run-node", "node", selector))
+				fmt.Fprintf(&source, "      - name: Collect producer %d\n        run: %s\n", index, githubRunnerCommand(plan, "pack-outputs", "node", selector))
+				actions.writeUploadStep(&source, plan, fmt.Sprintf("producer %d", index), fmt.Sprintf("producer-carrier-%d", index), fmt.Sprintf("producer-%d.tar", index))
 			}
-			workflow, files, err := lowerGitHubActions(source.Bytes(), actions)
+			workflow, files, err := lowerGitHubActions(plan, source.Bytes(), actions)
 			if err != nil {
 				t.Fatal(err)
 			}
-			workflow, err = shareGitHubActions(workflow, files, actions)
+			workflow, err = shareGitHubActions(plan, workflow, files, actions)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +112,7 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				}
 			}
 			assertGitHubCompositeReadableYAML(t, "workflow", workflow)
-			expanded, err := expandGitHubActions(workflow, files)
+			expanded, err := expandGitHubActions(plan, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -128,6 +133,9 @@ func TestGitHubSharedActionParametersContainDataWithoutPrograms(t *testing.T) {
 			plan, _, _ := authenticatedSourcePlan(t)
 			return plan
 		}},
+		{name: "strict ARC inspection", fixture: func(t *testing.T) *Plan { return arcTestPlan(t, "linux/amd64") }},
+		{name: "qualification handoff", fixture: referenceTestPlan},
+		{name: "development", fixture: githubDevelopmentTestPlan},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			assertGitHubSharedActionParameterData(t, test.fixture(t))
@@ -174,7 +182,7 @@ func assertGitHubSharedActionParameterData(t *testing.T, plan *Plan) {
 	}
 	selectorPrograms := 0
 	for name, raw := range bundle.Files {
-		if !strings.HasPrefix(name, githubSharedDirectory) {
+		if !strings.HasPrefix(name, githubActionsDirectoryFor(plan)+"shared/") {
 			continue
 		}
 		var action struct {
@@ -200,6 +208,127 @@ func assertGitHubSharedActionParameterData(t *testing.T, plan *Plan) {
 	}
 	if selectorPrograms == 0 {
 		t.Fatal("fixture does not exercise a shared selector-consuming implementation")
+	}
+}
+
+func TestGitHubSharedAttemptUploadNamesPreserveProviderContext(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		fixture func(*testing.T) *Plan
+		want    func(*Plan, githubActionRefs) githubStep
+	}{
+		{"inspection amd64", func(t *testing.T) *Plan { return arcTestPlan(t, "linux/amd64") }, func(plan *Plan, actions githubActionRefs) githubStep {
+			return githubInspectionDiagnosticStep(actions, plan.LifecycleOutputs[0].Name)
+		}},
+		{"inspection arm64", func(t *testing.T) *Plan { return arcTestPlan(t, "linux/arm64") }, func(plan *Plan, actions githubActionRefs) githubStep {
+			return githubInspectionDiagnosticStep(actions, plan.LifecycleOutputs[0].Name)
+		}},
+		{"qualification handoff", referenceTestPlan, func(_ *Plan, actions githubActionRefs) githubStep { return githubQualificationHandoffStep(actions) }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan := test.fixture(t)
+			want := test.want(plan, testActionRefs(t, plan))
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			concrete := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			found := 0
+			for _, job := range concrete.Jobs {
+				for _, step := range job.Steps {
+					if step.Name == want.Name {
+						found++
+						if !reflect.DeepEqual(step, want) {
+							t.Fatalf("attempt-named upload changed name, controls or inputs: %+v", step)
+						}
+					}
+				}
+			}
+			if found != 1 {
+				t.Fatalf("expected one exact %q upload, got %d", want.Name, found)
+			}
+			data := sharedGitHubActionData(t, bundle)
+			found = 0
+			for _, entry := range data.Entries {
+				for _, encoded := range entry.Values {
+					var values map[string]string
+					if err := canonical.UnmarshalExact([]byte(encoded), &values); err != nil {
+						t.Fatal(err)
+					}
+					if values["upload_name"] != want.Name {
+						continue
+					}
+					found++
+					if values["upload_name_attempt"] != "true" || values["upload_with_name"]+githubAttemptUploadNameSuffix != want.With["name"] {
+						t.Fatalf("attempt name was not separated into literal data: %v", values)
+					}
+					for key, value := range values {
+						if strings.Contains(value, "${{") {
+							t.Fatalf("provider expression escaped into invocation data %s", key)
+						}
+					}
+				}
+			}
+			if found != 1 {
+				t.Fatalf("expected one shared invocation for %q, got %d", want.Name, found)
+			}
+			workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			found = 0
+			for _, job := range workflow.Jobs {
+				for _, step := range job.Steps {
+					if step.Name != want.Name {
+						continue
+					}
+					found++
+					var action yamlv3.Node
+					path := strings.TrimPrefix(step.Uses, "./") + "/action.yml"
+					if err := yamlv3.Unmarshal(bundle.Files[path], &action); err != nil || len(action.Content) != 1 {
+						t.Fatalf("attempt upload does not use a shared action: %s / %v", step.Uses, err)
+					}
+					steps := githubYAMLField(githubYAMLField(action.Content[0], "runs"), "steps")
+					if steps == nil || len(steps.Content) != 1 || githubYAMLValue(githubYAMLField(steps.Content[0], "with"), "name") != githubStandaloneUploadNameExpression {
+						t.Fatal("provider run ID and attempt are not evaluated in the fixed action template")
+					}
+				}
+			}
+			if found != 1 {
+				t.Fatalf("expected one shared action call for %q, got %d", want.Name, found)
+			}
+		})
+	}
+}
+
+func TestGitHubSharedUploadRejectsOtherProviderNames(t *testing.T) {
+	plan := githubTestPlan(t)
+	actions := testActionRefs(t, plan)
+	for _, test := range []struct{ name, artifact, path string }{
+		{"different provider context", "nvkr-inspection-disk-${{ github.sha }}", githubInspectionLogPath("disk")},
+		{"reversed attempt fields", "nvkr-inspection-disk-${{ github.run_attempt }}-${{ github.run_id }}", githubInspectionLogPath("disk")},
+		{"unowned name", "arbitrary" + githubAttemptUploadNameSuffix, githubInspectionLogPath("disk")},
+		{"mismatched diagnostic path", "nvkr-inspection-disk" + githubAttemptUploadNameSuffix, githubInspectionLogPath("other")},
+		{"mismatched handoff path", githubQualificationHandoffName, ".nvkr/run.json"},
+		{"secret expression", "${{ secrets.NKE_SOURCE_TOKEN }}", githubInspectionLogPath("disk")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			diagnostic := githubInspectionDiagnosticStep(actions, "disk")
+			diagnostic.With["name"], diagnostic.With["path"] = test.artifact, test.path
+			document := githubWorkflowDocument{Jobs: map[string]githubJob{"diagnostic": {RunsOn: "ubuntu-24.04", Steps: []githubStep{
+				{Uses: actions.Checkout, With: map[string]string{"persist-credentials": "false"}},
+				{Name: "Download NVKR runner", Uses: actions.Download, With: map[string]string{"name": "nvkr-exec-linux-amd64", "path": "."}},
+				{Name: prepareHelperStepName, Run: prepareHelperRun},
+				diagnostic,
+			}}}}
+			raw, err := yaml.Marshal(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workflow, files, err := lowerGitHubActions(plan, raw, actions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = shareGitHubActions(plan, workflow, files, actions)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+		})
 	}
 }
 

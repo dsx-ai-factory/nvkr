@@ -17,13 +17,23 @@ import (
 func CompileDocuments(ctx context.Context, definitionPath string, definition authored.Definition,
 	environmentPath string, delivery authored.Environment, generatorVersion string,
 ) (*Plan, error) {
+	return compileDocumentsWithLoader(ctx, definitionPath, definition, environmentPath, delivery, generatorVersion,
+		func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
+			return loadFactoryCatalogStack(ctx, definitionPath, spec)
+		})
+}
+
+func compileDocumentsWithLoader(ctx context.Context, definitionPath string, definition authored.Definition,
+	environmentPath string, delivery authored.Environment, generatorVersion string,
+	loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error),
+) (*Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "definition compilation requires a context")
 	}
 	if err := admitInputs(definition, delivery); err != nil {
 		return nil, err
 	}
-	stack, err := loadFactoryCatalogStack(ctx, definitionPath, definition.Catalog)
+	stack, err := loadStack(ctx, definition.Catalog)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +42,7 @@ func CompileDocuments(ctx context.Context, definitionPath string, definition aut
 		if target.Catalog == nil {
 			continue
 		}
-		targetStack, err := loadFactoryCatalogStack(ctx, definitionPath, *target.Catalog)
+		targetStack, err := loadStack(ctx, *target.Catalog)
 		if err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "loading catalog stack for build %q", target.Name)
 		}

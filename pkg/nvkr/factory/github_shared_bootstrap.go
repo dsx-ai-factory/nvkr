@@ -14,8 +14,8 @@ import (
 // Bootstrap runs before the helper exists, so its commands remain literal. Only
 // the runner artifact's name varies between calls to the same architecture's
 // action. Full action equality also preserves shells, settings and secret scope.
-func shareGitHubBootstrap(files map[string][]byte, oldPath string, call *yamlv3.Node) error {
-	if !strings.HasPrefix(oldPath, githubActionsDirectory+"jobs/") || !strings.HasSuffix(oldPath, "/action.yml") ||
+func shareGitHubBootstrap(plan *Plan, files map[string][]byte, oldPath string, call *yamlv3.Node) error {
+	if !strings.HasPrefix(oldPath, githubActionsDirectoryFor(plan)+"jobs/") || !strings.HasSuffix(oldPath, "/action.yml") ||
 		!safeGeneratedPath(oldPath) || len(files[oldPath]) == 0 || call == nil || call.Kind != yamlv3.MappingNode ||
 		githubYAMLValue(call, "uses") != "./"+strings.TrimSuffix(oldPath, "/action.yml") {
 		return e.New(e.CodePipelineDrift, "shared bootstrap requires an owned generated action and its exact call")
@@ -86,7 +86,7 @@ func shareGitHubBootstrap(files map[string][]byte, oldPath string, call *yamlv3.
 	if err != nil {
 		return err
 	}
-	path := githubActionsDirectory + "bootstrap-" + variant
+	path := githubActionsDirectoryFor(plan) + "bootstrap-" + variant
 	newPath := path + "/action.yml"
 	if previous, exists := files[newPath]; exists && !bytes.Equal(previous, raw) {
 		return e.New(e.CodeEngineCapability, "generated bootstrap actions for %q have conflicting implementations", variant)

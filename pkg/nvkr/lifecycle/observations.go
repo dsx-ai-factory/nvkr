@@ -10,6 +10,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 )
 
 // observeOutputs resolves ordinary payload paths once and independently observes
@@ -37,11 +38,16 @@ type diskPayloadObserver interface {
 
 func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots []requiredOutput,
 	artifacts map[string]factory.Artifact, plan *factory.Plan, execution diskPayloadObserver,
-	stage heldDiskStager,
+	stage heldDiskStager, monitors ...*progress.Monitor,
 ) ([]Artifact, error) {
+	var monitor *progress.Monitor
+	if len(monitors) != 0 {
+		monitor = monitors[0]
+	}
 	var localized map[string]factory.Artifact
 	observed := make([]Artifact, 0, len(slots))
 	for _, slot := range slots {
+		monitor.SetOutput(slot.Name, "observing", "observation")
 		// Held disk observation must not depend on reopenable path descriptions.
 		if slot.Kind != OutputDiskImage && localized == nil {
 			if plan == nil {
@@ -67,8 +73,10 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 			artifact, err = observeOutput(ctx, slot, localized, plan, execution, workspace)
 		}
 		if err != nil {
+			monitor.SetOutput(slot.Name, "failed", "observation")
 			return nil, err
 		}
+		monitor.SetOutput(slot.Name, "observed", "observation")
 		observed = append(observed, artifact)
 	}
 	return observed, nil
