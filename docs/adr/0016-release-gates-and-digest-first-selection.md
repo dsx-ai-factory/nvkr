@@ -191,14 +191,20 @@ consumer verifier; neither the source Environment nor downloaded records can sup
 provider discovers the commit from the selected attempt and authenticates its successful default-branch
 execution. A Run URL without an attempt is ambiguous and is rejected.
 
-The real-signing producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+The real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
 It carries original Plan bytes, the compiler-read authored file closure and original root/output predicates.
+Predicates are keyed by the aggregate root and each delivered payload reference. The collector validates
+the bounded aggregate metadata against the Plan and joins its exact output origins to the saved output-route
+publication and signing records before copying the unchanged predicate bytes; it does not read payloads.
 Factory owns capture and replay of the Definition, Environment, base and per-output catalogs, overlays,
 registries, locks, patches and directory facts. Replay preserves logical paths, rejects incomplete or unsafe
 closures and reads authored files only from memory. Catalog-owned pinned upstream Git authentication remains
 required; the handoff does not create an offline mode. The consumer independently authenticates the source,
 transport integrity, recomputed Plan and complete published bytes before accepting evidence. Missing handoffs
 or original predicates are errors; consumers never rebuild or relabel evidence to fill the gap.
+Legacy aggregate publication remains supported as a producer route, but lacks invocation-bound release
+metadata and the per-output route records required by qualification. It emits no qualification handoff and qualification
+admission returns a capability error before publication work; it cannot claim complete M3 transport.
 
 The owning lifecycle module issues an opaque, subject-bound check receipt after authenticating its exact
 inputs and build evidence. It retains the held verified publication and frozen Plan. Closing it revokes all

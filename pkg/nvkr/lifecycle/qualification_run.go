@@ -102,11 +102,26 @@ func CheckQualificationHandoff(ctx context.Context, raw []byte, source *qualific
 		Predicates: handoff.Candidate.Predicates})
 }
 
+func newQualificationConsumer(reference string, policy QualificationPolicy, options QualificationRuntimeOptions) (*Consumer, error) {
+	binary := policy.Cosign.Path
+	if binary == "" {
+		binary = "cosign"
+	}
+	digest, err := policy.Cosign.ExecutableDigest("linux/" + runtime.GOARCH)
+	if err != nil {
+		return nil, err
+	}
+	return newQualificationReferenceConsumer(reference, ConsumerOptions{CosignBinary: binary, CosignDigest: digest,
+		WorkspaceRoot: options.WorkspaceRoot, Credential: options.Credential, Registry: options.Registry})
+}
+
 // Explicit pull credentials need an independently selected host: signatures
 // authenticate content digests, so valid bundles may also exist at an untrusted
-// mirror. Delivery confines all child and evidence references to root siblings.
-// Cosign already scopes its separate credential through a private Docker config.
-func newQualificationConsumer(reference string, policy QualificationPolicy, options QualificationRuntimeOptions) (*Consumer, error) {
+// mirror. Every qualification adapter uses this admission before constructing a
+// consumer. Candidate and Environment records cannot select the credential host.
+// Delivery confines child and evidence references to root siblings; cosign scopes
+// its separate credential through a private Docker config.
+func newQualificationReferenceConsumer(reference string, options ConsumerOptions) (*Consumer, error) {
 	if err := options.Registry.Validate(); err != nil {
 		return nil, err
 	}
@@ -126,16 +141,7 @@ func newQualificationConsumer(reference string, policy QualificationPolicy, opti
 			return nil, e.New(e.CodeUntrustedSigner, "qualification publication registry differs from the independently configured credential host")
 		}
 	}
-	binary := policy.Cosign.Path
-	if binary == "" {
-		binary = "cosign"
-	}
-	digest, err := policy.Cosign.ExecutableDigest("linux/" + runtime.GOARCH)
-	if err != nil {
-		return nil, err
-	}
-	return NewConsumer(ConsumerOptions{CosignBinary: binary, CosignDigest: digest,
-		WorkspaceRoot: options.WorkspaceRoot, Credential: options.Credential, Registry: options.Registry})
+	return NewConsumer(options)
 }
 
 func admitQualificationRun(ctx context.Context) error {
@@ -173,6 +179,9 @@ func prepareQualificationHandoff(ctx context.Context, raw []byte, origin qualifi
 		return handoff, nil, e.Wrap(e.CodeProvenanceMissing, err, "decoding original qualification Plan")
 	}
 	if err := original.Validate(); err != nil {
+		return handoff, nil, err
+	}
+	if err := factory.AdmitQualificationHandoff(&original); err != nil {
 		return handoff, nil, err
 	}
 	// Replay reads authored inputs only from the captured closure. Catalog-owned

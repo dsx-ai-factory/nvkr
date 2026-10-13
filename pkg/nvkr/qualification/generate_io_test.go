@@ -6,6 +6,7 @@ package qualification
 import (
 	"bytes"
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -258,6 +259,71 @@ func TestQualificationGeneratedRecovery(t *testing.T) {
 		})
 	}
 }
+func TestQualificationGeneratedRecoveryRequiresOriginalPolicy(t *testing.T) {
+	plan, policy := generationFixture(t)
+	original, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextPolicy := policy
+	nextPolicy.Cosign.PlatformDigests = maps.Clone(policy.Cosign.PlatformDigests)
+	nextPolicy.Cosign.PlatformDigests["linux/amd64"] = "sha256:" + strings.Repeat("f", 64)
+	next, err := RenderWorkflows(t.Context(), plan, nextPolicy, "qualification.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalManifest, err := original.manifestBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name             string
+		manifestComplete bool
+	}{
+		{name: "partial manifest before payload publication"},
+		{name: "complete manifest after payload publication", manifestComplete: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			mustWriteQualification(t, root, original)
+			stagedManifest := originalManifest
+			if !tc.manifestComplete {
+				// The writer stages both workflows before staging the manifest.
+				for name, raw := range original.files {
+					writeQualificationTestFile(t, root, qualificationStage(name, original), raw)
+				}
+				stagedManifest = stagedManifest[:len(stagedManifest)-1]
+			}
+			writeQualificationTestFile(t, root, qualificationStage(QualificationManifestPath, original), stagedManifest)
+			before := qualificationTreeSnapshot(t, root)
+			requireCode(t, CheckWorkflows(t.Context(), root, original), e.CodePipelineDrift)
+			requireCode(t, WriteWorkflows(t.Context(), root, next), e.CodeWriteConflict)
+			if !reflect.DeepEqual(before, qualificationTreeSnapshot(t, root)) {
+				t.Fatal("cross-generation refusal changed staged or published bytes or modes")
+			}
+
+			// Restore the interrupted generation first; never discard its stages.
+			mustWriteQualification(t, root, original)
+			if err := CheckWorkflows(t.Context(), root, original); err != nil {
+				t.Fatal(err)
+			}
+			if err := CheckGeneratedPolicy(t.Context(), root, policy); err != nil {
+				t.Fatal(err)
+			}
+
+			// Once recovery completes, the changed policy is an ordinary update.
+			mustWriteQualification(t, root, next)
+			if err := CheckWorkflows(t.Context(), root, next); err != nil {
+				t.Fatal(err)
+			}
+			if err := CheckGeneratedPolicy(t.Context(), root, nextPolicy); err != nil {
+				t.Fatal(err)
+			}
+			requireCode(t, CheckGeneratedPolicy(t.Context(), root, policy), e.CodePipelineDrift)
+		})
+	}
+}
+
 func TestQualificationGeneratedSafeRetirement(t *testing.T) {
 	plan, policy := generationFixture(t)
 	prior, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")

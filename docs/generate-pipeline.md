@@ -59,5 +59,22 @@ Under that scratch root, inspect:
 and inputs for both commands; the generator version contributes to generated content. Change authored
 inputs and regenerate instead of editing generated files.
 
+## Recover interrupted qualification generation
+
+When generation includes `--qualification-policy`, an interrupted write can leave files such as
+`.github/nvkr-qualification/manifest.stage`. `--check` reports the incomplete generation without repairing
+it. Changing policy or other inputs before retrying can produce `CodeWriteConflict`: the saved stage does
+not match the newly requested generation, so the writer preserves it and the published files.
+
+1. Restore the exact Definition, Environment, catalogs and pins, qualification policy, and CLI build used
+   by the interrupted command. Keep the same paths and output root.
+2. Repeat that original `run generate` command without `--check`, then run it with `--check` to confirm
+   recovery completed.
+3. Reapply the intended policy or input changes, regenerate, and check again.
+
+Do not delete stage files or ownership manifests to force an update. If the original inputs cannot be
+established, retain the files for investigation instead of guessing their ownership. The producer and
+qualification bundles have separate owners; their writes are not one atomic directory transaction.
+
 Generation neither submits the workflow to GitHub nor builds, signs, or publishes artifacts. Continue with
 [Plan inspection and comparison](plan-and-graph-inspection.md) or the [Run lifecycle](lifecycle.md).

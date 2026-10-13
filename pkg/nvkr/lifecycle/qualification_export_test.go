@@ -121,9 +121,7 @@ func TestFinalizeGeneratedWithHandoffAdmission(t *testing.T) {
 	}
 }
 
-// The fixture materializes a hosted contract closure without executing a build,
-// contacting a registry, or asserting real signing/qualification evidence.
-func qualificationExportFixture(t *testing.T) (*factory.Plan, factory.InputSnapshot, qualificationorigin.Description, string, []byte) {
+func qualificationExportInputsFixture(t *testing.T, perOutput bool) (*factory.Plan, factory.InputSnapshot, qualificationorigin.Description) {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	for key, value := range qualificationProducerEnvironment() {
@@ -140,6 +138,9 @@ func qualificationExportFixture(t *testing.T) (*factory.Plan, factory.InputSnaps
 	}
 	definition.Catalog.Base = "catalog"
 	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^" + regexp.QuoteMeta(source.BuilderID) + "$", Issuer: "https://token.actions.githubusercontent.com"}
+	if perOutput {
+		environment.Publication.Mode = "per-output-v1"
+	}
 	writeCanonicalTestFile(t, "definition.json", definition)
 	writeCanonicalTestFile(t, "environment.json", environment)
 	plan, snapshot, err := factory.CaptureCompileFiles(t.Context(), ".", "definition.json", "environment.json", "qualification-export-test")
@@ -147,6 +148,79 @@ func qualificationExportFixture(t *testing.T) (*factory.Plan, factory.InputSnaps
 		t.Fatal(err)
 	}
 	writeCanonicalTestFile(t, "plan.json", plan)
+	return plan, snapshot, source
+}
+
+// This fixture exercises handoff transport only. It does not execute a producer,
+// authenticate a registry, or claim that its descriptive signing records prove
+// a passing qualification; the consuming gate must authenticate those records.
+func qualificationExportHandoffFixture(t *testing.T) (*factory.Plan, factory.InputSnapshot, qualificationorigin.Description, string, []byte) {
+	t.Helper()
+	plan, snapshot, source := qualificationExportInputsFixture(t, true)
+	instant := time.Date(2026, time.September, 8, 12, 0, 0, 0, time.UTC)
+	runContext, err := provenance.NewGitHubRunContext(os.Getenv, instant, instant.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	predicate, err := factory.ProductionPredicate(plan, runContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	predicate = append(predicate, '\n')
+	artifacts := map[string]factory.Artifact{}
+	for _, artifact := range plan.Graph.Artifacts {
+		artifacts[artifact.ID] = artifact
+	}
+	digest := "sha256:" + strings.Repeat("a", 64)
+	fixture := exactInputFixtureForPlan(t, plan.Definition, plan.Environment, plan)
+	request := fixture.request
+	request.Release.InvocationID = source.InvocationID
+	for i := range request.Objects {
+		object := &request.Objects[i]
+		if object.Output == nil {
+			continue
+		}
+		binding := *object.Output
+		binding.Publication = &delivery.PublicationOrigin{
+			Ref:                  plan.Targets["output-"+object.Name].Ref + "@" + digest,
+			PreparedInvocationID: source.InvocationID, SignedInvocationID: source.InvocationID,
+		}
+		object.Output = &binding
+	}
+	full := filepath.Join(t.TempDir(), "original-metadata-source")
+	if _, err := delivery.BuildPublicationRoot(t.Context(), full, request); err != nil {
+		t.Fatal(err)
+	}
+	full, _ = attestFixtureLayout(t, full)
+	result, err := delivery.ExportMetadata(t.Context(), full, artifacts["metadata/release"].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, artifact := range plan.Graph.Artifacts {
+		route, ok := strings.CutPrefix(artifact.ID, "predicate/")
+		if !ok {
+			continue
+		}
+		subjectDigest := digest
+		if route == "release" {
+			subjectDigest = result.RootDigest
+		}
+		reference := plan.Targets[route].Ref + "@" + subjectDigest
+		writeQualificationHandoffFile(t, artifacts["publication/"+route].Path, []byte(reference+"\n"))
+		writeQualificationHandoffFile(t, artifact.Path, predicate)
+		writeCanonicalTestFile(t, artifacts["signature/"+route].Path, sign.SigningRecord{SchemaVersion: sign.SigningRecordSchemaVersion,
+			Ref: reference, Digest: subjectDigest, PredicateSHA256: pipeline.FileDigest(predicate), PredicateType: sign.ProvenancePredicateType,
+			Identity: plan.Environment.Signing.Identity, Issuer: plan.Environment.Signing.Issuer, Ran: [][]string{{"cosign", "sign"}}})
+	}
+	return plan, snapshot, source, plan.Targets["release"].Ref + "@" + result.RootDigest, predicate
+}
+
+// The legacy fixture materializes a hosted contract closure without executing a
+// build, contacting a registry, or asserting real signing/qualification evidence.
+func qualificationExportFixture(t *testing.T) (*factory.Plan, factory.InputSnapshot, qualificationorigin.Description, string, []byte) {
+	t.Helper()
+	plan, snapshot, source := qualificationExportInputsFixture(t, false)
+	environment := plan.Environment
 	artifacts := map[string]factory.Artifact{}
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
@@ -218,7 +292,7 @@ func qualificationExportFixture(t *testing.T) (*factory.Plan, factory.InputSnaps
 }
 
 func TestWriteQualificationHandoffPreservesOriginalBytesAndNeverOverwrites(t *testing.T) {
-	plan, inputs, source, reference, predicate := qualificationExportFixture(t)
+	plan, inputs, source, reference, predicate := qualificationExportHandoffFixture(t)
 	path := ".nvkr/qualification/handoff.json"
 	if err := writeQualificationHandoff(t.Context(), path, ".nvkr/factory", plan, inputs, source); err != nil {
 		t.Fatal(err)
@@ -232,9 +306,37 @@ func TestWriteQualificationHandoffPreservesOriginalBytesAndNeverOverwrites(t *te
 		t.Fatal(err)
 	}
 	if handoff.SchemaVersion != QualificationHandoffSchema || handoff.Source != source || !bytes.Equal(handoff.Plan, qualificationHandoffJSON(t, plan)) || !reflect.DeepEqual(handoff.Inputs, inputs) ||
-		handoff.Candidate.SchemaVersion != QualificationCandidateSchema || handoff.Candidate.Reference != reference || len(handoff.Candidate.Predicates) != 1 ||
-		handoff.Candidate.Predicates[0].Reference != reference || !bytes.Equal(handoff.Candidate.Predicates[0].Predicate, predicate) {
+		handoff.Candidate.SchemaVersion != QualificationCandidateSchema || handoff.Candidate.Reference != reference || len(handoff.Candidate.Predicates) != 1+len(plan.LifecycleOutputs) {
 		t.Fatal("export changed the exact source, Plan, captured inputs, or original predicate")
+	}
+	seen := make(map[string]bool, len(handoff.Candidate.Predicates))
+	for _, saved := range handoff.Candidate.Predicates {
+		if seen[saved.Reference] || !bytes.Equal(saved.Predicate, predicate) {
+			t.Fatal("export duplicated or changed an original predicate")
+		}
+		seen[saved.Reference] = true
+	}
+	var metadataPath string
+	for _, artifact := range plan.Graph.Artifacts {
+		if artifact.ID == "metadata/release" {
+			metadataPath = artifact.Path
+		}
+	}
+	inspection, err := delivery.InspectMetadata(t.Context(), metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	references, err := delivery.OutputReferences(reference, inspection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !seen[reference] {
+		t.Fatal("export omitted the original root predicate")
+	}
+	for output, payload := range references {
+		if !seen[payload] || seen[plan.Targets["output-"+output].Ref+"@sha256:"+strings.Repeat("a", 64)] {
+			t.Fatalf("export did not bind output %s to its actual payload subject", output)
+		}
 	}
 	if _, _, err := prepareQualificationHandoff(t.Context(), original, source); err != nil {
 		t.Fatal(err)
@@ -274,7 +376,7 @@ func TestWriteQualificationHandoffRequiresProducingSigningPolicyBeforeIO(t *test
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			plan := &factory.Plan{Environment: Environment{Signing: tc.signing}}
+			plan := &factory.Plan{Environment: Environment{Signing: tc.signing, Publication: &Publication{Mode: "per-output-v1"}}}
 			err := writeQualificationHandoff(t.Context(), filepath.Join(root, "new", "handoff.json"), "missing-workspace", plan, factory.InputSnapshot{}, qualificationSourceFixture().value)
 			assertCode(t, err, tc.code)
 			entries, err := os.ReadDir(root)
@@ -285,43 +387,35 @@ func TestWriteQualificationHandoffRequiresProducingSigningPolicyBeforeIO(t *test
 	}
 }
 
-func TestFinalizeGeneratedWithHandoffRecordsExportOutcome(t *testing.T) {
-	for _, failure := range []bool{false, true} {
-		name := "complete"
-		if failure {
-			name = "handoff collision"
+func TestLegacyAggregateFinalizationRefusesQualificationHandoffBeforeOutput(t *testing.T) {
+	plan, inputs, source, _, _ := qualificationExportFixture(t)
+	path := ".nvkr/qualification/handoff.json"
+	// Unsupported explicit export must not read restored records or create its
+	// output directory. The legacy producer remains valid without the handoff.
+	assertCode(t, writeQualificationHandoff(t.Context(), path, "missing-workspace", plan, inputs, source), e.CodeEngineCapability)
+	run, err := FinalizeGeneratedWithHandoff(t.Context(), "definition.json", "environment.json", "plan.json", "qualification-export-test", "42-2", "missing-workspace", ".nvkr/run.json", path)
+	assertCode(t, err, e.CodeEngineCapability)
+	if run != nil {
+		t.Fatal("unsupported handoff returned a Run")
+	}
+	for _, name := range []string{".nvkr/qualification", ".nvkr/run.json"} {
+		if _, err := os.Stat(name); !os.IsNotExist(err) {
+			t.Fatalf("unsupported handoff created %s: %v", name, err)
 		}
-		t.Run(name, func(t *testing.T) {
-			_, _, _, _, _ = qualificationExportFixture(t)
-			path := ".nvkr/qualification/handoff.json"
-			original := []byte("existing immutable handoff")
-			if failure {
-				writeQualificationHandoffFile(t, path, original)
-			}
-			run, err := FinalizeGeneratedWithHandoff(t.Context(), "definition.json", "environment.json", "plan.json", "qualification-export-test", "42-2", ".nvkr/factory", ".nvkr/run.json", path)
-			if failure {
-				assertCode(t, err, e.CodeImmutableViolation)
-				if run == nil || run.Status != RunFailed || run.Failure == nil || run.Failure.Code != string(e.CodeImmutableViolation) || len(run.Observed) != 0 {
-					t.Fatalf("export failure escaped final Run: %+v", run)
-				}
-				raw, readErr := os.ReadFile(path)
-				if readErr != nil || !bytes.Equal(raw, original) {
-					t.Fatalf("collision replaced handoff: %v", readErr)
-				}
-			} else if err != nil || run == nil || run.Status != RunComplete || run.Lane != LanePipeline {
-				t.Fatalf("complete handoff finalization: run=%+v error=%v", run, err)
-			}
-			raw, err := os.ReadFile(".nvkr/run.json")
-			if err != nil {
-				t.Fatal(err)
-			}
-			var recorded Run
-			if err := canonical.UnmarshalExact(raw, &recorded); err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(&recorded, run) {
-				t.Fatal("finalizer did not persist its exact returned Run")
-			}
-		})
+	}
+	run, err = FinalizeGenerated(t.Context(), "definition.json", "environment.json", "plan.json", "qualification-export-test", "42-2", ".nvkr/factory", ".nvkr/run.json")
+	if err != nil || run == nil || run.Status != RunComplete || run.Lane != LanePipeline {
+		t.Fatalf("legacy finalization without qualification handoff: run=%+v error=%v", run, err)
+	}
+	raw, err := os.ReadFile(".nvkr/run.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recorded Run
+	if err := canonical.UnmarshalExact(raw, &recorded); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(&recorded, run) {
+		t.Fatal("legacy finalizer did not persist its exact returned Run")
 	}
 }

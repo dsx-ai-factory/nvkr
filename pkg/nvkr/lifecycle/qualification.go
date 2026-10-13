@@ -236,6 +236,9 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if err := canonical.UnmarshalExact(raw, &plan); err != nil {
 		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "freezing qualification Plan")
 	}
+	if err := factory.AdmitQualificationHandoff(&plan); err != nil {
+		return nil, nil, err
+	}
 	expectation, err := PrepareExactInputs(request.Definition, request.Environment, &plan)
 	if err != nil {
 		return nil, nil, err

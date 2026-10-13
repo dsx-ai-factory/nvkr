@@ -6,13 +6,19 @@ package lifecycle
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -27,6 +33,7 @@ func qualificationHandoffFixture(t *testing.T) (string, QualificationHandoff, *f
 	t.Helper()
 	root := t.TempDir()
 	definition := testDefinition(t)
+	addTestSigningTool(t, &definition)
 	for _, name := range []string{catalog.RegistryFile, catalog.LockFile} {
 		raw, err := os.ReadFile(filepath.Join(definition.Catalog.Base, name))
 		if err != nil {
@@ -36,7 +43,10 @@ func qualificationHandoffFixture(t *testing.T) (string, QualificationHandoff, *f
 	}
 	definition.Catalog.Base = "catalog"
 	writeQualificationHandoffFile(t, filepath.Join(root, "definition.json"), qualificationHandoffJSON(t, definition))
-	writeQualificationHandoffFile(t, filepath.Join(root, "environment.json"), qualificationHandoffJSON(t, testEnvironment()))
+	environment := testEnvironment()
+	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: "^" + regexp.QuoteMeta(qualificationSourceFixture().value.BuilderID) + "$", Issuer: "https://token.actions.githubusercontent.com"}
+	environment.Publication.Mode = "per-output-v1"
+	writeQualificationHandoffFile(t, filepath.Join(root, "environment.json"), qualificationHandoffJSON(t, environment))
 	plan, snapshot, err := factory.CaptureCompileFiles(t.Context(), root, "definition.json", "environment.json", "qualification-handoff-test")
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +77,19 @@ func writeQualificationHandoffFile(t *testing.T, path string, raw []byte) {
 	}
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestQualificationHandoffRejectsLegacyAggregateBeforeReplay(t *testing.T) {
+	_, handoff, original := qualificationHandoffFixture(t)
+	handoff.Plan = qualificationHandoffJSON(t, legacyQualificationPlan(t, original))
+	// Missing captured inputs would fail replay with a different code. Mode
+	// admission must reject this original Plan before replay can read anything.
+	handoff.Inputs = factory.InputSnapshot{}
+	_, plan, err := prepareQualificationHandoff(t.Context(), qualificationHandoffJSON(t, handoff), handoff.Source)
+	assertCode(t, err, e.CodeEngineCapability)
+	if plan != nil {
+		t.Fatal("unsupported legacy handoff returned a compiled Plan")
 	}
 }
 
@@ -129,7 +152,10 @@ func TestQualificationHandoffRejectsAlteredClosure(t *testing.T) {
 		{"different valid captured input", func(h *QualificationHandoff) {
 			for i := range h.Inputs.Files {
 				if h.Inputs.Files[i].Path == "environment.json" {
-					environment := testEnvironment()
+					var environment Environment
+					if err := canonical.UnmarshalExact(h.Inputs.Files[i].Data, &environment); err != nil {
+						t.Fatal(err)
+					}
 					environment.UtilityContainer = "golang@sha256:" + strings.Repeat("b", 64)
 					h.Inputs.Files[i].Data = qualificationHandoffJSON(t, environment)
 				}
@@ -265,6 +291,152 @@ func TestQualificationConsumerScopesExplicitRegistryCredentials(t *testing.T) {
 			entries, err := os.ReadDir(root)
 			if err != nil || len(entries) != 0 {
 				t.Fatalf("credential admission touched workspace: %v, %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestQualificationConsumerCredentialTransportScopes(t *testing.T) {
+	for _, adapter := range []struct {
+		name string
+		open func(string, ConsumerOptions) (*Consumer, error)
+	}{
+		{"files", newQualificationReferenceConsumer},
+		{"run handoff", func(reference string, options ConsumerOptions) (*Consumer, error) {
+			policy := qualificationPolicyFixture()
+			policy.Cosign.Path, policy.Cosign.Digest = options.CosignBinary, options.CosignDigest
+			return newQualificationConsumer(reference, policy, QualificationRuntimeOptions{WorkspaceRoot: options.WorkspaceRoot,
+				Credential: options.Credential, Registry: options.Registry})
+		}},
+	} {
+		t.Run(adapter.name, func(t *testing.T) {
+			for _, tc := range []struct {
+				name, independentHost, ambientHost string
+				explicit, anonymous, wantAuth      bool
+				code                               e.Code
+			}{
+				{name: "missing explicit host", explicit: true, code: e.CodeTrustPolicyMissing},
+				{name: "mismatched explicit host", independentHost: "other.example.test", explicit: true, code: e.CodeUntrustedSigner},
+				{name: "matching explicit host", independentHost: "same", explicit: true, wantAuth: true},
+				{name: "anonymous ignores ambient credentials", ambientHost: "same", anonymous: true},
+				{name: "ambient credentials match host", ambientHost: "same", wantAuth: true},
+				{name: "ambient credentials exclude other host", ambientHost: "other.example.test"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					var requests, authenticated, unexpected atomic.Int32
+					authorization := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:private"))
+					registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						requests.Add(1)
+						if auth := r.Header.Get("Authorization"); auth != "" {
+							if auth == authorization {
+								authenticated.Add(1)
+							} else {
+								unexpected.Add(1)
+							}
+						}
+						if r.URL.Path == "/v2/" {
+							w.Header().Set("Docker-Distribution-API-Version", "registry/2.0")
+							w.Header().Set("WWW-Authenticate", `Basic realm="qualification-registry"`)
+							w.WriteHeader(http.StatusUnauthorized)
+							return
+						}
+						// No publication is served: this fixture proves only which
+						// registry receives credentials before content verification.
+						w.WriteHeader(http.StatusNotFound)
+					}))
+					defer registry.Close()
+					host := strings.TrimPrefix(registry.URL, "http://")
+					independentHost, ambientHost := tc.independentHost, tc.ambientHost
+					if independentHost == "same" {
+						independentHost = host
+					}
+					if ambientHost == "same" {
+						ambientHost = host
+					}
+					root := t.TempDir()
+					dockerConfig := filepath.Join(root, "docker")
+					writeQualificationHandoffFile(t, filepath.Join(dockerConfig, "config.json"), qualificationHandoffJSON(t,
+						map[string]any{"auths": map[string]any{ambientHost: map[string]string{
+							"auth": base64.StdEncoding.EncodeToString([]byte("user:private")),
+						}}}))
+					t.Setenv("DOCKER_CONFIG", dockerConfig)
+					options := ConsumerOptions{CosignBinary: filepath.Join(root, "must-not-execute"),
+						CosignDigest: "sha256:" + strings.Repeat("b", 64), WorkspaceRoot: filepath.Join(root, "materialization"),
+						Registry: delivery.RegistryOptions{PlainHTTP: true, Anonymous: tc.anonymous}}
+					if tc.explicit {
+						options.Registry.Username, options.Registry.Password = "user", "private"
+						options.Credential = sign.Credential{Registry: independentHost, Username: "user", Password: "private"}
+					}
+					reference := host + "/product/releases@sha256:" + strings.Repeat("a", 64)
+					consumer, err := adapter.open(reference, options)
+					if tc.code != "" {
+						assertCode(t, err, tc.code)
+						if consumer != nil || requests.Load() != 0 {
+							t.Fatal("refused credential host reached registry transport")
+						}
+						return
+					}
+					if err != nil || consumer == nil {
+						t.Fatalf("admitted transport failed construction: %v", err)
+					}
+					ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+					defer cancel()
+					publication, err := consumer.materialize(ctx, reference)
+					if publication != nil {
+						_ = publication.Close()
+						t.Fatal("empty registry issued a publication")
+					}
+					if err == nil || ctx.Err() != nil || requests.Load() == 0 {
+						t.Fatalf("registry refusal was not exercised: requests=%d error=%v context=%v", requests.Load(), err, ctx.Err())
+					}
+					if unexpected.Load() != 0 || (authenticated.Load() > 0) != tc.wantAuth {
+						t.Fatalf("credential routing changed: authenticated requests=%d unexpected=%d want authentication=%t", authenticated.Load(), unexpected.Load(), tc.wantAuth)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestQualificationConsumerSelectsNativePolicyPin(t *testing.T) {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip("qualification verifier admits AMD64 and ARM64")
+	}
+	native := "linux/" + runtime.GOARCH
+	other := "linux/amd64"
+	if native == other {
+		other = "linux/arm64"
+	}
+	nativePin, otherPin := "sha256:"+strings.Repeat("a", 64), "sha256:"+strings.Repeat("b", 64)
+	for _, tc := range []struct {
+		name string
+		pins map[string]string
+		code e.Code
+	}{
+		{"native platform pin", map[string]string{native: nativePin}, ""},
+		{"distinct native platform pins", map[string]string{native: nativePin, other: otherPin}, ""},
+		{"missing current platform pin", map[string]string{other: otherPin}, e.CodeUnpinnedInput},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			policy := qualificationPolicyFixture()
+			policy.Cosign = QualificationCosignPolicy{Path: filepath.Join(root, "must-not-execute"), PlatformDigests: tc.pins}
+			if err := policy.Validate(); err != nil {
+				t.Fatalf("independent policy is invalid: %v", err)
+			}
+			consumer, err := newQualificationConsumer("ghcr.io/product/releases@sha256:"+strings.Repeat("c", 64), policy,
+				QualificationRuntimeOptions{WorkspaceRoot: filepath.Join(root, "must-not-materialize"), Registry: delivery.RegistryOptions{Anonymous: true}})
+			if tc.code != "" {
+				assertCode(t, err, tc.code)
+				if consumer != nil {
+					t.Fatal("missing native executable pin returned verification/pull adapters")
+				}
+			} else if err != nil || consumer == nil {
+				t.Fatalf("native executable pin was not admitted: %v", err)
+			}
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("verifier pin admission touched workspace: %v, %v", entries, err)
 			}
 		})
 	}

@@ -155,6 +155,9 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if err := factory.AdmitQualificationHandoff(plan); err != nil {
+		return nil, err
+	}
 	if plan.Environment.Signing == nil || plan.Environment.Signing.Mode != factory.SigningModeCosign || plan.Environment.Signing.Issuer != "https://token.actions.githubusercontent.com" {
 		return nil, e.New(e.CodeEngineCapability, "qualification generation requires a real GitHub-signing producer with exact-attempt handoff")
 	}

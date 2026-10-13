@@ -262,7 +262,8 @@ func TestQualificationGenerationAdmission(t *testing.T) {
 	requireCode(t, err, e.CodeTimeout)
 }
 
-func TestQualificationGenerationSelectsExactWorkerPlatforms(t *testing.T) {
+func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*factory.Plan, lifecycle.QualificationPolicy) {
+	t.Helper()
 	maintained, policy := generationFixture(t)
 	var selected factory.BuildPlan
 	for _, build := range maintained.Builds {
@@ -292,6 +293,7 @@ func TestQualificationGenerationSelectsExactWorkerPlatforms(t *testing.T) {
 		t.Fatal(err)
 	}
 	environment := maintained.Environment.Clone()
+	environment.Publication.Mode = publicationMode
 	// This selected fixture only acquires prebuilt tools, so no source fetch credential is applicable.
 	environment.SourceAccess = nil
 	plan, err := factory.Compile(t.Context(), inputs, environment, stack, maintained.GeneratorVersion)
@@ -302,6 +304,41 @@ func TestQualificationGenerationSelectsExactWorkerPlatforms(t *testing.T) {
 	policy.Smoke.NonToolOutputs = nil
 	delete(policy.Smoke.Images, "linux/arm64")
 	delete(policy.Cosign.PlatformDigests, "linux/arm64")
+	return plan, policy
+}
+
+func TestQualificationGenerationRequiresPerOutputHandoff(t *testing.T) {
+	for _, tc := range []struct {
+		name, publicationMode string
+		code                  e.Code
+	}{
+		{"legacy aggregate", "", e.CodeEngineCapability},
+		{"per-output publication", "per-output-v1", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Compile each supported producer mode from its authored inputs. The
+			// legacy Plan is valid for production; only qualification is unsupported.
+			plan, policy := generationOperatorToolsFixture(t, tc.publicationMode)
+			if err := plan.Validate(); err != nil {
+				t.Fatalf("producer Plan is invalid: %v", err)
+			}
+			bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+			if tc.code != "" {
+				requireCode(t, err, tc.code)
+				if bundle != nil {
+					t.Fatal("unsupported qualification handoff emitted workflow bytes")
+				}
+				return
+			}
+			if err != nil || bundle == nil || len(bundle.Files()) != 2 {
+				t.Fatalf("supported per-output Plan did not emit the workflow pair: %v", err)
+			}
+		})
+	}
+}
+
+func TestQualificationGenerationSelectsExactWorkerPlatforms(t *testing.T) {
+	plan, policy := generationOperatorToolsFixture(t, "per-output-v1")
 	bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
 	if err != nil {
 		t.Fatal(err)

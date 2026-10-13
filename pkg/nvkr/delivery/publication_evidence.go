@@ -14,6 +14,14 @@ import (
 // VisitEvidence supplies exact held bundles and their checked subject bindings.
 // The callback cannot create publication or signature authority. No source
 // pathname is reopened, so replacement cannot alter the visited evidence.
+//
+// Callbacks run synchronously under the publication's shared lifetime lock. Each
+// callback must perform bounded, context-aware work and return promptly when ctx
+// is canceled. It must not call methods on this publication or any shallow copy,
+// including Close, or wait for work that does so: such reentry can deadlock.
+// Concurrent Close waits for the entire visit to return; it does not cancel ctx
+// or preempt a callback. Callers must arrange cancellation before waiting for
+// Close when an active callback needs cancellation to finish.
 func (publication *Publication) VisitEvidence(ctx context.Context, visit func(context.Context, EvidenceBinding, []byte) error) error {
 	if err := deliveryContext(ctx); err != nil {
 		return err

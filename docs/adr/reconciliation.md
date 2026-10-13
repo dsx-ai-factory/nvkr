@@ -70,14 +70,21 @@ independent policy approves repository, workflow and default branch and pins cos
 the commit from the selected attempt and authenticates successful completion and the actual default branch;
 downloaded records cannot select those trust decisions.
 
-Generated real-signing finalizers restore the original per-output publication references, signature records
-and predicates and upload one `handoff.json` as `nvkr-qualification-<run>-<attempt>` after success. The bounded
+Generated real-signing `per-output-v1` finalizers restore the original per-output publication references, signature records
+and predicates and upload one `handoff.json` as `nvkr-qualification-<run>-<attempt>` after success. The collector
+joins bounded aggregate metadata, exact output origins and saved route signing records to key original
+predicate bytes by the root and delivered payload references; it does not restore or read payload packages. The bounded
 canonical `qualification-handoff/v1` record includes the original Plan and compiler-captured Definition,
 Environment, base/output catalogs, overlays, registries, locks, patches and directory facts. Replay preserves
 logical paths, enforces byte/count/depth limits and has no authored-file checkout fallback. Catalog-owned
 pinned upstream Git validation still runs with its existing context and credentials; offline replay remains
 outside MVP. The old `CheckQualificationFiles` module adapter remains available for explicit diagnostics.
-Historical Runs without the complete handoff cannot use the simplified path.
+Historical Runs without the complete handoff cannot use the simplified path. Legacy aggregate producers
+retain their publication path but emit no qualification handoff: they lack invocation-bound release metadata
+and the per-output route records needed for complete original evidence transport. Explicit capability admission prevents
+export or consumption from implying otherwise. The file diagnostic adapter now shares the Run adapter's
+independent credential-host admission before transport; missing/mismatched hosts refuse explicit pull
+credentials, while anonymous and host-scoped keychain operation remain available.
 
 The check receipt retains the verified publication and a frozen Plan; closing it revokes copies, cancels and
 joins registered operations and then releases held bytes and any owned source receipt. It grants no execution

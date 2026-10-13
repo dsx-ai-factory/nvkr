@@ -766,8 +766,10 @@ With `publication.mode: per-output-v1`, the compiler emits independent output pu
 metadata-only aggregate operation (ADR-20 §6). Output publication packages cannot be grouped with other
 utility nodes, so grouping cannot recreate an all-output payload download. Offline packaging receives only
 the public GitHub workflow/run identity variables, never registry, source or OIDC credentials. Each output's
-verification exports a bounded metadata carrier. The finalizer downloads only the aggregate metadata,
-published reference, signing record, predicate, verification record and pinned cosign tool. Provider-result
+verification exports a bounded metadata carrier. The finalizer downloads the aggregate metadata,
+published reference, signing record, predicate, verification record and pinned cosign tool. For the complete
+qualification handoff it also restores each output's original publication reference, signing record and
+predicate; these bounded metadata carriers do not download output payloads. Provider-result
 admission still covers every stage and bootstrap job; any failed, skipped or missing required job prevents
 completion. Assembly and finalization have registry-read permission and no OIDC minting or package-write
 permission. All credentials and signing remain outside ARC producer jobs.

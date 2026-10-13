@@ -104,8 +104,9 @@ directory facts are preserved. Capture uses no-follow source reads; each file is
 aggregate to 32 MiB and file/directory/listing facts to 1,024 entries, with the catalog traversal-depth limit.
 Replay cannot fall back to a checkout. Catalog retains its bounded pinned-upstream Git authentication and embedded
 declaration checks, so replay is not offline. Lifecycle compares the recompiled Plan with the saved original.
-The generated producer exports original predicates only after successful finalization; unsigned/dry-run
-producers cannot emit a qualification handoff. Consumer policy and verifier pins remain separately selected.
+The generated signed `per-output-v1` producer exports original predicates only after successful finalization.
+Unsigned/dry-run and legacy aggregate producers cannot emit a qualification handoff; aggregate publication
+remains available without M3 qualification. Consumer policy and verifier pins remain separately selected.
 
 `lifecycle.Consumer.CheckQualification` joins the authenticated source to the verified publication, exact
 Definition/Environment/Plan, every named output and authenticated build evidence. Factory owns
@@ -114,7 +115,10 @@ retains the verified publication and frozen Plan. Its idempotent closure is shar
 revokes admission, cancels and joins registered operations, then releases held payloads. The receipt grants
 no smoke-execution or signing authority. The direct consumer and `CheckQualificationHandoff` operations borrow
 the caller's source receipt; source closure also revokes the check receipt. The Run adapter and retained
-`CheckQualificationFiles` diagnostic adapter transfer their source owner to the returned receipt. Defensive
+`CheckQualificationFiles` diagnostic adapter transfer their source owner to the returned receipt. All
+qualification adapters share independent canonical registry-host admission for explicit pull credentials;
+the candidate cannot select the credential destination. Anonymous and host-scoped keychain reads remain
+available. Defensive
 diagnostics cannot restore authority after closure. The independent `qualification` publisher contract
 consumes authenticated check and smoke receipts; its public descriptions are not receipt constructors.
 `run qualify --policy <path>` delegates to `qualification.PublishTriggeredRun`, which derives its source
@@ -146,7 +150,7 @@ these maintenance descriptions cannot grant execution or release authority.
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
 separating per-output Build Digest changes from execution and transport changes. It issues no authority.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse|export`, with
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate|check-artifacts`, and `release verify|inspect|browse|export`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
 available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the

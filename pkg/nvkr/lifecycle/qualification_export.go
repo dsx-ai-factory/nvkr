@@ -96,6 +96,9 @@ func writeQualificationHandoff(ctx context.Context, path, workspace string, plan
 }
 
 func admitQualificationProducer(plan *factory.Plan, source qualificationorigin.Description) error {
+	if err := factory.AdmitQualificationHandoff(plan); err != nil {
+		return err
+	}
 	if plan.Environment.Signing == nil || plan.Environment.Signing.Mode != factory.SigningModeCosign ||
 		plan.Environment.Signing.Issuer != "https://token.actions.githubusercontent.com" {
 		return e.New(e.CodeEngineCapability, "qualification handoff requires live GitHub build signing")
