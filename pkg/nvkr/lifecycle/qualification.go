@@ -144,6 +144,8 @@ func (consumer *Consumer) CheckQualification(ctx context.Context, request Qualif
 }
 
 func (consumer *Consumer) checkQualification(ctx context.Context, request QualificationRequest, source qualificationSource) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
+	// Invalid source and Plan inputs take diagnostic precedence over missing
+	// consumer adapters. Every admission check still precedes external work.
 	if source == nil {
 		return nil, nil, e.New(e.CodeProvenanceMissing, "artifact qualification requires an authenticated producing Run")
 	}

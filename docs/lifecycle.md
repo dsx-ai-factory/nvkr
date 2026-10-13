@@ -275,6 +275,10 @@ The module-level `lifecycle.Consumer.CheckQualification` then authenticates the 
 predicates. Descriptions and candidate files remain untrusted until their exact bytes, subjects, signatures,
 provenance and Plan bindings verify.
 
+At the consumer API boundary, source and Plan validation precede adapter-capability checks. A request with
+both malformed inputs and unavailable adapters reports the input error first. Neither case reaches registry
+or signature-verification I/O.
+
 Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
 signature/provenance, applicable payload pins and embedded declarations. Failed checks return coded
 diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
