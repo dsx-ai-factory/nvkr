@@ -13,7 +13,8 @@
   SEC-13 (registry-by-digest).
 
 - **Scope:** Sections 3–4 specify deferred qualified publication. Diagnostic transport construction is
-  implemented as stated in §4. Section 6 defines v1 publication; §7 is deferred registration.
+  implemented as stated in §4. Section 6 defines v1 publication; §7 is deferred registration. Section 8
+  defines local descriptive test-observation discovery/export with service publication and retention deferred.
 
 ## Context
 
@@ -487,6 +488,21 @@ No endpoint adapter, registration schema, or registration authority is implement
 requires its own admission, exact-byte persistence, authenticated endpoint response and operational evidence;
 it cannot derive availability or qualification from a plan or caller-provided success flag.
 
+### 8. Portable test observation discovery
+
+**Lane and scope:** descriptive historical reporting only; no build, qualifier or release authority.
+Authentication belongs to ADR-04 §5 and the observation owner. Public hosting and service writes remain deferred.
+
+Digest-pinned observation locators and verified historical indices are generated evidence metadata, not
+additional authored lifecycle objects. The passive reporter delegates exact signer/issuer and independently
+selected Definition/subject/suite authentication within reviewed source namespaces before counting an entry.
+First-party/community labels come from admitted policy, never locator claims. Deduplication retains source,
+attempt and coverage boundaries. Public index hosting, anonymous OCI access, retention and TestGrid service
+registration/write/read-back require explicitly selected destinations and external evidence. Destination
+and retention choices must be made before a future uploader exists; no retention field or default is
+implemented by the local exporter. All requested projection gates precede the first local commit. Local
+immutable JSON/Markdown or TestGrid exports supply no publication receipt, qualifier role or current-health claim.
+
 ## Consequences
 
 **Positive**
@@ -560,13 +576,3 @@ Qualified end-to-end acceptance requires publishing one cleared mixed-artifact R
 discovering every referrer by immutable digest, authenticating the downstream clearance, and proving that
 different destinations preserve every semantic and blob identity while omitted credentials never enter logs or
 payload bytes.
-
-## Portable test observation discovery
-
-Digest-pinned observation locators and verified historical indices are generated evidence metadata, not
-additional authored lifecycle objects. The passive reporter authenticates exact signer/issuer and independently
-selected Definition/subject/suite expectations within reviewed source namespaces before counting an entry.
-First-party/community labels come from admitted policy, never locator claims. Deduplication retains source,
-attempt and coverage boundaries. Public index hosting, anonymous OCI access, retention and TestGrid service
-registration/write/read-back require explicitly selected destinations and external evidence. A local immutable
-JSON/Markdown or TestGrid export supplies no publication receipt, qualifier role or current-health claim.

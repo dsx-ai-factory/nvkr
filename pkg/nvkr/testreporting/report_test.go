@@ -170,7 +170,7 @@ func TestIngestVerifiesEveryInputThenRetainsAttemptsFailuresSources(t *testing.T
 		t.Fatal(err)
 	}
 	md, err := report.Markdown(t.Context())
-	if err != nil || !strings.Contains(md, "no") && !strings.Contains(md, "do not establish") {
+	if err != nil || !strings.Contains(md, "Authenticated historical test observations. These records do not establish current cluster health, release qualification or TestGrid publication.") {
 		t.Fatalf("Markdown %q, %v", md, err)
 	}
 	inputs[0].Expected.Subjects[0].Output = "caller mutated"

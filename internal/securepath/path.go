@@ -7,9 +7,11 @@
 package securepath
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -84,6 +86,17 @@ func CreateParent(root *os.File, relative string) (*os.File, string, error) {
 // CreateTemporarySibling opens a private, exclusive regular file beneath parent.
 // The caller closes the file and removes its returned name on failure.
 func CreateTemporarySibling(parent *os.File) (*os.File, string, error) {
+	return CreateTemporarySiblingWithPrefix(parent, ".nvkr-download-")
+}
+
+// CreateTemporarySiblingWithPrefix gives private stages an explicit diagnostic label.
+// Labels are single safe basenames; neither labels nor random names confer identity.
+func CreateTemporarySiblingWithPrefix(parent *os.File, prefix string) (*os.File, string, error) {
+	if prefix == "" || len(prefix) > 64 || prefix == "." || prefix == ".." || strings.IndexFunc(prefix, func(c rune) bool {
+		return !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._-", c))
+	}) >= 0 {
+		return nil, "", fmt.Errorf("invalid private stage prefix")
+	}
 	if parent == nil {
 		return nil, "", fmt.Errorf("artifact parent directory is nil")
 	}
@@ -92,7 +105,7 @@ func CreateTemporarySibling(parent *os.File) (*os.File, string, error) {
 		if _, err := rand.Read(token[:]); err != nil {
 			return nil, "", err
 		}
-		name := ".nvkr-download-" + hex.EncodeToString(token[:])
+		name := prefix + hex.EncodeToString(token[:])
 		fd, err := unix.Openat(int(parent.Fd()), name,
 			unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0o600)
 		if err == unix.EEXIST {
@@ -278,4 +291,55 @@ func WorkspaceRelative(value string) bool {
 	clean := filepath.Clean(value)
 	return strings.TrimSpace(value) != "" && !filepath.IsAbs(value) && clean != "." && clean != ".." &&
 		!strings.HasPrefix(clean, ".."+string(filepath.Separator))
+}
+
+// ClearDirectory removes contents relative to an owned directory descriptor.
+// It never follows symlinks or removes the descriptor's own entry. The caller
+// owns the bounded recovery context and final unlink of its private stage.
+func ClearDirectory(ctx context.Context, dir *os.File) error { return clearDirectory(ctx, dir, 0) }
+func clearDirectory(ctx context.Context, dir *os.File, depth int) error {
+	if ctx == nil || dir == nil {
+		return fmt.Errorf("private stage cleanup requires context and descriptor")
+	}
+	if depth > 32 {
+		return fmt.Errorf("private stage cleanup depth budget")
+	}
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		// Rewind between deletion batches: directory cookies need not remain
+		// stable after unlink, and the remaining contents are still bounded by ctx.
+		if _, err := dir.Seek(0, 0); err != nil {
+			return err
+		}
+		entries, err := dir.ReadDir(64)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		for _, entry := range entries {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			flags := 0
+			if entry.IsDir() {
+				child, _, err := OpenChild(dir, entry.Name(), true)
+				if err != nil {
+					return err
+				}
+				err = clearDirectory(ctx, child, depth+1)
+				_ = child.Close()
+				if err != nil {
+					return err
+				}
+				flags = unix.AT_REMOVEDIR
+			}
+			if err := unix.Unlinkat(int(dir.Fd()), entry.Name(), flags); err != nil {
+				return err
+			}
+		}
+		if err == io.EOF {
+			return nil
+		}
+	}
 }

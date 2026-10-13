@@ -270,12 +270,31 @@ nvkr evidence report --inputs reviewed-evidence-inputs.json \
   --anonymous --format markdown --out verified-results.md
 ```
 
-Use `--format json` for a generated discovery index. Output is immutable and receipt lifetime is rechecked
-before export. Inputs have a cumulative 256 MiB authenticated covered-byte bound in addition to per-bundle
-limits. Community source paths use the independently selected Definition and authenticated signer projection;
-the grouping hash is a privacy/transport label, never identity or authority. A community attester receives
-no qualifier role from reporting. Closed/canceled receipts, inaccessible objects, wrong source paths,
-wrong identities, stale subjects and tampered files cannot become counted passes.
+Use `--format json` for a generated discovery index. All requested projections, including TestGrid
+membership and timestamp gates, are admitted before any output commit. Files and directories are immutable;
+receipt lifetime is rechecked before and after the commit. `reportCommitted` and `testGridCommitted` identify
+actual commits, and each output path is reported only after its rename commits. A late failure retains that
+explicit partial state and performs no rollback. Exports use private directories (`0700`) and files (`0600`).
+
+At most 128 inputs, 256 MiB of cumulative authenticated observation/covered-file bytes and 512 held files
+including control documents are retained, in addition to per-bundle limits. One independently bounded
+candidate inventory may be held temporarily before an aggregate gate rejects and closes it. Every input
+is authenticated before deduplication, including duplicates. Conflicting tier, Definition or signer admission
+for one namespace/source path fails before verification; first-party sources cannot use `community/` paths.
+With explicit credentials every input must use the single `NVKR_REGISTRY` host. Use `--anonymous` or separate
+report invocations for different registry hosts.
+
+Community paths use the independently selected Definition and an authenticated signer grouping digest:
+`community/<Definition digest hex>/signer-<grouping digest hex>`. The grouping digest uses the registered
+`nvkr.community-signer-label` canonical family over exact identity and issuer. It is deterministic and
+unsalted, so candidate identities can be checked offline. It supplies no confidentiality or authorization;
+raw signer identity and issuer remain disclosed in the index, Markdown and TestGrid evidence sidecar.
+The cross-signer collision guard is defense in depth. Reporting grants no qualifier role.
+
+The stock `testobservation.VerifyOCI` owner authenticates signatures and exact covered files; its bundle
+and registry tests exercise tamper rejection. Reporting tests inject private receipt fixtures to exercise
+source admission, aggregation, revocation, deduplication and export orchestration. These tests do not prove
+public registry, contributor or TestGrid service acceptance.
 
 ### TestGrid local export and companion work
 
@@ -288,11 +307,25 @@ metadata last. It binds deterministic JUnit transport labels to original filenam
 sidecar. No-result failures contain explicit status without synthetic passing cases. Producer timestamps are
 signed declared facts, not trusted time. TestGrid publication remains `published: false`.
 
-This is an export adapter, not service integration acceptance. The inspected existing Autotest publisher and
-TestGrid JUnit matcher informed its format; source/version details and the partial column-header example are
-in [the reporting contract](../pkg/nvkr/testreporting/README.md). The selected TestGrid backend still needs a
-companion registered-group/column-header change to render exact evidence links, tier and no-result status.
-An operator must select its actual bucket/tab/access/retention contract before a concrete deployable change
+The inspected Autotest publisher at `25bf36a133f5681ded8e5b341f87a2df80aca7eb`,
+`framework/reportingservice/destinations/testgrid_destination.py:859-887`, writes started metadata, original
+JUnit, then finished metadata. TestGrid inspected at `83d7f9234d3137d36cd2ff0004d938a0dbb537ee` pins upstream
+module `v0.0.175`: `util/gcs/read.go:279-280` admits the JUnit basename pattern and
+`pkg/updater/read.go:418-419` reads all matching files. Its updater manifest declares
+`v20251223-v0.0.175-2-g0e84967e`. These are historical source/configuration observations; they prove neither
+currently deployed image bytes nor actual ingestion.
+
+Multiple JUnit files keep their original bytes under full filename-digest transport labels. TestGrid may
+render those hashes as filename-derived contexts; `artifacts/evidence.json` maps them back to exact original
+filenames, raw digests and lengths. Historical backfill visibility depends on the selected TestGroup's
+retention and build ordering; retaining the original producer timestamp does not guarantee display.
+
+The inspected config-gen at `tools/config-gen/main.go:644-648` projects only `release_stream`, `release_tag`,
+`runtime_release` and `operations_release`. The [column-header example](../pkg/nvkr/testreporting/testdata/testgrid-column-header-example.json)
+is a partial field fragment, with every key checked against emitted metadata; it specifies no target.
+A selected TestGrid backend still needs a companion registered-group/column-header change to render exact
+evidence links, tier and no-result status. This local export provides no service integration acceptance.
+A future uploader requires an operator-selected bucket/tab/access/retention contract before a concrete deployable change
 or uploader can be prepared. Service authorization, immutable object writes and authenticated API/UI read-back
 remain unresolved. Public hosting and anonymous access also need a selected destination and read-back; local
 index generation proves neither. No external service writes or production evidence publication occur here.

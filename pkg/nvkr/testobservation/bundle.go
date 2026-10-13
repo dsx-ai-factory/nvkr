@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
@@ -519,32 +520,9 @@ func syncTree(ctx context.Context, dir *os.File) error {
 	return nil
 }
 func clearStage(dir *os.File) error {
-	if _, err := dir.Seek(0, 0); err != nil {
-		return err
-	}
-	entries, err := dir.ReadDir(-1)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		flags := 0
-		if entry.IsDir() {
-			child, _, err := securepath.OpenChild(dir, entry.Name(), true)
-			if err != nil {
-				return err
-			}
-			err = clearStage(child)
-			_ = child.Close()
-			if err != nil {
-				return err
-			}
-			flags = unix.AT_REMOVEDIR
-		}
-		if err := unix.Unlinkat(int(dir.Fd()), entry.Name(), flags); err != nil {
-			return err
-		}
-	}
-	return nil
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	return securepath.ClearDirectory(ctx, dir)
 }
 
 func decodeVersion(raw []byte, out any) error {

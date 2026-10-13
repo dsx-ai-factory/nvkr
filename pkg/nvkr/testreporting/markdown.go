@@ -6,23 +6,22 @@ package testreporting
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
+	"unicode"
 )
 
 func markdown(value string) string {
-	quoted := strconv.Quote(value)
-	value = quoted[1 : len(quoted)-1]
+
 	var out strings.Builder
 	for _, c := range value {
+		if unicode.IsControl(c) || unicode.In(c, unicode.Cf) {
+			fmt.Fprintf(&out, "\\u%04x", c)
+			continue
+		}
 		if strings.ContainsRune("\\`*_{}[]()#+-.!|><", c) {
 			out.WriteByte('\\')
 		}
-		if c == '\n' || c == '\r' {
-			out.WriteByte(' ')
-		} else {
-			out.WriteRune(c)
-		}
+		out.WriteRune(c)
 	}
 	return out.String()
 }
@@ -48,7 +47,7 @@ func (r *Report) Markdown(ctx context.Context) (string, error) {
 		fmt.Fprintf(&out, "Observation: %s\n\nOCI bundle: %s\n\n", markdown(entry.ObservationDigest), markdown(entry.Reference))
 		fmt.Fprintf(&out, "Signer: %s; issuer: %s; admitted tier: %s.\n\n", markdown(entry.Identity), markdown(entry.Issuer), markdown(entry.Tier))
 		if entry.SignerProjectionToken != "" {
-			fmt.Fprintf(&out, "Signer projection token (privacy label only): %s.\n\n", markdown(entry.SignerProjectionToken))
+			fmt.Fprintf(&out, "Signer projection token (deterministic grouping label; raw signer identity is disclosed): %s.\n\n", markdown(entry.SignerProjectionToken))
 		}
 		fmt.Fprintf(&out, "Suite: %s; invocation: %s; harness revision: %s; image: %s; policy: %s.\n\n", markdown(suite.Name), markdown(suite.Invocation), markdown(suite.HarnessRevision), markdown(suite.ImageDigest), markdown(suite.PolicyDigest))
 		fmt.Fprintf(&out, "Selection: %s. Required cases: %d; observed cases: %d.\n\n", markdown(strings.Join(suite.Selection, ", ")), entry.Coverage.Required, entry.Coverage.Total)

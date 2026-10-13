@@ -179,6 +179,14 @@ Digest-pinned coordinates use `nvkr.dev/test-observation-locator/v1`; locators h
 separate authority or digest family. Empty required-case lists and inventories encode as `[]`,
 never `null`. Decoders reject the alternate wire shape rather than reinterpret signed bytes.
 
+Descriptive reporting allocates `nvkr.community-signer-label` exclusively for deterministic signer grouping.
+Its canonical payload is the exact object `{identity, issuer}`; it has no attestation predicate and is not an
+authored lifecycle object or authentication receipt. The community source path combines the independently
+selected Definition digest with this domain-separated grouping digest. Authentication remains the
+observation owner's responsibility before a source is counted. The unsalted grouping value is enumerable
+and confers no confidentiality, qualification or publication authority; raw identity and issuer are disclosed
+in reporting projections. This allocation does not strengthen a build or release evidence lane.
+
 M3 qualification evidence (ADR-16) registers the following distinct schema and family. This is
 pipeline-attested build/evidence qualification; it does not reuse a reserved qualified-clearance family.
 

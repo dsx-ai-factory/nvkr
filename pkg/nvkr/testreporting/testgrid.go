@@ -86,29 +86,15 @@ func (r *Report) TestGrid(ctx context.Context, destination TestGridDestination) 
 	if err != nil {
 		return TestGridProjection{}, err
 	}
-	var selected *Entry
-	for i := range index.Entries {
-		entry := &index.Entries[i]
-		if entry.ObservationDigest == destination.ObservationDigest && entry.Namespace == destination.Namespace && entry.SourcePath == destination.SourcePath {
-			if selected != nil {
-				return TestGridProjection{}, failure("ambiguous TestGrid source selection")
-			}
-			selected = entry
-		}
+	selected, err := selectGridEntry(index, destination)
+	if err != nil {
+		return TestGridProjection{}, err
 	}
-	if selected == nil {
-		return TestGridProjection{}, failure("TestGrid selection is outside verified report membership")
+	owner, err := r.gridOwner(*selected)
+	if err != nil {
+		return TestGridProjection{}, err
 	}
-	var owner receipt
-	for _, held := range r.receipts {
-		if held.input.Expected.ObservationDigest == selected.ObservationDigest && held.input.Admission.Namespace == selected.Namespace && held.input.Admission.SourcePath == selected.SourcePath {
-			owner = held.receipt
-			break
-		}
-	}
-	if owner == nil {
-		return TestGridProjection{}, failure("verified TestGrid source lifetime unavailable")
-	}
+
 	o := selected.Observation
 	begin, err := observedTime(o, "testStartedUnix", "before")
 	if err != nil {
@@ -187,4 +173,34 @@ type TestGridMember struct {
 type testGridEvidence struct {
 	Index Index            `json:"index"`
 	Files []TestGridMember `json:"files"`
+}
+
+func selectGridEntry(index Index, destination TestGridDestination) (*Entry, error) {
+	var selected *Entry
+	for i := range index.Entries {
+		entry := &index.Entries[i]
+		if entry.ObservationDigest == destination.ObservationDigest && entry.Namespace == destination.Namespace && entry.SourcePath == destination.SourcePath {
+			if selected != nil {
+				return nil, failure("ambiguous TestGrid source selection")
+			}
+			selected = entry
+		}
+	}
+	if selected == nil {
+		return nil, failure("TestGrid selection is outside verified report membership")
+	}
+	return selected, nil
+}
+func (r *Report) gridOwner(selected Entry) (receipt, error) {
+	var owner receipt
+	for _, held := range r.receipts {
+		if held.input.Expected.ObservationDigest == selected.ObservationDigest && held.input.Admission.Namespace == selected.Namespace && held.input.Admission.SourcePath == selected.SourcePath && held.input.Locator.Reference == selected.Reference {
+			owner = held.receipt
+			break
+		}
+	}
+	if owner == nil {
+		return nil, failure("verified TestGrid source lifetime unavailable")
+	}
+	return owner, nil
 }

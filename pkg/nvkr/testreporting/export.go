@@ -6,9 +6,11 @@ package testreporting
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
@@ -39,6 +41,9 @@ func (r *Report) ExportMarkdown(ctx context.Context, out string) error {
 	return r.exportLocalFile(ctx, out, []byte(rendered))
 }
 func (r *Report) exportLocalFile(ctx context.Context, out string, raw []byte) error {
+	return r.exportLocalFileWithCommit(ctx, out, raw, nil)
+}
+func (r *Report) exportLocalFileWithCommit(ctx context.Context, out string, raw []byte, onCommit func()) error {
 	if err := checkContext(ctx); err != nil {
 		return err
 	}
@@ -58,7 +63,7 @@ func (r *Report) exportLocalFile(ctx context.Context, out string, raw []byte) er
 		return e.Wrap(e.CodeVerifyFailed, err, "holding generated index parent")
 	}
 	defer parent.Close()
-	stage, stageName, err := securepath.CreateTemporarySibling(parent)
+	stage, stageName, err := securepath.CreateTemporarySiblingWithPrefix(parent, ".nvkr-report-")
 	if err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "creating generated index stage")
 	}
@@ -99,34 +104,56 @@ func (r *Report) exportLocalFile(ctx context.Context, out string, raw []byte) er
 		return failure("generated index stage was replaced")
 	}
 	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), stageName, int(parent.Fd()), filepath.Base(absolute)); err != nil {
-		return e.Wrap(e.CodeImmutableViolation, err, "committing generated index without replacement")
+		return renameFailure(err, "committing generated index without replacement")
 	}
 	committed = true
+	if onCommit != nil {
+		onCommit()
+	}
 	if err := parent.Sync(); err != nil {
-		return e.Wrap(e.CodeUnavailable, err, "generated index committed but parent sync failed; no rollback performed")
+		return committedFailure(ctx, err, "generated index committed but parent sync failed; no rollback performed")
 	}
 	requested, info, err = securepath.OpenDirectory(filepath.Dir(absolute))
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "generated index committed but parent recheck failed; no rollback performed")
+		return committedFailure(ctx, err, "generated index committed but parent recheck failed; no rollback performed")
 	}
 	defer requested.Close()
 	if !os.SameFile(parentInfo, info) {
-		return failure("generated index committed but parent was replaced; no rollback performed")
+		return committedFailure(ctx, nil, "generated index committed but parent was replaced; no rollback performed")
 	}
 	published, publishedInfo, err := securepath.OpenChild(requested, filepath.Base(absolute), false)
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "generated index committed but file recheck failed; no rollback performed")
+		return committedFailure(ctx, err, "generated index committed but file recheck failed; no rollback performed")
 	}
 	defer published.Close()
 	if !os.SameFile(stagedInfo, publishedInfo) {
-		return failure("generated index committed but file identity was replaced; no rollback performed")
+		return committedFailure(ctx, nil, "generated index committed but file identity was replaced; no rollback performed")
 	}
 	final, err := io.ReadAll(io.LimitReader(published, MaxIndexBytes+1))
 	if err != nil || !bytes.Equal(final, raw) {
-		return failure("generated index committed but exact bytes changed; no rollback performed")
+		return committedFailure(ctx, nil, "generated index committed but exact bytes changed; no rollback performed")
 	}
 	if _, err := r.Index(ctx); err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "generated index committed but receipt lifetime recheck failed; no rollback performed")
+		return committedFailure(ctx, err, "generated index committed but receipt lifetime recheck failed; no rollback performed")
 	}
 	return nil
+}
+
+func renameFailure(err error, message string) error {
+	code := e.CodeVerifyFailed
+	if errors.Is(err, unix.EEXIST) || errors.Is(err, unix.ENOTEMPTY) {
+		code = e.CodeImmutableViolation
+	} else if errors.Is(err, unix.EINVAL) || errors.Is(err, unix.ENOSYS) || errors.Is(err, unix.ENOTSUP) || runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		code = e.CodeEngineCapability
+	}
+	return e.Wrap(code, err, "%s", message)
+}
+func committedFailure(ctx context.Context, err error, message string) error {
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s", message)
+	}
+	if err == nil {
+		return e.New(e.CodeVerifyFailed, "%s", message)
+	}
+	return e.Wrap(e.CodeVerifyFailed, err, "%s", message)
 }

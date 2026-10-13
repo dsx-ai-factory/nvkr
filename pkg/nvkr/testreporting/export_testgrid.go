@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
@@ -32,6 +33,9 @@ func (r *Report) ExportTestGrid(ctx context.Context, destination TestGridDestina
 	if err != nil {
 		return err
 	}
+	return r.exportGridProjection(ctx, projection, out, nil)
+}
+func (r *Report) exportGridProjection(ctx context.Context, projection TestGridProjection, out string, onCommit func()) error {
 	absolute, err := filepath.Abs(out)
 	if err != nil {
 		return e.Wrap(e.CodeUsage, err, "resolving projection output")
@@ -49,18 +53,24 @@ func (r *Report) ExportTestGrid(ctx context.Context, destination TestGridDestina
 	if err := unix.Mkdirat(int(parent.Fd()), stageName, 0o700); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "creating projection stage")
 	}
+	committed := false
+	var stage *os.File
+	defer func() {
+
+		if stage != nil {
+			if !committed {
+				cleanupGridStage(stage, projection)
+			}
+			_ = stage.Close()
+		}
+		if !committed {
+			_ = unix.Unlinkat(int(parent.Fd()), stageName, unix.AT_REMOVEDIR)
+		}
+	}()
 	stage, stageInfo, err := securepath.OpenChild(parent, stageName, true)
 	if err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "holding projection stage")
 	}
-	defer stage.Close()
-	committed := false
-	defer func() {
-		if !committed {
-			cleanupGridStage(stage, projection)
-			_ = unix.Unlinkat(int(parent.Fd()), stageName, unix.AT_REMOVEDIR)
-		}
-	}()
 	for _, member := range projection.Files {
 		if err := checkContext(ctx); err != nil {
 			return err
@@ -68,6 +78,10 @@ func (r *Report) ExportTestGrid(ctx context.Context, destination TestGridDestina
 		memberParent, leaf, err := securepath.CreateParent(stage, member.Name)
 		if err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "creating projection member parent")
+		}
+		if err := memberParent.Chmod(0700); err != nil {
+			_ = memberParent.Close()
+			return e.Wrap(e.CodeVerifyFailed, err, "protecting projection directory")
 		}
 		fd, err := unix.Openat(int(memberParent.Fd()), leaf, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0o600)
 		if err != nil {
@@ -109,49 +123,43 @@ func (r *Report) ExportTestGrid(ctx context.Context, destination TestGridDestina
 		return failure("TestGrid projection stage was replaced")
 	}
 	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), stageName, int(parent.Fd()), filepath.Base(absolute)); err != nil {
-		return e.Wrap(e.CodeImmutableViolation, err, "committing projection without replacement")
+		return renameFailure(err, "committing projection without replacement")
 	}
 	committed = true
+	if onCommit != nil {
+		onCommit()
+	}
 	if err := parent.Sync(); err != nil {
-		return e.Wrap(e.CodeUnavailable, err, "projection committed but parent sync failed; no rollback performed")
+		return committedFailure(ctx, err, "projection committed but parent sync failed; no rollback performed")
 	}
 	current, currentInfo, err = securepath.OpenDirectory(filepath.Dir(absolute))
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "projection committed but parent recheck failed; no rollback performed")
+		return committedFailure(ctx, err, "projection committed but parent recheck failed; no rollback performed")
 	}
 	_ = current.Close()
 	if !os.SameFile(parentInfo, currentInfo) {
-		return failure("projection committed but requested parent was replaced; no rollback performed")
+		return committedFailure(ctx, nil, "projection committed but requested parent was replaced; no rollback performed")
 	}
 	published, publishedInfo, err := securepath.OpenDirectory(absolute)
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "projection committed but directory recheck failed; no rollback performed")
+		return committedFailure(ctx, err, "projection committed but directory recheck failed; no rollback performed")
 	}
 	defer published.Close()
 	if !os.SameFile(stageInfo, publishedInfo) {
-		return failure("projection committed but output directory was replaced; no rollback performed")
+		return committedFailure(ctx, nil, "projection committed but output directory was replaced; no rollback performed")
 	}
 	if err := verifyGridProjection(published, projection); err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "projection committed but exact local recheck failed; no rollback performed")
+		return committedFailure(ctx, err, "projection committed but exact local recheck failed; no rollback performed")
 	}
 	if _, err := r.Index(ctx); err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "projection committed but receipt recheck failed; no rollback performed")
+		return committedFailure(ctx, err, "projection committed but receipt recheck failed; no rollback performed")
 	}
 	return nil
 }
-func cleanupGridStage(root *os.File, projection TestGridProjection) {
-	_ = unix.Unlinkat(int(root.Fd()), "started.json", 0)
-	_ = unix.Unlinkat(int(root.Fd()), "finished.json", 0)
-	artifacts, _, err := securepath.OpenChild(root, "artifacts", true)
-	if err == nil {
-		for _, member := range projection.Files {
-			if filepath.Dir(member.Name) == "artifacts" {
-				_ = unix.Unlinkat(int(artifacts.Fd()), filepath.Base(member.Name), 0)
-			}
-		}
-		_ = artifacts.Close()
-		_ = unix.Unlinkat(int(root.Fd()), "artifacts", unix.AT_REMOVEDIR)
-	}
+func cleanupGridStage(root *os.File, _ TestGridProjection) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_ = securepath.ClearDirectory(ctx, root)
 }
 
 func verifyGridProjection(root *os.File, projection TestGridProjection) error {

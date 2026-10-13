@@ -347,6 +347,8 @@ in reconciliation; a facade alone does not discharge that debt.
 | Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
 | Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
+| Portable test observations | `testresults`, `testobservation` | Strict original-result projection, exact covered-file/OCI authentication and live receipts; no qualification granted by an observation |
+| Historical test reporting | `testreporting` | Independent source admission and receipt-derived JSON/Markdown/local TestGrid projection; no current-health, cached authority or service-publication claim |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
 | Release authority and durable status | `release`, `status` | Status owns diagnostic checkpoint acceptance and high-water persistence; qualified release authorization, trusted time and publication remain deferred |
 | Public adaptation | `errors`; `client/v1` and `cmd/nvkr` outside this tree | Stable error mapping, read surfaces, SDK and CLI |

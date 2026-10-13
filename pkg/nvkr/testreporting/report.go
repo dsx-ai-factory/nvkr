@@ -9,8 +9,6 @@ package testreporting
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -25,6 +23,9 @@ import (
 
 const SchemaVersion = "nvkr.dev/test-report-index/v1"
 const MaxInputs = 128
+
+// Bound retained descriptor pressure independently from covered-byte sizes.
+const MaxHeldFiles = 512
 const MaxCoveredBytes int64 = testobservation.MaxTotalBytes
 const FirstParty = "first-party"
 const Community = "community"
@@ -47,7 +48,7 @@ type Input struct {
 }
 
 // Entry is a generated description of one freshly verified observation. Signer
-// projection tokens are privacy/grouping labels; they establish no authority.
+// projection tokens are deterministic grouping labels; they establish no authority.
 type Entry struct {
 	Namespace             string                      `json:"namespace"`
 	SourcePath            string                      `json:"sourcePath"`
@@ -131,10 +132,13 @@ func safePath(value string) bool {
 }
 func validateInput(input Input, options testobservation.RegistryOptions) error {
 	a := input.Admission
+	if a.Tier == FirstParty && strings.HasPrefix(a.SourcePath, "community/") {
+		return failure("first-party source cannot use the community path namespace")
+	}
 	if a.Revoked {
 		return e.New(e.CodeUntrustedSigner, "configured observation source is revoked")
 	}
-	if !text(a.Identity) || !text(a.Issuer) || (a.Tier != FirstParty && a.Tier != Community) || !safePath(a.SourcePath) || !canonical.IsDigest(a.DefinitionDigest) || a.DefinitionDigest != input.Expected.Inputs.DefinitionDigest {
+	if !text(a.Identity) || !text(a.Issuer) || strings.TrimSpace(a.Identity) != a.Identity || strings.TrimSpace(a.Issuer) != a.Issuer || (a.Tier != FirstParty && a.Tier != Community) || !safePath(a.SourcePath) || !canonical.IsDigest(a.DefinitionDigest) || a.DefinitionDigest != input.Expected.Inputs.DefinitionDigest {
 		return failure("independent signer, tier, source path and exact Definition admission required")
 	}
 	if options.Identity != "" && options.Identity != a.Identity || options.Issuer != "" && options.Issuer != a.Issuer {
@@ -167,25 +171,28 @@ func validateInput(input Input, options testobservation.RegistryOptions) error {
 }
 
 // ProjectionSourcePath prepares a community contribution path from independently
-// selected configuration. The hash is a privacy label, not an authenticated
+// selected configuration. The hash is a deterministic grouping label, not an authenticated
 // identity. Ingest recomputes it only after signer authentication before counting.
 func ProjectionSourcePath(definitionDigest, identity, issuer string) (string, error) {
-	if !canonical.IsDigest(definitionDigest) || !text(identity) || !text(issuer) {
+	if !canonical.IsDigest(definitionDigest) || !text(identity) || !text(issuer) || strings.TrimSpace(identity) != identity || strings.TrimSpace(issuer) != issuer {
 		return "", failure("projection requires exact Definition and signer configuration")
 	}
-	raw, err := canonical.Marshal(struct {
+	token, err := canonical.Digest(canonical.KindCommunitySignerLabel, struct {
 		Identity string `json:"identity"`
 		Issuer   string `json:"issuer"`
 	}{identity, issuer})
 	if err != nil {
 		return "", err
 	}
-	token := fmt.Sprintf("%x", sha256.Sum256(raw))
+	token = strings.TrimPrefix(token, "sha256:")
 	return "community/" + strings.TrimPrefix(definitionDigest, "sha256:") + "/signer-" + token, nil
 }
 
 // Ingest authenticates every supplied input through the stock OCI verifier.
 // Duplicate inputs are verified before deduplication within the admitted source.
+func stockVerify(ctx context.Context, input Input, options testobservation.RegistryOptions) (receipt, error) {
+	return testobservation.VerifyOCI(ctx, input.Locator.Reference, input.Expected, options)
+}
 func Ingest(ctx context.Context, inputs []Input, options testobservation.RegistryOptions) (*Report, error) {
 	return ingestWith(ctx, inputs, options, func(ctx context.Context, input Input, options testobservation.RegistryOptions) (receipt, error) {
 		return testobservation.VerifyOCI(ctx, input.Locator.Reference, input.Expected, options)
@@ -198,10 +205,17 @@ func ingestWith(ctx context.Context, inputs []Input, options testobservation.Reg
 	if len(inputs) == 0 || len(inputs) > MaxInputs || verify == nil {
 		return nil, e.New(e.CodeUsage, "reporting requires 1 through %d independently admitted inputs", MaxInputs)
 	}
+	sources := map[string]Admission{}
 	for _, input := range inputs {
 		if err := validateInput(input, options); err != nil {
 			return nil, err
 		}
+		a := input.Admission
+		key := a.Namespace + "\x00" + a.SourcePath
+		if prior, ok := sources[key]; ok && (prior.Tier != a.Tier || prior.DefinitionDigest != a.DefinitionDigest || prior.Identity != a.Identity || prior.Issuer != a.Issuer) {
+			return nil, failure("conflicting tier, Definition or signer for reviewed source")
+		}
+		sources[key] = a
 	}
 	result := &Report{ctx: ctx}
 	complete := false
@@ -211,6 +225,7 @@ func ingestWith(ctx context.Context, inputs []Input, options testobservation.Reg
 		}
 	}()
 	var retainedBytes int64
+	var retainedFiles int
 	for _, input := range inputs {
 		if err := checkContext(ctx); err != nil {
 			return nil, err
@@ -245,6 +260,14 @@ func ingestWith(ctx context.Context, inputs []Input, options testobservation.Reg
 			}
 			return nil, failure("authenticated report inventories exceed cumulative covered-byte budget")
 		}
+		observedFiles := 1 + len(entry.Observation.Files)
+		if observedFiles > MaxHeldFiles-retainedFiles {
+			if err := verified.Close(); err != nil {
+				return nil, e.Wrap(e.CodeUnavailable, err, "closing excess report descriptors")
+			}
+			return nil, failure("authenticated report inventories exceed cumulative held-file budget")
+		}
+		retainedFiles += observedFiles
 		retainedBytes += observedBytes
 	}
 	if _, err := result.indexLocked(ctx); err != nil {
@@ -318,6 +341,8 @@ func (r *Report) indexLocked(ctx context.Context) (Index, error) {
 	}
 	index := Index{SchemaVersion: SchemaVersion, Scope: "authenticated historical test observations; no current health or qualification claim", Entries: []Entry{}}
 	entries := map[string]Entry{}
+	// Defense in depth: an honest signer grouping digest is collision resistant,
+	// but a collision still cannot join independently authenticated identities.
 	sourceSigners := map[string]string{}
 	for _, owned := range r.receipts {
 		entry, err := projectEntry(ctx, owned)
@@ -328,7 +353,7 @@ func (r *Report) indexLocked(ctx context.Context) (Index, error) {
 			source := entry.Namespace + "\x00" + entry.SourcePath
 			signer := entry.Identity + "\x00" + entry.Issuer
 			if prior, exists := sourceSigners[source]; exists && prior != signer {
-				return Index{}, failure("community privacy label collides across authenticated signers")
+				return Index{}, failure("community deterministic grouping label collides across authenticated signers")
 			}
 			sourceSigners[source] = signer
 		}

@@ -41,8 +41,10 @@ to the public Verification Policy is deferred; no projection or conversion is im
 `evidence report` delegates passive ingestion and generated index/Markdown/local TestGrid projection to
 `testreporting`. Reviewed source admission and expected subjects remain external configuration; no cached
 projection restores receipt authority, no new authored lifecycle object is introduced, and no historical
-passing result establishes current cluster health. Service destinations and retention are explicit operator
-inputs; local export does not establish publication or TestGrid registration.
+passing result establishes current cluster health. Service destinations and retention must be explicitly
+selected before a future uploader exists; neither is defaulted, and retention is not a current export
+configuration field. Local export establishes no
+publication or TestGrid registration.
 
 
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
@@ -255,13 +257,16 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, the separate M3-C `qualification` publisher, `testresults`, `testobservation`
-  and `conformance`.
+  `qualificationorigin`, the separate M3-C `qualification` publisher, `testresults`, `testobservation`,
+  `testreporting` and `conformance`.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
   own a competing schema, verifier, receipt constructor, or policy decision. Remaining multi-step command
   orchestration is migration debt tracked independently rather than declared absent.
+  `testobservation` owns exact bundle/OCI authentication and live receipts; `testreporting` owns passive
+  source admission and generated historical projections. Reporting never restores a cached receipt or
+  executes a suite, and CLI/SDK adapters delegate these gates.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 
