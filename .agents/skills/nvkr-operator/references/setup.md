@@ -52,7 +52,7 @@ operations.
 For a setup-only request, stop after version/help verification and summarize what is ready. For a concrete
 task, continue into the skill's authoring or operation path.
 
-## Client discovery and maintenance
+## Client discovery
 
 [Codex documentation](https://learn.chatgpt.com/docs/build-skills) specifies `.agents/skills/` discovery from
 the working directory toward the repository root. [Claude Code
@@ -60,14 +60,3 @@ documentation](https://code.claude.com/docs/en/skills) specifies `.claude/skills
 install that client location. Both can read the README's explicit operator-skill link when instructed to use
 the repository. No cross-client automatic selection or complete URL-only agent execution has been demonstrated
 by the local CLI exercises.
-
-After renaming a linked guide, inspect the skill's relative links from each containing Markdown file. A
-reproducible inventory from the repository root is:
-
-```sh
-rg -n '\]\(' .agents/skills/nvkr-operator README.md docs/README.md
-```
-
-Review each local target against the current tree (and each section against the target document). This is a
-manual link audit, not a Markdown parser or automated broken-link gate. `make docs-check` covers only the Fern
-pages listed in `docs/index.yml`, which do not include this skill or the documentation map.
