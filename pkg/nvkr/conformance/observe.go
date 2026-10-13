@@ -5,11 +5,13 @@ package conformance
 
 import (
 	"context"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testobservation"
 	digest "github.com/opencontainers/go-digest"
 )
@@ -19,22 +21,30 @@ import (
 // Role remains an operator declaration; all API facts remain unauthenticated.
 func Observe(ctx context.Context, o Options, phase string) (testobservation.Environment, error) {
 	if phase != "before" && phase != "after" {
-		return testobservation.Environment{}, failure("observation phase must be before or after")
+		return testobservation.Environment{}, e.New(e.CodeUsage, "observation phase must be before or after")
 	}
 	a, err := admit(ctx, o)
 	if err != nil {
 		return testobservation.Environment{}, err
 	}
 	defer a.close()
-	return a.observe(ctx, phase)
+	workspace, err := os.MkdirTemp("", "nvkr-conformance-observe-")
+	if err != nil {
+		return testobservation.Environment{}, e.Wrap(e.CodeFetchFailed, err, "creating private observation workspace")
+	}
+	defer os.RemoveAll(workspace)
+	return a.observe(ctx, workspace, phase)
 }
-func (a *admitted) observe(ctx context.Context, phase string) (testobservation.Environment, error) {
+func (a *admitted) observe(ctx context.Context, workspace, phase string) (testobservation.Environment, error) {
 	env := testobservation.Environment{Role: a.options.Observation.Environment.Role}
 	add := func(key, value, evidence string) {
 		env.Facts = append(env.Facts, testobservation.Fact{Name: key, Value: value, Evidence: evidence, Phase: phase})
 	}
 	add("role", env.Role, "declared")
-	raw, _, err := a.kube(ctx, "", nil, "get", "--raw=/version")
+	for _, fact := range []struct{ name, value string }{{"tools.hydrophone.digest", a.options.Hydrophone.Digest}, {"tools.kubectl.digest", a.options.Kubectl.Digest}, {"harness.revision.declared", a.options.Observation.Suite.HarnessRevision}, {"conformance.imageVersion.declared", a.options.ImageVersion}, {"busybox.imageDigest", a.options.BusyboxImage[strings.LastIndex(a.options.BusyboxImage, "@")+1:]}} {
+		add(fact.name, fact.value, "declared")
+	}
+	raw, _, err := a.kube(ctx, workspace, nil, "get", "--raw=/version")
 	if err != nil {
 		return env, err
 	}
@@ -53,7 +63,7 @@ func (a *admitted) observe(ctx context.Context, phase string) (testobservation.E
 		return env, failure("conformance image and server major/minor versions differ")
 	}
 	add("kubernetes.version", live.String(), "cluster-api")
-	raw, _, err = a.kube(ctx, "", nil, "get", "nodes", "-o", "json")
+	raw, _, err = a.kube(ctx, workspace, nil, "get", "nodes", "-o", "json")
 	if err != nil {
 		return env, err
 	}
@@ -103,7 +113,7 @@ func (a *admitted) observe(ctx context.Context, phase string) (testobservation.E
 	// The caller declares which pods implement CNI; that classification is not
 	// inferred from arbitrary installed workloads or promoted to API evidence.
 	add("cni.selection", "operator-selected kube-system pods", "declared")
-	raw, _, err = a.kube(ctx, "", nil, "get", "pods", "--namespace=kube-system", "--selector="+a.options.CNISelector, "-o", "json")
+	raw, _, err = a.kube(ctx, workspace, nil, "get", "pods", "--namespace=kube-system", "--selector="+a.options.CNISelector, "-o", "json")
 	if err != nil {
 		return env, err
 	}
@@ -125,17 +135,11 @@ func (a *admitted) observe(ctx context.Context, phase string) (testobservation.E
 	ids := map[string]bool{}
 	for _, p := range pods.Items {
 		for _, c := range p.Status.ContainerStatuses {
-			id := c.ImageID
-			if i := strings.LastIndex(id, "@"); i >= 0 {
-				id = id[i+1:]
-			} else if i := strings.Index(id, "://"); i >= 0 {
-				id = id[i+3:]
+			id, err := projectImageIdentifier(c.ImageID)
+			if err != nil {
+				return env, err
 			}
-			parsed, err := digest.Parse(id)
-			if err != nil || parsed.Algorithm() != digest.SHA256 {
-				return env, failure("CNI runtime image identifier cannot be projected as SHA256")
-			}
-			ids[parsed.String()] = true
+			ids[id] = true
 		}
 	}
 	value, err := aggregate(ids)
@@ -171,4 +175,17 @@ func aggregate(values map[string]bool) (string, error) {
 		return "", failure("public fact aggregate exceeds budget")
 	}
 	return value, nil
+}
+
+func projectImageIdentifier(id string) (string, error) {
+	if i := strings.LastIndex(id, "@"); i >= 0 {
+		id = id[i+1:]
+	} else if i := strings.Index(id, "://"); i >= 0 {
+		id = id[i+3:]
+	}
+	parsed, err := digest.Parse(id)
+	if err != nil || parsed.Algorithm() != digest.SHA256 {
+		return "", failure("CNI runtime image identifier cannot be projected as SHA256")
+	}
+	return parsed.String(), nil
 }

@@ -123,7 +123,8 @@ func TestQualificationV2VerificationRequiresExpectedEvidence(t *testing.T) {
 		t.Run(string(raw), func(t *testing.T) {
 			stub := &cosignStub{}
 			err := newStubbedSigner(t, stub, Credential{}).VerifyQualificationV2(t.Context(), ociSubject(), raw)
-			if err == nil || len(stub.calls) != 0 {
+			requireSignCode(t, err, e.CodeVerifyFailed)
+			if len(stub.calls) != 0 {
 				t.Fatalf("invalid evidence reached subprocess: %v", err)
 			}
 		})
@@ -138,5 +139,51 @@ func TestQualificationV2InvalidPolicyCannotAttach(t *testing.T) {
 	requireSignCode(t, err, e.CodeTrustPolicyMissing)
 	if len(stub.calls) != 0 {
 		t.Fatal("invalid verification policy attached an attestation")
+	}
+}
+
+func TestQualificationV2PassiveVerificationFixedAuthority(t *testing.T) {
+	const predicate = `{"schemaVersion":"nvkr.dev/qualification-evidence/v2","verdict":"pass"}`
+	for _, tc := range []struct {
+		name, kind string
+		code       e.Code
+	}{
+		{name: "verified"},
+		{name: "v1 predicate", kind: "type", code: e.CodeVerifyFailed},
+		{name: "wrong subject", kind: "subject", code: e.CodeVerifyFailed},
+		{name: "wrong exact bytes", kind: "predicate", code: e.CodeVerifyFailed},
+		{name: "wrong signer", kind: "identity", code: e.CodeUntrustedSigner},
+		{name: "wrong issuer", kind: "issuer", code: e.CodeUntrustedSigner},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			digest, typ, identity, issuer, document := ociTestDigest, QualificationPredicateTypeV2, ociObservedIdentity, ociTestIssuer, predicate
+			switch tc.kind {
+			case "type":
+				typ = QualificationPredicateType
+			case "subject":
+				digest = "sha256:" + strings.Repeat("b", 64)
+			case "predicate":
+				document = `{"verdict":"forged"}`
+			case "identity":
+				identity = "https://github.com/other/build.yml@refs/heads/main"
+			case "issuer":
+				issuer = "https://wrong.example"
+			}
+			stub := &cosignStub{stdout: map[string]string{"download": qualificationBundleV2(t, digest, typ, identity, issuer, []byte(document))}}
+			err := newStubbedSigner(t, stub, Credential{}).VerifyQualificationV2(t.Context(), ociSubject(), []byte(predicate))
+			if tc.code != "" {
+				requireSignCode(t, err, tc.code)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			for _, call := range stub.calls {
+				if call.args[0] == "attest" || call.args[0] == "sign" {
+					t.Fatal("passive verification requested signing authority")
+				}
+			}
+			if tc.code == "" && (len(stub.calls) != 2 || stub.calls[0].args[0] != "download" || stub.calls[1].args[0] != "verify-blob-attestation") {
+				t.Fatalf("verification calls=%+v", stub.calls)
+			}
+		})
 	}
 }

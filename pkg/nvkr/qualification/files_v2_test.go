@@ -185,3 +185,34 @@ func TestFilesV2AggregateRetainedByteBudget(t *testing.T) {
 		t.Fatal("canceled intake retained observation bytes")
 	}
 }
+
+func TestConfiguredFilesV2OwnsLoadAndPrivateModeAdmission(t *testing.T) {
+	options := filesOptionsV2Fixture(t)
+	configuration := SuiteConfigurationV2{SchemaVersion: SuiteConfigurationSchemaV2, Policy: options.Policy, Suites: options.Suites}
+	raw, err := canonical.Marshal(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "configuration.json")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err = PublishConfiguredFilesV2(ctx, "does-not-exist", options)
+	requireCode(t, err, e.CodeTimeout)
+	options.Policy = PolicyV2{}
+	options.Suites = nil
+	_, err = PublishConfiguredFilesV2(t.Context(), path, options)
+	requireCode(t, err, e.CodeEngineCapability)
+	for _, mode := range []os.FileMode{0640, 0620, 0604, 0602} {
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+		_, err = LoadSuiteConfigurationV2(t.Context(), path)
+		requireCode(t, err, e.CodeVerifyFailed)
+		if !strings.Contains(err.Error(), "owner-only") {
+			t.Fatal(err)
+		}
+	}
+}

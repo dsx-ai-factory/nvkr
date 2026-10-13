@@ -123,7 +123,20 @@ func collectSuitesV2(ctx context.Context, checks lifecycle.ArtifactCheckDescript
 	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 	return result, nil
 }
+
+// The public boundary accepts only package-issued production capabilities. Its
+// private delegate keeps the same admission and recheck closure testable without
+// introducing a caller-supplied authority constructor.
+type suiteInvocationV2 interface {
+	Description() (qualificationorigin.Description, error)
+	RequireSource(qualificationorigin.Description) error
+}
+
 func (p *PublisherV2) Publish(ctx context.Context, checks *lifecycle.ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, smoke *SmokeReceipt, policy PolicyV2, receipts []*SuiteReceipt) (*PublicationV2, error) {
+	return p.publishReceiptsV2(ctx, checks, invocation, smoke, policy, receipts)
+}
+
+func (p *PublisherV2) publishReceiptsV2(ctx context.Context, checks suiteChecks, invocation suiteInvocationV2, smoke *SmokeReceipt, policy PolicyV2, receipts []*SuiteReceipt) (*PublicationV2, error) {
 	if err := suiteContext(ctx); err != nil {
 		return nil, err
 	}

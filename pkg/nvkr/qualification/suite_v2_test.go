@@ -5,6 +5,8 @@ package qualification
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -80,6 +82,10 @@ func suiteTestV2(t *testing.T) (*suiteFixtureV2, *suiteSourceV2, SuiteRequiremen
 		Suite:       testobservation.Suite{Name: "conformance", HarnessRevision: strings.Repeat("c", 40), ImageDigest: subject.Subject, PolicyDigest: subject.Subject, Invocation: "suite-invocation-1", Selection: []string{"conformance"}, RequiredCases: []testobservation.CaseID{{Suite: "suite", Name: "case"}}},
 		Environment: testobservation.Environment{Role: "tenant", Facts: []testobservation.Fact{{Name: "kubernetes-version", Value: "fixture", Evidence: "cluster-api", Phase: "before"}}}, Execution: testobservation.Outcome{Status: "completed"}, Cleanup: testobservation.Outcome{Status: "completed"},
 		Files: []testobservation.File{{Name: "results.xml", Role: "junit", Digest: subject.Subject, Size: 100}}, Summary: testresults.Summary{Total: 1, Passed: 1}}
+	observation.Subjects = nil
+	for _, selected := range base.ArtifactChecks.Outputs {
+		observation.Subjects = append(observation.Subjects, testobservation.Subject{Output: selected.Name, ArtifactDigest: selected.Subject, PayloadDigest: selected.BuildSubjects[0].Digest, BuildDigest: selected.BuildDigest, Platform: "linux/amd64"})
+	}
 	digest, err := observation.Digest()
 	if err != nil {
 		t.Fatal(err)
@@ -165,13 +171,16 @@ func TestSuiteV2NegativeAdmissionPerformsNoSigning(t *testing.T) {
 			p := &PublisherV2{newAttester: func(string) (qualificationAttesterV2, error) { calls++; return nil, nil }}
 			receipt, err := authenticateSuiteV2(t.Context(), f, s, r)
 			requireCode(t, err, tc.code)
-			// Rejected observation cannot enter the all-suites pre-sign gate.
-			_, err = collectSuitesV2(t.Context(), s.description, PolicyV2{RequiredSuites: []SuiteRequirement{r}}, []*SuiteReceipt{receipt})
-			if err == nil {
-				t.Fatal("rejected suite admitted")
+			// Exercise the same production delegate and admission closure rather
+			// than failing at an unrelated empty artifact capability.
+			base := evidenceFixture()
+			invocation := &invocationFixtureV2{description: base.Invocation, source: s.description.Origin}
+			_, err = p.publishReceiptsV2(t.Context(), s, invocation, nil, PolicyV2{RequiredSuites: []SuiteRequirement{r}}, []*SuiteReceipt{receipt})
+			code := e.CodeGateUnmet
+			if r.RequireAuthenticatedDeployment {
+				code = e.CodeEngineCapability
 			}
-			// No opaque source receipt can be replaced by the descriptive fixture.
-			_, err = p.Publish(t.Context(), &lifecycle.ArtifactCheckReceipt{}, nil, nil, PolicyV2{RequiredSuites: []SuiteRequirement{r}}, []*SuiteReceipt{receipt})
+			requireCode(t, err, code)
 			if err == nil || calls != 0 {
 				t.Fatalf("negative admission reached signing: %v", err)
 			}
@@ -345,29 +354,53 @@ func TestSuiteV2PreSignRevocationAndDetachedDescriptions(t *testing.T) {
 }
 
 func TestSuiteV2UnselectedSkippedCasesAreNotRequiredCoverage(t *testing.T) {
-	fixture, checks, r := suiteTestV2(t)
-	fixture.observation.Summary.Total = 2
-	fixture.observation.Summary.Skipped = 1
-	rebindSuiteFixtureV2(t, fixture, &r)
-	receipt, err := authenticateSuiteV2(t.Context(), fixture, checks, r)
-	if err != nil {
-		t.Fatal(err)
+	for _, requiredSkip := range []bool{false, true} {
+		t.Run(fmt.Sprintf("required-skip-%t", requiredSkip), func(t *testing.T) {
+			fixture, checks, r := suiteTestV2(t)
+			result := `<testsuite name="suite" tests="2" skipped="1"><testcase name="case"/><testcase name="unselected"><skipped/></testcase></testsuite>`
+			if requiredSkip {
+				result = `<testsuite name="suite" tests="2" skipped="1"><testcase name="case"><skipped/></testcase><testcase name="unselected"/></testsuite>`
+			}
+			source := t.TempDir()
+			if err := os.WriteFile(filepath.Join(source, "results.xml"), []byte(result), 0600); err != nil {
+				t.Fatal(err)
+			}
+			observation := fixture.observation
+			observation.Files = nil
+			observation.Summary = testresults.Summary{}
+			out := filepath.Join(t.TempDir(), "bundle")
+			if err := testobservation.Emit(t.Context(), source, observation, []testobservation.FileInput{{Name: "results.xml", Role: "junit", ExpectedDigest: fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(result)))}}, out); err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := testobservation.Open(t.Context(), out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer bundle.Close()
+			fixture.observation = bundle.Observation()
+			fixture.verification.Passing = bundle.Passing()
+			rebindSuiteFixtureV2(t, fixture, &r)
+			receipt, err := authenticateSuiteV2(t.Context(), fixture, checks, r)
+			if requiredSkip {
+				requireCode(t, err, e.CodeGateUnmet)
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := receipt.require(t.Context(), checks.description); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
 	}
-	if _, err := receipt.require(t.Context(), checks.description); err != nil {
-		t.Fatal(err)
-	}
-	// Verified.Passing comes from the owning JUnit coverage computation, not a
-	// consumer-provided summary. A required skipped case revokes that verdict.
-	fixture.verification.Passing = false
-	_, err = receipt.require(t.Context(), checks.description)
-	requireCode(t, err, e.CodeGateUnmet)
 }
 func TestSuiteV2NativeChildMembership(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		edit func(*testobservation.Subject)
 	}{
-		{"exact arm64 child", nil},
+		{"arm64 child only", nil},
+		{"all native children", func(_ *testobservation.Subject) {}},
 		{"wrong platform", func(s *testobservation.Subject) { s.Platform = "linux/amd64" }},
 		{"wrong native build", func(s *testobservation.Subject) { s.BuildDigest = "sha256:" + strings.Repeat("f", 64) }},
 		{"sibling payload", func(s *testobservation.Subject) { s.PayloadDigest = "sha256:" + strings.Repeat("b", 64) }},
@@ -395,9 +428,12 @@ func TestSuiteV2NativeChildMembership(t *testing.T) {
 			if tc.edit != nil {
 				tc.edit(&fixture.observation.Subjects[0])
 			}
+			if tc.name == "all native children" {
+				fixture.observation.Subjects = append([]testobservation.Subject{{Output: output.Name, Platform: children[0].Platform, ArtifactDigest: children[0].ManifestDigest, BuildDigest: children[0].BuildDigest, PayloadDigest: children[0].BuildSubject}}, fixture.observation.Subjects...)
+			}
 			rebindSuiteFixtureV2(t, fixture, &r)
 			receipt, err := authenticateSuiteV2(t.Context(), fixture, checks, r)
-			if tc.edit != nil {
+			if tc.name != "all native children" {
 				requireCode(t, err, e.CodeGateUnmet)
 			} else {
 				if err != nil {

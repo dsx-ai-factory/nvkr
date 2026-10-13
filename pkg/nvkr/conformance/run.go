@@ -43,6 +43,10 @@ func (r *Result) RawJUnit() []byte {
 // cleanup even after failure/cancellation. PrivateWorkspace belongs to the caller;
 // it contains private upstream diagnostics and must not be published wholesale.
 func Run(ctx context.Context, o Options) (*Result, error) {
+	return runWithClock(ctx, o, time.Now)
+}
+
+func runWithClock(ctx context.Context, o Options, now func() time.Time) (*Result, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "conformance requires a non-nil context")
 	}
@@ -53,6 +57,9 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 		return nil, e.New(e.CodeEngineCapability, "conformance execution is admitted only for local diagnostic clusters; upstream name-based automatic cleanup prevents site and tenant admission")
 	}
 
+	if !o.DisposableCluster {
+		return nil, e.New(e.CodeUsage, "conformance execution requires explicit disposable-cluster acknowledgement; local role is only a declaration")
+	}
 	a, err := admit(ctx, o)
 	if err != nil {
 		return nil, err
@@ -62,15 +69,12 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	if err != nil {
 		return nil, e.Wrap(e.CodeFetchFailed, err, "creating private conformance workspace")
 	}
-	if err = os.Chmod(workspace, 0o700); err != nil {
-		return nil, e.Wrap(e.CodeFetchFailed, err, "protecting private conformance workspace")
-	}
 	r := &Result{Observation: o.Observation, PrivateWorkspace: workspace}
-	started := strconv.FormatInt(time.Now().UTC().Unix(), 10)
+	started := strconv.FormatInt(now().UTC().Unix(), 10)
 	startFact := testobservation.Fact{Name: "testStartedUnix", Value: started, Evidence: "declared", Phase: "before"}
 	r.Observation.Environment.Facts = []testobservation.Fact{startFact}
 	defer func() {
-		r.Observation.Environment.Facts = append(r.Observation.Environment.Facts, testobservation.Fact{Name: "testFinishedUnix", Value: strconv.FormatInt(time.Now().UTC().Unix(), 10), Evidence: "declared", Phase: "after"})
+		r.Observation.Environment.Facts = append(r.Observation.Environment.Facts, testobservation.Fact{Name: "testFinishedUnix", Value: strconv.FormatInt(now().UTC().Unix(), 10), Evidence: "declared", Phase: "after"})
 		sort.Slice(r.Observation.Environment.Facts, func(i, j int) bool {
 			a, b := r.Observation.Environment.Facts[i], r.Observation.Environment.Facts[j]
 			if a.Phase != b.Phase {
@@ -82,12 +86,12 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 
 	r.Observation.Execution = testobservation.Outcome{Status: "not-run"}
 	r.Observation.Cleanup = testobservation.Outcome{Status: "completed"}
-	before, err := a.observe(ctx, "before")
+	before, err := a.observe(ctx, workspace, "before")
+	r.Observation.Environment = before
+	r.Observation.Environment.Facts = append(r.Observation.Environment.Facts, startFact, testobservation.Fact{Name: "disposableCluster.acknowledged", Value: "true", Evidence: "declared", Phase: "before"})
 	if err != nil {
 		return r, err
 	}
-	r.Observation.Environment = before
-	r.Observation.Environment.Facts = append(r.Observation.Environment.Facts, startFact)
 	var random [16]byte
 	if _, err = rand.Read(random[:]); err != nil {
 		return r, e.Wrap(e.CodeInternal, err, "generating unique conformance namespace")
@@ -118,7 +122,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 		return r, failure("created namespace UID unavailable; cleanup ownership not established")
 	}
 	owned := map[string]string{refs[0].path: ns.Metadata.UID}
-	runArgs := []string{"--conformance", "--namespace=" + namespace, "--skip-preflight=" + namespace, "--conformance-image=" + o.Image, "--busybox-image=" + o.BusyboxImage, "--output-dir=" + workspace, "--parallel=1", "--verbosity=1", "--startup-timeout=" + o.CommandTimeout.String()}
+	runArgs := []string{"--conformance", "--disable-progress-status", "--namespace=" + namespace, "--skip-preflight=" + namespace, "--conformance-image=" + o.Image, "--busybox-image=" + o.BusyboxImage, "--output-dir=" + workspace, "--parallel=1", "--verbosity=1", "--startup-timeout=" + a.options.StartupTimeout.String()}
 	_, code, runErr := a.command(ctx, a.hydrophone, runArgs, workspace, nil, o.RunTimeout)
 	r.Observation.Execution = testobservation.Outcome{Status: "completed", ExitCode: code}
 	if runErr != nil {
@@ -137,10 +141,13 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 		r.rawJUnit, readErr = held.ReadAllContext(cleanupCtx, testresults.MaxBytes)
 		_ = held.Close()
 	}
+	if readErr == nil {
+		_, readErr = testresults.ParseJUnit(cleanupCtx, r.rawJUnit)
+	}
 	if readErr != nil {
 		// An interrupted runner may not have downloaded an existing upstream file.
 		// Retrieve it before resource deletion; never fabricate results from logs.
-		fetched, _, fetchErr := a.kube(cleanupCtx, workspace, nil, "exec", "--namespace="+namespace, "e2e-conformance-test", "--container=output-container", "--", "cat", "/tmp/results/junit_01.xml")
+		fetched, _, fetchErr := a.kubeResults(cleanupCtx, workspace, "exec", "--namespace="+namespace, "e2e-conformance-test", "--container=output-container", "--", "cat", "/tmp/results/junit_01.xml")
 		if fetchErr == nil {
 			r.rawJUnit = fetched
 			readErr = nil
@@ -166,30 +173,25 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	if cleanupErr != nil {
 		r.Observation.Cleanup = testobservation.Outcome{Status: "failed", ExitCode: 1}
 	}
-	after, afterErr := a.observe(cleanupCtx, "after")
+	// Final passive observation has its own bounded recovery context; exhausted
+	// deletion time never erases the independently observed post-run state.
+	afterCtx, afterCancel := context.WithTimeout(context.Background(), o.CommandTimeout)
+	defer afterCancel()
+	after, afterErr := a.observe(afterCtx, workspace, "after")
 	if afterErr == nil {
 		r.Observation.Environment.Facts = append(r.Observation.Environment.Facts, after.Facts...)
 	} else if r.Observation.Execution.Status == "completed" {
 		r.Observation.Execution.Status = "infrastructure-error"
 	}
-	if cleanupErr != nil {
-		return r, cleanupErr
-	}
-	if afterErr != nil {
-		return r, afterErr
-	}
-	if runErr != nil && r.Observation.Execution.Status == "canceled" {
-		return r, runErr
-	}
-	if parseErr != nil {
-		return r, parseErr
-	}
 	if readErr != nil {
-		return r, failure("original suite results unavailable")
+		readErr = failure("original suite results unavailable")
 	}
-	if runErr != nil {
-		return r, runErr
+	// Preserve the runner cause first, including cancellation, while retaining
+	// independent cleanup, post-observation and result-recovery failures.
+	if err := errors.Join(runErr, cleanupErr, afterErr, parseErr, readErr); err != nil {
+		return r, err
 	}
+
 	return r, nil
 }
 
@@ -320,7 +322,7 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 	// precondition authenticated by the API, avoiding GET/name-delete races.
 	order := []resourceRef{refs[1], refs[2], refs[0]}
 	var lastDeleteErr error
-	for attempt := 0; attempt < 3; attempt++ {
+	for {
 		for _, ref := range order {
 			uid := owned[ref.path]
 			if uid == "" {
@@ -372,12 +374,8 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup")
+			return errors.Join(e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"), lastDeleteErr)
 		case <-timer.C:
 		}
 	}
-	if lastDeleteErr != nil {
-		return lastDeleteErr
-	}
-	return failure("namespace and RBAC terminal absence unverified")
 }

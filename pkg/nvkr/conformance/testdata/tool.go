@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,6 +43,20 @@ func readState() map[string]string {
 }
 func save(m map[string]string) { raw, _ := json.Marshal(m); _ = os.WriteFile(state, raw, 0o600) }
 func main() {
+	for _, entry := range os.Environ() {
+		key := strings.SplitN(entry, "=", 2)[0]
+		switch key {
+		case "HOME", "TMPDIR", "PATH", "KUBECONFIG", "KUBECACHEDIR":
+		default:
+			os.Exit(20)
+		}
+	}
+	wd, _ := os.Getwd()
+	if wd != os.Getenv("HOME") || wd != os.Getenv("TMPDIR") || os.Getenv("KUBECACHEDIR") != filepath.Join(wd, "kube-cache") {
+		os.Exit(21)
+	}
+	_ = os.MkdirAll(os.Getenv("KUBECACHEDIR"), 0700)
+	_ = os.WriteFile(filepath.Join(os.Getenv("KUBECACHEDIR"), "fixture-private-cache"), []byte("private"), 0600)
 	config := value("--kubeconfig=")
 	if config == "" {
 		os.Exit(3)
@@ -50,16 +65,35 @@ func main() {
 		os.Exit(4)
 	}
 	if has("--conformance") {
+		_ = os.WriteFile(state+".startup", []byte(value("--startup-timeout=")), 0600)
+		if !has("--disable-progress-status") {
+			os.Exit(22)
+		}
+		fmt.Fprintln(os.Stdout, "private Hydrophone stdout")
+		fmt.Fprintln(os.Stderr, "private Hydrophone stderr")
+		if mode == "verbose" {
+			fmt.Fprint(os.Stdout, strings.Repeat("x", 17<<20))
+			fmt.Fprint(os.Stderr, strings.Repeat("y", 2<<20))
+		}
 		ns := value("--namespace=")
 		m := readState()
 		m["clusterroles/conformance-serviceaccount:"+ns] = "role-uid"
 		m["clusterrolebindings/conformance-serviceaccount-role:"+ns] = "binding-uid"
 		save(m)
-		if mode == "cancel" {
+		if strings.HasPrefix(mode, "cancel") {
 			time.Sleep(30 * time.Second)
 		}
-		if mode != "missing" && mode != "deploy-failure" {
+		if mode != "missing" && mode != "deploy-failure" && mode != "interrupted-retrievable" {
 			raw := `<testsuite name="Kubernetes e2e suite" tests="1" failures="0"><testcase classname="Kubernetes e2e suite" name="[It] required"/></testsuite>`
+			if mode == "large-retrievable" {
+				raw = ""
+			}
+			if mode == "empty-retrievable" {
+				raw = ""
+			}
+			if mode == "truncated-retrievable" {
+				raw = "<testsuite"
+			}
 			if mode == "zero" {
 				raw = `<testsuite name="Kubernetes e2e suite" tests="0"/>`
 			}
@@ -93,6 +127,10 @@ func main() {
 	switch args[0] {
 	case "get":
 		if has("--raw=/version") {
+			if mode == "api-overflow" {
+				fmt.Fprint(os.Stdout, strings.Repeat("x", 17<<20))
+				return
+			}
 			if mode == "after-failure" && readState()["_finished"] != "" {
 				os.Exit(9)
 			}
@@ -120,6 +158,9 @@ func main() {
 		key := args[1] + "/" + args[2]
 		m := readState()
 		uid := m[key]
+		if mode == "preexisting" {
+			uid = "preexisting-uid"
+		}
 		if uid == "" {
 			return
 		}
@@ -128,6 +169,12 @@ func main() {
 			ns := strings.SplitN(args[2], ":", 2)[1]
 			record["subjects"] = []any{map[string]string{"namespace": ns, "name": "conformance-serviceaccount", "kind": "ServiceAccount"}}
 			record["roleRef"] = map[string]string{"name": "conformance-serviceaccount:" + ns, "kind": "ClusterRole", "apiGroup": "rbac.authorization.k8s.io"}
+			if mode == "foreign-subject-namespace" {
+				record["subjects"] = []any{map[string]string{"namespace": "foreign", "name": "conformance-serviceaccount", "kind": "ServiceAccount"}}
+			}
+			if mode == "extra-subject" {
+				record["subjects"] = []any{map[string]string{"namespace": ns, "name": "conformance-serviceaccount", "kind": "ServiceAccount"}, map[string]string{"namespace": ns, "name": "extra", "kind": "ServiceAccount"}}
+			}
 			if mode == "empty-binding-subjects" {
 				record["subjects"] = []any{}
 			}
@@ -147,10 +194,14 @@ func main() {
 		m := readState()
 		m["namespaces/"+args[2]] = "namespace-uid"
 		save(m)
+		if mode == "create-no-uid" {
+			output(map[string]any{"metadata": map[string]string{}})
+			return
+		}
 		output(map[string]any{"metadata": map[string]string{"uid": "namespace-uid"}})
 	case "delete":
 		_ = os.WriteFile(state+".delete", []byte("delete attempted"), 0o600)
-		if mode == "cleanup-failure" {
+		if mode == "cleanup-failure" || mode == "cancel-cleanup-failure" {
 			os.Exit(8)
 		}
 		var body struct {
@@ -168,10 +219,31 @@ func main() {
 		if m[key] != body.Preconditions.UID {
 			os.Exit(7)
 		}
+		if mode == "delayed-cleanup" && strings.HasPrefix(key, "namespaces/") {
+			n := len(m["_polls"])
+			if n < 5 {
+				m["_polls"] += "x"
+				save(m)
+				output(map[string]string{"status": "Success"})
+				return
+			}
+		}
 		delete(m, key)
 		save(m)
 		output(map[string]string{"status": "Success"})
 	case "exec":
+		if strings.HasSuffix(mode, "retrievable") {
+			if mode == "large-retrievable" {
+				fmt.Fprint(os.Stdout, `<testsuite name="Kubernetes e2e suite" tests="1" failures="0"><system-out>`)
+				fmt.Fprint(os.Stdout, strings.Repeat("x", 9<<20))
+				fmt.Fprint(os.Stdout, `</system-out><system-err>`)
+				fmt.Fprint(os.Stdout, strings.Repeat("y", 9<<20))
+				fmt.Fprint(os.Stdout, `</system-err><testcase classname="Kubernetes e2e suite" name="[It] required"/></testsuite>`)
+				return
+			}
+			fmt.Fprint(os.Stdout, `<testsuite name="Kubernetes e2e suite" tests="1" failures="0"><testcase classname="Kubernetes e2e suite" name="[It] required"/></testsuite>`)
+			return
+		}
 		os.Exit(1)
 	default:
 		os.Exit(5)

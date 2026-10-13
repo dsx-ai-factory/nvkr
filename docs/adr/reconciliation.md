@@ -257,14 +257,26 @@ acceptance, NVKE or Kubernetes coverage, public registry access or TestGrid inge
 required-suite qualification and reporting are separate integration capabilities; native smoke
 and independent qualification authorization cannot be inferred from observation receipts.
 
-The next slice adds `pkg/nvkr/conformance`: held pinned native static tools, self-contained private
-kubeconfig, version-matched digest-addressed upstream images, full focused selection, API snapshots,
-original JUnit retention and independently recorded cleanup. Local/site/tenant roles remain explicit; the initial runner admits local execution only. Proper-cluster
+`pkg/nvkr/conformance` implements the separate on-demand static-unqualified producer: held pinned native static tools, self-contained private
+kubeconfig, declared major.minor-matched digest-addressed upstream images, full focused selection, API snapshots,
+original JUnit retention and independently recorded cleanup. Local/site/tenant roles remain explicit; the initial runner requires the local role declaration and explicit disposable-cluster acknowledgement.
+This is operator admission, not authenticated physical locality or ownership proof. Proper-cluster
 site/tenant execution is deferred until upstream normal cleanup can enforce ownership.
 Linux actual sealed-process fixtures exercise execution, missing/zero/failed results, post-observation
 failure, timeout/cancellation, replaced resources and ownership-checked cleanup. They do not exercise a
 real Kubernetes cluster. Upstream name-based normal cleanup and unbounded downloaded disk use remain
 operational limits. The explicit command saves private candidate descriptions for review before emission.
+The local role is a declaration and the operator must explicitly acknowledge a disposable cluster; this
+is not an authenticated locality or exclusivity claim. Executed tool pins are recorded, but source-revision
+and image-version facts remain declarations without a source-to-binary/version-to-image receipt. A namespace
+create whose response does not establish a UID retains `cleanup=unknown`; no guessed UID authorizes deletion.
+Objects created elsewhere by upstream e2e tests are outside the wrapper's owned-resource cleanup; use and
+remove a disposable cluster through its operator-owned lifecycle. Whole-cluster cleanup is not a capability
+of this producer. The existing CLI signal handler does not escalate a second Ctrl-C and does not emit a
+cleanup-progress message; that shared signal UX remains deferred, while owned cleanup stays bounded and
+cancel causes remain coded. `review-junit.xml` intentionally retains the exact captured bytes separately
+from upstream's possibly incomplete download for explicit review. Declared wall-clock facts are diagnostic,
+not trusted time or release freshness authority.
 
 `qualification`/`sign` v2 add signature-origin-subject-policy-bound live suite receipts and a distinct
 qualification v2 predicate, including authenticated aggregate native-child joins. Suite closure and
@@ -274,7 +286,7 @@ M3-B smoke gates remain mandatory. The file adapter and CLI reuse the existing s
 artifact-check owners. Strong installed-deployment binding remains capability-rejected. Qualification v1
 is unchanged. Contract fixtures cover exact policy/origin/role, negative no-signing gates, late closure,
 version separation and actual local-key cosign v2 interoperability; hosted OIDC, real exact NVKE deployed
-subjects and production qualification acceptance remain unexercised. Reporting is the subsequent slice.
+subjects and production qualification acceptance remain unexercised. Passive reporting remains separately owned by the dependent reporting change.
 
 ## Support by owner
 

@@ -183,6 +183,25 @@ conformance does not establish NVKE site/tenant coverage. Qualification consumes
 required-suite evidence while preserving complete artifact and smoke gates.
 _Avoid_: Current health, installed-byte proof, physical GPU validation, qualification or release acceptance
 
+**Environment role**:
+The declared scope of a historical test observation: `local` for development diagnostics, `site` or
+`tenant` for an independently selected operational scope, and `unknown` when scope is unspecified.
+A role declaration proves neither cluster ownership nor installed artifact bytes. The local producer
+also requires explicit disposable-cluster acknowledgement; local observations cannot satisfy site/tenant
+qualification policy.
+_Avoid_: Node placement, cluster discovery, authenticated deployment
+
+**Suite receipt**:
+An opaque live capability issued after authenticating an exact historical observation and joining it to
+the source invocation, complete artifact-check receipt and independent suite policy. Closure of a borrowed
+owner revokes it. A serialized description, passing count or signer alone cannot reconstruct it.
+_Avoid_: Result file, caller-authored pass flag, reusable qualification token
+
+**Qualification v2**:
+Build/evidence qualification with independently authenticated required-suite evidence covering every exact
+named output and required native child, in addition to complete artifact and applicable smoke gates. It uses
+a distinct versioned predicate and grants no qualified reproduction or installed-deployment authority.
+_Avoid_: Local conformance pass, qualified release clearance, replacement for artifact or smoke checks
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.

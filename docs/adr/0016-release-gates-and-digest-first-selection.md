@@ -14,7 +14,9 @@
 
 - **Scope:** Sections 1–4 specify deferred qualified release authorization. Current implementation retains
   strict Inventory, ReleaseSet and PromotionPolicy documents, required-member/artifact completeness, and
-  authenticated ReleaseSet/policy diagnostics. Section 5 governs evidence tiers and deferred v1 full-release acceptance.
+  authenticated ReleaseSet/policy diagnostics. Section 5 governs evidence tiers and deferred v1 full-release
+  acceptance. Section 6 governs the unsigned local conformance producer and independently authenticated
+  qualification v2 handoff.
 
 ## Context
 
@@ -75,7 +77,7 @@ reference, untyped `verified` or `complete` flag, decoded report, or receipt or 
 artifact, evidence document, or policy is rejected.
 
 - The qualified verifier **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**.
-  It never runs a suite. The separate on-demand pipeline-attested producer in §6 can run pinned upstream
+  It never runs a suite. The separate on-demand static-unqualified local producer in §6 can run pinned upstream
   conformance against an explicitly selected existing test cluster; this grants no qualified authority.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
@@ -319,12 +321,20 @@ the approved scope and these contracts do not establish milestone completion or 
 
 ### 6. Portable suite observation and passive qualification handoff
 
-**Pipeline-attested producer contract.** The separate on-demand conformance producer runs pinned upstream
-Hydrophone against an explicitly admitted existing local test cluster. Site/tenant execution is capability-gated
+**On-demand local producer contract (`static-unqualified`; no lane authority).** The separate on-demand
+conformance producer runs pinned upstream
+Hydrophone against an explicitly selected existing test cluster acknowledged as disposable. The local role
+is an operator declaration, not proof of physical placement or exclusive cluster ownership. Site/tenant
+execution is capability-gated
 until upstream normal cleanup can preserve ownership safely. It performs no provisioning or automatic
 fleet discovery. Both native static executables and a self-contained private kubeconfig are byte pinned;
-full `[Conformance]` selection, exact test/sidecar images, version match, required cases and timeouts are
-explicit. The producer has no signing credential. Before/after API snapshots retain Kubernetes version,
+full `[Conformance]` selection, exact test/sidecar images, declared image/server major.minor match,
+required cases and timeouts are explicit. The producer has no signing credential and emits unsigned
+private candidates. An authenticated publication
+requires the separate observation signer and explicit consumer policy; a local run alone never earns the
+pipeline-attested tier. Tool byte pins are recorded, while their source revision and image version remain
+declarations rather than an authenticated source-to-binary or version-to-image join. Before/after API
+snapshots retain Kubernetes version,
 architecture/OS/runtime and CNI image facts without node names, addresses, API endpoints or credentials.
 Site, tenant and local roles are declarations. API facts establish what the endpoint reported, not installed
 artifact origin. Unknown source Run stays unknown. Raw upstream results and private diagnostics are retained
@@ -336,7 +346,9 @@ already-produced `test-observation/v1` evidence under independent literal signer
 subject, invocation and suite policy expectations; they recompute results from covered original bytes.
 A live closeable suite receipt additionally joins the observation's declared origin to the authenticated
 source Run/attempt and complete artifact-check receipt. It matches exact named native output subjects,
-including native children under the owning authenticated aggregate image-index membership. It requires
+including every required native child under the owning authenticated aggregate image-index membership.
+Each required suite covers every exact named output and every required child before any attestation; a
+covered sibling or one native platform cannot satisfy the remainder. It requires
 completed execution and cleanup, all independently required cases passed, and no failed/error result;
 skips outside required selection remain visible. Closure or cancellation revokes borrowed authority.
 Local-role observations cannot satisfy site/tenant qualification. A policy requiring authenticated
@@ -395,6 +407,13 @@ schemas and artifact-kind rules, canonical ordering, required-member/artifact co
 cancellation and diagnostic checkpoint rollback rejection. Command tests separately cover durable status
 high-water CAS. These tests do not establish release authorization, evidence-waiver evaluation, trusted-time
 freshness, qualified receipt issuance or a downstream clearance round trip.
+
+Section 6 contract evidence is owned by `pkg/nvkr/conformance`, `testobservation`, `qualification` and
+`sign` tests. It covers original result retention, private process isolation, coded cancellation and
+cleanup, independent suite authentication and exhaustive named-output/native-child bindings. This is
+contract evidence; hosted OIDC, real NVKE deployed-byte binding and production qualification acceptance
+remain separate external gates in reconciliation. Local kind results retain their exact producing revision
+and cannot establish those claims.
 
 Acceptance additionally requires a full fixture that starts with exact artifact bytes and canonical evidence,
 authenticates all typed receipts under distinct trust roles, promotes one complete compatible set, and verifies

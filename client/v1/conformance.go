@@ -22,3 +22,12 @@ func (c *Client) QualifyWithSuites(ctx context.Context, options qualification.Fi
 	}
 	return qualification.PublishFilesV2(ctx, options)
 }
+
+// QualifyWithSuiteConfiguration admits the facade before the owning module
+// opens the private suite policy and transport configuration.
+func (c *Client) QualifyWithSuiteConfiguration(ctx context.Context, configuration string, options qualification.FilesOptionsV2) (*qualification.PublicationV2, error) {
+	if err := c.ready(ctx, "qualifying with configured authenticated suites"); err != nil {
+		return nil, err
+	}
+	return qualification.PublishConfiguredFilesV2(ctx, configuration, options)
+}

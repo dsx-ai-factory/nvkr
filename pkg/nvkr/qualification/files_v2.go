@@ -62,6 +62,20 @@ func admitFilesV2(options FilesOptionsV2) error {
 	return nil
 }
 
+// PublishConfiguredFilesV2 loads the independently authored canonical suite
+// configuration in its owning module before executing the complete file gate.
+func PublishConfiguredFilesV2(ctx context.Context, configurationPath string, options FilesOptionsV2) (*PublicationV2, error) {
+	if err := suiteContext(ctx); err != nil {
+		return nil, err
+	}
+	configuration, err := LoadSuiteConfigurationV2(ctx, configurationPath)
+	if err != nil {
+		return nil, err
+	}
+	options.Policy, options.Suites = configuration.Policy, configuration.Suites
+	return PublishFilesV2(ctx, options)
+}
+
 // PublishFilesV2 authenticates the source/invocation, reuses the complete A gate,
 // freshly verifies every exact suite locator and issues opaque suite receipts.
 // It accepts no file-authored smoke verdicts; the missing M3-B issuer still blocks
@@ -214,7 +228,7 @@ func LoadSuiteConfigurationV2(ctx context.Context, path string) (SuiteConfigurat
 	if path == "" {
 		return configuration, e.New(e.CodeUsage, "suite configuration path required")
 	}
-	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "qualification suite configuration", MaxBytes: maxSuiteConfigurationV2Bytes})
+	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "qualification suite configuration", MaxBytes: maxSuiteConfigurationV2Bytes, RequirePrivateMode: true})
 	if err != nil {
 		return configuration, e.Wrap(e.CodeVerifyFailed, err, "holding suite configuration")
 	}

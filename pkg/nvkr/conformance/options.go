@@ -43,6 +43,8 @@ type Options struct {
 	Image, ImageVersion, BusyboxImage          string
 	Observation                                testobservation.Observation
 	RunTimeout, CommandTimeout, CleanupTimeout time.Duration
+	StartupTimeout                             time.Duration
+	DisposableCluster                          bool
 }
 type admitted struct {
 	options                         Options
@@ -51,6 +53,17 @@ type admitted struct {
 }
 
 func failure(reason string) error { return e.New(e.CodeVerifyFailed, "conformance: %s", reason) }
+
+// Capture cancellation keeps its lifecycle code and wrapped cause at every I/O boundary.
+func captureFailure(ctx context.Context, err error, code e.Code, message string) error {
+	if ctx != nil && ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s", message)
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return e.Wrap(e.CodeTimeout, err, "%s", message)
+	}
+	return e.Wrap(code, err, "%s", message)
+}
 func capability(err error) error {
 	return e.Wrap(e.CodeEngineCapability, err, "conformance requires held Linux executable support")
 }
@@ -62,32 +75,47 @@ func admit(ctx context.Context, o Options) (*admitted, error) {
 		return nil, e.Wrap(e.CodeTimeout, err, "conformance canceled before admission")
 	}
 	if o.Observation.Environment.Role != "site" && o.Observation.Environment.Role != "tenant" && o.Observation.Environment.Role != "local" {
-		return nil, failure("explicit site, tenant or local role declaration required")
+		return nil, e.New(e.CodeUsage, "conformance: explicit site, tenant or local role declaration required")
 	}
 	if o.Context == "" || len(o.Context) > 4096 || strings.ContainsAny(o.Context, "\x00\r\n") || o.CNISelector == "" || len(o.CNISelector) > 4096 || strings.ContainsAny(o.CNISelector, "\x00\r\n") {
-		return nil, failure("explicit private context and CNI selector required")
+		return nil, e.New(e.CodeUsage, "conformance: explicit private context and CNI selector required")
+	}
+	if o.StartupTimeout == 0 {
+		o.StartupTimeout = 5 * time.Minute
+	}
+	if o.StartupTimeout <= 0 || o.StartupTimeout > 12*time.Hour {
+		return nil, e.New(e.CodeUsage, "conformance: startup timeout must be positive and at most 12 hours")
 	}
 	if o.RunTimeout <= 0 || o.RunTimeout > 12*time.Hour || o.CommandTimeout <= 0 || o.CommandTimeout > 5*time.Minute || o.CleanupTimeout <= 0 || o.CleanupTimeout > 10*time.Minute {
-		return nil, failure("positive bounded timeouts required")
+		return nil, e.New(e.CodeUsage, "conformance: positive bounded timeouts required")
 	}
 	for _, tool := range []Tool{o.Hydrophone, o.Kubectl, o.Kubeconfig} {
 		if tool.Path == "" || !canonical.IsDigest(tool.Digest) {
-			return nil, failure("exact executable and kubeconfig byte pins required")
+			return nil, e.New(e.CodeUnpinnedInput, "conformance: exact executable and kubeconfig byte pins required")
 		}
 	}
 	image, err := name.NewDigest(o.Image, name.StrictValidation)
 	if err != nil || image.Context().Name() != "registry.k8s.io/conformance" {
-		return nil, failure("upstream conformance image requires digest reference")
+		return nil, e.New(e.CodeUnpinnedInput, "conformance: upstream conformance image requires digest reference")
 	}
 	if sidecar, sidecarErr := name.NewDigest(o.BusyboxImage, name.StrictValidation); sidecarErr != nil || !canonical.IsDigest(sidecar.DigestStr()) {
-		return nil, failure("busybox sidecar requires digest reference")
+		return nil, e.New(e.CodeUnpinnedInput, "conformance: busybox sidecar requires digest reference")
 	}
 	version, err := semver.StrictNewVersion(strings.TrimPrefix(o.ImageVersion, "v"))
 	if err != nil || version.Prerelease() != "" || version.Metadata() != "" {
-		return nil, failure("stable exact image version required")
+		return nil, e.New(e.CodeUsage, "conformance: stable declared image version required")
 	}
-	if o.Observation.Suite.HarnessRevision != HarnessRevision || o.Observation.Suite.ImageDigest != image.DigestStr() || len(o.Observation.Suite.Selection) != 1 || o.Observation.Suite.Selection[0] != `\[Conformance\]` || len(o.Observation.Suite.RequiredCases) == 0 {
-		return nil, failure("full conformance selection, upstream revision, image and independent cases required")
+	if o.Observation.Suite.HarnessRevision != HarnessRevision {
+		return nil, e.New(e.CodeUnpinnedInput, "conformance: declared harness revision must match the admitted upstream revision")
+	}
+	if o.Observation.Suite.ImageDigest != image.DigestStr() {
+		return nil, e.New(e.CodeUnpinnedInput, "conformance: suite image digest must match selected image")
+	}
+	if len(o.Observation.Suite.Selection) != 1 || o.Observation.Suite.Selection[0] != `\[Conformance\]` {
+		return nil, e.New(e.CodeUsage, "conformance: full conformance selection required")
+	}
+	if len(o.Observation.Suite.RequiredCases) == 0 {
+		return nil, e.New(e.CodeUsage, "conformance: independently selected required cases must be nonempty")
 	}
 	if err = testobservation.ValidateDescription(ctx, o.Observation); err != nil {
 		return nil, err
@@ -110,16 +138,19 @@ func admit(ctx context.Context, o Options) (*admitted, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.kubeconfig, err = heldfile.OpenContext(ctx, o.Kubeconfig.Path, heldfile.Options{Label: "private kubeconfig", MaxBytes: 1 << 20, ExpectedDigest: o.Kubeconfig.Digest})
+	a.kubeconfig, err = heldfile.OpenContext(ctx, o.Kubeconfig.Path, heldfile.Options{Label: "private kubeconfig", MaxBytes: 1 << 20, ExpectedDigest: o.Kubeconfig.Digest, RequirePrivateMode: true})
 	if err != nil {
-		return nil, e.Wrap(e.CodeUnpinnedInput, err, "holding private kubeconfig")
+		return nil, captureFailure(ctx, err, e.CodeUnpinnedInput, "holding private kubeconfig")
 	}
 	a.kubeBytes, err = a.kubeconfig.ReadAllContext(ctx, 1<<20)
 	if err != nil {
-		return nil, failure("reading held kubeconfig")
+		return nil, captureFailure(ctx, err, e.CodeVerifyFailed, "reading held kubeconfig")
 	}
 	if err = checkKubeconfig(a.kubeBytes, o.Context); err != nil {
 		return nil, err
+	}
+	if ctx.Err() != nil {
+		return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "conformance canceled after capture")
 	}
 	complete = true
 	return a, nil
@@ -127,7 +158,7 @@ func admit(ctx context.Context, o Options) (*admitted, error) {
 func openTool(ctx context.Context, tool Tool) (*heldfile.File, error) {
 	held, err := heldfile.OpenContext(ctx, tool.Path, heldfile.Options{Label: "conformance tool", Executable: true, MaxBytes: maxToolBytes, ExpectedDigest: tool.Digest})
 	if err != nil {
-		return nil, e.Wrap(e.CodeUnpinnedInput, err, "holding pinned conformance executable")
+		return nil, captureFailure(ctx, err, e.CodeUnpinnedInput, "holding pinned conformance executable")
 	}
 	parsed, err := elf.NewFile(held)
 	if err != nil {

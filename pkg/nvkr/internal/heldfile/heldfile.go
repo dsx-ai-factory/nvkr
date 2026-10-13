@@ -39,6 +39,9 @@ type Options struct {
 	Executable     bool
 	MaxBytes       int64
 	ExpectedDigest string
+	// RequirePrivateMode admits filesystem inputs only when their opened source
+	// descriptor has no group or other permission bits, before snapshotting.
+	RequirePrivateMode bool
 }
 
 // Descriptor is an anonymous regular file that may be inherited by a child.
@@ -97,6 +100,9 @@ func OpenContext(ctx context.Context, path string, options Options) (*File, erro
 	}
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("held input %q is not a regular file", path)
+	}
+	if options.RequirePrivateMode && info.Mode().Perm()&0o077 != 0 {
+		return nil, fmt.Errorf("held input %q must have private owner-only permissions", path)
 	}
 	if options.Executable && info.Mode().Perm()&0o111 == 0 {
 		return nil, fmt.Errorf("held executable %q has no execute bit", path)

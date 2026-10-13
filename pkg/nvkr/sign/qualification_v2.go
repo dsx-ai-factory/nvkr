@@ -103,9 +103,6 @@ func (s *CosignOCISigner) VerifyQualificationV2(ctx context.Context, subject Sub
 	if err != nil {
 		return err
 	}
-	if len(predicate) == 0 {
-		return e.New(e.CodeVerifyFailed, "qualification verification requires exact evidence bytes")
-	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	workspace, cleanup, err := newPrivateWorkspace("nvkr-qualification-verify-*")

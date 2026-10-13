@@ -237,6 +237,41 @@ func validateSuiteSubjectsV2(expected testobservation.Expected, checks lifecycle
 			return e.New(e.CodeGateUnmet, "suite subject has no matching exact acquired payload")
 		}
 	}
+	// Every required suite qualifies the entire selected publication. A matching
+	// member never authorizes an uncovered sibling or native index child.
+	for _, output := range checks.Outputs {
+		if err := validateOutputSubjects(output); err != nil {
+			return err
+		}
+		if output.ImageIndex != nil {
+			for _, child := range output.ImageIndex.Children {
+				covered := false
+				for _, subject := range expected.Subjects {
+					if subject.Output == output.Name && subject.Platform == child.Platform && subject.ArtifactDigest == child.ManifestDigest && subject.BuildDigest == child.BuildDigest && subject.PayloadDigest == child.BuildSubject {
+						covered = true
+					}
+				}
+				if !covered {
+					return e.New(e.CodeGateUnmet, "required suite omits an exact native image-index child")
+				}
+			}
+			continue
+		}
+		if len(output.BuildSubjects) == 0 {
+			return e.New(e.CodeGateUnmet, "required suite lacks exact payload coverage for a named output")
+		}
+		for _, payload := range output.BuildSubjects {
+			covered := false
+			for _, subject := range expected.Subjects {
+				if subject.Output == output.Name && subject.ArtifactDigest == output.Subject && subject.BuildDigest == output.BuildDigest && subject.PayloadDigest == payload.Digest && (output.Platform == "" || subject.Platform == output.Platform) {
+					covered = true
+				}
+			}
+			if !covered {
+				return e.New(e.CodeGateUnmet, "required suite omits an exact named output payload")
+			}
+		}
+	}
 	return nil
 }
 func originMatchesV2(origin testobservation.Origin, checks lifecycle.ArtifactCheckDescription) bool {

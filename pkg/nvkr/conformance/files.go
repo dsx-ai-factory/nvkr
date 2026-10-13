@@ -22,6 +22,8 @@ const ConfigurationSchema = "nvkr.dev/conformance-invocation/v1"
 // FileConfiguration is an operator-selected invocation description, never evidence.
 // The private kubeconfig path/context must not be copied into public observations.
 type FileConfiguration struct {
+	DisposableCluster     bool                        `json:"disposableCluster"`
+	StartupTimeoutSeconds int64                       `json:"startupTimeoutSeconds"`
 	SchemaVersion         string                      `json:"schemaVersion"`
 	Hydrophone            Tool                        `json:"hydrophone"`
 	Kubectl               Tool                        `json:"kubectl"`
@@ -44,14 +46,14 @@ func LoadOptions(ctx context.Context, path string) (Options, error) {
 	if err := ctx.Err(); err != nil {
 		return Options{}, e.Wrap(e.CodeTimeout, err, "conformance configuration canceled")
 	}
-	file, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "private conformance configuration", MaxBytes: 1 << 20})
+	file, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "private conformance configuration", MaxBytes: 1 << 20, RequirePrivateMode: true})
 	if err != nil {
-		return Options{}, e.Wrap(e.CodeVerifyFailed, err, "holding conformance configuration")
+		return Options{}, captureFailure(ctx, err, e.CodeVerifyFailed, "holding conformance configuration")
 	}
 	defer func() { _ = file.Close() }()
 	raw, err := file.ReadAllContext(ctx, 1<<20)
 	if err != nil {
-		return Options{}, e.Wrap(e.CodeVerifyFailed, err, "reading conformance configuration")
+		return Options{}, captureFailure(ctx, err, e.CodeVerifyFailed, "reading conformance configuration")
 	}
 	if err := ctx.Err(); err != nil {
 		return Options{}, e.Wrap(e.CodeTimeout, err, "conformance configuration canceled after capture")
@@ -60,10 +62,13 @@ func LoadOptions(ctx context.Context, path string) (Options, error) {
 	if err := canonical.UnmarshalExact(raw, &c); err != nil {
 		return Options{}, err
 	}
+	if c.StartupTimeoutSeconds < 0 || c.StartupTimeoutSeconds > 43200 {
+		return Options{}, e.New(e.CodeUsage, "startup timeout seconds must be zero (upstream 5m default) or at most 43200")
+	}
 	if c.SchemaVersion != ConfigurationSchema || c.RunTimeoutSeconds <= 0 || c.RunTimeoutSeconds > 43200 || c.CommandTimeoutSeconds <= 0 || c.CommandTimeoutSeconds > 300 || c.CleanupTimeoutSeconds <= 0 || c.CleanupTimeoutSeconds > 600 {
 		return Options{}, e.New(e.CodeUsage, "exact conformance configuration schema and bounded timeout seconds required")
 	}
-	return Options{Hydrophone: c.Hydrophone, Kubectl: c.Kubectl, Kubeconfig: c.Kubeconfig, Context: c.Context, CNISelector: c.CNISelector, Image: c.Image, ImageVersion: c.ImageVersion, BusyboxImage: c.BusyboxImage, Observation: c.Observation, RunTimeout: time.Duration(c.RunTimeoutSeconds) * time.Second, CommandTimeout: time.Duration(c.CommandTimeoutSeconds) * time.Second, CleanupTimeout: time.Duration(c.CleanupTimeoutSeconds) * time.Second}, nil
+	return Options{DisposableCluster: c.DisposableCluster, StartupTimeout: time.Duration(c.StartupTimeoutSeconds) * time.Second, Hydrophone: c.Hydrophone, Kubectl: c.Kubectl, Kubeconfig: c.Kubeconfig, Context: c.Context, CNISelector: c.CNISelector, Image: c.Image, ImageVersion: c.ImageVersion, BusyboxImage: c.BusyboxImage, Observation: c.Observation, RunTimeout: time.Duration(c.RunTimeoutSeconds) * time.Second, CommandTimeout: time.Duration(c.CommandTimeoutSeconds) * time.Second, CleanupTimeout: time.Duration(c.CleanupTimeoutSeconds) * time.Second}, nil
 }
 
 // RunFiles retains a private candidate description beside the original upstream
@@ -148,7 +153,7 @@ func (r *Result) SavePrivateDescription(ctx context.Context) error {
 		}
 		closeErr := errors.Join(file.Sync(), file.Close())
 		if err := errors.Join(writeErr, closeErr); err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "retaining private result record")
+			return captureFailure(ctx, err, e.CodeFetchFailed, "retaining private result record")
 		}
 	}
 	after, err := os.Stat(filepath.Clean(r.PrivateWorkspace))

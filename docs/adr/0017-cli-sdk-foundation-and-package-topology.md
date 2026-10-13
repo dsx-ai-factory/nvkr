@@ -30,6 +30,9 @@ Portable test observations and their digest-pinned locators are generated eviden
 additional authored lifecycle objects. `evidence emit`, `publish`, `verify-local` and `verify`
 delegate through the SDK to `testobservation`; the CLI owns flags and presentation only.
 Unsigned self-consistency, authenticated historical observation and qualification remain distinct.
+`evidence conformance` delegates through SDK `RunConformance` to the separate upstream producer.
+`run qualify-tests` and SDK `QualifyWithSuites` / `QualifyWithSuiteConfiguration` delegate to the
+qualification v2 owner after facade admission; suite configuration loading is not command-layer authority.
 
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
@@ -241,7 +244,8 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, and the separate M3-C `qualification` publisher.
+  `qualificationorigin`, the separate M3-C `qualification` publisher, `testresults`, `testobservation`
+  and `conformance`.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not

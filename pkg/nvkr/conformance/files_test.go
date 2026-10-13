@@ -4,11 +4,14 @@
 package conformance
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestFileConfigurationRejectsUnsupportedAndOverflowBeforeExecution(t *testing.T) {
@@ -29,7 +32,8 @@ func TestFileConfigurationRejectsUnsupportedAndOverflowBeforeExecution(t *testin
 				t.Fatal(err)
 			}
 			result, err := RunFiles(t.Context(), path)
-			if result != nil || err == nil {
+			var coded *e.Error
+			if result != nil || !errors.As(err, &coded) || coded.Code != e.CodeUsage {
 				t.Fatal("unsupported configuration reached producer")
 			}
 		})
@@ -45,7 +49,21 @@ func TestPrivateRecordPreservesOriginalAndCannotOverwrite(t *testing.T) {
 	if err != nil || string(raw) != "original failed result" {
 		t.Fatal("original changed", err)
 	}
-	if err := r.SavePrivateDescription(t.Context()); err == nil {
-		t.Fatal("existing private result overwritten")
+	err = r.SavePrivateDescription(t.Context())
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeFetchFailed {
+		t.Fatalf("overwrite admission=%v", err)
+	}
+}
+
+func TestPrivateConfigurationModeAdmission(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte("{}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadOptions(t.Context(), path)
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed || !strings.Contains(err.Error(), "owner-only") {
+		t.Fatal(err)
 	}
 }
