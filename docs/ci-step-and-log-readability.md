@@ -14,9 +14,12 @@ signing/attestation, and signature verification have separate isolation and cred
 
 The top-level workflow shows jobs, dependencies, permissions and protected Environments in ordinary YAML.
 After native preflight and checkout, local composite calls point into `.github/nvkr-run/actions/` for shared
-execution and transport templates. Matching step shapes reuse one template; stable invocation keys select
-their exact node and carrier values in `.github/nvkr-run/action-data.json`. The helper admits the Plan and
-recomputes those values before the fixed operations use them. Parameters carry data, never shell scripts.
+execution and transport interfaces. Calls such as `execute-node`, `execute-source` and `collect-node-outputs`
+name their operation. Grouped jobs repeat the same node interface; differing output counts use declared
+optional slots and further individual upload calls, without output-count or group-size action variants.
+Stable invocation keys select named node and carrier parameters in `.github/nvkr-run/action-data.json`.
+The helper admits the Plan and recomputes those values before the fixed operations use them. Parameters
+carry data, never shell scripts.
 A shared action prepares the downloaded helper. Operator setup
 and timed producer execution retain their caller context inline. Controlled transport wrappers contain one
 pinned upload/download; their conditions, timeouts and continue-on-error policy stay on the caller. Diagnostic

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				selector := fmt.Sprintf("producer-node-%d", index)
 				fmt.Fprintf(&source, "      - name: Execute producer %d\n        id: producer-%d\n        run: %s\n", index, index, githubRunnerCommand("run-node", "node", selector))
 				fmt.Fprintf(&source, "      - name: Collect producer %d\n        run: %s\n", index, githubRunnerCommand("pack-outputs", "node", selector))
-				fmt.Fprintf(&source, "      - name: Upload producer %d\n        uses: %s\n        with:\n          name: producer-carrier-%d\n          path: producer-%d.tar\n", index, actions.Upload, index, index)
+				actions.writeUploadStep(&source, fmt.Sprintf("producer %d", index), fmt.Sprintf("producer-carrier-%d", index), fmt.Sprintf("producer-%d.tar", index))
 			}
 			workflow, files, err := lowerGitHubActions(source.Bytes(), actions)
 			if err != nil {
@@ -85,7 +86,7 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 						if executionTemplate == "" {
 							executionTemplate = step.Uses
 						}
-						if step.Uses != executionTemplate || !strings.HasPrefix(step.Uses, "./"+githubSharedDirectory+"execute-node-") {
+						if step.Uses != executionTemplate || step.Uses != "./"+githubSharedDirectory+"execute-node" {
 							t.Fatalf("equivalent job %q uses a different implementation: %s", jobID, step.Uses)
 						}
 						invoked = true
@@ -118,7 +119,25 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 }
 
 func TestGitHubSharedActionParametersContainDataWithoutPrograms(t *testing.T) {
-	bundle, err := RenderGitHub(t.Context(), githubTestPlan(t))
+	for _, test := range []struct {
+		name    string
+		fixture func(*testing.T) *Plan
+	}{
+		{name: "public source", fixture: githubTestPlan},
+		{name: "authenticated source", fixture: func(t *testing.T) *Plan {
+			plan, _, _ := authenticatedSourcePlan(t)
+			return plan
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			assertGitHubSharedActionParameterData(t, test.fixture(t))
+		})
+	}
+}
+
+func assertGitHubSharedActionParameterData(t *testing.T, plan *Plan) {
+	t.Helper()
+	bundle, err := RenderGitHub(t.Context(), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +153,12 @@ func TestGitHubSharedActionParametersContainDataWithoutPrograms(t *testing.T) {
 				t.Fatal(err)
 			}
 			for key, value := range parameters {
+				role, _, _ := strings.Cut(key, "_")
+				if strings.HasPrefix(role, "s") {
+					if _, err := strconv.Atoi(strings.TrimPrefix(role, "s")); err == nil {
+						t.Fatalf("job %s part %s parameter %s uses a positional step interface", job, part, key)
+					}
+				}
 				if strings.HasSuffix(key, "_run") || strings.HasSuffix(key, "_script") || strings.HasSuffix(key, "_command") ||
 					strings.Contains(value, "./nvkr-exec ") || strings.Contains(value, "${{") || strings.HasPrefix(value, "!") {
 					t.Fatalf("job %s part %s parameter %s contains a program or provider expression", job, part, key)
@@ -229,28 +254,26 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 		}},
 		{name: "missing parameter", code: e.CodePipelineDrift, mutate: func(changed *GeneratedBundle) {
 			rewriteData(changed, func(data *githubActionDataDocument) {
-				entry := data.Entries[sortedKeys(data.Entries)[0]]
-				part := sortedKeys(entry.Values)[0]
-				var values map[string]string
-				if err := canonical.UnmarshalExact([]byte(entry.Values[part]), &values); err != nil {
-					t.Fatal(err)
-				}
-				removed := false
-				for _, key := range sortedKeys(values) {
-					if strings.HasSuffix(key, "_name") {
-						delete(values, key)
-						removed = true
-						break
+				for _, job := range sortedKeys(data.Entries) {
+					entry := data.Entries[job]
+					for _, part := range sortedKeys(entry.Values) {
+						var values map[string]string
+						if err := canonical.UnmarshalExact([]byte(entry.Values[part]), &values); err != nil {
+							t.Fatal(err)
+						}
+						if _, ok := values["execute_name"]; !ok || values["execute_present"] != "true" {
+							continue
+						}
+						delete(values, "execute_name")
+						raw, err := canonical.Marshal(values)
+						if err != nil {
+							t.Fatal(err)
+						}
+						entry.Values[part] = string(raw)
+						return
 					}
 				}
-				if !removed {
-					t.Fatal("fixture has no required step name parameter")
-				}
-				raw, err := canonical.Marshal(values)
-				if err != nil {
-					t.Fatal(err)
-				}
-				entry.Values[part] = string(raw)
+				t.Fatal("fixture has no active execution name parameter")
 			})
 		}},
 		{name: "unplanned selector", code: e.CodeEngineCapability, mutate: func(changed *GeneratedBundle) {
@@ -262,20 +285,19 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 						if err := canonical.UnmarshalExact([]byte(entry.Values[part]), &values); err != nil {
 							t.Fatal(err)
 						}
-						for _, key := range sortedKeys(values) {
-							if strings.HasSuffix(key, "_selector") {
-								values[key] = "not-an-admitted-operation"
-								raw, err := canonical.Marshal(values)
-								if err != nil {
-									t.Fatal(err)
-								}
-								entry.Values[part] = string(raw)
-								return
-							}
+						if values["execute_present"] != "true" || values["execute_selector"] == "" {
+							continue
 						}
+						values["execute_selector"] = "not-an-admitted-operation"
+						raw, err := canonical.Marshal(values)
+						if err != nil {
+							t.Fatal(err)
+						}
+						entry.Values[part] = string(raw)
+						return
 					}
 				}
-				t.Fatal("fixture has no operation selector to mutate")
+				t.Fatal("fixture has no active execution selector to mutate")
 			})
 		}},
 		{name: "extra invocation", code: e.CodeEngineCapability, mutate: func(changed *GeneratedBundle) {

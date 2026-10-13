@@ -6,8 +6,6 @@ package factory
 import (
 	"bytes"
 	"fmt"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -30,14 +28,7 @@ type githubActionDataEntry struct {
 	Values   map[string]string `json:"values"`
 }
 
-type githubSharedTemplate struct {
-	family string
-	key    string
-	raw    []byte
-	calls  []*yamlv3.Node
-}
-
-// shareGitHubActions factors closed, generated step sequences into templates.
+// shareGitHubActions projects generated operations onto named action interfaces.
 // The Plan remains execution authority. The descriptor contains only literal
 // labels, selectors and transport settings; no run programs or credentials.
 func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActionRefs) ([]byte, error) {
@@ -53,7 +44,6 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 		return nil, e.New(e.CodePipelineDrift, "shared actions require jobs")
 	}
 	data := githubActionDataDocument{Entries: map[string]githubActionDataEntry{}}
-	templates := map[string]*githubSharedTemplate{}
 	for index := 0; index < len(jobs.Content); index += 2 {
 		jobID, job := jobs.Content[index].Value, jobs.Content[index+1]
 		steps := githubYAMLField(job, "steps")
@@ -63,6 +53,7 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 		entry := githubActionDataEntry{Template: "stage-context", Values: map[string]string{}}
 		var rewritten []*yamlv3.Node
 		prepared := false
+		part, transfer := 0, 0
 		for _, call := range steps.Content {
 			if githubYAMLValue(call, "id") == githubContextStepID {
 				return nil, e.New(e.CodeEngineCapability, "job %q uses reserved action context ID", jobID)
@@ -109,40 +100,52 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 			if len(inner.Content) == 0 {
 				continue
 			}
-			part := strings.TrimPrefix(uses, prefix)
-			values, family, err := githubParameterizeAction(body, inner, actions)
+			invocations, err := projectGitHubActionInterfaces(body, call, actions)
 			if err != nil {
 				return nil, err
 			}
-			parameters, err := canonical.Marshal(values)
-			if err != nil {
-				return nil, err
+			controlled := false
+			for _, key := range githubTransferControlFields {
+				controlled = controlled || githubYAMLField(call, key) != nil
 			}
-			entry.Values[part] = string(parameters)
-			with := githubYAMLField(call, "with")
-			if with == nil {
-				with = githubYAMLMap()
-				githubYAMLSet(call, "with", with)
+			if controlled && len(invocations) != 1 {
+				return nil, e.New(e.CodeEngineCapability, "controlled action in job %q must project to one transport", jobID)
 			}
-			githubYAMLSet(with, "parameters", githubYAMLString(githubParametersExpression(part)))
-			templateRaw, err := encodeGitHubYAML(body)
-			if err != nil {
-				return nil, err
-			}
-			// Pins are literal in each template, but never part of its grouping
-			// key. Updating a dependency cannot rename the caller's template.
-			key := string(templateRaw)
-			for _, ref := range []string{actions.Checkout, actions.SetupGo, actions.Upload, actions.Download} {
-				if repository, _, ok := strings.Cut(ref, "@"); ok {
-					key = strings.ReplaceAll(key, ref, repository+"@PIN")
+			for _, invocation := range invocations {
+				part++
+				key := fmt.Sprintf("part-%d", part)
+				if controlled {
+					part--
+					transfer++
+					key = fmt.Sprintf("transfer-%d", transfer)
 				}
+				parameters, err := canonical.Marshal(invocation.Values)
+				if err != nil {
+					return nil, err
+				}
+				entry.Values[key] = string(parameters)
+				path := githubSharedDirectory + invocation.Family
+				templateRaw, err := encodeGitHubYAML(invocation.Body)
+				if err != nil {
+					return nil, err
+				}
+				if previous, exists := files[path+"/action.yml"]; exists && !bytes.Equal(previous, templateRaw) {
+					return nil, e.New(e.CodeEngineCapability, "action interface %q has conflicting implementations", invocation.Family)
+				}
+				files[path+"/action.yml"] = templateRaw
+				with := invocation.Arguments
+				if with == nil {
+					with = githubYAMLMap()
+				}
+				githubYAMLSet(with, "parameters", githubYAMLString(githubParametersExpression(key)))
+				projected := githubYAMLMap("name", githubYAMLString(invocation.Name), "uses", githubYAMLString("./"+path), "with", with)
+				for _, field := range githubTransferControlFields {
+					if value := githubYAMLField(call, field); value != nil {
+						githubYAMLSet(projected, field, value)
+					}
+				}
+				rewritten = append(rewritten, projected)
 			}
-			if prior := templates[key]; prior != nil {
-				prior.calls = append(prior.calls, call)
-			} else {
-				templates[key] = &githubSharedTemplate{family: family, key: key, raw: templateRaw, calls: []*yamlv3.Node{call}}
-			}
-			rewritten = append(rewritten, call)
 		}
 		steps.Content = rewritten
 		if prepared {
@@ -154,29 +157,6 @@ func shareGitHubActions(raw []byte, files map[string][]byte, actions githubActio
 				return nil, e.New(e.CodeEngineCapability, "job %q shared action data exceeds the provider output bound", jobID)
 			}
 			data.Entries[jobID] = entry
-		}
-	}
-	ordered := make([]*githubSharedTemplate, 0, len(templates))
-	for _, template := range templates {
-		ordered = append(ordered, template)
-	}
-	sort.Slice(ordered, func(i, j int) bool {
-		if ordered[i].family == ordered[j].family {
-			return ordered[i].key < ordered[j].key
-		}
-		return ordered[i].family < ordered[j].family
-	})
-	variants := map[string]int{}
-	for _, template := range ordered {
-		variants[template.family]++
-		name := template.family
-		if variants[name] > 1 {
-			name += "-variant-" + strconv.Itoa(variants[name])
-		}
-		path := githubSharedDirectory + name
-		files[path+"/action.yml"] = template.raw
-		for _, call := range template.calls {
-			githubYAMLSet(call, "uses", githubYAMLString("./"+path))
 		}
 	}
 	var err error
@@ -196,128 +176,6 @@ func githubParametersExpression(part string) string {
 
 func githubParameterExpression(key string) string {
 	return "${{ fromJSON(inputs.parameters)." + key + " }}"
-}
-
-func githubParameterizeAction(action, steps *yamlv3.Node, actions githubActionRefs) (map[string]string, string, error) {
-	values := map[string]string{}
-	inputs := githubYAMLField(action, "inputs")
-	if inputs == nil {
-		inputs = githubYAMLMap()
-		githubYAMLSet(action, "inputs", inputs)
-	}
-	githubYAMLSet(inputs, "parameters", githubActionInput("Plan-derived parameters for this operation; never shell source"))
-	nodes, uploads, downloads, packs := 0, 0, 0, 0
-	source, restore, container, finalize := false, false, false, false
-	for index, step := range steps.Content {
-		prefix := fmt.Sprintf("s%d_", index)
-		parameter := func(key string, value *yamlv3.Node) {
-			values[prefix+key] = value.Value
-			*value = *githubYAMLString(githubParameterExpression(prefix + key))
-		}
-		if name := githubYAMLField(step, "name"); name != nil {
-			parameter("name", name)
-		}
-		if id := githubYAMLField(step, "id"); id != nil {
-			values[prefix+"id"] = id.Value
-			id.Value = "operation_" + strconv.Itoa(index)
-		}
-		if with := githubYAMLField(step, "with"); with != nil {
-			for pos := 0; pos < len(with.Content); pos += 2 {
-				value := with.Content[pos+1]
-				if !strings.Contains(value.Value, "${{") {
-					parameter("with_"+strings.ReplaceAll(with.Content[pos].Value, "-", "_"), value)
-				}
-			}
-		}
-		env := githubYAMLField(step, "env")
-		if env != nil {
-			for pos := 0; pos < len(env.Content); pos += 2 {
-				key, value := env.Content[pos].Value, env.Content[pos+1]
-				source = source || key == sourceTokenEnv
-				// Credential-helper programs and provider/input expressions stay
-				// literal in the template, never in descriptive output data.
-				if !strings.Contains(value.Value, "${{") && !strings.HasPrefix(value.Value, "!") {
-					parameter("env_"+key, value)
-				}
-			}
-		}
-		uses := githubYAMLValue(step, "uses")
-		if uses == actions.Upload {
-			uploads++
-		}
-		if uses == actions.Download {
-			downloads++
-		}
-		run := githubYAMLField(step, "run")
-		if run == nil {
-			continue
-		}
-		container = container || githubYAMLValue(step, "shell") == "sh -e {0}"
-		finalize = finalize || strings.Contains(run.Value, "./nvkr-exec run finalize ") || strings.Contains(run.Value, "factory github recover ")
-		for _, operation := range []struct{ name, flag string }{{"run-node", "node"}, {"pack-outputs", "node"}, {"restore-inputs", "stage"}, {"prepare-images", "stage"}} {
-			command := githubRunnerCommand(operation.name, "", "") + " --" + operation.flag + " "
-			if !strings.HasPrefix(run.Value, command) {
-				continue
-			}
-			quoted := strings.TrimSuffix(strings.TrimPrefix(run.Value, command), "\n")
-			selector := quoted
-			if strings.HasPrefix(selector, "'") && strings.HasSuffix(selector, "'") {
-				selector = strings.ReplaceAll(selector[1:len(selector)-1], `'"'"'`, "'")
-			}
-			if shellQuote(selector) != quoted {
-				return nil, "", e.New(e.CodeEngineCapability, "shared action requires one literal %s selector", operation.flag)
-			}
-			values[prefix+"selector"] = selector
-			if env == nil {
-				env = githubYAMLMap()
-				githubYAMLSet(step, "env", env)
-			}
-			if githubYAMLField(env, githubSelectorEnvironment) != nil {
-				return nil, "", e.New(e.CodeEngineCapability, "shared action selector environment is already defined")
-			}
-			githubYAMLSet(env, githubSelectorEnvironment, githubYAMLString(githubParameterExpression(prefix+"selector")))
-			run.Value = strings.Replace(run.Value, command+quoted, command+`"$`+githubSelectorEnvironment+`"`, 1)
-			switch operation.name {
-			case "run-node":
-				nodes++
-			case "pack-outputs":
-				packs++
-			case "restore-inputs":
-				restore = true
-			}
-			break
-		}
-	}
-	family := "prepare-stage-inputs"
-	switch {
-	case finalize:
-		family = "finalize-run"
-	case nodes == 1:
-		family = fmt.Sprintf("execute-node-%d-carriers", uploads)
-	case nodes > 1:
-		family = fmt.Sprintf("execute-group-%d-nodes-%d-carriers", nodes, uploads)
-	case packs > 0:
-		family = fmt.Sprintf("collect-%d-carriers", uploads)
-	case uploads > 0:
-		family = "upload-carrier"
-	case downloads > 0:
-		family = "download-carriers"
-	}
-	if source {
-		family += "-source"
-	}
-	if restore {
-		family += "-with-inputs"
-	}
-	if container {
-		family += "-container"
-	}
-	githubYAMLSet(action, "name", githubYAMLString(strings.ReplaceAll(family, "-", " ")))
-	// YAML decoding attaches the old generated marker to the first key.
-	// Replace it together with the document header instead of duplicating it.
-	action.Content[0].HeadComment = ""
-	action.HeadComment = "SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\nSPDX-License-Identifier: Apache-2.0\n\nGENERATED BY nvkr run generate — DO NOT EDIT"
-	return values, family, nil
 }
 
 func githubPrepareStage(files map[string][]byte, helper *yamlv3.Node) (*yamlv3.Node, error) {

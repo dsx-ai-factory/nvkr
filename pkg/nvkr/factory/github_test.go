@@ -266,8 +266,8 @@ func relowerGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, 
 	return changed
 }
 
-// Malformed preparation fixtures intentionally use the lower-level boundary so
-// the semantic validator can diagnose the original helper ordering violation.
+// Fixtures with operations intentionally outside the shared interface use the
+// lower-level boundary so their semantic violation reaches bundle validation.
 func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, raw []byte) *GeneratedBundle {
 	t.Helper()
 	if !bytes.Contains(raw, []byte("# plan: ")) {

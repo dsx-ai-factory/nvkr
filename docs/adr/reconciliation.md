@@ -66,7 +66,7 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
-| 21 Generation | Exact recorded input selection, manifest-owned shared composite templates and Plan-derived invocation data with expanded-step validation, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Latest stable-workflow, shared-template and controlled-transfer regressions are unrun; shared-template hosted execution, automatic PR publication and scheduled/private-source service acceptance are unexercised; matrices and callable workflows remain deferred; lock and generated files are separate transactions; complete crash matrix remains |
+| 21 Generation | Exact recorded input selection, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Latest stable-workflow, semantic-interface and controlled-transfer regressions are unrun; semantic-action hosted execution, automatic PR publication and scheduled/private-source service acceptance are unexercised; matrices and callable workflows remain deferred; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays and exact toolchain substitutions | Pin-set loading needs pinned Git access. Curated graph/SBOM edges and embedded-version observation remain deferred. Exact pin identity is not external acquisition or production acceptance |
 
 ## Native disk execution and inspection
@@ -623,10 +623,12 @@ retains the external scope and binary identity.
 
 The generator/validator/writer enforce a 500,000-byte workflow limit. The top-level workflow retains named
 jobs, exact dependencies, runner and credential policy, native preflight and checkout. Manifest-owned local
-composite templates carry ordinary step sequences and share helper preparation. Matching job/segment shapes
-reuse a template, with their exact values held in one canonical `action-data.json` member instead of
-duplicated job-specific action files. The runtime descriptor admits the Plan and recomputes the selected
-values; templates retain fixed commands and pinned actions without accepting executable script data.
+composite actions expose fixed semantic interfaces for execution, input/image preparation, output collection
+and carrier transfer. Grouped jobs reuse the node interface; declared optional slots and further individual
+upload calls preserve output counts and order without cardinality-specific or numbered variant actions.
+One canonical `action-data.json` member holds named operation parameters. The runtime descriptor admits the
+Plan and recomputes the selected values; templates retain fixed commands and pinned actions without
+accepting executable script data.
 Operator setup and timed producer execution stay inline. Controlled upload/download wrappers contain one pinned transport step,
 with conditions, timeouts and continue-on-error on their callers; referenced transfer outputs remain
 inline. Static validation expands templates and invocation bindings for graph and credential checks and
@@ -646,14 +648,18 @@ composite layout is recorded. Oversized workflows still fail before writes. Nati
 shares the ARC group to avoid restoring its full material closure on publication runners. Consumed carrier deletion reduces duplicate
 storage but does not establish a measured hosted storage bound.
 
-The 2026-10-13 shared-template implementation compiled and generated the maintained candidate with internal
-renderer validation. Its workflow contains 288,417 bytes and 5,268 lines, compared with 496,315 bytes and
-5,429 lines before the change. The bundle has 20 shared actions and 23 manifest members; its 383,823-byte
-invocation-data member contains 295 job entries. The two most reused execution templates serve 138 and 77
-jobs. Sharing reduces the intermediate layout's 307 action files to 20; its explicit parameter bindings add
-39,206 workflow bytes relative to that intermediate 249,211-byte layout.
+The 2026-10-13 semantic-interface implementation compiled and generated the maintained candidate with
+internal renderer validation. Its 299 jobs are unchanged. The workflow contains 297,433 bytes and 5,549
+lines, compared with the original 496,315 bytes and 5,429 lines; the preceding shape-based layout contained
+288,417 bytes and 5,268 lines. The bundle has 13 actions totaling 25,770 bytes and 16 manifest members,
+down from 20 action files. `execute-node` serves 319 calls, `execute-source` 13 and `collect-node-outputs`
+30. Contiguous input preparation occupies 243 node slots; two preparation calls remain separate.
 
-The latest stability, controlled-transfer and shared-template regression tests were authored but not run
+The invocation-data member contains 295 job entries and grew from 383,823 to 959,415 bytes because named
+interfaces record optional-slot presence and provider defaults explicitly. This larger inspection record
+is separate from the bounded per-job runtime output described in ADR-18.
+
+The latest stability, controlled-transfer and semantic-interface regression tests were authored but not run
 after the user stopped test execution. The full completion gate remains incomplete. These local generation
 measurements establish neither GitHub execution nor hosted performance or release acceptance.
 

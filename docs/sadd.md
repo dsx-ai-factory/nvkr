@@ -499,10 +499,12 @@ Compilation resolves the selected Definition, Environment, and component catalog
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
 GitHub keeps named jobs, dependencies, runners, permissions and failure/time boundaries visible in the
-top-level workflow. Manifest-owned shared composite templates contain ordinary execution/transport sequences
-and helper preparation. Matching job shapes reuse one template; one canonical invocation-data member holds
-their parameters. The runtime descriptor operation recomputes selected values from the admitted Plan;
-templates contain fixed commands and pinned actions, with no executable script inputs. Controlled transport
+top-level workflow. Manifest-owned composite actions expose fixed interfaces for node/source execution,
+preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
+individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
+invocation-data member holds parameters with named operation roles. The runtime descriptor operation
+recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
+with no executable script inputs. Controlled transport
 wrappers contain one upload/download and retain their
 provider controls on the caller; native preflight, checkout, operator setup, timed producers and referenced
 transfer outputs stay inline. Static Plan/manifest references and source scheduling by target/consumer cohort

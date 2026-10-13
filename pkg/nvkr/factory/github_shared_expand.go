@@ -101,33 +101,8 @@ func materializeGitHubSharedActions(raw []byte, files map[string][]byte) ([]byte
 			if err := canonical.UnmarshalExact([]byte(encoded), &values); err != nil || values == nil {
 				return nil, nil, e.New(e.CodePipelineDrift, "job %q has invalid action parameters %q", jobID, part)
 			}
-			for key, value := range values {
-				githubYAMLSubstitute(inner, githubParameterExpression(key), githubYAMLString(value))
-			}
-			if githubYAMLContains(inner, "${{ fromJSON(inputs.parameters)") {
-				return nil, nil, e.New(e.CodePipelineDrift, "job %q has unresolved action parameters %q", jobID, part)
-			}
-			for stepIndex, step := range inner.Content {
-				key := "s" + strconv.Itoa(stepIndex) + "_"
-				if id, exists := values[key+"id"]; exists {
-					if githubYAMLValue(step, "id") != "operation_"+strconv.Itoa(stepIndex) {
-						return nil, nil, e.New(e.CodeEngineCapability, "shared action changes its operation ID")
-					}
-					githubYAMLSet(step, "id", githubYAMLString(id))
-				}
-				if selector, exists := values[key+"selector"]; exists {
-					env := githubYAMLField(step, "env")
-					run := githubYAMLField(step, "run")
-					quotedVariable := `"$` + githubSelectorEnvironment + `"`
-					if selector == "" || env == nil || env.Kind != yamlv3.MappingNode || run == nil || strings.Count(run.Value, quotedVariable) != 1 || githubYAMLValue(env, githubSelectorEnvironment) != selector {
-						return nil, nil, e.New(e.CodeEngineCapability, "shared action changes its literal selector binding")
-					}
-					run.Value = strings.Replace(run.Value, quotedVariable, shellQuote(selector), 1)
-					githubYAMLRemove(env, githubSelectorEnvironment)
-					if len(env.Content) == 0 {
-						githubYAMLRemove(step, "env")
-					}
-				}
+			if err := materializeGitHubInterfaceSteps(inner, values, inputs, with); err != nil {
+				return nil, nil, err
 			}
 			githubYAMLRemove(inputs, "parameters")
 			githubYAMLRemove(with, "parameters")
@@ -145,6 +120,114 @@ func materializeGitHubSharedActions(raw []byte, files map[string][]byte) ([]byte
 	}
 	workflow, err := encodeGitHubYAML(&document)
 	return workflow, materialized, err
+}
+
+// Interpret only the declared optional slots and field-presence metadata of
+// generated interfaces. This is not a provider-expression evaluator. The
+// recovered steps undergo the existing graph checks and exact regeneration.
+func materializeGitHubInterfaceSteps(steps *yamlv3.Node, values map[string]string, inputs, arguments *yamlv3.Node) error {
+	var concrete []*yamlv3.Node
+	for _, step := range steps.Content {
+		id := githubYAMLValue(step, "id")
+		role := strings.TrimPrefix(id, "operation_")
+		if role == id || role == "" {
+			return e.New(e.CodeEngineCapability, "shared action changes its named operation ID")
+		}
+		prefix := role + "_"
+		present, exists := values[prefix+"present"]
+		if !exists || (present != "true" && present != "false") {
+			return e.New(e.CodePipelineDrift, "shared action omits presence for operation %q", role)
+		}
+		guard := "${{ fromJSON(inputs.parameters)." + prefix + "present == 'true' }}"
+		condition := githubYAMLValue(step, "if")
+		if present == "false" {
+			if condition != guard {
+				return e.New(e.CodeEngineCapability, "shared action disables required operation %q", role)
+			}
+			continue
+		}
+		if condition == guard {
+			githubYAMLRemove(step, "if")
+		} else if condition != "" && condition != githubAlwaysCondition {
+			return e.New(e.CodeEngineCapability, "shared action changes operation %q condition", role)
+		}
+		if role == "upload" && values["upload_path_input"] != "" {
+			path := githubYAMLField(githubYAMLField(step, "with"), "path")
+			const expression = "${{ inputs.with-path || fromJSON(inputs.parameters).upload_with_path }}"
+			if path == nil || path.Value != expression || githubYAMLField(inputs, "with-path") == nil || githubYAMLField(arguments, "with-path") == nil {
+				return e.New(e.CodeEngineCapability, "shared upload changes its path interface")
+			}
+			switch values["upload_path_input"] {
+			case "true":
+				*path = *githubYAMLString("${{ inputs.with-path }}")
+			case "false":
+				if githubYAMLValue(arguments, "with-path") != "" {
+					return e.New(e.CodeEngineCapability, "shared upload overrides its Plan path")
+				}
+				*path = *githubYAMLString(githubParameterExpression("upload_with_path"))
+				githubYAMLRemove(inputs, "with-path")
+				githubYAMLRemove(arguments, "with-path")
+			default:
+				return e.New(e.CodePipelineDrift, "shared upload has invalid path-origin metadata")
+			}
+		}
+		for key, value := range values {
+			githubYAMLSubstitute(step, githubParameterExpression(key), githubYAMLString(value))
+		}
+		if githubYAMLContains(step, "${{ fromJSON(inputs.parameters)") {
+			return e.New(e.CodePipelineDrift, "shared operation %q has unresolved parameters", role)
+		}
+		originalID, exists := values[prefix+"id"]
+		if !exists {
+			return e.New(e.CodePipelineDrift, "shared operation %q omits ID metadata", role)
+		}
+		if originalID == "" {
+			githubYAMLRemove(step, "id")
+		} else {
+			githubYAMLSet(step, "id", githubYAMLString(originalID))
+		}
+		if with := githubYAMLField(step, "with"); with != nil {
+			for index := len(with.Content) - 2; index >= 0; index -= 2 {
+				key := with.Content[index].Value
+				presence := prefix + "with_" + strings.ReplaceAll(key, "-", "_") + "_present"
+				if defined, exists := values[presence]; exists {
+					switch defined {
+					case "true":
+					case "false":
+						githubYAMLRemove(with, key)
+					default:
+						return e.New(e.CodePipelineDrift, "shared operation %q has invalid input-presence metadata", role)
+					}
+				}
+			}
+		}
+		if selector, exists := values[prefix+"selector"]; exists {
+			env := githubYAMLField(step, "env")
+			run := githubYAMLField(step, "run")
+			quotedVariable := `"$` + githubSelectorEnvironment + `"`
+			if selector == "" || env == nil || env.Kind != yamlv3.MappingNode || run == nil || strings.Count(run.Value, quotedVariable) != 1 || githubYAMLValue(env, githubSelectorEnvironment) != selector {
+				return e.New(e.CodeEngineCapability, "shared operation %q changes its selector binding", role)
+			}
+			run.Value = strings.Replace(run.Value, quotedVariable, shellQuote(selector), 1)
+			githubYAMLRemove(env, githubSelectorEnvironment)
+			if len(env.Content) == 0 {
+				githubYAMLRemove(step, "env")
+			}
+		}
+		if run := githubYAMLField(step, "run"); run != nil {
+			switch values[prefix+"run_newline"] {
+			case "true":
+				run.Value = strings.TrimSuffix(run.Value, "\n") + "\n"
+			case "false":
+				run.Value = strings.TrimSuffix(run.Value, "\n")
+			default:
+				return e.New(e.CodePipelineDrift, "shared operation %q omits run formatting metadata", role)
+			}
+		}
+		concrete = append(concrete, step)
+	}
+	steps.Content = concrete
+	return nil
 }
 
 func githubActionPart(value string) bool {

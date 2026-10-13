@@ -50,9 +50,12 @@ generator must not invent them. Changes to input mode, environment or output gra
 change. Generated files are not editable scaffolds.
 
 The GitHub bundle includes shared composite templates beneath `.github/nvkr-run/actions/` and canonical
-invocation values in `.github/nvkr-run/action-data.json`. Matching job/segment shapes reuse a template instead
-of receiving separate action implementations. They lower Plan-derived steps without introducing another
-executable Plan or authored extension surface. The helper-preparation, execution, bootstrap and controlled-transfer
+invocation values in `.github/nvkr-run/action-data.json`. The generator selects fixed semantic interfaces for
+execution, preparation, collection and transfer. Grouped jobs repeat those calls; declared optional slots
+and further individual transfer calls handle differing output counts without shape-specific or numbered
+variant actions. Invocation values use named operation roles rather than step positions. These interfaces
+lower Plan-derived steps without introducing another executable Plan or authored extension surface.
+The helper-preparation, execution, bootstrap and controlled-transfer
 families and their invocation-data member appear in the same commit manifest as the top-level workflow and
 Plan. Their exact bytes, safe relative paths and modes participate in regeneration, drift
 checks and prior-manifest retirement. The workflow digest still describes the top-level workflow bytes;

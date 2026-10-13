@@ -87,7 +87,13 @@ func TestValidateGitHubBundleRejectsInspectionDiagnosticUploadTampering(t *testi
 					if bytes.Equal(workflow, baseline) {
 						t.Fatal("mutation did not change workflow semantics")
 					}
-					changed := relowerGitHubTestBundle(t, plan, bundle, workflow)
+					lower := relowerGitHubTestBundle
+					if test.name == "credential" {
+						// Transport credentials are outside the shared interface;
+						// preserve the hostile operation for semantic validation.
+						lower = unsharedGitHubTestBundle
+					}
+					changed := lower(t, plan, bundle, workflow)
 					// Authenticate the hostile bytes so rejection exercises
 					// semantic admission rather than a stale workflow digest.
 					assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)

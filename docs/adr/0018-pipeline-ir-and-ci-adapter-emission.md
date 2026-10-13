@@ -758,15 +758,19 @@ permission. All credentials and signing remain outside ARC producer jobs.
 
 The top-level workflow keeps each named job, exact dependency set, runner, timeout, permission, protected
 Environment and execution condition visible. Native-platform preflight remains before checkout. After
-checkout, shared local composite templates carry generated execution and transport sequences. Jobs with the
-same admitted step shape and input interface reuse one template; job-specific action files do not duplicate
-those implementations. A shared preparation action downloads the selected same-Run helper and immediately
-restores its execute bit. Templates live under `.github/nvkr-run/actions/`; one canonical
+checkout, shared local composite actions expose fixed semantic interfaces for node execution, source
+execution, input preparation, image preparation, output collection and individual carrier transfer.
+`execute-node`, `execute-source`, `prepare-inputs`, `prepare-images` and `collect-node-outputs` describe
+operations owned by the factory. The generator selects these interfaces directly; it does not create a new
+template for each observed step shape, group size or output count. A shared preparation action downloads the
+selected same-Run helper and immediately restores its execute bit. Templates live under
+`.github/nvkr-run/actions/`; one canonical
 `.github/nvkr-run/action-data.json` stores invocation values keyed by stable job/segment selectors. Both are
 exact manifest-owned bundle members. Templates retain fixed helper commands and literal catalog-pinned
 provider actions; invocation data contains selected node IDs, carrier names, paths and other parameters,
-never executable scripts or credentials. They add no authored operation, new scheduling authority or
-independently selectable execution input.
+never executable scripts or credentials. Parameters use named operation roles such as `execute_selector`
+and `upload_with_name` rather than numbered step positions. They add no authored operation, new scheduling
+authority or independently selectable execution input.
 
 The internal `factory github describe-action` operation admits the complete Plan and recomputes the selected
 invocation from the renderer before emitting bounded canonical JSON to the provider's step-output channel.
@@ -778,8 +782,16 @@ The checked-in data file is an inspectable generated projection, not runtime exe
 map its recomputed parameters through explicit environment values or action inputs; fixed shell commands
 quote their parameter variables instead of evaluating generated command text. Caller-only expressions and
 credentials retain explicit bindings outside this data. Bootstrap uses a shared family that does not depend
-on the helper it is building. Different shell, operation ordering, output arity or credential interfaces may
-require separate templates; reuse does not merge independently required artifact uploads.
+on the helper it is building. Host and job-container shells and distinct credential roles have explicit
+interfaces. Grouped jobs invoke the same node interface repeatedly in execution order. Contiguous input
+download/restore and image preparation occupy declared optional node slots; preparation separated from
+execution retains its own interface. Folding cannot cross inline setup or provider-control boundaries.
+Execution and output collection provide two optional carrier slots;
+additional carriers use the same individual upload interface before the next node executes. Every planned
+output retains its own ordered upload. Neither group size nor output cardinality produces another action
+file. Absent optional work does not execute; supported transport defaults preserve the pinned provider
+interface, while static materialization restores original field presence. Missing required work,
+unsupported bindings or reordered operations fail closed through expanded-graph admission.
 
 The workflow header points to fixed Plan and manifest paths instead of embedding a changing Plan digest.
 Source-fetch scheduling keys and ordering derive from the build target and its actual consuming component

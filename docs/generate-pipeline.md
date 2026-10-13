@@ -52,7 +52,7 @@ bin/nvkr run generate \
 Under that scratch root, inspect:
 
 - `.github/workflows/nvkr-run.yml`: named GitHub Actions jobs, dependencies, runners and credential policies.
-- `.github/nvkr-run/actions/`: shared composite templates for execution, transport and helper preparation.
+- `.github/nvkr-run/actions/`: shared actions with fixed interfaces for execution, preparation and transport.
 - `.github/nvkr-run/action-data.json`: generated invocation parameters selected by stable job/segment keys.
 - `.github/nvkr-run/plan.json`: the canonical Plan consumed by the workflow.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
@@ -64,8 +64,11 @@ inputs and regenerate instead of editing generated files.
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
 Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect
 the shared operations it calls, then find its invocation key in `action-data.json` for exact node and carrier
-values. Jobs with the same step shape reuse the same template. The helper recomputes those values from the
-admitted Plan at runtime; this data is generated, not another file to author. Templates contain fixed commands
+values. Calls such as `execute-node`, `execute-source` and `collect-node-outputs` name the operation rather
+than a generated shape. Grouped jobs reuse the node interface for each operation; optional slots and further
+individual upload calls preserve every output without adding output-count variants. Invocation parameters
+have named roles. The helper recomputes those values from the admitted Plan at runtime; this data is generated,
+not another file to author. Templates contain fixed commands
 and pinned actions, not scripts supplied as parameters. Native preflight, checkout, operator setup and timed
 producer execution remain inline. A controlled transfer delegates to an action containing one upload or
 download, with its condition, timeout and failure policy still visible on the caller. Transfers whose

@@ -205,8 +205,9 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 
 func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 	tests := []struct {
-		name   string
-		mutate func([]githubStep, []int) []githubStep
+		name     string
+		unshared bool
+		mutate   func([]githubStep, []int) []githubStep
 	}{
 		{
 			name: "omitted logical node",
@@ -216,7 +217,8 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 			},
 		},
 		{
-			name: "reordered logical nodes",
+			name:     "reordered logical nodes",
+			unshared: true,
 			mutate: func(steps []githubStep, execute []int) []githubStep {
 				steps[execute[0]], steps[execute[1]] = steps[execute[1]], steps[execute[0]]
 				return steps
@@ -259,7 +261,13 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			mutated := relowerGitHubTestBundle(t, plan, bundle, workflow)
+			lower := relowerGitHubTestBundle
+			if test.unshared {
+				// The mismatched execution/collection pair is intentionally
+				// outside the shared interface so the validator owns rejection.
+				lower = unsharedGitHubTestBundle
+			}
+			mutated := lower(t, plan, bundle, workflow)
 			err = ValidateGitHubBundle(context.Background(), plan, mutated)
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
@@ -271,8 +279,9 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 
 func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		mutate func(*githubWorkflowDocument) bool
+		name       string
+		entrypoint bool
+		mutate     func(*githubWorkflowDocument) bool
 	}{
 		{
 			name: "appended bootstrap shell",
@@ -291,7 +300,8 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 			},
 		},
 		{
-			name: "injected stage step",
+			name:       "injected stage step",
+			entrypoint: true,
 			mutate: func(document *githubWorkflowDocument) bool {
 				for _, id := range sortedKeys(document.Jobs) {
 					job := document.Jobs[id]
@@ -338,7 +348,13 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			raw := expandedGitHubWorkflow(t, bundle)
+			if test.entrypoint {
+				// Inject an unknown operation beside a real shared action call.
+				// Retaining the member set exercises executable-byte validation.
+				raw = bundle.Files[GitHubWorkflowPath]
+			}
+			document := decodeGitHubWorkflow(t, raw)
 			baseline, err := yaml.Marshal(document)
 			if err != nil {
 				t.Fatal(err)
@@ -353,7 +369,14 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 			if bytes.Equal(workflow, baseline) {
 				t.Fatal("mutation did not change workflow semantics")
 			}
-			mutated := relowerGitHubTestBundle(t, plan, bundle, workflow)
+			var mutated *GeneratedBundle
+			if test.entrypoint {
+				header := "# qualification: " + plan.Qualification.String() + "\n# plan: " + bundle.PlanPath + "\n# manifest: " + bundle.ManifestPath + "\n"
+				workflow = append([]byte(header), workflow...)
+				mutated = replaceGitHubBundleBytes(t, bundle, bundle.Files[GitHubWorkflowPath], workflow)
+			} else {
+				mutated = relowerGitHubTestBundle(t, plan, bundle, workflow)
+			}
 			err = ValidateGitHubBundle(context.Background(), plan, mutated)
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {

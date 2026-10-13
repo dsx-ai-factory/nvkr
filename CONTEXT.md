@@ -93,8 +93,9 @@ _Avoid_: Authored definition, execution observation
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
 Its workflow, shared composite templates and generated invocation data share one ownership manifest and
-byte-exact drift gate. Templates reuse fixed Plan operations; invocation parameters are recomputed from the
-admitted Plan at runtime. Neither scripts supplied as data nor separately authored lifecycle inputs are admitted.
+byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
+interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
+from the admitted Plan at runtime. Neither scripts supplied as data nor separately authored lifecycle inputs are admitted.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
