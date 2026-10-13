@@ -91,6 +91,8 @@ type GitHub struct {
 
 // NewGitHub uses an explicit read credential; empty permits public repository
 // reads. Redirects are refused, including repository renames and token forwarding.
+// The owned transport connects directly to api.github.com; environment proxy
+// settings are not used. An approved proxy route is not currently supported.
 func NewGitHub(token string) *GitHub {
 	return &GitHub{token: token, api: "https://api.github.com", client: &http.Client{
 		Timeout:       30 * time.Second,

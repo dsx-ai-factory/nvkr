@@ -257,6 +257,10 @@ bytes. Optional `NVKR_GITHUB_TOKEN` supplies read access to GitHub; private regi
 `NVKR_REGISTRY`, `NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`. No qualification signing credentials
 or identity token are required by this check. macOS rejects the operation before input or network work.
 
+GitHub source authentication requires direct HTTPS access to `api.github.com`. Its owned transport ignores
+`HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`, and refuses redirects. Environments that require an outbound
+proxy are not currently supported for this operation.
+
 The candidate transport uses `schemaVersion: nvkr.dev/qualification-candidate/v1`, a digest-pinned root
 `reference`, and `predicates`, each containing its exact subject `reference` and original canonical predicate
 bytes in the JSON base64 `predicate` field. It includes one predicate for the root and every named output.
