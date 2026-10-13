@@ -44,10 +44,10 @@ func evidenceOptions(c *cli.Context) testobservation.RegistryOptions {
 func cmdEvidence() *cli.Command {
 	return &cli.Command{Name: "evidence", Usage: "emit, publish and independently verify portable test observations", Subcommands: []*cli.Command{
 		{Name: "emit", Usage: "capture reviewed public result files without signing", Flags: []cli.Flag{
-			&cli.StringFlag{Name: "root", Required: true}, &cli.StringFlag{Name: "description", Required: true, Usage: "canonical observation description with empty inventory and zero summary"},
-			&cli.StringFlag{Name: "files", Required: true, Usage: "canonical explicit file selection with roles and exact raw pins"}, &cli.StringFlag{Name: "out", Required: true},
+			&cli.StringFlag{Name: "root", Required: true, Usage: "selected result root or immutable observation bundle"}, &cli.StringFlag{Name: "description", Required: true, Usage: "canonical observation description with empty inventory and zero summary"},
+			&cli.StringFlag{Name: "files", Required: true, Usage: "canonical explicit file selection with roles and exact raw pins"}, &cli.StringFlag{Name: "out", Required: true, Usage: "new bundle path; existing output is never replaced"},
 		}, Action: func(c *cli.Context) error {
-			identity, err := client.New().EmitEvidence(c.Context, c.String("root"), c.String("description"), c.String("files"), c.String("out"))
+			identity, err := client.New().EmitEvidence(c.Context, client.EmitEvidenceRequest{Root: c.String("root"), DescriptionPath: c.String("description"), SelectionPath: c.String("files"), OutputPath: c.String("out")})
 			if err != nil {
 				return err
 			}
@@ -55,59 +55,29 @@ func cmdEvidence() *cli.Command {
 				ObservationDigest string `json:"observationDigest"`
 			}{identity})
 		}},
-		{Name: "publish", Usage: "sign and publish exact recorded observations including failures", Flags: append(evidenceRegistryFlags(), &cli.StringFlag{Name: "root", Required: true}, &cli.StringFlag{Name: "repository", Required: true}), Action: func(c *cli.Context) error {
+		{Name: "publish", Usage: "sign and publish exact recorded observations including failures", Flags: append(evidenceRegistryFlags(), &cli.StringFlag{Name: "root", Required: true, Usage: "selected result root or immutable observation bundle"}, &cli.StringFlag{Name: "repository", Required: true, Usage: "explicit admitted OCI observation repository"}), Action: func(c *cli.Context) error {
 			result, publishErr := client.New().PublishEvidence(c.Context, c.String("root"), c.String("repository"), evidenceOptions(c))
 			if result != nil {
 				return errors.Join(publishErr, evidenceJSON(c, result))
 			}
 			return publishErr
 		}},
-		{Name: "verify-local", Usage: "check unsigned self-consistency against independent expectations", Flags: []cli.Flag{&cli.StringFlag{Name: "root", Required: true}, &cli.StringFlag{Name: "expected", Required: true}, &cli.BoolFlag{Name: "json"}}, Action: func(c *cli.Context) error {
-			expected, err := testobservation.LoadExpected(c.Context, c.String("expected"))
-			if err != nil {
-				return err
-			}
-			result, err := testobservation.VerifyLocal(c.Context, c.String("root"), expected)
+		{Name: "verify-local", Usage: "check unsigned self-consistency against independent expectations", Flags: []cli.Flag{&cli.StringFlag{Name: "root", Required: true, Usage: "selected result root or immutable observation bundle"}, &cli.StringFlag{Name: "expected", Required: true, Usage: "independent canonical subject, input and suite expectations"}, &cli.BoolFlag{Name: "json", Usage: "emit structured recorded-result diagnostics"}}, Action: func(c *cli.Context) error {
+			result, err := client.New().VerifyLocalEvidence(c.Context, c.String("root"), c.String("expected"))
 			if err != nil {
 				return err
 			}
 			if c.Bool("json") {
-				return evidenceJSON(c, result)
+				return evidenceJSON(c, result.Verification)
 			}
-			bundle, err := testobservation.Open(c.Context, c.String("root"))
-			if err != nil {
-				return err
-			}
-			defer func() { _ = bundle.Close() }()
-			if err := expected.Check(bundle.Observation()); err != nil {
-				return err
-			}
-			_, err = fmt.Fprint(c.App.Writer, testobservation.Render(bundle.Observation(), *result))
+			_, err = fmt.Fprint(c.App.Writer, testobservation.Render(result.Observation, result.Verification))
 			if err != nil {
 				return e.Wrap(e.CodeInternal, err, "writing evidence summary")
 			}
 			return nil
 		}},
-		{Name: "verify", Usage: "authenticate pinned OCI observations under independent expectations", Flags: append(evidenceRegistryFlags(), &cli.StringFlag{Name: "reference", Usage: "digest-pinned observation OCI reference"}, &cli.StringFlag{Name: "locator", Usage: "canonical locator file, not consumer trust"}, &cli.StringFlag{Name: "expected", Required: true}, &cli.BoolFlag{Name: "json"}), Action: func(c *cli.Context) error {
-			expected, err := testobservation.LoadExpected(c.Context, c.String("expected"))
-			if err != nil {
-				return err
-			}
-			reference := c.String("reference")
-			if (reference == "") == (c.String("locator") == "") {
-				return e.New(e.CodeUsage, "provide exactly one reference or locator")
-			}
-			if c.String("locator") != "" {
-				locator, err := testobservation.LoadLocator(c.Context, c.String("locator"))
-				if err != nil {
-					return err
-				}
-				if locator.ObservationDigest != expected.ObservationDigest {
-					return e.New(e.CodeVerifyFailed, "locator differs from independent expectation")
-				}
-				reference = locator.Reference
-			}
-			verified, err := client.New().VerifyEvidence(c.Context, reference, expected, evidenceOptions(c))
+		{Name: "verify", Usage: "authenticate pinned OCI observations under independent expectations", Flags: append(evidenceRegistryFlags(), &cli.StringFlag{Name: "reference", Usage: "digest-pinned observation OCI reference"}, &cli.StringFlag{Name: "locator", Usage: "canonical locator file, not consumer trust"}, &cli.StringFlag{Name: "expected", Required: true, Usage: "independent canonical subject, input and suite expectations"}, &cli.BoolFlag{Name: "json", Usage: "emit structured recorded-result diagnostics"}), Action: func(c *cli.Context) error {
+			verified, err := client.New().VerifyEvidenceFiles(c.Context, client.VerifyEvidenceRequest{Reference: c.String("reference"), LocatorPath: c.String("locator"), ExpectedPath: c.String("expected")}, evidenceOptions(c))
 			if err != nil {
 				return err
 			}
@@ -138,9 +108,9 @@ func cmdEvidence() *cli.Command {
 func evidenceJSON(c *cli.Context, value any) error {
 	raw, err := canonical.Marshal(value)
 	if err != nil {
-		return err
+		return e.Wrap(e.CodeInternal, err, "encoding evidence result")
 	}
-	if _, err := c.App.Writer.Write(raw); err != nil {
+	if _, err := c.App.Writer.Write(append(raw, '\n')); err != nil {
 		return e.Wrap(e.CodeInternal, err, "writing evidence result")
 	}
 	return nil

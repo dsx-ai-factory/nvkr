@@ -52,13 +52,8 @@ name: Merge Gate
 # This workflow does not establish who can bypass live repository rules; verify
 # bypass grants in repository settings when evaluating merge policy.
 on:
-  pull_request:
-    branches:
-      - main
-      # Validate the portable-evidence stack before its prerequisite lands.
-      - feat/m3-c-qualification-evidence
-      - codex/portable-test-evidence
-      - codex/kubernetes-conformance-evidence
+  # Validate every PR base, including temporary integration stacks.
+  pull_request: {}
   push:
     branches:
       - main

@@ -64,6 +64,55 @@ func LoadLocator(ctx context.Context, path string) (Locator, error) {
 	return DecodeLocator(raw)
 }
 
+// LocalVerification is a detached unsigned diagnostic, never a receipt.
+type LocalVerification struct {
+	Verification Verification `json:"verification"`
+	Observation  Observation  `json:"observation"`
+}
+
+// VerifyLocalFiles holds one bundle for both independent checks and presentation.
+func VerifyLocalFiles(ctx context.Context, root, expectedPath string) (*LocalVerification, error) {
+	expected, err := LoadExpected(ctx, expectedPath)
+	if err != nil {
+		return nil, err
+	}
+	bundle, err := Open(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = bundle.Close() }()
+	observation := bundle.Observation()
+	if err := expected.Check(observation); err != nil {
+		return nil, err
+	}
+	if err := captureContext(ctx); err != nil {
+		return nil, err
+	}
+	return &LocalVerification{Verification: Verification{ObservationDigest: bundle.Digest(), SelfConsistent: true, Passing: bundle.Passing(), SignerAuthenticated: false}, Observation: observation}, nil
+}
+
+// VerifyFiles owns locator and expectation loading. Locators never supply trust.
+func VerifyFiles(ctx context.Context, reference, locatorPath, expectedPath string, options RegistryOptions) (*Verified, error) {
+	if err := captureContext(ctx); err != nil {
+		return nil, err
+	}
+	if (reference == "") == (locatorPath == "") {
+		return nil, e.New(e.CodeUsage, "provide exactly one reference or locator")
+	}
+	expected, err := LoadExpected(ctx, expectedPath)
+	if err != nil {
+		return nil, err
+	}
+	if locatorPath != "" {
+		locator, err := LoadLocator(ctx, locatorPath)
+		if err != nil {
+			return nil, err
+		}
+		return VerifyLocator(ctx, locator, expected, options)
+	}
+	return VerifyOCI(ctx, reference, expected, options)
+}
+
 func readInput(ctx context.Context, path string, max int64) ([]byte, error) {
 	if err := captureContext(ctx); err != nil {
 		return nil, err

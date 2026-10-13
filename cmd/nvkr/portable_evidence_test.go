@@ -6,6 +6,8 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +15,9 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testobservation"
+	"github.com/urfave/cli/v2"
 )
 
 func TestPortableEvidenceCLIIndependentLocalLoop(t *testing.T) {
@@ -58,7 +62,7 @@ func TestPortableEvidenceCLIIndependentLocalLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	var verified testobservation.Verification
-	if err := canonical.UnmarshalExact(output.Bytes(), &verified); err != nil {
+	if err := canonical.UnmarshalExact(bytes.TrimSuffix(output.Bytes(), []byte("\n")), &verified); err != nil {
 		t.Fatal(err)
 	}
 	if !verified.SelfConsistent || !verified.Passing || verified.SignerAuthenticated {
@@ -67,7 +71,57 @@ func TestPortableEvidenceCLIIndependentLocalLoop(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(out, "files", "junit.xml"), []byte("tampered"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.RunContext(t.Context(), []string{"nvkr", "evidence", "verify-local", "--root", out, "--expected", expectedPath, "--json"}); err == nil {
+	if err := app.RunContext(t.Context(), []string{"nvkr", "evidence", "verify-local", "--root", out, "--expected", expectedPath, "--json"}); err != nil {
+		var coded *e.Error
+		if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
+			t.Fatalf("tamper error = %v, want %s", err, e.CodeVerifyFailed)
+		}
+	} else {
 		t.Fatal("tampered result accepted")
+	}
+}
+
+func TestEvidenceVerificationCoordinatesAdmittedBeforeFileIO(t *testing.T) {
+	for _, args := range [][]string{nil, {"--reference", "example.com/evidence@sha256:" + strings.Repeat("a", 64), "--locator", "missing-locator"}} {
+		t.Run(fmt.Sprint(args), func(t *testing.T) {
+			app := newApp()
+			app.Writer, app.ErrWriter = &bytes.Buffer{}, &bytes.Buffer{}
+			base := []string{"nvkr", "evidence", "verify", "--expected", "missing-policy", "--cosign", "missing-binary", "--cosign-digest", "sha256:" + strings.Repeat("a", 64), "--identity", "fixture", "--issuer", "fixture", "--anonymous"}
+			err := app.RunContext(t.Context(), append(base, args...))
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeUsage {
+				t.Fatalf("error = %v, want coordinate usage admission", err)
+			}
+		})
+	}
+}
+
+func TestEvidenceOptionsCredentialScope(t *testing.T) {
+	t.Setenv("NVKR_REGISTRY", "example.com")
+	t.Setenv("NVKR_REGISTRY_USER", "fixture-user")
+	t.Setenv("NVKR_REGISTRY_PASSWORD", "fixture-password")
+	for _, anonymous := range []bool{false, true} {
+		t.Run(fmt.Sprint(anonymous), func(t *testing.T) {
+			flags := flag.NewFlagSet("evidence", flag.ContinueOnError)
+			for _, f := range evidenceRegistryFlags() {
+				if err := f.Apply(flags); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := flags.Set("anonymous", fmt.Sprint(anonymous)); err != nil {
+				t.Fatal(err)
+			}
+			options := evidenceOptions(cli.NewContext(cli.NewApp(), flags, nil))
+			if options.Transport.Anonymous != anonymous {
+				t.Fatal("anonymous mode changed")
+			}
+			if anonymous {
+				if options.Credential.Registry != "" || options.Transport.Username != "" || options.Transport.Password != "" {
+					t.Fatal("anonymous mode inherited credentials")
+				}
+			} else if options.Credential.Registry != "example.com" || options.Credential.Username != "fixture-user" || options.Credential.Password != "fixture-password" || options.Transport.Username != options.Credential.Username || options.Transport.Password != options.Credential.Password {
+				t.Fatal("explicit host-scoped credentials were not mapped consistently")
+			}
+		})
 	}
 }
