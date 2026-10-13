@@ -59,17 +59,19 @@ func writeLocalRunJSON(out io.Writer, prepared *lifecycle.PreparedRun, run *life
 			result.Status = run.Status
 		}
 		switch run.Lane {
-		case lifecycle.LaneQualified, lifecycle.LanePipeline, lifecycle.LaneUnqualified, "unqualified-local-execution":
+		case lifecycle.LanePipeline, lifecycle.LaneUnqualified, factory.TierLocalExecution.String():
 			result.Lane = run.Lane
+		default:
+			return e.New(e.CodeInternal, "local Run result has an unsupported description lane")
 		}
 		result.RecordAvailable = !dryRun
 		for _, observed := range run.Observed {
-			if value, ok := allowed[observed.Name]; ok && value.Kind == observed.Kind {
-				if canonical.IsDigest(observed.Digest) {
-					value.Digest = observed.Digest
-				}
-				result.ObservedOutputs = append(result.ObservedOutputs, value)
+			value, ok := allowed[observed.Name]
+			if !ok || value.Kind != observed.Kind || !canonical.IsDigest(observed.Digest) {
+				return e.New(e.CodeInternal, "local Run result has an inconsistent output description")
 			}
+			value.Digest = observed.Digest
+			result.ObservedOutputs = append(result.ObservedOutputs, value)
 		}
 	}
 	sort.Slice(result.RequiredOutputs, func(i, j int) bool { return result.RequiredOutputs[i].Name < result.RequiredOutputs[j].Name })

@@ -27,6 +27,10 @@ func TestRunInspectionCLIIsReadOnlyAndSafe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	root = filepath.Join(root, "inspection-test")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	record := filepath.Join(root, "lifecycle.json")
 	run := prepared.Description()
 	raw, err := canonical.Marshal(run)
@@ -77,25 +81,23 @@ func TestRunInspectionCLIIsReadOnlyAndSafe(t *testing.T) {
 	}
 }
 
-func TestRunInspectionCLIReportsMissingRecordWithoutInventingRun(t *testing.T) {
-	var out bytes.Buffer
-	app := &cli.App{Writer: &out, Commands: []*cli.Command{cmdRun()}}
+func TestRunInspectionCLIRejectsMissingRecordWithoutInventingRun(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(root, "lifecycle.json")
-	if err := app.RunContext(t.Context(), []string{"nvkr", "run", "inspect", "--record", path, "--json"}); err != nil {
-		t.Fatal(err)
-	}
-	var result struct {
-		Record lifecycle.RunInspection `json:"record"`
-	}
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatal(err)
-	}
-	if result.Record.Status != "unavailable" || result.Record.RecordAvailable || !result.Record.Interrupted {
-		t.Fatalf("missing record invented terminal result: %+v", result)
+	for _, flags := range [][]string{nil, {"--json"}} {
+		t.Run(strings.Join(flags, " "), func(t *testing.T) {
+			var out bytes.Buffer
+			app := &cli.App{Writer: &out, Commands: []*cli.Command{cmdRun()}}
+			args := append([]string{"nvkr", "run", "inspect", "--record", path}, flags...)
+			err := app.RunContext(t.Context(), args)
+			assertLifecycleCommandCode(t, err, e.CodeVerifyFailed)
+			if out.Len() != 0 || strings.Contains(err.Error(), root) {
+				t.Fatal("missing record emitted invented metadata or a private path", err)
+			}
+		})
 	}
 }
 
@@ -146,6 +148,10 @@ func TestRunInspectionFailureIsDescriptiveAndDoesNotExposeCause(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	root = filepath.Join(root, "failed-inspection")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(root, "lifecycle.json")
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
@@ -165,5 +171,19 @@ func TestRunInspectionFailureIsDescriptiveAndDoesNotExposeCause(t *testing.T) {
 				t.Fatalf("unsafe inspection: %q", out.String())
 			}
 		})
+	}
+}
+
+func TestRecordedRunProjectionRemainsDetachedAndMetadataOnly(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	inspection := lifecycle.RunInspection{Attempt: "recorded", Status: lifecycle.RunComplete, RecordAvailable: true,
+		Outputs: []lifecycle.InspectedRunOutput{{Name: "cli", Kind: lifecycle.OutputExecutable, State: "observed", Digest: digest}}}
+	snapshot := recordedRunSnapshot(inspection)
+	if snapshot.Mode != "recorded" || snapshot.Phase != "recorded" || !snapshot.StartedAt.IsZero() || len(snapshot.Operations) != 0 || snapshot.Outputs[0].RecordedDigest != digest {
+		t.Fatal("terminal adapter lost recorded identity or manufactured live state")
+	}
+	snapshot.Outputs[0].Name = "substituted"
+	if inspection.Outputs[0].Name != "cli" {
+		t.Fatal("terminal adapter aliases SDK metadata")
 	}
 }

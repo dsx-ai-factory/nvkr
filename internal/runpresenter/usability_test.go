@@ -133,7 +133,7 @@ func TestSmallTerminalSuspendsInvisibleBrowsingAndRetainsStopControls(t *testing
 				if live {
 					expected = Cancel
 				}
-				if view.Input(key(tcell.KeyRune, 'y')) != expected || view.Input(key(tcell.KeyCtrlC, 0)) != Cancel {
+				if view.Input(key(tcell.KeyRune, 'y')) != expected || view.Input(key(tcell.KeyCtrlC, 0)) != expected {
 					t.Fatal("small screen lost stop controls")
 				}
 				screen.SetSize(80, 24)

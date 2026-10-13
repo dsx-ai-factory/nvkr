@@ -22,6 +22,7 @@ type restoredDiagnosticWriter struct {
 	t        *testing.T
 	restored *bool
 	joined   *bool
+	summary  *bytes.Buffer
 	bytes.Buffer
 }
 
@@ -29,6 +30,9 @@ func (w *restoredDiagnosticWriter) Write(raw []byte) (int, error) {
 	w.t.Helper()
 	if !*w.restored || !*w.joined {
 		w.t.Fatal("raw diagnostics were written before restoration and joining")
+	}
+	if w.summary.Len() == 0 {
+		w.t.Fatal("raw diagnostics were written before the safe final summary")
 	}
 	return w.Buffer.Write(raw)
 }
@@ -50,7 +54,7 @@ func TestLocalAutoTUIDiagnosticsReplayAfterRestorationAndJoining(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var out bytes.Buffer
 			restored, joined := false, false
-			diagnostics := &restoredDiagnosticWriter{t: t, restored: &restored, joined: &joined}
+			diagnostics := &restoredDiagnosticWriter{t: t, restored: &restored, joined: &joined, summary: &out}
 			var returned *lifecycle.Run
 			execute := func(ctx context.Context, prepared *lifecycle.PreparedRun, options lifecycle.LocalOptions) (*lifecycle.Run, error) {
 				if _, ok := options.Stdout.(*rundiagnostics.Buffer); !ok || options.Stdout != options.Stderr {

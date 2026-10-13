@@ -14,8 +14,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 )
 
 // MaxRunRecordBytes bounds metadata inspection, not execution admission.
@@ -24,17 +24,18 @@ const MaxRunRecordBytes int64 = 4 << 20
 // RunInspection is a safe detached metadata view. It authenticates no payload,
 // current availability, release policy, runtime health or executable capability.
 type RunInspection struct {
-	SchemaVersion     string               `json:"schemaVersion"`
-	Authority         string               `json:"authority"`
-	Attempt           string               `json:"attempt,omitempty"`
-	PlanDigest        string               `json:"planDigest,omitempty"`
-	Lane              string               `json:"lane,omitempty"`
-	Status            string               `json:"status"`
-	FailureCode       string               `json:"failureCode,omitempty"`
-	RecordAvailable   bool                 `json:"recordAvailable"`
-	CleanupIncomplete bool                 `json:"cleanupIncomplete"`
-	Interrupted       bool                 `json:"interrupted"`
-	Outputs           []InspectedRunOutput `json:"outputs"`
+	SchemaVersion     string `json:"schemaVersion"`
+	Authority         string `json:"authority"`
+	Attempt           string `json:"attempt,omitempty"`
+	PlanDigest        string `json:"planDigest,omitempty"`
+	Lane              string `json:"lane,omitempty"`
+	Status            string `json:"status"`
+	FailureCode       string `json:"failureCode,omitempty"`
+	RecordAvailable   bool   `json:"recordAvailable"`
+	CleanupIncomplete bool   `json:"cleanupIncomplete"`
+	// Interrupted remains false: stored metadata cannot exclude a live owner.
+	Interrupted bool                 `json:"interrupted"`
+	Outputs     []InspectedRunOutput `json:"outputs"`
 }
 
 // InspectedRunOutput describes declared metadata, never current retained bytes.
@@ -45,34 +46,14 @@ type InspectedRunOutput struct {
 	Digest string `json:"digest,omitempty"`
 }
 
-// Snapshot builds detached recorded-mode presentation state, preserving recorded
-// output digests as metadata. It creates no live clock or operation history and
-// does not check whether the recorded payloads are currently available.
-func (view RunInspection) Snapshot() progress.Snapshot {
-	phase := "recorded"
-	if view.Interrupted {
-		phase = "interrupted"
-	}
-	snapshot := progress.Snapshot{Attempt: view.Attempt, PlanDigest: view.PlanDigest,
-		Mode: "recorded", Phase: phase, Lane: view.Lane, Status: view.Status,
-		FailureCode: view.FailureCode, RecordAvailable: view.RecordAvailable,
-		CleanupIncomplete: view.CleanupIncomplete}
-	for _, output := range view.Outputs {
-		snapshot.Outputs = append(snapshot.Outputs, progress.Output{
-			Name: output.Name, Kind: output.Kind, State: output.State, Stage: "recorded metadata", RecordedDigest: output.Digest,
-		})
-	}
-	return snapshot
-}
-
 // InspectRun snapshots canonical lifecycle.json and the sibling attempt marker
 // through held descriptors without following symlinks in any path component.
 // The bounded regular record must have exact canonical bytes and valid frozen
 // output bindings. Returned fields omit raw failure messages and output locators;
 // inspection never opens payloads or modifies the attempt's storage.
-// A missing record in an existing directory reports an interrupted description,
-// not a failed or resumable Run. Marker presence conservatively describes cleanup
-// metadata; neither it nor a recorded digest authenticates current output bytes.
+// Missing records and records from a differently named attempt directory are
+// rejected. Neither record absence nor marker presence establishes interruption
+// or owner liveness; a marker only describes possible incomplete disk cleanup.
 func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 	if ctx == nil {
 		return RunInspection{}, e.New(e.CodeUsage, "Run inspection requires a context")
@@ -102,8 +83,7 @@ func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 		if canceled := ctx.Err(); canceled != nil {
 			return RunInspection{}, e.Wrap(e.CodeTimeout, canceled, "Run inspection canceled")
 		}
-		view.Interrupted = true
-		return view, nil
+		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record is unavailable; owner liveness and interruption are unknown")
 	}
 	if err != nil {
 		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record must be a regular file without symlinks")
@@ -132,6 +112,9 @@ func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 	}
 	if err := validateInspectedRun(&run); err != nil {
 		return RunInspection{}, err
+	}
+	if run.Attempt != filepath.Base(root.Name()) {
+		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record does not match its attempt directory")
 	}
 	// The marker can be created before an immutable record becomes visible. A
 	// second descriptor-relative sample avoids describing that new record without
@@ -187,6 +170,9 @@ func openRunInspectionDirectory(ctx context.Context, path string) (*os.File, err
 		next, _, openErr := securepath.OpenChild(root, part, true)
 		_ = root.Close()
 		if openErr != nil {
+			if os.IsNotExist(openErr) {
+				return nil, e.New(e.CodeVerifyFailed, "Run record directory is unavailable")
+			}
 			return nil, e.New(e.CodeVerifyFailed, "Run record directories must exist without symlinks")
 		}
 		root = next
@@ -196,11 +182,11 @@ func openRunInspectionDirectory(ctx context.Context, path string) (*os.File, err
 
 // runInspectionReadError preserves cancellation classification while mapping
 // other bounded-read failures to the record-verification boundary.
-func runInspectionReadError(ctx context.Context, cause error) error {
+func runInspectionReadError(ctx context.Context, _ error) error {
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "Run inspection canceled")
 	}
-	return e.Wrap(e.CodeVerifyFailed, cause, "reading bounded Run metadata")
+	return e.New(e.CodeVerifyFailed, "reading bounded Run metadata failed")
 }
 
 // validateInspectedRun checks only recorded descriptions: known vocabularies,
@@ -211,7 +197,7 @@ func validateInspectedRun(run *Run) error {
 		return e.New(e.CodeVerifyFailed, "Run record has an invalid frozen description")
 	}
 	switch run.Lane {
-	case LaneUnqualified, LanePipeline, LaneQualified, "unqualified-local-execution":
+	case LaneUnqualified, LanePipeline, factory.TierLocalExecution.String():
 	default:
 		return e.New(e.CodeVerifyFailed, "Run record has an unknown evidence lane")
 	}

@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -32,7 +33,9 @@ func cmdRunPlan() *cli.Command {
 		if err != nil {
 			return err
 		}
-		defer checkedOutputSignals()()
+		if view.tui || view.json || c.Bool("pretty") {
+			defer checkedOutputSignals()()
+		}
 		if view.tui {
 			plan, err := loadPlanInspection(c)
 			if err != nil {
@@ -42,8 +45,9 @@ func cmdRunPlan() *cli.Command {
 			if err != nil {
 				return err
 			}
-			shown := commandServices(c).show(c.Context, runpresenter.Options{NoColor: view.noColor}, monitor, nil)
-			return preserveRunError(shown.WorkErr, shown.PresentationErr)
+			var diagnostics rundiagnostics.Buffer
+			shown := commandServices(c).show(c.Context, runpresenter.Options{NoColor: view.noColor, Diagnostics: &diagnostics}, monitor, nil)
+			return replayRunDiagnostics(c, &diagnostics, preserveRunError(shown.WorkErr, shown.PresentationErr))
 		}
 		format := "text"
 		if c.Bool("json") || c.Bool("pretty") {
@@ -174,5 +178,8 @@ func writePlanView(ctx context.Context, raw []byte) error {
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "plan view canceled")
 	}
-	return checkedRunWrite(os.Stdout, raw)
+	if _, err := os.Stdout.Write(raw); err != nil {
+		return e.Wrap(e.CodeInternal, err, "writing plan view")
+	}
+	return nil
 }

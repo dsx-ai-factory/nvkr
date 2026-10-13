@@ -98,7 +98,8 @@ implementation record distinguishes contract tests from external execution.
 ### Choose local Run presentation
 
 `run local --ui=auto` selects a terminal dashboard only with interactive standard
-input/output and a usable terminal. Pipes, redirected output and `--ui=plain`
+input/output, a usable terminal and no nonempty `CI` environment variable.
+Pipes, redirected output, CI auto mode and `--ui=plain`
 retain scrolling output. The dashboard lists required named outputs, selected
 producer operations and dependencies, observation counts and bounded public
 activity. Producer completion and fresh activity do not establish output
@@ -135,7 +136,9 @@ observed outputs while returning the coded failure.
 
 While the dashboard is open, a shared memory buffer retains the last 128 KiB of
 producer stdout and stderr. If the command fails, the captured bytes are replayed
-to ordinary stderr after terminal restoration and owned-work joining. A marker
+to ordinary stderr after terminal restoration, owned-work joining and the safe
+final summary. Recovered presenter/worker panic diagnostics use the same private
+bounded sink. A marker
 identifies truncation. Raw producer text never enters the safe dashboard panes.
 This failure replay does not create a durable general-purpose log; successful
 Run output is not replayed. Existing Packer diagnostic retention is separate.
@@ -190,7 +193,8 @@ close confirmation and Ctrl+C remain available.
 
 The result browser opens after the command's existing operation finishes. Catalog
 maintenance and generation retain their normal write/check behavior; closing the
-browser neither repeats nor undoes it. Verification results reflect only the
+browser neither repeats nor undoes it. Ctrl+C closes this read-only browser and
+preserves the completed operation's owning result. Verification results reflect only the
 owning verifier's accepted lane and scope. Release browsing checks metadata;
 local Release inspection additionally checks closure membership and payload
 integrity. Neither operation authenticates signatures or consumer policy. Differences still return status 3 when requested. Raw changed
@@ -198,6 +202,23 @@ values, source URLs, private paths, signer expressions and error messages are
 excluded from safe result panes; use existing plain output for the complete
 machine or diagram representation. Hidden execution and CI helpers keep their
 existing interface.
+
+### Dashboard screenshots
+
+These controlled Plan views show the shared NVKR/NVKE demo styling; they do not
+represent executed producers or human usability acceptance.
+
+![Named output overview](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/overview.png)
+
+![Selected output details](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/details.png)
+
+![Exact dependency drill-down](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/drilldown.png)
+
+![Quit confirmation defaults to staying](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/quit.png)
+
+![Wide terminal details](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/wide-details.png)
+
+![Monochrome presentation](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/monochrome.png)
 
 ### Inspect a recorded attempt
 
@@ -208,15 +229,20 @@ bin/nvkr run inspect --record .nvkr/runs/build-001/lifecycle.json --ui=tui
 ```
 
 Inspection defaults to plain output. The bounded lifecycle-owned loader rejects
-symlinked directories/files, malformed canonical bytes and inconsistent named
-output metadata. It describes the sibling disk-commit marker separately. A marker
-without a record, an interrupted attempt without a record, and a complete record
-with incomplete cleanup have different descriptions. q asks before closing a
-read-only viewer; y closes it, while n, Esc or Enter keeps it open. Closure happens
-without execution, record changes or cleanup. Stored observations establish no
-current payload availability, signature verification or health; file modification
-times are not live freshness. The SDK exposes the same description through
-`Client.InspectRun`.
+symlinks in every path component, malformed canonical bytes, inconsistent named
+output metadata, unavailable qualified lanes and an attempt name that does not
+match its containing directory. Use a physical path (for example, start from
+`pwd -P`); macOS `/tmp` is a symlink, so use its physical `/private/tmp` path.
+A missing directory or record returns a coded verification failure. A disk marker
+without a record cannot distinguish unfinished live work from interruption; no
+interrupted Run is inferred. A present record describes its sibling disk-commit
+marker separately, without performing cleanup.
+
+q asks before closing a read-only viewer; y or Ctrl+C closes it, while n, Esc or
+Enter keeps it open. Closure does not execute, change a record, or perform cleanup.
+Stored observations establish no current payload availability, signature
+verification or health; file modification times are not live freshness. The SDK
+exposes the same detached description through `Client.InspectRun`.
 
 For a completed local `disk-image` output, lifecycle retains the exact observed QCOW2 as
 `<attempts-root>/<attempt>/outputs/<output-name>.qcow2` and prints that path. The file is read-only, is committed

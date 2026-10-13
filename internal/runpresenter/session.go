@@ -10,11 +10,13 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"reflect"
 	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/gdamore/tcell/v2"
@@ -27,17 +29,13 @@ type Options struct {
 	Screen  tcell.Screen
 	Live    bool
 	NoColor bool
+	// Diagnostics is an optional bounded private capture, never a terminal writer
+	// or safe progress stream. Its caller may replay bytes after Run returns.
+	Diagnostics *rundiagnostics.Buffer
 }
 
 // Result keeps the owning result separate from checked presentation failures.
 type Result struct{ WorkErr, PresentationErr error }
-
-// Eligible never opens /dev/tty behind a redirected or injected output writer.
-func Eligible(out io.Writer) bool {
-	terminal := os.Getenv("TERM")
-	return out == os.Stdout && terminal != "" && terminal != "dumb" &&
-		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-}
 
 // Run joins both owned goroutines on every normal return. A nil work closure
 // opens a read-only viewer; q closes it without touching the observed owner.
@@ -111,7 +109,8 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 			restored = true
 			func() {
 				defer func() {
-					if recover() != nil {
+					if recovered := recover(); recovered != nil {
+						capturePanic(options.Diagnostics, "terminal restoration", recovered)
 						result.PresentationErr = errors.Join(result.PresentationErr, nvkrerr.New(nvkrerr.CodeInternal, "terminal restoration failed"))
 					}
 				}()
@@ -120,7 +119,8 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 		}
 	}
 	defer func() {
-		if recover() != nil {
+		if recovered := recover(); recovered != nil {
+			capturePanic(options.Diagnostics, "terminal renderer", recovered)
 			result.PresentationErr = errors.Join(result.PresentationErr, nvkrerr.New(nvkrerr.CodeInternal, "terminal renderer failed"))
 			cancel()
 		}
@@ -144,7 +144,8 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 	go func() {
 		defer close(pumpDone)
 		defer func() {
-			if recover() != nil {
+			if recovered := recover(); recovered != nil {
+				capturePanic(options.Diagnostics, "terminal event reader", recovered)
 				pumpFailure <- terminalError("terminal event reader failed")
 			}
 		}()
@@ -155,7 +156,8 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 		go func() {
 			var err error
 			defer func() {
-				if recover() != nil {
+				if recovered := recover(); recovered != nil {
+					capturePanic(options.Diagnostics, "Run worker", recovered)
 					err = nvkrerr.New(nvkrerr.CodeInternal, "Run worker failed")
 				}
 				done <- err
@@ -254,6 +256,35 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 	}
 }
 
+// capturePanic retains a bounded current-goroutine stack behind the private sink
+// boundary. Only builtin strings are copied as values; arbitrary panic objects
+// contribute their type without executing Error or String methods.
+func capturePanic(sink *rundiagnostics.Buffer, location string, value any) {
+	if sink == nil {
+		return
+	}
+	var raw [rundiagnostics.MaxBytes]byte
+	n := copy(raw[:], "Recovered "+location+" panic")
+	if text, ok := value.(string); ok {
+		n += copy(raw[n:], ": ")
+		n += copy(raw[n:], text[:min(len(text), 4096)])
+		if len(text) > 4096 {
+			n += copy(raw[n:], " [value truncated]")
+		}
+	} else {
+		n += copy(raw[n:], " (type: ")
+		name := "<nil>"
+		if kind := reflect.TypeOf(value); kind != nil {
+			name = kind.String()
+		}
+		n += copy(raw[n:], name[:min(len(name), 256)])
+		n += copy(raw[n:], ")")
+	}
+	n += copy(raw[n:], "\nCurrent goroutine stack (bounded):\n")
+	n += runtime.Stack(raw[n:], false)
+	_, _ = sink.Write(raw[:n])
+}
+
 // canceled maps presentation cancellation to the public timeout code while
 // retaining its cause for callers that distinguish cancellation from deadlines.
 func canceled(err error) error {
@@ -262,7 +293,7 @@ func canceled(err error) error {
 
 // terminalError reports a static terminal failure without exposing raw I/O text.
 func terminalError(message string) error {
-	return nvkrerr.New(nvkrerr.CodePreflightFailed, "%s", message)
+	return nvkrerr.New(nvkrerr.CodeUnavailable, "%s", message)
 }
 
 // checkedTTY retains errors deliberately ignored by the pinned terminal stack.

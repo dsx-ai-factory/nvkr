@@ -81,6 +81,12 @@ func TestLocalProgressReconcilesOwningReturnedRun(t *testing.T) {
 			if (err != nil) != (got.FailureCode != "") {
 				t.Fatalf("error code lost: %v snapshot=%+v", err, got)
 			}
+			if err != nil {
+				var coded *e.Error
+				if !errors.As(err, &coded) || got.FailureCode != string(coded.Code) {
+					t.Fatalf("owner code differs from final progress: %v snapshot=%+v", err, got)
+				}
+			}
 			if got.CleanupIncomplete != (mode == "cleanup failure") {
 				t.Fatalf("cleanup status lost: %+v", got)
 			}

@@ -691,7 +691,7 @@ esac
 					t.Fatal(err)
 				}
 				var args []string
-				if err := json.Unmarshal(raw, &args); err != nil || len(args) != 17 || args[0] != ".nvkr/laptop-bootstrap/id-probe/nvkr" || args[8] != "id-probe" || args[14] != "1" || args[16] != "docker" {
+				if err := json.Unmarshal(raw, &args); err != nil || len(args) != 18 || args[0] != ".nvkr/laptop-bootstrap/id-probe/nvkr" || args[8] != "id-probe" || args[14] != "1" || args[16] != "docker" || args[17] != "--ui=plain" {
 					t.Fatalf("bad private invocation: %v %q", err, raw)
 				}
 				for _, arg := range args {

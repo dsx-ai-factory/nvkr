@@ -322,7 +322,7 @@ preview_command=("${runner}" run local --definition "${definition}" --environmen
 print_nvkr_command "${preview_command[@]}"
 "${preview_command[@]}"
 build_command=("${runner}" run local --definition "${definition}" --environment "${environment}" \
-  --attempt "${attempt}" --attempts-root .nvkr/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}")
+  --attempt "${attempt}" --attempts-root .nvkr/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}" --ui=plain)
 if [[ "${prepare_only}" == 1 ]]; then
   # This is a private description, not executable authority or source evidence.
   # Preserve the exact final argv selected above; never pass it through eval.

@@ -44,10 +44,12 @@ nvkr run plan --plan .github/nvkr-run/plan.json --ui=tui
 
 The explicit terminal explorer uses validated typed output/operation membership
 and dependencies. It leaves the Plan and generated ownership manifest unchanged.
-Use arrows to select, Enter for details/dependencies, Tab or 1/2/3 for panes, Esc to go back,
-`/` for output search, `f` for filters and `?` for help. Tabs identify Outputs,
-Details and Activity, with lines separating the panes. q asks before closing
-this read-only view: y closes it; n, Esc or Enter keeps it open. Closure does not
+Use arrows to select, Enter for details/dependencies, Tab or 1/2 for panes, Esc to go back,
+`/` for output search, `f` for filters and `?` for help. Tabs identify Outputs
+and Details, with frames separating the panes. Activity appears only when supplied
+(for example, during live Runs); static Plans have no Activity tab. `a` selects
+the Activity pane only when available. q asks before closing
+this read-only view: y or Ctrl+C closes it; n, Esc or Enter keeps it open. Closure does not
 execute a Plan or clean up a Run. Small terminals use a single pane.
 `--no-color` and nonempty `NO_COLOR` preserve textual state and focus.
 

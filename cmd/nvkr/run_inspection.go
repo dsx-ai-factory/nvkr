@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -18,6 +19,21 @@ import (
 type inspectedRunSource struct{ value progress.Snapshot }
 
 func (s inspectedRunSource) Snapshot() progress.Snapshot { return s.value }
+
+// recordedRunSnapshot adapts detached metadata to terminal presentation without
+// extending the lifecycle/SDK model with presenter types or a live clock.
+func recordedRunSnapshot(inspection lifecycle.RunInspection) progress.Snapshot {
+	snapshot := progress.Snapshot{Attempt: inspection.Attempt, PlanDigest: inspection.PlanDigest,
+		Mode: "recorded", Phase: "recorded", Lane: inspection.Lane, Status: inspection.Status,
+		FailureCode: inspection.FailureCode, RecordAvailable: inspection.RecordAvailable,
+		CleanupIncomplete: inspection.CleanupIncomplete}
+	for _, output := range inspection.Outputs {
+		snapshot.Outputs = append(snapshot.Outputs, progress.Output{
+			Name: output.Name, Kind: output.Kind, State: output.State, Stage: "recorded metadata", RecordedDigest: output.Digest,
+		})
+	}
+	return snapshot
+}
 
 func cmdRunInspect() *cli.Command {
 	return &cli.Command{Name: "inspect", Usage: "browse one recorded Run without execution or payload verification", Flags: []cli.Flag{
@@ -33,14 +49,17 @@ func cmdRunInspect() *cli.Command {
 		if c.Args().Present() {
 			return e.New(e.CodeUsage, "run inspect accepts flags only")
 		}
-		defer checkedOutputSignals()()
+		if view.tui || view.json {
+			defer checkedOutputSignals()()
+		}
 		inspection, err := lifecycle.InspectRun(c.Context, c.String("record"))
 		if err != nil {
 			return err
 		}
 		if view.tui {
-			shown := commandServices(c).show(c.Context, runpresenter.Options{NoColor: view.noColor}, inspectedRunSource{inspection.Snapshot()}, nil)
-			return preserveRunError(shown.WorkErr, shown.PresentationErr)
+			var diagnostics rundiagnostics.Buffer
+			shown := commandServices(c).show(c.Context, runpresenter.Options{NoColor: view.noColor, Diagnostics: &diagnostics}, inspectedRunSource{recordedRunSnapshot(inspection)}, nil)
+			return replayRunDiagnostics(c, &diagnostics, preserveRunError(shown.WorkErr, shown.PresentationErr))
 		}
 		if view.json {
 			raw, err := canonical.Marshal(struct {

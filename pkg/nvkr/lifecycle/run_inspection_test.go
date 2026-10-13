@@ -6,6 +6,7 @@ package lifecycle
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,12 +14,17 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
 func inspectionDirectory(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
+		t.Fatal(err)
+	}
+	path = filepath.Join(path, testRun().Attempt)
+	if err := os.Mkdir(path, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -35,19 +41,19 @@ func inspectionCompleteRun(t *testing.T) *Run {
 	return run
 }
 
-func TestInspectRunMetadataAndInterruptedAttempts(t *testing.T) {
+func TestInspectRunMetadataAndMissingRecordRefusal(t *testing.T) {
 	for _, test := range []struct {
-		name        string
-		run         *Run
-		marker      bool
-		interrupted bool
+		name    string
+		run     *Run
+		marker  bool
+		missing bool
 	}{
 		{"pending", testRun(), false, false},
 		{"complete", inspectionCompleteRun(t), false, false},
 		{"complete with cleanup", inspectionCompleteRun(t), true, false},
 		{"failed", failedRun(testRun(), e.New(e.CodeBuildFailed, "private-provider /private/secret token")), false, false},
-		{"marker only", nil, true, true},
-		{"interrupted before record", nil, false, true},
+		{"marker without record", nil, true, true},
+		{"reserved directory without record", nil, false, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := inspectionDirectory(t)
@@ -69,10 +75,17 @@ func TestInspectRunMetadataAndInterruptedAttempts(t *testing.T) {
 				}
 			}
 			view, err := InspectRun(t.Context(), path)
+			if test.missing {
+				assertCode(t, err, e.CodeVerifyFailed)
+				if view.RecordAvailable || view.Interrupted || view.Attempt != "" {
+					t.Fatal("missing record inferred lifecycle or owner state")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			if view.Interrupted != test.interrupted || view.CleanupIncomplete != test.marker || view.RecordAvailable != (test.run != nil) {
+			if view.Interrupted || view.CleanupIncomplete != test.marker || view.RecordAvailable != (test.run != nil) {
 				t.Fatalf("incorrect attempt description: %+v", view)
 			}
 			if test.run != nil {
@@ -94,19 +107,6 @@ func TestInspectRunMetadataAndInterruptedAttempts(t *testing.T) {
 			if strings.Contains(string(encoded), "private-provider") || strings.Contains(string(encoded), "/private/secret") || strings.Contains(string(encoded), "token") {
 				t.Fatal("inspection exposed raw diagnostic text")
 			}
-			snapshot := view.Snapshot()
-			if snapshot.Mode != "recorded" || !snapshot.StartedAt.IsZero() {
-				t.Fatal("inspection manufactured a live clock")
-			}
-			if len(snapshot.Outputs) > 0 {
-				if snapshot.Outputs[0].RecordedDigest != view.Outputs[0].Digest {
-					t.Fatal("recorded output identity was lost in presentation")
-				}
-				snapshot.Outputs[0].Name = "changed"
-				if view.Outputs[0].Name == "changed" {
-					t.Fatal("snapshot aliases inspection")
-				}
-			}
 		})
 	}
 }
@@ -121,6 +121,8 @@ func TestInspectRunRejectsUnsafeOrSubstitutedRecords(t *testing.T) {
 		{name: "wrong build", mutate: func(run *Run) { run.Observed[0].BuildDigest = "sha256:" + strings.Repeat("6", 64) }},
 		{name: "wrong content", mutate: func(run *Run) { run.ContentSubject = "sha256:" + strings.Repeat("6", 64) }},
 		{name: "unknown lane", mutate: func(run *Run) { run.Lane = "private lane text" }},
+		{name: "unsupported qualified lane", mutate: func(run *Run) { run.Lane = LaneQualified }},
+		{name: "wrong attempt directory", mutate: func(run *Run) { run.Attempt = "another-attempt" }},
 		{name: "pending with observed", mutate: func(run *Run) { run.Status = RunPending }},
 		{name: "unknown failure code", mutate: func(run *Run) {
 			run.Status = RunFailed
@@ -153,20 +155,91 @@ func TestInspectRunRejectsUnsafeOrSubstitutedRecords(t *testing.T) {
 	}
 }
 
+func TestInspectRunAdmitsOnlyWriterProducibleLanes(t *testing.T) {
+	for _, lane := range []string{LaneUnqualified, LanePipeline, factory.TierLocalExecution.String()} {
+		t.Run(lane, func(t *testing.T) {
+			run := inspectionCompleteRun(t)
+			run.Lane = lane
+			root := inspectionDirectory(t)
+			raw, err := canonical.Marshal(run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(root, "lifecycle.json")
+			if err := os.WriteFile(path, raw, 0o400); err != nil {
+				t.Fatal(err)
+			}
+			view, err := InspectRun(t.Context(), path)
+			if err != nil || view.Lane != lane {
+				t.Fatal("writer-producible lane refused", lane, err)
+			}
+		})
+	}
+}
+
+func TestRunInspectionReadErrorsDoNotExposeIOPaths(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "read failure", true: "canceled"}[canceled], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if canceled {
+				cancel()
+			}
+			err := runInspectionReadError(ctx, &os.PathError{Op: "read", Path: "/private/credential-sentinel", Err: errors.New("provider-secret")})
+			want := e.CodeVerifyFailed
+			if canceled {
+				want = e.CodeTimeout
+			}
+			assertCode(t, err, want)
+			if strings.Contains(err.Error(), "credential-sentinel") || strings.Contains(err.Error(), "provider-secret") {
+				t.Fatal("inspection exposed raw I/O cause")
+			}
+		})
+	}
+}
+
+func TestInspectRunMissingDirectoryIsDistinctFromSymlinkRefusal(t *testing.T) {
+	_, err := InspectRun(t.Context(), filepath.Join(inspectionDirectory(t), "missing", "lifecycle.json"))
+	assertCode(t, err, e.CodeVerifyFailed)
+	if strings.Contains(err.Error(), "symlink") || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatal("missing directory was described as a symlink violation", err)
+	}
+}
+
 func TestInspectRunRejectsSymlinkAndContextBeforeReading(t *testing.T) {
 	root := inspectionDirectory(t)
 	path := filepath.Join(root, "lifecycle.json")
-	if err := os.Symlink("missing", path); err != nil {
+	raw, err := canonical.Marshal(inspectionCompleteRun(t))
+	if err != nil {
 		t.Fatal(err)
 	}
-	_, err := InspectRun(t.Context(), path)
+	regular := filepath.Join(root, "regular-source.json")
+	if err := os.WriteFile(regular, raw, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("regular-source.json", path); err != nil {
+		t.Fatal(err)
+	}
+	_, err = InspectRun(t.Context(), path)
 	assertCode(t, err, e.CodeVerifyFailed)
-	link := filepath.Join(root, "linked-directory")
+	// A valid record through a symlinked ancestor must still be refused. Naming
+	// the symlink after the attempt avoids a directory-binding refusal masking it.
+	ancestor := inspectionDirectory(t)
+	link := filepath.Join(ancestor, filepath.Base(root))
 	if err := os.Symlink(root, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0o400); err != nil {
 		t.Fatal(err)
 	}
 	_, err = InspectRun(t.Context(), filepath.Join(link, "lifecycle.json"))
 	assertCode(t, err, e.CodeVerifyFailed)
+	if _, err := InspectRun(t.Context(), path); err != nil {
+		t.Fatal("physical path to the same valid record was refused", err)
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err = InspectRun(ctx, "missing/lifecycle.json")

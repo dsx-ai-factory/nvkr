@@ -22,6 +22,22 @@ import (
 )
 
 func localPresentationTestApp(execute localLifecycleExecutor, output io.Writer, services runPresentationServices) *cli.App {
+	// Injected executors own their fake telemetry, just as ExecuteLocal owns
+	// production finalization. The CLI adapter does not reconcile it again.
+	owner := execute
+	execute = func(ctx context.Context, prepared *lifecycle.PreparedRun, options lifecycle.LocalOptions) (*lifecycle.Run, error) {
+		result, err := owner(ctx, prepared, options)
+		status, lane := "unavailable", ""
+		var observed []string
+		if result != nil {
+			status, lane = result.Status, result.Lane
+			for _, output := range result.Observed {
+				observed = append(observed, output.Name)
+			}
+		}
+		options.Progress.Finish(status, lane, observed, string(runErrorCode(err)), result != nil && !options.DryRun, result != nil && result.Status == lifecycle.RunComplete && err != nil)
+		return result, err
+	}
 	command := cmdRunWithLocalExecutor(execute)
 	for _, child := range command.Subcommands {
 		if child.Name == "local" {
@@ -256,7 +272,7 @@ func (w failingRunWriter) Write(raw []byte) (int, error) {
 
 func TestCheckedLocalResultFailurePreservesRetainedOutcome(t *testing.T) {
 	lifecycleCommandRepo(t)
-	owner := errors.New("private cleanup failure")
+	owner := e.New(e.CodeImmutableViolation, "private cleanup failure")
 	for _, jsonMode := range []bool{false, true} {
 		for _, cleanupFailure := range []bool{false, true} {
 			for _, short := range []bool{false, true} {
@@ -333,6 +349,35 @@ func TestLocalJSONResultIsDeterministicAndCleanupDistinct(t *testing.T) {
 	}
 	if result.Status != lifecycle.RunComplete || result.CleanupIncomplete || result.ExitCode != 1 || !result.RecordAvailable || len(result.RequiredOutputs) != 3 || len(result.ObservedOutputs) != 3 {
 		t.Fatalf("report failure corrupted retained outcome: %+v", result)
+	}
+}
+
+func TestLocalJSONResultRejectsUnknownOwnerDescriptionsBeforeWriting(t *testing.T) {
+	lifecycleCommandRepo(t)
+	prepared, err := lifecycle.PrepareFiles(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "projection-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []struct {
+		name  string
+		apply func(*lifecycle.Run)
+	}{
+		{"unknown lane", func(run *lifecycle.Run) { run.Lane = "future-lane" }},
+		{"unavailable qualified lane", func(run *lifecycle.Run) { run.Lane = lifecycle.LaneQualified }},
+		{"unknown output", func(run *lifecycle.Run) { run.Observed[0].Name = "not-required" }},
+		{"changed kind", func(run *lifecycle.Run) { run.Observed[0].Kind = "future-kind" }},
+		{"invalid digest", func(run *lifecycle.Run) { run.Observed[0].Digest = "private-invalid-digest" }},
+	} {
+		t.Run(change.name, func(t *testing.T) {
+			run := completedPresentationRun(prepared)
+			change.apply(run)
+			var out bytes.Buffer
+			err := writeLocalRunJSON(&out, prepared, run, nil, false, false)
+			assertLifecycleCommandCode(t, err, e.CodeInternal)
+			if out.Len() != 0 {
+				t.Fatal("invalid owner description emitted partial JSON")
+			}
+		})
 	}
 }
 

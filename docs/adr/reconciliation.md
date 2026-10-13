@@ -403,64 +403,45 @@ not an iptables accept alone, decides admission. The demo does not override that
 administrator policy; see the [operator firewall guidance](../local-nvke-demo.md).
 Live acceptance of the new route remains unexercised.
 
-The NVKR CLI now supports interactive local Run presentation with explicit
-plain/JSON choices, read-only Plan/recorded-Run terminal views, and typed result
-browsers on all 22 public command leaves, including the versioned Release export. Result browsers open after the owning
-operation returns; catalog maintenance, generation and verification retain their
-existing transactions and scopes. Local release inspection checks closure
-membership and payload integrity; release browsing remains metadata-only.
-Neither inspection path supplies signature or consumer-policy acceptance. Default output formats and owning failure/diff
-codes remain intact. Hidden execution/CI helpers retain their existing interface. Factory and
-lifecycle issue typed descriptive updates into fixed graph/output tables and a
-bounded public activity ring. Output observations, final retained membership and
-the command error remain distinct; no log text, growth or UI event grants
-completion, release verification or runtime health. Stored inspection validates
-bounded canonical metadata and reports attempt markers without opening payloads
-or restoring execution authority. Safe panes omit raw errors, provider text and
-private paths. Static empty Activity panes are omitted; live Runs retain Activity.
-Interactive producer stdout/stderr are captured into a shared 128 KiB memory
-tail; failed command diagnostics are replayed to ordinary stderr only after
-terminal restoration and joining, with truncation marked. They never enter safe
-snapshots or panes. This is failure-console preservation, not durable general
-producer-log retention. Successful console output is not replayed.
-unsupported diagnostic placeholders are omitted. Existing Packer metadata transport remains separate.
-The tab strip identifies Outputs/Overview, Details and available Activity; named frames
-divide the panes. NVKR and the downstream NVKE demo share presentation colors;
-their progress sources, navigation and execution policies remain independently owned.
-Monochrome NVKR rendering preserves terminal-default foreground/background colors.
-Default browsing uses compact rows and owning-projected
-overview entries; complete nodes remain available through search, the all-entry
-toggle and exact dependency navigation. Details and Activity are disclosed on
-focus; dependency links precede selected metadata and technical context. A path
-identifies drill-down depth and the previous selection; exact Back navigation is
-retained. Static rows omit repeated shared states, while Details retain state.
-Static filters include only supplied Changed/Failed states. Below 40x12, browsing
-is suspended while close/cancel controls remain available. Recorded Run details
-retain the recorded output digest as metadata, without checking current payloads.
-Release outputs link to their exact bound evidence and evidence links back to
-its outputs. A pinned dependency hint
-identifies the exact selected action even after scrolling. q asks for confirmation, defaulting to staying; only y confirms
-canceling a live Run or closing a read-only viewer. Ctrl+C remains immediate.
-Owner completion and external cancellation dismiss an open prompt without
-waiting for input; confirmed cancellation still joins owned work.
+## ADR-17 CLI presentation and inspection
 
-Controlled local tests cover output/index membership, coalescing, causal failure,
-required-count preservation, complete-plus-cleanup-error results, record
-substitution, symlinks, mode/output equivalence, short writes, broken pipes,
-all-public flag coverage, typed command projections, exact default output bytes,
-explicit JSON admission, preserved difference status, responsive keyboard navigation, quit confirmation, and joined terminal
-failure/cancellation.
-Darwin and Linux ARM64 isolated-PTY fixtures exercise full terminal restoration
-and repeated SIGHUP cancellation with joined work. The SIGHUP fixture sends
-signals; it does not establish actual PTY-master-disconnection behavior.
-Cross-compiled ARM64 test binaries also passed native Linux progress, presenter,
-lifecycle/SDK inspection and CLI presentation fixtures on the existing local
-Podman VM. Targeted native Darwin race tests passed; Linux race instrumentation
-remains unexercised because that VM has no Go or C compiler. Linux AMD64
-cross-compilation establishes build compatibility only. These local
-working-tree fixtures are not a fresh NVKE producer Run,
-an external qualification record or a human usability study. The
-[lifecycle guide](../lifecycle.md#choose-local-run-presentation) owns usage.
+All 22 public command leaves expose typed terminal result browsers; local Run
+execution additionally supplies bounded operation/output progress. Owners retain
+execution, record, artifact and verification authority. Lifecycle alone finalizes
+live telemetry from its returned Run/error; complete output retention and a coded
+cleanup failure remain distinct. Safe panes exclude raw diagnostic and private
+transport/path data. Command results are detached descriptions within progress;
+the SDK inspection DTO has no terminal snapshot method.
+
+Non-interactive and explicitly plain output retain existing bytes and owning
+failure/diff codes. Interactive `run local` defaults to auto and captures a shared
+128 KiB memory tail instead of streaming successful producer output. Nonempty
+`CI` keeps auto plain; explicit terminal mode is available. Failed sessions restore
+and join before printing the safe summary and private tail. Recovered panic
+stacks use the same bounded private sink. No durable general producer log is
+created; Packer metadata retention remains separate. Temporary SIGPIPE handling
+for checked reporters must preserve child dispositions and restore the parent.
+
+Recorded inspection requires a canonical record bound to its directory's attempt
+name and currently producible lane. Every path component is no-follow. Missing
+records, including marker-only directories, fail closed rather than asserting
+interruption or excluding a live owner. Inspection opens no payloads and restores
+no execution authority. q confirms closure/cancellation; Ctrl+C closes static
+views with the owner's outcome and cancels live work with stop/join. Command
+browsers offer only supplied Changed/Failed filters; Plan/recorded-Run views use
+All/Active/Failed. The [lifecycle guide](../lifecycle.md#choose-local-run-presentation)
+owns navigation, mode selection and screenshots.
+
+Controlled contract tests cover exact output bytes, required membership,
+coalescing, cleanup outcomes, inspection substitution, no-follow paths,
+responsive navigation and terminal failure/cancellation. Opt-in real TTY
+restoration and SIGHUP fixtures exist; their invocation and env gates are in
+[Development](../../DEVELOPMENT.md#opt-in-terminal-presentation-checks).
+Earlier Darwin/Linux working-tree captures are not fresh execution evidence for
+this revision. A live NVKE producer Run, Linux race acceptance and human usability
+validation remain unexercised. Simulation screenshots establish presentation only.
+
+## Local ARM64 demo presentation
 
 The demo CLI automatically selects a terminal dashboard for interactive standard
 input/output. Its phase map, observed state and bounded public activity use typed

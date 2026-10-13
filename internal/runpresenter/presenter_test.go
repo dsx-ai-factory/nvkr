@@ -194,7 +194,11 @@ func TestQuitConfirmationDefaultsAndModalIsolation(t *testing.T) {
 				}
 				v.Input(key(tcell.KeyRune, 'q'))
 			}
-			if v.Input(key(tcell.KeyCtrlC, 0)) != Cancel || v.confirmQuit {
+			expected := Close
+			if live {
+				expected = Cancel
+			}
+			if v.Input(key(tcell.KeyCtrlC, 0)) != expected || v.confirmQuit {
 				t.Fatal("modal blocked immediate Ctrl-C")
 			}
 			v.Input(key(tcell.KeyRune, 'q'))
@@ -685,10 +689,7 @@ func TestReadOnlyCloseAndCancel(t *testing.T) {
 			})
 		}
 		result := Run(t.Context(), Options{Screen: screen}, fixedSource{fixture()}, nil)
-		if k.Key() == tcell.KeyCtrlC && result.WorkErr == nil {
-			t.Fatal("Ctrl-C lacked timeout")
-		}
-		if k.Rune() == 'q' && (result.WorkErr != nil || result.PresentationErr != nil) {
+		if result.WorkErr != nil || result.PresentationErr != nil {
 			t.Fatal("inspection close failed")
 		}
 	}

@@ -10,6 +10,7 @@ import (
 )
 
 type RunInspection = lifecycle.RunInspection
+type InspectedRunOutput = lifecycle.InspectedRunOutput
 
 // InspectRun returns bounded, safe stored metadata, without payload verification
 // or execution/restoration of the recorded attempt.

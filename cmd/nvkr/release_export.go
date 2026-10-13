@@ -4,10 +4,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -57,8 +59,13 @@ func releaseExportCmdWithOperation(export releaseExportOperation) *cli.Command {
 				// Decode the owning description only for presentation. This neither
 				// authenticates the bytes nor opens a second inspection operation.
 				var description releaseview.Description
-				if err := json.Unmarshal(raw, &description); err != nil {
-					return e.Wrap(e.CodeInternal, err, "decoding release description for presentation")
+				if err := canonical.ValidateJSONDocument(raw); err != nil {
+					return e.New(e.CodeInternal, "invalid release description for presentation")
+				}
+				decoder := json.NewDecoder(bytes.NewReader(raw))
+				decoder.DisallowUnknownFields()
+				if err := decoder.Decode(&description); err != nil {
+					return e.New(e.CodeInternal, "decoding release description for presentation")
 				}
 				shown = true
 				return showCommandResult(c, view, releaseDescriptionDisplay(description), nil)

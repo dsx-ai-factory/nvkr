@@ -6,6 +6,7 @@ package main
 import (
 	"sort"
 
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
@@ -63,6 +64,7 @@ func showCommandResult(c *cli.Context, view runPresentation, display commandDisp
 	if !view.tui {
 		return ownerErr
 	}
+	defer checkedOutputSignals()()
 	status := "complete"
 	if ownerErr != nil {
 		status = "failed"
@@ -88,6 +90,7 @@ func showCommandResult(c *cli.Context, view runPresentation, display commandDisp
 		ids[item.ID] = struct{}{}
 	}
 	source = progress.New(snapshot)
-	shown := commandServices(c).show(c.Context, runpresenter.Options{NoColor: view.noColor}, source, nil)
-	return preserveRunError(ownerErr, preserveRunError(shown.WorkErr, shown.PresentationErr))
+	var diagnostics rundiagnostics.Buffer
+	shown := commandServices(c).show(c.Context, runpresenter.Options{NoColor: view.noColor, Diagnostics: &diagnostics}, source, nil)
+	return replayRunDiagnostics(c, &diagnostics, preserveRunError(ownerErr, preserveRunError(shown.WorkErr, shown.PresentationErr)))
 }

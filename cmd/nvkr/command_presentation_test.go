@@ -211,6 +211,7 @@ func TestRootCommandTypedResultsAndDefaultBytes(t *testing.T) {
 }
 
 func TestReadOnlyPlanAutoSelectsEligibleTerminalWithoutLiveWork(t *testing.T) {
+	t.Setenv("CI", "")
 	lifecycleCommandRepo(t)
 	shown := false
 	app := newApp()

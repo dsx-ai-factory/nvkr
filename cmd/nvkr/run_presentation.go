@@ -51,15 +51,16 @@ func commandOutput(c *cli.Context) io.Writer {
 	return os.Stdout
 }
 
-// Only these checked leaf reporters opt out of Go's fd 1/2 SIGPIPE termination.
-// Restore the disposition after all owned work has joined so unrelated commands
-// retain their existing behavior when an application is embedded or tested.
+// Checked reporters receive fd 1/2 write errors without changing producer signal
+// dispositions. Go resets handled signals in children; ignored signals would be
+// inherited. Stop removes only our registration after owned work has joined.
 func checkedOutputSignals() func() {
 	if signal.Ignored(syscall.SIGPIPE) {
 		return func() {}
 	}
-	signal.Ignore(syscall.SIGPIPE)
-	return func() { signal.Reset(syscall.SIGPIPE) }
+	pipe := make(chan os.Signal, 1)
+	signal.Notify(pipe, syscall.SIGPIPE)
+	return func() { signal.Stop(pipe) }
 }
 
 // selectRunPresentationWithEligibility rejects conflicting modes before work.
@@ -81,7 +82,7 @@ func selectRunPresentationWithEligibility(c *cli.Context, live bool, eligibleTer
 	if mode == "tui" && !eligible {
 		return runPresentation{}, e.New(e.CodeUsage, "--ui=tui requires interactive stdin and stdout with a supported TERM; use --ui=plain")
 	}
-	return runPresentation{tui: mode == "tui" || mode == "auto" && live && eligible && !structured,
+	return runPresentation{tui: mode == "tui" || mode == "auto" && live && eligible && !structured && os.Getenv("CI") == "",
 		json: c.Bool("json"), noColor: c.Bool("no-color") || os.Getenv("NO_COLOR") != ""}, nil
 }
 
@@ -104,7 +105,9 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 	if c.Args().Present() {
 		return e.New(e.CodeUsage, "run local accepts flags only")
 	}
-	defer checkedOutputSignals()()
+	if view.tui || view.json {
+		defer checkedOutputSignals()()
+	}
 	var activity *buildactivity.Sink
 	if c.IsSet("build-activity-fd") {
 		if c.Bool("dry-run") || c.Bool("publish") {
@@ -143,10 +146,6 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		if result == nil && workErr == nil {
 			workErr = e.New(e.CodeInternal, "local execution returned no Run result")
 		}
-		if result != nil && result.Status == lifecycle.RunComplete && workErr != nil {
-			workErr = e.Wrap(e.CodeImmutableViolation, workErr, "completed local Run and outputs were retained, but commit cleanup is incomplete")
-		}
-		finishLocalPresentation(monitor, result, workErr, c.Bool("dry-run"))
 		return workErr
 	}
 	var workErr, presentationErr error
@@ -155,58 +154,55 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		// no producers; the screen then acts only as a read-only static viewer.
 		workErr = work(c.Context)
 		if workErr == nil {
-			shown := services.show(c.Context, runpresenter.Options{NoColor: view.noColor}, monitor, nil)
+			shown := services.show(c.Context, runpresenter.Options{NoColor: view.noColor, Diagnostics: &diagnostics}, monitor, nil)
 			presentationErr = preserveRunError(shown.WorkErr, shown.PresentationErr)
 		}
 	} else if view.tui {
-		shown := services.show(c.Context, runpresenter.Options{Live: true, NoColor: view.noColor}, monitor, work)
+		shown := services.show(c.Context, runpresenter.Options{Live: true, NoColor: view.noColor, Diagnostics: &diagnostics}, monitor, work)
 		workErr, presentationErr = shown.WorkErr, shown.PresentationErr
 	} else {
 		workErr = work(c.Context)
 	}
 	err = preserveRunError(workErr, presentationErr)
-	if view.tui && err != nil {
-		if raw, truncated := diagnostics.Snapshot(); len(raw) != 0 {
-			replay := []byte("\nMemory-captured producer console tail:\n")
-			if truncated {
-				replay = append(replay, "[Earlier diagnostics truncated; showing the last 128 KiB.]\n"...)
-			}
-			replay = append(replay, raw...)
-			if replay[len(replay)-1] != '\n' {
-				replay = append(replay, '\n')
-			}
-			output := c.App.ErrWriter
-			if output == nil {
-				output = os.Stderr
-			}
-			err = preserveRunError(err, checkedRunWrite(output, replay))
-		}
-	}
 	if view.json {
 		return preserveRunError(err, writeLocalRunJSON(commandOutput(c), prepared, result, err, c.Bool("dry-run"), result != nil && result.Status == lifecycle.RunComplete && workErr != nil))
 	}
 	if view.tui && err != nil && (result == nil || result.Status != lifecycle.RunComplete) {
-		return preserveRunError(err, printSafeLocalFailure(c, prepared, result, err))
+		err = preserveRunError(err, printSafeLocalFailure(c, prepared, result, err))
+	} else if result != nil && (workErr == nil || result.Status == lifecycle.RunComplete) {
+		err = preserveRunError(err, printLocalRunResult(c, result))
 	}
-	if result != nil && (workErr == nil || result.Status == lifecycle.RunComplete) {
-		return preserveRunError(err, printLocalRunResult(c, result))
+	if view.tui {
+		// Print the safe result before raw replay, which may end inside a terminal
+		// control sequence. Both happen after the session restores and joins work.
+		return replayRunDiagnostics(c, &diagnostics, err)
 	}
 	return err
 }
 
-// finishLocalPresentation projects the returned Run into descriptive progress.
-// A retained complete Run with a cleanup failure stays complete; dry runs never
-// claim a durable record, and an absent result is reported as unavailable.
-func finishLocalPresentation(monitor *progress.Monitor, result *lifecycle.Run, err error, dryRun bool) {
-	if result == nil {
-		monitor.Finish("unavailable", "", nil, string(runErrorCode(err)), false, false)
-		return
+// replayRunDiagnostics reports a private bounded tail only after a failed session
+// has restored and joined. Reporting cannot replace the owning failure code.
+func replayRunDiagnostics(c *cli.Context, diagnostics *rundiagnostics.Buffer, ownerErr error) error {
+	if ownerErr == nil {
+		return nil
 	}
-	observed := make([]string, 0, len(result.Observed))
-	for _, output := range result.Observed {
-		observed = append(observed, output.Name)
+	raw, truncated := diagnostics.Snapshot()
+	if len(raw) == 0 {
+		return ownerErr
 	}
-	monitor.Finish(result.Status, result.Lane, observed, string(runErrorCode(err)), !dryRun, result.Status == lifecycle.RunComplete && err != nil)
+	replay := []byte("\nMemory-captured diagnostics tail:\n")
+	if truncated {
+		replay = append(replay, "[Earlier diagnostics truncated; showing the last 128 KiB.]\n"...)
+	}
+	replay = append(replay, raw...)
+	if replay[len(replay)-1] != '\n' {
+		replay = append(replay, '\n')
+	}
+	output := c.App.ErrWriter
+	if output == nil {
+		output = os.Stderr
+	}
+	return preserveRunError(ownerErr, checkedRunWrite(output, replay))
 }
 
 // printSafeLocalFailure writes only identity, observed counts, and a known code.

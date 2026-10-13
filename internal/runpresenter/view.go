@@ -222,10 +222,14 @@ func (v *View) rememberSelection() {
 func (v *View) dismissConfirmation() { v.confirmQuit = false }
 
 // Input routes keys through the focused pane. Printable search input takes
-// precedence over q, f and other navigation shortcuts; Ctrl-C always stops.
+// precedence over q, f and other navigation shortcuts. Ctrl-C cancels live work
+// and closes a read-only view without changing its completed owner outcome.
 func (v *View) Input(event *tcell.EventKey) Action {
 	if event.Key() == tcell.KeyCtrlC {
 		v.dismissConfirmation()
+		if !v.live {
+			return Close
+		}
 		return Cancel
 	}
 	if v.confirmQuit {

@@ -107,6 +107,9 @@ separating per-output Build Digest changes from execution and transport changes.
 
 `progress` owns bounded descriptive snapshots of admitted operations and named
 outputs, supplied by factory scheduling and lifecycle output-observation boundaries.
+It also carries detached public command-result descriptions (titles, fields, items
+and navigation links). These values are presentation contracts, not additional
+Run membership or SDK inspection methods; CLI adapters project recorded metadata.
 It calls no renderer or caller-controlled writer from producer updates. Lossy
 wakeups and bounded public activity cannot change frozen membership or finalization.
 `internal/runpresenter` owns terminal admission, rendering, cancellation requests and
@@ -123,7 +126,10 @@ existing Packer diagnostic retention remains separately owned.
 
 Lifecycle's `InspectRun` owns bounded, no-follow canonical record inspection and
 projects safe file-recorded metadata and attempt-marker descriptions through the
-SDK. It validates the existing output slot bindings, without opening payload
+SDK. A record must exist and name its containing attempt directory; absence
+fails with a coded verification error and never establishes interruption or
+excludes a live owner. Inspection admits only currently producible lanes, not
+qualified lifecycle records. It validates the existing output slot bindings, without opening payload
 locators, restoring execution authority or inferring current availability/health.
 The CLI may show these views as plain/JSON or an explicitly selected read-only
 terminal explorer. All public command leaves additionally admit an explicitly
@@ -132,8 +138,11 @@ and verification, finish and release receipts before this read-only view opens.
 Typed names, identity fields, counts and navigation links are descriptions; they
 exclude transport locations, private paths and raw error/value text. Closing a
 result view neither repeats nor reverses the operation, and owning status codes
-remain authoritative. Existing default output bytes and exact Plan JSON are
-preserved; hidden CI/execution helpers retain their existing interface.
+remain authoritative; Ctrl+C closes a read-only viewer and cancels only live work.
+Existing non-interactive and explicitly plain output bytes, including exact Plan
+JSON, are preserved. Interactive `run local` defaults to the dashboard and does
+not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
+terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
 
 Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate`, and `release verify|inspect|browse|export`, with
 `--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain

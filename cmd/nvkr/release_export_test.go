@@ -260,3 +260,33 @@ func TestReleaseExportPlainWritePreservesExistingContract(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseExportTUIRejectsDescriptionSchemaDrift(t *testing.T) {
+	for _, raw := range []string{
+		`{"schemaVersion":"nvkr.dev/release-description/v1","private-unknown-field":"secret"}`,
+		`{"schemaVersion":"first","schemaVersion":"second"}`,
+		`{} {}`,
+		`{"outputs":"private-type-error"}`,
+	} {
+		t.Run(raw, func(t *testing.T) {
+			calls, shows := 0, 0
+			operation := func(context.Context, string, lifecycle.InspectionOptions) ([]byte, error) {
+				calls++
+				return []byte(raw), nil
+			}
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, _ func(context.Context) error) runpresenter.Result {
+				shows++
+				if source.Snapshot().FailureCode != string(e.CodeInternal) || len(source.Snapshot().Items) != 0 {
+					t.Error("invalid description invented result membership")
+				}
+				return runpresenter.Result{}
+			}}
+			var out bytes.Buffer
+			app := &cli.App{Writer: &out, Commands: []*cli.Command{{Name: "release", Subcommands: []*cli.Command{releaseExportCmdWithOperation(operation)}}}, Metadata: map[string]interface{}{commandPresentationServicesKey: services}}
+			err := app.RunContext(t.Context(), []string{"nvkr", "release", "export", "--reference", "unopened", "--ui=tui"})
+			if cliErrorCode(err) != e.CodeInternal || calls != 1 || shows != 1 || out.Len() != 0 || strings.Contains(err.Error(), "private-") {
+				t.Fatalf("schema drift was ignored, leaked, or repeated the owner: %v", err)
+			}
+		})
+	}
+}
