@@ -4,6 +4,7 @@
 package main
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
@@ -73,11 +74,10 @@ func showCommandResult(c *cli.Context, view runPresentation, display commandDisp
 		}
 	}
 	snapshot := progress.Snapshot{Mode: "command", Phase: "result", Status: status,
-		Title: display.Title, Note: display.Note, Fields: display.Fields, Items: display.Items,
+		Title: display.Title, Note: display.Note, Fields: display.Fields, Items: slices.Clone(display.Items),
 		FailureCode: string(runErrorCode(ownerErr))}
-	source := progress.New(snapshot)
-	// Sort a detached copy; callers retain ownership of their typed result data.
-	snapshot = source.Snapshot()
+	// Sorting changes only the detached item order. New takes the defensive
+	// nested copy once, after navigation validation, before exposing the source.
 	sort.Slice(snapshot.Items, func(i, j int) bool { return snapshot.Items[i].ID < snapshot.Items[j].ID })
 	ids := make(map[string]struct{}, len(snapshot.Items))
 	for _, item := range snapshot.Items {
@@ -89,7 +89,7 @@ func showCommandResult(c *cli.Context, view runPresentation, display commandDisp
 		}
 		ids[item.ID] = struct{}{}
 	}
-	source = progress.New(snapshot)
+	source := progress.New(snapshot)
 	var diagnostics rundiagnostics.Buffer
 	shown := commandServices(c).show(c.Context, runpresenter.Options{NoColor: view.noColor, Diagnostics: &diagnostics}, source, nil)
 	return replayRunDiagnostics(c, &diagnostics, preserveRunError(ownerErr, preserveRunError(shown.WorkErr, shown.PresentationErr)))

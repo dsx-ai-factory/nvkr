@@ -9,14 +9,11 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
 type readOnlyDiagnosticWriter struct {
@@ -35,26 +32,7 @@ func (w *readOnlyDiagnosticWriter) Write(raw []byte) (int, error) {
 
 func TestDirectReadOnlyViewersReplayPrivateDiagnosticsAfterFailure(t *testing.T) {
 	lifecycleCommandRepo(t)
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "reader-diagnostics")
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	root = filepath.Join(root, "reader-diagnostics")
-	if err := os.Mkdir(root, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	record := filepath.Join(root, "lifecycle.json")
-	initial, err := canonical.Marshal(prepared.Description())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(record, initial, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	root, record, initial := runInspectionFixture(t, "reader-diagnostics")
 	for _, command := range []struct {
 		name string
 		args []string

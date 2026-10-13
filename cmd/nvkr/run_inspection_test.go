@@ -17,29 +17,36 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func TestRunInspectionCLIIsReadOnlyAndSafe(t *testing.T) {
-	lifecycleCommandRepo(t)
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "inspection-test")
+// runInspectionFixture creates a valid canonical record in a physical attempt
+// directory. Rejection and substitution tests build their invalid records explicitly.
+func runInspectionFixture(t *testing.T, attempt string) (root, record string, raw []byte) {
+	t.Helper()
+	prepared, err := lifecycle.PrepareFiles(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", attempt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
+	root, err = filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	root = filepath.Join(root, "inspection-test")
+	root = filepath.Join(root, attempt)
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	record := filepath.Join(root, "lifecycle.json")
-	run := prepared.Description()
-	raw, err := canonical.Marshal(run)
+	record = filepath.Join(root, "lifecycle.json")
+	raw, err = canonical.Marshal(prepared.Description())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(record, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	return root, record, raw
+}
+
+func TestRunInspectionCLIIsReadOnlyAndSafe(t *testing.T) {
+	lifecycleCommandRepo(t)
+	root, record, raw := runInspectionFixture(t, "inspection-test")
 	for _, format := range []string{"plain", "json"} {
 		t.Run(format, func(t *testing.T) {
 			var out bytes.Buffer

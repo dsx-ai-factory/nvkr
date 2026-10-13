@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"cmp"
 	"slices"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -17,9 +18,6 @@ func NewProgress(plan *Plan, attempt string) (*progress.Monitor, error) {
 	if plan == nil {
 		return nil, e.New(e.CodeUsage, "progress requires a plan")
 	}
-	if err := plan.Validate(); err != nil {
-		return nil, err
-	}
 	digest, err := plan.Digest()
 	if err != nil {
 		return nil, err
@@ -31,6 +29,10 @@ func projectProgress(plan *Plan, attempt, digest string) progress.Snapshot {
 	snapshot := progress.Snapshot{Attempt: attempt, PlanDigest: digest, Mode: "inspection", Phase: "plan",
 		Lane: plan.Qualification.String(), Status: "pending"}
 	nodes, artifacts := planIndex(plan)
+	platforms := make(map[string]string, len(plan.Definition.Outputs))
+	for _, output := range plan.Definition.Outputs {
+		platforms[output.Name] = output.Platform
+	}
 	// Native targets are exact compiler-owned references, including index children.
 	targetOutput := make(map[string]string)
 	for _, output := range plan.LifecycleOutputs {
@@ -44,24 +46,24 @@ func projectProgress(plan *Plan, attempt, digest string) progress.Snapshot {
 	}
 	membership := make(map[string]map[string]bool, len(nodes))
 	parents := make(map[string][]string, len(nodes))
+	nativeRoots := make(map[string][]string, len(plan.LifecycleOutputs))
 	for _, node := range plan.Graph.Nodes {
+		if name := targetOutput[node.BuildTarget]; name != "" {
+			nativeRoots[name] = append(nativeRoots[name], node.ID)
+		}
 		for _, input := range node.Inputs {
 			parents[node.ID] = append(parents[node.ID], artifacts[input].Producer)
 		}
 		parents[node.ID] = uniqueSorted(parents[node.ID])
 		membership[node.ID] = make(map[string]bool)
 	}
+	outputIndices := make(map[string]int, len(plan.LifecycleOutputs))
 	for _, output := range plan.LifecycleOutputs {
 		row := progress.Output{Name: output.Name, Kind: output.Kind, State: "required"}
 		if output.ImageIndex != nil {
 			row.Platform = "aggregate"
 		} else {
-			for _, authored := range plan.Definition.Outputs {
-				if authored.Name == output.Name {
-					row.Platform = authored.Platform
-					break
-				}
-			}
+			row.Platform = platforms[output.Name]
 		}
 		// Include every selected native operation and the exact final payload owner;
 		// follow typed artifact edges to retain transitive/shared prerequisites.
@@ -69,11 +71,7 @@ func projectProgress(plan *Plan, attempt, digest string) progress.Snapshot {
 		if artifact, ok := artifacts[output.ArtifactID]; ok {
 			pending = append(pending, artifact.Producer)
 		}
-		for _, node := range plan.Graph.Nodes {
-			if targetOutput[node.BuildTarget] == output.Name {
-				pending = append(pending, node.ID)
-			}
-		}
+		pending = append(pending, nativeRoots[output.Name]...)
 		for len(pending) > 0 {
 			id := pending[len(pending)-1]
 			pending = pending[:len(pending)-1]
@@ -87,6 +85,7 @@ func projectProgress(plan *Plan, attempt, digest string) progress.Snapshot {
 			}
 		}
 		row.Dependencies = uniqueSorted(row.Dependencies)
+		outputIndices[output.Name] = len(snapshot.Outputs)
 		snapshot.Outputs = append(snapshot.Outputs, row)
 	}
 	// Downstream publication/finalization nodes inherit exact input membership.
@@ -117,19 +116,12 @@ func projectProgress(plan *Plan, attempt, digest string) progress.Snapshot {
 		snapshot.Operations = append(snapshot.Operations, row)
 	}
 	slices.SortFunc(snapshot.Operations, func(a, b progress.Operation) int {
-		if a.ID < b.ID {
-			return -1
-		}
-		if a.ID > b.ID {
-			return 1
-		}
-		return 0
+		return cmp.Compare(a.ID, b.ID)
 	})
-	for index := range snapshot.Outputs {
-		for _, operation := range snapshot.Operations {
-			if slices.Contains(operation.Outputs, snapshot.Outputs[index].Name) {
-				snapshot.Outputs[index].Operations = append(snapshot.Outputs[index].Operations, operation.ID)
-			}
+	for _, operation := range snapshot.Operations {
+		for _, name := range operation.Outputs {
+			index := outputIndices[name]
+			snapshot.Outputs[index].Operations = append(snapshot.Outputs[index].Operations, operation.ID)
 		}
 	}
 	return snapshot

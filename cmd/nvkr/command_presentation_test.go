@@ -6,9 +6,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -60,7 +62,7 @@ func TestCommandViewerPreservesOutcomeAndRejectsAmbiguousNavigation(t *testing.T
 		want  e.Code
 		shown bool
 	}{
-		{"sorted", []progress.Item{{ID: "b"}, {ID: "a"}}, "", "", true},
+		{"sorted", []progress.Item{{ID: "b", Fields: commandFields("Name", "b"), Dependencies: []string{"a"}}, {ID: "a", Fields: commandFields("Name", "a"), Dependencies: []string{"b"}}}, "", "", true},
 		{"owning difference", nil, e.CodeDiff, e.CodeDiff, true},
 		{"owning failure", nil, e.CodeBuildFailed, e.CodeBuildFailed, true},
 		{"missing key", []progress.Item{{Name: "a"}}, "", e.CodeInternal, false},
@@ -83,6 +85,21 @@ func TestCommandViewerPreservesOutcomeAndRejectsAmbiguousNavigation(t *testing.T
 				raw, _ := json.Marshal(snapshot)
 				if strings.Contains(string(raw), "private-sentinel") {
 					t.Fatal("owner error leaked")
+				}
+				if test.name == "sorted" {
+					snapshot.Items[0].Fields[0].Value = "reader mutation"
+					snapshot.Items[0].Dependencies[0] = "reader mutation"
+					fresh := source.Snapshot()
+					if fresh.Items[0].Fields[0].Value != "a" || fresh.Items[0].Dependencies[0] != "b" || test.items[1].Fields[0].Value != "a" || test.items[1].Dependencies[0] != "b" {
+						t.Fatal("nested reader mutation changed the retained or caller description")
+					}
+					// Conversely, the caller cannot alter a retained viewer snapshot.
+					test.items[1].Fields[0].Value = "caller mutation"
+					test.items[1].Dependencies[0] = "caller mutation"
+					fresh = source.Snapshot()
+					if fresh.Items[0].Fields[0].Value != "a" || fresh.Items[0].Dependencies[0] != "b" {
+						t.Fatal("nested caller mutation changed the retained viewer description")
+					}
 				}
 				return runpresenter.Result{}
 			}}
@@ -108,6 +125,28 @@ func TestCommandViewerPreservesOutcomeAndRejectsAmbiguousNavigation(t *testing.T
 				t.Fatal("caller result was mutated")
 			}
 		})
+	}
+}
+
+func BenchmarkCommandResultProjection(b *testing.B) {
+	display := commandDisplay{Title: "Catalog"}
+	for index := 63; index >= 0; index-- {
+		name := strconv.Itoa(index)
+		display.Items = append(display.Items, progress.Item{ID: name, Fields: commandFields("Name", name, "Kind", "image"), Dependencies: []string{"source", "toolchain"}})
+	}
+	services := runPresentationServices{show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, _ func(context.Context) error) runpresenter.Result {
+		_ = source.Snapshot()
+		return runpresenter.Result{}
+	}, eligible: func(io.Writer) bool { return true }}
+	app := &cli.App{Metadata: map[string]interface{}{commandPresentationServicesKey: services}}
+	c := cli.NewContext(app, flag.NewFlagSet("benchmark", flag.ContinueOnError), nil)
+	c.Context = b.Context()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := showCommandResult(c, runPresentation{tui: true}, display, nil); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 

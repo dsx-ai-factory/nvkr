@@ -142,14 +142,13 @@ func releasePublicationDisplay(description delivery.PublicationDescription, sele
 		}
 	}
 	display := releaseArtifactsDisplay("Release metadata browse", "Metadata inspection only; payloads, signatures and policy were not verified.", artifacts)
+	outputs := releaseOutputIndices(display.Items)
 	for _, output := range description.Outputs {
 		if output.OS == "" && output.Arch == "" {
 			continue
 		}
-		for index := range display.Items {
-			if display.Items[index].ID == "output/"+output.Name {
-				display.Items[index].Fields = append(display.Items[index].Fields, progress.Field{Label: "Recorded platform", Value: output.OS + "/" + output.Arch})
-			}
+		if index, visible := outputs["output/"+output.Name]; visible {
+			display.Items[index].Fields = append(display.Items[index].Fields, progress.Field{Label: "Recorded platform", Value: output.OS + "/" + output.Arch})
 		}
 	}
 	display.Fields = append(display.Fields,
@@ -166,14 +165,10 @@ func releasePublicationDisplay(description delivery.PublicationDescription, sele
 			continue
 		}
 		evidenceCount++
-		item := progress.Item{ID: "evidence/" + evidence.Name, Name: evidence.Name, Kind: evidence.Kind, State: "metadata",
-			Fields: []progress.Field{{Label: "Stage", Value: evidence.Binding.Stage}, {Label: "Subject kind", Value: evidence.Binding.SubjectKind}, {Label: "Subject digest", Value: evidence.Binding.SubjectDigest}, {Label: "Manifest digest", Value: evidence.ManifestDigest}, {Label: "Blob digest", Value: evidence.BlobDigest}}}
-		if evidence.Binding.Platform != "" {
-			item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: evidence.Binding.Platform})
-		}
+		item := releaseEvidenceItem(evidence.Name, evidence.Kind, evidence.ManifestDigest, evidence.BlobDigest, evidence.Binding)
 		for _, output := range evidence.Binding.Outputs {
 			if selection == "" || selection == output {
-				linkReleaseEvidence(&display, &item, output)
+				linkReleaseEvidence(&display, outputs, &item, output)
 			}
 		}
 		display.Items = append(display.Items, item)
@@ -182,16 +177,34 @@ func releasePublicationDisplay(description delivery.PublicationDescription, sele
 	return display
 }
 
+// Indices stay valid as evidence items are appended; pointers into Items would
+// refer to an old backing array after growth. Only visible outputs are indexed.
+func releaseOutputIndices(items []progress.Item) map[string]int {
+	outputs := make(map[string]int, len(items))
+	for index, item := range items {
+		outputs[item.ID] = index
+	}
+	return outputs
+}
+
 // Navigation follows the owner's exact output binding in both directions. Only
 // displayed targets are linked, including when browsing one selected output.
-func linkReleaseEvidence(display *commandDisplay, evidence *progress.Item, output string) {
-	for index := range display.Items {
-		if display.Items[index].ID == "output/"+output {
-			display.Items[index].Dependencies = append(display.Items[index].Dependencies, evidence.ID)
-			evidence.Dependencies = append(evidence.Dependencies, display.Items[index].ID)
-			return
-		}
+func linkReleaseEvidence(display *commandDisplay, outputs map[string]int, evidence *progress.Item, output string) {
+	if index, visible := outputs["output/"+output]; visible {
+		display.Items[index].Dependencies = append(display.Items[index].Dependencies, evidence.ID)
+		evidence.Dependencies = append(evidence.Dependencies, display.Items[index].ID)
 	}
+}
+
+// Both owning description types project the same closed set of public evidence
+// fields. Transport references, source locations and other raw values stay out.
+func releaseEvidenceItem(name, kind, manifestDigest, blobDigest string, binding delivery.EvidenceBinding) progress.Item {
+	item := progress.Item{ID: "evidence/" + name, Name: name, Kind: kind, State: "metadata",
+		Fields: commandFields("Stage", binding.Stage, "Subject kind", binding.SubjectKind, "Subject digest", binding.SubjectDigest, "Manifest digest", manifestDigest, "Blob digest", blobDigest)}
+	if binding.Platform != "" {
+		item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: binding.Platform})
+	}
+	return item
 }
 
 func releaseDescriptionDisplay(description releaseview.Description) commandDisplay {
@@ -233,14 +246,11 @@ func releaseDescriptionDisplay(description releaseview.Description) commandDispl
 		}
 		display.Items = append(display.Items, item)
 	}
+	outputs := releaseOutputIndices(display.Items)
 	for _, evidence := range description.Evidence {
-		item := progress.Item{ID: "evidence/" + evidence.Name, Name: evidence.Name, Kind: evidence.Kind, State: "metadata",
-			Fields: []progress.Field{{Label: "Stage", Value: evidence.Binding.Stage}, {Label: "Subject kind", Value: evidence.Binding.SubjectKind}, {Label: "Subject digest", Value: evidence.Binding.SubjectDigest}, {Label: "Manifest digest", Value: evidence.ManifestDigest}, {Label: "Blob digest", Value: evidence.BlobDigest}}}
-		if evidence.Binding.Platform != "" {
-			item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: evidence.Binding.Platform})
-		}
+		item := releaseEvidenceItem(evidence.Name, evidence.Kind, evidence.ManifestDigest, evidence.BlobDigest, delivery.EvidenceBinding(evidence.Binding))
 		for _, output := range evidence.Binding.Outputs {
-			linkReleaseEvidence(&display, &item, output)
+			linkReleaseEvidence(&display, outputs, &item, output)
 		}
 		display.Items = append(display.Items, item)
 	}

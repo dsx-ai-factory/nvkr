@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -298,34 +299,70 @@ func TestReleaseBrowseLinksOnlyExactVisibleEvidenceBindings(t *testing.T) {
 			{Output: lifecycle.Artifact{Name: "ab"}},
 		},
 		Evidence: []delivery.PublicationEvidence{
-			{Name: "shared", Binding: delivery.EvidenceBinding{Outputs: []string{"a", "ab"}}},
-			{Name: "only-ab", Binding: delivery.EvidenceBinding{Outputs: []string{"ab"}}},
+			{Name: "shared", Kind: "sbom", ManifestDigest: "manifest", BlobDigest: "blob", Binding: delivery.EvidenceBinding{Outputs: []string{"a", "ab"}, Stage: "build-output", SubjectKind: "file", SubjectDigest: "subject", Platform: "linux/arm64"}},
+			{Name: "only-ab", Kind: "sbom", Binding: delivery.EvidenceBinding{Outputs: []string{"ab"}}},
 		},
 	}
 	for _, selection := range []string{"", "a", "ab"} {
 		t.Run("selection="+selection, func(t *testing.T) {
-			display := releasePublicationDisplay(description, selection)
-			items := map[string]progress.Item{}
-			for _, item := range display.Items {
-				items[item.ID] = item
-			}
-			for _, item := range display.Items {
-				for _, dependency := range item.Dependencies {
-					target, found := items[dependency]
-					if !found || !slices.Contains(target.Dependencies, item.ID) {
-						t.Fatalf("nonreciprocal or invisible link: %s -> %s", item.ID, dependency)
-					}
+			browse := releasePublicationDisplay(description, selection)
+			exported := releaseview.Description{TotalOutputs: len(description.Outputs)}
+			for _, output := range description.Outputs {
+				if selection == "" || selection == output.Name {
+					exported.Outputs = append(exported.Outputs, releaseview.Output{Name: output.Name})
 				}
 			}
-			if selection != "ab" && !slices.Equal(items["output/a"].Dependencies, []string{"evidence/shared"}) {
-				t.Fatalf("a linked sibling evidence: %+v", items["output/a"])
+			for _, evidence := range description.Evidence {
+				if selection == "" || slices.Contains(evidence.Binding.Outputs, selection) {
+					exported.Evidence = append(exported.Evidence, releaseview.Evidence{Name: evidence.Name, Kind: evidence.Kind, ManifestDigest: evidence.ManifestDigest, BlobDigest: evidence.BlobDigest,
+						Binding: releaseview.EvidenceBinding{Outputs: evidence.Binding.Outputs, Stage: evidence.Binding.Stage, SubjectKind: evidence.Binding.SubjectKind, SubjectDigest: evidence.Binding.SubjectDigest, Platform: evidence.Binding.Platform}})
+				}
 			}
-			if selection == "a" {
-				if len(items) != 2 || !slices.Equal(items["evidence/shared"].Dependencies, []string{"output/a"}) {
-					t.Fatalf("selected evidence linked hidden output: %+v", items)
+			for _, display := range []commandDisplay{browse, releaseDescriptionDisplay(exported)} {
+				items := map[string]progress.Item{}
+				for _, item := range display.Items {
+					items[item.ID] = item
+				}
+				for _, item := range display.Items {
+					for _, dependency := range item.Dependencies {
+						target, found := items[dependency]
+						if !found || !slices.Contains(target.Dependencies, item.ID) {
+							t.Fatalf("%s: nonreciprocal or invisible link: %s -> %s", display.Title, item.ID, dependency)
+						}
+					}
+				}
+				if selection != "ab" && !slices.Equal(items["output/a"].Dependencies, []string{"evidence/shared"}) {
+					t.Fatalf("%s: a linked sibling evidence: %+v", display.Title, items["output/a"])
+				}
+				if selection == "a" {
+					if len(items) != 2 || !slices.Equal(items["evidence/shared"].Dependencies, []string{"output/a"}) {
+						t.Fatalf("%s: selected evidence linked hidden output: %+v", display.Title, items)
+					}
+				}
+				if !slices.Equal(items["evidence/shared"].Fields, browse.Items[len(exported.Outputs)].Fields) {
+					t.Fatalf("%s: browse/export evidence fields differ", display.Title)
 				}
 			}
 		})
+	}
+}
+
+func BenchmarkReleasePublicationProjection(b *testing.B) {
+	var description delivery.PublicationDescription
+	for index := 0; index < 64; index++ {
+		description.Outputs = append(description.Outputs, delivery.PublicationOutput{Output: lifecycle.Artifact{Name: strconv.Itoa(index), Kind: "image", OS: "linux", Arch: "arm64"}})
+	}
+	for index := 0; index < 256; index++ {
+		var outputs []string
+		for offset := 0; offset < 8; offset++ {
+			outputs = append(outputs, strconv.Itoa((index+offset)%len(description.Outputs)))
+		}
+		description.Evidence = append(description.Evidence, delivery.PublicationEvidence{Name: strconv.Itoa(index), Kind: "sbom", Binding: delivery.EvidenceBinding{Outputs: outputs, Stage: "build-output", Platform: "linux/arm64"}})
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		_ = releasePublicationDisplay(description, "")
 	}
 }
 

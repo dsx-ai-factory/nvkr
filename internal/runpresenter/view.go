@@ -89,36 +89,43 @@ func (v *View) update(snapshot progress.Snapshot) {
 	}
 	v.visible = nil
 	v.primaryCount = 0
-	outputs := snapshot.Outputs
 	if v.commandMode() {
-		// An Output-shaped private row keeps navigation shared; these rows
-		// are command item descriptions, never lifecycle output membership.
-		outputs = make([]progress.Output, 0, len(snapshot.Items))
 		v.commandItems = make(map[string]progress.Item, len(snapshot.Items))
 		for _, item := range snapshot.Items {
 			if item.Primary {
 				v.primaryCount++
 			}
 			v.commandItems[item.ID] = item
-			outputs = append(outputs, progress.Output{Name: item.ID, Kind: item.Kind, State: item.State, Stage: item.Name, Dependencies: item.Dependencies})
 		}
 	}
-	for _, output := range outputs {
+	query := strings.ToLower(v.query)
+	appendVisible := func(output progress.Output) {
 		_, _, failed := v.outputSummary(output)
 		active := output.State != "observed" && !failed
 		searchName := output.Name
 		if v.commandMode() {
 			if v.overview() && !v.commandItems[output.Name].Primary {
-				continue
+				return
 			}
 			searchName = output.Stage + " " + output.Name
 			active = output.State == "changed" || output.State == "added" || output.State == "removed"
 		}
 		if v.filter == 1 && !active || v.filter == 2 && !failed ||
-			!strings.Contains(strings.ToLower(searchName), strings.ToLower(v.query)) {
-			continue
+			query != "" && !strings.Contains(strings.ToLower(searchName), query) {
+			return
 		}
 		v.visible = append(v.visible, output)
+	}
+	if v.commandMode() {
+		// Output-shaped rows keep navigation shared without allocating a
+		// second table. They describe command items, never Run membership.
+		for _, item := range snapshot.Items {
+			appendVisible(progress.Output{Name: item.ID, Kind: item.Kind, State: item.State, Stage: item.Name, Dependencies: item.Dependencies})
+		}
+	} else {
+		for _, output := range snapshot.Outputs {
+			appendVisible(output)
+		}
 	}
 	slices.SortFunc(v.visible, func(a, b progress.Output) int {
 		if v.commandMode() {
@@ -793,7 +800,7 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 			}
 			view.SetBorder(true).SetBorderColor(border).SetTitle(" " + tview.Escape(title) + " ").SetTitleColor(palette.Accent)
 		}
-		var escaped []string
+		escaped := make([]string, 0, len(lines))
 		for _, line := range lines {
 			text := tview.Escape(line)
 			if !v.noColor {
@@ -816,10 +823,11 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 			}
 			escaped = append(escaped, text)
 		}
-		view.SetText(strings.Join(escaped, "\n"))
+		text := strings.Join(escaped, "\n")
+		view.SetText(text)
 		view.SetRect(x, y, w, h)
 		_, _, innerWidth, innerHeight := view.GetInnerRect()
-		wrapped := tview.WordWrap(strings.Join(escaped, "\n"), innerWidth)
+		wrapped := tview.WordWrap(text, innerWidth)
 		view.ScrollTo(min(max(0, scroll), max(0, len(wrapped)-innerHeight)), 0)
 		view.Draw(screen)
 		actual, _ := view.GetScrollOffset()
@@ -949,8 +957,11 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 	}
 	hintHeight := 0
 	var linkHint []string
+	var details []string
+	if v.focus == 1 && width >= 40 && height >= 12 && !v.help {
+		details = v.detailLines(now)
+	}
 	if v.focus == 1 && width >= 40 && height >= 12 && !v.confirmQuit && !v.searching && !v.help {
-		v.detailLines(now)
 		if len(v.links) > 0 {
 			ref := v.links[min(v.linkIndex, len(v.links)-1)]
 			linkHint = []string{fmt.Sprintf("Enter follows %d/%d: %s", v.linkIndex+1, len(v.links), safeText(v.linkName(ref)))}
@@ -1015,7 +1026,7 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 			v.rows = max(1, innerAvailable-3)
 		}
 		pane(v.outputLines(left-2), v.listTitle(), false, 0, contentTop, left, available, 0, false)
-		v.detailOffset = pane(v.detailLines(now), "Details · Enter follows, Esc back", true, right, contentTop, width-right, available, v.detailOffset, true)
+		v.detailOffset = pane(details, "Details · Enter follows, Esc back", true, right, contentTop, width-right, available, v.detailOffset, true)
 	} else {
 		v.rows = v.commandRowCapacity(innerAvailable)
 		if !v.commandMode() {
@@ -1025,7 +1036,7 @@ func (v *View) Draw(screen tcell.Screen, snapshot progress.Snapshot, now time.Ti
 		case 0:
 			pane(v.outputLines(width-2), v.listTitle(), true, 0, contentTop, width, available, 0, false)
 		case 1:
-			v.detailOffset = pane(v.detailLines(now), "Details · Enter follows, Esc back", true, 0, contentTop, width, available, v.detailOffset, true)
+			v.detailOffset = pane(details, "Details · Enter follows, Esc back", true, 0, contentTop, width, available, v.detailOffset, true)
 		case 2:
 			pane(v.activityLines(), "Activity · public descriptions", true, 0, contentTop, width, available, 0, true)
 		}

@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -37,15 +38,34 @@ func TestProgressProjectsIndexMembersWithoutSharedToolSiblingReuse(t *testing.T)
 			t.Fatalf("%s membership=%v want=%v", operation.ID, operation.Outputs, want[operation.ID])
 		}
 	}
+	wantOutputOperations := map[string][]string{
+		"images": {"amd64", "arm64", "assemble", "index", "tool"},
+		"cli":    {"assemble", "cli", "publish-cli", "tool"},
+	}
+	for _, output := range got.Outputs {
+		if !slices.Equal(output.Operations, wantOutputOperations[output.Name]) {
+			t.Fatalf("%s operations=%v want=%v", output.Name, output.Operations, wantOutputOperations[output.Name])
+		}
+		wantPlatform := "linux/amd64"
+		if output.Name == "images" {
+			wantPlatform = "aggregate"
+		}
+		if output.Platform != wantPlatform {
+			t.Fatalf("%s platform=%q want=%q", output.Name, output.Platform, wantPlatform)
+		}
+	}
+	slices.Reverse(plan.Graph.Nodes)
+	if reordered := projectProgress(plan, "attempt", "digest"); !reflect.DeepEqual(reordered, got) {
+		t.Fatal("graph iteration order changed the projected snapshot")
+	}
 	if got.Mode != "inspection" || got.Phase != "plan" || !got.StartedAt.IsZero() {
 		t.Fatalf("static Plan claimed execution: %+v", got)
 	}
 }
 
 func TestNewProgressValidatesPlanAndRetainsExactRows(t *testing.T) {
-	if _, err := NewProgress(nil, ""); err == nil {
-		t.Fatal("nil Plan accepted")
-	}
+	_, err := NewProgress(nil, "")
+	assertFactoryErrorCode(t, err, e.CodeUsage)
 	plan := githubTestPlan(t)
 	m, err := NewProgress(plan, "attempt")
 	if err != nil {
@@ -56,9 +76,8 @@ func TestNewProgressValidatesPlanAndRetainsExactRows(t *testing.T) {
 		t.Fatal("projection omitted admitted rows")
 	}
 	plan.SchemaVersion = "invalid"
-	if _, err := NewProgress(plan, "attempt"); err == nil {
-		t.Fatal("invalid Plan accepted")
-	}
+	_, err = NewProgress(plan, "attempt")
+	assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
 }
 
 func TestLocalProgressPreservesSchedulerResult(t *testing.T) {
@@ -99,4 +118,29 @@ func TestLocalProgressPreservesSchedulerResult(t *testing.T) {
 			}
 		})
 	}
+}
+
+func BenchmarkProgressCheckedInPlan(b *testing.B) {
+	plan, err := LoadPlanContext(b.Context(), "../../../.github/nvkr-run/plan.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+	digest, err := plan.Digest()
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Run("projection", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			_ = projectProgress(plan, "benchmark", digest)
+		}
+	})
+	b.Run("monitor", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			if _, err := NewProgress(plan, "benchmark"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }

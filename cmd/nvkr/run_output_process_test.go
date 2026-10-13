@@ -11,13 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/urfave/cli/v2"
@@ -51,26 +49,7 @@ func TestCLIClosedStdoutPreservesCheckedStatus(t *testing.T) {
 		return
 	}
 	lifecycleCommandRepo(t)
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "process-inspection")
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, err := canonical.Marshal(prepared.Description())
-	if err != nil {
-		t.Fatal(err)
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	root = filepath.Join(root, prepared.Description().Attempt)
-	if err := os.Mkdir(root, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	recordPath := filepath.Join(root, "lifecycle.json")
-	if err := os.WriteFile(recordPath, raw, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	_, recordPath, _ := runInspectionFixture(t, "process-inspection")
 	for _, test := range []struct {
 		name   string
 		code   e.Code
