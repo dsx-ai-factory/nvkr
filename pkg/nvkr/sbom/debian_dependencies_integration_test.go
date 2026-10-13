@@ -17,8 +17,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
-// TestRealDebianArtifactDependencies exercises final Debian archive identity
-// discovery through the ordinary scanner owner with independently pinned tools.
+// TestRealDebianArtifactDependencies exercises Debian control-metadata discovery
+// on controlled fixtures through the explicitly named diagnostic API.
 // It does not prove embedded application dependency coverage, installation,
 // signing or repository publication.
 func TestRealDebianArtifactDependencies(t *testing.T) {
@@ -68,12 +68,12 @@ func TestRealDebianArtifactDependencies(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("building real fixture package: %v, %s, %s", err, output.String(), diagnostic.String())
 			}
-			subject, err := heldfile.OpenContext(ctx, filename, heldfile.Options{Label: "final-Debian-test-subject", MaxBytes: 1 << 20})
+			subject, err := heldfile.OpenContext(ctx, filename, heldfile.Options{Label: "fixture-Debian-test-subject", MaxBytes: 1 << 20})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer subject.Close()
-			inventory, err := InspectDependencies(ctx, filename, subject.Digest(), "host-package", scanner)
+			inventory, err := InspectDebianArchiveMetadata(ctx, filename, subject.Digest(), scanner)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,32 +93,41 @@ func TestRealDebianArtifactDependencies(t *testing.T) {
 			// The same fixture bytes without the hint must not yield an
 			// accepted inventory under this selected Syft version.
 			unhinted := filepath.Join(t.TempDir(), "package")
-			copy, err := os.OpenFile(unhinted, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+			unhintedFile, err := os.OpenFile(unhinted, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, copyErr := subject.WriteToContext(ctx, copy)
-			closeErr := copy.Close()
+			_, copyErr := subject.WriteToContext(ctx, unhintedFile)
+			closeErr := unhintedFile.Close()
 			if copyErr != nil || closeErr != nil {
 				t.Fatalf("copying unhinted fixture: %v, %v", copyErr, closeErr)
 			}
 			_, err = InspectDependencies(ctx, unhinted, subject.Digest(), "host-package", scanner)
 			assertDependencyCode(t, err, e.CodeProvenanceMissing)
+			// Ordinary inspection remains filename-neutral, even for .deb.
+			_, err = InspectDependencies(ctx, filename, subject.Digest(), "host-package", scanner)
+			assertDependencyCode(t, err, e.CodeProvenanceMissing)
+			// Explicit diagnostics select their archive name independently of
+			// the caller's path; the same unhinted bytes retain package identity.
+			unhintedInventory, err := InspectDebianArchiveMetadata(ctx, unhinted, subject.Digest(), scanner)
+			if err != nil || unhintedInventory.Method != inventory.Method || len(unhintedInventory.Components) != 1 || unhintedInventory.Components[0].PURL != wantPURL {
+				t.Fatalf("unhinted diagnostic inventory: %+v, %v", unhintedInventory, err)
+			}
 			// These are pre-scan binding and original-fixture stability checks,
 			// not a separate observation of Syft's private snapshot.
-			_, err = InspectDependencies(ctx, filename, "sha256:"+strings.Repeat("0", 64), "host-package", scanner)
+			_, err = InspectDebianArchiveMetadata(ctx, filename, "sha256:"+strings.Repeat("0", 64), scanner)
 			assertDependencyCode(t, err, e.CodeVerifyFailed)
 			checked, err := heldfile.OpenContext(ctx, filename, heldfile.Options{
-				Label: "final-Debian-test-readback", MaxBytes: 1 << 20, ExpectedDigest: subject.Digest(),
+				Label: "fixture-Debian-test-readback", MaxBytes: 1 << 20, ExpectedDigest: subject.Digest(),
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer checked.Close()
 			if checked.Size() != subject.Size() {
-				t.Fatal("final Debian artifact size changed")
+				t.Fatal("Debian fixture size changed")
 			}
-			t.Logf("scanner=%s dpkg-deb=%s final-deb=%s bytes=%d package=%s", scanner.Digest, readerDigest, subject.Digest(), subject.Size(), wantPURL)
+			t.Logf("scanner=%s dpkg-deb=%s fixture-deb=%s bytes=%d package=%s method=%s ordinary-inspection=%s", scanner.Digest, readerDigest, subject.Digest(), subject.Size(), wantPURL, inventory.Method, e.CodeProvenanceMissing)
 		})
 	}
 	t.Run("non-archive bytes", func(t *testing.T) {
@@ -133,7 +142,7 @@ func TestRealDebianArtifactDependencies(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer subject.Close()
-		inventory, err := InspectDependencies(ctx, filename, subject.Digest(), "host-package", scanner)
+		inventory, err := InspectDebianArchiveMetadata(ctx, filename, subject.Digest(), scanner)
 		assertDependencyCode(t, err, e.CodeProvenanceMissing)
 		if len(inventory.Components) != 0 {
 			t.Fatal("filename hint accepted invalid package bytes")

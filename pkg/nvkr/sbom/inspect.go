@@ -70,6 +70,20 @@ func (receipt *DependencyScanReceipt) Inventory() DependencyInventory {
 // digest-pinned executable; it receives a held artifact descriptor and a minimal
 // environment. The workflow runs this node with networking disabled.
 func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind string, scanner Scanner) (DependencyInventory, error) {
+	return inspectPathDependencies(ctx, artifactPath, artifactDigest, kind, scanner, false)
+}
+
+// InspectDebianArchiveMetadata is a diagnostic API for package/control metadata,
+// not payload dependencies or target-platform verification. It selects a fixed
+// private archive snapshot name independent of the caller's filename. Its method
+// is rejected by dependency SBOM attachment and serialized BOM validation.
+func InspectDebianArchiveMetadata(ctx context.Context, artifactPath, artifactDigest string, scanner Scanner) (DependencyInventory, error) {
+	return inspectPathDependencies(ctx, artifactPath, artifactDigest, "host-package", scanner, true)
+}
+
+// inspectPathDependencies authenticates the exact path bytes and scanner before
+// dispatching either ordinary dependency inspection or explicit diagnostics.
+func inspectPathDependencies(ctx context.Context, artifactPath, artifactDigest, kind string, scanner Scanner, debianArchiveMetadata bool) (DependencyInventory, error) {
 	if ctx == nil {
 		return DependencyInventory{}, e.New(e.CodeUsage, "dependency inspection requires context")
 	}
@@ -100,14 +114,7 @@ func InspectDependencies(ctx context.Context, artifactPath, artifactDigest, kind
 	if subject.Digest() != artifactDigest {
 		return DependencyInventory{}, e.New(e.CodeVerifyFailed, "SBOM subject bytes differ from producer digest")
 	}
-	// Syft selects its Debian archive reader by extension. Keep only this
-	// discovery hint; the scanner still owns parsing the exact held bytes.
-	return inspectHeldDependencies(ctx, subject, kind, scanner, hasDebianArchiveHint(artifactPath))
-}
-
-// hasDebianArchiveHint selects discovery by filename, without validating format.
-func hasDebianArchiveHint(path string) bool {
-	return filepath.Ext(path) == ".deb"
+	return inspectHeldDependencies(ctx, subject, kind, scanner, debianArchiveMetadata)
 }
 
 // InspectHeldDependencies consumes the existing held capability without opening

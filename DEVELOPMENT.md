@@ -144,14 +144,19 @@ NVKR_SBOM_DEBIAN_INTEGRATION=1 \
 go test ./pkg/nvkr/sbom -run '^TestRealDebianArtifactDependencies$' -count=1 -v
 ```
 
-It builds controlled gzip/xz fixture packages and inspects them through the path-based API. It checks exact
-package metadata, same-byte scanning without a filename hint, pre-scan digest binding, original-fixture size
-stability, and rejection of non-archive bytes under a `.deb` hint. It does not test corrupted payload members.
-The metadata-only result is rejected by dependency SBOM attachment. No maintained output selects this path;
-this is not delivered-package inspection, payload dependency coverage, installation, signing or publication.
+It builds controlled gzip/xz fixture packages and inspects them through the separate
+`InspectDebianArchiveMetadata` diagnostic. That API always uses the fixed private snapshot name
+`subject.deb`, independent of the caller's filename. It checks exact package metadata, pre-scan digest binding,
+original-fixture size stability, and rejection of non-archive bytes. The same fixture bytes supplied to ordinary
+`InspectDependencies` receive no filename hint and must return `CodeProvenanceMissing`, with no accepted
+inventory, under the selected Syft version. It does not test corrupted payload members. The diagnostic method
+is rejected by dependency SBOM attachment and serialized BOM validation. Factory callers retain the ordinary
+dependency API; no maintained factory output invokes this separate diagnostic. This is not delivered-package
+inspection, payload dependency coverage, installation, signing or publication.
 See [the dependency SBOM reference](docs/dependency-sboms.md) and the
 [dated local fixture observation](docs/adr/reconciliation.md#external-run-references). Native amd64 execution
-has not been recorded. Rerun the opt-in regression on Syft pin changes.
+has not been recorded. Rerun the opt-in regression when changing either the factory catalog Syft pin or the
+Syft pin in `toolchains/nvkr-disk-inspect`; record which selected native executable was exercised.
 
 ## Repository layout
 

@@ -384,17 +384,20 @@ isolated. The report is projected into deterministic component names, versions a
 records, temporary paths, timestamps and scanner-generated IDs are excluded. Scanner executable identity is
 recorded separately. Unknown versions remain unknown; they are never filled from unrelated module tags.
 
-The path-based inspector API retains a literal `.deb` extension only as the constant private snapshot name
-`subject.deb`. This discovery behavior was exercised with Syft v1.51.1; rerun the opt-in regression when
-changing its pin. The caller's basename is not copied, and the extension supplies no format or identity proof.
-Syft parses a private read-only copy of the held bytes, rechecked against the digest after scanning. Other
-host files retain the generic snapshot name; the held-only API has no pathname hint, and OCI scanning is
-unaffected. The result uses the diagnostic method `syft-debian-archive-metadata/v1`, which dependency SBOM
-attachment and validation reject. Package/control metadata cannot become payload dependency evidence.
+The separate `InspectDebianArchiveMetadata` diagnostic always uses the constant private snapshot name
+`subject.deb`, independent of the caller's filename. The caller's basename is not copied, and the extension
+supplies no format or identity proof. Syft parses a private read-only copy of the held bytes, rechecked against
+the digest after scanning. Its result uses the diagnostic method `syft-debian-archive-metadata/v1`, which
+dependency SBOM attachment and serialized BOM validation reject. Package/control metadata cannot become
+payload dependency evidence. The ordinary path-based `InspectDependencies` and held-only
+`InspectHeldDependencies` APIs retain hint-free host-file scanning; OCI scanning is unaffected.
+The Syft v1.51.1 discovery premise is version-specific: rerun the opt-in regression when changing either
+the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
 
-No maintained output selects this inspector path. Factory SBOM nodes inspect producer bytes before APT
-wrapping, and the existing executable/APT routes do not preserve a source-created Debian package. This API
-does not admit such a delivery route. The authoritative Debian material reader remains digest-pinned
+Factory callers retain the ordinary dependency API; no maintained factory output invokes the separate
+Debian metadata diagnostic. Factory SBOM nodes inspect producer bytes before APT wrapping, and the existing
+executable/APT routes do not preserve a source-created Debian package. The diagnostic does not admit such
+a delivery route. The authoritative Debian material reader remains digest-pinned
 `dpkg-deb`, with platform checks and bounded payload expansion in the disk owner. A standalone Debian
 delivery format, declared-format propagation through path and held APIs, and payload coverage through that
 owner remain deferred. This diagnostic does not validate target architecture, preserve a source package,

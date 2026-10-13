@@ -280,8 +280,8 @@ func TestPinnedScannerProtocol(t *testing.T) {
 	}
 }
 
-// TestPinnedScannerDiscoveryHint verifies that only terminal lowercase .deb
-// paths select the fixed archive snapshot name, while byte checks still apply.
+// TestPinnedScannerDiscoveryHint distinguishes explicit metadata diagnostics
+// from ordinary dependency inspection, independent of the caller's filename.
 func TestPinnedScannerDiscoveryHint(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("held scanner execution is Linux-only")
@@ -289,16 +289,18 @@ func TestPinnedScannerDiscoveryHint(t *testing.T) {
 	const inventory = `{"bomFormat":"CycloneDX","specVersion":"1.5","components":[{"type":"library","name":"dependency","version":"1.0.0","purl":"pkg:generic/dependency@1.0.0"}]}`
 	for _, tc := range []struct {
 		name, filename, snapshot, kind string
-		held, mutate                   bool
+		held, mutate, metadata         bool
 	}{
-		{"generic binary", "tool", "subject", "host-package", false, false},
-		{"Debian archive", "source-package.deb", "subject.deb", "host-package", false, false},
-		{"uppercase is not a hint", "package.DEB", "subject", "host-package", false, false},
-		{"nonterminal extension", "package.deb.tmp", "subject", "host-package", false, false},
-		{"other extension", "package.rpm", "subject", "host-package", false, false},
-		{"held input has no filename hint", "package.deb", "subject", "host-package", true, false},
-		{"Debian snapshot mutation", "package.deb", "subject.deb", "host-package", false, true},
-		{"OCI path ignores Debian hint", "image.deb", "", "oci-image", false, false},
+		{"generic binary", "tool", "subject", "host-package", false, false, false},
+		{"ordinary Debian filename", "source-package.deb", "subject", "host-package", false, false, false},
+		{"Debian metadata diagnostic", "source-package.deb", "subject.deb", "host-package", false, false, true},
+		{"metadata diagnostic without extension", "package", "subject.deb", "host-package", false, false, true},
+		{"uppercase filename", "package.DEB", "subject", "host-package", false, false, false},
+		{"nonterminal extension", "package.deb.tmp", "subject", "host-package", false, false, false},
+		{"other extension", "package.rpm", "subject", "host-package", false, false, false},
+		{"held input has no filename hint", "package.deb", "subject", "host-package", true, false, false},
+		{"Debian snapshot mutation", "package.deb", "subject.deb", "host-package", false, true, true},
+		{"OCI path ignores Debian filename", "image.deb", "", "oci-image", false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -338,6 +340,8 @@ func TestPinnedScannerDiscoveryHint(t *testing.T) {
 						t.Fatalf("held scan binding = %s/%d/%s", observed, size, kind)
 					}
 				}
+			} else if tc.metadata {
+				inventory, err = InspectDebianArchiveMetadata(t.Context(), file, digest, scanner)
 			} else {
 				inventory, err = InspectDependencies(t.Context(), file, digest, tc.kind, scanner)
 			}
@@ -347,7 +351,7 @@ func TestPinnedScannerDiscoveryHint(t *testing.T) {
 				t.Fatal(err)
 			} else {
 				wantMethod := "syft-cyclonedx/v1"
-				if tc.snapshot == "subject.deb" {
+				if tc.metadata {
 					wantMethod = debianArchiveMetadataMethod
 				}
 				if inventory.Method != wantMethod {
@@ -358,24 +362,26 @@ func TestPinnedScannerDiscoveryHint(t *testing.T) {
 	}
 }
 
-// TestDebianArchiveHintPredicate checks filename selection on every platform.
-func TestDebianArchiveHintPredicate(t *testing.T) {
+// TestDebianMetadataAdmission checks capability inputs before file/scanner work.
+func TestDebianMetadataAdmission(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
 	for _, tc := range []struct {
-		path string
-		want bool
+		name    string
+		ctx     context.Context
+		digest  string
+		scanner Scanner
+		code    e.Code
 	}{
-		{"package.deb", true},
-		{"nested/source-package.deb", true},
-		{"package.DEB", false},
-		{"package.deb.tmp", false},
-		{"package.rpm", false},
-		{"package", false},
-		{"", false},
+		{"nil context", nil, "", Scanner{}, e.CodeUsage},
+		{"canceled context", ctx, "", Scanner{}, e.CodeTimeout},
+		{"missing subject digest", t.Context(), "", Scanner{}, e.CodeUnverifiedRef},
+		{"missing scanner pin", t.Context(), "sha256:" + strings.Repeat("a", 64), Scanner{Path: "missing-scanner"}, e.CodeProvenanceMissing},
+		{"missing scanner path", t.Context(), "sha256:" + strings.Repeat("a", 64), Scanner{Digest: "sha256:" + strings.Repeat("b", 64)}, e.CodeProvenanceMissing},
 	} {
-		t.Run(tc.path, func(t *testing.T) {
-			if got := hasDebianArchiveHint(tc.path); got != tc.want {
-				t.Fatalf("Debian archive hint = %t, want %t", got, tc.want)
-			}
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := InspectDebianArchiveMetadata(tc.ctx, "missing-subject", tc.digest, tc.scanner)
+			assertDependencyCode(t, err, tc.code)
 		})
 	}
 }
@@ -391,12 +397,33 @@ func TestDebianArchiveMetadataCannotBecomeDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := range bom.Metadata.Props {
-		if bom.Metadata.Props[i].Name == "nvkr:dependencyInspection" {
-			bom.Metadata.Props[i].Value = debianArchiveMetadataMethod
-		}
+	for _, tc := range []struct {
+		method, message string
+		code            e.Code
+	}{
+		{"", "dependency inventory omits its inspection method", e.CodeProvenanceMissing},
+		{debianArchiveMetadataMethod, "unsupported dependency inspection method", e.CodeUnsupported},
+		{"unknown/v1", "unsupported dependency inspection method", e.CodeUnsupported},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			candidate := cloneBOM(bom)
+			for i := range candidate.Metadata.Props {
+				if candidate.Metadata.Props[i].Name == "nvkr:dependencyInspection" {
+					if tc.method == "" {
+						candidate.Metadata.Props = slices.Delete(candidate.Metadata.Props, i, i+1)
+					} else {
+						candidate.Metadata.Props[i].Value = tc.method
+					}
+					break
+				}
+			}
+			err := candidate.Validate()
+			assertDependencyCode(t, err, tc.code)
+			if !strings.Contains(err.Error(), tc.message) || (tc.method != "" && !strings.Contains(err.Error(), tc.method)) {
+				t.Fatalf("method diagnostic = %v", err)
+			}
+		})
 	}
-	assertDependencyCode(t, bom.Validate(), e.CodeProvenanceMissing)
 }
 
 func assertDependencyCode(t *testing.T, err error, code e.Code) {

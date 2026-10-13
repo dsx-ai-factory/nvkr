@@ -10,9 +10,11 @@ payloads plus their producer records. The implementation is selected by artifact
 | OCI image export | Syft reads the final image filesystem | Installed OS packages and recognizable application dependencies |
 | Helm source archive | NVKR reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
 | Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
-| Debian archive inspector API diagnostic | Syft v1.51.1 discovers control metadata from a fixed private `.deb` snapshot name | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and validation; no maintained output selects this path |
+| Separate Debian archive metadata diagnostic | `InspectDebianArchiveMetadata` uses Syft v1.51.1 with the fixed private name `subject.deb`, independent of the caller's filename | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and serialized BOM validation; no maintained factory output invokes this diagnostic |
 
-The Debian filename hint supplies no format, target-architecture or payload-coverage authority. The existing
+Ordinary `InspectDependencies` and held-only `InspectHeldDependencies` retain hint-free host-file scanning;
+factory callers use those dependency APIs. The separate diagnostic's private `.deb` discovery hint supplies
+no format, target-architecture or payload-coverage authority. The existing
 digest-pinned `dpkg-deb` material reader owns authoritative Debian expansion and platform checks for disks.
 Standalone Debian delivery and declared-format propagation remain deferred; this diagnostic does not admit
 source-created packages through the executable/APT wrapper routes.
@@ -56,9 +58,11 @@ The opt-in `TestRealArtifactsThroughSBOMExecutor` test reads `NVKR_SBOM_ARTIFACT
 admission, real scanning, deterministic document validation and index digests for all three outputs. The
 scanner bytes must match the generated plan's executable pin. Run on Linux with networking disabled.
 
-The separate opt-in `TestRealDebianArtifactDependencies` exercises the inspector API on controlled gzip/xz
-fixtures, not a compiled factory output. [Development prerequisites](https://github.com/dsx-ai-factory/nvkr/blob/0f862f9f79de2beaf63dc994e3246b14e134b52c/DEVELOPMENT.md) identify its tool
-pins and command. Revalidate the discovery premise when changing the Syft pin. The
+The separate opt-in `TestRealDebianArtifactDependencies` exercises `InspectDebianArchiveMetadata` on controlled
+gzip/xz fixtures, not a compiled factory output. [Development prerequisites](https://github.com/dsx-ai-factory/nvkr/blob/main/DEVELOPMENT.md#opt-in-integration-checks)
+identify its tool pins and command. The same bytes scanned without the diagnostic's hint must return
+`CodeProvenanceMissing`, with no accepted inventory, under the selected Syft version. Revalidate the discovery
+premise when changing either the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`. The
 [dated local observation](https://github.com/dsx-ai-factory/nvkr/blob/0f862f9f79de2beaf63dc994e3246b14e134b52c/docs/adr/reconciliation.md#external-run-references) records native ARM64 tool and
 fixture identities; native amd64 execution has not been recorded. Non-archive bytes named `.deb` produce no
 accepted inventory; corrupt payload members and complete embedded dependency discovery are not established.

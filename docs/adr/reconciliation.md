@@ -58,7 +58,7 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
 | 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected unencrypted local execution; exact component/material bindings and acquisition-carrier retention | Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation, fused general wrapped-job phase isolation and embedded-version consistency remain closed |
 | 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
-| 13 Evidence | Exact offline binary/image dependency scanning, inspector API Debian archive metadata diagnostics and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | No maintained output selects the Debian metadata diagnostic; dependency SBOM attachment rejects its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
+| 13 Evidence | Exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Factory callers retain ordinary hint-free dependency inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; encrypted/object-store delivery is unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics | Qualified receipt/clearance assembly, release-specific trusted time, M3 qualification and M4 manifests/revocation remain unimplemented |
@@ -821,10 +821,35 @@ These native diagnostic measurements are separate from the factory's scanner pin
 Both fixtures yielded `pkg:deb/nvkr-debian-artifact-fixture@1.0.0?arch=arm64`. Pre-scan digest binding,
 original-fixture size stability, and non-archive bytes under a `.deb` hint were checked. This does not
 establish corrupt-payload rejection, complete embedded dependencies, source-created package delivery,
-signing, publication or installation. No maintained output selects this API path; native amd64 execution
-has not been recorded. The current diagnostic metadata method is rejected by dependency SBOM attachment
-and serialized BOM validation. The [opt-in regression](../../pkg/nvkr/sbom/debian_dependencies_integration_test.go)
-must be rerun when its selected Syft pin changes.
+signing, publication or installation. This historical revision exercised the filename-selected branch of
+`InspectDependencies`; it did not exercise the current separate `InspectDebianArchiveMetadata` API,
+the later diagnostic method, same-byte no-hint control or dependency BOM rejection guards.
+Native amd64 execution has not been recorded.
+
+On 2026-10-12, a separate local native Linux ARM64 run exercised the exact implementation at
+[source commit `8659cd28e5e615a8f490d0a302a419f329edc902`](https://github.com/dsx-ai-factory/nvkr/blob/8659cd28e5e615a8f490d0a302a419f329edc902/pkg/nvkr/sbom/debian_dependencies_integration_test.go).
+The Go 1.27.2 test executable was compiled before subsequent API edits. This run used the same Ubuntu image,
+Syft archive/executable and `dpkg-deb` executable identities, isolation flags and temporary-filesystem bound
+listed above, plus a read-only repository mount at `/workspace` with working directory
+`/workspace/pkg/nvkr/sbom` for catalog test fixtures. Both gzip/xz fixture digests, lengths and PURLs matched
+the earlier observation exactly.
+
+At this revision, filename-selected `InspectDependencies` returned `syft-debian-archive-metadata/v1`,
+with component type `library`, for both controlled packages. The same archive bytes scanned without the hint
+returned `CodeProvenanceMissing` and no accepted inventory. Actual fixture results were rejected by
+`WithDependencies` with `CodeUnsupported`. The separate
+[serialized BOM guard test](https://github.com/dsx-ai-factory/nvkr/blob/8659cd28e5e615a8f490d0a302a419f329edc902/pkg/nvkr/sbom/dependencies_test.go)
+rejected an injected diagnostic method with the then-current `CodeProvenanceMissing`; that test used a
+controlled component rather than the real scanner result. Scanner protocol, OCI isolation, filename-predicate
+and snapshot-mutation contract tests also passed in that runtime. Non-archive bytes were rejected.
+This observation does not exercise the subsequent separate `InspectDebianArchiveMetadata` API or establish
+corrupt-payload rejection, complete payload dependencies, source-created package delivery, signing,
+publication or installation. Native amd64 execution remains unrecorded.
+
+Current contract tests separately assert rejection of `syft-debian-archive-metadata/v1` by dependency SBOM
+attachment and serialized BOM validation. These tests do not retroactively strengthen the dated observation
+above. The [opt-in regression](../../pkg/nvkr/sbom/debian_dependencies_integration_test.go) must be rerun when
+changing either the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
 
 ## Remaining decisions
 
