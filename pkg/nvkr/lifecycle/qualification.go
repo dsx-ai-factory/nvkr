@@ -6,6 +6,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"sort"
 	"sync"
@@ -242,6 +243,12 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		}
 		return nil // Every evidence slot receives its own verification attempt.
 	})
+	if evidenceErr != nil {
+		// A traversal failure leaves complete-set coverage unproved, including
+		// outputs with no slot-specific verification failure. Preserve its code
+		// and cause while distinguishing its scope in every affected diagnostic.
+		evidenceErr = fmt.Errorf("incomplete evidence traversal for the complete publication: %w", evidenceErr)
+	}
 	for _, output := range publication.Outputs {
 		checks := []ArtifactCheckResult{{Name: "schema-and-membership", Status: "pass"}}
 		outputEvidenceErr := errors.Join(append(evidenceFailures[output.Name], evidenceErr)...)

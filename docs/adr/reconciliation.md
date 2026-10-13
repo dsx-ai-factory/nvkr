@@ -65,6 +65,9 @@ completed successful Run attempt, exact commit, repository, expected workflow an
 the candidate's supplied source fields are only expectations. The command returns diagnostics, not a
 serialized signing capability. Contract fixtures cover source refusal/receipt lifetime, candidate decoding,
 Plan/provenance substitution and per-output evidence failures; they do not establish provider acceptance.
+Additional contracts cover the embedded check's 1,024-selected-producer boundary, exact signer admission
+under literal substring policies, and canceled evidence traversal with retained slot-specific errors and
+complete-set refusal. Traversal failures are explicitly labeled in each output's evidence diagnostic.
 
 All root/output production predicates must name the exact authenticated source attempt. If output metadata
 carries publication origin, its preparation and signing invocations must both match. Earlier-attempt output
