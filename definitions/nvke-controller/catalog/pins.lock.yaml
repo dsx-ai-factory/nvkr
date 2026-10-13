@@ -70,6 +70,11 @@ pins:
     sourceDateEpoch: 1790728711
     tag: v0.21.0
     treeHash: 3e974db934ea90aba2f4d36e437872a31b39bdf6
+  nvke-cli:
+    commit: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    sourceDateEpoch: 1790728711
+    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    treeHash: 3e974db934ea90aba2f4d36e437872a31b39bdf6
   nvke-helm:
     commit: 33fb71b2f4224b470ebc628a9165fc4b92870406
     sourceDateEpoch: 1790728711

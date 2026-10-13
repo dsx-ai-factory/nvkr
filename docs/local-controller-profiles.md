@@ -62,3 +62,18 @@ image's init copy command reproduced the staged profiles and runbooks exactly.
 This tests image construction, transport and file copying, not a completed NVKR
 Run or Kubernetes init container. Those integrated checks and a fresh tenant
 deployment remain unverified; the older data-bundle recording does not prove them.
+
+## Dual-platform fixture image
+
+The [controller profiles Definition](../definitions/nvke-controller/definition-profiles.yaml)
+packages the pinned NVKE test fixtures for both Linux AMD64 and ARM64,
+with native image members collected into one OCI index. The
+[deploy Definition](../definitions/nvke-deploy/definition.yaml) selects this image
+alongside the controller and charts. It preserves the upstream fixture profiles,
+including placeholder deployment URLs; it is not a fleet profile configuration.
+The local Ubuntu 26.04 diagnostic profile remains ARM64-only.
+
+[Image producer contracts](../pkg/nvkr/factory/nvke_profiles_image_test.go)
+compile both native fixture image producers and bind the exact source patches.
+These tests establish catalog and packaging declarations, not a completed NVKR
+build, deployed chart, boot, or offline-install acceptance.
