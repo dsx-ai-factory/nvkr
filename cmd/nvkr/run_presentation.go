@@ -34,12 +34,16 @@ type runPresentationServices struct {
 	show     func(context.Context, runpresenter.Options, runSnapshotSource, func(context.Context) error) runpresenter.Result
 }
 
+// defaultRunPresentationServices binds terminal admission and session ownership
+// to the presenter; tests can replace both without opening the controlling TTY.
 func defaultRunPresentationServices() runPresentationServices {
 	return runPresentationServices{eligible: runpresenter.Eligible, show: func(ctx context.Context, options runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
 		return runpresenter.Run(ctx, options, source, work)
 	}}
 }
 
+// commandOutput respects an injected application writer before using stdout.
+// Terminal admission checks this exact writer to preserve redirected output.
 func commandOutput(c *cli.Context) io.Writer {
 	if c.App.Writer != nil {
 		return c.App.Writer
@@ -58,6 +62,9 @@ func checkedOutputSignals() func() {
 	return func() { signal.Reset(syscall.SIGPIPE) }
 }
 
+// selectRunPresentationWithEligibility rejects conflicting modes before work.
+// Auto selects a TUI only for live, unstructured output on an admitted terminal;
+// an explicit TUI request fails closed when the terminal is unavailable.
 func selectRunPresentationWithEligibility(c *cli.Context, live bool, eligibleTerminal func(io.Writer) bool) (runPresentation, error) {
 	mode := c.String("ui")
 	if mode == "" {
@@ -78,10 +85,17 @@ func selectRunPresentationWithEligibility(c *cli.Context, live bool, eligibleTer
 		json: c.Bool("json"), noColor: c.Bool("no-color") || os.Getenv("NO_COLOR") != ""}, nil
 }
 
+// runLocalCommand presents local execution through the real terminal services.
+// The injected executor retains ownership of the Run and its coded outcome.
 func runLocalCommand(c *cli.Context, execute localLifecycleExecutor) error {
 	return runLocalCommandWithServices(c, execute, defaultRunPresentationServices())
 }
 
+// runLocalCommandWithServices prepares and delegates a local Run without making
+// presentation state authoritative. The session must restore the terminal and
+// join work before returning; only then are captured producer bytes replayed on
+// failure. Plain and JSON modes keep their existing stream routing, and reporting
+// failures preserve the owning code and any retained complete Run.
 func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor, services runPresentationServices) error {
 	view, err := selectRunPresentationWithEligibility(c, !c.Bool("dry-run"), services.eligible)
 	if err != nil {
@@ -180,6 +194,9 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 	return err
 }
 
+// finishLocalPresentation projects the returned Run into descriptive progress.
+// A retained complete Run with a cleanup failure stays complete; dry runs never
+// claim a durable record, and an absent result is reported as unavailable.
 func finishLocalPresentation(monitor *progress.Monitor, result *lifecycle.Run, err error, dryRun bool) {
 	if result == nil {
 		monitor.Finish("unavailable", "", nil, string(runErrorCode(err)), false, false)
@@ -192,6 +209,8 @@ func finishLocalPresentation(monitor *progress.Monitor, result *lifecycle.Run, e
 	monitor.Finish(result.Status, result.Lane, observed, string(runErrorCode(err)), !dryRun, result.Status == lifecycle.RunComplete && err != nil)
 }
 
+// printSafeLocalFailure writes only identity, observed counts, and a known code.
+// Raw producer bytes and error text belong to separate private diagnostic replay.
 func printSafeLocalFailure(c *cli.Context, prepared *lifecycle.PreparedRun, run *lifecycle.Run, err error) error {
 	status, observed := "unavailable", 0
 	if run != nil {
@@ -206,6 +225,8 @@ func printSafeLocalFailure(c *cli.Context, prepared *lifecycle.PreparedRun, run 
 	return checkedRunWrite(commandOutput(c), []byte(message))
 }
 
+// runErrorCode exposes a registered owner code, maps unknown errors to internal,
+// and leaves successful outcomes empty instead of inventing a failure code.
 func runErrorCode(err error) e.Code {
 	if err == nil {
 		return ""
@@ -221,7 +242,7 @@ func runErrorCode(err error) e.Code {
 	return e.CodeInternal
 }
 
-// The owning failure remains first and retains its exact coded status and cause.
+// preserveRunError keeps the owning failure first with its coded status and cause.
 // A reporting failure cannot turn a retained successful Run into a failed Run.
 func preserveRunError(owner, reporting error) error {
 	if owner == nil {
@@ -233,6 +254,8 @@ func preserveRunError(owner, reporting error) error {
 	return e.Wrap(runErrorCode(owner), errors.Join(owner, reporting), "Run reporting also failed")
 }
 
+// checkedRunWrite turns failed and short writes into coded reporting errors.
+// Callers combine them with the owner outcome through preserveRunError.
 func checkedRunWrite(out io.Writer, raw []byte) error {
 	n, err := out.Write(raw)
 	if err == nil && n != len(raw) {
@@ -244,6 +267,8 @@ func checkedRunWrite(out io.Writer, raw []byte) error {
 	return nil
 }
 
+// printLocalRunResult reports the returned Run and owner-derived disk paths.
+// Dry-run output omits paths to records and payloads that were never retained.
 func printLocalRunResult(c *cli.Context, result *lifecycle.Run) error {
 	if result == nil {
 		return e.New(e.CodeInternal, "local execution returned no Run result")

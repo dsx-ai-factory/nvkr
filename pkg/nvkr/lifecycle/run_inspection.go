@@ -45,7 +45,9 @@ type InspectedRunOutput struct {
 	Digest string `json:"digest,omitempty"`
 }
 
-// Snapshot adapts inspected metadata to the shared descriptive presenter.
+// Snapshot builds detached recorded-mode presentation state, preserving recorded
+// output digests as metadata. It creates no live clock or operation history and
+// does not check whether the recorded payloads are currently available.
 func (view RunInspection) Snapshot() progress.Snapshot {
 	phase := "recorded"
 	if view.Interrupted {
@@ -64,9 +66,13 @@ func (view RunInspection) Snapshot() progress.Snapshot {
 }
 
 // InspectRun snapshots canonical lifecycle.json and the sibling attempt marker
-// through held descriptors. It never opens output locators or modifies storage.
-// A missing record in an existing attempt reports an interrupted description,
-// rather than inventing a failed Run or restoring a resumable attempt.
+// through held descriptors without following symlinks in any path component.
+// The bounded regular record must have exact canonical bytes and valid frozen
+// output bindings. Returned fields omit raw failure messages and output locators;
+// inspection never opens payloads or modifies the attempt's storage.
+// A missing record in an existing directory reports an interrupted description,
+// not a failed or resumable Run. Marker presence conservatively describes cleanup
+// metadata; neither it nor a recorded digest authenticates current output bytes.
 func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 	if ctx == nil {
 		return RunInspection{}, e.New(e.CodeUsage, "Run inspection requires a context")
@@ -159,6 +165,8 @@ func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 	return view, nil
 }
 
+// openRunInspectionDirectory walks from the filesystem root using no-follow
+// directory descriptors. The caller owns the returned descriptor and must close it.
 func openRunInspectionDirectory(ctx context.Context, path string) (*os.File, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
@@ -186,6 +194,8 @@ func openRunInspectionDirectory(ctx context.Context, path string) (*os.File, err
 	return root, nil
 }
 
+// runInspectionReadError preserves cancellation classification while mapping
+// other bounded-read failures to the record-verification boundary.
 func runInspectionReadError(ctx context.Context, cause error) error {
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "Run inspection canceled")
@@ -193,6 +203,9 @@ func runInspectionReadError(ctx context.Context, cause error) error {
 	return e.Wrap(e.CodeVerifyFailed, cause, "reading bounded Run metadata")
 }
 
+// validateInspectedRun checks only recorded descriptions: known vocabularies,
+// frozen output bindings, and any declared content identity. It reuses the owning
+// slot join instead of treating a canonical document as payload authentication.
 func validateInspectedRun(run *Run) error {
 	if err := validateRun(run); err != nil {
 		return e.New(e.CodeVerifyFailed, "Run record has an invalid frozen description")

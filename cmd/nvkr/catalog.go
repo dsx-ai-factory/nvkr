@@ -309,9 +309,10 @@ func catalogComponentsDisplay(loaded *catalog.Catalog, title string) commandDisp
 	return display
 }
 
+// catalogUpdateState distinguishes check-only proposals from confirmed writes.
+// Any failure other than the owner's check-mode diff leaves writes unconfirmed.
 func catalogUpdateState(check, changed bool, ownerErr error) string {
-	var coded *e.Error
-	if ownerErr != nil && !(check && errors.As(ownerErr, &coded) && coded.Code == e.CodeDiff) {
+	if ownerErr != nil && !(check && runErrorCode(ownerErr) == e.CodeDiff) {
 		return "resolution description; write outcome unconfirmed"
 	}
 	if !changed {

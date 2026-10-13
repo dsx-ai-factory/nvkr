@@ -254,9 +254,13 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 	}
 }
 
+// canceled maps presentation cancellation to the public timeout code while
+// retaining its cause for callers that distinguish cancellation from deadlines.
 func canceled(err error) error {
 	return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "Run presentation canceled")
 }
+
+// terminalError reports a static terminal failure without exposing raw I/O text.
 func terminalError(message string) error {
 	return nvkrerr.New(nvkrerr.CodePreflightFailed, "%s", message)
 }
@@ -273,6 +277,8 @@ type checkedTTY struct {
 	initialState *term.State
 }
 
+// record latches the first terminal failure and cancels the session owner.
+// The sanitized failure remains available after terminal restoration and join.
 func (t *checkedTTY) record(err error) {
 	if err != nil {
 		t.mu.Lock()
@@ -283,7 +289,12 @@ func (t *checkedTTY) record(err error) {
 		t.mu.Unlock()
 	}
 }
+
+// failure returns the latched error under the same lock used by terminal writers.
 func (t *checkedTTY) failure() error { t.mu.Lock(); defer t.mu.Unlock(); return t.err }
+
+// restoreFlags restores the admitted stdin file flags after tcell's drain work.
+// Injected TTYs can disable restoration when no real descriptor was admitted.
 func (t *checkedTTY) restoreFlags() error {
 	if !t.restore {
 		return nil
@@ -291,6 +302,9 @@ func (t *checkedTTY) restoreFlags() error {
 	_, err := unix.FcntlInt(uintptr(t.fd), unix.F_SETFL, t.flags)
 	return err
 }
+
+// Write restores shared descriptor flags before writing and records short writes.
+// It leaves termios alone while the session still owns raw terminal input.
 func (t *checkedTTY) Write(data []byte) (int, error) {
 	if err := t.restoreFlags(); err != nil {
 		t.record(err)
@@ -303,11 +317,17 @@ func (t *checkedTTY) Write(data []byte) (int, error) {
 	t.record(err)
 	return n, err
 }
+
+// Stop retains both the terminal stop failure and descriptor restoration failure.
 func (t *checkedTTY) Stop() error {
 	err := errors.Join(t.Tty.Stop(), t.restoreFlags())
 	t.record(err)
 	return err
 }
+
+// Close restores descriptor flags and the original cooked state after tcell has
+// joined its readers, retaining cleanup failures for the session result. Darwin
+// additionally settles pending-input bookkeeping without consuming user input.
 func (t *checkedTTY) Close() error {
 	err := errors.Join(t.Tty.Close(), t.restoreFlags())
 	// tcell joins its readers before Close. Restore the original cooked state

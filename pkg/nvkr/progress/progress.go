@@ -13,8 +13,13 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
+// MaxActivity bounds retained public activity, independently of the complete
+// admitted output and operation tables. Eviction does not shrink membership.
 const MaxActivity = 128
 
+// Snapshot is descriptive presentation state. Owners must project safe labels
+// before constructing it; this package does not sanitize arbitrary caller text
+// or authenticate the represented Run, output bytes, or command result.
 type Snapshot struct {
 	Attempt, PlanDigest, Mode, Phase, Lane, Status, FailureCode string
 	StartedAt                                                   time.Time
@@ -29,6 +34,8 @@ type Snapshot struct {
 	Items       []Item
 }
 
+// Field is an owner-projected public label/value pair, excluding raw diagnostics
+// and private transport or filesystem locations.
 type Field struct{ Label, Value string }
 
 // Item describes one result entry. ID is only a navigation key; neither it nor
@@ -42,6 +49,8 @@ type Item struct {
 	Dependencies []string
 }
 
+// Output tracks one frozen named output independently of its producer operations.
+// An observed state describes an owning update, not a payload-verification receipt.
 type Output struct {
 	Name, Kind, Platform, State, Stage string
 	// RecordedDigest describes an inspected record, never current payload proof.
@@ -50,12 +59,16 @@ type Output struct {
 	UpdatedAt                time.Time
 }
 
+// Operation describes an admitted graph node and its exact navigation links.
+// Producer completion alone cannot satisfy lifecycle output observation.
 type Operation struct {
 	ID, Kind, State, Code string
 	Outputs, Dependencies []string
 	StartedAt, UpdatedAt  time.Time
 }
 
+// Activity is a sequenced, closed public summary, never raw console bytes. Its
+// timestamp and presence do not establish successful or healthy execution.
 type Activity struct {
 	Sequence uint64
 	At       time.Time
@@ -79,6 +92,7 @@ type Monitor struct {
 
 // New owns a defensive copy of an already projected description. The caller
 // remains responsible for deriving labels from its admitted owning boundary.
+// Its activity ring starts empty; only monitor updates populate that history.
 // Descriptions, including a caller-created monitor, grant no authority.
 func New(initial Snapshot) *Monitor {
 	m := &Monitor{state: clone(initial), operations: make(map[string]int),
@@ -93,6 +107,9 @@ func New(initial Snapshot) *Monitor {
 	return m
 }
 
+// Snapshot returns detached state, including nested field and navigation slices.
+// Readers may mutate their copy without changing the monitor or other readers;
+// a nil monitor returns an empty description.
 func (m *Monitor) Snapshot() Snapshot {
 	if m == nil {
 		return Snapshot{}
@@ -103,7 +120,8 @@ func (m *Monitor) Snapshot() Snapshot {
 }
 
 // Updates is a best-effort wakeup, not an event or final-result channel. It is
-// never closed, avoiding races with late producer updates; the session owns stop.
+// coalesced and never closed, avoiding races with late producer updates. Readers
+// obtain current state through Snapshot; the session owns stop and joining.
 func (m *Monitor) Updates() <-chan struct{} {
 	if m == nil {
 		return nil
@@ -112,6 +130,7 @@ func (m *Monitor) Updates() <-chan struct{} {
 }
 
 // Matches checks a descriptive binding without inspecting or admitting a Plan.
+// An empty attempt checks only the digest; a nil monitor never matches.
 func (m *Monitor) Matches(attempt, digest string) bool {
 	if m == nil {
 		return false
@@ -138,6 +157,8 @@ func (m *Monitor) activity(text string, at time.Time) {
 	m.state.Activity = append(m.state.Activity, Activity{Sequence: m.sequence, At: at, Text: text})
 }
 
+// Start timestamps the first local or dry-run admission description. Repeated
+// starts, unknown modes, and updates after Finish are ignored; no work is admitted.
 func (m *Monitor) Start(mode string) {
 	if m == nil {
 		return
@@ -156,6 +177,8 @@ func (m *Monitor) Start(mode string) {
 	m.notify()
 }
 
+// SetPhase records a known owner-reported phase. Unknown phases are ignored and
+// phase changes neither start operations nor establish their completion.
 func (m *Monitor) SetPhase(phase string) {
 	if m == nil {
 		return
@@ -174,6 +197,9 @@ func (m *Monitor) SetPhase(phase string) {
 	m.notify()
 }
 
+// SetOperation updates an existing node using closed state and error vocabularies.
+// Terminal states are retained, unknown IDs count as dropped updates, and no
+// update can add graph membership or mark a required output observed.
 func (m *Monitor) SetOperation(id, state, code string) {
 	if m == nil {
 		return
@@ -220,6 +246,9 @@ func (m *Monitor) SetOperation(id, state, code string) {
 	m.notify()
 }
 
+// SetOutput records a known observation state/stage for a frozen named output.
+// Unknown names count as dropped updates; unknown states/stages are ignored.
+// Observations remain provisional until Finish reconciles retained membership.
 func (m *Monitor) SetOutput(name, state, stage string) {
 	if m == nil {
 		return
@@ -256,7 +285,9 @@ func (m *Monitor) SetOutput(name, state, stage string) {
 
 // Finish reconciles latest observations from the actual returned Run and error.
 // It is independent of wakeup delivery. A complete retained Run and a nonempty
-// error code may coexist, including an incomplete disk commit cleanup.
+// error code may coexist, including an incomplete disk commit cleanup. The first
+// final reconciliation wins and suppresses later telemetry; callers must already
+// have joined their operations. These inputs remain descriptions, not receipts.
 func (m *Monitor) Finish(status, lane string, observed []string, code string, recordAvailable, cleanupIncomplete bool) {
 	if m == nil {
 		return
@@ -321,6 +352,7 @@ func safeCode(code string) string {
 	return string(e.CodeInternal)
 }
 
+// clone detaches every nested collection used by presentation and navigation.
 func clone(source Snapshot) Snapshot {
 	result := source
 	result.Fields = slices.Clone(source.Fields)
