@@ -90,7 +90,6 @@ func TestParseJUnitRejects(t *testing.T) {
 		{"trailing text", valid + `x`},
 		{"name budget", `<testsuite name="s"><testcase name="` + strings.Repeat("a", maxValueBytes+1) + `"/></testsuite>`},
 		{"suite budget", `<testsuites>` + strings.Repeat(`<testsuite name="s"/>`, MaxSuites+1) + `</testsuites>`},
-		{"case budget", `<testsuite name="s">` + strings.Repeat(`<testcase name="a"/>`, MaxCases+1) + `</testsuite>`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -13,11 +13,12 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
 const SchemaVersion = "nvkr.dev/test-observation/v1"
-const PredicateType = "https://nvkr.dev/test-observation/v1"
+const PredicateType = sign.TestObservationPredicateType
 const ObservationFileName = "observation.json"
 const MaxObservationBytes = 1 << 20
 
@@ -110,7 +111,16 @@ func caseKey(c CaseID) string                  { return c.Suite + "\x00" + c.Cla
 func subjectKey(s Subject) string              { return s.Output + "\x00" + s.Platform }
 func factKey(f Fact) string                    { return f.Phase + "\x00" + f.Name }
 
+func normalizeEmpty(o *Observation) {
+	if o.Suite.RequiredCases == nil {
+		o.Suite.RequiredCases = []CaseID{}
+	}
+	if o.Files == nil {
+		o.Files = []File{}
+	}
+}
 func normalize(o *Observation) {
+	normalizeEmpty(o)
 	slices.SortFunc(o.Subjects, func(a, b Subject) int { return strings.Compare(subjectKey(a), subjectKey(b)) })
 	slices.Sort(o.Suite.Selection)
 	slices.SortFunc(o.Suite.RequiredCases, func(a, b CaseID) int { return strings.Compare(caseKey(a), caseKey(b)) })
@@ -118,6 +128,9 @@ func normalize(o *Observation) {
 	slices.SortFunc(o.Files, func(a, b File) int { return strings.Compare(a.Name, b.Name) })
 }
 func validate(o Observation, inventory bool) error {
+	if inventory && (o.Suite.RequiredCases == nil || o.Files == nil) {
+		return invalid("empty requiredCases and files must use arrays, not null")
+	}
 	if o.SchemaVersion != SchemaVersion {
 		return invalid("unsupported test observation schema %q", o.SchemaVersion)
 	}
@@ -245,6 +258,8 @@ func Decode(raw []byte) (Observation, error) {
 	return o, nil
 }
 func (o Observation) Canonical() ([]byte, error) {
+	o = clone(o)
+	normalizeEmpty(&o)
 	if err := validate(o, true); err != nil {
 		return nil, err
 	}
@@ -258,6 +273,8 @@ func (o Observation) Canonical() ([]byte, error) {
 	return raw, nil
 }
 func (o Observation) Digest() (string, error) {
+	o = clone(o)
+	normalizeEmpty(&o)
 	if err := validate(o, true); err != nil {
 		return "", err
 	}
@@ -276,6 +293,8 @@ func (expected Expected) Validate() error {
 	return validate(o, false)
 }
 func (expected Expected) Check(o Observation) error {
+	o = clone(o)
+	normalizeEmpty(&o)
 	if err := expected.Validate(); err != nil {
 		return err
 	}

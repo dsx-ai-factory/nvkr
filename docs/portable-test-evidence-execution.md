@@ -4,13 +4,13 @@ Portable observations bind exact input and tested output identities, independent
 policy and required cases, invocation, public environment facts, execution and cleanup outcomes,
 and an inventory of original approved result files. Authentication proves the selected attester's
 recorded claim. It does not establish physical hardware, installed deployment bytes or current health.
-The implementation follows the plan in `docs/session-plans-2026-10-12/11-portable-test-evidence-on-pr143.md`
-in the primary checkout; [reconciliation](adr/reconciliation.md) owns current support and evidence.
+[Reconciliation](adr/reconciliation.md) owns current support and evidence.
 
 ## Emit and inspect locally
 
 Prepare a canonical `testobservation.Observation` description with schema
-`nvkr.dev/test-observation/v1`, an empty `files` inventory and zero `summary`. Each input, subject,
+`nvkr.dev/test-observation/v1`, an empty `files: []` inventory and zero `summary`. Required-case lists and inventories
+use arrays, including `[]` for an empty list; wire `null` is rejected. Each input, subject,
 suite revision, image digest, selection, required-case list and policy digest comes from its owning
 source or explicitly reviewed test policy. Unknown cluster origin stays `unknown`; a caller-supplied
 Run is a declaration until independently authenticated. Site/tenant/local/unknown role and environment facts retain
@@ -21,7 +21,9 @@ Prepare a canonical array of `FileInput` records with `name`, `role` and indepen
 original private logs and kubeconfig remain private. The emitter does not redact files or assess
 whether their contents are safe to publish. Initial supported result format is bounded JUnit XML.
 Its tokenizer uses Go's standard library; result projection preserves failure/error/skip semantics,
-rejects ambiguous or contradictory counts and retains original bytes.
+rejects ambiguous or contradictory counts and retains original bytes. Ginkgo suite setup/cleanup
+entries contribute to raw counts but never satisfy required test-case coverage. Ordinary duplicate
+test identities remain errors; bounded failure diagnostics may exceed the identity-field limit.
 
 ```sh
 nvkr evidence emit --root public-results --description observation-description.json \
@@ -34,6 +36,8 @@ Existing output is never overwritten. `observation.json` covers members beneath 
 The independent `Expected` document selects observation digest, input identities, tested subjects
 and complete suite policy. It must be supplied independently of an untrusted locator or bundle.
 Unsigned verification reports self-consistency and recorded case outcomes only, even when cases pass.
+The JSON field `recordedRequiredCasesPassed` describes historical outcomes;
+`signerAuthenticated` is a separate claim and unsigned checks leave it false.
 
 Explicit failed, canceled, infrastructure-error, unknown and not-run observations remain visible.
 A completed empty suite, skipped required case, failed result or unsuccessful cleanup cannot pass.
@@ -49,7 +53,8 @@ interoperability tests do not supply a production public-key fallback.
 ```sh
 nvkr evidence publish --root observation-bundle --repository registry.example/evidence/recipe \
   --cosign /approved/cosign --cosign-digest "$COSIGN_DIGEST" \
-  --identity "$TEST_IDENTITY" --issuer "$OIDC_ISSUER"
+  --identity "$TEST_IDENTITY" --issuer "$OIDC_ISSUER" --anonymous > publication.json
+jq --sort-keys --compact-output --join-output .locator publication.json > reviewed-locator.json
 nvkr evidence verify --locator reviewed-locator.json --expected independent-expectations.json \
   --cosign /approved/cosign --cosign-digest "$COSIGN_DIGEST" \
   --identity "$TEST_IDENTITY" --issuer "$OIDC_ISSUER" --anonymous --json
@@ -60,19 +65,28 @@ selected policy inputs. No public destination is configured by this feature. Obs
 explicit `--anonymous` or complete host-scoped credentials through `NVKR_REGISTRY`, `NVKR_REGISTRY_USER`
 and `NVKR_REGISTRY_PASSWORD`. Anonymous mode ignores these environment credentials. Ambient Docker
 keychains and credential helpers are never consulted, because their resolution does not honor request
-cancellation. Cosign uses only an explicit private credential configuration, empty in anonymous mode.
+cancellation. Cosign creates and verifies a standard Sigstore bundle without registry access or registry credentials.
+The observation owner uploads and retrieves its standard OCI referrer through guarded ORAS transport.
 Publication uploads exact
 content, attaches the fixed observation predicate and independently verifies the served content before
 reporting success. Partial effects retain a locator and `successful: false`; they confer no authority.
 Publication can record a failed test without issuing passing qualification.
 
+Publication JSON is a result wrapper containing `locator` and `successful`; it is not itself
+a locator. Extract its locator as shown above. The locator consists of simple ASCII schema,
+digest and registry-coordinate strings, so sorted compact JSON without a trailing newline
+preserves its canonical encoding. A partial result has `successful: false`; its coordinates
+allow inspection of partial effects and do not imply successful publication.
+
 The locator contains schema, pinned OCI reference and semantic observation digest. The OCI manifest
 transport digest, canonical observation identity and signature bytes have distinct roles. Verification
 by locator or `--reference repository@sha256:...` authenticates signer, issuer and statement subject,
 checks the exact schema/inventory and every file, and recomputes results. It is passive and needs neither
-the original cluster nor producer checkout. All registry and token-realm requests are restricted to the explicitly admitted scheme and host;
-registries requiring a separate authentication host currently fail closed. Credentials are host-scoped and anonymous OCI consumption
-is explicit. Plain HTTP is restricted to explicitly selected loopback fixtures.
+the original cluster nor producer checkout. Registry manifests, uploads and token realms remain restricted to the admitted scheme and host;
+registries requiring a separate authentication host fail closed. Exact covered blob GETs may follow
+HTTPS storage redirects after authorization and cookie headers are removed. Size and raw digest
+checks still apply to the returned bytes. Anonymous OCI consumption is explicit. Plain HTTP
+is restricted to selected loopback fixtures.
 
 ## Qualification and external acceptance
 
@@ -80,11 +94,6 @@ Observation signing is separate from build signing and qualification. Existing q
 its strict predicate and required-suite capability rejection; this first slice cannot satisfy that gate.
 Kubernetes conformance execution, authenticated suite receipts and verified reporting belong to the next
 two stacked changes. They must preserve complete artifact membership and the separate M3-B smoke gate.
-
-The stack starts from PR143's `feat/m3-c-qualification-evidence` branch and preserves its owner's branch.
-The separately owned NVKE nightly PR145 can later consume this interface. The human requested scoped
-implementation and mergeable PRs; production evidence publication, cluster/hardware runs, TestGrid service
-writes and tracker changes have no named authorization or destination in this task.
 
 Local contract coverage includes bounded intake, path and member rejection, mutation, cancellation,
 receipt closure, unsigned versus authenticated reporting, independent subject/policy checks and partial

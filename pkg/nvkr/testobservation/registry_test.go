@@ -160,6 +160,12 @@ func TestObservationRegistrySignedRoundTrip(t *testing.T) {
 			requireCode(t, err, e.CodeVerifyFailed)
 			_, err = copiedReceipt.Reference(t.Context())
 			requireCode(t, err, e.CodeVerifyFailed)
+			for _, receipt := range []*Verified{verified, &copiedReceipt} {
+				_, err = receipt.Read(t.Context(), "results/junit.xml")
+				requireCode(t, err, e.CodeVerifyFailed)
+				_, _, err = receipt.Signer(t.Context())
+				requireCode(t, err, e.CodeVerifyFailed)
+			}
 
 		})
 	}
@@ -203,19 +209,23 @@ func TestObservationRegistryTransportAdmission(t *testing.T) {
 		}
 	}
 	for _, desc := range []oci.Descriptor{
-		{MediaType: FileMediaType, Size: MaxFileBytes + 1},
+		{MediaType: FileMediaType, Digest: descriptor(FileMediaType, []byte("x")).Digest, Size: MaxFileBytes + 1},
 		{MediaType: FileMediaType, Digest: descriptor(FileMediaType, []byte("x")).Digest, Size: 1, URLs: []string{"https://elsewhere.example/file"}},
 	} {
-		if err := validateDescriptor(desc, FileMediaType, "x", MaxFileBytes); err == nil {
-			t.Fatal("unsafe descriptor admitted")
-		}
+		requireCode(t, validateDescriptor(desc, FileMediaType, "x", MaxFileBytes), e.CodeVerifyFailed)
 	}
 	var forged Verified
 	_, err = forged.Description(t.Context())
 	requireCode(t, err, e.CodeVerifyFailed)
-	if _, err := VerifyOCI(t.Context(), "registry.example/repo:latest", Expected{}, RegistryOptions{}); err == nil {
-		t.Fatal("missing independent trust accepted")
+	o := observationFixture()
+	o.Execution.Status = "not-run"
+	digest, err := o.Digest()
+	if err != nil {
+		t.Fatal(err)
 	}
+	expected := Expected{ObservationDigest: digest, Inputs: o.Inputs, Subjects: o.Subjects, Suite: o.Suite}
+	_, err = VerifyOCI(t.Context(), "registry.example/repo@"+rawPin("x"), expected, RegistryOptions{Transport: delivery.RegistryOptions{Anonymous: true}})
+	requireCode(t, err, e.CodeTrustPolicyMissing)
 }
 
 func TestObservationRegistryCanceledReceipt(t *testing.T) {
@@ -241,7 +251,14 @@ func TestObservationRegistryCanceledReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer verified.Close()
+	copied := *verified
 	cancel()
+	for _, receipt := range []*Verified{verified, &copied} {
+		_, err = receipt.Read(t.Context(), "results/junit.xml")
+		requireCode(t, err, e.CodeTimeout)
+		_, _, err = receipt.Signer(t.Context())
+		requireCode(t, err, e.CodeTimeout)
+	}
 	_, err = verified.Description(t.Context())
 	requireCode(t, err, e.CodeTimeout)
 	if !errors.Is(err, context.Canceled) {

@@ -16,6 +16,7 @@ each concept to a worked example.
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Find published outputs and verify a consumer claim | [Release quickstart](release-quickstart.md) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../definitions/nvke-m2/README.md#qualification-readiness) |
+| Emit, publish and verify portable test observations | [Portable test evidence](portable-test-evidence-execution.md) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
@@ -64,8 +65,6 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 [acceptance specification](epics-v1-spec.md).
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
-The [portable test evidence execution analysis](portable-test-evidence-execution.md) maps source owners,
-the three implementation slices, initial file intake and remaining external acceptance decisions.
 Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
 [CI test performance](ci-test-performance.md) for the current profiling follow-up.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and

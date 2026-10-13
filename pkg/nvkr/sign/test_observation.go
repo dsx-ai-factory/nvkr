@@ -14,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/google/go-containerregistry/pkg/name"
 )
 
 // TestObservationPredicateType authenticates observations without granting
@@ -39,13 +40,16 @@ func (s *CosignOCISigner) AttestTestObservation(ctx context.Context, subject Sub
 	if err := subject.Validate(); err != nil {
 		return err
 	}
+	if err := s.admitDirectObservationOCI(subject); err != nil {
+		return err
+	}
 	if err := requireObservationPredicate(predicate); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	exact := append([]byte(nil), predicate...)
-	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: exact, exactPredicateBytes: true}, s.identity, s.issuer)
+	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: exact}, s.identity, s.issuer)
 	if err != nil {
 		return err
 	}
@@ -99,10 +103,13 @@ func (s *CosignOCISigner) VerifyTestObservation(ctx context.Context, subject Sub
 	if err := subject.Validate(); err != nil {
 		return err
 	}
+	if err := s.admitDirectObservationOCI(subject); err != nil {
+		return err
+	}
 	if err := requireObservationPredicate(predicate); err != nil {
 		return err
 	}
-	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: predicate, exactPredicateBytes: true}, s.identity, s.issuer)
+	policy, err := resolvePolicy(VerifyPolicy{RequireAttestation: true, ExpectedPredicate: predicate}, s.identity, s.issuer)
 	if err != nil {
 		return err
 	}
@@ -157,6 +164,10 @@ func (s *CosignOCISigner) writeObservationDockerConfig(ctx context.Context, work
 	if !s.credential.empty() {
 		return s.writeDockerConfig(ctx, workspace)
 	}
+	return writeEmptyObservationDockerConfig(ctx, workspace)
+}
+
+func writeEmptyObservationDockerConfig(ctx context.Context, workspace string) (string, error) {
 	dir := filepath.Join(workspace, dockerConfigDirName)
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "creating empty private registry config")
@@ -165,4 +176,19 @@ func (s *CosignOCISigner) writeObservationDockerConfig(ctx context.Context, work
 		return "", err
 	}
 	return dir, nil
+}
+
+// Stock OCI subcommands do not expose a transport hook that can constrain token
+// realms. Keep this legacy surface credential-free and reject registries for
+// which the established registry-name owner permits automatic plaintext use.
+// Production observation publication uses the detached bundle/guarded transport.
+func (s *CosignOCISigner) admitDirectObservationOCI(subject Subject) error {
+	if !s.credential.empty() {
+		return e.New(e.CodeEngineCapability, "direct cosign observation registry credentials are unsupported; use guarded observation publication")
+	}
+	parsed, err := name.NewRegistry(strings.SplitN(subject.Repository(), "/", 2)[0], name.StrictValidation)
+	if err != nil || parsed.Scheme() != "https" {
+		return e.New(e.CodeEngineCapability, "direct cosign observation registry may use plaintext; use guarded observation transport")
+	}
+	return nil
 }

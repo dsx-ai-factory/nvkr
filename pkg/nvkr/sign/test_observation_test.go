@@ -33,6 +33,7 @@ func observationBundle(t *testing.T, digest, predicateType, identity, issuer str
 		t.Fatal(err)
 	}
 	statement["predicate"] = json.RawMessage(predicate)
+	statement["subject"].([]any)[0].(map[string]any)["name"] = observationOCIRef
 	raw, err = json.Marshal(statement)
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +101,7 @@ func TestObservationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testing.
 					return fmt.Errorf("injected failure")
 				}
 				if call.args[0] == "attest" {
-					if strings.Join(call.args[:6], " ") != "attest --yes --new-bundle-format --type "+TestObservationPredicateType+" --predicate" || call.args[len(call.args)-1] != ociTestRef {
+					if strings.Join(call.args[:6], " ") != "attest --yes --new-bundle-format --type "+TestObservationPredicateType+" --predicate" || call.args[len(call.args)-1] != observationOCIRef {
 						t.Fatalf("bad test observation argv: %v", call.args)
 					}
 					raw, err := os.ReadFile(call.args[6])
@@ -122,7 +123,7 @@ func TestObservationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testing.
 				}
 				return nil
 			}
-			err := newStubbedSigner(t, stub, Credential{}).AttestTestObservation(t.Context(), ociSubject(), []byte(predicate))
+			err := newStubbedSigner(t, stub, Credential{}).AttestTestObservation(t.Context(), observationOCISubject(), []byte(predicate))
 			if tc.code != "" {
 				requireSignCode(t, err, tc.code)
 			} else if err != nil {
@@ -144,7 +145,7 @@ func TestObservationVerificationRequiresExpectedEvidence(t *testing.T) {
 	for _, raw := range [][]byte{nil, []byte(`{broken`)} {
 		t.Run(string(raw), func(t *testing.T) {
 			stub := &cosignStub{}
-			err := newStubbedSigner(t, stub, Credential{}).VerifyTestObservation(t.Context(), ociSubject(), raw)
+			err := newStubbedSigner(t, stub, Credential{}).VerifyTestObservation(t.Context(), observationOCISubject(), raw)
 			if err == nil || len(stub.calls) != 0 {
 				t.Fatalf("invalid evidence reached subprocess: %v", err)
 			}
@@ -156,7 +157,7 @@ func TestObservationInvalidPolicyCannotAttach(t *testing.T) {
 	stub := &cosignStub{}
 	signer := newStubbedSigner(t, stub, Credential{})
 	signer.identity = "["
-	err := signer.AttestTestObservation(t.Context(), ociSubject(), []byte(`{"verdict":"fail"}`))
+	err := signer.AttestTestObservation(t.Context(), observationOCISubject(), []byte(`{"verdict":"fail"}`))
 	requireSignCode(t, err, e.CodeTrustPolicyMissing)
 	if len(stub.calls) != 0 {
 		t.Fatal("invalid verification policy attached an attestation")
@@ -181,7 +182,7 @@ func TestObservationAdmissionAndCancellation(t *testing.T) {
 			if tc.cancel {
 				cancel()
 			}
-			err := newStubbedSigner(t, stub, Credential{}).AttestTestObservation(ctx, ociSubject(), tc.predicate)
+			err := newStubbedSigner(t, stub, Credential{}).AttestTestObservation(ctx, observationOCISubject(), tc.predicate)
 			requireSignCode(t, err, tc.code)
 			if len(stub.calls) != 0 {
 				t.Fatal("invalid observation reached subprocess")
@@ -212,7 +213,7 @@ func TestObservationVerificationExactBytesAndNoMintingAuthority(t *testing.T) {
 				}
 				return nil
 			}
-			err := newStubbedSigner(t, stub, Credential{}).VerifyTestObservation(t.Context(), ociSubject(), tc.expected)
+			err := newStubbedSigner(t, stub, Credential{}).VerifyTestObservation(t.Context(), observationOCISubject(), tc.expected)
 			if tc.code != "" {
 				requireSignCode(t, err, tc.code)
 			} else if err != nil {
@@ -237,7 +238,7 @@ func TestObservationCanceledAfterAttachmentNeverSucceeds(t *testing.T) {
 		}
 		return nil
 	}
-	err := newStubbedSigner(t, stub, Credential{}).AttestTestObservation(ctx, ociSubject(), []byte(`{"verdict":"fail"}`))
+	err := newStubbedSigner(t, stub, Credential{}).AttestTestObservation(ctx, observationOCISubject(), []byte(`{"verdict":"fail"}`))
 	requireSignCode(t, err, e.CodeTimeout)
 }
 
@@ -257,7 +258,11 @@ func TestObservationStockAdmissionBeforePathIO(t *testing.T) {
 		{"attest", signer.AttestTestObservation}, {"verify", signer.VerifyTestObservation},
 	} {
 		t.Run(operation.name, func(t *testing.T) {
-			requireSignCode(t, operation.run(t.Context(), ociSubject(), []byte(`{"verdict":"fail"}`)), want)
+			requireSignCode(t, operation.run(t.Context(), observationOCISubject(), []byte(`{"verdict":"fail"}`)), want)
 		})
 	}
 }
+
+var observationOCIRef = "registry.example.test/project/image@" + ociTestDigest
+
+func observationOCISubject() Subject { return Subject{Ref: observationOCIRef, Digest: ociTestDigest} }

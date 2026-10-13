@@ -104,7 +104,7 @@ func TestBundleFailuresRemainValidWithoutPassing(t *testing.T) {
 	}
 }
 func TestBundleRejectsTamperedControlAndMembers(t *testing.T) {
-	for _, kind := range []string{"unknown schema", "summary", "unknown field", "whitespace", "extra file", "extra directory", "missing file", "payload symlink", "control symlink", "wrong size"} {
+	for _, kind := range []string{"unknown schema", "summary", "consistent forged summary", "unknown field", "whitespace", "extra file", "extra directory", "missing file", "payload symlink", "control symlink", "wrong size"} {
 		t.Run(kind, func(t *testing.T) {
 			root := emitFixture(t, observationFixture(), passingJUnit)
 			path := filepath.Join(root, ObservationFileName)
@@ -117,6 +117,8 @@ func TestBundleRejectsTamperedControlAndMembers(t *testing.T) {
 				raw = []byte(strings.Replace(string(raw), SchemaVersion, "nvkr.dev/test-observation/v2", 1))
 			case "summary":
 				raw = []byte(strings.Replace(string(raw), `"passed":1`, `"passed":2`, 1))
+			case "consistent forged summary":
+				raw = []byte(strings.Replace(strings.Replace(string(raw), `"passed":1`, `"passed":0`, 1), `"failed":0`, `"failed":1`, 1))
 			case "unknown field":
 				raw = append([]byte(`{"unknown":true,`), raw[1:]...)
 			case "whitespace":
@@ -183,7 +185,7 @@ func TestBundleRejectsIndependentBindingSubstitution(t *testing.T) {
 	}
 	defer b.Close()
 	o := b.Observation()
-	for _, kind := range []string{"digest", "input", "output", "payload", "build", "platform", "suite", "policy", "invocation"} {
+	for _, kind := range []string{"digest", "input", "output", "payload", "build", "platform", "suite", "policy", "invocation", "artifact", "image", "revision", "selection", "required cases", "subjects"} {
 		t.Run(kind, func(t *testing.T) {
 			expected := Expected{ObservationDigest: b.Digest(), Inputs: o.Inputs, Subjects: append([]Subject(nil), o.Subjects...), Suite: clone(o).Suite}
 			pin := rawPin("substitute")
@@ -206,6 +208,18 @@ func TestBundleRejectsIndependentBindingSubstitution(t *testing.T) {
 				expected.Suite.PolicyDigest = pin
 			case "invocation":
 				expected.Suite.Invocation = "other"
+			case "artifact":
+				expected.Subjects[0].ArtifactDigest = pin
+			case "image":
+				expected.Suite.ImageDigest = pin
+			case "revision":
+				expected.Suite.HarnessRevision = strings.Repeat("b", 40)
+			case "selection":
+				expected.Suite.Selection = []string{"other"}
+			case "required cases":
+				expected.Suite.RequiredCases[0].Name = "other"
+			case "subjects":
+				expected.Subjects = append(expected.Subjects, Subject{Output: "extra", Platform: "linux/amd64", ArtifactDigest: pin, PayloadDigest: pin, BuildDigest: pin})
 			}
 			_, err := VerifyLocal(t.Context(), root, expected)
 			requireCode(t, err, e.CodeVerifyFailed)

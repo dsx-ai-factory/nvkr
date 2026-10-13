@@ -235,16 +235,27 @@ existing pinned static-ELF cosign owner and issues a live closeable receipt only
 all covered bytes pass. Test observation signatures confer no qualification or release authority.
 The reviewed public projection is supplied before signing; no automatic redaction or private-log
 publication is implemented. CLI/SDK emission, publication and passive verification delegate to
-these deep owners.
+these deep owners. Stock cosign creates/verifies the fixed observation bundle without registry
+credentials; guarded ORAS owns the standard OCI referrer transport. Manifest, token and upload
+origin checks remain strict; covered digest-bound blob GETs can follow credential-stripped HTTPS
+storage redirects. The detached bundle carries no passing-suite or release authority.
 
 Local fixtures cover original result preservation, failure/no-result records, excluded diagnostics,
 path and aggregate bounds, replacement, cancellation, closure, wrong policy/subject/key, partial
 attachment and separate unsigned/authenticated outcome reporting. A real Go test invocation and
 cosign 3.1.3 local-key loopback OCI round trip exercise original file publication, independent
-public-key consumption and tamper rejection. These prove the protocol, not hosted keyless signer
+public-key consumption and tamper rejection. This is an opt-in fixture, not a default CI check:
+
+```sh
+NVKR_TEST_COSIGN_BINARY=/approved/cosign go test ./pkg/nvkr/testobservation -run '^TestObservationCosignIndependentProducerConsumerLoop$' -count=1
+```
+
+The local-key adapter authenticates with stock cosign and compares the canonical predicate; it
+does not invoke the production keyless certificate-verification method. The recorded fixture
+therefore proves its scoped protocol flow, not hosted keyless signer
 acceptance, NVKE or Kubernetes coverage, public registry access or TestGrid ingestion. Conformance,
-qualification v2 and reporting are subsequent stack slices; qualification v1's required-suite
-capability rejection and M3-B gates remain unchanged in this slice.
+required-suite qualification and reporting are separate integration capabilities; native smoke
+and independent qualification authorization cannot be inferred from observation receipts.
 
 ## Support by owner
 

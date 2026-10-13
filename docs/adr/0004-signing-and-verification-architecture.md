@@ -159,7 +159,8 @@ Its canonical configuration binds exact input/subject descriptions, suite policy
 public environment facts, independent execution/cleanup outcomes, derived result summary and
 an inventory of every covered original file. Signed failures and no-result records are valid
 observations; authentication never converts them into passing qualification. Caller-selected
-signer identity and issuer are exact literals, separately admitted from build and qualifier roles.
+signer identity and issuer are exact literals independently selected by consumer policy.
+The verifier does not enforce inequality with build or qualifier identities.
 An OCI locator and its semantic observation digest are coordinates, not consumer trust policy.
 
 The consumer authenticates the statement's exact OCI transport subject and predicate type, then

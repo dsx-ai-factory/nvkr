@@ -31,7 +31,6 @@ additional authored lifecycle objects. `evidence emit`, `publish`, `verify-local
 delegate through the SDK to `testobservation`; the CLI owns flags and presentation only.
 Unsigned self-consistency, authenticated historical observation and qualification remain distinct.
 
-
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
 set; the compiler derives one native producer target per member and one required image-index output

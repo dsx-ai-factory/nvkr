@@ -42,10 +42,12 @@ type Expected struct {
 	Suite             Suite     `json:"suite"`
 }
 type Verification struct {
-	ObservationDigest   string `json:"observationDigest"`
-	SelfConsistent      bool   `json:"selfConsistent"`
-	Passing             bool   `json:"passing"`
-	SignerAuthenticated bool   `json:"signerAuthenticated"`
+	ObservationDigest string `json:"observationDigest"`
+	SelfConsistent    bool   `json:"selfConsistent"`
+	// Passing describes recomputed required-case coverage, not authenticated
+	// qualification or release acceptance. Its JSON name preserves that distinction.
+	Passing             bool `json:"recordedRequiredCasesPassed"`
+	SignerAuthenticated bool `json:"signerAuthenticated"`
 }
 
 func clone(o Observation) Observation {
@@ -79,6 +81,8 @@ func (b *Bundle) Digest() string {
 	}
 	return b.digest
 }
+
+// Passing describes recorded case coverage only; Open grants no signer authority.
 func (b *Bundle) Passing() bool { return b != nil && b.passing }
 func (b *Bundle) Read(ctx context.Context, name string) ([]byte, error) {
 	if b == nil {
@@ -303,6 +307,9 @@ func assess(ctx context.Context, o Observation, read func(string) ([]byte, error
 		summary.Errors += report.Summary.Errors
 		summary.Skipped += report.Summary.Skipped
 		for _, c := range report.Cases {
+			if c.SuiteNode {
+				continue
+			}
 			key := caseKey(CaseID{Suite: c.Suite, Class: c.Class, Name: c.Name})
 			if _, ok := cases[key]; ok {
 				return summary, false, invalid("duplicate case identity across covered JUnit files")

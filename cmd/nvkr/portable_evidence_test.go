@@ -57,6 +57,16 @@ func TestPortableEvidenceCLIIndependentLocalLoop(t *testing.T) {
 	defer bundle.Close()
 	expected := testobservation.Expected{ObservationDigest: bundle.Digest(), Inputs: description.Inputs, Subjects: description.Subjects, Suite: description.Suite}
 	expectedPath := writeCanonical("expected.json", expected)
+	locator := testobservation.Locator{SchemaVersion: testobservation.LocatorSchemaVersion, Reference: "example.com/evidence@" + pin, ObservationDigest: "sha256:" + strings.Repeat("b", 64)}
+	locatorPath := writeCanonical("locator.json", locator)
+	if err := app.RunContext(t.Context(), []string{"nvkr", "evidence", "verify", "--locator", locatorPath, "--expected", expectedPath, "--cosign", "missing-binary", "--cosign-digest", pin, "--identity", "fixture", "--issuer", "fixture", "--anonymous"}); err != nil {
+		var coded *e.Error
+		if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
+			t.Fatalf("locator mismatch = %v, want %s before signer admission", err, e.CodeVerifyFailed)
+		}
+	} else {
+		t.Fatal("mismatched locator accepted")
+	}
 	output.Reset()
 	if err := app.RunContext(t.Context(), []string{"nvkr", "evidence", "verify-local", "--root", out, "--expected", expectedPath, "--json"}); err != nil {
 		t.Fatal(err)

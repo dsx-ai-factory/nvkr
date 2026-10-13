@@ -161,7 +161,7 @@ frozen even where their names contain a version; the schema inside the canonical
 major versions within a family. Run presentation and Release reference views do not acquire redundant identities
 without a canonical subject.
 
-Portable test observations register a separate descriptive family. They bind exact input and named
+Portable test observations use the descriptive observation lane and register a separate family. They bind exact input and named
 artifact subjects, declared or unknown originating Run, suite invocation and policy, public environment
 observations, independent execution and cleanup outcomes, and the complete sorted covered-file inventory.
 Canonical bytes cover original result-file raw digests and lengths, with JUnit totals recomputed from those
@@ -174,6 +174,10 @@ cleanup never produce a passing observation. The aggregate selected result set i
 | Object | Canonical schema | Frozen family kind | Attestation predicate type |
 |---|---|---|---|
 | Test observation | `nvkr.dev/test-observation/v1` | `nvkr.test-observation` | `https://nvkr.dev/test-observation/v1` |
+
+Digest-pinned coordinates use `nvkr.dev/test-observation-locator/v1`; locators have no
+separate authority or digest family. Empty required-case lists and inventories encode as `[]`,
+never `null`. Decoders reject the alternate wire shape rather than reinterpret signed bytes.
 
 M3 qualification evidence (ADR-16) registers the following distinct schema and family. This is
 pipeline-attested build/evidence qualification; it does not reuse a reserved qualified-clearance family.

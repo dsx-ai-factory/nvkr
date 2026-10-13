@@ -49,6 +49,9 @@ type Case struct {
 	Class  string `json:"class"`
 	Name   string `json:"name"`
 	Status Status `json:"status"`
+	// SuiteNode identifies a Ginkgo setup/cleanup report entry. It contributes
+	// to every outcome count but cannot stand in for required test coverage.
+	SuiteNode bool `json:"suiteNode,omitempty"`
 }
 type Report struct {
 	Summary Summary `json:"summary"`
@@ -115,7 +118,7 @@ func ParseJUnit(ctx context.Context, raw []byte) (Report, error) {
 	if !started {
 		return Report{}, invalid("no test cases")
 	}
-	sort.Slice(p.report.Cases, func(i, j int) bool {
+	sort.SliceStable(p.report.Cases, func(i, j int) bool {
 		a, b := p.report.Cases[i], p.report.Cases[j]
 		if a.Suite != b.Suite {
 			return a.Suite < b.Suite
@@ -154,7 +157,7 @@ func (p *parser) token() (xml.Token, error) {
 		}
 		seen := map[string]bool{}
 		for _, a := range v.Attr {
-			if a.Name.Space != "" || seen[a.Name.Local] || len(a.Value) > maxValueBytes {
+			if a.Name.Space != "" || seen[a.Name.Local] || len(a.Value) > attributeBudget(v.Name.Local, a.Name.Local) {
 				return nil, invalid("attribute namespace, duplicate or budget")
 			}
 			seen[a.Name.Local] = true
@@ -166,6 +169,32 @@ func (p *parser) token() (xml.Token, error) {
 	}
 	return t, nil
 }
+
+// Outcome diagnostics are not identity fields. Ginkgo includes complete failure
+// messages as attributes; raw input and token/text budgets still bound them.
+func attributeBudget(element, attribute string) int {
+	if (element == "failure" || element == "error" || element == "skipped") && (attribute == "message" || attribute == "type") {
+		return maxTextBytes
+	}
+	return maxValueBytes
+}
+
+// These prefixes are the exact Ginkgo v2 suite-level NodeType string forms.
+// Setup/cleanup reports remain visible, including failures, but never supply a
+// named test-case pass. Ordinary duplicate case identities remain rejected.
+func suiteNode(name, class, suite, status string) bool {
+	if class != suite || status == "" {
+		return false
+	}
+	for _, node := range []string{"BeforeSuite", "SynchronizedBeforeSuite", "AfterSuite", "SynchronizedAfterSuite", "ReportBeforeSuite", "ReportAfterSuite", "DeferCleanup (Suite)"} {
+		prefix := "[" + node + "]"
+		if name == prefix || strings.HasPrefix(name, prefix+" ") {
+			return true
+		}
+	}
+	return false
+}
+
 func attributes(start xml.StartElement, allowed string) (map[string]string, error) {
 	out := map[string]string{}
 	for _, a := range start.Attr {
@@ -235,10 +264,12 @@ func (p *parser) suite(start xml.StartElement) (Summary, int, error) {
 					return summary, 0, err
 				}
 				key := [3]string{c.Suite, c.Class, c.Name}
-				if p.identities[key] {
+				if !c.SuiteNode && p.identities[key] {
 					return summary, 0, invalid("duplicate case identity")
 				}
-				p.identities[key] = true
+				if !c.SuiteNode {
+					p.identities[key] = true
+				}
 				if len(p.report.Cases) >= MaxCases {
 					return summary, 0, invalid("case budget")
 				}
@@ -249,7 +280,7 @@ func (p *parser) suite(start xml.StartElement) (Summary, int, error) {
 					pending++
 				}
 			case "properties":
-				if err = p.properties(v, properties); err != nil {
+				if err = p.properties(v, properties, true); err != nil {
 					return summary, 0, err
 				}
 			case "system-out", "system-err":
@@ -295,7 +326,7 @@ func (p *parser) testcase(start xml.StartElement, suite string) (Case, bool, err
 	if err != nil {
 		return Case{}, false, err
 	}
-	c := Case{Suite: suite, Class: attrs["classname"], Name: attrs["name"], Status: Passed}
+	c := Case{Suite: suite, Class: attrs["classname"], Name: attrs["name"], Status: Passed, SuiteNode: suiteNode(attrs["name"], attrs["classname"], suite, attrs["status"])}
 	if strings.TrimSpace(c.Name) == "" {
 		return c, false, invalid("unnamed case")
 	}
@@ -337,7 +368,7 @@ func (p *parser) testcase(start xml.StartElement, suite string) (Case, bool, err
 					return c, false, err
 				}
 			case "properties":
-				if err = p.properties(v, properties); err != nil {
+				if err = p.properties(v, properties, false); err != nil {
 					return c, false, err
 				}
 			default:
@@ -399,7 +430,7 @@ func (p *parser) textBody(_ xml.StartElement) error {
 		}
 	}
 }
-func (p *parser) properties(start xml.StartElement, values map[string]string) error {
+func (p *parser) properties(start xml.StartElement, values map[string]string, interpret bool) error {
 	if _, err := attributes(start, ""); err != nil {
 		return err
 	}
@@ -423,10 +454,12 @@ func (p *parser) properties(start xml.StartElement, values map[string]string) er
 			if a["name"] == "" {
 				return invalid("unnamed property")
 			}
-			if _, exists := values[a["name"]]; exists {
+			if _, exists := values[a["name"]]; interpret && exists {
 				return invalid("duplicate property")
 			}
-			values[a["name"]] = a["value"]
+			if interpret {
+				values[a["name"]] = a["value"]
+			}
 			if err = p.propertyBody(); err != nil {
 				return err
 			}

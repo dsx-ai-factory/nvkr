@@ -90,10 +90,10 @@ func validateCredentialScope(host string, options RegistryOptions) error {
 		return e.New(e.CodeUsage, "anonymous observation transport rejects explicit cosign registry credentials")
 	}
 	if options.Credential != (sign.Credential{}) && options.Credential.Registry != host {
-		return e.New(e.CodeUsage, "observation credential is outside the independently selected registry host")
+		return e.New(e.CodeUsage, "NVKR_REGISTRY must match the independently selected observation registry host")
 	}
 	if (options.Transport.Username != "" || options.Transport.Password != "") && (options.Credential.Registry != host || options.Transport.Username != options.Credential.Username || options.Transport.Password != options.Credential.Password) {
-		return e.New(e.CodeUsage, "explicit observation transport credentials require the same host-scoped cosign credential")
+		return e.New(e.CodeUsage, "NVKR_REGISTRY_USER and NVKR_REGISTRY_PASSWORD require matching credentials scoped by NVKR_REGISTRY")
 	}
 	return nil
 }
@@ -147,8 +147,12 @@ func admittedAuthenticator(ctx context.Context, options RegistryOptions) (observ
 	if err := preflight.Preflight(ctx); err != nil {
 		return nil, err
 	}
-	return sign.NewCosignOCISigner(sign.CosignOCIOptions{Binary: options.CosignBinary, BinaryDigest: options.CosignDigest,
-		Identity: "^" + regexp.QuoteMeta(options.Identity) + "$", Issuer: options.Issuer, Credential: options.Credential})
+	signer, err := sign.NewCosignOCISigner(sign.CosignOCIOptions{Binary: options.CosignBinary, BinaryDigest: options.CosignDigest,
+		Identity: "^" + regexp.QuoteMeta(options.Identity) + "$", Issuer: options.Issuer})
+	if err != nil {
+		return nil, err
+	}
+	return &stockObservationAuthenticator{signer: signer, options: options}, nil
 }
 
 // Published is diagnostic. A failed attachment/readback may leave immutable OCI
@@ -167,6 +171,9 @@ func Publish(ctx context.Context, root, repository string, options RegistryOptio
 		return nil, e.New(e.CodeUsage, "canonical untagged observation repository required")
 	}
 	if err := validateCredentialScope(parsed.Registry, options); err != nil {
+		return nil, err
+	}
+	if err := validateTransportOrigin(parsed.Registry, options.Transport); err != nil {
 		return nil, err
 	}
 	authenticator, err := admittedAuthenticator(ctx, options)
@@ -548,14 +555,36 @@ func observationRepository(reference string, options delivery.RegistryOptions) (
 		scheme = "http"
 	}
 	client := &http.Client{Transport: registryTransport{base: http.DefaultTransport, scheme: scheme, host: parsed.Registry}, Timeout: 3 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if req.URL.Host != parsed.Registry || req.URL.Scheme != scheme || len(via) >= 5 {
-			return e.New(e.CodeVerifyFailed, "observation registry redirect changes host")
-		}
-		return nil
+		return checkObservationRedirect(req, via, scheme, parsed.Registry)
 	}}
 	credential := auth.Credential{Username: options.Username, Password: options.Password}
 	repo.Client = &auth.Client{Client: client, Cache: auth.NewCache(), Credential: auth.StaticCredential(parsed.Registry, credential)}
 	return repo, nil
+}
+
+type blobFetchKey struct{}
+type blobRedirectKey struct{}
+type blobFetchPermission struct{ path string }
+
+// The standard HTTP client owns redirect execution. Only fetchExact's admitted
+// blob read can delegate a credential-free HTTPS GET to a storage endpoint;
+// manifests, challenge realms and upload requests retain exact-origin policy.
+func checkObservationRedirect(req *http.Request, via []*http.Request, scheme, host string) error {
+	if req.URL == nil || req.URL.User != nil || len(via) >= 5 {
+		return invalid("observation registry redirect is not admitted")
+	}
+	if req.URL.Host == host && req.URL.Scheme == scheme {
+		return nil
+	}
+	permission, ok := req.Context().Value(blobFetchKey{}).(blobFetchPermission)
+	if !ok || len(via) == 0 || req.Method != http.MethodGet || req.URL.Scheme != "https" || via[0].URL.Host != host || via[0].URL.Scheme != scheme || via[0].Method != http.MethodGet || via[0].URL.Path != permission.path {
+		return invalid("observation registry redirect changes origin outside an exact blob GET")
+	}
+	for _, header := range []string{"Authorization", "Proxy-Authorization", "Cookie", "Cookie2"} {
+		req.Header.Del(header)
+	}
+	*req = *req.WithContext(context.WithValue(req.Context(), blobRedirectKey{}, true))
+	return nil
 }
 
 // Check every request, including direct WWW-Authenticate token realm requests.
@@ -566,8 +595,14 @@ type registryTransport struct {
 }
 
 func (t registryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL == nil || req.URL.Scheme != t.scheme || req.URL.Host != t.host || req.URL.User != nil {
-		return nil, e.New(e.CodeVerifyFailed, "observation registry request leaves independently admitted origin")
+	if req.URL == nil || req.URL.User != nil {
+		return nil, invalid("observation registry request leaves independently admitted origin")
+	}
+	if req.URL.Scheme != t.scheme || req.URL.Host != t.host {
+		redirect, _ := req.Context().Value(blobRedirectKey{}).(bool)
+		if !redirect || req.URL.Scheme != "https" || req.Method != http.MethodGet || req.Header.Get("Authorization") != "" || req.Header.Get("Proxy-Authorization") != "" || req.Header.Get("Cookie") != "" || req.Header.Get("Cookie2") != "" {
+			return nil, invalid("observation registry request leaves independently admitted origin")
+		}
 	}
 	return t.base.RoundTrip(req)
 }
@@ -589,6 +624,9 @@ func validateDescriptor(desc oci.Descriptor, mediaType, title string, maxBytes i
 func fetchExact(ctx context.Context, repo *remote.Repository, desc oci.Descriptor, maxBytes int64) ([]byte, error) {
 	if desc.Size < 0 || desc.Size > maxBytes || !canonical.IsDigest(desc.Digest.String()) {
 		return nil, invalid("observation descriptor exceeds byte budget")
+	}
+	if desc.MediaType == ObservationMediaType || desc.MediaType == FileMediaType || desc.MediaType == AttestationMediaType || desc.MediaType == oci.MediaTypeImageConfig {
+		ctx = context.WithValue(ctx, blobFetchKey{}, blobFetchPermission{path: "/v2/" + repo.Reference.Repository + "/blobs/" + desc.Digest.String()})
 	}
 	reader, err := repo.Fetch(ctx, desc)
 	if err != nil {
@@ -612,11 +650,18 @@ func registryError(ctx context.Context, err error, operation string) error {
 	if canceled := captureContext(ctx); canceled != nil {
 		return canceled
 	}
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		return e.Wrap(coded.Code, err, "%s", operation)
+	}
 	return e.Wrap(e.CodeUnavailable, err, "%s", operation)
 }
 
 // VerifyLocator checks the locator only as a coordinate. Expected remains independent.
 func VerifyLocator(ctx context.Context, l Locator, expected Expected, options RegistryOptions) (*Verified, error) {
+	if err := captureContext(ctx); err != nil {
+		return nil, err
+	}
 	if err := l.Validate(); err != nil {
 		return nil, err
 	}

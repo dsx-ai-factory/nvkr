@@ -151,8 +151,6 @@ type VerificationRecord struct {
 // fields are mandatory: an unpinned identity or issuer would accept any Fulcio
 // certificate and is therefore not a trust decision at all.
 type VerifyPolicy struct {
-	// exactPredicateBytes is reserved for portable observation transport.
-	exactPredicateBytes bool
 	// ExpectedPredicate optionally binds the exact production predicate, including Plan and invocation.
 	ExpectedPredicate  []byte
 	IdentityRegexp     string
@@ -837,6 +835,7 @@ type inTotoStatement struct {
 	Type          string          `json:"_type"`
 	PredicateType string          `json:"predicateType"`
 	Subject       []struct {
+		Name   string            `json:"name"`
 		Digest map[string]string `json:"digest"`
 	} `json:"subject"`
 }

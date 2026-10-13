@@ -70,6 +70,10 @@ func decodeOCIBundles(raw []byte) ([][]byte, error) {
 // ociBundleClaims describes the exact certificate and statement supplied to
 // cosign. These claims become verified only after that same bundle passes cosign.
 func ociBundleClaims(raw []byte, digest, predicateType string, policy VerifyPolicy) (string, string, error) {
+	return ociBundleClaimsForSubject(raw, digest, predicateType, policy, "")
+}
+
+func ociBundleClaimsForSubject(raw []byte, digest, predicateType string, policy VerifyPolicy, exactSubjectName string) (string, string, error) {
 	var bundle struct {
 		MediaType string `json:"mediaType"`
 		DSSE      struct {
@@ -107,15 +111,16 @@ func ociBundleClaims(raw []byte, digest, predicateType string, policy VerifyPoli
 		return "", "", e.New(e.CodeVerifyFailed, "OCI bundle does not bind the required predicate and exact subject")
 	}
 
+	if exactSubjectName != "" && (statement.Type != "https://in-toto.io/Statement/v1" || statement.Subject[0].Name != exactSubjectName || !bytes.Equal(statement.Predicate, policy.ExpectedPredicate)) {
+		return "", "", e.New(e.CodeVerifyFailed, "observation statement does not bind exact subject name and canonical predicate bytes")
+	}
+
 	if len(policy.ExpectedPredicate) > 0 {
 		expected, err := canonical.Marshal(json.RawMessage(policy.ExpectedPredicate))
 		if err != nil {
 			return "", "", e.Wrap(e.CodeVerifyFailed, err, "canonicalize expected predicate")
 		}
 		actual, err := canonical.Marshal(statement.Predicate)
-		if policy.exactPredicateBytes {
-			expected = policy.ExpectedPredicate
-		}
 		if err != nil || !bytes.Equal(expected, actual) {
 			return "", "", e.New(e.CodeVerifyFailed, "authenticated statement does not bind the expected predicate")
 		}
