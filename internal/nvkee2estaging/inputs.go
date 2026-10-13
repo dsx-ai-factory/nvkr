@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package nvkequalification
+package nvkee2estaging
 
 import (
 	"bytes"
@@ -46,19 +46,19 @@ type mapping struct {
 func readDocument(ctx context.Context, filename string, value any) error {
 	file, info, err := securepath.OpenRegular(filename)
 	if err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "opening preparation input")
+		return e.Wrap(e.CodeUsage, err, "opening preparation input")
 	}
 	defer file.Close()
 	if info.Size() < 0 || info.Size() > documentLimit {
-		return e.New(e.CodePreflightFailed, "preparation document exceeds its 16 MiB bound")
+		return e.New(e.CodeUsage, "preparation document exceeds its 16 MiB bound")
 	}
 	var raw bytes.Buffer
 	if _, err := transportarchive.CopyExact(ctx, &raw, file, info.Size()); err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "reading preparation input")
+		return inputError(ctx, e.CodeUsage, err, "reading preparation input")
 	}
 	after, err := file.Stat()
 	if err != nil || !securepath.SameMetadata(info, after) {
-		return e.New(e.CodePreflightFailed, "preparation input changed while reading")
+		return e.New(e.CodeVerifyFailed, "preparation input changed while reading")
 	}
 	// The existing codec owns duplicate-name/UTF-8/trailing-document validation.
 	if err := canonical.ValidateJSONDocument(raw.Bytes()); err != nil {
@@ -67,7 +67,7 @@ func readDocument(ctx context.Context, filename string, value any) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw.Bytes()))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "decoding preparation input")
+		return e.Wrap(e.CodeUsage, err, "decoding preparation input")
 	}
 	return nil
 }
@@ -88,13 +88,13 @@ func invocation(options Options) (string, error) {
 }
 
 func checkRun(run lifecycle.Run, options Options) (map[string]lifecycle.Artifact, map[string]string, error) {
-	if run.SchemaVersion != lifecycle.RunSchemaVersion || run.Attempt != options.RunID+"-"+options.RunAttempt || run.Status != lifecycle.RunComplete || run.Failure != nil || len(run.Expected) == 0 || len(run.Expected) != len(run.Observed) {
-		return nil, nil, e.New(e.CodePreflightFailed, "require a complete current producing Run with exact observations")
+	if run.SchemaVersion != lifecycle.RunSchemaVersion || run.Attempt != options.RunID+"-"+options.RunAttempt || len(run.Expected) == 0 || len(run.Expected) != len(run.Observed) {
+		return nil, nil, e.New(e.CodeVerifyFailed, "require current Run identities with a consistent observed output description")
 	}
 	identities := map[string]string{"definitionDigest": run.DefinitionDigest, "environmentDigest": run.EnvironmentDigest, "planDigest": run.PlanDigest, "contentSubject": run.ContentSubject}
 	for _, digest := range identities {
 		if !canonical.IsDigest(digest) {
-			return nil, nil, e.New(e.CodePreflightFailed, "Run omits exact input/content identities")
+			return nil, nil, e.New(e.CodeVerifyFailed, "Run omits exact input/content identities")
 		}
 	}
 	named := make(map[string]lifecycle.Artifact, len(run.Observed))
@@ -103,7 +103,7 @@ func checkRun(run lifecycle.Run, options Options) (map[string]lifecycle.Artifact
 			return nil, nil, err
 		}
 		if _, exists := named[artifact.Name]; exists {
-			return nil, nil, e.New(e.CodePreflightFailed, "Run duplicates observed outputs")
+			return nil, nil, e.New(e.CodeVerifyFailed, "Run duplicates observed outputs")
 		}
 		named[artifact.Name] = artifact
 	}
@@ -111,7 +111,7 @@ func checkRun(run lifecycle.Run, options Options) (map[string]lifecycle.Artifact
 	for _, expected := range run.Expected {
 		actual, exists := named[expected.Name]
 		if seen[expected.Name] || !exists || expected.Kind != actual.Kind || expected.BuildDigest != actual.BuildDigest || !slices.Equal(expected.Components, actual.Components) {
-			return nil, nil, e.New(e.CodePreflightFailed, "Run contains missing, duplicated or substituted output bindings")
+			return nil, nil, e.New(e.CodeVerifyFailed, "Run contains missing, duplicated or substituted output bindings")
 		}
 		seen[expected.Name] = true
 	}
@@ -122,12 +122,12 @@ func checkRun(run lifecycle.Run, options Options) (map[string]lifecycle.Artifact
 // opaque. EqualFold matches Go's JSON Unicode matching; aliases never survive.
 func guardObject(object map[string]json.RawMessage, protected ...string) error {
 	if object == nil {
-		return e.New(e.CodePreflightFailed, "suite configuration sections must be JSON objects")
+		return e.New(e.CodeUsage, "suite configuration sections must be JSON objects")
 	}
 	for key := range object {
 		for _, field := range protected {
 			if strings.EqualFold(key, field) && key != field {
-				return e.New(e.CodePreflightFailed, "suite field must use canonical casing: %s", field)
+				return e.New(e.CodeUsage, "suite field must use canonical casing: %s", field)
 			}
 		}
 	}
@@ -141,7 +141,7 @@ func section(config map[string]json.RawMessage, name string, optional bool) (map
 	}
 	var result map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &result); err != nil || result == nil {
-		return nil, e.New(e.CodePreflightFailed, "suite section %q must be a JSON object", name)
+		return nil, e.New(e.CodeUsage, "suite section %q must be a JSON object", name)
 	}
 	return result, nil
 }
@@ -161,17 +161,17 @@ func checkedMapping(input mapping) (string, error) {
 		var preserve bool
 		if raw, exists := lifecycleConfig[key]; exists {
 			if err := json.Unmarshal(raw, &preserve); err != nil {
-				return "", e.New(e.CodePreflightFailed, "lifecycle preservation setting must be a boolean")
+				return "", e.New(e.CodeUsage, "lifecycle preservation setting must be a boolean")
 			}
 		}
 		if preserve {
-			return "", e.New(e.CodePreflightFailed, "nightly inputs must not preserve or reuse hardware")
+			return "", e.New(e.CodeUsage, "E2E inputs must not preserve or reuse hardware")
 		}
 	}
 	var reuse string
 	if raw, exists := lifecycleConfig["reuseCluster"]; exists {
 		if err := json.Unmarshal(raw, &reuse); err != nil || reuse != "" {
-			return "", e.New(e.CodePreflightFailed, "nightly inputs must not reuse hardware")
+			return "", e.New(e.CodeUsage, "E2E inputs must not reuse hardware")
 		}
 	}
 	site, err := section(input.SuiteConfig, "site", false)
@@ -183,7 +183,7 @@ func checkedMapping(input mapping) (string, error) {
 	}
 	var commit string
 	if err := json.Unmarshal(site["deployPathRef"], &commit); err != nil || !commitPattern.MatchString(commit) {
-		return "", e.New(e.CodePreflightFailed, "deployment assets require an explicit pinned source commit")
+		return "", e.New(e.CodeUsage, "deployment assets require an explicit pinned source commit")
 	}
 	cliConfig, err := section(input.SuiteConfig, "nvkectl", true)
 	if err != nil {
@@ -193,39 +193,39 @@ func checkedMapping(input mapping) (string, error) {
 		return "", err
 	}
 	if len(input.Bindings.Images) != len(imageRoles) || len(input.Bindings.Charts) != len(chartRoles) {
-		return "", e.New(e.CodePreflightFailed, "every installed image and chart needs one candidate or explicit fixture binding")
+		return "", e.New(e.CodeUsage, "every installed image and chart needs one candidate or explicit fixture binding")
 	}
 	all := []binding{input.Bindings.CLI}
 	for _, role := range imageRoles {
 		b, exists := input.Bindings.Images[role]
 		if !exists {
-			return "", e.New(e.CodePreflightFailed, "missing site image binding")
+			return "", e.New(e.CodeUsage, "missing site image binding")
 		}
 		all = append(all, b)
 		if b.Fixture != nil {
 			if strings.TrimSpace(b.Repository) == "" || !canonical.IsDigest(b.Digest) {
-				return "", e.New(e.CodePreflightFailed, "image fixture requires repository and native digest")
+				return "", e.New(e.CodeUsage, "image fixture requires repository and native digest")
 			}
 		}
 	}
 	for _, role := range chartRoles {
 		b, exists := input.Bindings.Charts[role]
 		if !exists {
-			return "", e.New(e.CodePreflightFailed, "missing site chart binding")
+			return "", e.New(e.CodeUsage, "missing site chart binding")
 		}
 		all = append(all, b)
 	}
 	for _, b := range all {
 		if (b.Output != "") == (b.Fixture != nil) {
-			return "", e.New(e.CodePreflightFailed, "each role needs exactly one output or fixture")
+			return "", e.New(e.CodeUsage, "each role needs exactly one output or fixture")
 		}
 		if b.Fixture != nil && (strings.TrimSpace(b.Fixture.Identity) == "" || b.Fixture.Path == "" || !canonical.IsDigest(b.Fixture.SHA256)) {
-			return "", e.New(e.CodePreflightFailed, "fixtures require explicit material identity, regular file and byte pin")
+			return "", e.New(e.CodeUsage, "fixtures require explicit material identity, regular file and byte pin")
 		}
 	}
 	cli := input.Bindings.CLI
 	if cli.Fixture != nil || cli.InstallPath == "" || !path.IsAbs(cli.InstallPath) || path.Clean(cli.InstallPath) != cli.InstallPath || strings.ContainsAny(cli.InstallPath, "\\\x00") {
-		return "", e.New(e.CodePreflightFailed, "CLI must select a producing output and canonical absolute installation path")
+		return "", e.New(e.CodeUsage, "CLI must select a producing output and canonical absolute installation path")
 	}
 	return commit, nil
 }
@@ -264,7 +264,7 @@ func checkedArtifacts(named map[string]lifecycle.Artifact, release lifecycle.Rel
 func selected(named map[string]lifecycle.Artifact, b binding, kind string) (lifecycle.Artifact, error) {
 	output, exists := named[b.Output]
 	if !exists || output.Kind != kind {
-		return lifecycle.Artifact{}, e.New(e.CodePreflightFailed, "binding does not select a published %s output", kind)
+		return lifecycle.Artifact{}, e.New(e.CodeVerifyFailed, "binding does not select a published %s output", kind)
 	}
 	return output, nil
 }

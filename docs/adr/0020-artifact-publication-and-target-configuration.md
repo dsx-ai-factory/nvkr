@@ -122,14 +122,14 @@ composition or authorize release.
 
 For artifact-publication consumption, the verified lifecycle owner may export
 the complete held transport closure after matching its authenticated aggregate
-invocation to the expected originating Run/attempt. Exact-input CLI export also
-requires the Definition, Environment and Plan expectation. Export uses the existing
-descriptor-relative, fsynced no-replace transaction and never reopens producer
+invocation to the expected originating Run/attempt. Export requires that same owner's
+opaque exact-input receipt binding the Definition, Environment and Plan expectation.
+Export uses the existing descriptor-relative, fsynced no-replace transaction and never reopens producer
 paths. Subsequent binary/chart/image extraction preserves their existing owning
 checks; archive transport checksums remain separate from native OCI subjects.
 This export grants no runtime verdict or stronger release/evidence lane. Contract
 tests exercise origin mismatch, closure substitution, closed capabilities and
-cancellation; externally exercised nightly consumption remains unrecorded.
+pre-start cancellation; externally exercised end-to-end consumption remains unrecorded.
 
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result

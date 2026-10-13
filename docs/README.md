@@ -15,7 +15,7 @@ each concept to a worked example.
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Find published outputs and verify a consumer claim | [Release quickstart](release-quickstart.md) |
-| Prepare the existing NVKE Go qualification suite after publication | [Direct-suite integration and activation gates](nvke-nightly-qualification.md) |
+| Stage inputs for the existing NVKE Go end-to-end suite | [NVKE input staging and activation gates](nvke-e2e-staging.md) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package nvkequalification
+package nvkee2estaging
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 
 // This helper receives only descriptions after Prepare has authenticated the
 // full publication. Every projection independently revalidates its local bytes.
-func stageMaterials(ctx context.Context, options Options, input mapping, named map[string]lifecycle.Artifact, layout string, report *Report) error {
+func stageMaterials(ctx context.Context, options Options, input mapping, named map[string]lifecycle.Artifact, layout string, publication *delivery.Publication, report *Report) error {
 	site, err := section(input.SuiteConfig, "site", false)
 	if err != nil {
 		return err
@@ -37,7 +37,7 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 		return err
 	}
 	binaries := filepath.Join(options.Out, "binaries")
-	bundle, err := delivery.ExtractBinaryBundle(ctx, layout, cli.Name, binaries)
+	bundle, err := publication.ExtractBinaryBundle(ctx, cli.Name, binaries)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 	if err := putJSON(cliConfig, "binary", executable); err != nil {
 		return err
 	}
-	report.Artifacts["cli"] = map[string]string{"output": cli.Name, "subject": cli.Digest, "payload_digest": payload}
+	report.Artifacts["cli"] = map[string]string{"trust": "publication-verified", "output": cli.Name, "subject": cli.Digest, "payload_digest": payload}
 	images := map[string]any{}
 	for _, role := range imageRoles {
 		b := input.Bindings.Images[role]
@@ -62,7 +62,7 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 				return err
 			}
 			images[role] = map[string]string{"repository": b.Repository, "digest": b.Digest, "archive": archive}
-			report.Artifacts[role] = map[string]string{"fixture": b.Fixture.Identity, "payload_digest": b.Fixture.SHA256}
+			report.Artifacts[role] = map[string]string{"trust": "fixture", "fixture": b.Fixture.Identity, "payload_digest": b.Fixture.SHA256}
 			continue
 		}
 		output, err := selected(named, b, lifecycle.OutputOCI)
@@ -79,7 +79,7 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 				}
 			}
 			if matches != 1 {
-				return e.New(e.CodePreflightFailed, "image output does not contain exactly one selected native platform")
+				return e.New(e.CodeVerifyFailed, "image output does not contain exactly one selected native platform")
 			}
 		}
 		repository, _, found := strings.Cut(output.Reference, "@")
@@ -96,7 +96,7 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 			return e.New(e.CodeVerifyFailed, "image export substituted native subject")
 		}
 		images[role] = map[string]string{"repository": repository, "digest": image.ManifestDigest, "archive": archive}
-		report.Artifacts[role] = map[string]string{"output": output.Name, "subject": output.Digest, "payload_digest": image.ArchiveDigest}
+		report.Artifacts[role] = map[string]string{"trust": "publication-verified", "output": output.Name, "subject": output.Digest, "payload_digest": image.ArchiveDigest}
 	}
 	overrides := map[string]string{}
 	for _, role := range chartRoles {
@@ -107,21 +107,21 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 			if err != nil {
 				return err
 			}
-			report.Artifacts["chart:"+role] = map[string]string{"fixture": b.Fixture.Identity, "payload_digest": b.Fixture.SHA256}
+			report.Artifacts["chart:"+role] = map[string]string{"trust": "fixture", "fixture": b.Fixture.Identity, "payload_digest": b.Fixture.SHA256}
 		} else {
 			output, err := selected(named, b, lifecycle.OutputHelm)
 			if err != nil {
 				return err
 			}
 			chart = filepath.Join(options.Out, "chart-"+role+".tgz")
-			if _, err := delivery.ExtractObject(ctx, layout, output.Name, chart); err != nil {
+			if _, err := publication.ExtractObject(ctx, output.Name, chart); err != nil {
 				return err
 			}
 			digest, err := fileDigest(ctx, chart)
 			if err != nil {
 				return err
 			}
-			report.Artifacts["chart:"+role] = map[string]string{"output": output.Name, "subject": output.Digest, "payload_digest": digest}
+			report.Artifacts["chart:"+role] = map[string]string{"trust": "publication-verified", "output": output.Name, "subject": output.Digest, "payload_digest": digest}
 		}
 		overrides[role] = chart
 	}
@@ -139,13 +139,17 @@ func stageMaterials(ctx context.Context, options Options, input mapping, named m
 	}
 	var commit string
 	if err := json.Unmarshal(site["deployPathRef"], &commit); err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "reading deployment source binding")
+		return e.Wrap(e.CodeVerifyFailed, err, "reading deployment source binding")
 	}
 	identity := input.DeployFixture.Identity
 	if identity == "" {
-		identity = "authenticated harness source"
+		identity = "checked harness source against unsigned receipt"
 	}
-	report.Artifacts["deploy_assets"] = map[string]string{"commit": commit, "fixture": identity}
+	trust := "source-checked-unsigned-receipt"
+	if input.DeployFixture.Identity != "" {
+		trust = "fixture"
+	}
+	report.Artifacts["deploy_assets"] = map[string]string{"trust": trust, "commit": commit, "fixture": identity}
 	return writeJSON(ctx, options.Out, "e2e-config.json", input.SuiteConfig)
 }
 
@@ -160,14 +164,14 @@ func bundleExecutable(bundle delivery.BinaryBundle, installPath, binaries, targe
 	for _, entry := range bundle.Entries {
 		if entry.InstallPath == installPath {
 			if entry.Mode&0o111 == 0 {
-				return "", e.New(e.CodePreflightFailed, "selected CLI entry is not executable")
+				return "", e.New(e.CodeVerifyFailed, "selected CLI entry is not executable")
 			}
 			selected = entry.Name
 			matches++
 		}
 	}
 	if matches != 1 || selected == "" || selected == "." || selected == ".." || strings.ContainsAny(selected, "/\\\x00") {
-		return "", e.New(e.CodePreflightFailed, "CLI installation path must identify exactly one flat verified bundle entry")
+		return "", e.New(e.CodeVerifyFailed, "CLI installation path must identify exactly one flat verified bundle entry")
 	}
 	return filepath.Join(binaries, selected), nil
 }
@@ -184,19 +188,19 @@ func putJSON(object map[string]json.RawMessage, key string, value any) error {
 func fileDigest(ctx context.Context, filename string) (string, error) {
 	file, info, err := securepath.OpenRegular(filename)
 	if err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "opening staged payload")
+		return "", e.Wrap(e.CodeVerifyFailed, err, "opening staged payload")
 	}
 	defer file.Close()
 	if info.Size() < 0 || info.Size() > fixtureLimit {
-		return "", e.New(e.CodePreflightFailed, "staged payload exceeds its byte bound")
+		return "", e.New(e.CodeVerifyFailed, "staged payload exceeds its byte bound")
 	}
 	hash := sha256.New()
 	if _, err := transportarchive.CopyExact(ctx, hash, file, info.Size()); err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "hashing staged payload")
+		return "", inputError(ctx, e.CodeVerifyFailed, err, "hashing staged payload")
 	}
 	after, err := file.Stat()
 	if err != nil || !securepath.SameMetadata(info, after) {
-		return "", e.New(e.CodePreflightFailed, "staged payload changed while hashing")
+		return "", e.New(e.CodeVerifyFailed, "staged payload changed while hashing")
 	}
 	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
 }
@@ -204,45 +208,45 @@ func fileDigest(ctx context.Context, filename string) (string, error) {
 func copyFixture(ctx context.Context, out, role string, input fixture) (string, error) {
 	file, info, err := securepath.OpenRegular(input.Path)
 	if err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "opening regular non-symlink fixture")
+		return "", e.Wrap(e.CodeVerifyFailed, err, "opening regular non-symlink fixture")
 	}
 	defer file.Close()
 	if info.Size() < 0 || info.Size() > fixtureLimit {
-		return "", e.New(e.CodePreflightFailed, "fixture exceeds its byte bound")
+		return "", e.New(e.CodeVerifyFailed, "fixture exceeds its byte bound")
 	}
 	directory := filepath.Join(out, "fixtures")
 	if err := os.Mkdir(directory, 0700); err != nil && !os.IsExist(err) {
-		return "", e.Wrap(e.CodePreflightFailed, err, "creating private fixture directory")
+		return "", e.Wrap(e.CodeInternal, err, "creating private fixture directory")
 	}
 	parent, _, err := securepath.OpenDirectory(directory)
 	if err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "holding fixture destination")
+		return "", e.Wrap(e.CodeInternal, err, "holding fixture destination")
 	}
 	defer parent.Close()
 	target, temporary, err := securepath.CreateTemporarySibling(parent)
 	if err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "opening private fixture copy")
+		return "", e.Wrap(e.CodeInternal, err, "opening private fixture copy")
 	}
 	defer func() { _ = target.Close(); _ = unix.Unlinkat(int(parent.Fd()), temporary, 0) }()
 	hash := sha256.New()
 	if _, err := transportarchive.CopyExact(ctx, io.MultiWriter(target, hash), file, info.Size()); err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "capturing exact fixture bytes")
+		return "", inputError(ctx, e.CodeVerifyFailed, err, "capturing exact fixture bytes")
 	}
 	after, err := file.Stat()
 	if err != nil || !securepath.SameMetadata(info, after) {
-		return "", e.New(e.CodePreflightFailed, "fixture changed while copying")
+		return "", e.New(e.CodeVerifyFailed, "fixture changed while copying")
 	}
 	if "sha256:"+hex.EncodeToString(hash.Sum(nil)) != input.SHA256 {
-		return "", e.New(e.CodePreflightFailed, "fixture payload differs from its explicit byte pin")
+		return "", e.New(e.CodeVerifyFailed, "fixture payload differs from its explicit byte pin")
 	}
 	if err := target.Sync(); err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "persisting private fixture")
+		return "", e.Wrap(e.CodeInternal, err, "persisting private fixture")
 	}
 	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), temporary, int(parent.Fd()), role); err != nil {
 		return "", e.Wrap(e.CodeImmutableViolation, err, "committing fixture without replacement")
 	}
 	if err := parent.Sync(); err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "persisting fixture commit")
+		return "", e.Wrap(e.CodeInternal, err, "persisting fixture commit")
 	}
 	return filepath.Join(directory, role), nil
 }
@@ -254,19 +258,19 @@ func writeJSON(ctx context.Context, directory, name string, value any) error {
 	}
 	parent, _, err := securepath.OpenDirectory(directory)
 	if err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "holding preparation directory")
+		return e.Wrap(e.CodeInternal, err, "holding preparation directory")
 	}
 	defer parent.Close()
 	file, temporary, err := securepath.CreateTemporarySibling(parent)
 	if err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "opening preparation description")
+		return e.Wrap(e.CodeInternal, err, "opening preparation description")
 	}
 	defer func() { _ = file.Close(); _ = unix.Unlinkat(int(parent.Fd()), temporary, 0) }()
 	if _, err := transportarchive.CopyExact(ctx, file, strings.NewReader(string(raw)), int64(len(raw))); err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "writing preparation description")
+		return inputError(ctx, e.CodeInternal, err, "writing preparation description")
 	}
 	if err := file.Sync(); err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "persisting preparation description")
+		return e.Wrap(e.CodeInternal, err, "persisting preparation description")
 	}
 	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), temporary, int(parent.Fd()), name); err != nil {
 		return e.Wrap(e.CodeImmutableViolation, err, "committing preparation description")
@@ -276,7 +280,7 @@ func writeJSON(ctx context.Context, directory, name string, value any) error {
 
 func wrapIO(err error) error {
 	if err != nil {
-		return e.Wrap(e.CodePreflightFailed, err, "persisting preparation directory")
+		return e.Wrap(e.CodeInternal, err, "persisting preparation directory")
 	}
 	return nil
 }

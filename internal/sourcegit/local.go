@@ -64,6 +64,10 @@ func LocalCommand(ctx context.Context, environment []string, dir string, args ..
 		"-c", "core.autocrlf=false", "-c", "core.eol=lf", "-c", "core.attributesFile=" + os.DevNull,
 		"-c", "diff.ignoreSubmodules=all", "-c", "submodule.recurse=false",
 		"-c", "gc.auto=0", "-c", "maintenance.auto=false"}
+	if args[0] == "status" {
+		// Diagnostic status must not refresh the restored index on disk.
+		prefix = append(prefix, "--no-optional-locks")
+	}
 	if dir != "" {
 		prefix = append(prefix, "-C", dir)
 	}

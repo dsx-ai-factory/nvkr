@@ -229,14 +229,18 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	}, opts.fetchReceiptDirectory)
 }
 
-// InspectRestoredSource verifies an existing fetch receipt and its current Git
-// and checkout bytes. It never fetches, vendors, writes or creates a receipt.
+// InspectRestoredSource checks an unsigned fetch receipt against its current Git
+// declaration and checkout bytes, including tracked worktree correspondence.
+// The restored receipt does not authenticate vendored or untracked bytes against
+// published provenance. It never fetches, vendors, writes or creates a receipt.
 // The digest describes the bytes checked during this call, not future execution
 // authority over the returned pathname. Callers must own its subsequent lifetime.
 func InspectRestoredSource(ctx context.Context, n ir.Node, sourceRoot string) (string, error) {
 	if ctx == nil {
 		return "", e.New(e.CodeUsage, "restored source inspection requires a context")
 	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
 	if err := ctx.Err(); err != nil {
 		return "", e.Wrap(e.CodeTimeout, err, "restored source inspection canceled")
 	}
@@ -267,6 +271,19 @@ func InspectRestoredSource(ctx context.Context, n ir.Node, sourceRoot string) (s
 	}
 	if err := (Local{}).verifyTree(dir, n, RunOptions{Ctx: ctx, SourceRoot: sourceRoot}); err != nil {
 		return "", err
+	}
+	// HEAD/tree metadata alone cannot establish that tracked files still match
+	// the pinned tree. A rewritten unsigned closure receipt must not bless edits.
+	status, err := sourceFetchGitOut(RunOptions{Ctx: ctx, SourceRoot: sourceRoot}, dir,
+		"status", "--porcelain=v1", "--untracked-files=no")
+	if err != nil {
+		if ctx.Err() != nil || sourceGitBoundaryError(err) {
+			return "", err
+		}
+		return "", e.Wrap(e.CodeFetchFailed, err, "checking restored tracked source correspondence")
+	}
+	if status != "" {
+		return "", e.New(e.CodeFetchFailed, "restored tracked source %q differs from its pinned Git tree", n.Dest)
 	}
 	return receipt.ClosureDigest, nil
 }
@@ -866,6 +883,9 @@ func readSourceReceiptContext(ctx context.Context, path string, directories ...*
 		}
 	}
 	b, err := readRegularBeneathContext(ctx, root, filepath.Base(path), 1<<20)
+	if ctx.Err() != nil {
+		return out, false, e.Wrap(e.CodeTimeout, ctx.Err(), "reading source receipt canceled")
+	}
 	if err != nil {
 		// The descriptor reader wraps a missing parent/final path.
 		// os.IsNotExist only recognizes a limited set of legacy wrappers; errors.Is

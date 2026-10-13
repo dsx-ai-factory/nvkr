@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// nvke-qualification prepares NVKE suite inputs through existing NVKR owners.
+// nvke-e2e-staging prepares NVKE suite inputs through existing NVKR owners.
 // It does not execute qualification or allocate runtime resources.
 package main
 
@@ -15,7 +15,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/dsx-ai-factory/nvkr/internal/nvkequalification"
+	"github.com/dsx-ai-factory/nvkr/internal/nvkee2estaging"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/spf13/cobra"
 )
@@ -23,21 +23,21 @@ import (
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	err := execute(ctx, os.Args[1:], os.Stdout, os.Stderr, nvkequalification.Prepare)
+	err := execute(ctx, os.Args[1:], os.Stdout, os.Stderr, nvkee2estaging.Prepare)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	os.Exit(e.ExitCode(err))
 }
 
-type preparer func(context.Context, nvkequalification.Options) (nvkequalification.Report, error)
+type preparer func(context.Context, nvkee2estaging.Options) (nvkee2estaging.Report, error)
 
 func execute(ctx context.Context, args []string, out, diagnostics io.Writer, prepare preparer) error {
-	var options nvkequalification.Options
+	var options nvkee2estaging.Options
 	options.Diagnostics = diagnostics
 	var stage bool
 	cmd := &cobra.Command{
-		Use: "nvke-qualification", Short: "Prepare pinned NVKE suite inputs without running qualification",
+		Use: "nvke-e2e-staging", Short: "Stage inputs for the externally owned NVKE Go suite",
 		Args: cobra.NoArgs, SilenceUsage: true, SilenceErrors: true,
 		RunE: func(command *cobra.Command, _ []string) error {
 			if options.PlanOnly == stage || options.CompileOnly && !stage {
@@ -79,7 +79,7 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer, pre
 		{"k8s", "declared Kubernetes version", &options.K8s},
 		{"arch", "declared native architecture", &options.Arch},
 		{"ubuntu", "declared Ubuntu version", &options.Ubuntu},
-		{"versions", "frozen NVKE suite version flags", &options.Versions},
+		{"versions", "operator-supplied expected NVKE suite version flags", &options.Versions},
 	} {
 		flags.StringVar(flag.value, flag.name, "", flag.help)
 		if err := cmd.MarkFlagRequired(flag.name); err != nil {

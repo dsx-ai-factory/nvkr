@@ -17,7 +17,7 @@ import (
 )
 
 func TestInspectRestoredSource(t *testing.T) {
-	for _, scenario := range []string{"valid", "missing receipt", "wrong receipt", "drift", "wrong HEAD", "canceled", "wrong node"} {
+	for _, scenario := range []string{"valid", "missing receipt", "wrong receipt", "drift", "rewritten receipt", "staged edit with rewritten receipt", "wrong HEAD", "canceled", "wrong node"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "src")
 			dir := filepath.Join(root, "checkout")
@@ -67,6 +67,21 @@ func TestInspectRestoredSource(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(dir, "suite.go"), []byte("substituted\n"), 0600); err != nil {
 					t.Fatal(err)
 				}
+			case "rewritten receipt", "staged edit with rewritten receipt":
+				if err := os.WriteFile(filepath.Join(dir, "suite.go"), []byte("package tampered\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "staged edit with rewritten receipt" {
+					git("add", "suite.go")
+				}
+				changed, err := sourceTreeDigestContext(t.Context(), dir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				receipt.ClosureDigest = changed
+				if err := writeSourceReceiptContext(t.Context(), path, receipt); err != nil {
+					t.Fatal(err)
+				}
 			case "wrong HEAD":
 				git("-c", "commit.gpgsign=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--allow-empty", "-qm", "different commit")
 			case "canceled":
@@ -103,5 +118,15 @@ func TestInspectRestoredSource(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSourceReceiptReadCancellationKeepsTimeoutCode(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, _, err := readSourceReceiptContext(ctx, filepath.Join(t.TempDir(), "receipt.json"))
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
+		t.Fatalf("receipt-read cancellation = %v, want Timeout", err)
 	}
 }

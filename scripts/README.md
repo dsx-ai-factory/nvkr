@@ -113,10 +113,10 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 
 ## Focused supporting contracts
 
-The Go `nvke-qualification` command prepares the pinned NVKE Go qualification
+The Go `nvke-e2e-staging` command prepares inputs for the pinned NVKE Go end-to-end
 suite after NVKR publication. Its implementation and tests live under
-`cmd/nvke-qualification` and `internal/nvkequalification`. See the
-[direct-suite integration and activation gates](../docs/nvke-nightly-qualification.md).
+`cmd/nvke-e2e-staging` and `internal/nvkee2estaging`. See the
+[input staging and activation gates](../docs/nvke-e2e-staging.md).
 The local driver stages and optionally compiles the suite; it does not allocate
 hardware or enable a nightly workflow. The special TestGrid integration is deferred.
 

@@ -312,6 +312,30 @@ func TestExportPublishedImageRejectsSubstitutionBeforeOutput(t *testing.T) {
 	}
 }
 
+func TestExportPublishedImageRejectsTrailingDestinationSeparatorBeforeSourceAccess(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "absent", true: "existing"}[existing], func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "image.tar")
+			if existing {
+				if err := os.Mkdir(out, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err := ExportPublishedImage(t.Context(), "/missing-publication", "cwe",
+				"registry.example.test/cwe@sha256:"+strings.Repeat("a", 64), "linux/amd64", out+string(filepath.Separator))
+			assertRegistryCode(t, err, e.CodeUsage)
+			if existing {
+				entries, err := os.ReadDir(out)
+				if err != nil || len(entries) != 0 {
+					t.Fatal("invalid destination was modified", err)
+				}
+			} else if _, err := os.Lstat(out); !os.IsNotExist(err) {
+				t.Fatal("invalid destination was created", err)
+			}
+		})
+	}
+}
+
 func TestExportPublishedImageRejectsDuplicateNameAcrossKindsBeforeOutput(t *testing.T) {
 	root, _, index := registryImageIndexFixture(t)
 	inspection, err := Inspect(t.Context(), root)

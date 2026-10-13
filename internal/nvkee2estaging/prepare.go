@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package nvkequalification
+package nvkee2estaging
 
 import (
 	"context"
@@ -16,18 +16,19 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
-// Prepare authenticates and stages core test materials, optionally compiling
+// Prepare checks descriptive inputs and stages verified publication materials, optionally compiling
 // the pinned suite. It never invokes the live test command or allocates hardware.
 // A partial failure record is persisted only inside a directory this call created.
 func Prepare(ctx context.Context, options Options) (report Report, resultErr error) {
 	report = Report{Repository: options.Repository, RunID: options.RunID, RunAttempt: options.RunAttempt, PublicationRef: options.Reference,
 		StreamName: options.StreamName, GPU: options.GPU, K8s: options.K8s, HarnessCommit: "not-inspected", Artifacts: map[string]any{},
-		MaterializationPhase: "not-started", MaterializationOutcome: "not-run", TestOutcome: "not-run", CleanupOutcome: "not-run", QualificationAuthority: "none"}
+		MaterializationPhase: "not-started", MaterializationOutcome: "not-run", TestOutcome: "not-run", CleanupOutcome: "not-run", QualificationAuthority: "none", RunRecordTrust: "run-record-unauthenticated", SourceTrust: "not-checked", ValidationOutcome: "not-run", CompilationOutcome: "not-run"}
 	if err := admitOptions(ctx, options); err != nil {
 		return report, err
 	}
@@ -48,6 +49,7 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 	if err != nil {
 		return report, err
 	}
+	report.RunRecordStatus = run.Status
 	report.InputIdentities = identities
 	var input mapping
 	if err := readDocument(ctx, options.Inputs, &input); err != nil {
@@ -57,6 +59,7 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 	if err != nil {
 		return report, err
 	}
+	report.ValidationOutcome = "input-descriptions-checked"
 	if _, err := os.Lstat(out); !os.IsNotExist(err) {
 		return report, e.New(e.CodeImmutableViolation, "refusing to reuse a cycle output directory")
 	}
@@ -91,7 +94,7 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 		return report, e.Wrap(e.CodeTimeout, err, "preparation canceled")
 	}
 	if err := os.MkdirAll(filepath.Dir(out), 0700); err != nil {
-		return report, e.Wrap(e.CodePreflightFailed, err, "creating preparation parent")
+		return report, e.Wrap(e.CodeInternal, err, "creating preparation parent")
 	}
 	if err := os.Mkdir(out, 0700); err != nil {
 		return report, e.Wrap(e.CodeImmutableViolation, err, "creating new preparation directory")
@@ -100,22 +103,10 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 		if resultErr == nil {
 			return
 		}
-		report.MaterializationOutcome = "failed"
-		report.ErrorClass = "preparation"
-		var coded *e.Error
-		if errors.As(resultErr, &coded) {
-			report.ErrorCode = string(coded.Code)
-		} else {
-			report.ErrorCode = string(e.CodePreflightFailed)
-		}
-		var exited *exec.ExitError
-		if errors.As(resultErr, &exited) {
-			status := exited.ExitCode()
-			report.SubprocessExitCode = &status
-		}
+		recordFailure(&report, resultErr)
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		if err := writeJSON(cleanup, out, "qualification-failure.json", report); err != nil {
+		if err := writeJSON(cleanup, out, "e2e-staging-failure.json", report); err != nil {
 			resultErr = errors.Join(resultErr, err)
 		}
 	}()
@@ -123,18 +114,19 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 	configPath := filepath.Join(out, "e2e-config.json")
 	if options.PlanOnly {
 		for name, artifact := range named {
-			report.Artifacts[name] = artifact
+			report.Artifacts[name] = map[string]any{"trust": "run-record-unauthenticated", "description": artifact}
 		}
 	} else {
 		source, err = factory.InspectRestoredSource(ctx, plan, options.SourceNode)
 		if err != nil {
 			return report, err
 		}
+		report.SourceTrust = "source-checked-unsigned-receipt"
 		report.Source = source
 		report.HarnessCommit = source.Commit
 		report.MaterializationPhase = "source-inspected"
 		if deployCommit != source.Commit && (input.DeployFixture.Commit != deployCommit || strings.TrimSpace(input.DeployFixture.Identity) == "") {
-			return report, e.New(e.CodePreflightFailed, "deployment source differs from harness without explicit fixture identity")
+			return report, e.New(e.CodeUsage, "deployment source differs from harness without explicit fixture identity")
 		}
 		consumer, err := lifecycle.NewConsumer(lifecycle.ConsumerOptions{CosignBinary: options.Cosign, CosignDigest: options.CosignDigest, WorkspaceRoot: filepath.Join(out, "verification")})
 		if err != nil {
@@ -160,20 +152,44 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 		if err != nil {
 			return report, err
 		}
+		report.ValidationOutcome = "source-and-publication-checked"
+		report.MaterializationOutcome = "in-progress"
 		layout := filepath.Join(out, "publication")
-		if err := verified.ExportForInvocation(bounded, origin, layout); err != nil {
+		if err := verified.ExportForInvocation(bounded, receipt, origin, layout); err != nil {
 			return report, err
 		}
+		_, rootDigest, found := strings.Cut(description.Subject, "@")
+		if !found {
+			return report, e.New(e.CodeVerifyFailed, "verified publication omits its root digest")
+		}
+		held, err := delivery.OpenPublication(bounded, layout, rootDigest)
+		if err != nil {
+			return report, err
+		}
+		defer func() { _ = held.Close() }()
 		report.MaterializationPhase = "publication-authenticated"
-		if err := stageMaterials(ctx, options, input, artifactMap, layout, &report); err != nil {
+		if err := stageMaterials(ctx, options, input, artifactMap, layout, held, &report); err != nil {
 			return report, err
 		}
+		report.MaterializationOutcome = "core-artifacts-staged"
 		if options.CompileOnly {
+			// Recheck the owner-observed checkout immediately before compilation;
+			// this does not authenticate an unsigned vendored closure.
+			current, err := factory.InspectRestoredSource(ctx, plan, options.SourceNode)
+			if err != nil {
+				report.ValidationOutcome = "failed"
+				return report, err
+			}
+			if current != source {
+				report.ValidationOutcome = "failed"
+				return report, e.New(e.CodeVerifyFailed, "restored suite source changed before compilation")
+			}
+			report.CompilationOutcome = "in-progress"
 			if err := compileSource(ctx, source.Path, options); err != nil {
 				return report, err
 			}
+			report.CompilationOutcome = "succeeded"
 		}
-		report.MaterializationOutcome = "core-artifacts-staged"
 	}
 	report.Source = source
 	report.HarnessCommit = source.Commit
@@ -181,8 +197,8 @@ func Prepare(ctx context.Context, options Options) (report Report, resultErr err
 	report.GoTestCommand = suiteCommand(configPath, options.Versions, capabilities, out)
 	report.GoTestDirectory = filepath.Join(source.Path, "controller/test/e2e")
 	report.RuntimeAdmission = "pending live usable-capacity/access and owned-cleanup inventory"
-	report.RemainingInputGates = []string{"QCOW2/EFI HTTPS exact-byte read-back", "post-boot material compatibility", "reviewed fixtures and suite-source capability", "rendered installed dependency closure"}
-	if err := writeJSON(ctx, out, "qualification.json", report); err != nil {
+	report.RemainingInputGates = []string{"QCOW2/EFI HTTPS exact-byte read-back", "post-boot material compatibility", "reviewed fixtures and suite-source capability", "authenticated vendored source closure before execution", "rendered installed dependency closure"}
+	if err := writeJSON(ctx, out, "e2e-staging.json", report); err != nil {
 		return report, err
 	}
 	return report, nil
@@ -207,7 +223,7 @@ func admitOptions(ctx context.Context, options Options) error {
 		return err
 	}
 	if options.Arch != "amd64" && options.Arch != "arm64" || options.GPU != "gb200" && options.GPU != "l40s" || options.Ubuntu != "24.04" && options.Ubuntu != "26.04" || options.K8s != "1.36" || options.GPU == "l40s" && options.Arch != "amd64" {
-		return e.New(e.CodeEngineCapability, "capabilities do not name a maintained qualification stream")
+		return e.New(e.CodeEngineCapability, "capabilities do not name a maintained NVKE E2E stream")
 	}
 	if options.StreamName != "forge-"+options.GPU+"-"+options.Arch+"-ubuntu-"+options.Ubuntu+"-kube-"+options.K8s {
 		return e.New(e.CodeUsage, "stream identity disagrees with capabilities")
@@ -257,13 +273,13 @@ func compileSource(ctx context.Context, source string, options Options) error {
 		if bounded.Err() != nil {
 			return e.Wrap(e.CodeTimeout, bounded.Err(), "suite compilation canceled")
 		}
-		return e.Wrap(e.CodePreflightFailed, err, "compiling pinned NVKE suite")
+		return inputError(bounded, e.CodeBuildFailed, err, "compiling pinned NVKE suite")
 	}
 	return nil
 }
 
 func compileEnvironment(environment []string) []string {
-	allowed := map[string]bool{"PATH": true, "HOME": true, "TMPDIR": true, "GOTMPDIR": true, "GOPATH": true, "GOCACHE": true, "GOMODCACHE": true, "GOTOOLCHAIN": true, "GOPROXY": true, "GOSUMDB": true, "CGO_ENABLED": true, "GOFLAGS": true}
+	allowed := map[string]bool{"PATH": true, "HOME": true, "TMPDIR": true, "GOTMPDIR": true, "GOPATH": true, "GOCACHE": true, "GOMODCACHE": true}
 	result := []string{}
 	for _, value := range environment {
 		key, _, _ := strings.Cut(value, "=")
@@ -271,11 +287,12 @@ func compileEnvironment(environment []string) []string {
 			result = append(result, value)
 		}
 	}
+	result = append(result, "GOWORK=off", "GOENV=off", "GOFLAGS=-mod=vendor", "GOPROXY=off", "GOTOOLCHAIN=local", "CGO_ENABLED=0")
 	return result
 }
 
 func suiteCommand(config, versions, capabilities, out string) []string {
-	return []string{"go", "test", "-v", "-count=1", "-timeout", "220m", ".", "-args", "-ginkgo.label-filter=site-controller", "-ginkgo.timeout=150m", "-ginkgo.fail-on-empty", "-ginkgo.no-color", "-ginkgo.junit-report=" + filepath.Join(out, "qualify-e2e.junit.xml"), "-ginkgo.json-report=" + filepath.Join(out, "qualify-e2e.report.json"), "-e2e.config=" + config, "-e2e.environment=forge", "-e2e.site-stage=full", "-e2e.keep-site=false", "-e2e.versions=" + versions, "-e2e.capabilities=" + capabilities}
+	return []string{"go", "test", "-v", "-count=1", "-timeout", "220m", ".", "-args", "-ginkgo.label-filter=site-controller", "-ginkgo.timeout=150m", "-ginkgo.fail-on-empty", "-ginkgo.no-color", "-ginkgo.junit-report=" + filepath.Join(out, "nvke-e2e.junit.xml"), "-ginkgo.json-report=" + filepath.Join(out, "nvke-e2e.report.json"), "-e2e.config=" + config, "-e2e.environment=forge", "-e2e.site-stage=full", "-e2e.keep-site=false", "-e2e.versions=" + versions, "-e2e.capabilities=" + capabilities}
 }
 
 // jsonBytes is descriptive output only; authority identities stay in owners.
@@ -285,4 +302,40 @@ func jsonBytes(value any) ([]byte, error) {
 		return nil, e.Wrap(e.CodeInternal, err, "encoding preparation description")
 	}
 	return append(raw, '\n'), nil
+}
+
+// inputError preserves coded owner failures and cancellation at the adapter boundary.
+func inputError(ctx context.Context, fallback e.Code, err error, message string) error {
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s", message)
+	}
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		return e.Wrap(coded.Code, err, "%s", message)
+	}
+	return e.Wrap(fallback, err, "%s", message)
+}
+
+func recordFailure(report *Report, err error) {
+	if report.MaterializationOutcome == "in-progress" {
+		report.MaterializationOutcome = "failed"
+	}
+	if report.CompilationOutcome == "in-progress" {
+		report.CompilationOutcome = "failed"
+	}
+	if report.ValidationOutcome != "source-and-publication-checked" {
+		report.ValidationOutcome = "failed"
+	}
+	report.ErrorClass = "preparation"
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		report.ErrorCode = string(coded.Code)
+	} else {
+		report.ErrorCode = string(e.CodeInternal)
+	}
+	var exited *exec.ExitError
+	if errors.As(err, &exited) {
+		status := exited.ExitCode()
+		report.SubprocessExitCode = &status
+	}
 }

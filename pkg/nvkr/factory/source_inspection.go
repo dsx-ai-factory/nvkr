@@ -24,7 +24,8 @@ type RestoredSourceDescription struct {
 }
 
 // InspectRestoredSource selects one exact fetch operation from a complete Plan
-// and delegates receipt and checkout authentication to the existing source owner.
+// and delegates unsigned receipt/checkout consistency checks to the source owner.
+// Its closure digest does not authenticate vendor bytes against published evidence.
 // It performs no acquisition, vendoring, producer execution or output writes.
 func InspectRestoredSource(ctx context.Context, plan *Plan, nodeID string) (RestoredSourceDescription, error) {
 	if ctx == nil || plan == nil {
@@ -57,12 +58,20 @@ func InspectRestoredSource(ctx context.Context, plan *Plan, nodeID string) (Rest
 	if receipt.Path == "" {
 		return RestoredSourceDescription{}, e.New(e.CodePipelineDrift, "source output for %q has no receipt", nodeID)
 	}
+	sourceRoot := strings.TrimSuffix(source.Path, suffix)
+	derivedReceipt, err := pipeline.SourceReceiptPath(sourceRoot, instruction.Dest)
+	if err != nil {
+		return RestoredSourceDescription{}, err
+	}
+	if filepath.Clean(receipt.Path) != filepath.Clean(derivedReceipt) {
+		return RestoredSourceDescription{}, e.New(e.CodePipelineDrift, "planned source receipt differs from the source owner's derived path")
+	}
 	if err := admitSourceFetchPath(ctx, receipt.Path, false); err != nil {
 		return RestoredSourceDescription{}, err
 	}
 	bounded, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	digest, err := pipeline.InspectRestoredSource(bounded, instruction, strings.TrimSuffix(source.Path, suffix))
+	digest, err := pipeline.InspectRestoredSource(bounded, instruction, sourceRoot)
 	if err != nil {
 		return RestoredSourceDescription{}, err
 	}

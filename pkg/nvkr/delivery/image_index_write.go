@@ -40,16 +40,16 @@ func writeHeldLayout(ctx context.Context, out string, writeIndex func(io.Writer)
 	out = filepath.Clean(out)
 	name := filepath.Base(out)
 	if name == "." || name == ".." || name == string(filepath.Separator) {
-		return e.New(e.CodeUsage, "image index destination must name a new directory")
+		return e.New(e.CodeUsage, "layout destination must name a new directory")
 	}
 	parent, _, err := securepath.OpenDirectory(filepath.Dir(out))
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening image index destination parent")
+		return e.Wrap(e.CodeVerifyFailed, err, "opening layout destination parent")
 	}
 	defer parent.Close()
 	stage, temporary, err := createImageIndexStage(parent)
 	if err != nil {
-		return e.Wrap(e.CodeInternal, err, "creating private image index stage")
+		return e.Wrap(e.CodeInternal, err, "creating private layout stage")
 	}
 	defer stage.Close()
 	var blobs, shaDirectory *os.File
@@ -78,11 +78,11 @@ func writeHeldLayout(ctx context.Context, out string, writeIndex func(io.Writer)
 	}()
 	blobs, err = createImageIndexDirectory(stage, "blobs")
 	if err != nil {
-		return e.Wrap(e.CodeInternal, err, "creating image blob directory")
+		return e.Wrap(e.CodeInternal, err, "creating layout blob directory")
 	}
 	shaDirectory, err = createImageIndexDirectory(blobs, "sha256")
 	if err != nil {
-		return e.Wrap(e.CodeInternal, err, "creating image SHA-256 directory")
+		return e.Wrap(e.CodeInternal, err, "creating layout SHA-256 directory")
 	}
 	digests := make([]string, 0, len(blobWriters))
 	for digest := range blobWriters {
@@ -106,18 +106,18 @@ func writeHeldLayout(ctx context.Context, out string, writeIndex func(io.Writer)
 	}
 	for _, directory := range []*os.File{shaDirectory, blobs, stage} {
 		if err := directory.Sync(); err != nil {
-			return e.Wrap(e.CodeInternal, err, "persisting image index directory")
+			return e.Wrap(e.CodeInternal, err, "persisting layout directory")
 		}
 	}
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
 	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), temporary, int(parent.Fd()), name); err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "committing image index without replacement")
+		return e.Wrap(e.CodeImmutableViolation, err, "committing layout without replacement")
 	}
 	committed = true
 	if err := parent.Sync(); err != nil {
-		return e.Wrap(e.CodeInternal, err, "persisting image index commit")
+		return e.Wrap(e.CodeInternal, err, "persisting layout commit")
 	}
 	return nil
 }
@@ -128,14 +128,14 @@ func createImageIndexStage(parent *os.File) (*os.File, string, error) {
 		if _, err := rand.Read(token[:]); err != nil {
 			return nil, "", err
 		}
-		name := ".nvkr-image-index-" + hex.EncodeToString(token[:])
+		name := ".nvkr-layout-" + hex.EncodeToString(token[:])
 		directory, err := createImageIndexDirectory(parent, name)
 		if err == unix.EEXIST {
 			continue
 		}
 		return directory, name, err
 	}
-	return nil, "", e.New(e.CodeInternal, "could not allocate private image index stage")
+	return nil, "", e.New(e.CodeInternal, "could not allocate private layout stage")
 }
 
 func createImageIndexDirectory(parent *os.File, name string) (*os.File, error) {
@@ -156,15 +156,15 @@ func writeImageIndexFile(ctx context.Context, directory *os.File, name string, w
 	}
 	fd, err := unix.Openat(int(directory.Fd()), name, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0o644)
 	if err != nil {
-		return e.Wrap(e.CodeInternal, err, "creating held image index member")
+		return e.Wrap(e.CodeInternal, err, "creating held layout member")
 	}
 	file := os.NewFile(uintptr(fd), name)
 	defer file.Close()
 	if err := write(file); err != nil {
-		return classifyContext(ctx, e.Wrap(e.CodeInternal, err, "writing held image index member"))
+		return classifyContext(ctx, e.Wrap(e.CodeInternal, err, "writing held layout member"))
 	}
 	if err := file.Sync(); err != nil {
-		return e.Wrap(e.CodeInternal, err, "persisting held image index member")
+		return e.Wrap(e.CodeInternal, err, "persisting held layout member")
 	}
 	return nil
 }

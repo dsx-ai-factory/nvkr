@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dsx-ai-factory/nvkr/internal/nvkequalification"
+	"github.com/dsx-ai-factory/nvkr/internal/nvkee2estaging"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -38,9 +38,9 @@ func TestHelpAndInvalidModesDoNotReachPreparation(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
-			err := execute(t.Context(), test.args, &out, &diagnostics, func(context.Context, nvkequalification.Options) (nvkequalification.Report, error) {
+			err := execute(t.Context(), test.args, &out, &diagnostics, func(context.Context, nvkee2estaging.Options) (nvkee2estaging.Report, error) {
 				t.Fatal("help or invalid flags reached preparation")
-				return nvkequalification.Report{}, nil
+				return nvkee2estaging.Report{}, nil
 			})
 			if test.code == "" {
 				if err != nil || !strings.Contains(out.String(), "--stage") {
@@ -66,12 +66,12 @@ func TestPreparationFlagsAndOwningErrorArePreserved(t *testing.T) {
 			args := append(requiredFlags(), mode, "--github-server-url", "https://github.example.test")
 			want := e.New(e.CodeVerifyFailed, "owning verification rejected candidate")
 			var out, diagnostics bytes.Buffer
-			err := execute(t.Context(), args, &out, &diagnostics, func(ctx context.Context, options nvkequalification.Options) (nvkequalification.Report, error) {
+			err := execute(t.Context(), args, &out, &diagnostics, func(ctx context.Context, options nvkee2estaging.Options) (nvkee2estaging.Report, error) {
 				if ctx == nil || options.PlanOnly == stage || options.RunID != "123" || options.RunAttempt != "2" ||
 					options.GitHubServerURL != "https://github.example.test" || options.SourceNode != "fetch-exact" {
 					t.Fatalf("flag mapping = %+v", options)
 				}
-				return nvkequalification.Report{}, want
+				return nvkee2estaging.Report{}, want
 			})
 			if !errors.Is(err, want) || out.Len() != 0 {
 				t.Fatalf("owner error changed or success printed: %v %q", err, out.String())

@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package nvkequalification
+package nvkee2estaging
 
 import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
 const testDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -94,6 +96,12 @@ func TestPlanOnlyDescribesFrozenRunWithoutSourceOrVerifier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if report.RunRecordTrust != "run-record-unauthenticated" || report.SourceTrust != "not-checked" || report.ValidationOutcome != "input-descriptions-checked" || report.CompilationOutcome != "not-run" {
+		t.Fatalf("plan-only trust overclaimed: %+v", report)
+	}
+	if artifact, ok := report.Artifacts["cli"].(map[string]any); !ok || artifact["trust"] != "run-record-unauthenticated" {
+		t.Fatal("unauthenticated Run description was labeled as verified")
+	}
 	if report.LiveCommandAdmitted || report.QualificationAuthority != "none" || report.MaterializationOutcome != "not-run" || report.TestOutcome != "not-run" || report.CleanupOutcome != "not-run" {
 		t.Fatalf("overclaimed report: %+v", report)
 	}
@@ -101,7 +109,7 @@ func TestPlanOnlyDescribesFrozenRunWithoutSourceOrVerifier(t *testing.T) {
 		t.Fatal("descriptive suite command loses safety flags")
 	}
 	var persisted Report
-	if err := readDocument(t.Context(), filepath.Join(options.Out, "qualification.json"), &persisted); err != nil {
+	if err := readDocument(t.Context(), filepath.Join(options.Out, "e2e-staging.json"), &persisted); err != nil {
 		t.Fatal(err)
 	}
 	if persisted.InputIdentities["planDigest"] != testDigest || persisted.Source.Commit != "not-inspected" {
@@ -109,7 +117,7 @@ func TestPlanOnlyDescribesFrozenRunWithoutSourceOrVerifier(t *testing.T) {
 	}
 	_, err = Prepare(t.Context(), options)
 	requireCode(t, err, e.CodeImmutableViolation)
-	if _, err := os.Stat(filepath.Join(options.Out, "qualification-failure.json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(options.Out, "e2e-staging-failure.json")); !os.IsNotExist(err) {
 		t.Fatal("rejected reuse changed existing output")
 	}
 }
@@ -171,7 +179,7 @@ func TestProtectedConfigRejectsGoCaseAliasesAndRetention(t *testing.T) {
 			}
 			writeTestJSON(t, options.Inputs, input)
 			_, err := Prepare(t.Context(), options)
-			requireCode(t, err, e.CodePreflightFailed)
+			requireCode(t, err, e.CodeUsage)
 			if _, err := os.Lstat(options.Out); !os.IsNotExist(err) {
 				t.Fatal("unsafe config created cycle")
 			}
@@ -193,7 +201,7 @@ func TestDuplicateDocumentsRejectedByOwningCodec(t *testing.T) {
 }
 
 func TestRunMembershipFailuresBeforeOutput(t *testing.T) {
-	for _, scenario := range []string{"attempt", "missing", "duplicated", "substituted", "failed"} {
+	for _, scenario := range []string{"attempt", "missing", "duplicated", "substituted"} {
 		t.Run(scenario, func(t *testing.T) {
 			options, _ := testOptions(t)
 			run := runDocument()
@@ -212,7 +220,7 @@ func TestRunMembershipFailuresBeforeOutput(t *testing.T) {
 			}
 			writeTestJSON(t, options.Run, run)
 			_, err := Prepare(t.Context(), options)
-			requireCode(t, err, e.CodePreflightFailed)
+			requireCode(t, err, e.CodeVerifyFailed)
 			if _, err := os.Stat(options.Out); !os.IsNotExist(err) {
 				t.Fatal("invalid Run created output")
 			}
@@ -262,9 +270,12 @@ func TestFixtureSnapshotNoFollowPinAndNoReplace(t *testing.T) {
 				}
 				return
 			}
-			code := e.CodePreflightFailed
+			code := e.CodeVerifyFailed
 			if scenario == "existing" {
 				code = e.CodeImmutableViolation
+			}
+			if scenario == "canceled" {
+				code = e.CodeTimeout
 			}
 			requireCode(t, err, code)
 			entries, err := os.ReadDir(filepath.Join(out, "fixtures"))
@@ -298,7 +309,7 @@ func TestBundleEntryUsesFlatNameAndExactInstallPath(t *testing.T) {
 			}
 			path, err := bundleExecutable(bundle, "/usr/local/bin/nvkectl", "/private/cycle/binaries", "amd64")
 			if scenario != "valid" {
-				code := e.CodePreflightFailed
+				code := e.CodeVerifyFailed
 				if scenario == "wrong platform" {
 					code = e.CodeEngineCapability
 				}
@@ -324,8 +335,8 @@ func TestEnterpriseOriginAndCompileEnvironment(t *testing.T) {
 		_, err := invocation(options)
 		requireCode(t, err, e.CodeUsage)
 	}
-	env := compileEnvironment([]string{"PATH=/go/bin", "GOCACHE=/cache", "SOURCE_TOKEN=private", "FORGE_API_KEY=private", "COSIGN_TOKEN=private"})
-	if !slices.Equal(env, []string{"PATH=/go/bin", "GOCACHE=/cache"}) {
+	env := compileEnvironment([]string{"PATH=/go/bin", "GOCACHE=/cache", "SOURCE_TOKEN=private", "FORGE_API_KEY=private", "COSIGN_TOKEN=private", "GOFLAGS=-mod=mod", "GOWORK=/external/go.work", "GOENV=/external/go.env", "GOPROXY=https://external.test", "GOTOOLCHAIN=auto", "CGO_ENABLED=1"})
+	if !slices.Equal(env, []string{"PATH=/go/bin", "GOCACHE=/cache", "GOWORK=off", "GOENV=off", "GOFLAGS=-mod=vendor", "GOPROXY=off", "GOTOOLCHAIN=local", "CGO_ENABLED=0"}) {
 		t.Fatalf("compile credential isolation: %v", env)
 	}
 }
@@ -366,13 +377,17 @@ func TestMaterialSelectionUsesVerifiedDescriptionsInsteadOfRunLocators(t *testin
 }
 
 func TestCompileOnlyNeverExecutesTestMain(t *testing.T) {
+	t.Setenv("GOFLAGS", "-invalid-parent-flag")
+	t.Setenv("GOWORK", "/unowned/external/go.work")
+	t.Setenv("GOTOOLCHAIN", "go999.0.0")
+	t.Setenv("GOPROXY", "https://unowned.invalid")
 	root := t.TempDir()
 	source := filepath.Join(root, "source")
 	suite := filepath.Join(source, "controller", "test", "e2e")
 	if err := os.MkdirAll(suite, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(suite, "go.mod"), []byte("module test.example/compileonly\n\ngo 1.27.2\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(suite, "go.mod"), []byte("module test.example/compileonly\n\ngo 1.27\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	marker := filepath.Join(root, "test-main-executed")
@@ -432,11 +447,83 @@ func TestMaterializationUsesRealCLIAndHelmOwners(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cliDescriptor, err := delivery.PayloadDescriptor(t.Context(), cliLayout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chartDescriptor, err := delivery.PayloadDescriptor(t.Context(), chartLayout)
+	if err != nil {
+		t.Fatal(err)
+	}
 	layout := filepath.Join(root, "publication")
-	_, err = delivery.BuildPublicationRoot(t.Context(), layout, delivery.PublicationRequest{Objects: []delivery.ObjectInput{
-		{Name: "cli", Kind: "binary-bundle", Path: cliLayout, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: cliResult.SemanticDigest},
-		{Name: "controller-chart", Kind: "helm-bundle", Bytes: chartBuffer.Bytes(), LayerMediaType: "application/vnd.cncf.helm.chart.content.v1.tar+gzip", ArtifactType: chartType, SemanticDigest: chartResult.SemanticDigest},
-	}})
+	outputs := []delivery.Output{
+		{Name: "cli", Kind: lifecycle.OutputExecutable, Digest: cliDescriptor.Digest, BuildDigest: testDigest, Components: []string{"nvkectl"}},
+		{Name: "controller-chart", Kind: lifecycle.OutputHelm, Digest: chartDescriptor.Digest, BuildDigest: testDigest},
+	}
+	content, err := delivery.ContentDigest(outputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cliPayload, err := fileDigest(t.Context(), binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chartPayload := fmt.Sprintf("sha256:%x", sha256.Sum256(chartBuffer.Bytes()))
+	objects := []delivery.ObjectInput{
+		{Name: "cli", Kind: "binary-bundle", Path: cliLayout, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: cliResult.SemanticDigest,
+			Output: &delivery.OutputBinding{Repository: "cli", Format: lifecycle.OutputExecutable, BuildDigest: testDigest, Components: []string{"nvkectl"}, BuildSubjects: []delivery.BuildSubject{{Component: "nvkectl", Digest: cliPayload}}}},
+		{Name: "controller-chart", Kind: lifecycle.OutputHelm, Path: chartLayout, Layout: true, ArtifactType: chartType, SemanticDigest: chartResult.SemanticDigest, BlobDigest: chartResult.RootDigest,
+			Output: &delivery.OutputBinding{Repository: "controller-chart", Format: lifecycle.OutputHelm, BuildDigest: testDigest}},
+	}
+	for component, subject := range map[string]string{"nvkectl": cliPayload, "controller-chart": chartDescriptor.Digest} {
+		output := component
+		if component == "nvkectl" {
+			output = "cli"
+		}
+		stage, kind, inspection := "build-output", "file", subject
+		if component == "controller-chart" {
+			stage, kind, inspection = "packaging", "helm-bundle", chartPayload
+		}
+		bom, err := sbom.NewSubject(testDigest, component, subject)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if component == "controller-chart" {
+			archive := filepath.Join(root, "chart.tgz")
+			if err := os.WriteFile(archive, chartBuffer.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			inventory, err := sbom.InspectDependencies(t.Context(), archive, chartPayload, "tarball", sbom.Scanner{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			bom, err = sbom.WithDependencies(bom, inventory.Components, inventory.Method, inventory.ScannerDigest)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		bom, err = sbom.ForSubject(bom, subject, stage, inspection)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := bom.Marshal()
+		if err != nil {
+			t.Fatal(err)
+		}
+		semantic, err := bom.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		inspectionBinding := ""
+		if stage == "packaging" {
+			inspectionBinding = inspection
+		}
+		objects = append(objects, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: semantic, Bytes: raw,
+			Evidence: &delivery.EvidenceBinding{Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspectionBinding}})
+	}
+	publicationResult, err := delivery.BuildPublicationRoot(t.Context(), layout, delivery.PublicationRequest{
+		Release: &delivery.ReleaseMetadata{DefinitionDigest: testDigest, EnvironmentDigest: testDigest, PlanDigest: testDigest, ContentSubject: content}, Objects: objects,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,8 +533,13 @@ func TestMaterializationUsesRealCLIAndHelmOwners(t *testing.T) {
 		t.Fatal(err)
 	}
 	named := map[string]lifecycle.Artifact{"cli": {Name: "cli", Kind: lifecycle.OutputExecutable, Digest: cliResult.RootDigest}, "controller-chart": {Name: "controller-chart", Kind: lifecycle.OutputHelm, Digest: chartResult.RootDigest}}
+	held, err := delivery.OpenPublication(t.Context(), layout, publicationResult.RootDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer held.Close()
 	report := Report{Artifacts: map[string]any{}}
-	if err := stageMaterials(t.Context(), Options{Out: out, Arch: "amd64"}, input, named, layout, &report); err != nil {
+	if err := stageMaterials(t.Context(), Options{Out: out, Arch: "amd64"}, input, named, layout, held, &report); err != nil {
 		t.Fatal(err)
 	}
 	var config map[string]json.RawMessage
@@ -470,7 +562,50 @@ func TestMaterializationUsesRealCLIAndHelmOwners(t *testing.T) {
 	if err != nil || !bytes.Equal(chart, chartBuffer.Bytes()) {
 		t.Fatal("native Helm owner did not preserve package bytes")
 	}
-	if _, exists := report.Artifacts["chart:controller"]; !exists {
-		t.Fatal("chart material absent from report")
+	for role, trust := range map[string]string{"cli": "publication-verified", "chart:controller": "publication-verified", "profiles": "fixture", "chart:spire": "fixture", "deploy_assets": "source-checked-unsigned-receipt"} {
+		entry, ok := report.Artifacts[role].(map[string]string)
+		if !ok || entry["trust"] != trust {
+			t.Fatalf("%s trust = %v, want %s", role, report.Artifacts[role], trust)
+		}
+	}
+}
+
+func TestFailureRecordSeparatesValidationMaterializationAndCompilation(t *testing.T) {
+	for _, tc := range []struct {
+		name, validation, materialization, compilation, wantValidation, wantMaterialization, wantCompilation string
+	}{
+		{"validation rejection", "input-descriptions-checked", "not-run", "not-run", "failed", "not-run", "not-run"},
+		{"copy rejection", "source-and-publication-checked", "in-progress", "not-run", "source-and-publication-checked", "failed", "not-run"},
+		{"compile rejection", "source-and-publication-checked", "core-artifacts-staged", "in-progress", "source-and-publication-checked", "core-artifacts-staged", "failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report := Report{ValidationOutcome: tc.validation, MaterializationOutcome: tc.materialization, CompilationOutcome: tc.compilation}
+			recordFailure(&report, e.New(e.CodeVerifyFailed, "owner rejection"))
+			if report.ValidationOutcome != tc.wantValidation || report.MaterializationOutcome != tc.wantMaterialization || report.CompilationOutcome != tc.wantCompilation || report.ErrorCode != string(e.CodeVerifyFailed) {
+				t.Fatalf("failure conflated outcomes or discarded owner code: %+v", report)
+			}
+		})
+	}
+}
+
+func TestAdapterErrorPreservesOwningCodesAndCancellation(t *testing.T) {
+	owner := e.New(e.CodeImmutableViolation, "immutable fixture")
+	requireCode(t, inputError(t.Context(), e.CodeInternal, owner, "copying fixture"), e.CodeImmutableViolation)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	requireCode(t, inputError(ctx, e.CodeInternal, context.Canceled, "copying fixture"), e.CodeTimeout)
+}
+
+func TestRunStatusIsUnauthenticatedDiagnosticOnly(t *testing.T) {
+	options, _ := testOptions(t)
+	run := runDocument()
+	run["status"] = "failed"
+	writeTestJSON(t, options.Run, run)
+	report, err := Prepare(t.Context(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.RunRecordStatus != "failed" || report.RunRecordTrust != "run-record-unauthenticated" || report.QualificationAuthority != "none" || report.MaterializationOutcome != "not-run" {
+		t.Fatalf("Run status became authority: %+v", report)
 	}
 }

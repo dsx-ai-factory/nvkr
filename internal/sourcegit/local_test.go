@@ -63,6 +63,39 @@ func runLocalFixture(t *testing.T, environment []string, dir string, args ...str
 	return output.Bytes()
 }
 
+func TestLocalGitStatusDoesNotRewriteRestoredIndex(t *testing.T) {
+	source, _ := localFixtureRepository(t)
+	// Force Git to recheck clean content whose cached stat information changed.
+	old := time.Unix(1, 0)
+	if err := os.Chtimes(filepath.Join(source, "input.txt"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	index := filepath.Join(source, ".git", "index")
+	before, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := runLocalFixture(t, []string{"PATH=" + os.Getenv("PATH")}, source, "status", "--porcelain=v1", "--untracked-files=no")
+	if len(output) != 0 {
+		t.Fatalf("clean content reported as changed: %s", output)
+	}
+	after, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := os.Stat(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) || !info.ModTime().Equal(current.ModTime()) {
+		t.Fatal("diagnostic status rewrote the restored index")
+	}
+}
+
 func TestLocalGitNeutralizesGlobalCallbacksAndConversions(t *testing.T) {
 	source, commit := localFixtureRepository(t)
 	for _, withHome := range []bool{false, true} {

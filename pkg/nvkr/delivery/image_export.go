@@ -45,7 +45,7 @@ func ExportPublishedImage(ctx context.Context, root, objectName, reference, plat
 		return PublishedImageExport{}, err
 	}
 	ref, err := name.NewDigest(reference, name.StrictValidation)
-	if err != nil || ref.Name() != reference || objectName == "" || strings.TrimSpace(out) == "" {
+	if err != nil || ref.Name() != reference || objectName == "" || strings.TrimSpace(out) == "" || strings.HasSuffix(out, string(filepath.Separator)) {
 		return PublishedImageExport{}, e.New(e.CodeUsage, "image export requires named output, canonical digest reference and new destination")
 	}
 	if platform != "" && platform != "linux/amd64" && platform != "linux/arm64" {

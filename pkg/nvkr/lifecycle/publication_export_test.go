@@ -20,25 +20,50 @@ func TestVerifiedReleaseExportRequiresOriginAndLiveCapability(t *testing.T) {
 		invocation string
 		closed     bool
 		cancel     bool
+		receipt    string
 		code       e.Code
 	}{
-		{"exact invocation", invocation, false, false, ""},
-		{"earlier aggregate attempt", "https://github.com/example/nvkr/actions/runs/123/attempts/1", false, false, e.CodeVerifyFailed},
-		{"wrong run", "https://github.com/example/nvkr/actions/runs/124/attempts/2", false, false, e.CodeVerifyFailed},
-		{"closed capability", invocation, true, false, e.CodeGateUnmet},
-		{"canceled", invocation, false, true, e.CodeTimeout},
+		{"exact invocation", invocation, false, false, "issued", ""},
+		{"earlier aggregate attempt", "https://github.com/example/nvkr/actions/runs/123/attempts/1", false, false, "issued", e.CodeVerifyFailed},
+		{"wrong run", "https://github.com/example/nvkr/actions/runs/124/attempts/2", false, false, "issued", e.CodeVerifyFailed},
+		{"closed capability", invocation, true, false, "issued", e.CodeGateUnmet},
+		{"canceled", invocation, false, true, "issued", e.CodeTimeout},
+		{"missing receipt", invocation, false, false, "nil", e.CodeGateUnmet},
+		{"unissued receipt", invocation, false, false, "zero", e.CodeGateUnmet},
+		{"other live owner of same publication", invocation, false, false, "other", e.CodeGateUnmet},
+		{"different policy", invocation, false, false, "policy", e.CodeVerifyFailed},
+		{"different inputs", invocation, false, false, "inputs", e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			layout, digest := testPreparedPublicationLayoutForInvocation(t, invocation)
-			publication, err := delivery.OpenPublication(t.Context(), layout, digest)
+			fixture := newExactInputFixture(t).withReleaseMetadata(t, func(metadata *delivery.ReleaseMetadata) {
+				metadata.InvocationID = invocation
+			})
+			expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
 			if err != nil {
 				t.Fatal(err)
 			}
-			// The signature policy boundary is covered by Consumer tests. This
-			// fixture isolates the authenticated-byte export and origin boundary.
-			verified := &VerifiedRelease{valid: true, publication: publication,
-				release: Release{Subject: "registry.example.test/product@" + digest}}
+			verified, receipt, err := fixture.consumer(t, nil).VerifyExactInputs(t.Context(), fixture.reference, exactInputPolicy(), expectation)
+			if err != nil {
+				t.Fatal(err)
+			}
 			defer verified.Close()
+			switch tc.receipt {
+			case "nil":
+				receipt = nil
+			case "zero":
+				receipt = &ExactInputReceipt{}
+			case "other":
+				other, otherReceipt, err := fixture.consumer(t, nil).VerifyExactInputs(t.Context(), fixture.reference, exactInputPolicy(), expectation)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer other.Close()
+				receipt = otherReceipt
+			case "policy":
+				receipt.description.PolicyDigest = "different-policy"
+			case "inputs":
+				receipt.description.PlanDigest = "different-plan"
+			}
 			if tc.closed {
 				_ = verified.Close()
 			}
@@ -48,7 +73,7 @@ func TestVerifiedReleaseExportRequiresOriginAndLiveCapability(t *testing.T) {
 				cancel()
 			}
 			out := filepath.Join(t.TempDir(), "exported")
-			err = verified.ExportForInvocation(ctx, tc.invocation, out)
+			err = verified.ExportForInvocation(ctx, receipt, tc.invocation, out)
 			if tc.code != "" {
 				assertCode(t, err, tc.code)
 				if _, err := os.Lstat(out); !os.IsNotExist(err) {
@@ -60,10 +85,10 @@ func TestVerifiedReleaseExportRequiresOriginAndLiveCapability(t *testing.T) {
 				t.Fatal(err)
 			}
 			got, err := delivery.Inspect(t.Context(), out)
-			if err != nil || got.RootDigest != digest {
+			if err != nil || got.RootDigest != fixture.rootDigest {
 				t.Fatalf("exported root changed: %+v %v", got, err)
 			}
-			assertCode(t, verified.ExportForInvocation(ctx, invocation, out), e.CodeVerifyFailed)
+			assertCode(t, verified.ExportForInvocation(ctx, receipt, invocation, out), e.CodeImmutableViolation)
 		})
 	}
 }

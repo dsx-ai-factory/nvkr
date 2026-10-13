@@ -69,6 +69,7 @@ type ExactInputExpectation struct {
 // has matched a package-issued ExactInputExpectation.
 type ExactInputReceipt struct {
 	issued      bool
+	owner       *VerifiedRelease
 	description ExactInputDescription
 }
 
@@ -162,7 +163,7 @@ func (verified *VerifiedRelease) RequireExactInputs(expectation *ExactInputExpec
 	if bound.ContentSubject != description.Metadata.ContentSubject {
 		return nil, e.New(e.CodeVerifyFailed, "verified publication content does not realize the exact compiled output set")
 	}
-	return &ExactInputReceipt{issued: true, description: ExactInputDescription{
+	return &ExactInputReceipt{issued: true, owner: verified, description: ExactInputDescription{
 		ReleaseSubject: verified.release.Subject, PolicyDigest: verified.release.PolicyDigest,
 		DefinitionDigest:  expectation.prepared.DefinitionDigest,
 		EnvironmentDigest: expectation.prepared.EnvironmentDigest, PlanDigest: expectation.prepared.PlanDigest,

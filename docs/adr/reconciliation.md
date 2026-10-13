@@ -65,7 +65,7 @@ qualified provider adapters, encrypted VM execution and air-gap operation remain
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention and SDK/CLI delegation | No general resume protocol or authority restored by serialization; strict local publication, encrypted disks and qualified lifecycle remain unavailable |
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub generation, exact optional branch dispatch allowlist, bounded non-canceling concurrency, scoped credentials and unconditional finalization; explicit native ARC disk grouping and optional native hosted platform maps (including separate CLI output slots) | Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
-| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
+| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication, external end-to-end consumption and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows | Automatic PR publication and scheduled/private-source service acceptance are unexercised; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays and exact toolchain substitutions | Pin-set loading needs pinned Git access. Curated graph/SBOM edges and embedded-version observation remain deferred. Exact pin identity is not external acquisition or production acceptance |
 
@@ -817,15 +817,18 @@ expectations are checked before external work; the lifecycle owner authenticates
 and issues a policy/publication-bound opaque receipt. Current readers reject historical v3 roots, including
 the Run 37533806963 demo release. That browsing record does not establish current-schema external acceptance.
 
-Local direct-suite preparation authenticates an exact restored Plan source and
-can export a verified publication's held closure only for the expected aggregate
-invocation. Named binary/chart extraction and native image archive export reuse
-delivery owners; tests cover byte preservation, origin mismatch and no-replace
-failures. The [NVKE qualification integration](../nvke-nightly-qualification.md)
-uses a Go adapter and Go regression tests to stage core artifacts and optionally
-compile the existing Go suite through the established Go owners. The special
-TestGrid integration is deferred. Local contracts do not prove runtime execution,
-full hardware input closure, live IAM/capacity, result publication or nightly operation. Generated activation and OCI-to-HTTPS
+Local input staging checks a restored checkout against the exact Plan Git commit/tree,
+tracked worktree state and unsigned source-receipt closure. This diagnostic check does
+not authenticate the restored vendor closure. A verified publication's held closure
+can be exported only with its owner's exact-input receipt and expected aggregate
+invocation. Named binary/chart extraction retains held delivery descriptors; native image
+archive export reuses delivery checks. Tests cover byte preservation, origin mismatch
+and no-replace failures. The [NVKE input staging adapter](../nvke-e2e-staging.md)
+and its regression tests use Go to stage core artifacts and optionally compile the existing
+suite without executing it. NVKR remains passive toward the externally owned runtime suite
+under ADR-16. Authenticated restored source/vendor binding and the special TestGrid integration
+are deferred. Local contracts do not prove runtime execution, full hardware input closure,
+live IAM/capacity, result publication or nightly operation. Generated activation and OCI-to-HTTPS
 disk delivery remain unimplemented, with no production pin or runner-policy changes.
 
 Consumer Verification Policy binds `minimumDiskEvidence` into its typed digest. Pipeline-attested policy

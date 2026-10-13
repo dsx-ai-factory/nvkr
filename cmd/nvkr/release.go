@@ -55,11 +55,6 @@ func executeReleaseVerification(ctx context.Context, reference string, policy li
 		return releaseVerificationResult{}, err
 	}
 	defer func() { _ = verified.Close() }()
-	if export.Directory != "" {
-		if err := verified.ExportForInvocation(ctx, export.Invocation, export.Directory); err != nil {
-			return releaseVerificationResult{}, err
-		}
-	}
 	description, err := verified.Description()
 	if err != nil {
 		return releaseVerificationResult{}, err
@@ -71,6 +66,11 @@ func executeReleaseVerification(ctx context.Context, reference string, policy li
 			return releaseVerificationResult{}, exactErr
 		}
 		result.ExactInputs = &exact
+	}
+	if export.Directory != "" {
+		if err := verified.ExportForInvocation(ctx, receipt, export.Invocation, export.Directory); err != nil {
+			return releaseVerificationResult{}, err
+		}
 	}
 	return result, nil
 }

@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package nvkequalification prepares the downstream NVKE suite from a completed
+// Package nvkee2estaging prepares the downstream NVKE suite from a completed
 // Run. It delegates source, publication and material integrity to their owners;
 // its configuration and reports confer no release or runtime authority.
-package nvkequalification
+package nvkee2estaging
 
 import (
 	"io"
@@ -34,6 +34,11 @@ type Report struct {
 	GPU                    string                            `json:"gpu"`
 	K8s                    string                            `json:"k8s"`
 	HarnessCommit          string                            `json:"harness_commit"`
+	RunRecordStatus        string                            `json:"run_record_status,omitempty"`
+	RunRecordTrust         string                            `json:"run_record_trust"`
+	SourceTrust            string                            `json:"source_trust"`
+	ValidationOutcome      string                            `json:"validation_outcome"`
+	CompilationOutcome     string                            `json:"compilation_outcome"`
 	Source                 factory.RestoredSourceDescription `json:"source"`
 	Artifacts              map[string]any                    `json:"artifacts"`
 	MaterializationPhase   string                            `json:"materialization_phase"`
