@@ -83,8 +83,9 @@ Give a terminal-capable agent this repository URL and a concrete task, for examp
 The [NVKR operator skill](.agents/skills/nvkr-operator/SKILL.md) guides the agent through
 safe repository acquisition, the pinned CLI build, customer input authoring, and supported
 operations. It can create or update Definitions, Environments, catalog producers, pins and
-overlays, then validate and explain their effects through the CLI. Repository-aware skill
-clients can discover it after checkout; other agents can follow the linked file directly.
+overlays, then validate and explain their effects through the CLI. Codex supports discovery
+at this repository skill location after checkout. Claude Code uses a different project-skill
+location; it and other agents can read this linked file directly.
 No global installation is necessary. A URL alone does not request an artifact build or publication.
 
 ## Current scope

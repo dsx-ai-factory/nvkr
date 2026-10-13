@@ -204,6 +204,9 @@ contains the retained three-output NVKE inputs; `definitions/nvke-m2/` supplies 
 selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json`
 are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
+`.agents/skills/nvkr-operator/` is the customer agent entry point; maintainers keep it consistent with
+`CONTEXT.md`, reconciliation, current task guides and CLI help when those contracts change.
+
 ## Completion gate
 
 Run checks proportionate to the change, with the full release-blocking gate before claiming repository-wide
