@@ -20,7 +20,8 @@ bin/nvkr release verify --help
 
 `factory inspect-source` is an internal diagnostic command. It checks the exact Plan
 node, receipt path, Git commit/tree, clean tracked worktree and current closure against
-the restored unsigned receipt without fetching or writing. A rewritten unsigned receipt
+the restored unsigned receipt without fetching or writing. Index flags that hide tracked
+files from worktree checks are rejected. A rewritten unsigned receipt
 does not authenticate vendor or untracked source content. The description is a
 point-in-time observation; the operator owns the private checkout's lifetime.
 Authenticated restored source/vendor binding remains an activation gate.

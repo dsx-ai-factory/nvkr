@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -274,6 +275,10 @@ func InspectRestoredSource(ctx context.Context, n ir.Node, sourceRoot string) (s
 	}
 	// HEAD/tree metadata alone cannot establish that tracked files still match
 	// the pinned tree. A rewritten unsigned closure receipt must not bless edits.
+	// Refuse flags that hide tracked changes before relying on Git status.
+	if err := sourcegit.CheckWorktreeIndex(ctx, os.Environ(), dir, maxSourceClosureEntries); err != nil {
+		return "", err
+	}
 	status, err := sourceFetchGitOut(RunOptions{Ctx: ctx, SourceRoot: sourceRoot}, dir,
 		"status", "--porcelain=v1", "--untracked-files=no")
 	if err != nil {

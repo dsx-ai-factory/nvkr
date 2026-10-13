@@ -22,6 +22,50 @@ import (
 // Keep it aligned with the fetch-only projection below and ADR-18 section 8.
 const LocalCredentialPolicy = "local credential policy: fetch projects global credential.helper, credential.username and credential.useHttpPath, or use an explicit local repository redirect; system helpers, GH/GCM/keyring environment and arbitrary SSH command overrides are not inherited"
 
+// CheckWorktreeIndex refuses index flags that suppress tracked-worktree checks.
+// Git owns its index format; only documented ls-files status tags and NUL record
+// framing are inspected here. This is diagnostic admission, not source authentication.
+func CheckWorktreeIndex(ctx context.Context, environment []string, dir string, maxEntries int) error {
+	if maxEntries <= 0 || dir == "" {
+		return e.New(e.CodeUsage, "source index inspection requires an explicit repository and positive entry bound")
+	}
+	command, err := LocalCommand(ctx, environment, dir, "ls-files", "--cached", "-v", "-z")
+	if err != nil {
+		return err
+	}
+	// Reuse the existing bounded, owned Git-query runner rather than capturing
+	// unbounded output. Large path inventories fail closed at this byte budget.
+	data, err := localGitQuery(ctx, command.Path, command.Env, command.Args[1:], "index worktree flags", 16<<20, false)
+	if err != nil {
+		return err
+	}
+	return checkWorktreeIndexRecords(data, maxEntries)
+}
+
+func checkWorktreeIndexRecords(data []byte, maxEntries int) error {
+	seen := make(map[string]struct{})
+	for len(data) > 0 {
+		record, remaining, terminated := bytes.Cut(data, []byte{0})
+		// https://git-scm.com/docs/git-ls-files: -v uses lower-case tags for
+		// assume-unchanged; S means skip-worktree; H excludes both and unmerged.
+		// -z emits paths verbatim, so a newline or space belongs to the name,
+		// never another status record. Unknown tags/framing are not accepted.
+		if !terminated || len(record) < 3 || record[0] != 'H' || record[1] != ' ' {
+			return e.New(e.CodeFetchFailed, "source index has hidden worktree flags or unsupported status records")
+		}
+		name := string(record[2:])
+		if _, duplicate := seen[name]; duplicate {
+			return e.New(e.CodeFetchFailed, "source index contains ambiguous duplicate tracked entries")
+		}
+		if len(seen) >= maxEntries {
+			return e.New(e.CodeFetchFailed, "source index exceeds its tracked-entry bound")
+		}
+		seen[name] = struct{}{}
+		data = remaining
+	}
+	return nil
+}
+
 // LocalCommand isolates ordinary developer Git operations. Git itself reads
 // developer credential configuration, which is projected only into fetch. It
 // never forwards global build callbacks, filters, templates or line conversions.

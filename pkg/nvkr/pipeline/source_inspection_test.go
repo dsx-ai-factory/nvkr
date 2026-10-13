@@ -17,7 +17,7 @@ import (
 )
 
 func TestInspectRestoredSource(t *testing.T) {
-	for _, scenario := range []string{"valid", "missing receipt", "wrong receipt", "drift", "rewritten receipt", "staged edit with rewritten receipt", "wrong HEAD", "canceled", "wrong node"} {
+	for _, scenario := range []string{"valid", "newline path", "missing receipt", "wrong receipt", "drift", "rewritten receipt", "staged edit with rewritten receipt", "clean assume-unchanged", "clean skip-worktree", "clean combined flags", "tampered assume-unchanged", "tampered skip-worktree", "tampered combined flags", "wrong HEAD", "canceled", "wrong node"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "src")
 			dir := filepath.Join(root, "checkout")
@@ -37,7 +37,12 @@ func TestInspectRestoredSource(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "suite.go"), []byte("package suite\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			git("add", "suite.go")
+			if scenario == "newline path" {
+				if err := os.WriteFile(filepath.Join(dir, "literal\nh forged-status\nS disguised\t "), []byte("literal filename\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			git("add", ".")
 			git("-c", "commit.gpgsign=false", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture")
 			n := ir.Node{Kind: ir.KindFetch, Dest: "checkout", Commit: git("rev-parse", "HEAD"), TreeHash: git("rev-parse", "HEAD^{tree}")}
 			vendor, err := fetchVendorSpecDigest(n)
@@ -62,17 +67,26 @@ func TestInspectRestoredSource(t *testing.T) {
 				}
 			}
 			ctx := t.Context()
+			if strings.Contains(scenario, "assume-unchanged") || strings.Contains(scenario, "combined flags") {
+				git("update-index", "--assume-unchanged", "--", "suite.go")
+			}
+			if strings.Contains(scenario, "skip-worktree") || strings.Contains(scenario, "combined flags") {
+				git("update-index", "--skip-worktree", "--", "suite.go")
+			}
 			switch scenario {
 			case "drift":
 				if err := os.WriteFile(filepath.Join(dir, "suite.go"), []byte("substituted\n"), 0600); err != nil {
 					t.Fatal(err)
 				}
-			case "rewritten receipt", "staged edit with rewritten receipt":
+			case "rewritten receipt", "staged edit with rewritten receipt", "tampered assume-unchanged", "tampered skip-worktree", "tampered combined flags":
 				if err := os.WriteFile(filepath.Join(dir, "suite.go"), []byte("package tampered\n"), 0600); err != nil {
 					t.Fatal(err)
 				}
 				if scenario == "staged edit with rewritten receipt" {
 					git("add", "suite.go")
+				}
+				if strings.HasPrefix(scenario, "tampered ") && git("status", "--porcelain=v1", "--untracked-files=no") != "" {
+					t.Fatal("fixture did not reproduce hidden tracked worktree drift")
 				}
 				changed, err := sourceTreeDigestContext(t.Context(), dir)
 				if err != nil {
@@ -92,7 +106,7 @@ func TestInspectRestoredSource(t *testing.T) {
 				n.Kind = ir.KindBuild
 			}
 			got, err := InspectRestoredSource(ctx, n, root)
-			if scenario == "valid" {
+			if scenario == "valid" || scenario == "newline path" {
 				if err != nil || got != digest {
 					t.Fatalf("inspection=%q error=%v", got, err)
 				}
