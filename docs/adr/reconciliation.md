@@ -50,8 +50,10 @@ The separate FDE diagnostic route admits direct Packer only with explicit public
 It retains raw QCOW2 bytes locally or through a generated native ARC build-only workflow, without release
 publication, signing, inspection or confidentiality claims. Its separate `definitions/nvke-fde` selection
 contains one AMD64 output and the complete material closure. Runtime admission and generated transport
-contracts are distinct from an actual FDE bake: a successful native provider Run at this head has not yet
-been recorded. The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retained bootstrap
+contracts are complemented by [Run 38443178035](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035),
+which completed the pinned FDE target and finalized a `static-unqualified` Run at code commit `68c219845398b8ef5890e5c76a13d4901a22630d`.
+The [native ARC record below](#native-arc-disk-route) binds the exact output and retained evidence.
+The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retained bootstrap
 files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
 requires no GitHub secret; private passphrases remain unsupported.
 
@@ -649,8 +651,36 @@ existing `main` and M2 validation-branch policies. That provider configuration i
 The build-only finalizer uses the selected native ARC pool and matching helper with a two-hour bound,
 restoring and rehashing the complete raw-disk closure without publication authority. Comparable AMD64
 material, source and disk-package carriers in [Run 37533806963](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963)
-totaled 15,362,463,697 compressed bytes. This prior measurement motivates the runner choice; neither the
-new FDE disk size nor its finalizer's required scratch capacity has been externally measured.
+totaled 15,362,463,697 compressed bytes. This prior measurement motivated the runner choice. The FDE
+attempt below completed on ARC; peak scratch usage was not measured, so it establishes no general
+capacity bound.
+
+On October 13, 2026, [Run 38443178035](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
+completed all ten generated jobs on `codex/fde-image-pipeline` at commit
+`68c219845398b8ef5890e5c76a13d4901a22630d`, attempt `38443178035-1`.
+The [native job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/job/115457416653)
+ran for 43m 07s, including setup, a 29m 48s grouped build step and all uploads.
+Its log records successful Packer target `nke-node-fde.qemu.nke-fde`.
+The [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/job/115483887874)
+completed in 6m 22s on a fresh native runner, restoring the complete closure and checking its exact bytes.
+The retained Run has `status: complete`, `lane: static-unqualified`, one expected and observed
+`nvke-node-fde-amd64` disk output, its eleven-component closure and no failure:
+
+- Plan Digest: `sha256:3f5db9dda12b12accfe2ba10567b5d1b00e99538c469ee2d32ad631e5a91dba7`.
+- Output Build Digest: `sha256:b5c4dbb201dbac6e8f5498d67a2bba297f2ee4824766b0b6cf59f3d21a7e19b8`.
+- Raw QCOW2 payload: `sha256:c3d6b6694f1b0c626b1df0f61b10a60a5f2bd9fac9d0c37ff2407a0b7b85cede`,
+  6,738,411,520 bytes (6.28 GiB).
+- Run content subject: `sha256:5c2d10edb27c52e7ae99b8d0def2566762ae11a1e5a07db5feb708bb552dd75a`.
+
+The [image artifact](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11840209683),
+[producer result](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11841075777),
+[terminal observation](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11840159679)
+and [final Run record](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11841676055)
+retain the evidence. The payload digest and size agree across the producer and finalized Run; they are
+the raw QCOW2 identity, not the Actions ZIP identity. This proves the pinned FDE-target bake and generated
+build-only workflow for this attempt. The recorded `luks2` declaration is not independent guest inspection,
+boot or TPM-enrollment validation, deployed-clone confidentiality, reproducibility, qualification or
+publication evidence. The pinned-source audit's key-material and firstboot limitations still apply.
 
 ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted policy for the two native KVM pools.
 The grouped helper retains original material and disk owners through reconciliation and packaging; generation
