@@ -56,7 +56,7 @@ func compactGitHubWorkflow(raw []byte) ([]byte, error) {
 				*node = yamlv3.Node{Kind: yamlv3.AliasNode, Value: first.Anchor, Alias: first}
 				return
 			}
-			node.Anchor = fmt.Sprintf("nvkr_%d", len(anchors)+1)
+			node.Anchor = fmt.Sprintf("n%d", len(anchors)+1)
 			anchors[key] = node
 		}
 		for i, child := range node.Content {

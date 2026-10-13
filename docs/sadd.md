@@ -473,10 +473,14 @@ Pin sets and values bindings share strict document traversal. Packaging writes v
 values without rewriting templates. Deployment values supply repositories, keeping chart bytes independent
 of Environment publication namespaces. Helm digest overrides remain possible; deployment enforcement is separate.
 
-`curatedBy` graph binding, aggregate SBOM curation edges and ADR-10's `embeds` consistency remain deferred.
-An `embeds` declaration alone cannot establish observed image contents. Disk inventory requires the separate
-strict inspection and material-reconciliation contract in ADR-13; runtime correctness remains with NVKE. Any deferred
-registration transport must consume accepted artifact references without adding a topology model.
+`curatedBy` graph binding and aggregate SBOM curation edges remain deferred. ADR-10's optional `embeds`
+metadata check compares authored membership with the complete selected map in the pinned upstream manifest.
+Omission is `not-applicable`; any authored declaration must pass the strict check. It reads raw upstream
+metadata without applying patches, configuration or material substitutions, so it establishes neither effective
+customized composition nor observed image contents. Build/evidence checks retain those exact input bindings.
+Disk inventory requires the separate strict inspection and material-reconciliation contract in ADR-13;
+runtime correctness remains with NVKE. Any deferred registration transport must consume accepted artifact
+references without adding a topology model.
 
 ### External Interface and Specification {#external-interface-and-specification}
 
@@ -559,13 +563,27 @@ wrapped-job acceptance, not implied by putting steps in sequence.
 
 M3 authenticates the complete selected set against its exact producing Run, attempt, commit and inputs. It
 checks schemas, applicable pins and sources, build signatures/provenance and delivered-tool smoke. The
-lifecycle owner issues an opaque check receipt with no signing authority. The independent qualification
-publisher requires every applicable result before signing; missing smoke results fail closed. It authenticates
+implemented M3-A diagnostic takes an exact Run attempt URL and independently selected policy through
+`run check-artifacts --run <URL> --policy <path>`. The provider discovers the commit and authenticates the
+successful attempt against the approved repository, workflow and actual default branch. The real-signing
+producer generates a bounded handoff containing original Plan bytes, compiler-read authored inputs and
+original publication predicates. Replay preserves logical paths and recompiles from captured files without a
+checkout fallback; catalog-owned pinned Git authentication still runs, so this is not offline replay.
+Downloaded records cannot select consumer policy or replace missing evidence.
+
+The lifecycle owner issues an opaque check receipt retaining the verified publication and frozen Plan.
+Closing it revokes copies, cancels and joins registered operations, then releases held bytes and any owned
+source receipt. The receipt grants neither smoke-execution nor signing authority. This A implementation does
+not establish M3-B smoke, M3-C signing or hosted qualification acceptance; reconciliation owns those gaps.
+The independent qualification publisher requires every applicable result before signing; missing smoke results
+fail closed. It authenticates
 the successful default-branch build separately from its own invocation and signs for every selected subject.
 Any failed verdict prevents all attestations; later signing/attachment failure marks qualification unsuccessful
 even if earlier attachments remain. Smoke execution has no qualification credentials.
 
-The MVP keeps disk evidence producer-only and checks embedded declarations against pinned upstream metadata.
+The MVP keeps disk evidence producer-only. Embedded declarations are optional; omission is not applicable,
+while authored declarations must match their referenced pinned upstream metadata. This supplies no effective
+customized or installed composition claim and does not replace exact build-input/material evidence.
 External suites outside scope are explicitly not evaluated. Future required suites must supply authenticated
 subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
 conformance or cluster qualification. M4 lists
@@ -943,7 +961,7 @@ already obtained.
 | Default-branch production/PR trigger exercises, source access and protected-environment policy | CI/release engineering and NVKE source owners | Remaining M1 acceptance beyond recorded manual candidate runs |
 | Transparency disclosure approval, Fulcio/Rekor operations and deletion protection | Product security and service owners | Organizational approval and sustainable consumer verification |
 | Native route approval, measured capacity envelope and independent full-payload disk consumption | NVKE build owner and CI engineering | M2 acceptance beyond the scoped candidate delivery |
-| `curatedBy`, aggregate SBOM curation edges and `embeds` consistency | Catalog/build owners | Upstream composition binding beyond catalog pin validation |
+| `curatedBy` and aggregate SBOM curation edges | Catalog/build owners | Deferred curated composition binding beyond optional upstream metadata checks |
 | M3 role policy and qualification implementation | Qualification owner | Build/evidence verdicts |
 | M4 concurrency, partial-write reconciliation, tag and retention protocol | Release engineering and registry owner | Reliable repeated and interrupted release publication |
 | Qualified provider observation, Nix, authority/discovery adapters and operational exercises | Qualified-lane module owners | Qualified production acceptance |

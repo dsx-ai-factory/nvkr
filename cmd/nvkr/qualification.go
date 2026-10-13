@@ -4,49 +4,44 @@
 package main
 
 import (
+	"context"
 	"os"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 	"github.com/urfave/cli/v2"
 )
 
-func qualificationFileFlags() []cli.Flag {
-	return append(lifecycleInputFlags(),
-		&cli.StringFlag{Name: "plan", Required: true, Usage: "original generated Run Plan"},
-		&cli.StringFlag{Name: "candidate", Required: true, Usage: "original publication reference and exact production predicates"},
-		&cli.StringFlag{Name: "source-repository", Required: true, Usage: "approved producing owner/repository"},
-		&cli.StringFlag{Name: "source-run", Required: true},
-		&cli.StringFlag{Name: "source-attempt", Required: true},
-		&cli.StringFlag{Name: "source-commit", Required: true},
-		&cli.StringFlag{Name: "source-workflow", Required: true, Usage: "approved producing .github/workflows path"},
-		&cli.StringFlag{Name: "default-branch", Required: true},
-		&cli.StringFlag{Name: "cosign", Required: true, Usage: "exact pinned cosign executable"},
-		&cli.StringFlag{Name: "cosign-digest", Required: true},
-		&cli.StringFlag{Name: "workspace", Value: ".nvkr/qualification", Usage: "private publication materialization workspace"},
-	)
-}
-
-func qualificationFileOptions(c *cli.Context) lifecycle.QualificationFilesOptions {
-	return lifecycle.QualificationFilesOptions{
-		DefinitionPath: c.String("definition"), EnvironmentPath: c.String("environment"),
-		PlanPath: c.String("plan"), CandidatePath: c.String("candidate"), GitHubToken: os.Getenv("NVKR_GITHUB_TOKEN"),
-		Source: qualificationorigin.SourceRequest{Repository: c.String("source-repository"), RunID: c.String("source-run"),
-			Attempt: c.String("source-attempt"), Commit: c.String("source-commit"), Workflow: c.String("source-workflow"), DefaultBranch: c.String("default-branch")},
-		Consumer: lifecycle.ConsumerOptions{CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"), WorkspaceRoot: c.String("workspace"),
-			Credential: sign.Credential{Registry: os.Getenv("NVKR_REGISTRY"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
-			Registry:   delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")}},
+func qualificationRuntimeOptions(c *cli.Context) lifecycle.QualificationRuntimeOptions {
+	return lifecycle.QualificationRuntimeOptions{
+		GitHubToken: os.Getenv("NVKR_GITHUB_TOKEN"), WorkspaceRoot: c.String("workspace"),
+		Credential: sign.Credential{Registry: os.Getenv("NVKR_REGISTRY"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
+		Registry:   delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
 	}
 }
 
+type qualificationRunChecker func(context.Context, string, string, lifecycle.QualificationRuntimeOptions) (*lifecycle.ArtifactCheckReceipt, *lifecycle.ArtifactCheckDescription, error)
+
 func cmdRunCheckArtifacts() *cli.Command {
+	return cmdRunCheckArtifactsWithChecker(lifecycle.CheckQualificationRun)
+}
+
+func cmdRunCheckArtifactsWithChecker(check qualificationRunChecker) *cli.Command {
 	return &cli.Command{Name: "check-artifacts", Usage: "authenticate the complete published artifact set against its producing Run; grants no signing authority",
-		Flags: qualificationFileFlags(), Action: func(c *cli.Context) error {
-			receipt, report, checkErr := lifecycle.CheckQualificationFiles(c.Context, qualificationFileOptions(c))
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "run", Usage: "exact producing GitHub Run URL, including /attempts/N"},
+			&cli.StringFlag{Name: "policy", Usage: "independently selected qualification policy YAML"},
+			&cli.StringFlag{Name: "workspace", Value: ".nvkr/qualification", Usage: "private publication materialization workspace"},
+		}, Action: func(c *cli.Context) error {
+			// Keep missing-value admission coded; cli.Required emits an uncoded error.
+			if c.Args().Present() || strings.TrimSpace(c.String("run")) == "" || strings.TrimSpace(c.String("policy")) == "" || strings.TrimSpace(c.String("workspace")) == "" {
+				return e.New(e.CodeUsage, "check-artifacts requires --run and --policy, a non-empty workspace, and no positional arguments")
+			}
+			receipt, report, checkErr := check(c.Context, c.String("run"), c.String("policy"), qualificationRuntimeOptions(c))
 			if receipt != nil {
 				defer func() { _ = receipt.Close() }()
 			}

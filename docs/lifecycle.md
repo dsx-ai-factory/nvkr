@@ -238,54 +238,76 @@ convenience NVKR reader.
 
 ## Authenticate an M3 candidate
 
-On Linux, `nvkr run check-artifacts` checks the already-published M2 bytes against the producing Run's
-saved inputs and evidence. Supply the original Definition, Environment, Plan and canonical candidate
-transport record, plus the independently expected source identity:
+On Linux, `nvkr run check-artifacts` checks the already-published bytes against one exact producing Run
+attempt and an independently selected trust policy:
 
 ```sh
 nvkr run check-artifacts \
-  --definition "$DEFINITION" --environment "$ENVIRONMENT" \
-  --plan "$ORIGINAL_PLAN" --candidate "$CANDIDATE" \
-  --source-repository "$SOURCE_REPOSITORY" --source-run "$SOURCE_RUN" \
-  --source-attempt "$SOURCE_ATTEMPT" --source-commit "$SOURCE_COMMIT" \
-  --source-workflow "$SOURCE_WORKFLOW" --default-branch main \
-  --cosign "$COSIGN_BINARY" --cosign-digest "$COSIGN_DIGEST"
+  --run https://github.com/OWNER/REPO/actions/runs/ID/attempts/N \
+  --policy qualification.yaml
 ```
 
-`SOURCE_WORKFLOW` is the approved repository-relative workflow path. `COSIGN_DIGEST` pins exact executable
-bytes. Optional `NVKR_GITHUB_TOKEN` supplies read access to GitHub; private registry reads use
-`NVKR_REGISTRY`, `NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`. No qualification signing credentials
-or identity token are required by this check. macOS rejects the operation before input or network work.
+Replace `OWNER/REPO`, `ID` and `N` with the intended Run and attempt. An attempt is mandatory; the command
+never selects the latest retry implicitly. Configure the trusted producer and verifier once in
+`qualification.yaml`, then reuse that policy across approved Runs:
 
-GitHub source authentication requires direct HTTPS access to `api.github.com`. Its owned transport ignores
-`HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY`, and refuses redirects. Environments that require an outbound
-proxy are not currently supported for this operation.
+```yaml
+schemaVersion: nvkr.dev/qualification-policy/v1
+source:
+  repository: OWNER/REPO
+  workflow: .github/workflows/nvkr-run.yml
+  defaultBranch: main
+cosign:
+  # Replace this placeholder with the SHA-256 of the independently trusted executable.
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+```
 
-The candidate transport uses `schemaVersion: nvkr.dev/qualification-candidate/v1`, a digest-pinned root
-`reference`, and `predicates`, each containing its exact subject `reference` and original canonical predicate
-bytes in the JSON base64 `predicate` field. It includes one predicate for the root and every named output.
-It is a bounded internal handoff, not an independently authored lifecycle input or proof of success.
-Unknown fields, duplicate JSON keys, unsupported versions and noncanonical encodings are rejected. The
-current command consumes this saved handoff; it does not manufacture missing build evidence.
+The zero digest is a placeholder, not an accepted executable pin. The verifier defaults to `cosign` on
+`PATH`; optional `cosign.path` selects another executable, with relative paths resolved beside the policy.
+Its bytes must match the independent digest. Neither the producer's Environment nor downloaded files can
+select consumer trust. The optional `--workspace` defaults to `.nvkr/qualification`.
+`NVKR_GITHUB_TOKEN` supplies GitHub read credentials; private registry reads use `NVKR_REGISTRY`,
+`NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`. This check needs no qualification signing credentials
+or identity token. macOS rejects it before input or network work.
 
-The lifecycle file owner recompiles the exact supplied inputs and requires the original Plan identity to
-match. `qualificationorigin.GitHub.AuthenticateSource` separately authenticates a completed successful
-GitHub Run attempt, exact commit, expected workflow, intended repository and its actual default branch.
-The module-level `lifecycle.Consumer.CheckQualification` then authenticates the publication and original
-predicates. Descriptions and candidate files remain untrusted until their exact bytes, subjects, signatures,
-provenance and Plan bindings verify.
+The source owner discovers the commit from GitHub's exact attempt endpoint, checks successful completion,
+approved repository and workflow, and the repository's actual default branch. It then downloads the single
+`nvkr-qualification-ID-N` artifact for that attempt. Direct HTTPS access to `api.github.com` and approved
+artifact download endpoints is required. The owned transport ignores proxy environment variables; an
+admitted artifact download location receives a fresh request without GitHub API credentials.
+
+Generated real-signing workflows save one `handoff.json` after complete finalization. It contains the
+original Plan, the compiler-read Definition and Environment, base and output-specific catalogs, overlays,
+registries, locks, patches and directory facts, plus the original root/output publication references and
+predicate bytes. The handoff contains no consumer policy. Unsigned or dry-run workflows do not produce it;
+an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
+
+The lifecycle owner recompiles the captured authored bytes with their original logical paths and requires
+the exact original Plan identity. Authored reads have no checkout fallback. Catalog-owned authentication
+of pinned upstream Git trees remains required and may use its existing credentials and bounded network
+access; this is not offline compilation. Unknown fields, duplicate keys, noncanonical encodings, unsafe
+paths, incomplete inputs and oversized transport fail closed. The handoff is descriptive generated
+transport, not proof that any artifact passed. `lifecycle.Consumer.CheckQualification` still verifies the
+complete publication, original predicates, signatures, subjects and input bindings.
+
+For programmatic use, `lifecycle.CheckQualificationRun` owns Run selection, policy loading and handoff
+retrieval. `lifecycle.CheckQualificationHandoff` borrows a provider-issued source receipt. The existing
+`lifecycle.CheckQualificationFiles` adapter remains available for explicit saved-file diagnostics; normal
+CLI use does not require those files or separately entered source-commit fields.
 
 At the consumer API boundary, source and Plan validation precede adapter-capability checks. A request with
 both malformed inputs and unavailable adapters reports the input error first. Neither case reaches registry
 or signature-verification I/O.
 
 Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
-signature/provenance, applicable payload pins and embedded declarations. Failed checks return coded
+signature/provenance, applicable payload pins and any authored embedded declarations. Failed checks return coded
 diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
-defensive data and grants no authority. Callers close the receipt after use; closure revokes all shallow
-copies. The direct consumer method borrows the caller's source Run receipt, whose closure also revokes the
-check receipt. The file adapter creates and transfers its source owner to the returned check receipt, so
-closing that receipt also closes its internally created source.
+defensive data and grants no authority. A successful receipt retains the verified publication and a frozen
+Plan until closed. Closure revokes all shallow copies, cancels and joins registered operations, then releases
+held payload bytes. This lifetime does not itself authorize smoke execution. The direct consumer and handoff
+methods borrow the caller's source Run receipt, whose closure also revokes the check receipt. The Run and
+file adapters transfer their internally created source owner to the returned receipt and close it with that
+receipt.
 If the source is revoked during verification, the final source check refuses receipt issuance. Each output
 then includes a separate failed `source-lifetime` diagnostic and an overall failure; completed signature,
 pin and other artifact checks keep their actual results. This extra diagnostic appears only on final
@@ -305,10 +327,16 @@ qualification gate. Earlier bytes are never relabeled as produced by the current
 check diagnostics and returns the stable failure code; its serialized output cannot restore a live receipt
 or grant qualification signing authority.
 
-Wrapped source producers require the [pinned embedded declaration](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md)
-profile. Current M2 candidate catalogs have not supplied those declarations and therefore cannot pass
-the gate. M3-B's authenticated smoke receipt is not available, so required delivered-tool smoke blocks
-qualification signing. An A receipt alone cannot sign evidence or authorize release. The C publisher's
+The [pinned embedded declaration](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md)
+profile is optional for source producers; no producer must supply it. Omission yields `not-applicable`.
+Any authored declaration must match its referenced pinned upstream metadata, and a missing, invalid or
+disagreeing reference fails. The check reads
+raw source metadata; it does not apply patches, configuration or material substitutions and cannot establish
+effective customized or installed composition. Source, patch, configuration and material identity/provenance
+checks remain required. The maintained candidate needs no new upstream component manifests.
+
+M3-B's authenticated smoke receipt is not available in this implementation, so required delivered-tool smoke
+blocks qualification signing. An A receipt alone cannot sign evidence or authorize release. The C publisher's
 contract and local tests do not establish real hosted signing or complete-set consumer acceptance.
 [Reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary) records contract coverage and
 the outstanding hosted signing, exact-input candidate and consumer acceptance evidence.

@@ -171,18 +171,39 @@ aggregate or the Release lane. A content-validated rebuild proves neither exact-
 construction. Qualified promotion under §1–§4 remains all-or-nothing for its exact required release members;
 there is no mixed-evidence shortcut around a missing reproduction receipt.
 
-The [approved M3 MVP](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826) is a
-build/evidence qualification gate over the exact complete M2 publication. It authenticates every named
+The current M3 MVP is a build/evidence qualification gate over the exact complete M2 publication. It authenticates every named
 output against its producing Run, attempt, commit, Definition and relevant input identities. Strict input and
 evidence schemas, exact output membership, applicable pins/digests and source consistency, and cryptographically
 verified build signatures and provenance are mandatory. Missing, duplicate, extra, substituted or mismatched
 members/evidence fail with stable coded errors. Acquired payload identity and OCI delivery-container identity
 are checked through their respective bindings; equality between those distinct digest domains is not required.
-Authored embedded-component declarations must agree with the upstream version manifest at the pinned commit.
-This metadata check supplies no disk-content inspection. Disk evidence explicitly remains producer-only.
+The current scope directed by the user makes embedded-component declarations optional. Omission is
+`not-applicable`; an explicitly authored declaration
+must agree with its referenced upstream manifest at the pinned commit, and missing or invalid referenced data
+fails. This raw-source metadata check establishes neither effective customized composition nor installed contents.
+Source, patch, configuration and material identity/provenance checks remain mandatory. Qualification requires
+no new upstream component manifest. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+establishes producer-only disk evidence and defers disk inspection and material reconciliation.
+
+The manual diagnostic entrypoint takes an exact GitHub Run attempt URL and independently authored
+qualification policy. The policy approves the producer repository, workflow and default branch and pins the
+consumer verifier; neither the source Environment nor downloaded records can supply those decisions. The
+provider discovers the commit from the selected attempt and authenticates its successful default-branch
+execution. A Run URL without an attempt is ambiguous and is rejected.
+
+The real-signing producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+It carries original Plan bytes, the compiler-read authored file closure and original root/output predicates.
+Factory owns capture and replay of the Definition, Environment, base and per-output catalogs, overlays,
+registries, locks, patches and directory facts. Replay preserves logical paths, rejects incomplete or unsafe
+closures and reads authored files only from memory. Catalog-owned pinned upstream Git authentication remains
+required; the handoff does not create an offline mode. The consumer independently authenticates the source,
+transport integrity, recomputed Plan and complete published bytes before accepting evidence. Missing handoffs
+or original predicates are errors; consumers never rebuild or relabel evidence to fill the gap.
 
 The owning lifecycle module issues an opaque, subject-bound check receipt after authenticating its exact
-inputs and build evidence. A decoded report, caller-supplied digest or passed boolean cannot restore the
+inputs and build evidence. It retains the held verified publication and frozen Plan. Closing it revokes all
+copies, cancels and joins registered operations, then releases the held publication and any owned source
+receipt. A decoded report, caller-supplied digest or passed boolean cannot restore the
 receipt, and the receipt itself grants no qualification signing authority. M3-B supplies applicable
 delivered CLI/operator version smoke results from those exact payload bytes with networking disabled.
 Smoke startup failure, unsuccessful execution or a conflicting version fails the output; non-tool outputs

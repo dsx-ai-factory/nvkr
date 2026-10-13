@@ -165,7 +165,11 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (
 		if reference != fixture.reference {
 			return nil, e.New(e.CodeVerifyFailed, "wrong fixture reference")
 		}
-		return delivery.OpenPublication(ctx, fixture.layout, fixture.rootDigest)
+		publication, err := delivery.OpenPublication(ctx, fixture.layout, fixture.rootDigest)
+		if err == nil {
+			t.Cleanup(func() { _ = publication.Close() })
+		}
+		return publication, err
 	}}
 	return request, consumer, verifier
 }

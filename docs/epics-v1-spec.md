@@ -15,8 +15,9 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
 - The NVKE OS image build bakes in Kubernetes (node side and control-plane images), CNI, and node-agent. NVKR wraps
   that build using selected material producers; embedded components need not be separately delivered.
   M2 and the M3 MVP require exact-subject producer provenance. Full-disk inventory and material reconciliation
-  are deferred hardening. Authored embedded-component declarations still match pinned upstream metadata; the NVKE
-  OS image build team owns embedded software correctness and runtime validation.
+  are deferred hardening. Embedded-component declarations are optional; if authored, they must match their
+  referenced pinned upstream metadata. Omission is not applicable. The comparison does not establish customized
+  or installed composition; the NVKE OS image build team owns embedded software correctness and runtime validation.
 - V1 production acceptance retains its AMD64-only product floor. M2 requires producer provenance; M3 adds
   authenticated build/evidence checks while retaining producer-only disk scope. The
   [approved October 12 M3 scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
@@ -197,13 +198,14 @@ these named outputs to the exact delivered artifacts.
   scope; installed-content inventory and reconciliation are deferred hardening. NVKE owns the correctness and runtime
   validation of embedded software; NVKR attests production and composition under the admitted evidence contract.
   Matching dependency or inventory evidence never promotes this wrapped disk to a reproduction claim.
-- **Embedded-component declaration.** The OS image producer declares the components it embeds, which may be
-  built or acquired by selected material producers without separate delivery (node-agent, node-side Kubernetes, control-plane images, CNI, and spire-agent
-  if so decided), each with name, version and known source pin. The declaration flows into the provenance's
-  resolved dependencies and the aggregate SBOM as dependency edges from the image to its members, and M3
-  cross-checks it against NVKE's own version manifest at the pinned commit. The declared list alone cannot supply
-  the full-disk inventory. M2 and M3 MVP producer-provenance evidence report inspection as not performed.
-  Read-only final-disk inspection and material reconciliation remain deferred hardening.
+- **Composition inputs and optional metadata.** The OS image's selected source and material inputs account for
+  its required components (node-agent, node-side Kubernetes, control-plane images, CNI, and spire-agent if so
+  decided), without requiring separate delivery. Exact source, patch, configuration and material identities
+  remain bound to production evidence. An embedded-component metadata declaration is optional. If
+  authored, its complete member list, versions and known source pins must match the referenced upstream metadata
+  at the pinned commit; omission is not applicable. This comparison does not apply build customizations or
+  establish installed contents. M2 and M3 MVP producer evidence report inspection as not performed. Read-only
+  final-disk inspection and material reconciliation remain deferred hardening.
 - **Image and blob publication.** Pushing container-image layouts by digest with the pinned digest preserved,
   and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
   digest and skips content that is already present, so re-runs are cheap and mirrors are idempotent.
@@ -213,7 +215,7 @@ these named outputs to the exact delivered artifacts.
   lockfile), which M4 schedules and extends. Each acquired artifact carries an `acquired` provenance attestation
   recording the upstream reference, the lockfile pin, and the fetch time, and making no build claim.
 - **Spire-agent.** Placement requires a recorded owner decision in the Definition: inside the OS
-  image (its matrix row then reads "inside the OS image" and it joins the embedded-component declaration) or
+  image (its matrix row then reads "inside the OS image" and its selected production inputs account for it) or
   acquired by digest as a named output in the Release. Until decided it is a dated deferral, not an omission.
 - **Packages.** An operator tooling package (kubectl, Helm); NVKE chart packages where sources are available. Each is one signed,
   attested OCI artifact.
@@ -239,13 +241,13 @@ incomplete; a build failure cannot create an implicit deferral.
 
 **Acceptance criteria**
 1. The native AMD64 OS image is published as one signed, attested disk-image artifact built from its pinned NVKE commit. Its provenance identifies the source commit, tree hash and wrapped-build scope; exact-subject producer/material evidence and consumer verification succeed. An admitted acquired-disk fallback preserves the pinned bytes and carries acquisition provenance. Inspection is reported honestly and is outside the M3 MVP. Any additional disk selected by the Definition independently satisfies the same delivery and evidence checks.
-2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance lists its declared embedded components, and every embedded row appears in that declaration. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
+2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance binds its selected source and material inputs; every required inside-image component is accounted for in those production inputs. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
 3. CWE controller and NVKE container images are either built (`wrapped-build`, provenance naming the NVKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NVKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
 4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
 5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
 
 **Definition of done**
-- Tests cover tag-move refusal for image, blob, and package pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege, network or credentials before any output is written; the credential-free build phase; release membership rejecting a member digest that differs from the published digest; and an embedded-component declaration that disagrees with the upstream version manifest.
+- Tests cover tag-move refusal for image, blob, and package pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege, network or credentials before any output is written; the credential-free build phase; release membership rejecting a member digest that differs from the published digest; optional embedded metadata that is omitted, agrees with its pinned upstream reference, or fails because referenced upstream metadata is missing, malformed or inconsistent.
 - The evidence log has one row per artifact-matrix row: published reference and digest with its source lane, "inside the OS image" (node-agent, Kubernetes, CNI, and spire-agent if so decided), or the deferral reason and date; plus the single run URL from criterion 5 and the consumer transcripts from criteria 1-4.
 - Every fallback taken and every deferral is recorded in the owning decision record, the implementation record, and this specification's artifact source/delivery matrix.
 - An independent review of the publication code, the wrapped-build policy (where privilege and network are allowed, and that no credential is present), and the definition and lockfile changes is closed.
@@ -259,17 +261,20 @@ incomplete; a build failure cannot create an implicit deferral.
 Successful qualification produces independently verifiable evidence under an identity distinct from the
 builder. Release issuance requires successful qualification and evidence publication for the complete selected set.
 
-The [approved scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826) owns this MVP.
-The [implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930) separates
-artifact authentication, delivered-tool smoke, independent evidence publication and acceptance demonstrations.
-Approval of this scope does not establish completed implementation or organizational ADR ratification.
+This specification records the current scope directed by the user, including optional embedded-component
+metadata. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+establishes producer-only disk evidence and the deferred capabilities described below. The
+[implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930) separates artifact
+authentication, delivered-tool smoke, independent evidence publication and acceptance demonstrations.
+Scope approval does not establish completed implementation or organizational ADR ratification.
 
 **Delivers**
 - **Authenticated candidate.** Strict input and evidence schemas; complete exact output membership; applicable
   pin, digest and source consistency; cryptographically verified build signatures and provenance under the
   expected signer and issuer. Payload and delivery-container identities retain their distinct bindings.
-  Authored embedded-component declarations agree with the upstream version manifest at the pinned commit;
-  this is metadata consistency, without inspection of disk contents.
+  Source, patch, configuration and material identities remain bound to production evidence. Embedded-component
+  declarations are optional; omission is not applicable, while any authored declaration must match its referenced
+  upstream metadata at the pinned commit. This does not establish effective customized or installed composition.
 - **Delivered-tool smoke.** Each selected CLI and operator executable performs its documented version check
   using delivered bytes with networking disabled and without qualification signing authority. Non-tool outputs
   follow an explicit applicability rule.
@@ -295,10 +300,12 @@ results bound to exact artifact subjects; missing or failing required results bl
    extra, duplicate, substituted or mismatched members fail with a specific error. Unrelated Run evidence
    cannot satisfy the candidate.
 2. **Authenticated checks.** Every output passes schema validation, applicable pin/digest consistency and
-   verification of build signatures and provenance against the expected signer and issuer. Authored
-   embedded-component declarations agree with the upstream version manifest at the pinned commit; a missing
-   or disagreeing declaration fails without inspecting disk contents. Provenance identifies the expected
-   source and exact subject. Payload and delivery-container identities are checked through their respective bindings.
+   verification of build signatures and provenance against the expected signer and issuer. Exact source, patch,
+   configuration and material identities remain bound to the producing Run. Embedded-component declarations are
+   optional: omission is not applicable; any authored declaration must agree with its referenced upstream metadata
+   at the pinned commit, and missing, malformed or disagreeing referenced data fails. This metadata check does not
+   establish effective customized or installed composition. Provenance identifies the expected source and exact
+   subject. Payload and delivery-container identities are checked through their respective bindings.
 3. **Delivered-tool smoke.** Every selected CLI and operator executable performs its documented version check
    using delivered bytes without network access. Startup failure, unsuccessful execution or a conflicting
    declared version fails that output. An explicit applicability rule records smoke as not applicable to non-tool outputs.
@@ -314,8 +321,8 @@ results bound to exact artifact subjects; missing or failing required results bl
    signing authority. A green build alone does not establish qualification.
 7. **Observed acceptance.** One complete selected set passes independent consumer verification. Controlled
    failures cover altered bytes, missing provenance, invalid or missing signatures, wrong pins, inconsistent
-   embedded-component declarations, mismatched Run evidence and failed smoke. Each fails with a check-specific
-   error and publishes no qualification attestations.
+   explicitly authored embedded-component metadata, mismatched Run evidence and failed smoke. Each fails with
+   a check-specific error and publishes no qualification attestations.
 8. **Operational failure blocks release.** A signing or evidence-attachment failure marks qualification
    unsuccessful and prevents release issuance. Earlier attachments may remain after an operational failure;
    partial publication never counts as success.

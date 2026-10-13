@@ -151,8 +151,10 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
 documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
-retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening;
-authored embedded-component declarations still require consistency with the pinned upstream version manifest.
+retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
+Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
+match its referenced pinned upstream metadata. That comparison does not establish effective customized or
+installed composition; exact source, patch, configuration and material bindings remain required.
 Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
 
@@ -160,8 +162,13 @@ _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
 Checks for the complete selected artifact set against its exact producing Run, attempt, commit and inputs,
 including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
 has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
-the authenticated check receipt itself grants no signing authority. External suites outside the MVP are
-reported as not evaluated, never passed; a required suite needs authenticated subject-bound evidence.
+the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact Run
+attempt and an independent consumer policy. The generated handoff carries original inputs and evidence for
+recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
+The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
+joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
+subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
 
 **Inventory**:

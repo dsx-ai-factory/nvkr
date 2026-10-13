@@ -18,7 +18,7 @@ import (
 // It is independent of the member limit within each upstream manifest.
 const maxEmbeddedSelectedProducers = 1024
 
-// EmbeddedComponents declares the complete component map at Path in an upstream
+// EmbeddedComponents optionally declares the complete component map at Path in an upstream
 // YAML/JSON manifest. The manifest is read only from this producer's pinned Git
 // commit/tree. Members are metadata expectations, never observed disk contents.
 // An explicitly empty map is allowed only when that exact upstream map is empty.
@@ -110,10 +110,10 @@ func (receipt *EmbeddedReceipt) Description() (EmbeddedDescription, error) {
 	return value, nil
 }
 
-// CheckEmbeddedComponents rechecks every selected producer's applicable authored
-// declarations. Wrapped image/disk producers require an explicit declaration,
-// even for an empty upstream map. Other source producers can opt in. Acquired
-// bytes and hermetic producers without a declaration are not applicable.
+// CheckEmbeddedComponents rechecks every selected producer's explicitly authored
+// declaration. A producer without one is not applicable, regardless of builder
+// type or network mode, and causes no source access. An explicit empty member
+// map still requires the selected pinned upstream map to be empty.
 // Each call admits 1 through 1,024 selected producers before any source access.
 func CheckEmbeddedComponents(ctx context.Context, snapshot *Catalog, selected []string) (*EmbeddedReceipt, error) {
 	return checkEmbeddedComponents(ctx, snapshot, selected, openPinnedTree)
@@ -144,9 +144,6 @@ func checkEmbeddedComponents(ctx context.Context, snapshot *Catalog, selected []
 		if !exists || (i > 0 && names[i-1] == name) || (!component.FromSource && component.Prebuilt == nil) {
 			return nil, e.New(e.CodeInvalidCatalog, "embedded checks have an unknown, duplicate or excluded producer %q", name)
 		}
-		if component.Embeds == nil && embeddedRequired(component) {
-			return nil, e.New(e.CodePinSetMismatch, "wrapped producer %q is missing its embedded-component declaration", name)
-		}
 		components[i] = component
 		components[i].Embeds = CloneEmbeddedComponents(component.Embeds)
 	}
@@ -166,10 +163,6 @@ func checkEmbeddedComponents(ctx context.Context, snapshot *Catalog, selected []
 		return nil, err
 	}
 	return &EmbeddedReceipt{issued: true, description: result}, nil
-}
-
-func embeddedRequired(component Component) bool {
-	return component.FromSource && (component.BuilderType == BuilderBuildKit || component.BuilderType == BuilderVMImage || component.BuildNetwork == "default")
 }
 
 func checkEmbeddedProducer(ctx context.Context, component Component, open embeddedTreeOpener) error {

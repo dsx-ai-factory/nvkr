@@ -22,7 +22,7 @@ func TestWorkflowCompactionPreservesExpandedGraph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(compact, []byte("*nvkr_")) || len(compact) >= len(raw) {
+	if !bytes.Contains(compact, []byte("*n")) || len(compact) >= len(raw) {
 		t.Fatal("repeated steps not compacted")
 	}
 	expected, err := yaml.YAMLToJSONStrict(raw)

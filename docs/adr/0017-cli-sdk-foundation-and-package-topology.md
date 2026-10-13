@@ -91,17 +91,34 @@ canonical, trust, evidence, status and release invariants. `client/v1` is a cont
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
 
-For M3-A, `qualificationorigin` authenticates the exact successful GitHub source Run/attempt against fixed
-provider facts and issues a closeable receipt. `lifecycle.Consumer.CheckQualification` joins that receipt to
-the verified publication, exact Definition/Environment/Plan, every named output and authenticated build
-evidence. Catalog owns pinned upstream embedded-declaration checks; factory owns production-predicate
-semantics; signing owns cryptographic verification. The resulting immutable artifact-check receipt has
-idempotent closure shared by shallow copies and grants no smoke-execution or signing authority. The direct
-consumer operation borrows the caller's source receipt; source closure also revokes the check receipt.
-The file adapter creates and transfers its source owner to the returned check receipt, whose closure then
-closes that source too. Its defensive diagnostics cannot restore authority after closure. The independent `qualification` publisher contract consumes authenticated
-check and smoke receipts; its public descriptions are not receipt constructors. ADR-16 owns verdict and
-publication rules, and reconciliation records the separate A/B/C implementation and acceptance boundaries.
+For M3-A, `run check-artifacts --run <exact-attempt-URL> --policy <path>` delegates to
+`lifecycle.CheckQualificationRun`; the only optional command input is the private workspace. Lifecycle owns
+strict policy loading and the full handoff orchestration. `qualificationorigin` discovers the commit from
+the exact successful GitHub attempt, applies the independent repository/workflow/default-branch policy and
+issues a closeable source receipt. It downloads only that attempt's bounded, provider-digest-bound archive,
+whose sole member is the generated `handoff.json`. An artifact name or decoded description grants no authority.
+
+Factory captures the complete compiler-read authored closure and replays it from memory through the existing
+compiler. Original logical paths, base and output catalog overrides, overlays, registries, locks, patches and
+directory facts are preserved. Capture uses no-follow source reads; each file is bounded to 4 MiB, the
+aggregate to 32 MiB and file/directory/listing facts to 1,024 entries, with the catalog traversal-depth limit.
+Replay cannot fall back to a checkout. Catalog retains its bounded pinned-upstream Git authentication and embedded
+declaration checks, so replay is not offline. Lifecycle compares the recompiled Plan with the saved original.
+The generated producer exports original predicates only after successful finalization; unsigned/dry-run
+producers cannot emit a qualification handoff. Consumer policy and verifier pins remain separately selected.
+
+`lifecycle.Consumer.CheckQualification` joins the authenticated source to the verified publication, exact
+Definition/Environment/Plan, every named output and authenticated build evidence. Factory owns
+production-predicate semantics; signing owns cryptographic verification. The immutable artifact-check receipt
+retains the verified publication and frozen Plan. Its idempotent closure is shared by shallow copies: it
+revokes admission, cancels and joins registered operations, then releases held payloads. The receipt grants
+no smoke-execution or signing authority. The direct consumer and `CheckQualificationHandoff` operations borrow
+the caller's source receipt; source closure also revokes the check receipt. The Run adapter and retained
+`CheckQualificationFiles` diagnostic adapter transfer their source owner to the returned receipt. Defensive
+diagnostics cannot restore authority after closure. The independent `qualification` publisher contract
+consumes authenticated check and smoke receipts; its public descriptions are not receipt constructors.
+ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
+acceptance boundaries.
 
 `status.AcceptDiagnosticCheckpoint` owns protected minimum reads, exact document authentication, checkpoint
 verification and receipt-derived byte-CAS persistence before interpreting withdrawal. Its caller-supplied epoch

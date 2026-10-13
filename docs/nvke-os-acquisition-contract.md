@@ -96,5 +96,5 @@ installer-to-target coverage and evidence joining the exact capture, producer, l
 Base-ISO content, downloads outside APT and events outside the capture window require separate coverage.
 Missing historical repository metadata fails closed; a guessed package URL is never substituted.
 Do not promote this diagnostic to complete acquisition closure or a full disk SBOM. M2's explicit
-build-provenance scope defers deep disk reconciliation to M3; current status belongs in
+build-provenance scope defers deep disk reconciliation beyond the approved M3 MVP; current status belongs in
 [reconciliation](adr/reconciliation.md).
