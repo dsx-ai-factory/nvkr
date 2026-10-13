@@ -110,6 +110,8 @@ func githubFactoryCommand(name, selector string, action func(*cli.Context, *fact
 		if err != nil {
 			return err
 		}
-		return action(c, plan, factory.GitHubStepOptions{Stdout: os.Stdout, Stderr: os.Stderr, SummaryPath: os.Getenv("GITHUB_STEP_SUMMARY")})
+		// The generated workflow owns opening and final Run summaries. Individual
+		// operations retain their full diagnostics in job logs.
+		return action(c, plan, factory.GitHubStepOptions{Stdout: os.Stdout, Stderr: os.Stderr})
 	}}
 }
