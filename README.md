@@ -73,6 +73,20 @@ The [tutorial Definition](definitions/nvke-v1/README.md) selects the CLI, CWE im
 The [combined NVKE candidate](definitions/nvke-m2/README.md) selects 34 outputs, including AMD64 and ARM64
 container and node images, and supplies the repository's generated GitHub workflow.
 
+## Use NVKR with your AI agent
+
+Give a terminal-capable agent this repository URL and a concrete task, for example:
+
+> Use https://github.com/dsx-ai-factory/nvkr to create inputs for a Linux ARM64 NVKE CLI
+> executable. Show the Plan and changes before running anything.
+
+The [NVKR operator skill](.agents/skills/nvkr-operator/SKILL.md) guides the agent through
+safe repository acquisition, the pinned CLI build, customer input authoring, and supported
+operations. It can create or update Definitions, Environments, catalog producers, pins and
+overlays, then validate and explain their effects through the CLI. Repository-aware skill
+clients can discover it after checkout; other agents can follow the linked file directly.
+No global installation is necessary. A URL alone does not request an artifact build or publication.
+
 ## Current scope
 
 GitHub is the maintained hosted generator and signing/publication provider. Actual builds require their
