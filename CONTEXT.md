@@ -175,6 +175,15 @@ External suites outside the MVP are reported as not evaluated, never passed; a r
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
 
+**Test observation**:
+A historical attester record binding exact tested subjects, input identities, suite selection and required
+cases, original public result bytes, environment facts and separate execution/cleanup outcomes. Unsigned
+self-consistency and authenticated attestation are distinct; either may describe failure. Local Kubernetes
+conformance does not establish NVKE site/tenant coverage. Qualification consumes independently authenticated
+required-suite evidence while preserving complete artifact and smoke gates.
+_Avoid_: Current health, installed-byte proof, physical GPU validation, qualification or release acceptance
+
+
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
 _Avoid_: List of successful outputs, component catalog

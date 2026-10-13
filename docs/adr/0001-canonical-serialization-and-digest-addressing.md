@@ -187,6 +187,7 @@ pipeline-attested build/evidence qualification; it does not reuse a reserved qua
 | Qualification evidence | `nvkr.dev/qualification-evidence/v2` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v2` |
 | Qualification policy | `nvkr.dev/qualification-policy/v1` | `nvkr.qualification-policy` | Independently selected configuration; no evidence predicate |
 | Native smoke worker | `nvkr.dev/tool-smoke-worker/v1` | `nvkr.tool-smoke-worker` | Detached signed document; no qualification attachment |
+| Qualification with required suites | `nvkr.dev/qualification-evidence/v3` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v3` |
 
 The document binds the authenticated originating repository, Run, attempt, commit, workflow/ref and build
 invocation; the separately authenticated qualification invocation; gate version; Definition, Environment,
@@ -196,6 +197,9 @@ pass/fail only. Applicable checks must pass before publication; non-applicable c
 applicability result. External suites outside this MVP use `not-evaluated` with reason `outside MVP scope`;
 this is never interpreted as passed. Disk scope states producer-only evidence and no content inspection.
 Unknown fields, versions or verdicts, duplicate members, noncanonical bytes and inexact bindings fail closed.
+The v3 schema binds exact portable observation references/digests and independently selected required-suite
+policies in addition to the unchanged complete artifact and smoke gates. It reuses the owning qualification
+family with explicit incompatible schema/predicate dispatch; native v2 readers and writers have no v3 fallback.
 
 The complete qualification-policy identity includes source and qualifier workflow selection, the distinct
 same-repository native smoke workflow, every platform executable/image pin, fixed tool profiles, explicit

@@ -87,6 +87,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		cmdRunCheckArtifacts(),
 		cmdRunQualify(),
 		cmdRunSmokeWorker(),
+		cmdRunQualifyTests(),
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
 			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},

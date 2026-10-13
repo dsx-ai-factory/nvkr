@@ -43,6 +43,7 @@ func evidenceOptions(c *cli.Context) testobservation.RegistryOptions {
 
 func cmdEvidence() *cli.Command {
 	return &cli.Command{Name: "evidence", Usage: "emit, publish and independently verify portable test observations", Subcommands: []*cli.Command{
+		cmdEvidenceConformance(),
 		{Name: "emit", Usage: "capture reviewed public result files without signing", Flags: []cli.Flag{
 			&cli.StringFlag{Name: "root", Required: true, Usage: "selected result root or immutable observation bundle"}, &cli.StringFlag{Name: "description", Required: true, Usage: "canonical observation description with empty inventory and zero summary"},
 			&cli.StringFlag{Name: "files", Required: true, Usage: "canonical explicit file selection with roles and exact raw pins"}, &cli.StringFlag{Name: "out", Required: true, Usage: "new bundle path; existing output is never replaced"},

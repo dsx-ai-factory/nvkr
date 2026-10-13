@@ -1,0 +1,51 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package conformance
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+)
+
+func TestFileConfigurationRejectsUnsupportedAndOverflowBeforeExecution(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		c    FileConfiguration
+	}{
+		{"unknown schema", FileConfiguration{SchemaVersion: "future", RunTimeoutSeconds: 1, CommandTimeoutSeconds: 1, CleanupTimeoutSeconds: 1}},
+		{"duration overflow", FileConfiguration{SchemaVersion: ConfigurationSchema, RunTimeoutSeconds: 1 << 62, CommandTimeoutSeconds: 1, CleanupTimeoutSeconds: 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := canonical.Marshal(tc.c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "configuration.json")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			result, err := RunFiles(t.Context(), path)
+			if result != nil || err == nil {
+				t.Fatal("unsupported configuration reached producer")
+			}
+		})
+	}
+}
+
+func TestPrivateRecordPreservesOriginalAndCannotOverwrite(t *testing.T) {
+	r := &Result{PrivateWorkspace: t.TempDir(), rawJUnit: []byte("original failed result")}
+	if err := r.SavePrivateDescription(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(r.PrivateWorkspace, "review-junit.xml"))
+	if err != nil || string(raw) != "original failed result" {
+		t.Fatal("original changed", err)
+	}
+	if err := r.SavePrivateDescription(t.Context()); err == nil {
+		t.Fatal("existing private result overwritten")
+	}
+}

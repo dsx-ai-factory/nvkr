@@ -257,6 +257,25 @@ acceptance, NVKE or Kubernetes coverage, public registry access or TestGrid inge
 required-suite qualification and reporting are separate integration capabilities; native smoke
 and independent qualification authorization cannot be inferred from observation receipts.
 
+The next slice adds `pkg/nvkr/conformance`: held pinned native static tools, self-contained private
+kubeconfig, version-matched digest-addressed upstream images, full focused selection, API snapshots,
+original JUnit retention and independently recorded cleanup. Local/site/tenant roles remain explicit; the initial runner admits local execution only. Proper-cluster
+site/tenant execution is deferred until upstream normal cleanup can enforce ownership.
+Linux actual sealed-process fixtures exercise execution, missing/zero/failed results, post-observation
+failure, timeout/cancellation, replaced resources and ownership-checked cleanup. They do not exercise a
+real Kubernetes cluster. Upstream name-based normal cleanup and unbounded downloaded disk use remain
+operational limits. The explicit command saves private candidate descriptions for review before emission.
+
+`qualification`/`sign` v2 add signature-origin-subject-policy-bound live suite receipts and a distinct
+qualification v2 predicate, including authenticated aggregate native-child joins. Suite closure and
+source/check closure invalidate the borrowed authority; failed or required-skipped cases prevent signing.
+Unselected skipped cases do not erase passing required coverage. Complete M3-A artifact membership and
+M3-B smoke gates remain mandatory. The file adapter and CLI reuse the existing source/invocation and
+artifact-check owners. Strong installed-deployment binding remains capability-rejected. Qualification v1
+is unchanged. Contract fixtures cover exact policy/origin/role, negative no-signing gates, late closure,
+version separation and actual local-key cosign v2 interoperability; hosted OIDC, real exact NVKE deployed
+subjects and production qualification acceptance remain unexercised. Reporting is the subsequent slice.
+
 ## Support by owner
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |

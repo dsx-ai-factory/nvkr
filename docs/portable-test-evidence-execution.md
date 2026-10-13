@@ -108,3 +108,65 @@ original result publication and independent consumption. Linux signing race chec
 These checks do not prove hosted OIDC acceptance, actual NVKE or Kubernetes test coverage, anonymous
 public access, external-contributor acceptance or TestGrid ingestion. Those require separately recorded
 exact runs, selected targets and authoritative read-back.
+
+## Run Kubernetes conformance
+
+The first concrete producer is pinned upstream Hydrophone at
+`5fe47daaff5fe025215cb257118dc2a0e643e1d6`. It invokes an existing cluster and
+retains upstream JUnit. It does not create the cluster or implement an alternative test framework.
+A local kind cluster is a useful Kubernetes test environment; its role is `local`, and its results
+cannot establish NVKE site/tenant coverage. AI validation and simulated GPU producers are later work.
+
+Supply canonical `conformance.FileConfiguration` with schema
+`nvkr.dev/conformance-invocation/v1`, exact tool/kubeconfig byte pins, one private context,
+a CNI pod selector, digest-addressed upstream conformance and busybox images, exact stable image
+version, explicit timeout seconds and an independent observation description. The upstream revision,
+image digest and full `\[Conformance\]` focus must match its suite policy. Required cases are independently
+selected from the upstream full conformance selection; never manufacture coverage from observed passes.
+The image version must match the server. Kubernetes API observations supply version and node/runtime/CNI
+facts before and after; role, product binding and time remain declarations. No authenticated installed-byte
+binding is inferred from container image status. Unknown source origin stays unknown.
+
+```sh
+nvkr evidence conformance --configuration private-conformance-invocation.json
+```
+
+Stock execution requires Linux with independently pinned native static Hydrophone/kubectl binaries.
+The initial execution lane admits the local role only; site/tenant execution fails before work until
+upstream normal cleanup can preserve ownership safely. Read-only observation and passive signed-suite
+ingestion remain distinct.
+A private kubeconfig must contain one TLS context with embedded token or certificate/key; external
+credential commands, ambient files and authentication-provider plugins are rejected. This narrow profile
+can require preparing a self-contained test-only credential file. The producer receives no signing OIDC
+credential. Timeouts bound every command, suite and cleanup. Only the uniquely owned test namespace and
+matching RBAC resources are eligible for explicit UID-precondition cleanup; terminal absence is checked.
+Hydrophone's normal automatic cleanup is name-based and upstream file downloads have no hard disk quota.
+These remain operational limitations; the initial supported producer uses a disposable local test
+environment and bounded outer runtime.
+
+The command returns the private workspace and execution/cleanup diagnostics, including on failure.
+`observation-description.json` and `review-junit.xml` there are unsigned candidates. Review the original
+JUnit and public facts, explicitly select public files and raw pins, then use the separate `evidence emit`
+command. Never publish the entire private workspace. `conformance.Result.Emit` provides the same narrow
+SDK projection after explicit reviewed JUnit digest admission. Cancel/infra/no-result records remain
+nonpassing and never fabricate a successful case.
+
+## Qualify authenticated required suites
+
+`run qualify-tests` is the distinct qualification v2 surface; existing `run qualify` retains v1 behavior.
+Use its existing artifact/source/verifier flags plus `--qualification-workflow` and `--suite-config`.
+The bounded canonical `qualification.SuiteConfigurationV2` selects schema
+`nvkr.dev/qualification-suite-configuration/v2`, independent `PolicyV2` requirements and exact suite
+locators with registry options. Generate the JSON with the canonical codec from the typed configuration;
+existing nested transport/credential option field names retain their current Go serialization names.
+Do not place secrets in public summaries or copy consumer policy from a locator.
+
+Each required suite selects exact observation digest/inputs/tested subjects/suite policy, literal signer
+and issuer, and required site/tenant role. The file adapter independently authenticates source and active
+qualifier invocation, verifies complete artifact membership, verifies the suite and issues a live opaque
+receipt. Native children of aggregate image outputs retain their actual native manifest/Build identity.
+A closed/canceled receipt or wrong Run/attempt/policy/subject cannot sign. Strong authenticated installed
+binding is currently unsupported and fails admission. Local kind observations cannot satisfy site/tenant
+policy. The missing M3-B smoke issuer and current OCI/APT applicability limitations still block those
+qualification outputs; conformance is not a substitute. Passing required coverage tolerates upstream
+skips outside required selection, while skipped required cases always block.

@@ -74,8 +74,9 @@ private state; it cannot be serialized or reconstructed from public fields. A fi
 reference, untyped `verified` or `complete` flag, decoded report, or receipt or capability for a different
 artifact, evidence document, or policy is rejected.
 
-- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**. It **never
-  runs the conformance suite**; running it would break verifier isolation and cross into fleet operation.
+- The qualified verifier **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**.
+  It never runs a suite. The separate on-demand pipeline-attested producer in §6 can run pinned upstream
+  conformance against an explicitly selected existing test cluster; this grants no qualified authority.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
   distinct from the build/publish identity**. `vectorDigests` is sorted and exhaustive for the promoted set.
@@ -316,15 +317,40 @@ rerun behavior and revocation; ADR-04 owns explicit consumer scopes. An artifact
 does not establish full-release acceptance. Reconciliation owns implementation and external-acceptance status;
 the approved scope and these contracts do not establish milestone completion or organizational ratification.
 
-### 6. Passive external qualification handoff — deferred producer protocol
+### 6. Portable suite observation and passive qualification handoff
 
-The external suite owns execution, provisioning, process context and lifecycle. NVKR never initiates or
-supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
-suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
-`resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
-unpinned identities, caller-provided pass booleans, wrong roles, expired evidence or mismatched subjects fail
-closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
-are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
+**Pipeline-attested producer contract.** The separate on-demand conformance producer runs pinned upstream
+Hydrophone against an explicitly admitted existing local test cluster. Site/tenant execution is capability-gated
+until upstream normal cleanup can preserve ownership safely. It performs no provisioning or automatic
+fleet discovery. Both native static executables and a self-contained private kubeconfig are byte pinned;
+full `[Conformance]` selection, exact test/sidecar images, version match, required cases and timeouts are
+explicit. The producer has no signing credential. Before/after API snapshots retain Kubernetes version,
+architecture/OS/runtime and CNI image facts without node names, addresses, API endpoints or credentials.
+Site, tenant and local roles are declarations. API facts establish what the endpoint reported, not installed
+artifact origin. Unknown source Run stays unknown. Raw upstream results and private diagnostics are retained
+before bounded run-owned cleanup; execution and cleanup outcomes remain separate. The wrapper's explicit cleanup verifies exact UID ownership and terminal absence. Upstream normal automatic cleanup remains name-based and downloaded
+files have no hard disk quota; outer command/result bounds do not erase those limitations.
+
+**Passive consumer contract.** The verifier and ingester run no suite or provisioning. They authenticate
+already-produced `test-observation/v1` evidence under independent literal signer/issuer, exact input,
+subject, invocation and suite policy expectations; they recompute results from covered original bytes.
+A live closeable suite receipt additionally joins the observation's declared origin to the authenticated
+source Run/attempt and complete artifact-check receipt. It matches exact named native output subjects,
+including native children under the owning authenticated aggregate image-index membership. It requires
+completed execution and cleanup, all independently required cases passed, and no failed/error result;
+skips outside required selection remain visible. Closure or cancellation revokes borrowed authority.
+Local-role observations cannot satisfy site/tenant qualification. A policy requiring authenticated
+installed-deployment binding is capability-rejected before work because that owner is not implemented.
+
+Qualification v2 uses distinct schema/predicate `nvkr.dev/qualification-evidence/v2` and gate v2,
+with no v1 fallback. It retains every complete artifact and smoke gate and adds exact observation references,
+semantic digests and independently selected suite requirements. Missing, wrong-subject, wrong-attempt,
+failed, untrusted or revoked suite evidence prevents all signing. Qualification v1 remains unchanged and
+continues rejecting required external suites. The unavailable M3-B smoke issuer and unsupported OCI/APT
+smoke applicability still block those outputs; suite evidence is not a bypass. Optional/outside-scope
+observations grant no required pass. M4 manifest consumption, qualified exhaustive release-set conformance,
+authenticated deployment and qualification reuse remain deferred; historical or local evidence grants no
+current operational acceptance or CNCF certification.
 
 ## Consequences
 
@@ -337,18 +363,18 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
   rollback restores a known-good candidate only after current authorization and status checks pass.
 
 **Negative / costs**
-- The conformance-result contract and its signer identity are an external dependency — the suite producer, NVKE.
+- The conformance-result signer identity and real-cluster acceptance remain external owner decisions.
 - The clearance result is a new consumable object the downstream must agree to check.
 
 **Neutral**
 - The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
-  It runs no suite, performs no infra rollback, and authorizes no mutation.
+  The verifier runs no suite or infrastructure rollback. The explicit producer owns only its admitted test attempt.
 
 ## Alternatives considered
 
 - **Infer conformance from reproduction (single gate).** Rejected — SEC-08 requires two independent gates.
-- **Run the conformance suite inside NVKR.** Rejected — it breaks verifier isolation and the produce-vs-operate
-  boundary.
+- **Run conformance inside the verifier.** Rejected: passive authentication remains isolated from the separately
+  admitted on-demand upstream producer. Provisioning inside either path remains outside this contract.
 - **Select releases by tag.** Rejected — a mutable tag must never bypass digest and signature verification.
 - **Rollback that mutates running infrastructure.** Rejected — NVKR re-selects a verified set; the engine makes
   any infra change.
