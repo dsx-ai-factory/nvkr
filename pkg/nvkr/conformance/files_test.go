@@ -37,7 +37,7 @@ func TestConfigurationLoadingUsesSelectedPathsAndDurationBounds(t *testing.T) {
 	if err := os.WriteFile(path, configurationBytes(t), 0600); err != nil {
 		t.Fatal(err)
 	}
-	options, err := loadConfiguration(t.Context(), path, "selected-workspace")
+	options, _, err := loadConfiguration(t.Context(), path, "selected-workspace")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestConfigurationRejectsAmbiguousAndAuthorityInputs(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.raw), 0600); err != nil {
 				t.Fatal(err)
 			}
-			_, err := loadConfiguration(t.Context(), path, "/must-not-create")
+			_, _, err := loadConfiguration(t.Context(), path, "/must-not-create")
 			requireCode(t, err, e.CodeUsage)
 		})
 	}
@@ -113,31 +113,20 @@ func TestRunReferenceFilesAdmissionDoesNotReadConfiguration(t *testing.T) {
 
 func TestRunReferenceFilesRejectsWrongLocalPinsBeforeRunAuthentication(t *testing.T) {
 	options := buildFixture(t, "success")
-	for _, tc := range []struct {
-		name string
-		edit func(*Options)
-	}{
-		{"kubeconfig", func(o *Options) { o.Kubeconfig.Digest = "sha256:" + strings.Repeat("c", 64) }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			o := options
-			tc.edit(&o)
-			raw, err := json.Marshal(Configuration{Runner: o, ToolsSource: toolsSourceFixture()})
-			if err != nil {
-				t.Fatal(err)
-			}
-			path := filepath.Join(t.TempDir(), "runner.json")
-			if err := os.WriteFile(path, raw, 0600); err != nil {
-				t.Fatal(err)
-			}
-			// A valid locator with an unreadable policy proves local byte admission
-			// precedes the existing policy/provider owner, which must not be reached.
-			output, err := RunReferenceFiles(t.Context(), "registry.example.test/release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "/must-not-open-policy", path, lifecycle.QualificationRuntimeOptions{WorkspaceRoot: t.TempDir()})
-			requireCode(t, err, e.CodeUnpinnedInput)
-			if output.SchemaVersion != "" {
-				t.Fatal("bad local pin emitted output")
-			}
-		})
+	options.Kubeconfig.Digest = "sha256:" + strings.Repeat("c", 64)
+	raw, err := json.Marshal(Configuration{Runner: options, ToolsSource: toolsSourceFixture()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "runner.json")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	// An unreadable policy proves local byte admission precedes the provider owner.
+	output, err := RunReferenceFiles(t.Context(), "registry.example.test/release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "/must-not-open-policy", path, lifecycle.QualificationRuntimeOptions{WorkspaceRoot: t.TempDir()})
+	requireCode(t, err, e.CodeUnpinnedInput)
+	if output.SchemaVersion != "" {
+		t.Fatal("bad local pin emitted output")
 	}
 }
 

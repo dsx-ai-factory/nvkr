@@ -19,13 +19,6 @@ func cleanupLoopFixture() ([]resourceRef, map[string]string, object) {
 	found.Metadata.UID = owned[refs[0].path]
 	return refs, owned, found
 }
-func requireCleanupCode(t *testing.T, err error, code e.Code) {
-	t.Helper()
-	var coded *e.Error
-	if !errors.As(err, &coded) || coded.Code != code {
-		t.Fatalf("want %s, got %v", code, err)
-	}
-}
 func TestCleanupPermanentDeleteRefusalStopsImmediately(t *testing.T) {
 	for _, name := range []string{"Forbidden", "UID precondition conflict", "unclassified command refusal"} {
 		t.Run(name, func(t *testing.T) {
@@ -52,7 +45,7 @@ func TestCleanupPermanentDeleteRefusalStopsImmediately(t *testing.T) {
 				}
 				return refusal
 			}, time.Millisecond)
-			requireCleanupCode(t, err, e.CodeVerifyFailed)
+			requireCode(t, err, e.CodeVerifyFailed)
 			if calls != 1 || !errors.Is(err, refusal) {
 				t.Fatalf("refusal retried/lost: calls%d err%v", calls, err)
 			}
@@ -74,7 +67,7 @@ func TestCleanupTransientDeletionPreservesCauseOnTimeout(t *testing.T) {
 				}
 				return object{}, nil
 			}, func(context.Context, resourceRef, []byte) error { calls++; return transient }, time.Millisecond)
-			requireCleanupCode(t, err, code)
+			requireCode(t, err, code)
 			if calls < 2 || !errors.Is(err, cause) || !errors.Is(err, context.DeadlineExceeded) {
 				t.Fatalf("retry cause lost: calls%d err%v", calls, err)
 			}
@@ -95,7 +88,7 @@ func TestCleanupDeleteFailurePreservedOnLaterGetFailure(t *testing.T) {
 		}
 		return object{}, nil
 	}, func(context.Context, resourceRef, []byte) error { calls++; return deletion }, time.Millisecond)
-	requireCleanupCode(t, err, e.CodeUnavailable)
+	requireCode(t, err, e.CodeUnavailable)
 	if !errors.Is(err, deletion) || !errors.Is(err, getErr) || calls != 1 {
 		t.Fatalf("lost delete/GET causes: %v", err)
 	}

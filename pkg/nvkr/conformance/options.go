@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
 	"time"
 
@@ -193,13 +192,8 @@ func decodeAPI(raw []byte, out any) error {
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return failure("ambiguous cluster API JSON")
 	}
-	d := json.NewDecoder(bytes.NewReader(raw))
-	if err := d.Decode(out); err != nil {
+	if err := json.Unmarshal(raw, out); err != nil {
 		return failure("invalid cluster API JSON")
-	}
-	var extra any
-	if err := d.Decode(&extra); !errors.Is(err, io.EOF) {
-		return failure("trailing cluster API JSON")
 	}
 	return nil
 }
@@ -219,7 +213,7 @@ func validateOptions(o Options) (Options, error) {
 		return Options{}, e.New(e.CodeUnsupported, "conformance profile does not admit caller environment overrides; configure the supported tool flags and embedded kubeconfig")
 	}
 	if !safetext.Valid(o.SuiteName, 256, false) || strings.TrimSpace(o.SuiteName) != o.SuiteName || !safetext.Valid(o.WorkspaceRoot, 4096, false) {
-		return Options{}, e.New(e.CodeUsage, "conformance requires named suite, declared harness version and private workspace root")
+		return Options{}, e.New(e.CodeUsage, "conformance requires named suite and private workspace root")
 	}
 	if o.Context == "" || len(o.Context) > 4096 || strings.ContainsAny(o.Context, "\x00\r\n") || o.CNISelector == "" || len(o.CNISelector) > 4096 || strings.ContainsAny(o.CNISelector, "\x00\r\n") {
 		return Options{}, e.New(e.CodeUsage, "conformance: explicit private context and CNI selector required")

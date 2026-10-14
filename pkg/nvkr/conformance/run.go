@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"time"
@@ -321,20 +322,7 @@ func resourceRefs(ns string) []resourceRef {
 func (a *admitted) getObject(ctx context.Context, workspace string, ref resourceRef) (object, error) {
 	// --ignore-not-found distinguishes absence from authentication/network errors
 	// without interpreting localized stderr or accepting an arbitrary exit code.
-	var kind, name string
-	for i := len(ref.path) - 1; i >= 0; i-- {
-		if ref.path[i] == '/' {
-			name = ref.path[i+1:]
-			prefix := ref.path[:i]
-			for j := len(prefix) - 1; j >= 0; j-- {
-				if prefix[j] == '/' {
-					kind = prefix[j+1:]
-					break
-				}
-			}
-			break
-		}
-	}
+	kind, name := path.Base(path.Dir(ref.path)), path.Base(ref.path)
 	raw, _, err := a.kube(ctx, workspace, nil, "get", kind, name, "--ignore-not-found=true", "-o", "json")
 	if err != nil {
 		return object{}, err

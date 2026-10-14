@@ -112,8 +112,15 @@ type deploymentNode struct {
 	Metadata apiMetadata `json:"metadata"`
 	Status   struct {
 		NodeInfo struct {
-			OperatingSystem string `json:"operatingSystem"`
-			Architecture    string `json:"architecture"`
+			OperatingSystem         string `json:"operatingSystem"`
+			Architecture            string `json:"architecture"`
+			OSImage                 string `json:"osImage"`
+			KernelVersion           string `json:"kernelVersion"`
+			ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
+			KubeletVersion          string `json:"kubeletVersion"`
+			MachineID               string `json:"machineID"`
+			BootID                  string `json:"bootID"`
+			SystemUUID              string `json:"systemUUID"`
 		} `json:"nodeInfo"`
 	} `json:"status"`
 }

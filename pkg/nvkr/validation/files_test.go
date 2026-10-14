@@ -35,22 +35,6 @@ func requireError(t *testing.T, err error, code e.Code, message string) {
 		t.Fatalf("error=%v want=%s containing %q", err, code, message)
 	}
 }
-func TestProfileDefaultAndExplicitCheckSelection(t *testing.T) {
-	for _, checkName := range []string{"", "kube-conformance"} {
-		raw, err := json.Marshal(profileFixture())
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := saveProfile(t, raw)
-		profile, checks, err := loadConfiguration(t.Context(), checkName, path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if profile.Source.Policy != filepath.Join(filepath.Dir(path), "policy.yaml") || len(checks) != 1 || checks[0].Config != filepath.Join(filepath.Dir(path), "checks/conformance.json") {
-			t.Fatalf("selected configuration differs: %+v %+v", profile, checks)
-		}
-	}
-}
 func TestProfileCapabilityRefusalPrecedesSourceAndHarnessWork(t *testing.T) {
 	for _, tc := range []struct {
 		name, selection string
@@ -172,14 +156,24 @@ func TestConfiguredCheckInstancesSelectTheirExplicitSuite(t *testing.T) {
 		selection string
 		count     int
 	}{{"", 2}, {"my-customer-check", 1}, {"another-check", 1}} {
-		_, selected, err := loadConfiguration(t.Context(), tc.selection, path)
+		loaded, selected, err := loadConfiguration(t.Context(), tc.selection, path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(selected) != tc.count {
 			t.Fatalf("selection %q: got %d checks", tc.selection, len(selected))
 		}
+		if loaded.Source.Policy != filepath.Join(filepath.Dir(path), profile.Source.Policy) {
+			t.Fatal("policy path did not resolve beside configuration")
+		}
 		for _, check := range selected {
+			config := profile.Checks[0].Config
+			if check.Name == second.Name {
+				config = second.Config
+			}
+			if check.Config != filepath.Join(filepath.Dir(path), config) {
+				t.Fatal("check path did not resolve beside configuration")
+			}
 			if check.Suite != "kube-conformance" || check.Harness != "hydrophone" {
 				t.Fatal("instance name changed explicit suite/harness")
 			}

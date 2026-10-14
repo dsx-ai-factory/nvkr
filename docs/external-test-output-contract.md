@@ -132,7 +132,7 @@ owner-only pinned access input for an existing disposable cluster. The acknowled
 responsibility, not proof of locality or exclusive ownership.
 
 The current binding supports selected native OCI images only. Before/after API checks match PodSpec
-and image-ID to the authenticated native manifest selected by node platform, and compare mapped
+and image-ID to the authenticated native manifest selected by node platform, and compare
 the `kube-system` namespace UID as a cluster-identity surrogate, plus mapped pod/node/container
 identities and restart counts. They describe those two snapshots, not
 continuous identity during execution, installed-byte attestation or coverage of unmapped outputs/index

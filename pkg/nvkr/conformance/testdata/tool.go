@@ -71,10 +71,6 @@ func main() {
 		}
 		fmt.Fprintln(os.Stdout, "private Hydrophone stdout")
 		fmt.Fprintln(os.Stderr, "private Hydrophone stderr")
-		if mode == "verbose" {
-			fmt.Fprint(os.Stdout, strings.Repeat("x", 17<<20))
-			fmt.Fprint(os.Stderr, strings.Repeat("y", 2<<20))
-		}
 		ns := value("--namespace=")
 		m := readState()
 		m["clusterroles/conformance-serviceaccount:"+ns] = "role-uid"
@@ -83,16 +79,13 @@ func main() {
 		if strings.HasPrefix(mode, "cancel") {
 			time.Sleep(30 * time.Second)
 		}
-		if mode != "slow-recovery" && mode != "missing" && mode != "deploy-failure" && mode != "interrupted-retrievable" && mode != "empty-inpod" && mode != "malformed-inpod" {
+		if mode != "slow-recovery" && mode != "missing" && mode != "interrupted-retrievable" && mode != "malformed-inpod" {
 			raw := `<testsuite name="Kubernetes e2e suite" tests="1" failures="0"><testcase classname="Kubernetes e2e suite" name="[It] required"/></testsuite>`
 			if mode == "large-retrievable" {
 				raw = ""
 			}
 			if mode == "empty-retrievable" {
 				raw = ""
-			}
-			if mode == "truncated-retrievable" {
-				raw = "<testsuite"
 			}
 			if mode == "zero" {
 				raw = `<testsuite name="Kubernetes e2e suite" tests="0"/>`
@@ -110,7 +103,7 @@ func main() {
 			m["_finished"] = "yes"
 			save(m)
 		}
-		if mode == "failed" || mode == "deploy-failure" {
+		if mode == "failed" {
 			os.Exit(1)
 		}
 		return
@@ -127,16 +120,8 @@ func main() {
 	switch args[0] {
 	case "get":
 		if has("--raw=/version") {
-			if mode == "api-overflow" {
-				fmt.Fprint(os.Stdout, strings.Repeat("x", 17<<20))
-				return
-			}
 			if mode == "after-failure" && readState()["_finished"] != "" {
 				os.Exit(9)
-			}
-			if mode == "version-mismatch" {
-				output(map[string]string{"gitVersion": "v1.34.1"})
-				return
 			}
 			output(map[string]string{"gitVersion": "v1.35.1"})
 			return
@@ -274,9 +259,6 @@ func main() {
 	case "exec":
 		if mode == "slow-recovery" {
 			time.Sleep(30 * time.Second)
-		}
-		if mode == "empty-inpod" {
-			return
 		}
 		if mode == "malformed-inpod" {
 			fmt.Fprint(os.Stdout, "<testsuite")

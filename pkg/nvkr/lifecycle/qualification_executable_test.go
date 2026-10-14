@@ -19,12 +19,7 @@ import (
 
 func executableReceiptFixture(t *testing.T) (*ArtifactCheckReceipt, ExecutableMemberDescription) {
 	t.Helper()
-	request, consumer, verifier := newQualificationFixture(t)
-	receipt, _, err := consumer.checkQualification(t.Context(), request, verifier.source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = receipt.Close() })
+	receipt := diagnosticReceiptFixture(t)
 	description, err := receipt.Description()
 	if err != nil {
 		t.Fatal(err)

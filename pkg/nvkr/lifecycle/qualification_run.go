@@ -53,11 +53,6 @@ func CheckQualificationRun(ctx context.Context, runURL, policyPath string, optio
 	if err != nil {
 		return nil, nil, err
 	}
-	return checkQualificationRunWithPolicy(ctx, locator, policy, options)
-}
-
-// The caller has frozen the independently selected policy exactly once.
-func checkQualificationRunWithPolicy(ctx context.Context, locator qualificationorigin.RunLocator, policy QualificationPolicy, options QualificationRuntimeOptions) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
 	return checkQualificationRunWithPolicyAndReference(ctx, locator, policy, options, "")
 }
 

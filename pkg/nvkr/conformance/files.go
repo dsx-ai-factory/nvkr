@@ -64,7 +64,7 @@ func RunReferenceFiles(ctx context.Context, reference, policyPath, configPath st
 	if err := heldfile.RequireExecutableSupport(); err != nil {
 		return testresults.Output{}, capability(err)
 	}
-	options, toolsSource, err := loadConfigurationWithSource(ctx, configPath, runtimeOptions.WorkspaceRoot)
+	options, toolsSource, err := loadConfiguration(ctx, configPath, runtimeOptions.WorkspaceRoot)
 	if err != nil {
 		return testresults.Output{}, err
 	}
@@ -110,12 +110,7 @@ func RunReferenceFiles(ctx context.Context, reference, policyPath, configPath st
 	return producer.Produce(ctx)
 }
 
-func loadConfiguration(ctx context.Context, path, workspace string) (Options, error) {
-	options, _, err := loadConfigurationWithSource(ctx, path, workspace)
-	return options, err
-}
-
-func loadConfigurationWithSource(ctx context.Context, path, workspace string) (Options, PublishedSource, error) {
+func loadConfiguration(ctx context.Context, path, workspace string) (Options, PublishedSource, error) {
 	const limit = 1 << 20
 	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "conformance configuration", MaxBytes: limit})
 	if err != nil {
@@ -159,10 +154,8 @@ func loadConfigurationWithSource(ctx context.Context, path, workspace string) (O
 	if err != nil {
 		return Options{}, PublishedSource{}, e.Wrap(e.CodeUsage, err, "resolving conformance configuration path")
 	}
-	for _, tool := range []*Tool{&options.Kubeconfig} {
-		if tool.Path != "" && !filepath.IsAbs(tool.Path) {
-			tool.Path = filepath.Join(filepath.Dir(configPath), tool.Path)
-		}
+	if options.Kubeconfig.Path != "" && !filepath.IsAbs(options.Kubeconfig.Path) {
+		options.Kubeconfig.Path = filepath.Join(filepath.Dir(configPath), options.Kubeconfig.Path)
 	}
 	options.WorkspaceRoot, err = filepath.Abs(workspace)
 	if err != nil {

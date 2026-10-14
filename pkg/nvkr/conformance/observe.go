@@ -56,25 +56,7 @@ func (a *admitted) observe(ctx context.Context, workspace, phase string) ([]test
 		return env, err
 	}
 	var nodes struct {
-		Items []struct {
-			Metadata struct {
-				Name string `json:"name"`
-				UID  string `json:"uid"`
-			} `json:"metadata"`
-			Status struct {
-				NodeInfo struct {
-					Architecture            string `json:"architecture"`
-					OperatingSystem         string `json:"operatingSystem"`
-					OSImage                 string `json:"osImage"`
-					KernelVersion           string `json:"kernelVersion"`
-					ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
-					KubeletVersion          string `json:"kubeletVersion"`
-					MachineID               string `json:"machineID"`
-					BootID                  string `json:"bootID"`
-					SystemUUID              string `json:"systemUUID"`
-				} `json:"nodeInfo"`
-			} `json:"status"`
-		} `json:"items"`
+		Items []deploymentNode `json:"items"`
 	}
 	if err = decodeAPI(raw, &nodes); err != nil {
 		return env, err
