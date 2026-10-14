@@ -77,19 +77,20 @@ requires no GitHub secret; private passphrases remain unsupported.
 
 ## Preparatory external test output boundary
 
-`pkg/nvkr/testresults` supplies an output-description contract for original JUnit XML and CTRF JSON
-references and available producer metadata. Its validator admits wrapper/reference/metadata shape only;
-references and metadata are declarations until independently checked. No new lifecycle object,
-structured identity, authenticated receipt or passing verdict is issued. Optional bindings reuse
-`lifecycle.ExactInputDescription` and `sign.Subject` descriptions; existing validation-vector v3 and
-qualification-evidence v2 remain unchanged and cannot be authorized by this output.
+`pkg/nvkr/testresults` owns producer-supplied JUnit/CTRF report references and metadata in lane
+**none (descriptive)**. Bounded wrapper validation and deterministic Encode/Decode are implemented;
+complete/partial capture declarations do not mean suite success. Optional post-publication input
+bindings require the existing complete exact-input shape, including policy identity. Local subject
+descriptions and policy references grant no authentication or enforcement. Validation-vector v3 and
+qualification-evidence v2 remain unchanged.
 
-Authoritative format validation is deferred: no JUnit profile parser or CTRF JSON Schema validator is
-implemented by this change. Concrete producer execution, environment observation, file capture and
-retention, signing/registry transport, CLI/SDK workflows, qualification and Verification Policy integration
-remain disabled or unimplemented at this boundary. Contract tests do not establish external producer,
-Kubernetes runtime or service acceptance. The [contract reference](../portable-test-evidence-execution.md)
-pins the upstream format source and records these limits.
+The `Producer` interface permits external implementations outside the qualified verifier; no producer
+execution, file collector, original-byte verification, JUnit parser or CTRF JSON Schema validator is
+supplied. Runtime adapters, generic test selection, authenticated coverage/qualification, signing and
+publication remain unimplemented. Contract tests establish no external execution or service acceptance.
+[ADR-05](0005-trust-object-model-and-digest-authentication.md#4-publisher-evidence-and-later-observations-are-different-trust-objects)
+and [ADR-16](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+retain evidence separation; the [contract reference](../external-test-output-contract.md) records limits.
 
 ## M3 MVP scope and acceptance boundary
 

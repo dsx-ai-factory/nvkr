@@ -26,16 +26,6 @@ belongs to the downstream deployment owner and is not part of the Definition or 
 sets, clearance, publication roots, and qualification records are generated/authenticated internals available
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
-External test producers have a preparatory output-description boundary under `pkg/nvkr/testresults`.
-It references original JUnit XML, CTRF JSON, or both, and preserves the distinction between declared,
-observed and missing metadata. These descriptions grant no receipt or lifecycle authority. Contract
-validation covers the wrapper and references only; format validation, concrete producers, runtime,
-file capture, signing, publication and lifecycle integration remain deferred. The relationship to public
-Verification Policy is deferred. The [external test output reference](../portable-test-evidence-execution.md)
-owns format-source references and current limits. Optional bindings reuse existing input/subject
-descriptions; validation-vector v3 and qualification-evidence v2 stay unchanged. No new digest family,
-authored object or qualification signing capability is introduced.
-
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
 set; the compiler derives one native producer target per member and one required image-index output
@@ -321,12 +311,22 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, and the separate M3-C `qualification` publisher.
+  `qualificationorigin`, `testresults`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
   own a competing schema, verifier, receipt constructor, or policy decision. Remaining multi-step command
   orchestration is migration debt tracked independently rather than declared absent.
+
+`testresults` owns external producer output descriptions, wrapper validation and deterministic
+serialization. Its lane is **none (descriptive)**. `Producer` permits external implementations outside
+the qualified verifier; the package supplies no execution implementation, file capture, result parser,
+signer or qualification receipt. Outputs are producer-supplied data, not public lifecycle objects.
+Optional post-publication inputs reuse `lifecycle.ExactInputDescription`; local subject descriptions
+carry immutable reference/digest declarations. Policy references do not activate enforcement.
+Validation-vector v3 and qualification-evidence v2 remain unchanged. The
+[external test output reference](../external-test-output-contract.md) owns format pins and limits;
+ADR-05/16 keep later descriptive outputs separate from publisher evidence and verifier authority.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 

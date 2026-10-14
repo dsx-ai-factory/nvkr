@@ -112,6 +112,12 @@ evidence and is never included in, or hashed back into, the reference vector it 
 compatibility, and vulnerability results are likewise release-gate receipts under ADR-13/16, not mutable fields
 added to an already published vector. Every claim therefore has exactly one owner and no vector self-compares.
 
+External test output descriptions are producer-supplied data in lane **none (descriptive)**, not
+publisher evidence or later authenticated release-gate receipts. The ADR-17 interface permits external
+producer implementations outside the qualified verifier; no execution implementation is supplied.
+A future explicit diagnostic adapter must remain isolated from verification and cannot rewrite a
+published vector or convert its own unsigned output into qualification authority (ADR-16).
+
 Every retained trust object — resolved build graph, ValidationVector, ReleaseSet, Inventory,
 publisher-evidence index, and ReproductionObservation — is independently digest-addressable via the ADR-01 codec,
 satisfying SEC-01.

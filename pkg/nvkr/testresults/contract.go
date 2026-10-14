@@ -6,7 +6,9 @@
 package testresults
 
 import (
+	"bytes"
 	"context"
+	"sort"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -15,9 +17,21 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 const SchemaVersion = "nvkr.dev/test-results-output/v1"
+
+// Limits bound descriptive handoffs, not report payloads or execution coverage.
+const MaxDocumentBytes = 16 << 20
+const MaxSelections = 1024
+const MaxReports = 1024
+const MaxEnvironmentFacts = 10000
+const MaxSubjects = 1024
+const CaptureComplete = "complete"
+const CapturePartial = "partial"
+const emptyBlobDigest = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
 const FormatJUnit = "junit-xml"
 const FormatCTRF = "ctrf-json"
 
@@ -26,8 +40,9 @@ const FormatCTRF = "ctrf-json"
 // does not validate JSON against the upstream schema or interpret test results.
 const CTRFProfile = "ctrf-0.2.0"
 
-// Producer implementations own configuration and execution. An error may
-// accompany partial diagnostic output; neither output nor Validate implies pass.
+// Producer implementations outside the qualified verifier own configuration and
+// execution. On error, any retained output must use CapturePartial. Neither
+// output, CaptureComplete nor Validate implies that tests passed.
 type Producer interface {
 	Produce(context.Context) (Output, error)
 }
@@ -35,12 +50,15 @@ type Producer interface {
 // Output is a descriptive handoff, not a receipt or a new lifecycle input.
 // An absent Binding permits standalone producers without invented NVKR inputs.
 type Output struct {
+	// CaptureStatus records capture completeness, never a test verdict. Partial
+	// output may retain reports, facts and bindings after producer failure.
+	CaptureStatus string            `json:"captureStatus"`
 	SchemaVersion string            `json:"schemaVersion"`
 	Producer      ProducerIdentity  `json:"producer"`
 	Suite         SuiteSelection    `json:"suite"`
 	Harness       *HarnessIdentity  `json:"harness,omitempty"`
-	Reports       []ReportReference `json:"reports"`
-	Environment   []EnvironmentFact `json:"environment"`
+	Reports       []ReportReference `json:"reports,omitempty"`
+	Environment   []EnvironmentFact `json:"environment,omitempty"`
 	Binding       *Binding          `json:"binding,omitempty"`
 }
 
@@ -101,16 +119,38 @@ type Binding struct {
 }
 
 type SubjectBinding struct {
-	Output   string       `json:"output"`
-	Platform string       `json:"platform,omitempty"`
-	Subject  sign.Subject `json:"subject"`
+	Output   string             `json:"output"`
+	Platform string             `json:"platform,omitempty"`
+	Subject  SubjectDescription `json:"subject"`
+}
+
+// SubjectDescription owns this handoff's stable wire keys. Converting to the
+// signing owner's shape only validates descriptions; it grants no signing proof.
+type SubjectDescription struct {
+	Ref    string `json:"ref"`
+	Digest string `json:"digest"`
 }
 
 // Validate checks only the handoff description. It performs no I/O, hashing,
 // format parsing, count reconciliation, coverage evaluation or passing verdict.
 func (o Output) Validate() error {
-	if o.SchemaVersion != SchemaVersion || !text(o.Producer.Name) || !text(o.Suite.Name) {
-		return invalid("test output requires its schema and named producer and suite")
+	if o.SchemaVersion == "" {
+		return invalid("schema is required")
+	}
+	if o.SchemaVersion != SchemaVersion {
+		return unsupported("schema")
+	}
+	if o.CaptureStatus == "" {
+		return invalid("capture status is required")
+	}
+	if o.CaptureStatus != CaptureComplete && o.CaptureStatus != CapturePartial {
+		return unsupported("capture status")
+	}
+	if !text(o.Producer.Name) || !text(o.Suite.Name) {
+		return invalid("named producer and suite are required")
+	}
+	if len(o.Suite.Selection) > MaxSelections || len(o.Reports) > MaxReports || len(o.Environment) > MaxEnvironmentFacts {
+		return invalid("collection count exceeds its limit")
 	}
 	if err := o.Producer.Revision.validate(); err != nil {
 		return err
@@ -126,7 +166,7 @@ func (o Output) Validate() error {
 			return err
 		}
 	}
-	if len(o.Suite.Selection) == 0 || len(o.Reports) == 0 {
+	if len(o.Suite.Selection) == 0 || o.CaptureStatus == CaptureComplete && len(o.Reports) == 0 {
 		return invalid("test output requires explicit selection and original report references")
 	}
 	selection := map[string]bool{}
@@ -138,14 +178,23 @@ func (o Output) Validate() error {
 	}
 	reports := map[string]ReportReference{}
 	for _, report := range o.Reports {
-		if report.Format != FormatJUnit && report.Format != FormatCTRF {
-			return e.New(e.CodeUnsupported, "unsupported test report format")
+		if report.Format == "" {
+			return invalid("report format is required")
 		}
-		if !text(report.Profile) || report.Format == FormatCTRF && report.Profile != CTRFProfile {
-			return invalid("test report requires an admitted profile")
+		if report.Format != FormatJUnit && report.Format != FormatCTRF {
+			return unsupported("report format")
+		}
+		if !text(report.Profile) {
+			return invalid("report profile requires canonical text")
+		}
+		if report.Format == FormatCTRF && report.Profile != CTRFProfile {
+			return unsupported("CTRF profile")
 		}
 		if !text(report.Reference) || !canonical.IsDigest(report.Digest) || report.ByteLength < 0 {
-			return invalid("original report requires a unique reference, exact sha256 and nonnegative byte length")
+			return invalid("report requires canonical reference, exact sha256 and nonnegative byte length")
+		}
+		if report.ByteLength == 0 && report.Digest != emptyBlobDigest {
+			return invalid("zero byte report requires the empty sha256 digest")
 		}
 		if _, duplicate := reports[report.Reference]; duplicate {
 			return invalid("original report references must be unique")
@@ -157,7 +206,10 @@ func (o Output) Validate() error {
 			continue
 		}
 		source, included := reports[report.DerivedFrom]
-		if !included || report.DerivedFrom == report.Reference {
+		if report.DerivedFrom == report.Reference {
+			return invalid("report cannot derive from itself")
+		}
+		if !included {
 			return invalid("derived report must reference another included original report")
 		}
 		if source.DerivedFrom != "" {
@@ -171,7 +223,10 @@ func (o Output) Validate() error {
 			return invalid("environment facts require unique scoped names and phases")
 		}
 		if fact.Phase != "before" && fact.Phase != "during" && fact.Phase != "after" && fact.Phase != "unknown" {
-			return invalid("unsupported environment observation phase")
+			if fact.Phase == "" {
+				return invalid("environment phase is required")
+			}
+			return unsupported("environment phase")
 		}
 		if err := fact.Metadata.validate(); err != nil {
 			return err
@@ -184,27 +239,41 @@ func (o Output) Validate() error {
 	if o.Binding.Inputs == nil && len(o.Binding.Subjects) == 0 {
 		return invalid("empty test output binding")
 	}
+	if len(o.Binding.Subjects) > MaxSubjects {
+		return invalid("subject count exceeds its limit")
+	}
 	if inputs := o.Binding.Inputs; inputs != nil {
-		for _, digest := range []string{inputs.PolicyDigest, inputs.DefinitionDigest, inputs.EnvironmentDigest, inputs.PlanDigest, inputs.ContentSubject} {
-			if !canonical.IsDigest(digest) {
-				return invalid("test input binding requires complete existing input identities")
-			}
-		}
-		if err := delivery.ValidatePublicationReference(inputs.ReleaseSubject); err != nil {
-			return err
+		if err := inputs.Validate(); err != nil {
+			return e.Wrap(e.CodeUsage, err, "test output input binding")
 		}
 	}
+	emptyPlatforms := map[string]bool{}
+	nativePlatforms := map[string]bool{}
 	subjects := map[[2]string]bool{}
 	for _, subject := range o.Binding.Subjects {
 		key := [2]string{subject.Output, subject.Platform}
 		if !text(subject.Output) || subject.Platform != "" && !text(subject.Platform) || subjects[key] {
 			return invalid("test subjects require unique named output and platform descriptions")
 		}
-		if err := subject.Subject.Validate(); err != nil {
-			return err
+		if subject.Platform != "" {
+			if err := target.ValidatePlatform(subject.Platform); err != nil {
+				return e.Wrap(e.CodeUsage, err, "test output subject platform")
+			}
+			nativePlatforms[subject.Output] = true
+		} else {
+			emptyPlatforms[subject.Output] = true
+		}
+		if emptyPlatforms[subject.Output] && nativePlatforms[subject.Output] {
+			return invalid("subject output cannot mix absent and native platforms")
+		}
+		if !text(subject.Subject.Ref) || strings.Contains(subject.Subject.Ref, "://") {
+			return invalid("subject reference requires canonical OCI locator")
+		}
+		if err := (sign.Subject{Ref: subject.Subject.Ref, Digest: subject.Subject.Digest}).Validate(); err != nil {
+			return e.Wrap(e.CodeUsage, err, "test output subject binding")
 		}
 		if err := delivery.ValidatePublicationReference(subject.Subject.Ref); err != nil {
-			return err
+			return e.Wrap(e.CodeUsage, err, "test output subject reference")
 		}
 		subjects[key] = true
 	}
@@ -222,7 +291,10 @@ func (m Metadata) validate() error {
 			return invalid("unknown or unavailable metadata cannot claim a value")
 		}
 	default:
-		return invalid("metadata requires explicit declared, observed, unknown or unavailable status")
+		if m.Status == "" {
+			return invalid("metadata status is required")
+		}
+		return unsupported("metadata status")
 	}
 	return nil
 }
@@ -230,4 +302,71 @@ func (m Metadata) validate() error {
 func text(value string) bool {
 	return safetext.Valid(value, 4096, false) && strings.TrimSpace(value) == value
 }
-func invalid(message string) error { return e.New(e.CodeVerifyFailed, "%s", message) }
+func invalid(message string) error { return e.New(e.CodeUsage, "test output: %s", message) }
+
+func unsupported(field string) error {
+	return e.New(e.CodeUnsupported, "test output: unsupported %s", field)
+}
+
+// Encode validates the description, sorts cloned collections and emits canonical
+// JSON. Neither this encoding nor capture completeness interprets test outcomes.
+func Encode(output Output) ([]byte, error) {
+	if err := output.Validate(); err != nil {
+		return nil, err
+	}
+	output.Suite.Selection = append([]string(nil), output.Suite.Selection...)
+	sort.Strings(output.Suite.Selection)
+	output.Reports = append([]ReportReference(nil), output.Reports...)
+	sort.Slice(output.Reports, func(i, j int) bool { return output.Reports[i].Reference < output.Reports[j].Reference })
+	output.Environment = append([]EnvironmentFact(nil), output.Environment...)
+	sort.Slice(output.Environment, func(i, j int) bool {
+		a, b := output.Environment[i], output.Environment[j]
+		if a.Phase != b.Phase {
+			return a.Phase < b.Phase
+		}
+		if a.Scope != b.Scope {
+			return a.Scope < b.Scope
+		}
+		return a.Name < b.Name
+	})
+	if output.Binding != nil {
+		binding := *output.Binding
+		binding.Subjects = append([]SubjectBinding(nil), binding.Subjects...)
+		sort.Slice(binding.Subjects, func(i, j int) bool {
+			a, b := binding.Subjects[i], binding.Subjects[j]
+			if a.Output != b.Output {
+				return a.Output < b.Output
+			}
+			return a.Platform < b.Platform
+		})
+		output.Binding = &binding
+	}
+	raw, err := canonical.Marshal(output)
+	if err != nil {
+		return nil, e.Wrap(e.CodeUsage, err, "test output encoding")
+	}
+	if len(raw) > MaxDocumentBytes {
+		return nil, invalid("encoded document exceeds byte limit")
+	}
+	return raw, nil
+}
+
+// Decode accepts only the bounded, normalized canonical wire representation.
+// Unknown fields, duplicate keys and alternative encodings fail before handoff.
+func Decode(raw []byte) (Output, error) {
+	if len(raw) == 0 || len(raw) > MaxDocumentBytes {
+		return Output{}, invalid("document byte length exceeds bounds")
+	}
+	var output Output
+	if err := canonical.UnmarshalExact(raw, &output); err != nil {
+		return Output{}, e.Wrap(e.CodeUsage, err, "test output decoding")
+	}
+	normalized, err := Encode(output)
+	if err != nil {
+		return Output{}, err
+	}
+	if !bytes.Equal(raw, normalized) {
+		return Output{}, invalid("collections must use normalized ordering")
+	}
+	return output, nil
+}

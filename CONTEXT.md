@@ -242,6 +242,13 @@ A catalog declaration describing how to build or acquire a named component from 
 platforms it supports. It carries build or acquisition instructions, never a deployment placement taxonomy.
 _Avoid_: Named output, artifact, authored build group
 
+**External test producer**:
+An external implementation of the test-output interface that owns its test execution and supplies
+original report references plus descriptive metadata. Distinct from a component catalog producer,
+which builds or acquires delivery artifacts. The output-description package supplies no executor,
+suite-selection dispatcher or authenticated evidence; its lane is none (descriptive).
+_Avoid_: Component producer, qualified verifier, conformance receipt
+
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact
 toolchain-pin substitution for an explicit sorted component set and host architecture. Substitution fails if
