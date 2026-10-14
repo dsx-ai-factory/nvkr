@@ -317,6 +317,13 @@ workspace, new identity or serialized verification capability is introduced. Con
 source compatibility, installation formats and offline completeness. Unpublished packages remain Run
 artifacts; this interface describes publications and does not assemble a release from a local workspace.
 
+Diagnostic executable pulling reuses that complete metadata/evidence validation, then checks and extracts only
+one exact named executable payload into a new caller-selected directory. Delivery owns admission, metadata
+and payload checks, safe file membership, preserved permission modes, destination publication and temporary
+cleanup; lifecycle supplies the overall deadline. Existing destinations are rejected, and unsupported formats
+fail before payload or destination work. Pulling executes or installs nothing and grants no signature or policy acceptance. The
+explicit Release verifier remains the authenticated consumer boundary.
+
 Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
 unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
 one image output with a sorted finite platform set; the compiler freezes a native Build, result and SBOM use

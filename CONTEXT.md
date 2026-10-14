@@ -40,6 +40,8 @@ _Avoid_: Producer, expected output, release
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
 Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
 signature or policy acceptance.
+Diagnostic executable pulling additionally checks a selected output's byte integrity without establishing
+signature or policy acceptance.
 A release description is a versioned, detached metadata view derived solely from a pinned publication;
 it is not another lifecycle object or a verified Release. It retains every named artifact, platform and
 bound source/evidence record, including aggregate image-index children. Source repository/commit belongs

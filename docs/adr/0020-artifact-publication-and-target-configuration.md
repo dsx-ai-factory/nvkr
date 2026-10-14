@@ -175,7 +175,7 @@ module implements its transport representation as an OCI image index with artifa
 `application/vnd.nvkr.publication-root.v4`: every child is an exact OCI manifest or nested index, and the canonical
 root config binds each child's name, kind, artifact type, OCI descriptor digest, exact payload or root blob
 digest, semantic digest, size, and optional platform. The registry tag is only a discovery hint; the publisher
-returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Pull materializes and verifies the
+returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Full-layout pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
 The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.
@@ -192,6 +192,22 @@ suggestion, mode, ordinary SHA-256, and size. Its one deterministic
 ORAS can download it and ordinary `tar` can unpack it. Debian packages may also be projected into a deterministic
 Acquire-By-Hash repository; that APT Projection is not a new release artifact, and an unsigned `Release` file is
 development-only.
+
+Diagnostic `release pull --output <name> --out <directory>` obtains a named executable directly from the pinned
+registry release root. It checks the complete bounded release metadata/evidence closure before format admission,
+then downloads only the selected bundle's payload. Delivery checks the archive descriptor and its exact regular
+file membership, names, SHA-256 values, sizes and modes against the canonical config before exposing the new
+destination. Files appear directly beneath the caller's directory with their recorded modes; absolute install
+suggestions are not followed. The destination parent must already exist, and existing destinations are rejected.
+Failure or cancellation before commit exposes no destination. A failed parent-directory sync after commit
+reports failure even though the complete destination may exist. Delivery owns admission, metadata and payload
+checks, destination publication and private temporary-data cleanup; lifecycle bounds the overall deadline.
+Unknown selections fail with a coded usage error; other supported artifact formats fail with a coded capability
+error before payload or destination work. Malformed or unknown format metadata is rejected by the metadata reader. The command
+does not accept a local layout, infer a host platform, install or execute downloaded files. It runs on macOS and
+Linux and checks byte integrity only: signatures and consumer policy remain unverified, no verification receipt
+is issued, and no accepted Release or stronger evidence lane is implied. Explicit `artifact-publication`
+verification retains its complete payload and policy checks; `authenticity` retains its signature/evidence-only scope.
 
 The public CLI constructor emits only a visibly `diagnostic` root and requires `--allow-diagnostic` before push.
 It cannot set publication identity, publication-manifest digest, or clearance digest. Qualified publishing is

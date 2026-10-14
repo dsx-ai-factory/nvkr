@@ -56,7 +56,7 @@ func TestPublicCommandPresentationCoverage(t *testing.T) {
 		}
 	}
 	visit(newApp().Commands, "")
-	if len(leaves) != 24 || canonicalDiagnostics != 2 {
+	if len(leaves) != 25 || canonicalDiagnostics != 2 {
 		t.Fatalf("public coverage changed: %d leaves, %d canonical diagnostic commands: %v", len(leaves), canonicalDiagnostics, leaves)
 	}
 }

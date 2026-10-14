@@ -1,4 +1,4 @@
-# Browse and export release metadata
+# Browse, export, and pull release outputs
 
 `nvkr release browse` reads the bounded metadata and evidence of an exact release publication root and
 shows its declared artifacts and memberships. `release export` writes that complete description as versioned
@@ -48,6 +48,43 @@ after all release metadata and evidence memberships have been checked; it cannot
 metadata or missing evidence. Payload integrity remains outside browsing's scope.
 Shared evidence keeps its complete list of output memberships in text and JSON even when only one output is
 shown. Evidence references identify the exact manifest under the derived owning output repository.
+
+## Pull an executable output
+
+Choose an exact output name from `release browse` and an explicit new destination directory:
+
+```sh
+bin/nvkr release pull --reference "$RELEASE_REF" \
+  --output nvkectl-linux-arm64 --out ./nvkectl-linux-arm64
+```
+
+This downloads the selected executable bundle and writes its files directly beneath the destination, for
+example `./nvkectl-linux-arm64/nvkectl`. Recorded permission modes are preserved. The destination's parent must
+exist; the destination itself must not already exist, and it is exposed only after successful integrity checks.
+Bundle installation suggestions do not choose destination paths. Pulling neither installs nor executes a file;
+it does not infer a platform from the host or output name. Inspect the declared platform before choosing an output.
+Failure before the directory is committed leaves no destination. If the final parent-directory sync fails,
+the command reports failure even though the complete destination may already exist.
+
+The operation validates the complete bounded release metadata and evidence closure before selecting the
+payload. It checks the selected archive's digest and size, then its exact file membership, names, sizes,
+digests, and modes. Unrelated payload layers are not downloaded, including other executable bundles and disk
+images. An unknown output is a coded usage error. An output that is not an executable bundle fails with a
+coded capability error before any payload download or destination creation.
+
+`release pull` accepts only a registry reference. Use `publish extract` for an executable bundle already in a
+local layout. Registry credentials, `--anonymous`, `--plain-http`, `--workspace`, and the ten-minute default
+`--timeout` follow the browsing rules above. `--workspace` selects the parent for private temporary registry
+data; `--out` selects the new directory containing the extracted files. Temporary data is removed on success,
+failure, or cancellation; a caller-owned workspace remains.
+
+The default result is plain text. `--ui=tui` opens the [read-only result browser](lifecycle.md#browse-public-command-results)
+after successful extraction, showing the selected platform and written file identities. Closing the browser
+does not repeat the download or undo the written files. Presentation admission precedes acquisition.
+
+Successful pulling establishes byte integrity against the supplied release metadata. Its result grants no
+signature, consumer-policy, qualification, installation, or runtime acceptance. Apply `release verify` to the
+same exact root under an independently accepted policy before treating the downloaded executable as trusted.
 
 ## Export a complete release description
 

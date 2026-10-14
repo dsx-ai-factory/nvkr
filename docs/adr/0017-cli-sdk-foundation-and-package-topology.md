@@ -182,7 +182,7 @@ excludes a live owner. Inspection admits only currently producible lanes, not
 qualified lifecycle records. It validates the existing output slot bindings, without opening payload
 locators, restoring execution authority or inferring current availability/health.
 The CLI may show these views as plain/JSON or an explicitly selected read-only
-terminal explorer. Of the 24 public command leaves, 22 admit an explicitly selected result browser;
+terminal explorer. Of the 25 public command leaves, 23 admit an explicitly selected result browser;
 `run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics. The hidden native
 worker is not a public command.
 Owning operations, including maintenance transactions
@@ -197,7 +197,7 @@ not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
 terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
 
 Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify`,
-and `release verify|inspect|browse|export`. Producer operations select authored inputs with `--definition` and
+and `release verify|inspect|browse|export|pull`. Producer operations select authored inputs with `--definition` and
 `--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
@@ -246,6 +246,20 @@ is retained, including aggregate image-index children and exact evidence/source 
 roles, source compatibility and installation requirements remain outside this interface. The CLI writes the
 complete description after admission and metadata validation. Export creates no identity, Run completion,
 payload or signature acceptance, or publication authority. Unpublished workspace export is not an interface.
+
+`lifecycle.PullReleaseOutput`, exposed as `release pull`, is a diagnostic use case for one exact named executable
+output under a pinned registry Release reference. Lifecycle owns the overall deadline and delegates to
+`delivery.PullExecutable`. Delivery owns reference, selection, destination and transport admission, complete
+metadata/evidence validation, selected executable format and payload checks, and private temporary storage
+and cleanup. Its optional workspace is the parent for owned temporary data. The extracted files retain their
+bundle names and permission modes beneath the caller's destination. The destination parent must already exist;
+existing destinations are rejected, and installation suggestions cannot redirect writes. Failure or cancellation
+before commit exposes no destination; a failed directory sync after commit can leave the complete destination
+while reporting failure. This operation runs on macOS and Linux and executes no downloaded file.
+The CLI retains plain output by default and admits its optional read-only result browser before acquisition;
+the successful snapshot describes files already written and cannot repeat or reverse the operation.
+Its result describes integrity-checked bytes and confers no
+signature, policy or Release acceptance; authenticated consumption remains the explicit verification use case.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic

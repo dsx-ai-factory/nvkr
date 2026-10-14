@@ -133,11 +133,12 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 	}
 	return &cli.Command{
 		Name:            "release",
-		Usage:           "inspect or verify an immutable release closure",
+		Usage:           "inspect, pull outputs from, or verify an immutable release closure",
 		HideHelpCommand: true,
 		Subcommands: append([]*cli.Command{
 			releaseBrowseCmd(),
 			releaseExportCmd(),
+			releasePullCmd(),
 			{
 				Name: "inspect", Usage: "inspect an exact local OCI release layout without granting authority",
 				Flags: append([]cli.Flag{&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "layout", Required: true}}, commandPresentationFlags()...),
