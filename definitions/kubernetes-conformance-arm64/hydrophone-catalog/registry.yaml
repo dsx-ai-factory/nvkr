@@ -17,7 +17,7 @@ components:
     outputType: raw
     patches:
       - name: patches/bounded-download.patch
-        sha256: sha256:ca2cedb2b5461518e3628837ed3318127a9d12018679b9c67a923258fa84074f
+        sha256: sha256:d0014a0f2e39033d5a63a5938b46793e908ccf2cdc1282c8cba1cc7ffe85770b
     platforms:
       - linux/amd64
       - linux/arm64

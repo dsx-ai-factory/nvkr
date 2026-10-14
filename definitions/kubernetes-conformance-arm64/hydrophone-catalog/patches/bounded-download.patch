@@ -4,47 +4,82 @@
 diff --git a/pkg/conformance/client/download.go b/pkg/conformance/client/download.go
 --- a/pkg/conformance/client/download.go
 +++ b/pkg/conformance/client/download.go
-@@ -19,12 +19,14 @@
+@@ -19,18 +19,20 @@
  import (
- 	"bytes"
- 	"context"
+-	"bytes"
+-	"context"
+-	"fmt"
+-	"io"
+-	"net/http"
+-	"os"
+-	"path/filepath"
+-	"strings"
+-
+-	"sigs.k8s.io/hydrophone/pkg/conformance"
+-	"sigs.k8s.io/hydrophone/pkg/log"
+-
+-	corev1 "k8s.io/api/core/v1"
+-	"k8s.io/apimachinery/pkg/runtime"
+-	"k8s.io/client-go/tools/remotecommand"
+-	"k8s.io/streaming/pkg/httpstream"
++	"bytes"
++	"context"
 +	"errors"
- 	"fmt"
- 	"io"
- 	"net/http"
- 	"os"
- 	"path/filepath"
- 	"strings"
++	"fmt"
++	"io"
++	"net/http"
++	"os"
++	"path/filepath"
++	"strings"
 +	"sync"
- 
- 	"sigs.k8s.io/hydrophone/pkg/conformance"
- 	"sigs.k8s.io/hydrophone/pkg/log"
-@@ -54,15 +56,10 @@
- 	dest := filepath.Join(outputDir, filename)
- 	log.Printf("Downloading %s to %s...", filename, dest)
- 
++
++	"sigs.k8s.io/hydrophone/pkg/conformance"
++	"sigs.k8s.io/hydrophone/pkg/log"
++
++	corev1 "k8s.io/api/core/v1"
++	"k8s.io/apimachinery/pkg/runtime"
++	"k8s.io/client-go/tools/remotecommand"
++	"k8s.io/streaming/pkg/httpstream"
+ )
+@@ -53,14 +55,9 @@
+ func (c *Client) fetchFile(ctx context.Context, outputDir, filename string) error {
+-	dest := filepath.Join(outputDir, filename)
+-	log.Printf("Downloading %s to %s...", filename, dest)
+-
 -	localFile, err := os.Create(dest)
 -	if err != nil {
 -		return err
 -	}
 -	defer localFile.Close()
 -
- 	containerFile := "/tmp/results/" + filename
+-	containerFile := "/tmp/results/" + filename
 -
 -	return c.downloadFile(ctx, conformance.PodName, conformance.OutputContainer, containerFile, localFile)
++	dest := filepath.Join(outputDir, filename)
++	log.Printf("Downloading %s to %s...", filename, dest)
++
++	containerFile := "/tmp/results/" + filename
 +	return writeDownloadedFile(ctx, dest, func(ctx context.Context, writer io.Writer) error {
 +		return c.downloadFile(ctx, conformance.PodName, conformance.OutputContainer, containerFile, writer)
 +	})
  }
- 
- // downloadFile extracts test results from the container to local output directory
-@@ -106,18 +103,96 @@
- 		return fmt.Errorf("failed to initialize the command executor: %w", err)
- 	}
- 
+@@ -109,15 +106,93 @@
 -	// Stream the file content from the container to the writer
+-	var stderr bytes.Buffer
+-
+-	err = executor.StreamWithContext(
+-		ctx,
+-		remotecommand.StreamOptions{
+-			Stdout: writer,
+-			Stderr: &stderr,
+-		})
+-	if err != nil {
+-		return fmt.Errorf("download failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+-	}
+-
+-	return nil
 +	return streamFile(ctx, executor, writer)
-+}
+ }
 +
 +const (
 +	maxDownloadBytes = 64 << 20
@@ -76,14 +111,7 @@ diff --git a/pkg/conformance/client/download.go b/pkg/conformance/client/downloa
 +func streamFile(ctx context.Context, executor remotecommand.Executor, writer io.Writer) error {
 +	ctx, cancel := context.WithCancelCause(ctx)
 +	defer cancel(nil)
- 	var stderr bytes.Buffer
--
--	err = executor.StreamWithContext(
--		ctx,
--		remotecommand.StreamOptions{
--			Stdout: writer,
--			Stderr: &stderr,
--		})
++	var stderr bytes.Buffer
 +	stdoutBudget := &downloadWriter{ctx: ctx, cancel: cancel, writer: writer, remaining: maxDownloadBytes}
 +	stderrBudget := &downloadWriter{ctx: ctx, cancel: cancel, writer: &stderr, remaining: maxStderrBytes}
 +	err := executor.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: stdoutBudget, Stderr: stderrBudget})
@@ -94,12 +122,11 @@ diff --git a/pkg/conformance/client/download.go b/pkg/conformance/client/downloa
 +	if cause := context.Cause(ctx); cause != nil {
 +		return fmt.Errorf("download failed: %w", cause)
 +	}
- 	if err != nil {
- 		return fmt.Errorf("download failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
- 	}
--
- 	return nil
- }
++	if err != nil {
++		return fmt.Errorf("download failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
++	}
++	return nil
++}
 +
 +// StreamOptions requires writers; LimitReader cannot bound these streams.
 +// Cancel on write failures because client-go can discard io.Copy errors.
