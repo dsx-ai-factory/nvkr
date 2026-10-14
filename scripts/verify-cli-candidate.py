@@ -32,7 +32,12 @@ OLD_SOURCE = "ed9fb09b04fd40bf331d25df2222206ffaca593e"
 def run(command, log=None, timeout=1800):
     if log:
         with log.open("w") as output:
-            subprocess.run(command, check=True, timeout=timeout, stdout=output, stderr=subprocess.STDOUT)
+            try:
+                subprocess.run(command, check=True, timeout=timeout, stdout=output, stderr=subprocess.STDOUT)
+            except subprocess.SubprocessError:
+                output.flush()
+                print(log.read_text()[-12000:], file=sys.stderr, flush=True)
+                raise
     else:
         subprocess.run(command, check=True, timeout=timeout)
 
@@ -184,6 +189,7 @@ def invoke(root, artifact, plan, suite, label, keep=True, expected=0):
 
 
 def main(args):
+    os.chdir(REPO)
     root = args.root.resolve()
     root.mkdir(parents=True)
     assert sys.platform == "linux" and platform.machine() in ({"amd64": {"x86_64"}, "arm64": {"aarch64"}}[args.arch])
@@ -198,7 +204,8 @@ def main(args):
             copied = subprocess.check_output([str(REPO / "bin/crane"), "digest", "localhost:5000/nvkr-toolchain-cli:diagnostic"], text=True).strip()
             assert copied == NATIVE_IMAGES[args.arch].split("@", 1)[1], copied
         nvkr = str(REPO / "bin/nvkr")
-        authored = ["--definition", str(root / "inputs/definition.json"), "--environment", str(root / "inputs/environment.json")]
+        authored = ["--definition", str((root / "inputs/definition.json").relative_to(REPO)),
+                    "--environment", str((root / "inputs/environment.json").relative_to(REPO))]
         run([nvkr, "catalog", "pin", "--dir", str(root / "inputs/catalog"), "--commit", SOURCE, "--timeout", "5m", "nvke-cli"], root / "pin.log")
         plan = root / "plan.json"
         run([nvkr, "run", "plan", *authored, "--json"], plan)
@@ -316,6 +323,7 @@ def main(args):
             run([nvkr, "catalog", "pin", "--dir", str(root / "inputs/catalog"), "--commit", OLD_SOURCE, "nvke-cli"], root / "old-pin.log")
             old_plan = root / "old-plan.json"
             run([nvkr, "run", "plan", *authored, "--json"], old_plan)
+            run(["tar", "-czf", str(root / "old-inputs.tgz"), "-C", str(root), "inputs"])
             _, code = invoke(root, artifact, old_plan, "contract", "missing-interface", expected=1)
             assert code == 1
             negatives["missingInterface"] = {"exit": code, "commit": OLD_SOURCE, "successResult": False}
