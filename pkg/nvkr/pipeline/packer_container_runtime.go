@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	packerContainerCleanupTimeout   = 20 * time.Second
+	packerContainerCleanupTimeout   = 20 * time.Minute
 	packerContainerTerminationGrace = 2 * time.Second
 )
 
