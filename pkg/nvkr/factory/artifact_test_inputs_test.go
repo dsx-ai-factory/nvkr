@@ -33,17 +33,44 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 	}
 	image := "nvkr-toolchain-cli@sha256:" + strings.Repeat("a", 64)
 	component.ToolchainImage = image
-	if mode == "map" || mode == "precedence" {
+	if mode == "map" || mode == "precedence" || mode == "fallback" {
 		component.ToolchainImages = map[string]string{arch: image}
 		component.ToolchainImage = ""
+		if mode == "fallback" {
+			component.ToolchainImages = map[string]string{map[string]string{"amd64": "arm64", "arm64": "amd64"}[arch]: image}
+			component.ToolchainImage = image
+		}
 		if mode == "precedence" {
 			component.ToolchainImage = "fallback@sha256:" + strings.Repeat("b", 64)
 		}
+	}
+	switch mode {
+	case "alias", "equal-alias", "conflicting-alias":
+		component.VersionStamp["NVKECTL_VERSION"] = "v1"
+		if mode == "alias" {
+			delete(component.VersionStamp, "NKECTL_VERSION")
+		}
+		if mode == "conflicting-alias" {
+			component.VersionStamp["NVKECTL_VERSION"] = "v2"
+		}
+	case "nix":
+		component.BuilderType = ir.BuilderNix
+		component.Flake = &catalog.FlakePin{Ref: "github:example/tool?rev=" + component.Commit, Output: "packages.x86_64-linux.default", LockDigest: "sha256:" + strings.Repeat("b", 64), Image: "nixos/nix@sha256:" + strings.Repeat("c", 64)}
+	case "acquired":
+		component = catalog.Component{Platforms: []string{"linux/amd64"}, Tag: "v1.0.0", SourceDate: 1700000000, OutputType: "host-package", VersionStamp: map[string]string{"NKECTL_VERSION": "v1"}, Prebuilt: &catalog.Prebuilt{URL: "https://supplier.example/tool", Evidence: &catalog.ExternalEvidence{None: true}, Digests: map[string]string{"amd64": "sha256:" + strings.Repeat("d", 64)}}}
+	case "image":
+		component.OutputType = "oci-image"
 	}
 	base.Components["nvkectl"] = component
 	definition, environment := fixtureInputs("cli-test", "renamed-cli", DefaultRunsOn)
 	definition.Outputs[0].Components = []string{"nvkectl"}
 	definition.Outputs[0].Platform = "linux/" + arch
+	if mode == "image" {
+		definition.Outputs[0].Format = authored.OutputOCI
+	}
+	if mode == "no-cli" {
+		definition.Outputs[0].Components = []string{"containerd"}
+	}
 	if outputs == 2 {
 		other := definition.Outputs[0]
 		other.Name = "other-cli"
@@ -57,6 +84,11 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 		t.Fatal(err)
 	}
 	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	if strings.Contains(mode, "alias") {
+		// Renamed stamps are refused by canonical IR environment admission.
+		assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+		return nil
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +110,7 @@ func writeCLIPlan(t *testing.T, plan *Plan) string {
 
 func TestCLIArtifactTestToolchains(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
-		for _, mode := range []string{"scalar", "map", "precedence", "relocated"} {
+		for _, mode := range []string{"scalar", "map", "precedence", "fallback", "relocated"} {
 			t.Run(arch+"/"+mode, func(t *testing.T) {
 				plan := cliTestPlan(t, arch, mode, 1)
 				inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "")
@@ -134,5 +166,42 @@ func TestCLIArtifactTestRequiresVersion(t *testing.T) {
 				t.Fatal("missing expected version emitted inputs")
 			}
 		})
+	}
+}
+
+func TestCLIArtifactTestUnsupportedProducers(t *testing.T) {
+	for _, mode := range []string{"nix", "acquired", "image", "no-cli"} {
+		t.Run(mode, func(t *testing.T) {
+			plan := cliTestPlan(t, "amd64", mode, 1)
+			inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "")
+			code := e.CodeEngineCapability
+			if mode == "no-cli" {
+				code = e.CodeUsage
+			}
+			assertFactoryErrorCode(t, err, code)
+			if inputs != nil {
+				t.Fatal("unsupported producer emitted inputs")
+			}
+		})
+	}
+}
+
+func TestCLIArtifactTestVersionAliasAdmission(t *testing.T) {
+	for _, mode := range []string{"alias", "equal-alias", "conflicting-alias"} {
+		t.Run(mode, func(t *testing.T) { cliTestPlan(t, "amd64", mode, 1) })
+	}
+}
+
+func TestCLIArtifactTestValidatesUnselectedOutput(t *testing.T) {
+	plan := cliTestPlan(t, "amd64", "scalar", 2)
+	for i := range plan.Builds[0].Graph.Nodes {
+		if plan.Builds[0].Graph.Nodes[i].Kind == ir.KindBuild {
+			plan.Builds[0].Graph.Nodes[i].Toolchain = "tampered@sha256:" + strings.Repeat("b", 64)
+		}
+	}
+	inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "renamed-cli")
+	assertFactoryErrorCode(t, err, e.CodeUnverifiedRef)
+	if inputs != nil {
+		t.Fatal("invalid unselected output emitted inputs")
 	}
 }
