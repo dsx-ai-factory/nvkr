@@ -9,6 +9,8 @@ navigation:
     contents:
       - page: Quickstart
         path: quickstart.md
+      - page: Use NVKR with your AI agent
+        path: use-with-agents.md
       - page: Concepts
         path: user-concepts.md
       - page: Definition, Run, and Release

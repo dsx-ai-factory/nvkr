@@ -75,6 +75,7 @@ container and node images, and supplies the repository's generated GitHub workfl
 
 ## Use NVKR with your AI agent
 
+See [Use NVKR with your AI agent](docs/use-with-agents.md) for copyable prompts and supported setup.
 Give a terminal-capable agent this repository URL and a concrete task, for example:
 
 > Use https://github.com/dsx-ai-factory/nvkr to create inputs for a Linux ARM64 NVKE CLI
