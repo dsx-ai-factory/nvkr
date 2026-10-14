@@ -247,19 +247,23 @@ roles, source compatibility and installation requirements remain outside this in
 complete description after admission and metadata validation. Export creates no identity, Run completion,
 payload or signature acceptance, or publication authority. Unpublished workspace export is not an interface.
 
-`lifecycle.PullReleaseOutput`, exposed as `release pull`, is a diagnostic use case for one exact named executable
-output under a pinned registry Release reference. Lifecycle owns the overall deadline and delegates to
-`delivery.PullExecutable`. Delivery owns reference, selection, destination and transport admission, complete
-metadata/evidence validation, selected executable format and payload checks, and private temporary storage
-and cleanup. Its optional workspace is the parent for owned temporary data. The extracted files retain their
-bundle names and permission modes beneath the caller's destination. The destination parent must already exist;
-existing destinations are rejected, and installation suggestions cannot redirect writes. Failure or cancellation
-before commit exposes no destination; a failed directory sync after commit can leave the complete destination
-while reporting failure. This operation runs on macOS and Linux and executes no downloaded file.
+`lifecycle.PullReleaseOutput`, exposed as `release pull`, is a diagnostic use case for one exact named output
+under a pinned registry Release reference. Lifecycle owns the overall deadline and delegates to `delivery.PullOutput`.
+Delivery owns reference, selection, destination and transport admission, complete metadata/evidence validation,
+selected format and payload-closure checks, and private temporary storage and cleanup. Its optional workspace
+is the parent for owned temporary data. Executables retain their bundle names and modes; disks and Helm charts
+retain exact payload bytes in named files, including declared LUKS2 disk ciphertext without decryption. Images
+retain their native OCI/Docker manifests, configs and layers in a standard OCI layout; APT repositories retain
+their repository trees. An aggregate OCI output includes every declared platform. Only the selected output's
+payload closure is downloaded. The destination parent must already exist; existing destinations are rejected,
+and installation suggestions cannot redirect writes. Failure or cancellation before commit exposes no
+destination; a failed directory sync after commit can leave the complete destination while reporting failure.
+Malformed or unsupported format metadata fails with a coded error before payload or destination work. This
+operation runs on macOS and Linux and executes no downloaded file.
 The CLI retains plain output by default and admits its optional read-only result browser before acquisition;
 the successful snapshot describes files already written and cannot repeat or reverse the operation.
-Its result describes integrity-checked bytes and confers no
-signature, policy or Release acceptance; authenticated consumption remains the explicit verification use case.
+Its result describes integrity-checked bytes and confers no signature, policy or Release acceptance;
+authenticated consumption remains the explicit verification use case.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic

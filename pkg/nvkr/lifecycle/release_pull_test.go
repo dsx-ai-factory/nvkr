@@ -51,7 +51,7 @@ func TestPullReleaseOutputAdmitsBeforeWork(t *testing.T) {
 			out := filepath.Join(root, "output")
 			bundle, err := PullReleaseOutput(test.ctx, test.ref, test.output, out, test.options)
 			assertCode(t, err, test.code)
-			if !reflect.DeepEqual(bundle, delivery.BinaryBundle{}) {
+			if !reflect.DeepEqual(bundle, delivery.PulledOutput{}) {
 				t.Fatal("failed pull returned a bundle")
 			}
 			entries, err := os.ReadDir(root)
@@ -79,7 +79,7 @@ func TestPullReleaseOutputDeadlineCleansWorkspace(t *testing.T) {
 		Registry: delivery.RegistryOptions{Anonymous: true, PlainHTTP: true},
 	})
 	assertCode(t, err, e.CodeTimeout)
-	if !reflect.DeepEqual(bundle, delivery.BinaryBundle{}) {
+	if !reflect.DeepEqual(bundle, delivery.PulledOutput{}) {
 		t.Fatal("timed out pull returned a bundle")
 	}
 	if _, err := os.Lstat(out); !errors.Is(err, os.ErrNotExist) {

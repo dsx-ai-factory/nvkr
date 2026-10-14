@@ -159,7 +159,7 @@ producers and creates no attempt. Closing that view does not cancel another Run.
 The following public commands accept `--ui=tui` and `--no-color`: Definition validation
 and inspection; Run planning, graph, comparison, inspection, generation and local
 execution; producer resolution; all catalog inspection and maintenance commands;
-and Release inspection, browsing, export, executable pulling and verification. Other than the interactive
+and Release inspection, browsing, export, pulling and verification. Other than the interactive
 local Run default described above, commands default to `--ui=plain` and keep their
 existing text, canonical JSON or diagram output. On commands with a result
 browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output

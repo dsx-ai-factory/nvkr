@@ -16,8 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/internal/securepath"
-	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -25,67 +23,94 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// PullExecutable checks the complete release metadata/evidence closure and then
-// downloads only the exact named executable output. It verifies bundle membership,
-// file bytes and modes before atomically creating out without replacement. The
-// parent of out must exist. workspace is an optional parent for owned scratch;
-// private scratch is removed on return. This operation establishes selected byte
-// integrity and membership, not signature verification or policy acceptance.
+// PulledOutput describes a materialized exact named output. It is diagnostic data,
+// not a signature, consumer-policy or release-acceptance receipt.
+type PulledOutput struct {
+	Output PublicationOutput `json:"output"`
+	Files  []PulledFile      `json:"files,omitempty"`
+	bundle BinaryBundle
+}
+
+// PulledFile describes a top-level payload file, relative to the destination.
+// OCI layouts and APT repositories are represented by their complete directory.
+type PulledFile struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size,omitempty"`
+}
+
+// PullOutput validates the complete release metadata/evidence closure and
+// downloads only the exact named output's payload closure. Each supported format
+// is checked by its delivery owner before atomically creating out without
+// replacement. The destination parent must exist; workspace is an optional parent
+// for owned scratch, which is removed on return. This checks byte integrity and
+// membership, not signatures or consumer policy.
+func PullOutput(ctx context.Context, reference, output, out, workspace string, options RegistryOptions) (PulledOutput, error) {
+	return pullOutput(ctx, reference, output, out, workspace, options, "")
+}
+
+// PullExecutable retains the executable-only API and rejects other formats before
+// payload retrieval. Use PullOutput to retrieve any supported release output.
 func PullExecutable(ctx context.Context, reference, output, out, workspace string, options RegistryOptions) (BinaryBundle, error) {
+	result, err := pullOutput(ctx, reference, output, out, workspace, options, "executable")
+	return result.bundle, err
+}
+
+func pullOutput(ctx context.Context, reference, output, out, workspace string, options RegistryOptions, requiredFormat string) (PulledOutput, error) {
 	if err := deliveryContext(ctx); err != nil {
-		return BinaryBundle{}, err
+		return PulledOutput{}, err
 	}
 	if err := ValidatePublicationReference(reference); err != nil {
-		return BinaryBundle{}, err
+		return PulledOutput{}, err
 	}
 	if !canonicalToken(output) || strings.ContainsAny(output, "/\\") {
-		return BinaryBundle{}, e.New(e.CodeUsage, "release pull requires an exact named output")
+		return PulledOutput{}, e.New(e.CodeUsage, "release pull requires an exact named output")
 	}
 	if strings.TrimSpace(out) == "" || strings.ContainsRune(out, '\x00') ||
 		filepath.Base(filepath.Clean(out)) == "." || filepath.Base(filepath.Clean(out)) == ".." || filepath.Clean(out) == string(filepath.Separator) {
-		return BinaryBundle{}, e.New(e.CodeUsage, "release pull destination must name a new directory")
+		return PulledOutput{}, e.New(e.CodeUsage, "release pull destination must name a new directory")
 	}
 	if err := options.Validate(); err != nil {
-		return BinaryBundle{}, err
+		return PulledOutput{}, err
 	}
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		return BinaryBundle{}, e.New(e.CodeEngineCapability, "release pull requires atomic no-replace directory publication")
+		return PulledOutput{}, e.New(e.CodeEngineCapability, "release pull requires atomic no-replace directory publication")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 	defer cancel()
 	if workspace != "" {
 		outAbsolute, err := resolvePullPath(ctx, out)
 		if err != nil {
-			return BinaryBundle{}, classifyContext(ctx, e.Wrap(e.CodeUsage, err, "resolving release pull destination"))
+			return PulledOutput{}, classifyContext(ctx, e.Wrap(e.CodeUsage, err, "resolving release pull destination"))
 		}
 		workspaceAbsolute, err := resolvePullPath(ctx, workspace)
 		if err != nil {
-			return BinaryBundle{}, classifyContext(ctx, e.Wrap(e.CodeUsage, err, "resolving release pull workspace"))
+			return PulledOutput{}, classifyContext(ctx, e.Wrap(e.CodeUsage, err, "resolving release pull workspace"))
 		}
 		relative, err := filepath.Rel(outAbsolute, workspaceAbsolute)
 		if err != nil || relative == "." || !strings.HasPrefix(relative, ".."+string(filepath.Separator)) && relative != ".." {
-			return BinaryBundle{}, e.New(e.CodeUsage, "release pull workspace must be outside the destination directory")
+			return PulledOutput{}, e.New(e.CodeUsage, "release pull workspace must be outside the destination directory")
 		}
 		workspace = workspaceAbsolute
 	}
 	if workspace != "" {
 		if err := os.MkdirAll(workspace, 0o700); err != nil {
-			return BinaryBundle{}, e.Wrap(e.CodeImmutableViolation, err, "creating release pull workspace")
+			return PulledOutput{}, e.Wrap(e.CodeImmutableViolation, err, "creating release pull workspace")
 		}
 	}
 	stage, err := os.MkdirTemp(workspace, "nvkr-release-pull-*")
 	if err != nil {
-		return BinaryBundle{}, e.Wrap(e.CodeImmutableViolation, err, "creating private release pull workspace")
+		return PulledOutput{}, e.Wrap(e.CodeImmutableViolation, err, "creating private release pull workspace")
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
 	layout := filepath.Join(stage, "metadata")
 	inspection, err := PullMetadata(ctx, reference, layout, options)
 	if err != nil {
-		return BinaryBundle{}, err
+		return PulledOutput{}, err
 	}
 	description, err := InspectMetadataDescription(ctx, layout, reference)
 	if err != nil {
-		return BinaryBundle{}, err
+		return PulledOutput{}, err
 	}
 	var selected *PublicationOutput
 	for i := range description.Outputs {
@@ -95,10 +120,10 @@ func PullExecutable(ctx context.Context, reference, output, out, workspace strin
 		}
 	}
 	if selected == nil {
-		return BinaryBundle{}, e.New(e.CodeUsage, "release has no output named %q", output)
+		return PulledOutput{}, e.New(e.CodeUsage, "release has no output named %q", output)
 	}
-	if selected.Kind != "executable" || selected.ArtifactType != MediaBinaryBundle {
-		return BinaryBundle{}, e.New(e.CodeEngineCapability, "release pull supports executable outputs; %q has format %q", output, selected.Kind)
+	if requiredFormat != "" && selected.Kind != requiredFormat {
+		return PulledOutput{}, e.New(e.CodeEngineCapability, "this pull requires %s outputs; %q has format %q", requiredFormat, output, selected.Kind)
 	}
 	var object PublishedObject
 	for _, candidate := range inspection.Root.Objects {
@@ -107,6 +132,43 @@ func PullExecutable(ctx context.Context, reference, output, out, workspace strin
 			break
 		}
 	}
+	result := PulledOutput{Output: *selected}
+	switch selected.Kind {
+	case "executable":
+		bundle, err := pullExecutableOutput(ctx, selected.Reference, out, layout, stage, object, options)
+		if err != nil {
+			return PulledOutput{}, err
+		}
+		result.bundle = bundle
+		for _, entry := range bundle.Entries {
+			result.Files = append(result.Files, PulledFile{Path: entry.Name, SHA256: entry.SHA256, Size: entry.Size})
+		}
+	case "disk-image":
+		if err := pullDiskOutput(ctx, selected.Reference, out, layout, stage, object, options); err != nil {
+			return PulledOutput{}, err
+		}
+		result.Files = []PulledFile{{Path: output + ".qcow2", SHA256: object.BlobDigest, Size: selected.Disk.Size}}
+	case outputFormatHelm:
+		file, err := pullHelmOutput(ctx, selected.Reference, out, layout, stage, object, options)
+		if err != nil {
+			return PulledOutput{}, err
+		}
+		result.Files = []PulledFile{file}
+	case "apt-repository":
+		if err := pullAPTOutput(ctx, selected.Reference, out, layout, stage, object, options); err != nil {
+			return PulledOutput{}, err
+		}
+	case "oci":
+		if err := pullImageOutput(ctx, selected.Reference, out, object, options); err != nil {
+			return PulledOutput{}, err
+		}
+	default:
+		return PulledOutput{}, e.New(e.CodeEngineCapability, "release pull does not support format %q", selected.Kind)
+	}
+	return result, nil
+}
+
+func pullExecutableOutput(ctx context.Context, reference, out, layout, stage string, object PublishedObject, options RegistryOptions) (BinaryBundle, error) {
 	manifestRaw, err := readBlob(ctx, layout, Descriptor{Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
 	if err != nil {
 		return BinaryBundle{}, err
@@ -118,7 +180,7 @@ func PullExecutable(ctx context.Context, reference, output, out, workspace strin
 	if err := validatePulledBundle(bundle, object); err != nil {
 		return BinaryBundle{}, err
 	}
-	held, err := fetchExecutableLayer(ctx, selected.Reference, manifest.Layers[0], stage, options)
+	held, err := fetchExecutableLayer(ctx, reference, manifest.Layers[0], stage, options)
 	if err != nil {
 		return BinaryBundle{}, err
 	}
@@ -181,8 +243,24 @@ func validatePulledBundle(bundle BinaryBundle, object PublishedObject) error {
 }
 
 func fetchExecutableLayer(ctx context.Context, reference string, descriptor Descriptor, workspace string, options RegistryOptions) (*heldfile.File, error) {
-	if !isDigest(descriptor.Digest) || descriptor.Size < 0 || descriptor.Size > maxDeliveryFileBytes || descriptor.MediaType != MediaBinaryBundleLayer {
-		return nil, e.New(e.CodeVerifyFailed, "executable layer descriptor is malformed or exceeds its byte bound")
+	if descriptor.MediaType != MediaBinaryBundleLayer {
+		return nil, e.New(e.CodeVerifyFailed, "executable requires a binary bundle layer")
+	}
+	file, err := fetchPullLayer(ctx, reference, descriptor, workspace, options)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	held, err := heldfile.FromReaderContext(ctx, file, heldfile.Options{Label: "release executable layer", ExpectedDigest: descriptor.Digest, MaxBytes: max(descriptor.Size, 1)})
+	if err != nil {
+		return nil, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "holding executable layer"))
+	}
+	return held, nil
+}
+
+func fetchPullLayer(ctx context.Context, reference string, descriptor Descriptor, workspace string, options RegistryOptions) (*os.File, error) {
+	if !isDigest(descriptor.Digest) || descriptor.Size < 0 || descriptor.Size > maxDeliveryFileBytes || !validMediaType(descriptor.MediaType) {
+		return nil, e.New(e.CodeVerifyFailed, "output layer descriptor is malformed or exceeds its byte bound")
 	}
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
@@ -190,97 +268,65 @@ func fetchExecutableLayer(ctx context.Context, reference string, descriptor Desc
 	}
 	ref, err := name.NewDigest(reference, parse...)
 	if err != nil {
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening exact executable repository")
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening exact output repository")
 	}
 	layer, err := remote.Layer(ref.Context().Digest(descriptor.Digest), registryOptions(ctx, options)...)
 	if err != nil {
-		return nil, metadataFetchError(ctx, err, "fetch executable layer")
+		return nil, metadataFetchError(ctx, err, "fetch output layer")
 	}
 	reader, err := layer.Compressed()
 	if err != nil {
-		return nil, metadataFetchError(ctx, err, "open executable layer")
+		return nil, metadataFetchError(ctx, err, "open output layer")
 	}
 	defer func() { _ = reader.Close() }()
-	path := filepath.Join(workspace, "executable-layer")
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	path := filepath.Join(workspace, "payload-"+strings.TrimPrefix(descriptor.Digest, "sha256:"))
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating private executable download")
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating private output download")
 	}
+	complete := false
+	defer func() {
+		if !complete {
+			_ = file.Close()
+		}
+	}()
 	hash := sha256.New()
 	written, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(contextReader{ctx: ctx, reader: reader}, descriptor.Size+1))
-	closeErr := file.Close()
 	if err := deliveryContext(ctx); err != nil {
 		return nil, err
 	}
 	got := "sha256:" + hex.EncodeToString(hash.Sum(nil))
 	if written > descriptor.Size || written == descriptor.Size && got != descriptor.Digest {
-		return nil, e.New(e.CodeVerifyFailed, "executable layer differs from its exact descriptor")
+		return nil, e.New(e.CodeVerifyFailed, "output layer differs from its exact descriptor")
 	}
 	if copyErr != nil {
-		return nil, metadataFetchError(ctx, copyErr, "read executable layer")
-	}
-	if closeErr != nil {
-		return nil, e.Wrap(e.CodeImmutableViolation, closeErr, "closing private executable download")
+		return nil, metadataFetchError(ctx, copyErr, "read output layer")
 	}
 	if written != descriptor.Size || got != descriptor.Digest {
-		return nil, e.New(e.CodeVerifyFailed, "executable layer differs from its exact descriptor")
+		return nil, e.New(e.CodeVerifyFailed, "output layer differs from its exact descriptor")
 	}
-	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "release executable layer", ExpectedDigest: descriptor.Digest, MaxBytes: descriptor.Size})
-	if err != nil {
-		return nil, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "holding executable layer"))
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "rewinding private output download")
 	}
-	return held, nil
+	complete = true
+	return file, nil
 }
 
 func extractPulledExecutable(ctx context.Context, held *heldfile.File, out string, bundle BinaryBundle) error {
-	if err := deliveryContext(ctx); err != nil {
-		return err
-	}
-	out = filepath.Clean(out)
-	parent, _, err := securepath.OpenDirectory(filepath.Dir(out))
-	if err != nil {
-		return e.Wrap(e.CodeImmutableViolation, err, "opening executable destination parent (it must already exist)")
-	}
-	defer func() { _ = parent.Close() }()
-	stage, temporary, err := createImageIndexStage(parent)
-	if err != nil {
-		return e.Wrap(e.CodeImmutableViolation, err, "creating private executable destination")
-	}
-	defer func() { _ = stage.Close() }()
-	committed := false
-	defer func() {
-		if !committed {
-			for _, entry := range bundle.Entries {
-				_ = unix.Unlinkat(int(stage.Fd()), entry.Name, 0)
+	return publishPullDirectory(ctx, out, func(stage *os.File) error {
+		create := func(entry BinaryEntry) (*os.File, error) {
+			fd, err := unix.Openat(int(stage.Fd()), entry.Name, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, entry.Mode)
+			if err != nil {
+				return nil, err
 			}
-			_ = unix.Unlinkat(int(parent.Fd()), temporary, unix.AT_REMOVEDIR)
+			return os.NewFile(uintptr(fd), entry.Name), nil
 		}
-	}()
-	create := func(entry BinaryEntry) (*os.File, error) {
-		fd, err := unix.Openat(int(stage.Fd()), entry.Name, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, entry.Mode)
-		if err != nil {
-			return nil, err
+		if err := extractBundleLayerWith(ctx, held, bundle, create); err != nil {
+			return classifyContext(ctx, err)
 		}
-		return os.NewFile(uintptr(fd), entry.Name), nil
-	}
-	if err := extractBundleLayerWith(ctx, held, bundle, create); err != nil {
-		return classifyContext(ctx, err)
-	}
-	if err := stage.Sync(); err != nil {
-		return e.Wrap(e.CodeImmutableViolation, err, "persisting executable directory")
-	}
-	if err := deliveryContext(ctx); err != nil {
-		return err
-	}
-	if err := held.AssertUnchangedContext(ctx); err != nil {
-		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "rechecking executable layer before commit"))
-	}
-	if err := transportarchive.PublishAtNoReplace(int(parent.Fd()), temporary, int(parent.Fd()), filepath.Base(out)); err != nil {
-		return e.Wrap(e.CodeImmutableViolation, err, "committing executable directory without replacement")
-	}
-	committed = true
-	if err := parent.Sync(); err != nil {
-		return classifyContext(ctx, e.Wrap(e.CodeImmutableViolation, err, "persisting executable directory commit"))
-	}
-	return nil
+		if err := held.AssertUnchangedContext(ctx); err != nil {
+			return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "rechecking executable layer before commit"))
+		}
+		return nil
+	})
 }

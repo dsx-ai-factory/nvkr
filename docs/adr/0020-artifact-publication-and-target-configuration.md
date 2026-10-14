@@ -193,18 +193,26 @@ ORAS can download it and ordinary `tar` can unpack it. Debian packages may also 
 Acquire-By-Hash repository; that APT Projection is not a new release artifact, and an unsigned `Release` file is
 development-only.
 
-Diagnostic `release pull --output <name> --out <directory>` obtains a named executable directly from the pinned
+Diagnostic `release pull --output <name> --out <directory>` obtains one named output directly from the pinned
 registry release root. It checks the complete bounded release metadata/evidence closure before format admission,
-then downloads only the selected bundle's payload. Delivery checks the archive descriptor and its exact regular
-file membership, names, SHA-256 values, sizes and modes against the canonical config before exposing the new
-destination. Files appear directly beneath the caller's directory with their recorded modes; absolute install
-suggestions are not followed. The destination parent must already exist, and existing destinations are rejected.
+then downloads only the selected output's complete payload closure. Delivery checks exact descriptors and
+format-specific payload membership before exposing the new destination. The supported projections are:
+
+| Output format | Projection directly beneath the destination |
+|---|---|
+| `executable` | Exact regular bundle files by recorded name, SHA-256, size and mode; absolute installation suggestions are not followed |
+| `disk-image` | `<output-name>.qcow2` containing the exact plain or declared LUKS2-encrypted QCOW2 payload bytes; no decryption |
+| `helm-oci` | `<output-name>.tgz` containing the unchanged compressed chart archive |
+| `oci` | A standard OCI layout retaining exact native OCI or Docker schema-2 manifests, configs and layers; an aggregate OCI index includes every declared native platform and its full payload closure |
+| `apt-repository` | The complete checked repository tree of regular files and owner-readable, searchable directories; every file, including indexes, is digest-bound to the archive, and links and special files are rejected |
+
+The destination parent must already exist, and existing destinations are rejected.
 Failure or cancellation before commit exposes no destination. A failed parent-directory sync after commit
 reports failure even though the complete destination may exist. Delivery owns admission, metadata and payload
 checks, destination publication and private temporary-data cleanup; lifecycle bounds the overall deadline.
-Unknown selections fail with a coded usage error; other supported artifact formats fail with a coded capability
-error before payload or destination work. Malformed or unknown format metadata is rejected by the metadata reader. The command
-does not accept a local layout, infer a host platform, install or execute downloaded files. It runs on macOS and
+Unknown selections fail with a coded usage error; malformed or unsupported format metadata fails with a coded
+error before payload or destination work. The command does not accept a local layout, infer a host platform,
+select only one aggregate platform, install or execute downloaded files, or load images into a runtime. It runs on macOS and
 Linux and checks byte integrity only: signatures and consumer policy remain unverified, no verification receipt
 is issued, and no accepted Release or stronger evidence lane is implied. Explicit `artifact-publication`
 verification retains its complete payload and policy checks; `authenticity` retains its signature/evidence-only scope.

@@ -19,7 +19,7 @@ each concept to a worked example.
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
-| Find published outputs, download an executable, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
+| Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../definitions/nvke-m2/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
@@ -41,7 +41,7 @@ records source availability and remaining gaps.
 |---|---|
 | Immutable attempts, completeness, consumer policy, and SDK | [Lifecycle](lifecycle.md) |
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
-| Registry/layout browsing, generic JSON export, executable downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
+| Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |

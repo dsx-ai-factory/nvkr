@@ -317,11 +317,15 @@ workspace, new identity or serialized verification capability is introduced. Con
 source compatibility, installation formats and offline completeness. Unpublished packages remain Run
 artifacts; this interface describes publications and does not assemble a release from a local workspace.
 
-Diagnostic executable pulling reuses that complete metadata/evidence validation, then checks and extracts only
-one exact named executable payload into a new caller-selected directory. Delivery owns admission, metadata
-and payload checks, safe file membership, preserved permission modes, destination publication and temporary
-cleanup; lifecycle supplies the overall deadline. Existing destinations are rejected, and unsupported formats
-fail before payload or destination work. Pulling executes or installs nothing and grants no signature or policy acceptance. The
+Diagnostic output pulling reuses that complete metadata/evidence validation, then retrieves and checks only
+one exact named output's complete payload closure into a new caller-selected directory. Executables retain
+their recorded filenames and modes, disks and charts retain their exact payload bytes (including declared
+LUKS2 disk ciphertext without decryption), OCI layouts retain native OCI/Docker image bytes and every declared
+aggregate platform, and APT outputs retain repository trees.
+Delivery owns admission, metadata and payload checks, safe file membership, preserved permission modes,
+destination publication and temporary cleanup; lifecycle supplies the overall deadline. Existing destinations
+are rejected, and malformed or unsupported format metadata fails with a coded error before payload or
+destination work. Pulling executes or installs nothing and grants no signature or policy acceptance. The
 explicit Release verifier remains the authenticated consumer boundary.
 
 Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,

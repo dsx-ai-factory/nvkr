@@ -42,7 +42,7 @@ Named artifacts retain their observed payload digests. Canonical release content
 artifact set. The enclosing publication root carries the exact output, component/build and evidence bindings,
 including sibling repository/digest references. Its transport identity is distinct from content identity and
 cannot appear as one of its own content members. Consumers authenticate and recompute the exact membership
-before accepting outputs. Diagnostic executable pulling separately checks the complete metadata membership and
+before accepting outputs. Diagnostic output pulling separately checks the complete metadata membership and
 selected payload integrity without granting signature or policy acceptance (ADR-20). Names inside publication
 records cannot select arbitrary destination paths.
 

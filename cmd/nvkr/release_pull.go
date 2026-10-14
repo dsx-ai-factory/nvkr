@@ -21,16 +21,16 @@ func releasePullCmd() *cli.Command {
 	return releasePullCmdWithOperation(lifecycle.PullReleaseOutput)
 }
 
-type releasePullOperation func(context.Context, string, string, string, lifecycle.PullOptions) (delivery.BinaryBundle, error)
+type releasePullOperation func(context.Context, string, string, string, lifecycle.PullOptions) (delivery.PulledOutput, error)
 
 func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 	return &cli.Command{
-		Name: "pull", Usage: "download and extract one executable output (signatures and policy not verified)",
+		Name: "pull", Usage: "download one named output (signatures and policy not verified)",
 		OnUsageError: codedUsageError,
 		Flags: append([]cli.Flag{
 			&cli.StringFlag{Name: "reference", Usage: "publication root repository@sha256:digest (required)"},
-			&cli.StringFlag{Name: "output", Usage: "exact executable output name from release browse (required)"},
-			&cli.StringFlag{Name: "out", Usage: "new destination directory for the executable files (required)"},
+			&cli.StringFlag{Name: "output", Usage: "exact output name from release browse (required)"},
+			&cli.StringFlag{Name: "out", Usage: "new destination directory for the selected output (required)"},
 			&cli.StringFlag{Name: "workspace", Usage: "parent for temporary registry download storage"},
 			&cli.DurationFlag{Name: "timeout", Value: 10 * time.Minute, Usage: "bound the complete download and extraction"},
 			&cli.BoolFlag{Name: "anonymous", Usage: "disable ambient registry credentials"},
@@ -55,7 +55,7 @@ func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 					return e.New(e.CodeUsage, "release pull requires --%s", flag)
 				}
 			}
-			bundle, err := pull(c.Context, c.String("reference"), c.String("output"), c.String("out"), lifecycle.PullOptions{
+			result, err := pull(c.Context, c.String("reference"), c.String("output"), c.String("out"), lifecycle.PullOptions{
 				WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"),
 				Registry: delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
 			})
@@ -64,9 +64,9 @@ func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 			}
 			if view.tui {
 				shown = true
-				return showCommandResult(c, view, releasePullDisplay(c.String("output"), bundle), nil)
+				return showCommandResult(c, view, releasePullDisplay(c.String("output"), result), nil)
 			}
-			if _, err := c.App.Writer.Write([]byte(releasePullMessage(c.String("output"), c.String("out"), bundle))); err != nil {
+			if _, err := c.App.Writer.Write([]byte(releasePullMessage(c.String("output"), c.String("out"), result))); err != nil {
 				return e.Wrap(e.CodeUnavailable, err, "writing release pull result")
 			}
 			return nil
@@ -74,23 +74,35 @@ func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 	}
 }
 
-func releasePullMessage(output, out string, bundle delivery.BinaryBundle) string {
+func releasePullMessage(output, out string, result delivery.PulledOutput) string {
 	var message strings.Builder
 	fmt.Fprintf(&message, "Pulled %q (%q) into %q; payload integrity checked, signatures and policy not verified.\n",
-		output, bundle.OS+"/"+bundle.Arch, out)
-	for _, entry := range bundle.Entries {
-		fmt.Fprintf(&message, "  %q (%s)\n", filepath.Join(out, entry.Name), entry.SHA256)
+		output, result.Output.Kind, out)
+	if result.Output.OS != "" {
+		fmt.Fprintf(&message, "  Platform: %q\n", result.Output.OS+"/"+result.Output.Arch)
+	}
+	if result.Output.ImageIndex != nil {
+		fmt.Fprintf(&message, "  Platforms: %q\n", strings.Join(result.Output.ImageIndex.RequiredPlatforms, ", "))
+	}
+	for _, file := range result.Files {
+		fmt.Fprintf(&message, "  %q (%s)\n", filepath.Join(out, file.Path), file.SHA256)
 	}
 	return message.String()
 }
 
-func releasePullDisplay(output string, bundle delivery.BinaryBundle) commandDisplay {
+func releasePullDisplay(output string, result delivery.PulledOutput) commandDisplay {
 	display := commandDisplay{Title: "Release output pull",
-		Note:   "The selected executable files were written. Payload integrity checked; signatures and policy were not verified.",
-		Fields: commandFields("Output", output, "Platform", bundle.OS+"/"+bundle.Arch)}
-	for _, entry := range bundle.Entries {
-		display.Items = append(display.Items, progress.Item{ID: "file/" + entry.Name, Name: entry.Name, Kind: "executable", State: "written", Primary: true,
-			Fields: commandFields("SHA256", entry.SHA256, "Bytes", fmt.Sprint(entry.Size))})
+		Note:   "The selected output was written. Payload integrity checked; signatures and policy were not verified.",
+		Fields: commandFields("Output", output, "Format", result.Output.Kind)}
+	if result.Output.OS != "" {
+		display.Fields = append(display.Fields, commandFields("Platform", result.Output.OS+"/"+result.Output.Arch)...)
+	}
+	if result.Output.ImageIndex != nil {
+		display.Fields = append(display.Fields, commandFields("Platforms", strings.Join(result.Output.ImageIndex.RequiredPlatforms, ", "))...)
+	}
+	for _, file := range result.Files {
+		display.Items = append(display.Items, progress.Item{ID: "file/" + file.Path, Name: file.Path, Kind: result.Output.Kind, State: "written", Primary: true,
+			Fields: commandFields("SHA256", file.SHA256, "Bytes", fmt.Sprint(file.Size))})
 	}
 	return display
 }

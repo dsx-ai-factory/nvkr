@@ -1,8 +1,8 @@
 # Browse, export, pull, and verify a release
 
-Explore the outputs and evidence in an existing release, download a named executable, and apply your consumer
+Explore the outputs and evidence in an existing release, download a named output, and apply your consumer
 policy separately. Start at the repository root with `bin/nvkr` built using the [quickstart](quickstart.md).
-Browsing, export, and executable pulling work on macOS and Linux; verification runs on Linux, directly or
+Browsing, export, and output pulling work on macOS and Linux; verification runs on Linux, directly or
 through Docker on macOS.
 
 ## Find an output
@@ -50,25 +50,34 @@ or producer checkout is required. Consumers own installation roles and compatibi
 [description contract](release-navigation.md#export-a-complete-release-description) for fields and inspection
 limits. Export and unfiltered JSON browsing produce the same description, without verifying payloads or policy.
 
-## Download an executable
+## Download an output
 
-Choose an output whose type is `executable` and whose declared platform matches your intended destination.
-For example, if the listing includes `nvkectl-linux-arm64`:
+Use the exact name from the listing and choose a new destination directory:
+
+```sh
+bin/nvkr release pull --reference "$RELEASE_REF" \
+  --output "$OUTPUT_NAME" --out ./downloaded-output
+```
+
+The destination contains the selected format's files: executable bundle members, a QCOW2 disk, a Helm chart
+archive, an OCI image layout, or an APT repository tree. See the [output format table](release-navigation.md#pull-an-output)
+for exact filenames and layout. For example, if the listing includes `nvkectl-linux-arm64`:
 
 ```sh
 bin/nvkr release pull --reference "$RELEASE_REF" \
   --output nvkectl-linux-arm64 --out ./nvkectl-linux-arm64
 ```
 
-The new directory contains the bundle's named files directly, such as `./nvkectl-linux-arm64/nvkectl`, with
-their recorded permission modes. `--out` is required, must not already exist, and needs an existing parent
-directory. The command does not install or execute the files, and it does not select a platform automatically.
+This creates `./nvkectl-linux-arm64/nvkectl` with its recorded permission mode. For every format, `--out` is
+required, must not already exist, and needs an existing parent directory. The command does not install or
+execute the files, and it does not select a platform automatically. An aggregate image includes all its
+declared platforms. A disk retains its plain or declared LUKS2-encrypted QCOW2 bytes; pulling does not decrypt it.
 Add `--anonymous` for a public registry.
 
-Pulling checks the complete release metadata and evidence, then downloads only the selected executable's
-payload and checks its archive and file digests, sizes, names, and modes. It does **not** authenticate signatures
-or apply your acceptance policy. Use the same exact release reference in the verification step below before
-treating those bytes as accepted. Other artifact types are not supported by `release pull`.
+Pulling checks the complete release metadata and evidence, then downloads and checks only the selected output's
+payloads. It does **not** authenticate signatures or apply your acceptance policy. Use the same exact release
+reference in the verification step below before treating those bytes as accepted. Malformed or unsupported
+format metadata fails with a coded error before payload or destination work.
 
 ## Verify against an accepted policy
 

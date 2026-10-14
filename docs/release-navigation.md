@@ -49,7 +49,7 @@ metadata or missing evidence. Payload integrity remains outside browsing's scope
 Shared evidence keeps its complete list of output memberships in text and JSON even when only one output is
 shown. Evidence references identify the exact manifest under the derived owning output repository.
 
-## Pull an executable output
+## Pull an output
 
 Choose an exact output name from `release browse` and an explicit new destination directory:
 
@@ -58,33 +58,46 @@ bin/nvkr release pull --reference "$RELEASE_REF" \
   --output nvkectl-linux-arm64 --out ./nvkectl-linux-arm64
 ```
 
-This downloads the selected executable bundle and writes its files directly beneath the destination, for
-example `./nvkectl-linux-arm64/nvkectl`. Recorded permission modes are preserved. The destination's parent must
-exist; the destination itself must not already exist, and it is exposed only after successful integrity checks.
-Bundle installation suggestions do not choose destination paths. Pulling neither installs nor executes a file;
-it does not infer a platform from the host or output name. Inspect the declared platform before choosing an output.
+The selected output's format determines what appears directly beneath `--out`:
+
+| Output format | Destination contents |
+|---|---|
+| `executable` | The bundle's named files with recorded permission modes, such as `nvkectl` |
+| `disk-image` | `<output-name>.qcow2`, preserving the exact plain or declared LUKS2-encrypted disk payload bytes without decryption |
+| `helm-oci` | `<output-name>.tgz`, preserving the unchanged chart archive |
+| `oci` | A standard OCI layout with `oci-layout`, `index.json`, and `blobs/`; native OCI and Docker schema-2 images retain their exact manifests, configs, and layers; aggregate OCI indexes include every declared platform |
+| `apt-repository` | The checked APT repository tree of regular files and directories, directly beneath the destination directory |
+
+For the example above, the executable is `./nvkectl-linux-arm64/nvkectl`. The destination's parent must exist;
+the destination itself must not already exist, and it is exposed only after successful integrity checks.
+Bundle installation suggestions do not choose destination paths. Pulling neither installs nor executes a
+file and does not import images into a runtime. It does not infer a platform from the host or output name or
+reduce an aggregate image to the current host's platform. Inspect the declared platform before choosing an output.
 Failure before the directory is committed leaves no destination. If the final parent-directory sync fails,
 the command reports failure even though the complete destination may already exist.
 
 The operation validates the complete bounded release metadata and evidence closure before selecting the
-payload. It checks the selected archive's digest and size, then its exact file membership, names, sizes,
-digests, and modes. Unrelated payload layers are not downloaded, including other executable bundles and disk
-images. An unknown output is a coded usage error. An output that is not an executable bundle fails with a
-coded capability error before any payload download or destination creation.
+payload. It checks the selected output's exact payload closure and format-specific integrity, including
+descriptor digests and sizes, archive membership where applicable, and executable file digests and modes.
+An aggregate image's closure includes all its declared native children. Payloads belonging only to other
+outputs are not downloaded. An unknown output is a coded usage error. Malformed or unsupported format metadata
+fails with a coded error before payload or destination work. APT archives reject links and special files;
+directories must be readable and searchable by their owner. Every file, including repository indexes, is bound
+to the downloaded archive by its digest.
 
 `release pull` accepts only a registry reference. Use `publish extract` for an executable bundle already in a
 local layout. Registry credentials, `--anonymous`, `--plain-http`, `--workspace`, and the ten-minute default
 `--timeout` follow the browsing rules above. `--workspace` selects the parent for private temporary registry
-data; `--out` selects the new directory containing the extracted files. Temporary data is removed on success,
+data; `--out` selects the new directory containing the downloaded output. Temporary data is removed on success,
 failure, or cancellation; a caller-owned workspace remains.
 
 The default result is plain text. `--ui=tui` opens the [read-only result browser](lifecycle.md#browse-public-command-results)
-after successful extraction, showing the selected platform and written file identities. Closing the browser
+after a successful pull, showing the format, declared platforms and written file identities. Closing the browser
 does not repeat the download or undo the written files. Presentation admission precedes acquisition.
 
 Successful pulling establishes byte integrity against the supplied release metadata. Its result grants no
 signature, consumer-policy, qualification, installation, or runtime acceptance. Apply `release verify` to the
-same exact root under an independently accepted policy before treating the downloaded executable as trusted.
+same exact root under an independently accepted policy before treating the downloaded output as trusted.
 
 ## Export a complete release description
 
@@ -194,8 +207,8 @@ artifact payload downloads, or `--scope artifact-publication` to include payload
 
 ## Implementation and validation scope
 
-Delivery owns the bounded metadata reader and the output/evidence projection. Lifecycle admits the reference
-and options, bounds the operation, reads or pulls the metadata, obtains its detached description and removes
+For browsing, delivery owns the bounded metadata reader and the output/evidence projection. Lifecycle admits
+the reference and options, bounds the operation, reads or pulls the metadata, obtains its detached description and removes
 temporary resources. Presentation owns the explicit versioned wire description and filters and formats only
 that description. No new release identity or publication format is introduced. Artifact-publication verification
 retains its full payload and policy checks. The pre-cutover exporter passed targeted tests, the full local
@@ -203,12 +216,18 @@ completion gate with uncached tests, and the uncached race suite on pinned Go 1.
 validation and the existing inspection evidence below retain their original namespace and scope; they do
 not establish external acceptance of the renamed reader.
 
+For pulling, delivery owns admission, complete metadata validation, retrieval and integrity of the selected
+payload closure, destination publication, and private temporary cleanup. Lifecycle supplies the overall deadline.
+
 Contract tests cover anonymous and authenticated loopback registries, identical local/remote descriptions,
 exact sibling references and evidence subjects, config-declared platforms, zero artifact payload-layer
 downloads including disk images, failed admission before filesystem/network work, temporary-workspace cleanup
 in a read-only current directory, rejection of evidence without output membership, empty Helm build-subject
 arrays, filtered shared membership, Unicode-safe JSON round trips and CLI option admission. Those fixtures
-establish contracts, not GHCR, signing-service or production acceptance. Current support and external evidence remain recorded in
+establish contracts, not GHCR, signing-service or production acceptance. Pulling contracts cover exact output
+selection, the five supported formats, complete aggregate-platform membership, exclusion of unrelated payloads,
+integrity failures, existing-destination refusal, and cleanup. They do not establish registry-service,
+installation, image-runtime, or production acceptance. Current support and external evidence remain recorded in
 [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
 
 The [recorded loopback replay](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI

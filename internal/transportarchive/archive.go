@@ -499,11 +499,14 @@ const maxHelmTransportDecompressedBytes = 512 << 20
 // bounds 1:1. Without a smaller budget on the gzip lane, a small decompression
 // bomb could expand without bound; the budget is charged for every
 // decompressed byte, including data tar.Reader.Next skips between entries.
-func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, func(), error) {
-	buffered := bufio.NewReader(source)
+func openTransportTarSource(ctx context.Context, source io.Reader, allowCompressed bool) (io.Reader, func(), error) {
+	if err := requireTransportContext(ctx, "opening transport archive"); err != nil {
+		return nil, nil, err
+	}
+	buffered := bufio.NewReader(transportContextReader{ctx: ctx, reader: source})
 	magic, err := buffered.Peek(2)
 	if err != nil && err != io.EOF {
-		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive")
+		return nil, nil, transportError(ctx, e.CodeVerifyFailed, err, "inspecting transport archive")
 	}
 	if len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
 		if !allowCompressed {
@@ -511,12 +514,12 @@ func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, 
 		}
 		gz, err := gzip.NewReader(buffered)
 		if err != nil {
-			return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed transport archive")
+			return nil, nil, transportError(ctx, e.CodeVerifyFailed, err, "opening compressed transport archive")
 		}
-		return &transportLimitReader{reader: gz, remaining: maxHelmTransportDecompressedBytes, bound: maxHelmTransportDecompressedBytes},
+		return transportContextReader{ctx: ctx, reader: &transportLimitReader{reader: gz, remaining: maxHelmTransportDecompressedBytes, bound: maxHelmTransportDecompressedBytes}},
 			func() { _ = gz.Close() }, nil
 	}
-	return &transportLimitReader{reader: buffered, remaining: maxTransportBytes, bound: maxTransportBytes}, func() {}, nil
+	return transportContextReader{ctx: ctx, reader: &transportLimitReader{reader: buffered, remaining: maxTransportBytes, bound: maxTransportBytes}}, func() {}, nil
 }
 
 // transportLimitReader fails closed once an untrusted stream has yielded more
@@ -557,7 +560,7 @@ func (reader *transportLimitReader) Read(p []byte) (int, error) {
 // with no top-level directory, fail closed; extraction independently
 // re-validates every entry.
 func detectTransportChartRootFrom(ctx context.Context, source io.Reader, allowCompressed bool) (string, error) {
-	tarSource, closeTarSource, err := openTransportTarSource(source, allowCompressed)
+	tarSource, closeTarSource, err := openTransportTarSource(ctx, source, allowCompressed)
 	if err != nil {
 		return "", err
 	}
@@ -574,7 +577,7 @@ func detectTransportChartRootFrom(ctx context.Context, source io.Reader, allowCo
 			break
 		}
 		if err != nil {
-			return "", e.Wrap(e.CodeVerifyFailed, err, "reading transport archive")
+			return "", transportError(ctx, e.CodeVerifyFailed, err, "reading transport archive")
 		}
 		entries++
 		if entries > maxTransportEntries {
@@ -623,7 +626,7 @@ func DetectTransportChartRoot(ctx context.Context, archive string) (string, erro
 	}
 	root, err := detectTransportChartRootFrom(ctx, file, true)
 	if err != nil {
-		return "", e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
+		return "", transportError(ctx, e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
 	}
 	return root, nil
 }
@@ -650,7 +653,7 @@ func DetectAndUnpackChartRoot(ctx context.Context, archive, root string) (string
 	}
 	chartRoot, err := detectTransportChartRootFrom(ctx, file, true)
 	if err != nil {
-		return "", e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
+		return "", transportError(ctx, e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "rewinding transport archive %s", archive)
@@ -741,7 +744,7 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 		return e.Wrap(e.CodeInternal, err, "opening transport staging root")
 	}
 	defer func() { _ = stageRoot.Close() }()
-	tarSource, closeTarSource, err := openTransportTarSource(file, allowCompressed)
+	tarSource, closeTarSource, err := openTransportTarSource(ctx, file, allowCompressed)
 	if err != nil {
 		return transportError(ctx, e.CodeVerifyFailed, err, "opening held transport archive")
 	}
@@ -750,6 +753,21 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	seen := map[string]bool{}
 	directoryModes := map[string]fs.FileMode{}
 	directories := map[string]bool{"": true}
+	defer func() {
+		// Archive modes may remove write/search permissions. Restore permissions
+		// only inside this owned stage, before its deferred removal; roots already
+		// published outside the stage are absent and are never changed here.
+		names := make([]string, 0, len(directories))
+		for name := range directories {
+			if name != "" {
+				names = append(names, name)
+			}
+		}
+		sort.Slice(names, func(i, j int) bool { return strings.Count(names[i], "/") < strings.Count(names[j], "/") })
+		for _, name := range names {
+			_ = stageRoot.Chmod(filepath.FromSlash(name), 0o700)
+		}
+	}()
 	entries := 0
 	for {
 		if err := ctx.Err(); err != nil {

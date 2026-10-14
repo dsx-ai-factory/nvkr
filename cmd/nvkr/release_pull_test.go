@@ -25,9 +25,18 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func TestReleasePullDownloadsOnlySelectedExecutable(t *testing.T) {
-	for _, arch := range []string{"amd64", "arm64"} {
-		t.Run(arch, func(t *testing.T) {
+func TestReleasePullDownloadsOnlySelectedOutput(t *testing.T) {
+	for _, selected := range []struct {
+		arch, output, path, payload string
+		mode                        os.FileMode
+	}{
+		{"amd64", "tools", "cli", "opaque cli fixture bytes", 0o755},
+		{"arm64", "tools", "cli", "opaque cli fixture bytes", 0o755},
+		{"amd64", "node-image", "node-image.qcow2", "opaque disk fixture bytes", 0o644},
+		{"arm64", "node-image", "node-image.qcow2", "opaque disk fixture bytes", 0o644},
+	} {
+		t.Run(selected.arch+"/"+selected.output, func(t *testing.T) {
+			arch := selected.arch
 			fixture := releaseBrowsePayloadFixture(t, arch)
 			var selectedGets, otherGets atomic.Int64
 			var corruptMetadata atomic.Bool
@@ -35,7 +44,7 @@ func TestReleasePullDownloadsOnlySelectedExecutable(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodGet {
 					if fixture.payloads[filepath.Base(r.URL.Path)] && strings.Contains(r.URL.Path, "/blobs/") {
-						if strings.Contains(r.URL.Path, "/product/tools/") {
+						if strings.Contains(r.URL.Path, "/product/"+selected.output+"/") {
 							selectedGets.Add(1)
 						} else {
 							otherGets.Add(1)
@@ -61,8 +70,8 @@ func TestReleasePullDownloadsOnlySelectedExecutable(t *testing.T) {
 			selectedGets.Store(0)
 			otherGets.Store(0)
 			root := t.TempDir()
-			out, workspace := filepath.Join(root, "tools"), filepath.Join(root, "workspace")
-			args := []string{"--reference", reference, "--output", "tools", "--out", out, "--workspace", workspace, "--anonymous", "--plain-http"}
+			out, workspace := filepath.Join(root, selected.output), filepath.Join(root, "workspace")
+			args := []string{"--reference", reference, "--output", selected.output, "--out", out, "--workspace", workspace, "--anonymous", "--plain-http"}
 			raw, err := runReleasePull(t.Context(), args...)
 			if err != nil {
 				t.Fatal(err)
@@ -70,15 +79,15 @@ func TestReleasePullDownloadsOnlySelectedExecutable(t *testing.T) {
 			if selectedGets.Load() == 0 || otherGets.Load() != 0 {
 				t.Fatalf("wrong payloads fetched: selected=%d other=%d", selectedGets.Load(), otherGets.Load())
 			}
-			payload, err := os.ReadFile(filepath.Join(out, "cli"))
-			if err != nil || string(payload) != "opaque cli fixture bytes" {
+			payload, err := os.ReadFile(filepath.Join(out, selected.path))
+			if err != nil || string(payload) != selected.payload {
 				t.Fatalf("wrong extracted bytes: %q, %v", payload, err)
 			}
-			info, err := os.Stat(filepath.Join(out, "cli"))
-			if err != nil || info.Mode().Perm() != 0o755 {
-				t.Fatalf("executable mode not retained: %v, %v", info, err)
+			info, err := os.Stat(filepath.Join(out, selected.path))
+			if err != nil || info.Mode().Perm() != selected.mode {
+				t.Fatalf("payload mode not retained: %v, %v", info, err)
 			}
-			for _, want := range []string{filepath.Join(out, "cli"), "linux/" + arch, "payload integrity checked", "signatures and policy not verified"} {
+			for _, want := range []string{filepath.Join(out, selected.path), "linux/" + arch, "payload integrity checked", "signatures and policy not verified"} {
 				if !strings.Contains(raw, want) {
 					t.Errorf("pull result missing %q: %s", want, raw)
 				}
@@ -90,8 +99,7 @@ func TestReleasePullDownloadsOnlySelectedExecutable(t *testing.T) {
 				code         e.Code
 			}{
 				{"unknown", "missing", false, e.CodeUsage},
-				{"unsupported", "node-image", false, e.CodeEngineCapability},
-				{"invalid sibling metadata", "tools", true, e.CodeFetchFailed},
+				{"invalid metadata", selected.output, true, e.CodeFetchFailed},
 			} {
 				t.Run(test.name, func(t *testing.T) {
 					corruptMetadata.Store(test.corrupt)
@@ -147,9 +155,9 @@ func TestReleasePullRejectsInvalidUsageBeforeAcquisition(t *testing.T) {
 func TestReleasePullEscapesRegistryLabels(t *testing.T) {
 	for _, control := range []string{"\x1b[2J", "\u202e", "\t"} {
 		t.Run(control, func(t *testing.T) {
-			bundle := delivery.BinaryBundle{OS: "linux" + control, Arch: "arm64" + control,
-				Entries: []delivery.BinaryEntry{{Name: "cli" + control, SHA256: "sha256:" + strings.Repeat("a", 64)}}}
-			raw := releasePullMessage("tools"+control, "out"+control, bundle)
+			result := delivery.PulledOutput{Output: delivery.PublicationOutput{Output: delivery.Output{Kind: "executable" + control, OS: "linux" + control, Arch: "arm64" + control}},
+				Files: []delivery.PulledFile{{Path: "cli" + control, SHA256: "sha256:" + strings.Repeat("a", 64)}}}
+			raw := releasePullMessage("tools"+control, "out"+control, result)
 			if strings.Contains(raw, control) {
 				t.Fatalf("pull printed a terminal control character: %q", raw)
 			}
@@ -188,18 +196,18 @@ func TestReleasePullPresentationSurroundsOneOwnedOperation(t *testing.T) {
 			calls, views := 0, 0
 			destination := filepath.Join(t.TempDir(), "output")
 			var out bytes.Buffer
-			operation := func(ctx context.Context, reference, output, path string, options lifecycle.PullOptions) (delivery.BinaryBundle, error) {
+			operation := func(ctx context.Context, reference, output, path string, options lifecycle.PullOptions) (delivery.PulledOutput, error) {
 				calls++
 				if ctx == nil || reference != "exact-reference" || output != "tools" || path != destination || options.Timeout <= 0 {
 					t.Fatal("command lost selected operation inputs")
 				}
 				if test.ownerCode != "" {
-					return delivery.BinaryBundle{}, e.New(test.ownerCode, "private-error-sentinel")
+					return delivery.PulledOutput{}, e.New(test.ownerCode, "private-error-sentinel")
 				}
 				if err := os.Mkdir(destination, 0o700); err != nil {
 					t.Fatal(err)
 				}
-				return delivery.BinaryBundle{OS: "linux", Arch: "amd64", Entries: []delivery.BinaryEntry{{Name: "cli", SHA256: "sha256:" + strings.Repeat("a", 64), Size: 17}}}, nil
+				return delivery.PulledOutput{Output: delivery.PublicationOutput{Output: delivery.Output{Kind: "executable", OS: "linux", Arch: "amd64"}}, Files: []delivery.PulledFile{{Path: "cli", SHA256: "sha256:" + strings.Repeat("a", 64), Size: 17}}}, nil
 			}
 			app := &cli.App{Writer: &out, Commands: []*cli.Command{{Name: "release", Subcommands: []*cli.Command{releasePullCmdWithOperation(operation)}}}, Metadata: map[string]interface{}{commandPresentationServicesKey: runPresentationServices{
 				eligible: func(io.Writer) bool { return test.eligible },
