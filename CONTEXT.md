@@ -235,8 +235,9 @@ suite-selection dispatcher or authenticated evidence; its lane is none (descript
 _Avoid_: Component producer, qualified verifier, conformance receipt
 
 **Validation profile**:
-Explicit diagnostic configuration selecting a source and admitted named checks with separate harness
-configuration. It is not a Definition, an applicability detector or a Verification Policy. Its outputs
+Explicit diagnostic configuration selecting a product publication and named check instances with
+separate suite/harness protocols and configuration. Tools are independently selected exact members
+of authenticated catalog-produced executable outputs. It is not a Definition, an applicability detector or a Verification Policy. Its outputs
 remain descriptive and cannot authorize qualification or promotion.
 _Avoid_: Recipe, test dispatcher framework, qualification policy
 

@@ -18,7 +18,7 @@ import (
 )
 
 func profileFixture() Configuration {
-	return Configuration{Source: Source{Kind: "published", Reference: "registry.example.test/release@sha256:" + strings.Repeat("a", 64), Policy: "policy.yaml"}, Checks: []Check{{Name: "kube-conformance", Harness: "hydrophone", Config: "checks/conformance.json"}}}
+	return Configuration{Source: Source{Kind: "published", Reference: "registry.example.test/release@sha256:" + strings.Repeat("a", 64), Policy: "policy.yaml"}, Checks: []Check{{Name: "kube-conformance", Suite: "kube-conformance", Harness: "hydrophone", Config: "checks/conformance.json"}}}
 }
 func saveProfile(t *testing.T, raw []byte) string {
 	t.Helper()
@@ -59,10 +59,10 @@ func TestProfileCapabilityRefusalPrecedesSourceAndHarnessWork(t *testing.T) {
 		message         string
 	}{
 		{"unknown selection", "ai-tests", func(*Configuration) {}, e.CodeUnsupported, "not configured"},
-		{"AI check", "", func(p *Configuration) { p.Checks[0].Name = "ai-tests" }, e.CodeUnsupported, "check type"},
+		{"AI check", "", func(p *Configuration) { p.Checks[0].Suite = "ai-tests" }, e.CodeUnsupported, "suite"},
 		{"unsupported unselected check", "kube-conformance", func(p *Configuration) {
-			p.Checks = append(p.Checks, Check{Name: "user-added", Harness: "command", Config: "/must-not-open"})
-		}, e.CodeUnsupported, "check type"},
+			p.Checks = append(p.Checks, Check{Name: "user-added", Suite: "ai-tests", Harness: "command", Config: "/must-not-open"})
+		}, e.CodeUnsupported, "suite"},
 		{"other harness", "", func(p *Configuration) { p.Checks[0].Harness = "sonobuoy" }, e.CodeUnsupported, "harness"},
 		{"local source", "", func(p *Configuration) { p.Source.Kind = "local" }, e.CodeEngineCapability, "owning diagnostic capability"},
 		{"wrong reference", "", func(p *Configuration) { p.Source.Reference = "registry.example.test/release:latest" }, e.CodeUsage, "source reference"},
@@ -153,5 +153,36 @@ func TestRunFilesContextAndPathAdmission(t *testing.T) {
 	for _, path := range []string{"", " path", strings.Repeat("x", 4097)} {
 		_, err = RunFiles(t.Context(), "", path, lifecycle.QualificationRuntimeOptions{WorkspaceRoot: "workspace"})
 		requireError(t, err, e.CodeUsage, "configuration and workspace")
+	}
+}
+
+func TestConfiguredCheckInstancesSelectTheirExplicitSuite(t *testing.T) {
+	profile := profileFixture()
+	profile.Checks[0].Name = "my-customer-check"
+	second := profile.Checks[0]
+	second.Name = "another-check"
+	second.Config = "checks/second.json"
+	profile.Checks = append(profile.Checks, second)
+	raw, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := saveProfile(t, raw)
+	for _, tc := range []struct {
+		selection string
+		count     int
+	}{{"", 2}, {"my-customer-check", 1}, {"another-check", 1}} {
+		_, selected, err := loadConfiguration(t.Context(), tc.selection, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(selected) != tc.count {
+			t.Fatalf("selection %q: got %d checks", tc.selection, len(selected))
+		}
+		for _, check := range selected {
+			if check.Suite != "kube-conformance" || check.Harness != "hydrophone" {
+				t.Fatal("instance name changed explicit suite/harness")
+			}
+		}
 	}
 }

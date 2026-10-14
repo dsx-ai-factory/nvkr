@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  hydrophone:
+    artifactPath: nvkr-output/hydrophone
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+        go build -trimpath -mod=vendor -buildvcs=false -ldflags "-s -w -buildid=" -o /src/nvkr-output/hydrophone .
+    cgo: false
+    fromSource: true
+    outputType: raw
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    source: hydrophone
+    writeDir: nvkr-output
+kind: SourceBuildRegistry
+metadata:
+  description: 'Review candidate: original Hydrophone commit plus declared fixed dependency transformation; not admitted.'
+  name: validation-tools-reviewed-candidate
+sources:
+  hydrophone:
+    repo: https://github.com/kubernetes-sigs/hydrophone
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:2d658507a011f1eadc0114d7a421b312b2e77d9042a24036a26e267cc9231677
+      arm64: docker.io/library/golang@sha256:a83e961ad968e2e7abc2a59554e356f00c2a270a15fbb39f2c84a4caf13be9c3
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        printf '%s\n' 'b7c118ff379b9c27fe088e376ce0934e32b9b4082f7896fcd1b5dcd8bceb1a88  go.mod' '2dd54b8e0ab592ff2c4f275b520e38b2546e09a555586c0c91c22335f646f26b  go.sum' | sha256sum --quiet -c -
+        go mod edit -require=golang.org/x/net@v0.60.0 -require=golang.org/x/text@v0.42.0 -require=golang.org/x/sys@v0.48.0 -require=golang.org/x/term@v0.46.0
+        timeout --kill-after=10s 540s go mod download all
+        printf '%s\n' 'acc161af7697836af3a90986231e9beb0ba7f34d8587a829a3687965dc322af3  go.mod' '8e077e271bb64985fe21dc9599a278560b477c2421478f22fce603970362af44  go.sum' | sha256sum --quiet -c -
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        printf '%s\n' 'acc161af7697836af3a90986231e9beb0ba7f34d8587a829a3687965dc322af3  go.mod' '8e077e271bb64985fe21dc9599a278560b477c2421478f22fce603970362af44  go.sum' | sha256sum --quiet -c -

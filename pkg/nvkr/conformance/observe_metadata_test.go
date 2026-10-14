@@ -17,7 +17,15 @@ func TestObservedNodeFactsKeepOSReleaseAndMissingEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer admitted.close()
-	facts, err := admitted.observe(t.Context(), filepath.Dir(options.Hydrophone.Path), "before")
+	admitted.hydrophone, err = fixtureCapture(options)(t.Context(), options.Hydrophone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admitted.kubectl, err = fixtureCapture(options)(t.Context(), options.Kubectl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts, err := admitted.observe(t.Context(), filepath.Dir(options.Kubeconfig.Path), "before")
 	if err != nil {
 		t.Fatal(err)
 	}

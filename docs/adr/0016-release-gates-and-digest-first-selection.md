@@ -327,16 +327,13 @@ unpinned identities, caller-provided pass booleans, wrong roles, expired evidenc
 closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
 are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
 
-The ADR-17 external `Producer` interface is usable outside the qualified verifier. Its output-description
-lane is **none (descriptive)**; wrapper validation and serialization issue no receipt and execute no tests.
-The separately user-invoked `validate` diagnostic route admits configured checks against an immutable
-published source. Its current concrete adapter runs pinned Hydrophone on an existing local disposable
-cluster, checks explicit native OCI workload mappings through before/after API observations and retains
-original JUnit. It cannot turn its own unsigned outputs into promotion authority. Source authentication
-reuses lifecycle's existing owner; the qualified verifier remains passive. Local unsigned Run records,
-site/tenant execution, inferred product/test selection, CTRF conversion, passing verdicts, signing and
-qualification integration are unavailable. ADR-05 retains publisher/observation separation; ADR-17 owns
-profile/adapter delegation and the contract reference records the scoped diagnostic limits.
+The ADR-17 external `Producer` interface is usable by implementations outside the qualified verifier.
+Its output-description lane is **none (descriptive)**; wrapper validation and serialization issue no
+receipt. No producer execution is implemented at this boundary. A future separately user-invoked
+diagnostic adapter must remain isolated from qualification verification and cannot use its own
+unsigned outputs to authorize promotion. Cluster operation, generic test selection and qualification
+integration require their owning decisions; this contract activates none of them. ADR-05 keeps
+producer-supplied descriptions separate from publisher evidence and authenticated later observations.
 
 ## Consequences
 
@@ -353,8 +350,8 @@ profile/adapter delegation and the contract reference records the scoped diagnos
 - The clearance result is a new consumable object the downstream must agree to check.
 
 **Neutral**
-- The qualified-verifier boundary is load-bearing: it consumes a conformance result and emits a clearance
-  or verification result. It runs no suite, performs no infra rollback, and authorizes no mutation.
+- The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
+  It runs no suite, performs no infra rollback, and authorizes no mutation.
 
 ## Alternatives considered
 

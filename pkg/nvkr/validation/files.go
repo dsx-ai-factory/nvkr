@@ -38,6 +38,7 @@ type Source struct {
 }
 type Check struct {
 	Name    string `json:"name"`
+	Suite   string `json:"suite"`
 	Harness string `json:"harness"`
 	Config  string `json:"config"`
 }
@@ -154,8 +155,11 @@ func (profile Configuration) validate() error {
 	}
 	seen := map[string]bool{}
 	for _, check := range profile.Checks {
-		if check.Name != "kube-conformance" {
-			return e.New(e.CodeUnsupported, "validation check type %q is unsupported", check.Name)
+		if !safetext.Valid(check.Name, 256, false) || strings.TrimSpace(check.Name) != check.Name {
+			return e.New(e.CodeUsage, "validation check requires a safe instance name")
+		}
+		if check.Suite != "kube-conformance" {
+			return e.New(e.CodeUnsupported, "validation suite %q is unsupported", check.Suite)
 		}
 		if check.Harness != "hydrophone" {
 			return e.New(e.CodeUnsupported, "validation harness %q is unsupported for %s", check.Harness, check.Name)

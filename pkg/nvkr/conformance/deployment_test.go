@@ -175,7 +175,7 @@ func TestDeploymentFailureBeforeHarnessAndDriftAfterCleanup(t *testing.T) {
 			_, err := produce(t, o)
 			requireCode(t, err, e.CodeVerifyFailed)
 			if mode == "deployment-wrong-image" || mode == "deployment-missing" {
-				if _, err := os.Stat(filepath.Join(filepath.Dir(o.Hydrophone.Path), "state.json.startup")); !os.IsNotExist(err) {
+				if _, err := os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.startup")); !os.IsNotExist(err) {
 					t.Fatalf("rejected deployment started harness: %v", err)
 				}
 			}

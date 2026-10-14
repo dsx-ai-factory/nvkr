@@ -77,12 +77,33 @@ requires no GitHub secret; private passphrases remain unsupported.
 
 ## Preparatory external test output boundary
 
-`pkg/nvkr/testresults` implements JUnit/CTRF output descriptions, wrapper validation and deterministic
-Encode/Decode in lane **none (descriptive)**. Producer execution, file collection, format parsing,
-authenticated coverage, signing and publication remain unimplemented. Contract tests establish no
-external execution or service acceptance. Validation-vector v3 and qualification-evidence v2 are unchanged.
-[ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
-owns the boundary; the [output reference](../external-test-output-contract.md) owns fields and limits.
+`pkg/nvkr/testresults` owns producer-supplied JUnit/CTRF report references and metadata in lane
+**none (descriptive)**. Bounded wrapper validation and deterministic Encode/Decode are implemented;
+complete/partial capture declarations do not mean suite success. Optional post-publication input
+bindings require the existing complete exact-input shape, including policy identity. Local subject
+descriptions and policy references grant no authentication or enforcement. Validation-vector v3 and
+qualification-evidence v2 remain unchanged.
+
+The description owner supplies no execution, file collector, JUnit parser or CTRF JSON Schema
+validator. Separately, top-level `validate` / SDK `Client.Validate` delegate to `validation.RunFiles`
+for explicitly configured check instances against an authenticated immutable published root. Lifecycle
+discovers and authenticates the producing Run internally; customer CLI flags require no GitHub URL.
+Instance names are distinct from the supported suite/harness pair, `kube-conformance` / `hydrophone`.
+The producer selects Hydrophone/kubectl executable members and conformance/busybox native OCI images
+from independently authenticated catalog-produced outputs. Existing compilation, acquisition, delivery
+and held-file owners supply those bytes; customer binary paths, executable hashes and raw image references
+are not accepted as tool proof. Tool and product publications may be the same explicitly selected root.
+Both receipt lifetimes cover capture, execution and cleanup. Explicit selected native OCI workload mappings
+are checked through before/after API assertions before test resources are created. The kube-system namespace
+UID is a cluster-identity surrogate; unmapped subjects have no coverage claim. Local disposable-cluster
+execution and original JUnit retention are implemented. Local unsigned subject sources return
+`CodeEngineCapability`; unsupported suites/harnesses fail before provider or harness work. Generic Definition
+applicability and user/AI producer adapters are not implemented. Report validity, passing results,
+continuous/installed-byte proof, qualification, signing and publication remain outside this diagnostic route.
+Contract tests establish no successful external execution of the rewritten route. ADR-16/17 are unchanged;
+implementation does not establish organizational ratification or activate the qualified verifier.
+[ADR-05](0005-trust-object-model-and-digest-authentication.md#4-publisher-evidence-and-later-observations-are-different-trust-objects)
+retains evidence separation; the [contract reference](../external-test-output-contract.md) records limits.
 
 ## M3 MVP scope and acceptance boundary
 

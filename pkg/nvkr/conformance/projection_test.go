@@ -44,10 +44,10 @@ func TestProjectionBudgetRefusesBeforeHarness(t *testing.T) {
 			if _, err = testresults.Encode(output); err != nil {
 				t.Fatalf("refusal lost encodable partial: %v", err)
 			}
-			if _, err = os.Stat(filepath.Join(filepath.Dir(o.Hydrophone.Path), "state.json.startup")); !os.IsNotExist(err) {
+			if _, err = os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.startup")); !os.IsNotExist(err) {
 				t.Fatalf("budget refusal started harness: %v", err)
 			}
-			if _, err = os.Stat(filepath.Join(filepath.Dir(o.Hydrophone.Path), "state.json")); !os.IsNotExist(err) {
+			if _, err = os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json")); !os.IsNotExist(err) {
 				t.Fatalf("budget refusal created suite resources: %v", err)
 			}
 		})
@@ -66,7 +66,7 @@ func TestTerminalProjectionBudgetRetainsReport(t *testing.T) {
 	if _, err = os.ReadFile(output.Reports[0].Reference); err != nil {
 		t.Fatal("original report lost")
 	}
-	if _, err = os.Stat(filepath.Join(filepath.Dir(o.Hydrophone.Path), "state.json.delete")); err != nil {
+	if _, err = os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.delete")); err != nil {
 		t.Fatal("terminal refusal abandoned cleanup")
 	}
 }

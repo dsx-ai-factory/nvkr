@@ -47,7 +47,7 @@ func TestValidateCLIAdmissionBeforeRunner(t *testing.T) {
 	}
 }
 func TestValidateCLIForwardsConfiguredSelectionAndPartialOutputs(t *testing.T) {
-	for _, selected := range []string{"", "kube-conformance"} {
+	for _, selected := range []string{"", "cluster-conformance"} {
 		t.Run(selected, func(t *testing.T) {
 			t.Setenv("NVKR_GITHUB_TOKEN", "explicit-token")
 			t.Setenv("NVKR_REGISTRY", "registry.example.test")

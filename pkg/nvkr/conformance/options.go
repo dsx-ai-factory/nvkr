@@ -9,11 +9,9 @@ package conformance
 import (
 	"bytes"
 	"context"
-	"debug/elf"
 	"encoding/json"
 	"errors"
 	"io"
-	"runtime"
 	"strings"
 	"time"
 
@@ -23,11 +21,9 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
-	"github.com/google/go-containerregistry/pkg/name"
 	"sigs.k8s.io/yaml"
 )
 
-const HarnessRevision = "5fe47daaff5fe025215cb257118dc2a0e643e1d6"
 const maxToolBytes = 256 << 20
 const maxAPIBytes = 16 << 20
 const maxDiagnosticBytes = 1 << 20
@@ -37,16 +33,17 @@ type Tool struct {
 	Digest string `json:"digest"`
 }
 type Options struct {
-	Hydrophone        Tool                            `json:"hydrophone"`
-	Kubectl           Tool                            `json:"kubectl"`
+	Hydrophone        ExecutableSelector              `json:"hydrophone"`
+	Kubectl           ExecutableSelector              `json:"kubectl"`
 	Kubeconfig        Tool                            `json:"kubeconfig"`
 	Context           string                          `json:"context"`
 	CNISelector       string                          `json:"cniSelector"`
-	Image             string                          `json:"image"`
+	Image             string                          `json:"-"`
+	ConformanceImage  ImageSelector                   `json:"conformanceImage"`
 	ImageVersion      string                          `json:"imageVersion"`
-	BusyboxImage      string                          `json:"busyboxImage"`
+	BusyboxImage      string                          `json:"-"`
+	Busybox           ImageSelector                   `json:"busybox"`
 	SuiteName         string                          `json:"suiteName"`
-	HarnessVersion    string                          `json:"harnessVersion"`
 	Role              string                          `json:"role"`
 	WorkspaceRoot     string                          `json:"-"`
 	Environment       []string                        `json:"environment"`
@@ -55,6 +52,7 @@ type Options struct {
 	CleanupTimeout    time.Duration                   `json:"-"`
 	StartupTimeout    time.Duration                   `json:"-"`
 	DisposableCluster bool                            `json:"disposableCluster"`
+	ToolArtifacts     *lifecycle.ArtifactCheckReceipt `json:"-"`
 	Artifacts         *lifecycle.ArtifactCheckReceipt `json:"-"`
 	Targets           []DeploymentTarget              `json:"targets"`
 }
@@ -102,14 +100,6 @@ func admit(ctx context.Context, o Options) (*admitted, error) {
 			a.close()
 		}
 	}()
-	a.hydrophone, err = openTool(ctx, o.Hydrophone)
-	if err != nil {
-		return nil, err
-	}
-	a.kubectl, err = openTool(ctx, o.Kubectl)
-	if err != nil {
-		return nil, err
-	}
 	a.kubeconfig, err = openPrivateKubeconfig(ctx, o.Kubeconfig)
 	if err != nil {
 		return nil, captureFailure(ctx, err, e.CodeUnpinnedInput, "holding private kubeconfig")
@@ -126,31 +116,6 @@ func admit(ctx context.Context, o Options) (*admitted, error) {
 	}
 	complete = true
 	return a, nil
-}
-func openTool(ctx context.Context, tool Tool) (*heldfile.File, error) {
-	held, err := heldfile.OpenContext(ctx, tool.Path, heldfile.Options{Label: "conformance tool", Executable: true, MaxBytes: maxToolBytes, ExpectedDigest: tool.Digest})
-	if err != nil {
-		return nil, captureFailure(ctx, err, e.CodeUnpinnedInput, "holding pinned conformance executable")
-	}
-	parsed, err := elf.NewFile(held)
-	if err != nil {
-		_ = held.Close()
-		return nil, e.New(e.CodeEngineCapability, "conformance tool must be static Linux ELF")
-	}
-	defer func() { _ = parsed.Close() }()
-	native := (runtime.GOARCH == "amd64" && parsed.Machine == elf.EM_X86_64) || (runtime.GOARCH == "arm64" && parsed.Machine == elf.EM_AARCH64)
-	if !native || parsed.Type != elf.ET_EXEC || parsed.Class != elf.ELFCLASS64 || parsed.Data != elf.ELFDATA2LSB {
-		_ = held.Close()
-		return nil, e.New(e.CodeEngineCapability, "conformance tool requires native 64-bit static Linux ELF")
-	}
-
-	for _, p := range parsed.Progs {
-		if p.Type == elf.PT_INTERP || p.Type == elf.PT_DYNAMIC {
-			_ = held.Close()
-			return nil, e.New(e.CodeEngineCapability, "conformance dynamic executable unsupported")
-		}
-	}
-	return held, nil
 }
 func (a *admitted) close() {
 	for _, f := range []*heldfile.File{a.hydrophone, a.kubectl, a.kubeconfig} {
@@ -253,7 +218,7 @@ func validateOptions(o Options) (Options, error) {
 	if len(o.Environment) != 0 {
 		return Options{}, e.New(e.CodeUnsupported, "conformance profile does not admit caller environment overrides; configure the supported tool flags and embedded kubeconfig")
 	}
-	if !safetext.Valid(o.SuiteName, 256, false) || strings.TrimSpace(o.SuiteName) != o.SuiteName || !safetext.Valid(o.HarnessVersion, 256, false) || strings.TrimSpace(o.HarnessVersion) != o.HarnessVersion || !safetext.Valid(o.WorkspaceRoot, 4096, false) {
+	if !safetext.Valid(o.SuiteName, 256, false) || strings.TrimSpace(o.SuiteName) != o.SuiteName || !safetext.Valid(o.WorkspaceRoot, 4096, false) {
 		return Options{}, e.New(e.CodeUsage, "conformance requires named suite, declared harness version and private workspace root")
 	}
 	if o.Context == "" || len(o.Context) > 4096 || strings.ContainsAny(o.Context, "\x00\r\n") || o.CNISelector == "" || len(o.CNISelector) > 4096 || strings.ContainsAny(o.CNISelector, "\x00\r\n") {
@@ -268,17 +233,18 @@ func validateOptions(o Options) (Options, error) {
 	if o.RunTimeout <= 0 || o.RunTimeout > 12*time.Hour || o.CommandTimeout <= 0 || o.CommandTimeout > 5*time.Minute || o.CleanupTimeout <= 0 || o.CleanupTimeout > 10*time.Minute {
 		return Options{}, e.New(e.CodeUsage, "conformance: positive bounded timeouts required")
 	}
-	for _, tool := range []Tool{o.Hydrophone, o.Kubectl, o.Kubeconfig} {
-		if tool.Path == "" || !canonical.IsDigest(tool.Digest) {
-			return Options{}, e.New(e.CodeUnpinnedInput, "conformance: exact executable and kubeconfig byte pins required")
+	if o.Kubeconfig.Path == "" || !canonical.IsDigest(o.Kubeconfig.Digest) {
+		return Options{}, e.New(e.CodeUnpinnedInput, "conformance requires an exact kubeconfig access pin")
+	}
+	for _, selector := range []ExecutableSelector{o.Hydrophone, o.Kubectl} {
+		if err := validateExecutableSelector(selector); err != nil {
+			return Options{}, err
 		}
 	}
-	image, err := name.NewDigest(o.Image, name.StrictValidation)
-	if err != nil || image.Context().Name() != "registry.k8s.io/conformance" || image.Name() != o.Image || !canonical.IsDigest(image.DigestStr()) {
-		return Options{}, e.New(e.CodeUnpinnedInput, "conformance: upstream conformance image requires digest reference")
-	}
-	if sidecar, sidecarErr := name.NewDigest(o.BusyboxImage, name.StrictValidation); sidecarErr != nil || !canonical.IsDigest(sidecar.DigestStr()) || sidecar.Name() != o.BusyboxImage {
-		return Options{}, e.New(e.CodeUnpinnedInput, "conformance: busybox sidecar requires digest reference")
+	for _, selector := range []ImageSelector{o.ConformanceImage, o.Busybox} {
+		if err := validateImageSelector(selector); err != nil {
+			return Options{}, err
+		}
 	}
 	version, err := semver.StrictNewVersion(strings.TrimPrefix(o.ImageVersion, "v"))
 	if err != nil || version.Prerelease() != "" || version.Metadata() != "" {

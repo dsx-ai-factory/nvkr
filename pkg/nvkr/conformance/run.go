@@ -28,7 +28,10 @@ const JUnitProfile = "kubernetes-e2e-ginkgo"
 // Producer is the configured upstream Hydrophone adapter. Its successful return
 // means orchestration and raw capture completed, not that JUnit is valid or tests
 // passed. Its binding describes authenticated source inputs and selected API image assertions, not independent installed-byte or qualification authority.
-type Producer struct{ options Options }
+type Producer struct {
+	options     Options
+	captureTool executableCapture
+}
 
 var _ testresults.Producer = (*Producer)(nil)
 
@@ -44,6 +47,16 @@ func New(options Options) (*Producer, error) {
 		return nil, err
 	}
 	if _, err = selectOutputs(description, options.Targets); err != nil {
+		return nil, err
+	}
+	tools, err := options.ToolArtifacts.Description()
+	if err != nil {
+		return nil, err
+	}
+	if err = validateToolSelections(tools, options); err != nil {
+		return nil, err
+	}
+	if _, _, err = resolveImages(tools, options); err != nil {
 		return nil, err
 	}
 	return &Producer{options: options}, nil
@@ -63,10 +76,18 @@ func (p *Producer) Produce(ctx context.Context) (output testresults.Output, resu
 	if p == nil {
 		return testresults.Output{}, e.New(e.CodeUsage, "configured conformance producer required")
 	}
-	err := p.options.Artifacts.WithDiagnosticOperation(ctx, func(operation context.Context, description lifecycle.ArtifactCheckDescription) error {
-		var err error
-		output, err = p.produce(operation, description)
-		return err
+	err := p.options.ToolArtifacts.WithDiagnosticOperation(ctx, func(toolsContext context.Context, tools lifecycle.ArtifactCheckDescription) error {
+		if err := validateToolSelections(tools, p.options); err != nil {
+			return err
+		}
+		if _, _, err := resolveImages(tools, p.options); err != nil {
+			return err
+		}
+		return p.options.Artifacts.WithDiagnosticOperation(toolsContext, func(operation context.Context, description lifecycle.ArtifactCheckDescription) error {
+			var err error
+			output, err = p.produce(operation, description)
+			return err
+		})
 	})
 	return output, err
 }
@@ -87,6 +108,30 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 		return testresults.Output{}, err
 	}
 	defer a.close()
+	capture := p.captureTool
+	if capture == nil {
+		capture = func(ctx context.Context, selector ExecutableSelector) (*heldfile.File, error) {
+			return captureExecutable(ctx, selector, p.options.ToolArtifacts.WriteExecutableMember)
+		}
+	}
+	a.hydrophone, err = capture(ctx, p.options.Hydrophone)
+	if err != nil {
+		return testresults.Output{}, err
+	}
+	a.kubectl, err = capture(ctx, p.options.Kubectl)
+	if err != nil {
+		return testresults.Output{}, err
+	}
+	if p.captureTool == nil {
+		toolsDescription, descriptionErr := p.options.ToolArtifacts.Description()
+		if descriptionErr != nil {
+			return testresults.Output{}, descriptionErr
+		}
+		a.options.Image, a.options.BusyboxImage, err = resolveImages(toolsDescription, p.options)
+		if err != nil {
+			return testresults.Output{}, err
+		}
+	}
 	o := a.options
 	root, err := filepath.Abs(o.WorkspaceRoot)
 	if err != nil {
@@ -99,7 +144,7 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 	output = testresults.Output{SchemaVersion: testresults.SchemaVersion, CaptureStatus: testresults.CapturePartial,
 		Producer: testresults.ProducerIdentity{Name: "nvkr-kubernetes-conformance", Revision: testresults.Metadata{Status: "unknown"}},
 		Suite:    testresults.SuiteSelection{Name: o.SuiteName, Selection: []string{`\[Conformance\]`}, Revision: testresults.Metadata{Status: "declared", Value: o.Image}},
-		Harness:  &testresults.HarnessIdentity{Name: "hydrophone", Version: testresults.Metadata{Status: "declared", Value: o.HarnessVersion}},
+		Harness:  &testresults.HarnessIdentity{Name: "hydrophone", Version: testresults.Metadata{Status: "unknown"}},
 	}
 	for _, fact := range []struct{ name, value string }{{"invocationID", description.Origin.InvocationID}, {"commit", description.Origin.Commit}, {"repository", description.Origin.Repository}, {"workflow", description.Origin.Workflow}} {
 		metadata := testresults.Metadata{Status: "unavailable"}

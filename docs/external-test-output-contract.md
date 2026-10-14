@@ -55,12 +55,12 @@ coverage or judge results passing. A format label is not a validity claim.
 ## Run configured diagnostic checks
 
 `nvkr validate` delegates through SDK `Client.Validate` to `validation.RunFiles`. No argument runs
-the profile's configured admitted checks; one positional name selects that configured check. Supply
+the profile's configured supported checks; one positional name selects that configured check. Supply
 flags before the optional check name, following the existing CLI parser convention:
 
 ```sh
 nvkr validate --config validation.json --workspace .nvkr/validation
-nvkr validate --config validation.json --workspace .nvkr/validation kube-conformance
+nvkr validate --config validation.json --workspace .nvkr/validation cluster-conformance
 ```
 
 The profile explicitly selects a published source and independently selected policy. Replace the
@@ -73,7 +73,7 @@ reference placeholder with the immutable publication root; there is no automatic
     "reference": "<publication-repository>@sha256:<reviewed-root-digest>",
     "policy": "qualification.yaml"
   },
-  "checks": [{"name": "kube-conformance", "harness": "hydrophone", "config": "conformance.json"}]
+  "checks": [{"name": "cluster-conformance", "suite": "kube-conformance", "harness": "hydrophone", "config": "conformance.json"}]
 }
 ```
 
@@ -88,28 +88,58 @@ Relative policy and check-configuration paths resolve beside the profile. Lifecy
 source-Run lookup and artifact authentication; customers need no GitHub Run URL. An unsigned local
 Run or record cannot restore that receipt. Source kind `local` returns `CodeEngineCapability` until
 an owning local diagnostic capability exists; no local behavior is approximated by hosted authentication.
-Only `kube-conformance` with `hydrophone` is admitted. Other configured checks/harnesses, including
-user/AI adapters, currently return `CodeUnsupported` before provider or harness work. New producers can
-implement the shared interface but require explicit adapter admission; no plugin framework, shell
+Check `name` is a configurable unique instance name; `suite` and `harness` select separate supported
+protocols. The initial suite/harness pair is `kube-conformance` / `hydrophone`. Unsupported pairs,
+including user/AI adapters, return `CodeUnsupported` before provider or harness work. New producers
+can implement the shared interface but require a concrete supported adapter; no plugin framework, shell
 configuration, Definition/product detector or implicit applicability rule is implemented.
 
-The Hydrophone configuration is `{"runner": <conformance.Options>, "timeouts": {...}}` with duration
-strings `run`, `command`, `cleanup`, `startup` (defaults `2h`, `1m`, `5m`, `5m`). Runner fields are
-`hydrophone`, `kubectl`, `kubeconfig` (each `path`/exact byte `digest`), `context`, `cniSelector`, pinned
-`image`, declared `imageVersion`, pinned `busyboxImage`, `suiteName`, declared `harnessVersion`,
-`role: local`, `disposableCluster: true` and explicit `targets`. Environment overrides are unsupported.
-Each target specifies `output`, `namespace`, `labelSelector`, `container`, and positive
-`requiredReplicas`. Relative tool/kubeconfig paths resolve beside that configuration. Use native static
-Linux executables and a self-contained owner-only kubeconfig on an existing disposable cluster.
-The acknowledgement is operator responsibility, not proof of locality/exclusive ownership.
+The producer configuration independently selects its tools publication and policy:
+
+```json
+{
+  "toolsSource": {
+    "reference": "<tools-publication-repository>@sha256:<reviewed-root-digest>",
+    "policy": "tools-qualification.yaml"
+  },
+  "runner": {
+    "hydrophone": {"output": "<executable-output>", "member": "<bundle-member>", "platform": "linux/arm64"},
+    "kubectl": {"output": "<executable-output>", "member": "<bundle-member>", "platform": "linux/arm64"},
+    "conformanceImage": {"output": "<conformance-image-output>", "platform": "linux/arm64"},
+    "busybox": {"output": "<busybox-image-output>", "platform": "linux/arm64"},
+    "kubeconfig": {"path": "cluster.kubeconfig", "digest": "sha256:<access-file-digest>"}
+  },
+  "timeouts": {"run": "2h", "command": "1m", "cleanup": "5m", "startup": "5m"}
+}
+```
+
+This fragment shows source/member selection; the remaining runner fields are required: `context`,
+`cniSelector`, declared `imageVersion`, `suiteName`, `role: local`, `disposableCluster: true` and explicit `targets`. Each target specifies
+`output`, `namespace`, `labelSelector`, `container`, and positive `requiredReplicas`.
+Environment overrides are unsupported. Relative tools-policy and kubeconfig paths resolve beside
+this configuration. The product publication remains mandatory and separate from `toolsSource`. `conformanceImage` and
+`busybox` select exact native OCI image outputs from the same authenticated tools publication; raw
+caller image references are not accepted. `imageVersion` is declared protocol metadata checked against
+server major/minor, not source/version proof. Harness version remains explicitly unknown.
+
+Tools use ordinary catalog-produced executable outputs, authenticated by the existing lifecycle
+owner before exact member export, holding both publication receipts through use. No globally installed
+Hydrophone/kubectl or caller-supplied executable path/digest is selected. Member exports undergo
+native static Linux executable checks. The example names are placeholders, not an approved tool
+catalog or published candidate. Tool source/security approval must be established for the selected
+publication; exact-byte authentication alone supplies no such approval. Kubeconfig is a self-contained,
+owner-only pinned access input for an existing disposable cluster. The acknowledgement is operator
+responsibility, not proof of locality or exclusive ownership.
 
 The current binding supports selected native OCI images only. Before/after API checks match PodSpec
 and image-ID to the authenticated native manifest selected by node platform, and compare mapped
-cluster/pod/node/container identity and restart counts. They describe those two snapshots, not
+the `kube-system` namespace UID as a cluster-identity surrogate, plus mapped pod/node/container
+identities and restart counts. They describe those two snapshots, not
 continuous identity during execution, installed-byte attestation or coverage of unmapped outputs/index
-children. No cluster is provisioned. Site/tenant execution is unavailable because
-[pinned Hydrophone `5fe47daaff5fe025215cb257118dc2a0e643e1d6`](https://github.com/kubernetes-sigs/hydrophone/blob/5fe47daaff5fe025215cb257118dc2a0e643e1d6/cmd/root.go)
-has name-based automatic normal cleanup; wrapper recovery retains UID preconditions.
+children. No cluster is provisioned. Site/tenant execution is unavailable. The previously reviewed
+[Hydrophone `5fe47daaff5fe025215cb257118dc2a0e643e1d6`](https://github.com/kubernetes-sigs/hydrophone/blob/5fe47daaff5fe025215cb257118dc2a0e643e1d6/cmd/root.go)
+has name-based automatic normal cleanup; that source review does not establish the revision of a
+selected published executable. Wrapper recovery retains UID preconditions.
 
 Hydrophone directly runs the upstream Ginkgo conformance suite and fetches original JUnit. The initial
 adapter selects that narrow route. [Sonobuoy](https://sonobuoy.io/docs/v0.56.7/plugins/) offers broader

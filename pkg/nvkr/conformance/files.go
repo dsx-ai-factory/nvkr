@@ -16,15 +16,22 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
 // Configuration is independently selected execution and deployment mapping.
 // It cannot supply artifact receipts, credentials or passing test verdicts.
+type PublishedSource struct {
+	Reference string `json:"reference"`
+	Policy    string `json:"policy"`
+}
+
 type Configuration struct {
-	Runner   Options `json:"runner"`
-	Timeouts struct {
+	ToolsSource PublishedSource `json:"toolsSource"`
+	Runner      Options         `json:"runner"`
+	Timeouts    struct {
 		Run     string `json:"run,omitempty"`
 		Command string `json:"command,omitempty"`
 		Cleanup string `json:"cleanup,omitempty"`
@@ -34,7 +41,7 @@ type Configuration struct {
 
 // RunReferenceFiles authenticates the immutable published source through the existing lifecycle
 // owner, retains its receipt through observation, execution and cleanup, then
-// closes it. Configuration is strict JSON; relative tool paths resolve beside it.
+// closes it. Configuration is strict JSON; relative access and tools-policy paths resolve beside it.
 // Results describe raw reports and API observations, never qualification or pass.
 func RunReferenceFiles(ctx context.Context, reference, policyPath, configPath string, runtimeOptions lifecycle.QualificationRuntimeOptions) (output testresults.Output, resultErr error) {
 	if ctx == nil {
@@ -57,7 +64,7 @@ func RunReferenceFiles(ctx context.Context, reference, policyPath, configPath st
 	if err := heldfile.RequireExecutableSupport(); err != nil {
 		return testresults.Output{}, capability(err)
 	}
-	options, err := loadConfiguration(ctx, configPath, runtimeOptions.WorkspaceRoot)
+	options, toolsSource, err := loadConfigurationWithSource(ctx, configPath, runtimeOptions.WorkspaceRoot)
 	if err != nil {
 		return testresults.Output{}, err
 	}
@@ -68,6 +75,20 @@ func RunReferenceFiles(ctx context.Context, reference, policyPath, configPath st
 		return testresults.Output{}, err
 	}
 	preflight.close()
+	toolsReceipt, _, err := lifecycle.CheckQualificationReference(ctx, toolsSource.Reference, toolsSource.Policy, runtimeOptions)
+	if err != nil {
+		if toolsReceipt != nil {
+			_ = toolsReceipt.Close()
+		}
+		return testresults.Output{}, err
+	}
+	defer func() {
+		resultErr = errors.Join(resultErr, toolsReceipt.Close())
+		if resultErr != nil && output.SchemaVersion != "" {
+			output.CaptureStatus = testresults.CapturePartial
+		}
+	}()
+	options.ToolArtifacts = toolsReceipt
 	receipt, _, err := lifecycle.CheckQualificationReference(ctx, reference, policyPath, runtimeOptions)
 	if err != nil {
 		if receipt != nil {
@@ -90,24 +111,29 @@ func RunReferenceFiles(ctx context.Context, reference, policyPath, configPath st
 }
 
 func loadConfiguration(ctx context.Context, path, workspace string) (Options, error) {
+	options, _, err := loadConfigurationWithSource(ctx, path, workspace)
+	return options, err
+}
+
+func loadConfigurationWithSource(ctx context.Context, path, workspace string) (Options, PublishedSource, error) {
 	const limit = 1 << 20
 	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "conformance configuration", MaxBytes: limit})
 	if err != nil {
-		return Options{}, captureFailure(ctx, err, e.CodeUsage, "opening conformance configuration")
+		return Options{}, PublishedSource{}, captureFailure(ctx, err, e.CodeUsage, "opening conformance configuration")
 	}
 	defer func() { _ = held.Close() }()
 	raw, err := held.ReadAllContext(ctx, limit)
 	if err != nil {
-		return Options{}, captureFailure(ctx, err, e.CodeUsage, "reading conformance configuration")
+		return Options{}, PublishedSource{}, captureFailure(ctx, err, e.CodeUsage, "reading conformance configuration")
 	}
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return Options{}, e.Wrap(e.CodeUsage, err, "conformance configuration requires one unambiguous JSON document")
+		return Options{}, PublishedSource{}, e.Wrap(e.CodeUsage, err, "conformance configuration requires one unambiguous JSON document")
 	}
 	var config Configuration
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&config); err != nil {
-		return Options{}, e.Wrap(e.CodeUsage, err, "decoding conformance configuration")
+		return Options{}, PublishedSource{}, e.Wrap(e.CodeUsage, err, "decoding conformance configuration")
 	}
 	options := config.Runner
 	for _, timeout := range []struct {
@@ -124,23 +150,30 @@ func loadConfiguration(ctx context.Context, path, workspace string) (Options, er
 		if timeout.value != "" {
 			value, err := time.ParseDuration(timeout.value)
 			if err != nil {
-				return Options{}, e.Wrap(e.CodeUsage, err, "conformance timeout requires a duration")
+				return Options{}, PublishedSource{}, e.Wrap(e.CodeUsage, err, "conformance timeout requires a duration")
 			}
 			*timeout.out = value
 		}
 	}
 	configPath, err := filepath.Abs(path)
 	if err != nil {
-		return Options{}, e.Wrap(e.CodeUsage, err, "resolving conformance configuration path")
+		return Options{}, PublishedSource{}, e.Wrap(e.CodeUsage, err, "resolving conformance configuration path")
 	}
-	for _, tool := range []*Tool{&options.Hydrophone, &options.Kubectl, &options.Kubeconfig} {
+	for _, tool := range []*Tool{&options.Kubeconfig} {
 		if tool.Path != "" && !filepath.IsAbs(tool.Path) {
 			tool.Path = filepath.Join(filepath.Dir(configPath), tool.Path)
 		}
 	}
 	options.WorkspaceRoot, err = filepath.Abs(workspace)
 	if err != nil {
-		return Options{}, e.Wrap(e.CodeUsage, err, "resolving conformance workspace")
+		return Options{}, PublishedSource{}, e.Wrap(e.CodeUsage, err, "resolving conformance workspace")
 	}
-	return validateOptions(options)
+	if strings.Contains(config.ToolsSource.Reference, "://") || delivery.ValidatePublicationReference(config.ToolsSource.Reference) != nil || !safetext.Valid(config.ToolsSource.Policy, 4096, false) || strings.TrimSpace(config.ToolsSource.Policy) != config.ToolsSource.Policy {
+		return Options{}, PublishedSource{}, e.New(e.CodeUsage, "conformance requires an independent published tools source and policy")
+	}
+	if !filepath.IsAbs(config.ToolsSource.Policy) {
+		config.ToolsSource.Policy = filepath.Join(filepath.Dir(configPath), config.ToolsSource.Policy)
+	}
+	options, err = validateOptions(options)
+	return options, config.ToolsSource, err
 }

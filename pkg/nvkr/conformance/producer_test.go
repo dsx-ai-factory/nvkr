@@ -6,6 +6,7 @@ package conformance
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
@@ -41,7 +44,7 @@ preferences: {}
 
 func optionsFixture() Options {
 	pin := "sha256:" + strings.Repeat("a", 64)
-	return Options{Targets: []DeploymentTarget{{Output: "image", Namespace: "workload", LabelSelector: "app=nvke", Container: "nvke", RequiredReplicas: 1}}, DisposableCluster: true, Role: "local", SuiteName: "kubernetes-conformance", HarnessVersion: "fixture-declared-version", WorkspaceRoot: "/not-created", Hydrophone: Tool{Path: "/not-opened", Digest: pin}, Kubectl: Tool{Path: "/not-opened", Digest: pin}, Kubeconfig: Tool{Path: "/not-opened", Digest: pin}, Context: "exact", CNISelector: "app=cni", Image: "registry.k8s.io/conformance@" + pin, ImageVersion: "1.35.1", BusyboxImage: "registry.k8s.io/e2e-test-images/busybox@" + pin, RunTimeout: time.Minute, CommandTimeout: 2 * time.Second, CleanupTimeout: 5 * time.Second}
+	return Options{Targets: []DeploymentTarget{{Output: "image", Namespace: "workload", LabelSelector: "app=nvke", Container: "nvke", RequiredReplicas: 1}}, DisposableCluster: true, Role: "local", SuiteName: "kubernetes-conformance", WorkspaceRoot: "/not-created", Hydrophone: ExecutableSelector{Output: "tools", Member: "hydrophone", Platform: "linux/" + runtime.GOARCH}, Kubectl: ExecutableSelector{Output: "tools", Member: "kubectl", Platform: "linux/" + runtime.GOARCH}, ConformanceImage: ImageSelector{Output: "conformance", Platform: "linux/amd64"}, Busybox: ImageSelector{Output: "busybox", Platform: "linux/amd64"}, Kubeconfig: Tool{Path: "/not-opened", Digest: pin}, Context: "exact", CNISelector: "app=cni", Image: "registry.k8s.io/conformance@" + pin, ImageVersion: "1.35.1", BusyboxImage: "registry.k8s.io/e2e-test-images/busybox@" + pin, RunTimeout: time.Minute, CommandTimeout: 2 * time.Second, CleanupTimeout: 5 * time.Second}
 }
 func requireCode(t *testing.T, err error, code e.Code) {
 	t.Helper()
@@ -56,9 +59,9 @@ func TestConfigurationAdmissionBeforeIO(t *testing.T) {
 		edit func(*Options)
 		code e.Code
 	}{
-		{"image tag", func(o *Options) { o.Image = "registry.k8s.io/conformance:v1.35.1" }, e.CodeUnpinnedInput},
-		{"sidecar tag", func(o *Options) { o.BusyboxImage = "busybox:latest" }, e.CodeUnpinnedInput},
-		{"missing pin", func(o *Options) { o.Hydrophone.Digest = "" }, e.CodeUnpinnedInput},
+		{"image tag", func(o *Options) { o.ConformanceImage.Output = "" }, e.CodeUsage},
+		{"sidecar tag", func(o *Options) { o.Busybox.Platform = "" }, e.CodeUsage},
+		{"missing selector", func(o *Options) { o.Hydrophone.Member = "" }, e.CodeUsage},
 		{"missing context", func(o *Options) { o.Context = "" }, e.CodeUsage},
 		{"missing CNI classification", func(o *Options) { o.CNISelector = "" }, e.CodeUsage},
 		{"missing version", func(o *Options) { o.ImageVersion = "unknown" }, e.CodeUsage},
@@ -134,18 +137,12 @@ func buildFixture(t *testing.T, mode string) Options {
 	if raw, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("building process fixture: %v %s", err, raw)
 	}
-	binary, err := os.ReadFile(bin)
-	if err != nil {
-		t.Fatal(err)
-	}
 	kube := filepath.Join(root, "kubeconfig")
 	if err := os.WriteFile(kube, []byte(kubeFixture), 0600); err != nil {
 		t.Fatal(err)
 	}
 	o := optionsFixture()
 	o.WorkspaceRoot = root
-	o.Hydrophone = Tool{Path: bin, Digest: blobDigest(binary)}
-	o.Kubectl = o.Hydrophone
 	o.Kubeconfig = Tool{Path: kube, Digest: blobDigest([]byte(kubeFixture))}
 	return o
 }
@@ -155,7 +152,7 @@ func produce(t *testing.T, o Options) (testresults.Output, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &Producer{options: o}
+	p := &Producer{options: o, captureTool: fixtureCapture(o)}
 	return p.produce(t.Context(), artifactDescriptionFixture())
 }
 func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) {
@@ -203,7 +200,7 @@ func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) 
 			if (len(out.Reports) > 0) != tc.report {
 				t.Fatalf("report capture=%v error=%v", out.Reports, err)
 			}
-			if out.Binding == nil || len(out.Binding.Subjects) != 1 || out.Binding.Inputs == nil || out.Producer.Revision.Status != "unknown" || out.Suite.Name != o.SuiteName || out.Harness == nil || out.Harness.Name != "hydrophone" || out.Harness.Version.Value != o.HarnessVersion {
+			if out.Binding == nil || len(out.Binding.Subjects) != 1 || out.Binding.Inputs == nil || out.Producer.Revision.Status != "unknown" || out.Suite.Name != o.SuiteName || out.Harness == nil || out.Harness.Name != "hydrophone" || out.Harness.Version.Status != "unknown" {
 				t.Fatal("diagnostic adapter lost source binding or merged identities")
 			}
 			before, after := false, false
@@ -255,7 +252,7 @@ func TestCancellationStillOwnsCleanupAndPreservesCause(t *testing.T) {
 			if !errors.Is(err, context.DeadlineExceeded) || out.Binding == nil {
 				t.Fatal("cancellation lost or runtime became qualification")
 			}
-			if _, err := os.Stat(filepath.Join(filepath.Dir(o.Hydrophone.Path), "state.json.delete")); err != nil {
+			if _, err := os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.delete")); err != nil {
 				t.Fatal("cancellation abandoned cleanup")
 			}
 			if mode == "cancel-cleanup-failure" && !strings.Contains(err.Error(), "exit 8") {
@@ -270,7 +267,7 @@ func TestCleanupNeverDeletesReplacedOrForeignScope(t *testing.T) {
 			o := buildFixture(t, mode)
 			_, err := produce(t, o)
 			requireCode(t, err, e.CodeVerifyFailed)
-			if _, err := os.Stat(filepath.Join(filepath.Dir(o.Hydrophone.Path), "state.json.delete")); !errors.Is(err, os.ErrNotExist) {
+			if _, err := os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.delete")); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("DELETE without exact ownership")
 			}
 		})
@@ -287,7 +284,7 @@ func TestExecutableAndPrivateKubeconfigAdmission(t *testing.T) {
 				}
 				code = e.CodeUnpinnedInput
 			} else {
-				raw, err := os.ReadFile(o.Hydrophone.Path)
+				raw, err := os.ReadFile(fixtureToolPath(o))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -296,10 +293,9 @@ func TestExecutableAndPrivateKubeconfigAdmission(t *testing.T) {
 				} else {
 					raw[18], raw[19] = 255, 255
 				}
-				if err := os.WriteFile(o.Hydrophone.Path, raw, 0700); err != nil {
+				if err := os.WriteFile(fixtureToolPath(o), raw, 0700); err != nil {
 					t.Fatal(err)
 				}
-				o.Hydrophone.Digest = blobDigest(raw)
 			}
 			_, err := produce(t, o)
 			requireCode(t, err, code)
@@ -340,7 +336,7 @@ func TestReportRecoveryTimeoutDoesNotConsumeCleanupBudget(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) || len(out.Reports) != 0 {
 		t.Fatalf("recovery refusal lost: %+v %v", out, err)
 	}
-	if _, err := os.Stat(filepath.Join(filepath.Dir(o.Hydrophone.Path), "state.json.delete")); err != nil {
+	if _, err := os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.delete")); err != nil {
 		t.Fatal("report timeout abandoned UID cleanup")
 	}
 }
@@ -360,5 +356,19 @@ func TestReportReferenceRemainsAbsoluteWithRelativeWorkspace(t *testing.T) {
 	raw, err := os.ReadFile(out.Reports[0].Reference)
 	if err != nil || blobDigest(raw) != out.Reports[0].Digest {
 		t.Fatal("changing cwd reinterpreted original report", err)
+	}
+}
+
+func fixtureToolPath(o Options) string { return filepath.Join(filepath.Dir(o.Kubeconfig.Path), "tool") }
+func fixtureCapture(o Options) executableCapture {
+	return func(ctx context.Context, selector ExecutableSelector) (*heldfile.File, error) {
+		return captureExecutable(ctx, selector, func(ctx context.Context, output, member, platform string, limit int64, destination io.Writer) (lifecycle.ExecutableMemberDescription, error) {
+			raw, err := os.ReadFile(fixtureToolPath(o))
+			if err != nil {
+				return lifecycle.ExecutableMemberDescription{}, err
+			}
+			_, err = destination.Write(raw)
+			return lifecycle.ExecutableMemberDescription{Output: output, Member: member, Platform: platform, PayloadDigest: blobDigest(raw), Size: int64(len(raw))}, err
+		})
 	}
 }

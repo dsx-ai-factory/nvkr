@@ -19,14 +19,18 @@ func (a *admitted) observe(ctx context.Context, workspace, phase string) ([]test
 	env := []testresults.EnvironmentFact{}
 	add := func(key, value, evidence string) {
 		status := "declared"
-		if evidence == "cluster-api" {
+		if evidence == "cluster-api" || evidence == "held-bytes" {
 			status = "observed"
 		}
 		env = append(env, testresults.EnvironmentFact{Scope: "cluster", Name: key, Phase: phase, Metadata: testresults.Metadata{Status: status, Value: value}})
 	}
 	add("role", a.options.Role, "declared")
-	for _, fact := range []struct{ name, value string }{{"tools.hydrophone.digest", a.options.Hydrophone.Digest}, {"tools.kubectl.digest", a.options.Kubectl.Digest}, {"harness.revision.declared", HarnessRevision}, {"conformance.imageVersion.declared", a.options.ImageVersion}, {"busybox.imageDigest", a.options.BusyboxImage[strings.LastIndex(a.options.BusyboxImage, "@")+1:]}} {
-		add(fact.name, fact.value, "declared")
+	for _, fact := range []struct{ name, value string }{{"tools.hydrophone.digest", a.hydrophone.Digest()}, {"tools.kubectl.digest", a.kubectl.Digest()}, {"conformance.imageVersion.declared", a.options.ImageVersion}, {"busybox.imageDigest", a.options.BusyboxImage[strings.LastIndex(a.options.BusyboxImage, "@")+1:]}} {
+		evidence := "declared"
+		if strings.HasPrefix(fact.name, "tools.") {
+			evidence = "held-bytes"
+		}
+		add(fact.name, fact.value, evidence)
 	}
 	raw, _, err := a.kube(ctx, workspace, nil, "get", "--raw=/version")
 	if err != nil {
@@ -109,6 +113,10 @@ func (a *admitted) observe(ctx context.Context, workspace, phase string) ([]test
 			if !publicToken(value) {
 				return env, failure("node runtime fact is missing or outside public projection")
 			}
+		}
+		platform := info.OperatingSystem + "/" + info.Architecture
+		if platform != a.options.ConformanceImage.Platform || platform != a.options.Busybox.Platform {
+			return env, failure("selected suite images do not match every observed node platform")
 		}
 		arch[info.Architecture] = true
 		os[info.OperatingSystem] = true

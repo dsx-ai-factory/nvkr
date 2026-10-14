@@ -20,11 +20,9 @@ import (
 func configurationBytes(t *testing.T) []byte {
 	t.Helper()
 	options := optionsFixture()
-	options.Hydrophone.Path = "tools/hydrophone"
-	options.Kubectl.Path = "tools/kubectl"
 	options.Kubeconfig.Path = "private/kubeconfig"
 	options.Targets = []DeploymentTarget{{Output: "image", Namespace: "nvke", LabelSelector: "app=nvke", Container: "nvke", RequiredReplicas: 1}}
-	config := Configuration{Runner: options}
+	config := Configuration{Runner: options, ToolsSource: toolsSourceFixture()}
 	config.Timeouts.Run = "11m"
 	raw, err := json.Marshal(config)
 	if err != nil {
@@ -43,7 +41,7 @@ func TestConfigurationLoadingUsesSelectedPathsAndDurationBounds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if options.Hydrophone.Path != filepath.Join(root, "tools/hydrophone") || options.Kubectl.Path != filepath.Join(root, "tools/kubectl") || options.Kubeconfig.Path != filepath.Join(root, "private/kubeconfig") {
+	if options.Kubeconfig.Path != filepath.Join(root, "private/kubeconfig") {
 		t.Fatalf("relative paths did not resolve beside configuration: %+v", options)
 	}
 	workspace, err := filepath.Abs("selected-workspace")
@@ -61,6 +59,10 @@ func TestConfigurationRejectsAmbiguousAndAuthorityInputs(t *testing.T) {
 		{"duplicate document key", `{"runner":{},"runner":{}}`},
 		{"trailing document", valid + ` {}`},
 		{"unknown field", strings.TrimSuffix(valid, "}") + `,"receipt":{}}`},
+		{"legacy binary paths", strings.Replace(valid, `"hydrophone":{`, `"hydrophone":{"path":"/manual","digest":"sha256:manual",`, 1)},
+		{"forged tools receipt", strings.Replace(valid, `"runner":{`, `"runner":{"toolArtifacts":{},`, 1)},
+		{"manual image", strings.Replace(valid, `"runner":{`, `"runner":{"image":"registry.example.test/manual@sha256:manual",`, 1)},
+		{"manual version", strings.Replace(valid, `"runner":{`, `"runner":{"harnessVersion":"0.8.0",`, 1)},
 		{"forged receipt", strings.Replace(valid, `"runner":{`, `"runner":{"artifacts":{},`, 1)},
 		{"runner workspace override", strings.Replace(valid, `"runner":{`, `"runner":{"workspaceRoot":"/foreign",`, 1)},
 		{"runner timeout override", strings.Replace(valid, `"runner":{`, `"runner":{"runTimeout":1,`, 1)},
@@ -115,14 +117,12 @@ func TestRunReferenceFilesRejectsWrongLocalPinsBeforeRunAuthentication(t *testin
 		name string
 		edit func(*Options)
 	}{
-		{"Hydrophone", func(o *Options) { o.Hydrophone.Digest = "sha256:" + strings.Repeat("c", 64) }},
-		{"kubectl", func(o *Options) { o.Kubectl.Digest = "sha256:" + strings.Repeat("c", 64) }},
 		{"kubeconfig", func(o *Options) { o.Kubeconfig.Digest = "sha256:" + strings.Repeat("c", 64) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			o := options
 			tc.edit(&o)
-			raw, err := json.Marshal(Configuration{Runner: o})
+			raw, err := json.Marshal(Configuration{Runner: o, ToolsSource: toolsSourceFixture()})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -149,4 +149,8 @@ func TestRunReferenceFilesRefusesWrongLocatorBeforeConfiguration(t *testing.T) {
 			t.Fatal("wrong publication locator emitted reports")
 		}
 	}
+}
+
+func toolsSourceFixture() PublishedSource {
+	return PublishedSource{Reference: "registry.example.test/tools@sha256:" + strings.Repeat("a", 64), Policy: "/must-not-open-policy"}
 }
