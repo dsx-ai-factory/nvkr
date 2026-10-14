@@ -4,10 +4,69 @@
 package delivery
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func TestPublicationLayoutExportSharedLifetime(t *testing.T) {
+	for _, scenario := range []string{"nil", "unopened", "close original", "close copy", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			result, err := BuildPublicationRoot(t.Context(), filepath.Join(root, "source"), releasePublicationRequestFixture(t, "linux", "amd64"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			publication, err := OpenPublication(t.Context(), filepath.Join(root, "source"), result.RootDigest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer publication.Close()
+			copyOf := *publication
+			ctx, code := t.Context(), e.CodeGateUnmet
+			handles := []*Publication{publication, &copyOf}
+			switch scenario {
+			case "nil":
+				handles = []*Publication{nil}
+			case "unopened":
+				handles = []*Publication{{}}
+			case "close original", "close copy":
+				// A copied live handle exports the same checked closure.
+				out := filepath.Join(root, "before-close")
+				if err := copyOf.WriteLayout(ctx, out); err != nil {
+					t.Fatal(err)
+				}
+				inspection, err := Inspect(ctx, out)
+				if err != nil || inspection.RootDigest != result.RootDigest {
+					t.Fatalf("copied handle changed held closure: %v", err)
+				}
+				toClose := publication
+				if scenario == "close copy" {
+					toClose = &copyOf
+				}
+				if err := toClose.Close(); err != nil {
+					t.Fatal(err)
+				}
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+				code = e.CodeTimeout
+			}
+			for _, handle := range handles {
+				directory := t.TempDir()
+				assertRegistryCode(t, handle.WriteLayout(ctx, filepath.Join(directory, "layout")), code)
+				entries, err := os.ReadDir(directory)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("unavailable export leaked output or stage: %v, entries=%v", err, entries)
+				}
+			}
+		})
+	}
+}
 
 func TestPublicationExportUsesHeldBytesAfterSourceReplacement(t *testing.T) {
 	for _, disk := range []bool{false, true} {

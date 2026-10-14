@@ -352,9 +352,16 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if err := writeGitHubFinalizerRestoreSteps(&body, plan, nodeJobs); err != nil {
 			return nil, err
 		}
-		writeCatalogValidationStep(&body, plan, "Finalize Run and check completeness", "finalize-catalog", fmt.Sprintf("./nvkr-exec run finalize --definition %s --environment %s --plan %s --attempt \"${{ github.run_id }}-${{ github.run_attempt }}\" --workspace .nvkr/factory --out .nvkr/run.json",
-			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(layout.planPath)))
+		finalize := fmt.Sprintf("./nvkr-exec run finalize --definition %s --environment %s --plan %s --attempt \"${{ github.run_id }}-${{ github.run_attempt }}\" --workspace .nvkr/factory --out .nvkr/run.json",
+			shellQuote(plan.DefinitionPath), shellQuote(plan.EnvironmentPath), shellQuote(layout.planPath))
+		if githubQualificationHandoffEnabled(plan) {
+			finalize += " --handoff " + githubQualificationHandoffPath
+		}
+		writeCatalogValidationStep(&body, plan, "Finalize Run and check completeness", "finalize-catalog", finalize)
 		fmt.Fprintf(&body, "      - name: Upload final Run record\n        id: %s\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nvkr-lifecycle-run\n          path: .nvkr/run.json\n          if-no-files-found: error\n", githubRunUploadID, actions.Upload)
+		if githubQualificationHandoffEnabled(plan) {
+			writeGitHubQualificationHandoffStep(&body, actions)
+		}
 		writeGitHubRunSummary(&body, githubRunEndSummary(len(allNeeds)))
 	}
 	workflow := body.Bytes()

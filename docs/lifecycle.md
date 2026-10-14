@@ -156,7 +156,7 @@ producers and creates no attempt. Closing that view does not cancel another Run.
 
 ### Browse public command results
 
-Every public command accepts `--ui=tui` and `--no-color`: Definition validation
+The following public commands accept `--ui=tui` and `--no-color`: Definition validation
 and inspection; Run planning, graph, comparison, inspection, generation and local
 execution; producer resolution; all catalog inspection and maintenance commands;
 and Release inspection, browsing, export and verification. Other than the interactive
@@ -164,6 +164,7 @@ local Run default described above, commands default to `--ui=plain` and keep the
 existing text, canonical JSON or diagram output. On commands with a result
 browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
 and `--ui=tui` are incompatible and fail before input, network or write work.
+`run check-artifacts` retains canonical machine-readable diagnostics and does not offer presentation flags.
 
 ```sh
 bin/nvkr definition inspect --definition definitions/nvke-v1/definition.yaml --ui=tui
@@ -405,6 +406,118 @@ The scoped consumer and exact output/content bindings have positive and negative
 release acceptance still requires its deferred qualification, membership, and revocation adapters; the scoped
 result cannot substitute for them. The ADR-04 stock-cosign consumer contract remains independent of the
 convenience NVKR reader.
+
+## Authenticate an M3 candidate
+
+On Linux, `nvkr run check-artifacts` checks the already-published bytes against one exact producing Run
+attempt and an independently selected trust policy:
+
+```sh
+nvkr run check-artifacts \
+  --run https://github.com/OWNER/REPO/actions/runs/ID/attempts/N \
+  --policy qualification.yaml
+```
+
+Replace `OWNER/REPO`, `ID` and `N` with the intended Run and attempt. An attempt is mandatory; the command
+never selects the latest retry implicitly. Configure the trusted producer and verifier once in
+`qualification.yaml`, then reuse that policy across approved Runs:
+
+```yaml
+schemaVersion: nvkr.dev/qualification-policy/v1
+source:
+  repository: OWNER/REPO
+  workflow: .github/workflows/nvkr-run.yml
+  defaultBranch: main
+cosign:
+  # Replace this placeholder with the SHA-256 of the independently trusted executable.
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+```
+
+The zero digest is a placeholder, not an accepted executable pin. The verifier defaults to `cosign` on
+`PATH`; optional `cosign.path` selects another executable, with relative paths resolved beside the policy.
+Its bytes must match the independent digest. Neither the producer's Environment nor downloaded files can
+select consumer trust. The optional `--workspace` defaults to `.nvkr/qualification`.
+`NVKR_GITHUB_TOKEN` supplies GitHub read credentials; private registry reads use `NVKR_REGISTRY`,
+`NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`. This check needs no qualification signing credentials
+or identity token. macOS rejects it before input or network work.
+
+The source owner discovers the commit from GitHub's exact attempt endpoint, checks successful completion,
+approved repository and workflow, and the repository's actual default branch. It then downloads the single
+`nvkr-qualification-ID-N` artifact for that attempt. Direct HTTPS access to `api.github.com` and approved
+artifact download endpoints is required. The owned transport ignores proxy environment variables; an
+admitted artifact download location receives a fresh request without GitHub API credentials.
+
+Generated real-signing `per-output-v1` workflows save one `handoff.json` after complete finalization. It contains the
+original Plan, the compiler-read Definition and Environment, base and output-specific catalogs, overlays,
+registries, locks, patches and directory facts, plus the original predicate bytes keyed by the root and every
+delivered payload reference. The collector joins bounded aggregate metadata and saved output-route records
+without reading payload packages. The handoff contains no consumer policy. Unsigned, dry-run and legacy aggregate workflows do not produce it;
+an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
+Legacy aggregate builds/publication remain available, but they lack invocation-bound release metadata and
+the per-output route records needed for M3 qualification; direct qualification rejects that capability before publication work.
+
+The lifecycle owner recompiles the captured authored bytes with their original logical paths and requires
+the exact original Plan identity. Authored reads have no checkout fallback. Catalog-owned authentication
+of pinned upstream Git trees remains required and may use its existing credentials and bounded network
+access; this is not offline compilation. Unknown fields, duplicate keys, noncanonical encodings, unsafe
+paths, incomplete inputs and oversized transport fail closed. The handoff is descriptive generated
+transport, not proof that any artifact passed. `lifecycle.Consumer.CheckQualification` still verifies the
+complete publication, original predicates, signatures, subjects and input bindings.
+
+For programmatic use, `lifecycle.CheckQualificationRun` owns Run selection, policy loading and handoff
+retrieval. `lifecycle.CheckQualificationHandoff` borrows a provider-issued source receipt. The existing
+`lifecycle.CheckQualificationFiles` adapter remains available for explicit saved-file diagnostics; normal
+CLI use does not require those files or separately entered source-commit fields.
+All three adapters scope explicit registry pull credentials to the independently configured canonical
+`ConsumerOptions.Credential.Registry` host (the corresponding runtime credential for Run/handoff calls).
+A candidate or Environment cannot choose that destination; missing or mismatched hosts fail before
+registry access. Anonymous pulls and registry-scoped credential keychains remain available.
+
+At the consumer API boundary, source and Plan validation precede adapter-capability checks. A request with
+both malformed inputs and unavailable adapters reports the input error first. Neither case reaches registry
+or signature-verification I/O.
+
+Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
+signature/provenance, applicable payload pins and any authored embedded declarations. Failed checks return coded
+diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
+defensive data and grants no authority. A successful receipt retains the verified publication and a frozen
+Plan until closed. Closure revokes all shallow copies, cancels and joins registered operations, then releases
+held payload bytes. This lifetime does not itself authorize smoke execution. The direct consumer and handoff
+methods borrow the caller's source Run receipt, whose closure also revokes the check receipt. The Run and
+file adapters transfer their internally created source owner to the returned receipt and close it with that
+receipt.
+If the source is revoked during verification, the final source check refuses receipt issuance. Each output
+then includes a separate failed `source-lifetime` diagnostic and an overall failure; completed signature,
+pin and other artifact checks keep their actual results. This extra diagnostic appears only on final
+source-admission failure. Successful reports retain the six artifact checks above. Always inspect the
+returned error or command exit status; diagnostic data alone never proves receipt issuance.
+Payload digests remain distinct from OCI delivery-container subjects, and disk results explicitly retain
+producer-only scope without content inspection.
+
+An incomplete evidence traversal is labeled as a failure of the complete publication in every output's
+signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;
+no output receives a passing evidence verdict merely because its own signature check did not fail.
+
+Qualification requires the root and every output predicate to name that exact source attempt. When output
+metadata records publication origin, both preparation and signing invocations must also match. Earlier-attempt
+publication reuse remains available to the existing publication retry protocol, but cannot satisfy this MVP
+qualification gate. Earlier bytes are never relabeled as produced by the current attempt. The CLI writes
+check diagnostics and returns the stable failure code; its serialized output cannot restore a live receipt
+or grant qualification signing authority.
+
+The [pinned embedded declaration](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md)
+profile is optional for source producers; no producer must supply it. Omission yields `not-applicable`.
+Any authored declaration must match its referenced pinned upstream metadata, and a missing, invalid or
+disagreeing reference fails. The check reads
+raw source metadata; it does not apply patches, configuration or material substitutions and cannot establish
+effective customized or installed composition. Source, patch, configuration and material identity/provenance
+checks remain required. The maintained candidate needs no new upstream component manifests.
+
+M3-B's authenticated smoke receipt is not available in this implementation, so required delivered-tool smoke
+blocks qualification signing. An A receipt alone cannot sign evidence or authorize release. The C publisher's
+contract and local tests do not establish real hosted signing or complete-set consumer acceptance.
+[Reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary) records contract coverage and
+the outstanding hosted signing, exact-input candidate and consumer acceptance evidence.
 
 ## Use the SDK
 

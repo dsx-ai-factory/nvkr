@@ -4,16 +4,19 @@
 package nvkedemo
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +29,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
@@ -42,6 +46,7 @@ type NightlyProfile struct {
 	RuntimeTarget     string `json:"runtime_target"`
 	Network           string `json:"network"`
 	DiskOutput        string `json:"disk_output"`
+	ControllerOutput  string `json:"controller_output,omitempty"`
 	ProfilesOutput    string `json:"profiles_output"`
 	OSProfile         string `json:"os_profile"`
 	KubernetesVersion string `json:"kubernetes_version"`
@@ -71,6 +76,9 @@ type NightlyInputs struct {
 
 const nightlyRecordLimit int64 = 8 << 20
 const nightlyMaxJSONInteger int64 = 1<<53 - 1
+
+// Match the logical output-name contract owned by definition/model.go.
+var nightlyOutputNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 
 func nightlyJSON(raw []byte, out any, strict bool) error {
 	if int64(len(raw)) > nightlyRecordLimit {
@@ -154,6 +162,9 @@ func validateNightlyProfile(profile NightlyProfile) error {
 	}
 	if profile.RuntimeTarget != "native-arm64-vm" || (profile.Network != "ovn" && profile.Network != "upstream-ovn") {
 		return e.New(e.CodeEngineCapability, "nightly adapter requires native ARM64 VMs and an explicit supported OVN network")
+	}
+	if profile.ControllerOutput != "" && !nightlyOutputNamePattern.MatchString(profile.ControllerOutput) {
+		return e.New(e.CodeVerifyFailed, "nightly controller output requires a canonical logical name")
 	}
 	return nil
 }
@@ -244,10 +255,84 @@ func selectNightlyArtifact(list nightlyArtifactList, name string, build NightlyB
 		return nightlyGitHubArtifact{}, e.New(e.CodeVerifyFailed, "missing or duplicate exact nightly artifact %s", name)
 	}
 	artifact := list.Artifacts[0]
-	if artifact.Name != name || artifact.ID <= 0 || artifact.ID > nightlyMaxJSONInteger || artifact.Size <= 0 || artifact.Size > 32<<20 || !canonical.IsDigest(artifact.Digest) || artifact.Expired == nil || *artifact.Expired || artifact.WorkflowRun.ID != build.ProducerRun || artifact.WorkflowRun.RepositoryID != repositoryID || artifact.WorkflowRun.HeadRepositoryID != repositoryID || artifact.WorkflowRun.HeadBranch != "main" || artifact.WorkflowRun.HeadSHA != build.SourceCommit {
+	if artifact.Name != name || artifact.ID <= 0 || artifact.ID > nightlyMaxJSONInteger || artifact.Size <= 0 || artifact.Size > diagnosticLimit || !canonical.IsDigest(artifact.Digest) || artifact.Expired == nil || *artifact.Expired || artifact.WorkflowRun.ID != build.ProducerRun || artifact.WorkflowRun.RepositoryID != repositoryID || artifact.WorkflowRun.HeadRepositoryID != repositoryID || artifact.WorkflowRun.HeadBranch != "main" || artifact.WorkflowRun.HeadSHA != build.SourceCommit {
 		return nightlyGitHubArtifact{}, e.New(e.CodeUnpinnedInput, "nightly artifact origin, digest, expiration or size differs")
 	}
 	return artifact, nil
+}
+
+// The provider digest binds only the exact ZIP blob. It does not authenticate
+// the lifecycle Run or publication described by its member. The existing command
+// owner caps captured archive bytes at diagnosticLimit before this decoder runs.
+func nightlyArchiveMember(ctx context.Context, archive []byte, artifact nightlyGitHubArtifact, memberName string) ([]byte, error) {
+	if err := requireContext(ctx); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "nightly archive context")
+	}
+	if len(archive) == 0 || len(archive) > diagnosticLimit || int64(len(archive)) != artifact.Size || pipeline.FileDigest(archive) != artifact.Digest {
+		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP differs from its exact provider digest or size bound")
+	}
+	// Reuse archive/zip rather than supplying another archive grammar. The
+	// resource bound follows qualificationorigin/handoff_download.go: cap metadata
+	// reads before the decoder allocates a complete central-directory collection.
+	input := &nightlyZIPReaderAt{ctx: ctx, reader: bytes.NewReader(archive), metadata: true, remaining: 1 << 20}
+	reader, err := zip.NewReader(input, int64(len(archive)))
+	if err != nil {
+		return nil, nightlyArchiveError(ctx, err, "decoding nightly artifact ZIP")
+	}
+	if len(reader.File) != 1 {
+		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP requires exactly one selected member")
+	}
+	member := reader.File[0]
+	if member.Name != memberName || !member.Mode().IsRegular() || member.UncompressedSize64 > 32<<20 {
+		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP member has an unexpected path, type or size")
+	}
+	input.metadata = false
+	held, err := member.Open()
+	if err != nil {
+		return nil, nightlyArchiveError(ctx, err, "opening nightly artifact ZIP member")
+	}
+	raw, readErr := io.ReadAll(io.LimitReader(held, (32<<20)+1))
+	if err = errors.Join(readErr, held.Close()); err != nil {
+		return nil, nightlyArchiveError(ctx, err, "reading nightly artifact ZIP member")
+	}
+	if len(raw) > 32<<20 || uint64(len(raw)) != member.UncompressedSize64 {
+		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP member exceeds its bound or declared size")
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "nightly artifact ZIP canceled")
+	}
+	return raw, nil
+}
+
+func nightlyArchiveError(ctx context.Context, err error, operation string) error {
+	if cause := ctx.Err(); cause != nil {
+		return e.Wrap(e.CodeTimeout, cause, "%s canceled", operation)
+	}
+	return e.Wrap(e.CodeVerifyFailed, err, "%s", operation)
+}
+
+type nightlyZIPReaderAt struct {
+	ctx       context.Context
+	reader    io.ReaderAt
+	metadata  bool
+	remaining int64
+}
+
+func (reader *nightlyZIPReaderAt) ReadAt(p []byte, offset int64) (int, error) {
+	if err := reader.ctx.Err(); err != nil {
+		return 0, err
+	}
+	if reader.metadata {
+		if int64(len(p)) > reader.remaining {
+			return 0, e.New(e.CodeVerifyFailed, "nightly artifact ZIP metadata exceeds its read bound")
+		}
+		reader.remaining -= int64(len(p))
+	}
+	n, err := reader.reader.ReadAt(p, offset)
+	if cause := reader.ctx.Err(); cause != nil {
+		return n, cause
+	}
+	return n, err
 }
 
 type nightlyCapture func(context.Context, []string, string, time.Duration) ([]byte, error)
@@ -329,13 +414,11 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 			return nil, err
 		}
 	}
-	downloads := make([]string, len(names))
-	for i, name := range names {
-		downloads[i], err = os.MkdirTemp(workspace, "nightly-download-")
+	archives := make([][]byte, len(names))
+	for i := range names {
+		artifactEndpoint := "repos/" + repository + "/actions/artifacts/" + strconv.FormatInt(selected[i].ID, 10) + "/zip"
+		archives[i], err = capture(ctx, []string{"gh", "api", "--hostname", "github.com", "--allow-escape-sequences", "-H", "X-GitHub-Api-Version: 2026-03-10", artifactEndpoint}, "nightly-artifact-download-"+strconv.Itoa(i), 10*time.Minute)
 		if err != nil {
-			return nil, e.Wrap(e.CodeImmutableViolation, err, "creating fresh artifact destination")
-		}
-		if _, err = capture(ctx, []string{"gh", "run", "download", strconv.FormatInt(build.ProducerRun, 10), "--repo", "github.com/" + repository, "--name", name, "--dir", downloads[i]}, "nightly-artifact-download-"+strconv.Itoa(i), 10*time.Minute); err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil, e.Wrap(e.CodeTimeout, err, "downloading exact nightly artifact canceled")
 			}
@@ -356,6 +439,26 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 		}
 		if !reflect.DeepEqual(actual, selected[i]) {
 			return nil, e.New(e.CodeUnpinnedInput, "artifact identity changed during download")
+		}
+	}
+	memberNames := []string{"run.json", "publication-release.tar"}
+	members := make([][]byte, len(names))
+	for i := range names {
+		members[i], err = nightlyArchiveMember(ctx, archives[i], selected[i], memberNames[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	// No artifact destination is created until both provider-pinned blobs and
+	// their exact members have been admitted, including the before/after joins.
+	downloads := make([]string, len(names))
+	for i := range names {
+		downloads[i], err = os.MkdirTemp(workspace, "nightly-download-")
+		if err != nil {
+			return nil, e.Wrap(e.CodeImmutableViolation, err, "creating fresh artifact destination")
+		}
+		if err = privateWrite(filepath.Join(downloads[i], memberNames[i]), members[i]); err != nil {
+			return nil, e.Wrap(e.CodeImmutableViolation, err, "staging provider-pinned nightly artifact member")
 		}
 	}
 	raw, err := readRunFile(ctx, downloads[0], "run.json", nightlyRecordLimit)

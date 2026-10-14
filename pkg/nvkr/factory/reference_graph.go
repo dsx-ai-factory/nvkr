@@ -91,8 +91,10 @@ func selectedPublicationOutputs(plan *Plan, node Node) []LifecycleOutputPlan {
 	return plan.LifecycleOutputs
 }
 
-// Only authenticated release metadata and its cryptographic tools/records cross
-// the final aggregate boundary. Provider job outcomes still cover the whole DAG.
+// Authenticated release metadata, its cryptographic tools, and the original
+// output publication records cross the final boundary. The handoff needs those
+// exact predicate bytes; payloads remain in their own publications. Provider job
+// outcomes still cover the whole DAG.
 func finalizerArtifact(plan *Plan, a Artifact) bool {
 	if !PerOutputPublication(plan) {
 		_, raw := diskPublicationRequirement(plan, a)
@@ -101,6 +103,12 @@ func finalizerArtifact(plan *Plan, a Artifact) bool {
 	switch a.ID {
 	case "metadata/release", "publication/release", "signature/release", "predicate/release", "verification/release", "tool/" + plan.Definition.CosignTool:
 		return true
+	}
+	for _, output := range plan.LifecycleOutputs {
+		route := outputPublicationRoute(output.Name)
+		if a.ID == "publication/"+route || a.ID == "signature/"+route || a.ID == "predicate/"+route {
+			return true
+		}
 	}
 	return false
 }

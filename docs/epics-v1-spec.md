@@ -14,12 +14,14 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
 **Facts the specification rests on.**
 - The NVKE OS image build bakes in Kubernetes (node side and control-plane images), CNI, and node-agent. NVKR wraps
   that build using selected material producers; embedded components need not be separately delivered.
-  M2 requires exact-subject producer provenance; M3 requires a full-disk inventory reconciling traced materials
-  with read-only inspection of the delivered disk. This establishes composition, not correct behavior; the NVKE
-  OS image build team owns embedded software correctness and runtime validation.
+  M2 and the M3 MVP require exact-subject producer provenance. Full-disk inventory and material reconciliation
+  are deferred hardening. Embedded-component declarations are optional; if authored, they must match their
+  referenced pinned upstream metadata. Omission is not applicable. The comparison does not establish customized
+  or installed composition; the NVKE OS image build team owns embedded software correctness and runtime validation.
 - V1 production acceptance retains its AMD64-only product floor. M2 requires producer provenance; M3 adds
-  strict inspection and material reconciliation. The October 7 task-chat instruction preserves that boundary;
-  it is not an independently published decider approval, organizational ratification or a Jira update.
+  authenticated build/evidence checks while retaining producer-only disk scope. The
+  [approved October 12 M3 scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+  defers strict inspection and material reconciliation; scope approval is not organizational ADR ratification.
   ARM64 is an implementation extension recorded in the
   [implementation record](adr/reconciliation.md#native-arc-disk-route). Any additional architecture explicitly selected
   by a Definition remains mandatory for that Run and Release; the product floor cannot waive its completeness.
@@ -41,7 +43,7 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
   scope). An unavailable scope fails; it never falls back to the weaker one.
 - Every built artifact has a per-artifact software bill of materials (CycloneDX), bound to the observed digest
   and published as a signed attestation. M2 disk documents describe exact producer/material subjects and state
-  that disk inspection was not performed; M3 adds inspected composition and reconciliation. The signed release
+  that disk inspection was not performed; M3 preserves that explicit scope. The signed release
   index binds required evidence membership; Run completion is a separate record. SBOMs verify no upstream signature.
 - Workflows use generic GitHub-hosted runners, with only the narrowly admitted operator-trusted native
   virtualization-pool exception for disk jobs. Pool isolation and capacity require separate evidence.
@@ -99,8 +101,9 @@ separately delivered artifact is signed and attested; the Release binds exact na
 | NVKE Helm charts | Pinned chart sources | OCI packages / M2 |
 | Operator tooling | Acquired kubectl and Helm | OCI package / M2 |
 
-A deferred member stays explicit in authored requirements and planned qualification waivers; it must
-never disappear because a build failed. Disk inventory proves composition for the exact disk subject,
+A deferred member stays explicit in authored requirements and planning; the M3 MVP accepts no waivers and
+requires every selected member to complete. A member must never disappear because a build failed.
+Disk inventory proves composition for the exact disk subject,
 not reproduction of the QCOW2, decoded RAW stream or encrypted delivery bytes.
 
 ---
@@ -191,17 +194,18 @@ these named outputs to the exact delivered artifacts.
 - **The OS image artifact.** One AMD64 disk-image artifact, with provenance naming the NVKE
   commit and tree hash. Pushed as a single-layer artifact if the registry's blob limit permits,
   otherwise chunked, with the whole-image digest in the run record and provenance.
-  M2 binds those bytes to the successful producer and authenticated materials. M3 adds reconciled installed-content inventory. NVKE owns the correctness and runtime
+  M2 binds those bytes to the successful producer and authenticated materials. M3 retains that producer-only
+  scope; installed-content inventory and reconciliation are deferred hardening. NVKE owns the correctness and runtime
   validation of embedded software; NVKR attests production and composition under the admitted evidence contract.
   Matching dependency or inventory evidence never promotes this wrapped disk to a reproduction claim.
-- **Embedded-component declaration.** The OS image producer declares the components it embeds, which may be
-  built or acquired by selected material producers without separate delivery (node-agent, node-side Kubernetes, control-plane images, CNI, and spire-agent
-  if so decided), each with name, version and known source pin. The declaration flows into the provenance's
-  resolved dependencies and the aggregate SBOM as dependency edges from the image to its members, and M3
-  cross-checks it against NVKE's own version manifest at the pinned commit. The declared list alone cannot supply
-  the full-disk inventory. M2 producer-provenance evidence reports inspection as not performed. M3 requires
-  read-only final-disk inspection and material reconciliation; unreadable filesystems, inspection failure or
-  disagreement fail that qualification path.
+- **Composition inputs and optional metadata.** The OS image's selected source and material inputs account for
+  its required components (node-agent, node-side Kubernetes, control-plane images, CNI, and spire-agent if so
+  decided), without requiring separate delivery. Exact source, patch, configuration and material identities
+  remain bound to production evidence. An embedded-component metadata declaration is optional. If
+  authored, its complete member list, versions and known source pins must match the referenced upstream metadata
+  at the pinned commit; omission is not applicable. This comparison does not apply build customizations or
+  establish installed contents. M2 and M3 MVP producer evidence report inspection as not performed. Read-only
+  final-disk inspection and material reconciliation remain deferred hardening.
 - **Image and blob publication.** Pushing container-image layouts by digest with the pinned digest preserved,
   and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
   digest and skips content that is already present, so re-runs are cheap and mirrors are idempotent.
@@ -211,7 +215,7 @@ these named outputs to the exact delivered artifacts.
   lockfile), which M4 schedules and extends. Each acquired artifact carries an `acquired` provenance attestation
   recording the upstream reference, the lockfile pin, and the fetch time, and making no build claim.
 - **Spire-agent.** Placement requires a recorded owner decision in the Definition: inside the OS
-  image (its matrix row then reads "inside the OS image" and it joins the embedded-component declaration) or
+  image (its matrix row then reads "inside the OS image" and its selected production inputs account for it) or
   acquired by digest as a named output in the Release. Until decided it is a dated deferral, not an omission.
 - **Packages.** An operator tooling package (kubectl, Helm); NVKE chart packages where sources are available. Each is one signed,
   attested OCI artifact.
@@ -223,27 +227,27 @@ these named outputs to the exact delivered artifacts.
 node-side Kubernetes, control-plane images, CNI); independent runtime or functional validation of embedded
 software (NVKE OS image build team); NVKR-built Kubernetes; vulnerability scanning; verification of upstream signatures on acquired
 artifacts (acquisition is digest-pinned trust on first use); deployment topology or node-role assignment;
-ARM64 or any other architecture as a product acceptance requirement; deep disk inspection and material reconciliation (M3).
+ARM64 or any other architecture as a product acceptance requirement; deep disk inspection and material reconciliation.
 An additional architecture selected by a Definition remains subject to the same complete-output contract.
 
 **Pre-authorized fallbacks.** Mirror the prebuilt signed QCOW2 by digest (`acquired`) if the OS build cannot run
 on an admitted execution route. The acquired-disk fallback must preserve the exact acquired bytes and carry
-acquisition provenance; M3 additionally requires exact-disk inspection and material reconciliation.
+acquisition provenance; M3 preserves the producer-only scope without claiming disk inspection.
 Mirror NVKE-published CWE and NVKE images (`acquired`) instead of building them. Enclose chart
 tarballs in the signed package instead of publishing CNCF OCI charts. Any approved deferred artifact remains
-explicit in the requirements and evidence with its reason and decision. The M3 gate records the deferral as a
-waiver, never a pass, and M4 preserves it in the release manifest. A missing required output still makes its Run
+explicit in the requirements and planning with its reason and decision. Every selected output must complete
+before the M3 MVP can pass; it accepts no qualification waivers. A missing required output still makes its Run
 incomplete; a build failure cannot create an implicit deferral.
 
 **Acceptance criteria**
-1. The native AMD64 OS image is published as one signed, attested disk-image artifact built from its pinned NVKE commit. Its provenance identifies the source commit, tree hash and wrapped-build scope; exact-subject producer/material evidence and consumer verification succeed. An admitted acquired-disk fallback preserves the pinned bytes and carries acquisition provenance. Inspection is reported honestly and is an M3 requirement. Any additional disk selected by the Definition independently satisfies the same delivery and evidence checks.
-2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance lists its declared embedded components, and every embedded row appears in that declaration. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
+1. The native AMD64 OS image is published as one signed, attested disk-image artifact built from its pinned NVKE commit. Its provenance identifies the source commit, tree hash and wrapped-build scope; exact-subject producer/material evidence and consumer verification succeed. An admitted acquired-disk fallback preserves the pinned bytes and carries acquisition provenance. Inspection is reported honestly and is outside the M3 MVP. Any additional disk selected by the Definition independently satisfies the same delivery and evidence checks.
+2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance binds its selected source and material inputs; every required inside-image component is accounted for in those production inputs. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
 3. CWE controller and NVKE container images are either built (`wrapped-build`, provenance naming the NVKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NVKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
 4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
 5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
 
 **Definition of done**
-- Tests cover tag-move refusal for image, blob, and package pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege, network or credentials before any output is written; the credential-free build phase; release membership rejecting a member digest that differs from the published digest; and an embedded-component declaration that disagrees with the upstream version manifest.
+- Tests cover tag-move refusal for image, blob, and package pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege, network or credentials before any output is written; the credential-free build phase; release membership rejecting a member digest that differs from the published digest; optional embedded metadata that is omitted, agrees with its pinned upstream reference, or fails because referenced upstream metadata is missing, malformed or inconsistent.
 - The evidence log has one row per artifact-matrix row: published reference and digest with its source lane, "inside the OS image" (node-agent, Kubernetes, CNI, and spire-agent if so decided), or the deferral reason and date; plus the single run URL from criterion 5 and the consumer transcripts from criteria 1-4.
 - Every fallback taken and every deferral is recorded in the owning decision record, the implementation record, and this specification's artifact source/delivery matrix.
 - An independent review of the publication code, the wrapped-build policy (where privilege and network are allowed, and that no credential is present), and the definition and lockfile changes is closed.
@@ -253,56 +257,85 @@ incomplete; a build failure cannot create an implicit deferral.
 
 ## Epic M3 — Qualification
 
-**Goal.** An automated, fail-closed gate runs on every delivered artifact after signing and emits signed
-qualification evidence under its own identity. This checks producer selections and build evidence. It does not
-establish cluster conformance or independently verify the OS image's runtime behavior.
+**Goal.** Every artifact selected by a Definition is checked against its producing Run and build evidence.
+Successful qualification produces independently verifiable evidence under an identity distinct from the
+builder. Release issuance requires successful qualification and evidence publication for the complete selected set.
+
+This specification records the current scope directed by the user, including optional embedded-component
+metadata. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+establishes producer-only disk evidence and the deferred capabilities described below. The
+[implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930) separates artifact
+authentication, delivered-tool smoke, independent evidence publication and acceptance demonstrations.
+Scope approval does not establish completed implementation or organizational ADR ratification.
 
 **Delivers**
-- **The gate.** Four checks over every published artifact: *schema* (the Definition, component selections, pins and Environment decode exactly and validate);
-  *pin consistency* (every acquired artifact's published digest equals its lockfile pin; every built artifact's
-  published digest equals its run-record digest and its provenance names the pinned source commit and tree hash;
-  every required output digest equals the published digest of that output; every embedded component declared
-  by a wrapped build agrees with the upstream version manifest at the pinned commit, and a missing or disagreeing
-  member fails the check); *presence* (a cosign signature and
-  a provenance attestation exist and verify for every artifact under the build identity; a missing attestation is
-  a distinct failure); *smoke* (operator tooling binaries and the NVKE CLI run `version` inside a
-  network-disabled container).
-- **Signed evidence.** A versioned qualification-evidence document naming the definition digest, the run record,
-  each subject's published digest, every applicable check with its verdict, and any waivers (component, reason,
-  approver named in the decision record). It is attested to every subject by the qualification workflow: a
-  separate committed workflow with its own keyless identity that holds only the credential needed to attach
-  attestations. Build provenance verifies against the build identity; qualification evidence verifies against
-  the qualification identity; both are in the consumer instructions. A failing verdict is never attested.
-- **Placement.** On default-branch runs the qualification workflow runs after the build workflow's verification
-  step and is a must-pass condition for release (M4). On pull requests the gate runs inside the build workflow
-  against the packaged outputs on the runner without contacting the registry: schema, pin consistency (against
-  run-record digests), and smoke run; presence is recorded as not applicable because pull requests sign nothing;
-  nothing is attested.
-- **Verify-only dispatch.** A manual dispatch that runs verification and the gate against an already-published
-  manifest, building and publishing nothing. Used for red-run rehearsal here and by M4's manual release.
-- **Disk inspection and reconciliation.** Produce and verify a full inventory from read-only inspection of each
-  exact delivered disk, reconciled with authenticated materials, under the separate qualification identity.
-  Missing or substituted evidence, unreadable filesystems, inspection failure or disagreement fails closed.
-- **Carry-over.** Any approved artifact deferral from M2 is resolved or explicitly retained with its qualification waiver under M2's criterion 4.
+- **Authenticated candidate.** Strict input and evidence schemas; complete exact output membership; applicable
+  pin, digest and source consistency; cryptographically verified build signatures and provenance under the
+  expected signer and issuer. Payload and delivery-container identities retain their distinct bindings.
+  Source, patch, configuration and material identities remain bound to production evidence. Embedded-component
+  declarations are optional; omission is not applicable, while any authored declaration must match its referenced
+  upstream metadata at the pinned commit. This does not establish effective customized or installed composition.
+- **Delivered-tool smoke.** Each selected CLI and operator executable performs its documented version check
+  using delivered bytes with networking disabled and without qualification signing authority. Non-tool outputs
+  follow an explicit applicability rule.
+- **Independent evidence.** All required results are collected before any qualification signing begins. A
+  complete passing set receives subject-bound evidence under a separate qualification identity. A failed
+  verdict prevents all qualification attestations for the invocation. Later signing or attachment failure
+  marks qualification unsuccessful even if earlier attachments remain.
+- **Trusted source and invocation.** Qualification admits only successful approved builds from the intended
+  repository and default branch, authenticating the source Run separately from the qualification invocation.
+  It reuses the same published bytes and never rebuilds or substitutes them. Missing required outputs cannot
+  be dropped or treated as passing.
 
-**Does not deliver.** Independent functional or runtime validation of OS image contents (owned by the NVKE OS image build team);
-vulnerability scanning; booting the image; cluster conformance; deployment topology and cluster-scoped qualification.
+**Deferred scope.** Full disk-content inspection and material reconciliation, including embedded disk-content
+verification; waived verdicts; offline pull-request qualification; a dedicated verify-only dispatch; incremental
+qualification reuse. Disk evidence explicitly remains producer-only. Cluster end-to-end tests, boot validation,
+vulnerability scanning and byte-identical reproduction are outside this MVP. External suites outside scope
+are explicitly reported as not evaluated, never passed. Any later required suite must supply authenticated
+results bound to exact artifact subjects; missing or failing required results block qualification.
 
 **Acceptance criteria**
-1. The gate is green on the default-branch run for every selected producer and every published artifact.
-2. On a clean machine, `cosign verify-attestation` with the qualification-evidence predicate type and the published qualification identity and issuer (distinct from the build identity) succeeds for each artifact; the decoded evidence names the definition digest, the run record, the subject digest, every applicable check with its verdict, and any waivers.
-3. Negatives, each run against a scratch registry repository, each failing the run with an error code specific to the failed check and attaching no qualification attestation to the affected subject: a mutated blob; a deleted provenance attestation; a stripped signature; a lockfile pin edited to a wrong digest; an embedded-component declaration whose version disagrees with the upstream manifest at the pinned commit; missing or substituted exact-disk inventory or material reconciliation evidence.
-4. Every subject appears in the evidence with exactly one verdict: pass, fail, or waived. A waived verdict names the component, the reason, and the approver. A run containing any fail verdict attests no evidence.
-5. A pull request run executes the gate against the packaged outputs: the gate job is present and green, the run log records no registry reads or writes, presence is recorded as not applicable, and no qualification attestation is pushed.
-6. A verify-only dispatch pointed at the tampered scratch repository from criterion 3 is red with the same check-specific error codes. (Pre-authorized to slip to Oct 2.)
-7. Every selected disk passes exact-subject read-only content inspection and material reconciliation; signed qualification evidence binds each delivered digest and the strict inspected-evidence scope independently.
+1. **Complete, exact candidate.** Qualification accounts for every selected output and authenticates its
+   relationship to the originating Run, attempt, commit, Definition and relevant input identities. Missing,
+   extra, duplicate, substituted or mismatched members fail with a specific error. Unrelated Run evidence
+   cannot satisfy the candidate.
+2. **Authenticated checks.** Every output passes schema validation, applicable pin/digest consistency and
+   verification of build signatures and provenance against the expected signer and issuer. Exact source, patch,
+   configuration and material identities remain bound to the producing Run. Embedded-component declarations are
+   optional: omission is not applicable; any authored declaration must agree with its referenced upstream metadata
+   at the pinned commit, and missing, malformed or disagreeing referenced data fails. This metadata check does not
+   establish effective customized or installed composition. Provenance identifies the expected source and exact
+   subject. Payload and delivery-container identities are checked through their respective bindings.
+3. **Delivered-tool smoke.** Every selected CLI and operator executable performs its documented version check
+   using delivered bytes without network access. Startup failure, unsuccessful execution or a conflicting
+   declared version fails that output. An explicit applicability rule records smoke as not applicable to non-tool outputs.
+4. **Pass or fail only.** Every output receives exactly one overall pass or fail verdict; every applicable
+   check has a result. No waivers are accepted. All checks finish before qualification signing begins. Any
+   failed verdict blocks all qualification attestations for that invocation and preserves failure diagnostics.
+5. **Independent signed evidence.** After all verdicts pass, evidence is signed for every selected artifact
+   under a qualification identity distinct from the builder. Evidence binds exact subjects, originating Run
+   and attempt, Definition and relevant input identities, check results, gate version and qualification
+   invocation. Disk evidence explicitly states that content inspection was not performed.
+6. **Trusted invocation.** Only successful approved builds from the intended repository and default branch
+   enter qualification. Records belong to the exact originating build. Smoke execution has no qualification
+   signing authority. A green build alone does not establish qualification.
+7. **Observed acceptance.** One complete selected set passes independent consumer verification. Controlled
+   failures cover altered bytes, missing provenance, invalid or missing signatures, wrong pins, inconsistent
+   explicitly authored embedded-component metadata, mismatched Run evidence and failed smoke. Each fails with
+   a check-specific error and publishes no qualification attestations.
+8. **Operational failure blocks release.** A signing or evidence-attachment failure marks qualification
+   unsuccessful and prevents release issuance. Earlier attachments may remain after an operational failure;
+   partial publication never counts as success.
 
 **Definition of done**
-- Tests cover a passing gate, each failure mode in criterion 3, the not-applicable presence result on pull requests, and the invariant that failing evidence is never attested.
-- An independent review of the gate, its placement, and the qualification workflow's credential scope is closed.
-- Consumer instructions are extended with the qualification-evidence predicate type, the qualification identity and issuer, the command that decodes the evidence document, and the rule that an artifact without qualification evidence is not released.
-- The evidence log records the run URL, per-artifact evidence references, the consumer transcript, and the log of the negative runs.
-- The owning decision records scope this gate as build-level, keep deployment qualification outside NVKR, register the qualification-evidence document schema before implementation, and distinguish NVKR's disk inventory from NVKE-owned embedded-software correctness and runtime validation.
+- Tests cover the checks, applicability rules, exact identity/subject binding and failure boundaries.
+- Independent review of gate placement, trusted invocation and credential separation is closed.
+- Consumer instructions identify the build and qualification identities and issuer, and explain independent
+  verification and rejection of absent, incomplete or mismatched evidence.
+- The positive Run, per-artifact evidence, independent consumer transcript and controlled failures are linked.
+- The qualification evidence schema and reduced milestone scope are recorded in the owning decisions,
+  implementation record and this specification. M4 integration consumes the failure contract; implementing
+  M4 first is not a prerequisite for closing M3 acceptance.
 
 ---
 
@@ -388,7 +421,7 @@ Independent reviews, decision ratification and scoped evidence are required at e
 | NVKE build owners | Buildable pinned entrypoints, vendored private inputs, external image/chart list, OS contents and Spire-agent placement |
 | CI/release engineering | Admitted runner virtualization, privilege, disk, wall-time and isolation requirements, including the narrowly selected native route |
 | Registry/identity owners | Registry blob limits and retention, protected publication environment, keyless identities, source access and public-transparency disclosure approval |
-| Qualification owner | Separate signing identity, explicit waivers and independent negative verification transcripts |
+| Qualification owner | Separate signing identity, complete pass/fail evidence and independent positive/negative verification transcripts |
 | Release owner | Pin-bot permissions, immutable-tag enforcement, rerun/concurrency behavior and channel policy |
 
 The OS build's execution route and source lane, NVKE image build/acquisition choice, Spire-agent placement,
@@ -401,3 +434,7 @@ Outside v1: non-OCI delivery, upstream from-source replacement builds, acquired 
 verification, vulnerability scanning, deployment topology, cluster E2E qualification, air gap,
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
+
+A downstream nightly end-to-end test is customer CI infrastructure, outside v1
+product acceptance. It can exercise delivered artifacts without expanding the
+build/evidence qualification milestone or supplying independently signed conformance.

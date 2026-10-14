@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 ---
-name: NVKR nightly NVKE qualification
+name: NVKR nightly NVKE end-to-end tests
 
 'on':
   schedule:
@@ -9,7 +9,7 @@ name: NVKR nightly NVKE qualification
   workflow_dispatch:
     inputs:
       profile:
-        description: Maintained nightly project to build and qualify
+        description: Maintained nightly project to build and test
         type: choice
         required: true
         default: all
@@ -105,10 +105,60 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  qualify:
-    name: Qualify published ${{ matrix.name }}
+  select-runtime:
+    name: Select completed candidates for runtime tests
     needs: [select, build]
     if: always() && needs.select.result == 'success' && !cancelled()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      matrix: ${{ steps.completed.outputs.matrix }}
+      available: ${{ steps.completed.outputs.available }}
+    steps:
+      - name: Select only this cycle's available producer locators
+        id: completed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATRIX: ${{ needs.select.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          selected='[]'
+          profiles=$(jq -er '
+            if (.include | type) == "array" and (.include | length) > 0 and
+              all(.include[];
+                (.name == "nvke-nightly-arm64" or .name == "nvke-nightly-upstream-ovn-arm64") and
+                (.harness_commit | test("^[0-9a-f]{40}$"))) and
+              (.include | map(.name) | length == (unique | length)) then
+              .include[].name
+            else error("invalid maintained runtime matrix") end
+          ' <<<"$MATRIX")
+          while IFS= read -r profile; do
+            artifact="nightly-build-$profile-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            facts=$(gh api --hostname github.com -H 'X-GitHub-Api-Version: 2026-03-10' \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$artifact&per_page=100")
+            available=$(jq -er --arg name "$artifact" --arg sha "$GITHUB_SHA" '
+              if .total_count == 0 and (.artifacts | length) == 0 then "false"
+              elif .total_count == 1 and (.artifacts | length) == 1 and
+                .artifacts[0].name == $name and .artifacts[0].expired == false and
+                .artifacts[0].workflow_run.head_sha == $sha then "true"
+              else error("invalid exact-cycle producer locator") end
+            ' <<<"$facts")
+            if [[ "$available" == true ]]; then
+              selected=$(jq -c --arg profile "$profile" '. + [$profile]' <<<"$selected")
+            fi
+          done <<<"$profiles"
+          matrix=$(jq -ce --argjson selected "$selected" \
+            '{include: [.include[] | select(.name as $name | $selected | index($name))]}' <<<"$MATRIX")
+          printf 'matrix=%s\navailable=%s\n' "$matrix" \
+            "$(jq -r '.include | length > 0' <<<"$matrix")" >> "$GITHUB_OUTPUT"
+
+  runtime-test:
+    name: Test published ${{ matrix.name }}
+    needs: [select-runtime]
+    if: needs.select-runtime.result == 'success' && needs.select-runtime.outputs.available == 'true' && !cancelled()
     runs-on: arc-arm64-kvm
     environment: nkd-arc
     timeout-minutes: 360
@@ -116,13 +166,15 @@ jobs:
       contents: read
       actions: read
       packages: read
+    env:
+      COSIGN_DIGEST: c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a
     concurrency:
       group: nvkr-nightly-native-arm64-runtime
       cancel-in-progress: false
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.select-runtime.outputs.matrix) }}
     steps:
       - name: Check out the exact coordinator source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -164,7 +216,7 @@ jobs:
         with:
           name: nightly-build-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .nightly-private/build
-      - name: Check out the reviewed NVKE qualification suite
+      - name: Check out the pinned NVKE end-to-end suite
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           repository: dsx-ai-factory/nvke
@@ -174,8 +226,6 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Fetch and check the independent native verifier
-        env:
-          COSIGN_DIGEST: c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a
         run: |
           set -euo pipefail
           destination="$RUNNER_TEMP/nightly-cosign-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
@@ -188,6 +238,7 @@ jobs:
           printf '%s  %s\n' "$COSIGN_DIGEST" "$destination/cosign" | sha256sum -c -
           chmod 0500 "$destination/cosign"
           printf 'NVKR_NIGHTLY_COSIGN=%s\n' "$destination/cosign" >> "$GITHUB_ENV"
+          printf 'NVKR_NIGHTLY_COSIGN_DIGEST=sha256:%s\n' "$COSIGN_DIGEST" >> "$GITHUB_ENV"
       - name: Authenticate the publication and run the existing NVKE Go suite
         env:
           GOTOOLCHAIN: local
@@ -200,17 +251,22 @@ jobs:
           NVKR_NIGHTLY_NETWORK_HELPER: ${{ github.workspace }}/bin/nvke-demo
           NVKR_NIGHTLY_WORKSPACE: ${{ runner.temp }}/nightly-candidate-${{ matrix.name }}
           NVKR_NIGHTLY_REPORTS: ${{ runner.temp }}/nightly-reports-${{ matrix.name }}
-          NVKR_NIGHTLY_COSIGN_DIGEST: sha256:c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a
         run: |
           set -euo pipefail
           go test ./internal/nvkedemo -list '^TestNightlyPublishedCandidate$' \
             | grep -Fx TestNightlyPublishedCandidate
           go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$' -timeout 330m -count=1 -v
-      - name: Preserve public qualification and cleanup reports
+          jq -e --arg profile "$NVKR_NIGHTLY_PROFILE" --argjson run "$GITHUB_RUN_ID" \
+            --argjson attempt "$GITHUB_RUN_ATTEMPT" --arg sha "$GITHUB_SHA" '
+            .profile == $profile and .phase == "runtime" and .runtimePassed == true and
+            .coordinatorRun == $run and .coordinatorAttempt == $attempt and
+            .sourceCommit == $sha and .qualificationAuthority == "none"
+          ' "$NVKR_NIGHTLY_REPORTS/cycle.json" >/dev/null
+      - name: Preserve public runtime and cleanup reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
-          name: nightly-qualification-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: nightly-runtime-report-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nightly-reports-${{ matrix.name }}/*
           if-no-files-found: warn
           retention-days: 7

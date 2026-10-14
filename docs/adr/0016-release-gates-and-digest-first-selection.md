@@ -74,10 +74,8 @@ private state; it cannot be serialized or reconstructed from public fields. A fi
 reference, untyped `verified` or `complete` flag, decoded report, or receipt or capability for a different
 artifact, evidence document, or policy is rejected.
 
-- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**.
-  Release verification and authorization never execute the suite. A downstream
-  coordinator may invoke NVKE's suite in a separate runtime job under section 6;
-  its unsigned report cannot authorize promotion.
+- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**. It **never
+  runs the conformance suite**; running it would break verifier isolation and cross into fleet operation.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
   distinct from the build/publish identity**. `vectorDigests` is sorted and exhaustive for the promoted set.
@@ -173,43 +171,107 @@ aggregate or the Release lane. A content-validated rebuild proves neither exact-
 construction. Qualified promotion under §1–§4 remains all-or-nothing for its exact required release members;
 there is no mixed-evidence shortcut around a missing reproduction receipt.
 
-V1 full-release acceptance is a **deferred** build/evidence qualification gate and versioned release manifest.
-Qualification checks schema, pins (including embedded-component consistency), signatures, production attestations,
-and a tooling smoke test in a network-disabled container. Every subject receives one pass/fail/waived verdict;
-a waiver binds component, reason and approver. Failing evidence is never attested. This gate is neither runtime
-conformance nor deployment qualification.
+The current M3 MVP is a build/evidence qualification gate over the exact complete M2 publication. It authenticates every named
+output against its producing Run, attempt, commit, Definition and relevant input identities. Strict input and
+evidence schemas, exact output membership, applicable pins/digests and source consistency, and cryptographically
+verified build signatures and provenance are mandatory. Missing, duplicate, extra, substituted or mismatched
+members/evidence fail with stable coded errors. Acquired payload identity and OCI delivery-container identity
+are checked through their respective bindings; equality between those distinct digest domains is not required.
+The current scope directed by the user makes embedded-component declarations optional. Omission is
+`not-applicable`; an explicitly authored declaration
+must agree with its referenced upstream manifest at the pinned commit, and missing or invalid referenced data
+fails. This raw-source metadata check establishes neither effective customized composition nor installed contents.
+Source, patch, configuration and material identity/provenance checks remain mandatory. Qualification requires
+no new upstream component manifest. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+establishes producer-only disk evidence and defers disk inspection and material reconciliation.
 
-The separate qualification workflow signs `nvkr.qualification-evidence/v1`; the build workflow cannot sign in
-that role. A versioned `nvkr.release-manifest/v1` lists every selected artifact from one default-branch Run with
-its source lane, digest, signature, provenance, qualification evidence, and explicit deferred members. A fail
-verdict makes the Run fail and prevents manifest issuance. Both documents require ADR-01 canonical schema and
-family registration before implementation. The public Release view does not turn them into caller-authored
-objects and is not itself proof that these gates passed.
+The manual diagnostic entrypoint takes an exact GitHub Run attempt URL and independently authored
+qualification policy. The policy approves the producer repository, workflow and default branch and pins the
+consumer verifier; neither the source Environment nor downloaded records can supply those decisions. The
+provider discovers the commit from the selected attempt and authenticates its successful default-branch
+execution. A Run URL without an attempt is ambiguous and is rejected.
+
+The real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+It carries original Plan bytes, the compiler-read authored file closure and original root/output predicates.
+Predicates are keyed by the aggregate root and each delivered payload reference. The collector validates
+the bounded aggregate metadata against the Plan and joins its exact output origins to the saved output-route
+publication and signing records before copying the unchanged predicate bytes; it does not read payloads.
+Factory owns capture and replay of the Definition, Environment, base and per-output catalogs, overlays,
+registries, locks, patches and directory facts. Replay preserves logical paths, rejects incomplete or unsafe
+closures and reads authored files only from memory. Catalog-owned pinned upstream Git authentication remains
+required; the handoff does not create an offline mode. The consumer independently authenticates the source,
+transport integrity, recomputed Plan and complete published bytes before accepting evidence. Missing handoffs
+or original predicates are errors; consumers never rebuild or relabel evidence to fill the gap.
+Legacy aggregate publication remains supported as a producer route, but lacks invocation-bound release
+metadata and the per-output route records required by qualification. It emits no qualification handoff and qualification
+admission returns a capability error before publication work; it cannot claim complete M3 transport.
+
+The owning lifecycle module issues an opaque, subject-bound check receipt after authenticating its exact
+inputs and build evidence. It retains the held verified publication and frozen Plan. Closing it revokes all
+copies, cancels and joins registered operations, then releases the held publication and any owned source
+receipt. A decoded report, caller-supplied digest or passed boolean cannot restore the
+receipt, and the receipt itself grants no qualification signing authority. M3-B supplies applicable
+delivered CLI/operator version smoke results from those exact payload bytes with networking disabled.
+Smoke startup failure, unsuccessful execution or a conflicting version fails the output; non-tool outputs
+use an explicit not-applicable rule. The publisher must reject missing required smoke results. No placeholder
+or absent implementation may mint passing smoke evidence.
+
+The MVP requires each root/output production predicate's invocation to equal the authenticated source Run
+attempt exactly. Where an output carries a publication-origin record, both its preparation and signing
+invocations must equal that source attempt. ADR-20's existing publication retry/reuse behavior is unchanged,
+but an earlier-attempt publication cannot satisfy this qualification gate. Reusing bytes never permits
+relabelling their producing attempt; authenticated qualification reuse remains deferred.
+
+Every output has exactly one overall pass/fail verdict and every applicable check has a result. The overall
+verdict includes final source-receipt admission: if revocation is detected after artifact checks complete,
+failure diagnostics add a separate `source-lifetime` result to every output and mark its overall verdict
+failed. The completed artifact checks retain their actual results. This failure-only diagnostic uses the
+existing check list; successful reports retain their six checks and unchanged canonical shape. No check
+receipt is issued, and the original source error is returned. All required gate and smoke results are
+collected before qualification signing begins. Any failed verdict prevents all qualification attestations
+for that invocation. Only a complete passing set can receive evidence for every
+selected subject under a qualification workflow identity distinct from the builder and an explicit issuer
+policy. The source build's successful default-branch invocation is authenticated separately from the
+qualification invocation (ADR-18); a green build or the publisher's own identity alone is insufficient.
+Smoke execution receives no qualification signing authority.
+
+Qualification evidence binds its schema and gate version, exact subject membership, producing Run/attempt/commit,
+Definition and relevant input identities, source build identity, qualification invocation and per-check results.
+Its canonical schema and family are registered in ADR-01 before use. Signing and attachment use the admitted
+signing machinery. All-verdicts-before-signing is a preflight guarantee, not a transaction across registry
+attachments: an operational failure marks the invocation unsuccessful and blocks release even when earlier
+attachments remain. The release consumer must authenticate complete successful qualification publication;
+presence of one attachment cannot prove success for the set. M4's release manifest remains a separate deferred
+consumer and grants no qualified-lane clearance.
+
+Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated
+verify-only dispatch and incremental reuse are deferred hardening. External qualification suites such as
+NVKE's have a reserved integration boundary: results must be independently authenticated and bound to exact
+artifact subjects, invocation and policy before inclusion. A suite outside this MVP is explicitly
+`not evaluated—outside MVP scope`, never passed. Once policy requires a suite, absent or failing authenticated
+results block qualification. NVKR does not build cluster test infrastructure for this MVP. This gate grants
+neither runtime conformance, deployment qualification nor exact-byte reproduction.
 
 Merge of the reviewed bump/regeneration change to the default branch is the v1 release decision; it is not
 gated on reproduction. Unattended merge requires separate security authorization. ADR-06 owns immutable tags,
 rerun behavior and revocation; ADR-04 owns explicit consumer scopes. An artifact-publication verification result
-does not establish full-release acceptance. M3/M4 remain unimplemented.
+does not establish full-release acceptance. Reconciliation owns implementation and external-acceptance status;
+the approved scope and these contracts do not establish milestone completion or organizational ratification.
 
-### 6. External runtime coordination and deferred qualified handoff
+### 6. Passive external qualification handoff — deferred producer protocol
 
-The external suite owns runtime assertions, provisioning and guest lifecycle.
-A separately authored GitHub Actions coordinator may schedule project-specific
-producer Runs and invoke NVKE's existing suite in an isolated runtime job. Its
-first proposed target is kind plus KVM guests on the explicitly admitted native
-ARM64 runner (ADR-18). The supply-chain core verifies the complete exact-input
-publication and hands held bytes to the downstream harness; it issues no runtime
-pass receipt. The coordinator binds one exact producing run, invocation,
-publication, suite source and coverage profile. Successful cycles require
-nonempty executed assertions, native guest observations and successful owned
-cleanup. Schedules and unsigned results do not establish service acceptance.
-
-A future qualified adapter must authenticate an already-produced independently signed observation containing pinned suite,
+The external suite owns execution, provisioning, process context and lifecycle. NVKR never initiates or
+supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
 suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
 `resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
 unpinned identities, caller-provided pass booleans, wrong roles, expired evidence or mismatched subjects fail
 closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
 are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
+
+The repository's separately authored NVKE E2E adapter is downstream CI test infrastructure,
+outside the NVKR product lifecycle and v1 qualification acceptance. ADR-18 §3 records its
+runner and trust constraints. It uses artifact-consumer APIs and issues no conformance receipt;
+it does not change this passive product boundary or establish named-decider ratification.
 
 ## Consequences
 
@@ -226,14 +288,14 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
 - The clearance result is a new consumable object the downstream must agree to check.
 
 **Neutral**
-- Release authorization consumes independently authenticated conformance.
-  A downstream coordinator cannot turn its unsigned runtime report into clearance.
+- The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
+  It runs no suite, performs no infra rollback, and authorizes no mutation.
 
 ## Alternatives considered
 
 - **Infer conformance from reproduction (single gate).** Rejected — SEC-08 requires two independent gates.
-- **Run the conformance suite inside release verification or authorization.** Rejected: it breaks verifier
-  isolation. A separate downstream runtime job retains that boundary and owns test-resource cleanup.
+- **Run the conformance suite inside NVKR.** Rejected — it breaks verifier isolation and the produce-vs-operate
+  boundary.
 - **Select releases by tag.** Rejected — a mutable tag must never bypass digest and signature verification.
 - **Rollback that mutates running infrastructure.** Rejected — NVKR re-selects a verified set; the engine makes
   any infra change.

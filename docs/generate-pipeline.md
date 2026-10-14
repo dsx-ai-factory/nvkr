@@ -55,9 +55,30 @@ Under that scratch root, inspect:
 - `.github/nvkr-run/plan.json`: the canonical Plan consumed by the workflow.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
+Those are the default paths when the Environment omits `githubBundle` or sets it
+to an empty string. To generate a separate project bundle, author `githubBundle`
+in that Environment. A name contains at most 48 lowercase letters, digits and
+hyphens, with alphanumeric ends. Its paths are derived by the generator:
+
+| Environment selection | Workflow | Generated records directory |
+|---|---|---|
+| Omitted or empty `githubBundle` | `.github/workflows/nvkr-run.yml` | `.github/nvkr-run/` |
+| `githubBundle: <name>` | `.github/workflows/nvkr-run-<name>.yml` | `.github/nvkr-run-<name>/` |
+
+Each records directory contains its own `plan.json` and `manifest.json`. Default
+and named bundles can coexist; each owns only its files and retirement. The
+selection changes Environment and Plan identity without changing component Build
+identity. Set the signing policy for the chosen workflow explicitly; selecting a
+bundle name never rewrites that policy or permits authored generated paths.
+
 `--check` regenerates in memory and compares exact bytes without writing files. Use the same CLI build
 and inputs for both commands; the generator version contributes to generated content. Change authored
 inputs and regenerate instead of editing generated files.
+
+The generator emits manual `workflow_dispatch` pipelines, with no cron or
+callable-workflow trigger. A separately authored downstream CI coordinator can
+schedule dispatches; that scheduling and runtime-test ownership are separate
+from generated bundle ownership.
 
 Generation neither submits the workflow to GitHub nor builds, signs, or publishes artifacts. Continue with
 [Plan inspection and comparison](plan-and-graph-inspection.md) or the [Run lifecycle](lifecycle.md).

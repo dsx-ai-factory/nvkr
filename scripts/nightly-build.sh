@@ -23,16 +23,40 @@ workflow=$(jq -er '.build_workflow' <<<"$selection")
   fail NVKR-E-PIPELINE-DRIFT 'profile workflow does not match its generated namespace' 51
 [[ ! -e $out && ! -L $out ]] || fail NVKR-E-IMMUTABLE-VIOLATION 'nightly build output must be fresh' 47
 mkdir -m 700 "$out"
-api() { timeout --signal=TERM --kill-after=5s 60s gh api --hostname github.com -H 'X-GitHub-Api-Version: 2026-03-10' "$@"; }
-run_id='' terminal=false
+run_id='' terminal=false active_pid=''
+# GNU timeout creates the owned command's process group. Waiting with Bash's
+# builtin lets INT/TERM traps run promptly instead of waiting for foreground I/O.
+run_owned() {
+  local status=0
+  "$@" &
+  active_pid=$!
+  wait "$active_pid" || status=$?
+  active_pid=''
+  return "$status"
+}
+api() { run_owned timeout --signal=TERM --kill-after=1s 60s gh api --hostname github.com -H 'X-GitHub-Api-Version: 2026-03-10' "$@"; }
 # Invoked through the EXIT trap, including error and cancellation paths.
 # shellcheck disable=SC2329
 cleanup() {
   local status=$?
-  trap - EXIT INT TERM
+  trap - EXIT
+  # Finish this bounded cleanup even if the runner sends its second signal.
+  trap '' INT TERM
+  if [[ -n $active_pid ]]; then
+    # Stop only our current GNU-timeout group, then reap its direct child. The
+    # PID fallback also covers cancellation before timeout creates that group;
+    # the second group signal covers group creation racing the first signal.
+    kill -KILL -- "-$active_pid" 2>/dev/null || true
+    kill -KILL "$active_pid" 2>/dev/null || true
+    kill -KILL -- "-$active_pid" 2>/dev/null || true
+    wait "$active_pid" 2>/dev/null || true
+    active_pid=''
+  fi
   if [[ -n $run_id && $terminal != true ]]; then
     # Cancel only the ID returned by this dispatch. Never guess a run by time.
-    if api --method POST "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" >"$out/cancel.json" 2>"$out/cancel-error.txt"; then
+    if run_owned timeout --signal=TERM --kill-after=1s 5s gh api --hostname github.com \
+      -H 'X-GitHub-Api-Version: 2026-03-10' --method POST \
+      "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel" >"$out/cancel.json" 2>"$out/cancel-error.txt"; then
       printf '%s\n' 'Owned producer cancellation requested; cancellation is not a cleanup verdict.' >&2
     else
       printf '%s\n' 'Owned producer cancellation was not acknowledged; inspect its exact run ID.' >&2
@@ -56,7 +80,8 @@ api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/disp
   fail NVKR-E-UNAVAILABLE 'dispatch outcome is ambiguous; do not retry or guess the producing run' 30
 run_id=$(jq -er '.workflow_run_id | select(type == "number" and . > 0 and . <= 9007199254740991 and floor == .) | tostring' "$out/dispatch.json") ||
   fail NVKR-E-UNAVAILABLE 'dispatch returned no exact run ID; no latest-run fallback is allowed' 30
-deadline=$((SECONDS + 21000))
+# Reserve thirty minutes below the 360-minute job for admission and cleanup.
+deadline=$((SECONDS + 19800))
 while (( SECONDS < deadline )); do
   api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >"$out/producer-run.json"
   jq -e --arg id "$run_id" --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" \
@@ -76,6 +101,6 @@ while (( SECONDS < deadline )); do
         producerURL:$producer.html_url,trust:"github-run-facts; publication-not-yet-verified"}' >"$out/build.json"
     exit 0
   fi
-  sleep 15
+  run_owned timeout --signal=TERM --kill-after=1s 20s sleep 15
 done
 fail NVKR-E-TIMEOUT 'nightly producer exceeded its bounded wait' 31

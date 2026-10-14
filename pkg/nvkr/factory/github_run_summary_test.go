@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -65,8 +66,19 @@ func TestGitHubRunSummariesHaveTwoOwners(t *testing.T) {
 						}
 					case githubRunEndSummaryID:
 						ends++
-						if id != "nvkr-lifecycle-run" || index != len(job.Steps)-1 || step.If != "${{ always() }}" || job.Steps[index-1].ID != githubRunUploadID {
-							t.Fatal("closing summary does not follow final Run upload unconditionally")
+						if id != "nvkr-lifecycle-run" || index != len(job.Steps)-1 || step.If != "${{ always() }}" {
+							t.Fatal("closing summary is not the final unconditional diagnostic step")
+						}
+						uploadIndex := index - 1
+						if githubQualificationHandoffEnabled(plan) {
+							wantHandoff := githubQualificationHandoffStep(githubActionRefs{Upload: plan.Actions["upload-artifact"].Uses()})
+							if uploadIndex < 0 || !reflect.DeepEqual(job.Steps[uploadIndex], wantHandoff) {
+								t.Fatal("closing summary does not follow the exact successful-attempt handoff upload")
+							}
+							uploadIndex--
+						}
+						if uploadIndex < 0 || job.Steps[uploadIndex].ID != githubRunUploadID {
+							t.Fatal("closing steps do not follow the final Run upload in order")
 						}
 					default:
 						t.Fatalf("unexpected summary writer: %s/%s", id, step.ID)

@@ -20,7 +20,7 @@ func (publication *Publication) ExportImage(ctx context.Context, objectName, ref
 	if err != nil {
 		return PublishedImageExport{}, err
 	}
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return PublishedImageExport{}, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()

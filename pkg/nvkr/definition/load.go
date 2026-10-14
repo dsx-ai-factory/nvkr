@@ -54,8 +54,40 @@ func loadStrict(ctx context.Context, path, label string, output any) error {
 		}
 		return e.Wrap(e.CodeInvalidCatalog, err, "reading %s %s", label, path)
 	}
+	return decodeStrict(raw, label, output)
+}
+
+// DecodeDefinition admits bounded saved authored bytes through the same strict
+// schema and validation as LoadDefinition. It performs no filesystem reads.
+func DecodeDefinition(raw []byte) (Definition, error) {
+	var definition Definition
+	if err := decodeStrict(raw, "definition", &definition); err != nil {
+		return Definition{}, err
+	}
+	if err := definition.Validate(); err != nil {
+		return Definition{}, err
+	}
+	return definition, nil
+}
+
+// DecodeEnvironment admits bounded saved authored bytes without filesystem reads.
+func DecodeEnvironment(raw []byte) (Environment, error) {
+	var environment Environment
+	if err := decodeStrict(raw, "environment", &environment); err != nil {
+		return Environment{}, err
+	}
+	if err := environment.Validate(); err != nil {
+		return Environment{}, err
+	}
+	return environment, nil
+}
+
+func decodeStrict(raw []byte, label string, output any) error {
+	if int64(len(raw)) > maxDocumentBytes {
+		return e.New(e.CodeInvalidCatalog, "%s document exceeds its byte bound", label)
+	}
 	if err := yaml.UnmarshalStrict(raw, output); err != nil {
-		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s %s", label, path)
+		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
 	}
 	return nil
 }

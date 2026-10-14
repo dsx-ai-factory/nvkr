@@ -421,8 +421,15 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if err := yaml.UnmarshalStrict([]byte("steps:\n"+expected.String()), &restore); err != nil {
 			return e.Wrap(e.CodeInvalidCatalog, err, "GitHub finalizer restore schema")
 		}
-		if len(job.Steps) != 3+len(restore.Steps)+2 || !reflect.DeepEqual(job.Steps[3:3+len(restore.Steps)], restore.Steps) {
+		expectedSteps := 3 + len(restore.Steps) + 2
+		if githubQualificationHandoffEnabled(plan) {
+			expectedSteps++
+		}
+		if len(job.Steps) != expectedSteps || !reflect.DeepEqual(job.Steps[3:3+len(restore.Steps)], restore.Steps) {
 			return e.New(e.CodeEngineCapability, "GitHub finalizer must restore every exact planned carrier and record its producer outcome")
+		}
+		if githubQualificationHandoffEnabled(plan) && !reflect.DeepEqual(job.Steps[len(job.Steps)-1], githubQualificationHandoffStep(actions)) {
+			return e.New(e.CodeEngineCapability, "GitHub finalizer must upload only the complete handoff for this successful exact attempt")
 		}
 		if err := actions.validateHelperPreparedFirst("nvkr-lifecycle-run", job.Steps); err != nil {
 			return err

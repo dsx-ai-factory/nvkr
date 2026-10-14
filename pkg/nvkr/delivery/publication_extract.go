@@ -17,7 +17,7 @@ func (publication *Publication) ExtractBinaryBundle(ctx context.Context, name, o
 	if err := deliveryContext(ctx); err != nil {
 		return BinaryBundle{}, err
 	}
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return BinaryBundle{}, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()
@@ -41,7 +41,7 @@ func (publication *Publication) ExtractObject(ctx context.Context, name, out str
 	if err := deliveryContext(ctx); err != nil {
 		return PublishedObject{}, err
 	}
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return PublishedObject{}, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()

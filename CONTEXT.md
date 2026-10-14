@@ -161,10 +161,26 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 accepts producer
-provenance with its remaining delivery gates; M3 requires strict inspection and material reconciliation.
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
+retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
+Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
+match its referenced pinned upstream metadata. That comparison does not establish effective customized or
+installed composition; exact source, patch, configuration and material bindings remain required.
 Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
+
+**Build/evidence qualification**:
+Checks for the complete selected artifact set against its exact producing Run, attempt, commit and inputs,
+including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
+has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
+the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact Run
+attempt and an independent consumer policy. The generated handoff carries original inputs and evidence for
+recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
+The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
+joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
+subject-bound evidence.
+_Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
@@ -180,11 +196,13 @@ Qualified release-gate acceptance is deferred; no retained clearance implementat
 _Avoid_: Generic pass result, cluster qualification
 
 **Downstream test coordinator**:
-A separately authored automation that joins exact project producer Runs, consumes
-authenticated publication bytes, and invokes an externally owned suite in an
-isolated runtime job. It owns temporary test-resource cleanup and unsigned
-reports; those reports are not qualified conformance receipts or a seventh
-public lifecycle object (ADR-16).
+A separately authored repository CI adapter outside the NVKR product lifecycle
+that joins exact project producer Runs, consumes authenticated publication bytes
+and invokes NVKE's suite in a separate job. NVKE owns guest/cluster provisioning,
+assertions and teardown; the parent harness owns host admission, outer leases,
+disk service and network-control restoration. Its unsigned reports are diagnostics,
+not qualified conformance receipts or a seventh public lifecycle object (ADR-16/18).
+_Avoid_: Nightly qualification, qualified runtime, product fleet operator
 
 **Clearance**:
 Authenticated authorization for one exact qualified ReleaseSet after its required evidence, policy, and lifecycle checks pass.

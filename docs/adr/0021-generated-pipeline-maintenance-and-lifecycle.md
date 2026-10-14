@@ -49,7 +49,10 @@ Every generated execution, recovery and utility-container command selects that e
 Plan path; validation rejects a bundle whose paths differ from the admitted Environment.
 Signing identity and issuer remain explicit Environment policy and are never rewritten
 to accommodate a selected workflow filename. Operators must select the matching policy.
-This admits independent generated project bundles, not scheduling or callable workflows.
+The generator emits independent manual-dispatch bundles, with no cron or callable
+workflow trigger. A separately authored downstream CI coordinator may schedule
+dispatches of those bundles; its scheduling, exact-run correlation and runtime
+ownership are outside generation (ADR-16/18).
 
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
@@ -240,10 +243,7 @@ disallowed; that ambiguity is what makes forgotten-regen drift possible.
 Current generated Run contract evidence in `pkg/nvkr/factory/bundle_io_test.go` covers idempotent generation,
 byte-exact drift checks, unchanged obsolete-member retirement, empty-directory cleanup, and preservation of
 modified or unlisted files. These tests do not establish a complete crash/kill-point matrix.
-Named-bundle contracts additionally cover default-byte preservation, coexisting bundles,
-independent drift and retirement, cross-namespace ownership rejection, exact utility Plan
-selection and unsafe-name admission before catalog resolution. They do not prove hosted
-execution or nightly service acceptance.
+Reconciliation records named-bundle contract evidence and its hosted-acceptance limits.
 
 Retired qualified renderer and bundle-transaction tests were removed with their unused implementation. The
 maintained Run writer keeps its ownership, retirement, cancellation and drift tests. Retired-engine admission

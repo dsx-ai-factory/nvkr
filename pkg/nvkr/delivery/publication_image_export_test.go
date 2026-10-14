@@ -261,13 +261,18 @@ func TestPublicationImageExportConcurrentClose(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		copyOf := *publication
+		exporter, closer := publication, &copyOf
+		if attempt%2 != 0 {
+			exporter, closer = &copyOf, publication
+		}
 		out := filepath.Join(t.TempDir(), "image.tar")
 		done := make(chan error, 1)
 		go func() {
-			_, err := publication.ExportImage(t.Context(), "cwe", "registry.example.test/cwe@"+index.Children[0].ManifestDigest, index.Children[0].Platform, out)
+			_, err := exporter.ExportImage(t.Context(), "cwe", "registry.example.test/cwe@"+index.Children[0].ManifestDigest, index.Children[0].Platform, out)
 			done <- err
 		}()
-		if err := publication.Close(); err != nil {
+		if err := closer.Close(); err != nil {
 			t.Fatal(err)
 		}
 		if err := <-done; err != nil {
@@ -289,6 +294,15 @@ func TestPublicationImageExportConcurrentClose(t *testing.T) {
 			image, err := InspectContainerImage(t.Context(), extracted, index.Children[0].Platform)
 			if err != nil || image.ManifestDigest != index.Children[0].ManifestDigest {
 				t.Fatalf("close race corrupted image: %v", err)
+			}
+		}
+		for _, handle := range []*Publication{publication, &copyOf} {
+			directory := t.TempDir()
+			got, err := handle.ExportImage(t.Context(), "cwe", "registry.example.test/cwe@"+index.Children[0].ManifestDigest, index.Children[0].Platform, filepath.Join(directory, "closed.tar"))
+			assertRegistryCode(t, err, e.CodeGateUnmet)
+			entries, readErr := os.ReadDir(directory)
+			if got != (PublishedImageExport{}) || readErr != nil || len(entries) != 0 {
+				t.Fatalf("closed shallow handle exposed output: %+v, %v, %v", got, entries, readErr)
 			}
 		}
 	}

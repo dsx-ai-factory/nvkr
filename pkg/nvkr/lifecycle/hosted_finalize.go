@@ -5,29 +5,49 @@ package lifecycle
 
 import (
 	"context"
+	"os"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 )
 
 // FinalizeGenerated re-admits the authored inputs and committed plan, then
 // observes artifacts restored by a hosted pipeline into one immutable Run.
 func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, planPath, generatorVersion, attempt, workspace, outputPath string) (*Run, error) {
+	return finalizeGenerated(ctx, definitionPath, environmentPath, planPath, generatorVersion, attempt, workspace, outputPath, "")
+}
+
+func finalizeGenerated(ctx context.Context, definitionPath, environmentPath, planPath, generatorVersion, attempt, workspace, outputPath, handoffPath string) (*Run, error) {
+	if ctx == nil {
+		return nil, e.New(e.CodeUsage, "hosted Run finalization requires a context")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "hosted Run finalization canceled")
+	}
+	var source qualificationorigin.Description
+	if handoffPath != "" {
+		var err error
+		source, err = producingSourceDescription(attempt, os.Getenv)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if workspace == "" {
 		return nil, e.New(e.CodeUsage, "hosted Run finalization requires a workspace")
 	}
-	definition, err := LoadDefinition(ctx, definitionPath)
+	var expectedPlan *factory.Plan
+	var inputs factory.InputSnapshot
+	var err error
+	if handoffPath != "" {
+		expectedPlan, inputs, err = factory.CaptureCompileFiles(ctx, ".", definitionPath, environmentPath, generatorVersion)
+	} else {
+		expectedPlan, err = CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
+	}
 	if err != nil {
 		return nil, err
 	}
-	environment, err := LoadEnvironment(ctx, environmentPath)
-	if err != nil {
-		return nil, err
-	}
-	expectedPlan, err := Compile(ctx, definitionPath, definition, environmentPath, environment, generatorVersion)
-	if err != nil {
-		return nil, err
-	}
+	definition, environment := expectedPlan.Definition, expectedPlan.Environment
 	plan, err := factory.LoadPlanContext(ctx, planPath)
 	if err != nil {
 		return nil, err
@@ -42,6 +62,11 @@ func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	}
 	if want != got {
 		return nil, e.New(e.CodePipelineDrift, "hosted Run plan %s differs from recompiled plan %s", got, want)
+	}
+	if handoffPath != "" {
+		if err := admitQualificationProducer(plan, source); err != nil {
+			return nil, err
+		}
 	}
 	run, err := PrepareRun(definition, environment, plan, attempt)
 	if err != nil {
@@ -68,6 +93,11 @@ func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 		if err != nil {
 			return recordRunFailure(ctx, outputPath, run, err, "binding reference release content")
 		}
+		if handoffPath != "" {
+			if err := writeQualificationHandoff(ctx, handoffPath, workspace, plan, inputs, source); err != nil {
+				return recordRunFailure(ctx, outputPath, run, err, "recording qualification handoff failure")
+			}
+		}
 		if err := writeRunRecord(ctx, outputPath, bound); err != nil {
 			return nil, err
 		}
@@ -93,6 +123,11 @@ func FinalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	bound, err = bindReleaseContent(plan, bound)
 	if err != nil {
 		return recordRunFailure(ctx, outputPath, run, err, "recording hosted failed Run")
+	}
+	if handoffPath != "" {
+		if err := writeQualificationHandoff(ctx, handoffPath, workspace, plan, inputs, source); err != nil {
+			return recordRunFailure(ctx, outputPath, run, err, "recording qualification handoff failure")
+		}
 	}
 	if err := writeRunRecord(ctx, outputPath, bound); err != nil {
 		return nil, err

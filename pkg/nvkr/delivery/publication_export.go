@@ -18,7 +18,7 @@ func (publication *Publication) WriteLayout(ctx context.Context, out string) err
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()

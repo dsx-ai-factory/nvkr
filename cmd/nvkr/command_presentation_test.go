@@ -23,8 +23,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func TestAllPublicCommandsOfferPresentation(t *testing.T) {
+func TestPublicCommandPresentationCoverage(t *testing.T) {
 	var leaves []string
+	canonicalDiagnostics := 0
 	var visit func([]*cli.Command, string)
 	visit = func(commands []*cli.Command, parent string) {
 		for _, command := range commands {
@@ -43,14 +44,20 @@ func TestAllPublicCommandsOfferPresentation(t *testing.T) {
 					flags[name] = true
 				}
 			}
-			if !flags["ui"] || !flags["no-color"] {
+			if name == "run check-artifacts" {
+				// Qualification diagnostics retain their canonical JSON contract.
+				canonicalDiagnostics++
+				if flags["ui"] || flags["no-color"] {
+					t.Errorf("canonical diagnostic command %s unexpectedly offers presentation flags", name)
+				}
+			} else if !flags["ui"] || !flags["no-color"] {
 				t.Errorf("public command %s has no presentation flags", name)
 			}
 		}
 	}
 	visit(newApp().Commands, "")
-	if len(leaves) != 22 {
-		t.Fatalf("public coverage changed: %d %v", len(leaves), leaves)
+	if len(leaves) != 23 || canonicalDiagnostics != 1 {
+		t.Fatalf("public coverage changed: %d leaves, %d canonical diagnostic commands: %v", len(leaves), canonicalDiagnostics, leaves)
 	}
 }
 

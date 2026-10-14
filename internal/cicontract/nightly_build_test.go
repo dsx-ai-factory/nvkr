@@ -4,6 +4,7 @@
 package cicontract
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,9 +12,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
+	"golang.org/x/sys/unix"
 )
 
 const nightlySHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -30,14 +35,28 @@ for argument in "$@"; do
   if [[ $argument == repos/* ]]; then endpoint=$argument; fi
 done
 printf '%s %s\n' "$method" "$endpoint" >>"$FAKE_GH_ROOT/calls"
+block_request() {
+  trap '' INT TERM
+  "$FAKE_REAL_SLEEP" 120 &
+  printf '%s\n' "$!" >"$FAKE_GH_ROOT/api-descendant-pid"
+  printf '%s\n' "$$" >"$FAKE_GH_ROOT/api-pid"
+  printf '%s\n' "$PPID" >"$FAKE_GH_ROOT/timeout-pid"
+  printf '%s\n' ready >"$FAKE_GH_ROOT/api-ready"
+  wait "$!"
+}
 case "$method $endpoint" in
   'GET repos/example/nvkr') cat "$FAKE_GH_ROOT/repository.json" ;;
   'GET repos/example/nvkr/actions/workflows/nvkr-run-oss.yml') cat "$FAKE_GH_ROOT/workflow.json" ;;
   'POST repos/example/nvkr/actions/workflows/nvkr-run-oss.yml/dispatches')
+    if [[ ${FAKE_GH_BLOCK:-} == dispatch ]]; then block_request; fi
     if [[ $FAKE_DISPATCH_FAILURE == true ]]; then exit 17; fi
     cat "$FAKE_GH_ROOT/dispatch.json" ;;
-  'GET repos/example/nvkr/actions/runs/4242') cat "$FAKE_GH_ROOT/producer.json" ;;
-  'POST repos/example/nvkr/actions/runs/4242/cancel') printf '{"acknowledged":true}\n' ;;
+  'GET repos/example/nvkr/actions/runs/4242')
+    if [[ ${FAKE_GH_BLOCK:-} == producer ]]; then block_request; fi
+    cat "$FAKE_GH_ROOT/producer.json" ;;
+  'POST repos/example/nvkr/actions/runs/4242/cancel')
+    if [[ ${FAKE_GH_BLOCK:-} == cancel ]]; then block_request; fi
+    printf '{"acknowledged":true}\n' ;;
   *) printf 'unexpected API call: %s %s\n' "$method" "$endpoint" >&2; exit 99 ;;
 esac
 `
@@ -91,6 +110,11 @@ func newNightlyFixture(t *testing.T) *nightlyFixture {
 		"GITHUB_REPOSITORY=example/nvkr", "GITHUB_REPOSITORY_ID=123",
 		"GITHUB_SHA=" + nightlySHA, "GITHUB_RUN_ID=101", "GITHUB_RUN_ATTEMPT=3",
 	}
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.setEnv("FAKE_REAL_SLEEP", sleep)
 	fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": nightlyWorkflow}})
 	fixtureJSON(t, filepath.Join(root, "repository.json"), map[string]any{"id": 123, "full_name": "example/nvkr", "default_branch": "main"})
 	fixtureJSON(t, filepath.Join(root, "workflow.json"), map[string]string{"path": ".github/workflows/" + nightlyWorkflow, "state": "active"})
@@ -112,16 +136,9 @@ func (f *nightlyFixture) setEnv(key, value string) {
 
 func (f *nightlyFixture) run(t *testing.T, profile string) (string, int) {
 	t.Helper()
-	fixtureJSON(t, filepath.Join(f.root, "producer.json"), f.producer)
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot locate repository script")
-	}
-	script := filepath.Join(filepath.Dir(filename), "..", "..", "scripts", "nightly-build.sh")
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, "bash", script, f.profiles, profile, f.out)
-	command.Env = f.environment
+	command := f.command(t, ctx, profile)
 	output, err := command.CombinedOutput()
 	if ctx.Err() != nil {
 		t.Fatalf("nightly fixture exceeded test bound: %v\n%s", ctx.Err(), output)
@@ -134,6 +151,19 @@ func (f *nightlyFixture) run(t *testing.T, profile string) (string, int) {
 		t.Fatalf("execute nightly fixture: %v", err)
 	}
 	return string(output), exited.ExitCode()
+}
+
+func (f *nightlyFixture) command(t *testing.T, ctx context.Context, profile string) *exec.Cmd {
+	t.Helper()
+	fixtureJSON(t, filepath.Join(f.root, "producer.json"), f.producer)
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot locate repository script")
+	}
+	script := filepath.Join(filepath.Dir(filename), "..", "..", "scripts", "nightly-build.sh")
+	command := exec.CommandContext(ctx, "bash", script, f.profiles, profile, f.out)
+	command.Env = f.environment
+	return command
 }
 
 func (f *nightlyFixture) calls(t *testing.T) []string {
@@ -285,5 +315,123 @@ func TestNightlyBuildRejectsAdmissionWithoutMutation(t *testing.T) {
 				t.Fatalf("rejected admission created output: %v", err)
 			}
 		})
+	}
+}
+
+func waitNightlyMarker(t *testing.T, ctx context.Context, root, name string) {
+	t.Helper()
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		if _, err := os.Stat(filepath.Join(root, name)); err == nil {
+			return
+		} else if !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("nightly fixture never reached %s: %v", name, ctx.Err())
+		case <-tick.C:
+		}
+	}
+}
+
+// Keep the fixture's foreground pipe open until both its API process and the
+// inherited-pipe descendant terminate. A prompt cmd.Wait therefore proves join,
+// without depending on whether the platform has already reaped orphan zombies.
+func TestNightlyBuildSignalsStopActiveWorkAndCancelOnlyOwnedRun(t *testing.T) {
+	for _, phase := range []string{"producer", "poll", "dispatch", "cancel"} {
+		for _, signal := range []unix.Signal{unix.SIGINT, unix.SIGTERM} {
+			t.Run(phase+"/"+signal.String(), func(t *testing.T) {
+				f := newNightlyFixture(t)
+				f.setEnv("FAKE_GH_BLOCK", phase)
+				marker := "api-ready"
+				if phase == "poll" || phase == "cancel" {
+					f.producer["status"] = "in_progress"
+					marker = "sleep-ready"
+					pollSleep := `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$PPID" >"$FAKE_GH_ROOT/timeout-pid"
+printf '%s\n' ready >"$FAKE_GH_ROOT/sleep-ready"
+exec "$FAKE_REAL_SLEEP" "$@"
+`
+					if err := os.WriteFile(filepath.Join(f.bin, "sleep"), []byte(pollSleep), 0o700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+				defer cancel()
+				command := f.command(t, ctx, "oss")
+				if err := ownedcmd.ConfigureCancellation(command, time.Second); err != nil {
+					t.Fatal(err)
+				}
+				// This contract observes pipe closure by the owned descendants;
+				// WaitDelay must not hide a leaked child by closing those pipes.
+				command.WaitDelay = 0
+				var output bytes.Buffer
+				command.Stdout, command.Stderr = &output, &output
+				if err := command.Start(); err != nil {
+					t.Fatal(err)
+				}
+				done := make(chan error, 1)
+				go func() { done <- command.Wait() }()
+				joined := false
+				t.Cleanup(func() {
+					if joined {
+						return
+					}
+					// These are exclusively this fixture's child groups. Failure
+					// cleanup must not leave the deliberately stubborn mock alive.
+					if raw, err := os.ReadFile(filepath.Join(f.root, "timeout-pid")); err == nil {
+						if pid, err := strconv.Atoi(strings.TrimSpace(string(raw))); err == nil && pid > 0 {
+							_ = unix.Kill(-pid, unix.SIGKILL)
+						}
+					}
+					_ = ownedcmd.KillDescendants(command)
+					_ = command.Process.Kill()
+					select {
+					case <-done:
+					case <-time.After(2 * time.Second):
+						t.Error("nightly fixture failure cleanup did not join")
+					}
+				})
+				waitNightlyMarker(t, ctx, f.root, marker)
+				if err := command.Process.Signal(signal); err != nil {
+					t.Fatal(err)
+				}
+				bound := 4 * time.Second
+				if phase == "cancel" {
+					bound = 8 * time.Second
+					waitNightlyMarker(t, ctx, f.root, "api-ready")
+					// The runner's second signal must not interrupt the bounded
+					// owned-run cancel attempt after active work was stopped.
+					if err := command.Process.Signal(unix.SIGTERM); err != nil {
+						t.Fatal(err)
+					}
+				}
+				select {
+				case err := <-done:
+					joined = true
+					var exited *exec.ExitError
+					if !errors.As(err, &exited) || exited.ExitCode() != 31 {
+						t.Fatalf("signal did not preserve timeout status: %v\n%s", err, output.String())
+					}
+				case <-time.After(bound):
+					t.Fatalf("signal did not promptly stop and join active %s work", phase)
+				}
+				noBuildResult(t, f)
+				calls := f.calls(t)
+				want := 5
+				if phase == "dispatch" {
+					want = 3
+				}
+				if len(calls) != want || phase != "dispatch" && calls[len(calls)-1] != "POST repos/example/nvkr/actions/runs/4242/cancel" {
+					t.Fatalf("signal guessed/retried dispatch or canceled an unowned ID: %v", calls)
+				}
+				if phase == "cancel" && !strings.Contains(output.String(), "not acknowledged") {
+					t.Fatalf("expired cancel falsely claimed acknowledgment: %s", output.String())
+				}
+			})
+		}
 	}
 }
