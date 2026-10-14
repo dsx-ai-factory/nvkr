@@ -77,7 +77,7 @@ func TestObserveHostedDiskOutputsChecksExactPublicationMembership(t *testing.T) 
 				t.Fatal(err)
 			}
 			attested := artifacts[slot.ArtifactID].Path
-			if _, err := delivery.AttestEvidence(t.Context(), prepared, attested, fixtureSBOMAttestation(t)); err != nil {
+			if _, err := delivery.AttestPreparedEvidence(t.Context(), prepared, attested, fixtureSBOMAttestation(t)); err != nil {
 				t.Fatal(err)
 			}
 			if test.name == "duplicate members" {

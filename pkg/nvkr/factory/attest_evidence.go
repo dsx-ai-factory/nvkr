@@ -108,7 +108,7 @@ func executeAttestEvidence(ctx context.Context, plan *Plan, node Node, artifacts
 	if err != nil {
 		return err
 	}
-	result, err := delivery.AttestEvidence(ctx, input.Path, output.Path, attester.AttestSBOM)
+	result, err := delivery.AttestPreparedEvidence(ctx, input.Path, output.Path, attester.AttestSBOM)
 	if err != nil {
 		return err
 	}

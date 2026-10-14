@@ -924,8 +924,14 @@ does not establish that a large-image workflow fits a hosted runner.
 For the live disk group, capacity planning must include materialized sources, toolchains, build scratch, produced
 image, package representation and, in strict mode, inspection temporaries that coexist. Keeping packaging with
 the producer preserves live ownership; it does not remove these storage requirements. Separate hosted jobs must
-also budget retained carriers, authenticated restoration snapshots, extracted inputs and publication or
-verification temporaries. No numeric capacity or duration target is invented here.
+also budget retained carriers, extracted inputs and publication or verification temporaries. Restoration
+hashes extraction and rechecks the same held carrier before publishing, avoiding a full tar snapshot.
+Evidence attestation consumes the private preparation and moves unchanged payload blobs into the final layout
+after preparing the signed evidence. Thus restoration retains a carrier plus extracted payload, and outgoing
+packing retains the final payload plus its carrier; attestation introduces no extra unchanged payload copy.
+Failure after attestation claims the preparation requires restore/build retry (ADR-20 §6). These local
+lifetimes do not bound provider ZIP handling, other coexisting files or later registry-fetched verification
+snapshots, and no measured hosted capacity or duration target is claimed.
 
 Runner requirements are modeled with a generic per-step request, not as builder-specific metadata. Minimum CPU,
 memory and ephemeral storage, eligible host platforms, typed host capabilities, and an executor wall-time budget

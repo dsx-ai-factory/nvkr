@@ -812,7 +812,9 @@ an already-entered regular-file syscall cannot be interrupted, so this is not a 
 
 The compiler creates a private release preparation, a production SBOM-attestation stage producing the
 final release package, and one publish/sign/verify route. The attestation stage binds and verifies each
-CycloneDX document before final release identity is derived. It adds one internal handoff. GitHub handoff artifacts remain
+CycloneDX document before final release identity is derived. The private preparation is disposable: delivery
+consumes its unchanged payload files into the final layout after preparing the signed evidence, with the
+ownership and retry contract in ADR-20 §6. It adds one internal handoff. GitHub handoff artifacts remain
 internal job transfers, not additional deliverables. Product names do not cause duplicate copies of the full
 closure to be uploaded or published.
 
@@ -828,7 +830,13 @@ command argument is added.
 
 Each stage downloads one exact set of external input carriers, then restores each required carrier in one
 helper step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
-part of the requested set. After a successful restore, the helper deletes that exact regular carrier file to
+part of the requested set. Restoration holds the opened carrier inode and streams extraction into a private
+staging tree while hashing every carrier byte. It then rehashes that same held inode and checks unchanged
+metadata before publishing any extracted root. This uses no additional full-archive snapshot; the retained
+carrier and extracted tree coexist until validation completes. Archive traversal, entry and byte limits,
+no-follow access and atomic no-replace publication remain mandatory. Carrier consistency is transport
+validation, not artifact or release authority; consumers still authenticate their own exact closures.
+After a successful restore, the helper deletes that exact regular carrier file to
 avoid retaining both the archive and its unpacked contents. Failed and unrequested carriers remain untouched.
 Each operation prepares its outputs in one step and retains an independent upload
 for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
