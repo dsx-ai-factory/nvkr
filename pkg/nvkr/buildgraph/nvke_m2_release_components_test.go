@@ -37,7 +37,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 		output, component string
 	}{
 		{"capnico-controller", "capnico-controller"},
-		{"controller-profiles", "nvke-nico-reference-profiles"},
+		{"nico-reference-profiles-fixture", "nvke-nico-reference-profiles"},
 		{"nktp", "nktp-chart"},
 		{"capi-controller-image", "capi-controller-image"},
 		{"capi-kubeadm-bootstrap-image", "capi-kubeadm-bootstrap-image"},
@@ -111,6 +111,9 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 		})
 	}
 	provisioned := outputs["cluster-api-provider-provisioned"]
+	if _, exists := outputs["controller-profiles"]; exists {
+		t.Fatal("reference fixtures must not use the production/demo controller-profiles output name")
+	}
 	if provisioned.Catalog == nil || provisioned.Catalog.Base != "../nvke-controller/catalog" ||
 		!slices.Equal(provisioned.Components, []string{"cluster-api-provider-provisioned"}) ||
 		!slices.Equal(provisioned.Platforms, []string{"linux/amd64", "linux/arm64"}) {

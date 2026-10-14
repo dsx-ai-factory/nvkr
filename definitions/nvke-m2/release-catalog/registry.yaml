@@ -5,7 +5,7 @@ apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: nvke-m2-release-components
-  description: Source-built CAPNICo, NKTP and NICO reference config profiles; deployment topology and site configuration remain consumer-owned.
+  description: Source-built CAPNICo, NKTP chart and NICO reference-profile fixtures, plus digest-pinned acquired CAPI, cert-manager and NKTP runtime images. Deployment topology and site configuration remain consumer-owned.
 components:
   capi-controller-image:
     source: capi
@@ -134,7 +134,7 @@ components:
     source: nvke-content
     builderType: buildkit-rootless
     toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
-    artifactPath: bin/controller-profiles-{{.Arch}}.oci.tar
+    artifactPath: bin/nico-reference-profiles-fixture-{{.Arch}}.oci.tar
     writeDir: bin
     platforms: [linux/amd64, linux/arm64]
     outputType: oci-image
@@ -154,7 +154,7 @@ components:
           --opt 'platform=linux/{{.Arch}}' \
           --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
-          --output 'type=oci,dest=/src/bin/controller-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
+          --output 'type=oci,dest=/src/bin/nico-reference-profiles-fixture-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
 sources:
   capi:
     repo: https://github.com/kubernetes-sigs/cluster-api
@@ -197,10 +197,10 @@ sources:
         export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
         export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
         pins="$(sha256sum nktp/deploy/charts/nktp/Chart.yaml nktp/deploy/charts/nktp/Chart.lock)"
-        .nvkr-tools/helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
-        .nvkr-tools/helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
-        .nvkr-tools/helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
-        .nvkr-tools/helm dependency build nktp/deploy/charts/nktp --skip-refresh
+        timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
+        timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
+        timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
+        timeout --kill-after=10s 120s .nvkr-tools/helm dependency build nktp/deploy/charts/nktp --skip-refresh
         printf '%s\n' "$pins" | sha256sum -c -
         set -- nktp/deploy/charts/nktp/charts/*.tgz
         test "$#" -eq 3

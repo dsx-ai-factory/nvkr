@@ -19,8 +19,9 @@ The catalogs introduced by
 [public-source producers](../definitions/nvke-os-source/README.md) and
 [OVN outputs](../definitions/nvke-ovn-source/README.md). The local demo selects
 the OVN fork producers for the disk's chart/image packages. The other direct-source
-OS producers are not yet integrated into that selection, and the maintained M2
-OS graph is unchanged. The remaining migration is not completed by merging those
+OS producers are not yet integrated into that selection. M2 still uses the source-owned package-folder
+producers; adding its independent DSX material does not integrate the remaining direct-source catalog.
+The remaining migration is not completed by merging those
 candidate catalogs.
 
 | Required area | Existing implementation | Missing for the requested build |
@@ -28,13 +29,13 @@ candidate catalogs.
 | CLI/controller/chart | Local source producers and controller image binding | Exercise the complete final source-built selection; migrating to a different NVKE baseline also requires its matching build interface/toolchain |
 | CAPNICo | This example selects a source-owned BuildKit producer at public v0.0.45, commit `30882520888ab7bb75d125cb7bb9aa89e48acd6a` | Include it in the complete Run and validate provider reconciliation; a producer declaration is not runtime acceptance |
 | Provisioned provider | Existing `nvke-controller/catalog` source producer, selected locally | Include it in the complete Run and validate provider reconciliation; the NICo demo does not use this provider |
-| Fleet profiles | NVKE `image.yml` identifies `nvke-site-deploy` as the production source; checked-in profiles are an example fixture | Accessible Git URL and approved revision, producer and image output. Do not publish the fixture as production profiles |
+| Fleet profiles | NVKE `image.yml` identifies `nvke-site-deploy` as the production source; M2's `nico-reference-profiles-fixture` is explicitly test data, not production profiles | Accessible Git URL and approved revision, producer and image output. A signed reference fixture does not satisfy production fleet-profile delivery |
 | Kubernetes/containerd/crictl/CNI/Helm/TPM | PR #113 has fourteen direct-source producers across supported versions | Integrate the candidate catalog and package the authenticated outputs for actual consumers. Its static containerd subset is not feature-equivalent to NVKE's upstream release archive; held Helm preparation remains a separate hosted-route limitation, not a blocker to the local developer-fetch route |
 | Remaining OS application dependencies | PR #113's inventory maps released inputs and missing source producers | SPIRE, runc with seccomp, CoreDNS, etcd, pause, Calico/Tigera and embedded OCI images; preserve package dependencies, paths, units, hooks and import behavior |
 | OVN image/chart/packages | The local demo selects PR #113's pinned DSX fork producers for its OS material closure, with matching profile and tenant chart stream | Fresh Packer/boot acceptance and maintained M2 integration. Independently published outputs are separate from embedded-disk bytes unless original-owner reuse is established. The fork's standard Ubuntu Dockerfile still uses APT; not every embedded subcomponent is Git-built |
 | Twelve deployment runtime images | Current M2 image catalog acquires pinned native images | Source-build/image-package producers for the selected PostgreSQL, Temporal, SPIRE, CSI and related inputs. OS source producers alone do not replace these acquired images |
 | Upstream charts/operator tools | Current laptop catalog acquires four charts and Helm/kubectl | Source chart producers and source-built operator tools; retain correct values/image bindings and chart dependencies |
-| DSX IMDS | Release inventory retains payload digests but no established source revision | Accessible source with an approved pin, or a declared unavailable-source exception and accessible digest-matching payload. An older plugin-free SPIRE package is not completion |
+| DSX IMDS | M2 selects private `project-dsx-identity` at `76b0ba906b7d3bc7002d3d431f1f0e1819743aab` and feeds a source-built agent into SPIRE packaging | Ordinary local source admission rejects that tree's submodules; reachable dependency vulnerabilities and OSS-inclusion approval remain unresolved. Standalone plugin builds do not establish source admission, boot behavior or distribution clearance |
 | OS material assembly | Existing OS graph produces image-inputs and stages them for source-owned Packer | Connect direct-source binary/image packages, remove package-folder calls including indirect agent packaging, and preserve the source-owned material contract |
 | Shared published/embedded image/chart bytes | [Issue #116](https://github.com/dsx-ai-factory/nvkr/issues/116) records the missing generic handoff | An authenticated original-owner cross-output reuse contract. Independent rebuilds cannot be relabeled as identical published bytes |
 | Local OS runtime | Native Colima Docker/TCG can execute the declared disk graph; Docker Desktop on macOS is not supported by this launcher | Complete source smoke, direct-source material integration and tenant/workload acceptance. A disk build does not prove these gates |

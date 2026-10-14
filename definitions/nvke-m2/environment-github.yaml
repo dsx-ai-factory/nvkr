@@ -77,7 +77,7 @@ signing:
   mode: cosign
 sourceAccess:
   https://github.com/dsx-ai-factory/project-dsx-identity:
-    credentialRef: github:NKE_SOURCE_TOKEN
+    credentialRef: github:DSX_SOURCE_TOKEN
     mirror: https://github.com/dsx-ai-factory/project-dsx-identity
   https://github.com/dsx-ai-factory/nvke:
     credentialRef: github:NKE_SOURCE_TOKEN

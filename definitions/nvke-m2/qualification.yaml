@@ -88,10 +88,6 @@ smoke:
       kind: oci
       components: [cluster-api-provider-provisioned]
       reason: deployment-image
-    - output: controller-profiles
-      kind: oci
-      components: [nvke-nico-reference-profiles]
-      reason: deployment-image
     - output: csi-node-driver-registrar-image
       kind: oci
       components: [csi-node-driver-registrar-image]
@@ -103,6 +99,11 @@ smoke:
     - output: cwe
       kind: oci
       components: [nvke-controller]
+      reason: deployment-image
+    # A fixture content image, not production fleet configuration or deployment proof.
+    - output: nico-reference-profiles-fixture
+      kind: oci
+      components: [nvke-nico-reference-profiles]
       reason: deployment-image
     - output: nktp-collector-image
       kind: oci

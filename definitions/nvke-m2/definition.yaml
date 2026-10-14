@@ -107,13 +107,6 @@ outputs:
     helm:
       images:
         controller: cwe
-  - name: controller-profiles
-    platforms: [linux/amd64, linux/arm64]
-    catalog:
-      base: ./release-catalog
-    format: oci
-    components:
-      - nvke-nico-reference-profiles
   - name: csi-node-driver-registrar-image
     platform: linux/amd64
     catalog:
@@ -135,6 +128,14 @@ outputs:
     format: oci
     components:
       - nvke-controller
+  # Reference test data, not the runnable demo's controller-profiles or fleet configuration.
+  - name: nico-reference-profiles-fixture
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components:
+      - nvke-nico-reference-profiles
   - name: nktp
     platform: linux/amd64
     catalog:

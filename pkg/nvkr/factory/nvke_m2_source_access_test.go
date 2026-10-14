@@ -27,7 +27,7 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 	if access, ok := environment.SourceAccess[mirror]; !ok || access.Mirror != mirror || access.CredentialRef != "github:NKE_SOURCE_TOKEN" {
 		t.Fatal("existing CLI/controller source access was changed")
 	}
-	if access, ok := environment.SourceAccess[dsxRepository]; !ok || access.Mirror != dsxRepository || access.CredentialRef != "github:NKE_SOURCE_TOKEN" {
+	if access, ok := environment.SourceAccess[dsxRepository]; !ok || access.Mirror != dsxRepository || access.CredentialRef != "github:DSX_SOURCE_TOKEN" {
 		t.Fatal("DSX source access must retain its exact repository-scoped projection")
 	}
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
@@ -75,7 +75,11 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 					continue
 				}
 				privateFetches[source.Repo]++
-				if projected[sourceTokenEnv] != "${{ secrets.NKE_SOURCE_TOKEN }}" || projected["GIT_CONFIG_VALUE_0"] != source.Repo || projected["GIT_CONFIG_KEY_0"] != "url."+selectedMirror+".insteadOf" || projected["GIT_CONFIG_KEY_2"] != "credential."+selectedMirror+".helper" {
+				credential := "${{ secrets.NKE_SOURCE_TOKEN }}"
+				if source.Repo == dsxRepository {
+					credential = "${{ secrets.DSX_SOURCE_TOKEN }}"
+				}
+				if projected[sourceTokenEnv] != credential || projected["GIT_CONFIG_VALUE_0"] != source.Repo || projected["GIT_CONFIG_KEY_0"] != "url."+selectedMirror+".insteadOf" || projected["GIT_CONFIG_KEY_2"] != "credential."+selectedMirror+".helper" {
 					t.Errorf("private source fetch %s has no exact approved credential/mirror projection", source.ID)
 				}
 			}

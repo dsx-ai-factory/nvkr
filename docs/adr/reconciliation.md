@@ -56,7 +56,7 @@ has not been demonstrated. Qualified release authorization, full v1 qualificatio
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
 The maintained M2 candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
-reference config profiles, the provisioned infrastructure provider, NKTP and native bootstrap/telemetry
+explicitly named reference-profile fixtures, the provisioned infrastructure provider, NKTP and native bootstrap/telemetry
 images. Both native architectures retain plain and public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
 `build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected
 output membership must agree. Strict inspection/publication, qualified reproduction and private-passphrase
@@ -1012,6 +1012,9 @@ preparation and operation parameters select their own job context. Static expans
 independent nodes before substitution so sibling selectors and credentials cannot be mutated together.
 Operation calls with provider controls stay explicit. The combined candidate retains all members under
 the existing workflow-size bound; this is local generation/expansion evidence, not hosted execution.
+The current production workflow is 462,507 bytes (37,493 bytes of provider headroom); development is
+442,400 bytes. The maintained rendering test fails above a 95% soft budget, before the unchanged
+500,000-byte provider admission bound, directing membership changes to compaction work.
 Matrix scheduling and reusable callable workflows remain deferred, and no fresh hosted execution of this
 composite layout is recorded. Oversized workflows still fail before writes. Native offline disk preparation
 shares the ARC group to avoid restoring its full material closure on publication runners. Consumed carrier deletion reduces duplicate
@@ -1114,7 +1117,7 @@ ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted poli
 The grouped helper retains original material and disk owners through reconciliation and packaging; generation
 contracts cover both architectures, individual-node bypass rejection and unsupported policy rejection. For
 publication workflows, source fetch, bootstrap and release credentials remain outside ARC jobs. Native preparation/measurement is provided
-separately. M2 now generates all 37 named outputs with four native disk jobs from the same Definition,
+separately. M2 now generates all 69 named outputs with four native disk jobs from the same Definition,
 an exact catalog overlay and measured native inspection profiles. Four toolchain images were
 published to internal GHCR packages under the user's scoped candidate exception, with exact
 manifest/config read-back. This is not completed organizational license/security review.
@@ -1202,10 +1205,11 @@ cutover, hosted publication, independent consumer acceptance or qualification.
 
 The [M2 Definition instructions](../../definitions/nvke-m2/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
-CAPNICo and reference profiles, the existing provisioned infrastructure provider, source-packaged NKTP,
+CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NKTP,
 and fourteen acquired runtime-image components delivered separately for both native architectures.
 The selected NVKE/CAPI sources and NKTP dependency charts own their versions; Helm test-only images are
-excluded. The profile image is reference-only, not fleet configuration or a complete legacy OSProfile set.
+excluded. `nico-reference-profiles-fixture` identifies reference test data in the release membership itself,
+not fleet configuration, the runnable demo's `controller-profiles`, or a complete legacy OSProfile set.
 Provider manifests, image-reference relocation and installation remain consumer work, not delivery proved here.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,

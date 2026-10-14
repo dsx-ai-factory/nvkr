@@ -295,5 +295,8 @@ func TestMaintainedM2RenderingFitsGitHubFileLimit(t *testing.T) {
 	if err := validateGitHubWorkflowSize(raw); err != nil {
 		t.Fatal(err)
 	}
+	if len(raw) > maxGitHubWorkflowBytes*95/100 {
+		t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
+	}
 	t.Logf("maintained M2 rendering: %d bytes (%d bytes below GitHub limit)", len(raw), maxGitHubWorkflowBytes-len(raw))
 }

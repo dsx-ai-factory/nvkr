@@ -16,7 +16,7 @@ full product acceptance are separate facts.
 | Deployment images | `image-catalog` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `release-catalog` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
 | Provisioned infrastructure provider | `../nvke-controller/catalog` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
-| Reference config profiles | `release-catalog` | `controller-profiles`, one AMD64/ARM64 content image containing the two NICO reference config profiles and their runbooks, not production fleet configuration |
+| Reference-profile fixture | `release-catalog` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration or the demo's runnable `controller-profiles` |
 | Telemetry | `release-catalog` | Source-packaged `nktp` with its three vendored dependencies; eight required/optional runtime images for each native architecture, including the enabled Target Allocator and the uninstall hook's kubectl |
 | Bootstrap runtime images | `release-catalog` | CAPI core, kubeadm bootstrap/control-plane and three cert-manager images, each with separate AMD64 and ARM64 outputs |
 
@@ -27,13 +27,24 @@ BuildKit, source-vendor, Helm and acquired-image routes build or acquire them. E
 both native subjects; acquired images retain separate native outputs because aggregation currently admits
 built OCI exports only. The architecture-independent NKTP chart is packaged once. Existing outputs remain required.
 
-| Member | Authoritative selection | Boundary |
+| Member | Selection mirrored from pinned upstream inputs | Boundary |
 |---|---|---|
 | CAPNICo | NVKE's selected `controller/deploy/nke-sbom/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
 | NKTP chart and dependencies | The same NVKE `v0.21.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select chart `0.1.0-rc.2` and three exact dependencies | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
 | NKTP images | Selected source values and authenticated dependency charts: collector/operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
-| Reference profiles | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly reference-only: the control-plane profile skips its pre-join reboot. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
+| Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
 | CAPI and cert-manager images | Selected NVKE `make/tool-versions.mk` chooses CAPI `v1.12.3`; its published provider manifests name the three controllers, and its clusterctl config selects cert-manager `v1.19.3` | Acquired runtime images only. Provider manifests/metadata and installation remain a separate consumer contract |
+
+These version selections are explicit mirrors of the pinned upstream files, not live imports. A future
+upstream version bump requires a reviewed catalog/lock update; automatic source-to-catalog version drift
+detection is not implemented.
+
+NKTP image-reference binding remains a nonblocking follow-up, not a completed deployment contract.
+The signed chart still contains upstream tags, whereas the separately delivered native images have exact
+digests. Follow-up acceptance requires binding every enabled parent/subchart image to the corresponding
+published digest and testing rendered manifests for both architectures without mutable image tags.
+Until then, consumers must explicitly relocate/bind those references; chart and image delivery alone
+does not prove offline installation or that a deployed workload uses the signed image outputs.
 
 This does not silently update the retained controller/CLI to current NVKE main. That newer code reads
 `MachineImage`, `ClusterRelease` and `NodePoolRelease` resources; the retained controller still reads legacy
@@ -57,7 +68,7 @@ generation remain source-owned; newly built plugin bytes do not reuse the histor
 
 The DSX repository is private. Authorized source acquisition and source builds do not approve OSS
 distribution: public-release inclusion still needs its owner's confirmation. Production and development
-Environments route its source credential only to authenticated fetch jobs. The workflow credential's
+Environments route a separate fine-grained `DSX_SOURCE_TOKEN`, restricted to this repository, only to authenticated DSX fetch jobs. The workflow credential's
 actual DSX read access and a full hosted image build with the restored package remain unverified.
 There is also a native local source-admission blocker: this exact DSX tree declares submodules, whereas
 ADR-18's ordinary local source route rejects nonempty `.gitmodules` and gitlinks. The plugin does not
@@ -207,7 +218,8 @@ Assembly authenticates same-Plan, same-workflow metadata and evidence; it does n
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities, but
 hosted mixed-attempt reuse remains unexercised.
 
-Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN`; native build jobs receive source bytes without that
+Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE
+or the separately provisioned, DSX-only `DSX_SOURCE_TOKEN`; native build jobs receive source bytes without either
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
 before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
 package. Restrict `nkd-arc`, `nkd-release` and the signing identity to the selected refs. Maintained inputs
@@ -247,6 +259,10 @@ records both workflow files. Generation and drift checks do not execute any prod
 The generator rejects a workflow above 500,000 bytes before writing. YAML compaction preserves the
 expanded job graph and credential boundaries. Changes to authored inputs must regenerate these files;
 never edit the bundle by hand.
+The current production workflow is 462,507 bytes, leaving 37,493 bytes below that limit; development is
+442,400 bytes. The maintained rendering regression rejects growth above 95% of the provider limit so
+further membership expansion must first preserve compaction headroom. This is a maintenance guard,
+not a different provider or runtime limit.
 
 Source/artifact maintenance belongs to reviewed catalog changes using `catalog pin`, `catalog bump`
 and `catalog pin-artifacts`. Do not copy historical preparation commands that would silently restore the

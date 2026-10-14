@@ -95,7 +95,7 @@ func TestGitHubSemanticCallAliasesKeepIndependentJobParameters(t *testing.T) {
 			t.Fatal("shared calls changed independent job parameters or mutated their descriptor")
 		}
 	}
-	assertGitHubCompositeReadableYAML(t, "workflow", workflow)
+	assertGitHubCompositeReadableYAML(t, "workflow", workflow, &Plan{})
 }
 
 func TestGitHubSemanticCallAliasesRequireIdenticalUncontrolledCalls(t *testing.T) {
@@ -106,6 +106,7 @@ func TestGitHubSemanticCallAliasesRequireIdenticalUncontrolledCalls(t *testing.T
 		{name: "identical", shared: true},
 		{name: "different credential", field: "credential", value: "${{ secrets.OTHER_SOURCE }}"},
 		{name: "different selector", field: "parameters", value: githubParametersExpression("part-2")},
+		{name: "identical non-canonical selectors", field: "non-canonical parameters", value: "${{ inputs.parameters }}"},
 		{name: "step ID", field: "id", value: "source"},
 		{name: "condition", field: "if", value: "${{ always() }}"},
 		{name: "timeout", field: "timeout-minutes", value: "5"},
@@ -123,6 +124,9 @@ func TestGitHubSemanticCallAliasesRequireIdenticalUncontrolledCalls(t *testing.T
 			case "":
 			case "credential", "parameters":
 				githubYAMLSet(githubYAMLField(second, "with"), test.field, githubYAMLString(test.value))
+			case "non-canonical parameters":
+				githubYAMLSet(githubYAMLField(first, "with"), "parameters", githubYAMLString(test.value))
+				githubYAMLSet(githubYAMLField(second, "with"), "parameters", githubYAMLString(test.value))
 			default:
 				// Even identical controls stay explicit rather than aliased.
 				githubYAMLSet(first, test.field, githubYAMLString(test.value))
@@ -136,6 +140,49 @@ func TestGitHubSemanticCallAliasesRequireIdenticalUncontrolledCalls(t *testing.T
 			step := githubYAMLField(githubYAMLField(jobs, "second"), "steps").Content[0]
 			if (step.Kind == yamlv3.AliasNode) != test.shared {
 				t.Fatal("semantic alias changed a credential, selector or controlled invocation")
+			}
+		})
+	}
+}
+
+func TestGitHubSemanticCallAliasesUseSelectedLayout(t *testing.T) {
+	for _, development := range []bool{false, true} {
+		name := "production"
+		if development {
+			name = "development"
+		}
+		t.Run(name, func(t *testing.T) {
+			plan := githubTestPlan(t)
+			plan.Environment.GitHubDevelopment = development
+			actions := testActionRefs(t, plan)
+			raw := githubActionInterfaceFixture(actions, []githubInterfaceFixture{
+				{name: "first", nodes: 2, carriers: 2}, {name: "second", nodes: 2, carriers: 2},
+			})
+			raw = bytes.ReplaceAll(raw, []byte(FactoryPlanPath), []byte(githubLayoutFor(plan).planPath))
+			workflow, files, err := lowerGitHubActions(plan, raw, actions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			workflow, err = shareGitHubActions(plan, workflow, files, actions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Contains(workflow, []byte("*operation-execute-node-part-1")) {
+				t.Fatal("fixture did not exercise shared operation aliases")
+			}
+			assertGitHubCompositeReadableYAML(t, "workflow", workflow, plan)
+			for job, value := range decodeGitHubWorkflow(t, workflow).Jobs {
+				seen := map[string]bool{}
+				for _, step := range value.Steps {
+					if seen[step.Name] {
+						t.Fatalf("job %q repeats step label %q", job, step.Name)
+					}
+					seen[step.Name] = true
+				}
+			}
+			expanded, err := expandGitHubActions(plan, workflow, files)
+			if err != nil || !reflect.DeepEqual(decodeGitHubWorkflow(t, expanded), decodeGitHubWorkflow(t, raw)) {
+				t.Fatalf("layout expansion changed producer labels or semantics: %v", err)
 			}
 		})
 	}

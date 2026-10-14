@@ -50,9 +50,6 @@ func materializeGitHubSharedActions(plan *Plan, raw []byte, files map[string][]b
 		}
 		prepared := false
 		for pos, call := range steps.Content {
-			if call.Kind == yamlv3.AliasNode {
-				call = call.Alias
-			}
 			uses := githubYAMLValue(call, "uses")
 			if !strings.HasPrefix(uses, "./"+sharedDirectory) {
 				continue

@@ -77,7 +77,7 @@ it is not a substitute for validating the complete manifest-owned action closure
 
 Identical complete semantic calls without provider controls may share descriptive YAML anchors after
 structural equality checks, including their parameter selector and credential references. The outer label names
-the operation, while the job and expanded role labels retain the selected producer. Controlled diagnostic
+the operation and job-local part, while the job and expanded role labels retain the selected producer. Controlled diagnostic
 steps retain their original caller labels. Static expansion resolves aliases into independent copies before
 substituting per-job parameters, so one job cannot mutate another's input or credential bindings. Job
 permissions, conditions, dependencies and runtime selection remain inline. This changes presentation only,

@@ -109,9 +109,9 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		cert-manager-cainjector-image cert-manager-cainjector-image-arm64
 		cert-manager-controller-image cert-manager-controller-image-arm64
 		cert-manager-webhook-image cert-manager-webhook-image-arm64
-		cluster-api-provider-provisioned controller-chart controller-profiles
+		cluster-api-provider-provisioned controller-chart
 		csi-node-driver-registrar-image csi-node-driver-registrar-image-arm64 cwe
-		nktp nktp-collector-image nktp-collector-image-arm64
+		nico-reference-profiles-fixture nktp nktp-collector-image nktp-collector-image-arm64
 		nktp-kube-state-metrics-image nktp-kube-state-metrics-image-arm64
 		nktp-kubectl-image nktp-kubectl-image-arm64 nktp-lgtm-image nktp-lgtm-image-arm64
 		nktp-metrics-server-image nktp-metrics-server-image-arm64 nktp-node-exporter-image nktp-node-exporter-image-arm64

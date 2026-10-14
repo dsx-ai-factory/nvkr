@@ -11,13 +11,16 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
 	"github.com/gdamore/tcell/v2"
@@ -324,13 +327,47 @@ func TestDashboardGuestReportsFollowMaintainedPackerSelectors(t *testing.T) {
 }
 
 func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
+	t.Chdir("../..")
+	for _, small := range []bool{false, true} {
+		name := "complete M2 truncated"
+		if small {
+			name = "real CLI selection complete"
+		}
+		t.Run(name, func(t *testing.T) {
+			var plan *factory.Plan
+			var err error
+			if small {
+				const definitionPath = "definitions/nvke-v1/definition.yaml"
+				const environmentPath = "definitions/nvke-v1/environment-github.yaml"
+				authored, loadErr := definition.LoadDefinition(t.Context(), definitionPath)
+				if loadErr != nil {
+					t.Fatal(loadErr)
+				}
+				authored.Outputs = slices.DeleteFunc(authored.Outputs, func(output definition.DefinitionOutput) bool { return output.Name != "nvkectl" })
+				if len(authored.Outputs) != 1 {
+					t.Fatal("real CLI output is absent")
+				}
+				environment, loadErr := definition.LoadEnvironment(t.Context(), environmentPath)
+				if loadErr != nil {
+					t.Fatal(loadErr)
+				}
+				plan, err = factory.CompileDocuments(t.Context(), definitionPath, authored, environmentPath, environment, "test")
+			} else {
+				plan, err = factory.LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertDashboardLauncherProjection(t, plan, !small)
+		})
+	}
+}
+
+func assertDashboardLauncherProjection(t *testing.T, plan *factory.Plan, wantTruncated bool) {
+	t.Helper()
 	jq, err := exec.LookPath("jq")
 	if err != nil {
 		t.Skip("launcher projection integration requires jq")
-	}
-	plan, err := factory.LoadPlanContext(t.Context(), "../../.github/nvkr-run/plan.json")
-	if err != nil {
-		t.Fatal(err)
 	}
 	doc, err := planview.Inspect(plan)
 	if err != nil {
@@ -340,7 +377,7 @@ func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	script, err := os.ReadFile("../../scripts/nvke-full-arm64-local.sh")
+	script, err := os.ReadFile("scripts/nvke-full-arm64-local.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,6 +420,9 @@ func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
 	if !found || json.Unmarshal([]byte(summary), &totals) != nil {
 		t.Fatal("launcher projection omitted its bounded-display summary")
 	}
+	if totals.Truncated != wantTruncated {
+		t.Fatalf("real Plan display truncation = %t, want %t", totals.Truncated, wantTruncated)
+	}
 	if s.buildTruncated != totals.Truncated || len(s.buildVertices) != totals.Vertices ||
 		len(s.buildEdges) != totals.Edges || len(s.buildVertices) == 0 || len(s.buildEdges) == 0 || s.phases[1].state != "running" {
 		t.Fatal("maintained Plan projection lost links or promoted execution authority")
@@ -395,6 +435,40 @@ func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
 		if !vertices[edge.From] || !vertices[edge.To] {
 			t.Fatal("launcher emitted a dangling Plan link")
 		}
+	}
+	// Compute membership from the typed complete graph, independently of the
+	// launcher's emitted summary and the dashboard's parser. Apply limits before
+	// text filtering, matching the documented bounded display contract.
+	complete, err := doc.GraphSnapshot("complete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var operations, artifacts []planview.Vertex
+	for _, vertex := range complete.Vertices {
+		switch vertex.Kind {
+		case "operation":
+			operations = append(operations, vertex)
+		case "artifact", "output":
+			artifacts = append(artifacts, vertex)
+		}
+	}
+	wantVertices := append(slices.Clone(operations[:min(512, len(operations))]), artifacts[:min(1024, len(artifacts))]...)
+	wantVertices = slices.DeleteFunc(wantVertices, func(vertex planview.Vertex) bool {
+		return utf8.RuneCountInString(vertex.Key) > 256 || utf8.RuneCountInString(vertex.Reference) > 256 ||
+			utf8.RuneCountInString(vertex.Build) > 256 || utf8.RuneCountInString(vertex.Label) > 512
+	})
+	retained := make(map[string]bool, len(wantVertices))
+	for _, vertex := range wantVertices {
+		retained[vertex.Key] = true
+	}
+	var wantEdges []planview.Edge
+	for _, edge := range complete.Edges {
+		if retained[edge.From] && retained[edge.To] && utf8.RuneCountInString(edge.Relation) <= 64 && len(wantEdges) < 4096 {
+			wantEdges = append(wantEdges, edge)
+		}
+	}
+	if !slices.Equal(s.buildVertices, wantVertices) || !slices.Equal(s.buildEdges, wantEdges) {
+		t.Fatal("launcher/dashboard projection differs from independently retained real Plan membership")
 	}
 }
 
