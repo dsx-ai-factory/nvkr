@@ -122,6 +122,23 @@ func TestGenericDispatchRetainsPartialOutputAndError(t *testing.T) {
 	if err != nil || len(outputs) != 1 || outputs[0].CaptureStatus != testresults.CaptureComplete {
 		t.Fatal("successful capture changed")
 	}
+	second := checks[0]
+	second.Name, second.Config = "second", "checks/invalid.json"
+	third := checks[0]
+	third.Name, third.Config = "third", "checks/must-not-run.json"
+	checks = append(checks, second, third)
+	laterAdmission := e.New(e.CodeUsage, "second producer configuration refused")
+	calls = 0
+	outputs, err = runSelected(t.Context(), source, checks, lifecycle.QualificationRuntimeOptions{}, func(_ context.Context, _, _, config string, _ lifecycle.QualificationRuntimeOptions) (testresults.Output, error) {
+		calls++
+		if config == second.Config {
+			return testresults.Output{}, laterAdmission
+		}
+		return testresults.Output{SchemaVersion: testresults.SchemaVersion, CaptureStatus: testresults.CaptureComplete}, nil
+	})
+	if calls != 2 || !errors.Is(err, laterAdmission) || len(outputs) != 1 || outputs[0].CaptureStatus != testresults.CaptureComplete {
+		t.Fatalf("later refusal lost earlier capture or continued execution: calls%d outputs%+v err%v", calls, outputs, err)
+	}
 }
 func TestRunFilesContextAndPathAdmission(t *testing.T) {
 	var missingContext context.Context

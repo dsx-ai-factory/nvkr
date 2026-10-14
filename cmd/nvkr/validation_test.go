@@ -162,6 +162,7 @@ func TestValidateCLIExplicitRegistryAuthenticationMode(t *testing.T) {
 		{name: "credentials without host", user: "user", password: "password", refused: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NVKR_GITHUB_TOKEN", "explicit-provider-token")
 			t.Setenv("NVKR_REGISTRY", tc.host)
 			t.Setenv("NVKR_REGISTRY_USER", tc.user)
 			t.Setenv("NVKR_REGISTRY_PASSWORD", tc.password)
@@ -171,7 +172,7 @@ func TestValidateCLIExplicitRegistryAuthenticationMode(t *testing.T) {
 				ownerErr = e.New(e.CodeUsage, "owning adapter rejected credential shape")
 			}
 			app := validationCLI(func(_ context.Context, _, _ string, options lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
-				if options.Registry.Anonymous != tc.anonymous || options.Credential.Registry != tc.host || options.Credential.Username != tc.user || options.Registry.Password != tc.password {
+				if options.GitHubToken != "explicit-provider-token" || options.Registry.Anonymous != tc.anonymous || options.Credential.Registry != tc.host || options.Credential.Username != tc.user || options.Registry.Password != tc.password {
 					t.Fatal("credentials silently defaulted or lost")
 				}
 				return nil, ownerErr

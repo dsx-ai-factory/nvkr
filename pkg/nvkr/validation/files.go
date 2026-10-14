@@ -44,8 +44,9 @@ type Check struct {
 }
 
 // RunFiles runs configured admitted checks, or one explicitly selected name.
-// Admission validates the entire profile before provider or harness work. Only
-// kube-conformance/hydrophone is implemented; other adapters remain unsupported.
+// Admission validates the entire profile's selections before provider or harness
+// work. Each selected producer configuration is admitted when that check starts.
+// Only kube-conformance/hydrophone is implemented; other adapters remain unsupported.
 func RunFiles(ctx context.Context, checkName, configPath string, options lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "validation requires context")

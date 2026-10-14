@@ -10,10 +10,14 @@ components:
       - -euc
       - |
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+        go test -mod=vendor ./pkg/conformance/client -run 'TestDownloadWriter|TestStreamFile|TestWriteDownloadedFile' -count=1
         go build -trimpath -mod=vendor -buildvcs=false -ldflags "-s -w -buildid=" -o /src/nvkr-output/hydrophone .
     cgo: false
     fromSource: true
     outputType: raw
+    patches:
+      - name: patches/bounded-download.patch
+        sha256: sha256:ca2cedb2b5461518e3628837ed3318127a9d12018679b9c67a923258fa84074f
     platforms:
       - linux/amd64
       - linux/arm64

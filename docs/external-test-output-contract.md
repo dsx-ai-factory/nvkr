@@ -116,9 +116,15 @@ The producer configuration independently selects its tools publication and polic
 This fragment shows source/member selection; the remaining runner fields are required: `context`,
 `cniSelector`, declared `imageVersion`, `suiteName`, `role: local`, `disposableCluster: true` and explicit `targets`. Each target specifies
 `output`, `namespace`, `labelSelector`, `container`, and positive `requiredReplicas`.
+The complete profile's source and suite/harness selections are admitted before execution; each
+referenced producer configuration is admitted when its check starts. Invalid settings for a later
+check can therefore stop execution after earlier checks have run. Outputs retain the producer's
+suite name and follow execution order; profile instance names are not serialized into the output.
+Invoke one named check when a consumer requires an explicit invocation-to-result association.
+
 Environment overrides are unsupported. Relative tools-policy and kubeconfig paths resolve beside
-this configuration. The product publication remains mandatory and separate from `toolsSource`. `conformanceImage` and
-`busybox` select exact native OCI image outputs from the same authenticated tools publication; raw
+this configuration. Product and tool sources are independently selected and may name the same
+publication root. `conformanceImage` and `busybox` select exact native OCI image outputs from the same authenticated tools publication; raw
 caller image references are not accepted. `imageVersion` is declared protocol metadata checked against
 server major/minor, not source/version proof. Harness version remains explicitly unknown.
 

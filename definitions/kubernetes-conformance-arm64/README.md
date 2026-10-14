@@ -24,6 +24,17 @@ changed Go modules retain BSD-3-Clause licenses; the three OpenTelemetry modules
 retain Apache-2.0. Generated locks are maintained by `catalog pin` and
 `catalog pin-artifacts`, not edited by hand.
 
+The Hydrophone component applies the hash-bound `patches/bounded-download.patch`
+after source vendoring. It limits each downloaded log/report to 64 MiB and exec
+stderr to 1 MiB, cancels the stream on overflow/write failure, and exposes a final
+filename only after a successful transfer and file close. Staging and final files
+use mode `0600`; staging files are removed after failed transfers, and late
+client-go writes are rejected. The ordinary offline build runs the focused
+patched client tests before compiling the binary. These limits cover this
+maintained catalog producer, not arbitrary authenticated tools.
+The adapter disables upstream progress-status collection, whose separate exec
+buffer path is therefore unused by this invocation.
+
 The source candidates and their actual catalog-produced ARM64 binaries passed
 `govulncheck` 1.8.0 source/binary scans against database revision `2026-10-08T22:31:09Z`.
 Hydrophone upstream unit tests and focused kubectl version/get/apply tests passed.
