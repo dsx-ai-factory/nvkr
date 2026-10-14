@@ -40,8 +40,10 @@ bin/nvkr run generate \
 The downstream nightly workflow owns the real NVKE suite and its cleanup. Generating this producer
 workflow does not execute that suite or establish operational acceptance.
 
-`../nightly-profiles.json` records this profile as security-blocked. The coordinator refuses it before
-dispatch, verifier download or runtime allocation. Both the installer Helm releases inspected and the
-independently pinned newest stable Cosign 3.1.3 ARM64 binary have unresolved vulnerability findings.
-The latter matches official checksum metadata and has 27 vulnerable-symbol findings from the pinned
-binary scanner. Configuration generation does not execute these unapproved tools or waive their findings.
+`../nightly-profiles.json` selects this project's generated producer and exact NVKE suite revision.
+The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
+publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
+vulnerability-clearance claim. The suite revision is
+`17eee6e02541d20ffdb8611ffa3754a07f7d8116`, including its `^TestE2E$` runtime entrypoint
+selection; product source pins remain independently fixed. The first combined nightly cycle remains
+unrecorded.

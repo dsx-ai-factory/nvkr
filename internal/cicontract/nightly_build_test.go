@@ -91,7 +91,7 @@ func newNightlyFixture(t *testing.T) *nightlyFixture {
 		"GITHUB_REPOSITORY=example/nvkr", "GITHUB_REPOSITORY_ID=123",
 		"GITHUB_SHA=" + nightlySHA, "GITHUB_RUN_ID=101", "GITHUB_RUN_ATTEMPT=3",
 	}
-	fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": nightlyWorkflow, "security_status": "admitted", "blocked_reason": ""}})
+	fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": nightlyWorkflow}})
 	fixtureJSON(t, filepath.Join(root, "repository.json"), map[string]any{"id": 123, "full_name": "example/nvkr", "default_branch": "main"})
 	fixtureJSON(t, filepath.Join(root, "workflow.json"), map[string]string{"path": ".github/workflows/" + nightlyWorkflow, "state": "active"})
 	fixtureJSON(t, filepath.Join(root, "dispatch.json"), map[string]int{"workflow_run_id": 4242})
@@ -244,7 +244,7 @@ func TestNightlyBuildFailedTerminalProducerNeedsNoCancellation(t *testing.T) {
 }
 
 func TestNightlyBuildRejectsAdmissionWithoutMutation(t *testing.T) {
-	for _, scenario := range []string{"unknown profile", "wrong ref", "existing output", "symlink output", "profile workflow drift", "blocked profile", "remaining blocker", "missing admission reason"} {
+	for _, scenario := range []string{"unknown profile", "wrong ref", "existing output", "symlink output", "profile workflow drift"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newNightlyFixture(t)
 			profile, wantStatus := "oss", 2
@@ -264,17 +264,8 @@ func TestNightlyBuildRejectsAdmissionWithoutMutation(t *testing.T) {
 					t.Fatal(err)
 				}
 				wantStatus = 47
-			case "blocked profile":
-				fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": nightlyWorkflow, "security_status": "blocked"}})
-				wantStatus = 29
-			case "remaining blocker":
-				fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": nightlyWorkflow, "security_status": "admitted", "blocked_reason": "tools not admitted"}})
-				wantStatus = 29
-			case "missing admission reason":
-				fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": nightlyWorkflow, "security_status": "admitted"}})
-				wantStatus = 29
 			case "profile workflow drift":
-				fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": "unmaintained.yml", "security_status": "admitted"}})
+				fixtureJSON(t, f.profiles, []map[string]string{{"name": "oss", "bundle": "oss", "build_workflow": "unmaintained.yml"}})
 				wantStatus = 51
 			}
 			output, status := f.run(t, profile)

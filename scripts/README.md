@@ -116,9 +116,9 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 `nightly-build.sh` dispatches one maintained generated producer and joins its
 exact GitHub run. The separately authored nightly coordinator invokes the Go
 integration test and NVKE's existing runtime suite after authenticated publication.
-See the [nightly workflow and current admission](../docs/nvke-nightly.md).
-The initial kind plus KVM profiles remain blocked by producer/verifier security
-and source compatibility prerequisites. The special TestGrid integration is deferred.
+See the [nightly workflow and runtime bindings](../docs/nvke-nightly.md).
+The initial profiles select kind plus native ARM64 KVM guests with explicit OVN
+variants. The special TestGrid integration is deferred.
 
 - `demo-catalog-change.sh` exercises previewed and machine-managed source pin
   changes against an isolated catalog copy.

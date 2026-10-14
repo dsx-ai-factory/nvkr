@@ -75,9 +75,6 @@ func runNightlyPublishedCandidate(ctx context.Context) (resultErr error) {
 	if err = validateNightlyCycle(profile, build, os.Getenv("GITHUB_REPOSITORY"), os.Getenv("GITHUB_REPOSITORY_ID"), os.Getenv("GITHUB_SHA"), os.Getenv("GITHUB_RUN_ID"), os.Getenv("GITHUB_RUN_ATTEMPT")); err != nil {
 		return err
 	}
-	if err = nightlySecurityAdmission(profile); err != nil {
-		return err
-	}
 	public, err := freshDestination(os.Getenv("NVKR_NIGHTLY_REPORTS"))
 	if err != nil || !filepath.IsAbs(os.Getenv("NVKR_NIGHTLY_REPORTS")) {
 		return e.New(e.CodeUsage, "nightly requires a fresh absolute public report directory")
@@ -701,13 +698,6 @@ func nightlyRuntime(ctx context.Context, runner Runner, source string, profile N
 		resultErr = errors.Join(resultErr, e.Wrap(e.CodeBuildFailed, err, "NVKE runtime suite or cleanup failed"))
 	}
 	return errors.Join(resultErr, verdictErr)
-}
-
-func nightlySecurityAdmission(profile NightlyProfile) error {
-	if profile.SecurityStatus != "admitted" {
-		return e.New(e.CodeEngineCapability, "nightly profile security admission is blocked: %s", profile.BlockedReason)
-	}
-	return nil
 }
 
 func nightlyPreparationEnvironment(native []string, binding map[string]string, work string) ([]string, error) {

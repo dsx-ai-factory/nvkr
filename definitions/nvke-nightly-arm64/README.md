@@ -39,9 +39,10 @@ The downstream nightly workflow owns executing the NVKE runtime suite. Definitio
 workflow generation establish neither runtime E2E success nor hardware acceptance. Runner capacity,
 toolchain access, source access and protected-environment policy require independent admission.
 
-`../nightly-profiles.json` records this profile as security-blocked. The nightly coordinator refuses
-it before dispatch, verifier download or runtime allocation. The independently pinned ARM64 Cosign
-3.1.3 executable matches its official release checksum but the repository-pinned binary scanner found
-27 vulnerable-symbol findings; the newest official stable release is the same version. Combined with
-the installer Helm findings above, this leaves no admitted verifier/installer tool selection. Generating
-the committed bundle exercises configuration and drift contracts without executing those tools.
+`../nightly-profiles.json` selects this project's generated producer and exact NVKE suite revision.
+The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
+publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
+vulnerability-clearance claim. The suite revision is
+`17eee6e02541d20ffdb8611ffa3754a07f7d8116`, including its `^TestE2E$` runtime entrypoint
+selection; product source pins remain independently fixed. The first combined nightly cycle remains
+unrecorded.

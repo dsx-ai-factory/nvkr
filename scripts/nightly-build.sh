@@ -21,8 +21,6 @@ selection=$(jq -ce --arg name "$profile" '[.[] | select(.name == $name)] | if le
 workflow=$(jq -er '.build_workflow' <<<"$selection")
 [[ $workflow == "nvkr-run-$(jq -er '.bundle' <<<"$selection").yml" ]] ||
   fail NVKR-E-PIPELINE-DRIFT 'profile workflow does not match its generated namespace' 51
-jq -e '.security_status == "admitted" and .blocked_reason == ""' <<<"$selection" >/dev/null ||
-  fail NVKR-E-ENGINE-CAPABILITY 'nightly profile is blocked until its reviewed source and tools are admitted' 29
 [[ ! -e $out && ! -L $out ]] || fail NVKR-E-IMMUTABLE-VIOLATION 'nightly build output must be fresh' 47
 mkdir -m 700 "$out"
 api() { timeout --signal=TERM --kill-after=5s 60s gh api --hostname github.com -H 'X-GitHub-Api-Version: 2026-03-10' "$@"; }

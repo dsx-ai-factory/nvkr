@@ -141,13 +141,16 @@ func TestNightlyCoordinatorSelectionFailsClosedBeforeDispatch(t *testing.T) {
 	for _, test := range []struct {
 		name      string
 		selection string
-		approved  bool
+		mutation  string
 		want      int
 	}{
-		{"blocked all", "all", false, 0},
-		{"admitted all fixture", "all", true, 2},
-		{"admitted one fixture", "nvke-nightly-arm64", true, 1},
-		{"unknown", "unknown", true, 0},
+		{"maintained all", "all", "", 2},
+		{"maintained one", "nvke-nightly-arm64", "", 1},
+		{"unknown", "unknown", "", 0},
+		{"unreviewed harness", "all", "harness_commit", 0},
+		{"unsupported runtime", "all", "runtime_target", 0},
+		{"unsupported network", "all", "network", 0},
+		{"duplicate profile", "all", "duplicate", 0},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -157,15 +160,11 @@ func TestNightlyCoordinatorSelectionFailsClosedBeforeDispatch(t *testing.T) {
 				for key, value := range profile {
 					fixture[i][key] = value
 				}
-				// A fixture selection exercises only this read-only jq step.
-				// It does not approve tools or execute a runtime job.
-				if test.approved {
-					fixture[i]["security_status"] = "admitted"
-					fixture[i]["blocked_reason"] = ""
-				} else {
-					fixture[i]["security_status"] = "blocked"
-					fixture[i]["blocked_reason"] = "explicit unapproved tool fixture"
-				}
+			}
+			if test.mutation == "duplicate" {
+				fixture = append(fixture, fixture[0])
+			} else if test.mutation != "" {
+				fixture[0][test.mutation] = "unsupported"
 			}
 			raw, err := json.Marshal(fixture)
 			if err != nil {
@@ -185,7 +184,7 @@ func TestNightlyCoordinatorSelectionFailsClosedBeforeDispatch(t *testing.T) {
 			log, err := command.CombinedOutput()
 			if test.want == 0 {
 				if err == nil {
-					t.Fatal("inadmitted profile emitted a runtime matrix")
+					t.Fatal("invalid profile emitted a runtime matrix")
 				}
 				if _, err := os.Stat(output); !os.IsNotExist(err) {
 					t.Fatal("rejected selection emitted outputs before dispatch")

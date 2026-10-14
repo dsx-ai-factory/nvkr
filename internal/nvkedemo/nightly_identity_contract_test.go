@@ -23,7 +23,7 @@ import (
 )
 
 func nightlyIdentityFixture() (NightlyProfile, NightlyBuild) {
-	profile := NightlyProfile{Name: "nightly-fixture", Bundle: "nightly-fixture", Definition: "definitions/nightly-fixture/definition.json", Environment: "definitions/nightly-fixture/environment-github.json", Plan: ".github/nvkr-run-nightly-fixture/plan.json", BuildWorkflow: "nvkr-run-nightly-fixture.yml", HarnessCommit: strings.Repeat("a", 40), RuntimeTarget: "kind-vms-arm64", Network: "nvidia-ovn", DiskOutput: "disk", ProfilesOutput: "profiles", OSProfile: "os", KubernetesVersion: "v1.36.0", LabelFilter: "nightly", SecurityStatus: "admitted"}
+	profile := NightlyProfile{Name: "nightly-fixture", Bundle: "nightly-fixture", Definition: "definitions/nightly-fixture/definition.json", Environment: "definitions/nightly-fixture/environment-github.json", Plan: ".github/nvkr-run-nightly-fixture/plan.json", BuildWorkflow: "nvkr-run-nightly-fixture.yml", HarnessCommit: strings.Repeat("a", 40), RuntimeTarget: "native-arm64-vm", Network: "ovn", DiskOutput: "disk", ProfilesOutput: "profiles", OSProfile: "os", KubernetesVersion: "v1.36.0", LabelFilter: "nightly"}
 	build := NightlyBuild{Profile: profile, CoordinatorRun: "100", CoordinatorAttempt: "2", ProducerRun: 200, ProducerAttempt: 1, SourceCommit: strings.Repeat("b", 40), ProducerURL: "https://github.com/example/nvkr/actions/runs/200", Trust: "github-run-facts; publication-not-yet-verified"}
 	return profile, build
 }
@@ -59,8 +59,13 @@ func TestNightlyCycleBindsCoordinatorSourceProfileAndProducer(t *testing.T) {
 			assertNightlyCode(t, validateNightlyCycle(profile, changed, "example/nvkr", "123", base.SourceCommit, "100", "2"), e.CodeUnpinnedInput)
 		})
 	}
-	if err := validateNightlyCycle(profile, base, "example/nvkr", "123", base.SourceCommit, "100", "2"); err != nil {
-		t.Fatal(err)
+	for _, network := range []string{"ovn", "upstream-ovn"} {
+		selected, locator := profile, base
+		selected.Network = network
+		locator.Profile = selected
+		if err := validateNightlyCycle(selected, locator, "example/nvkr", "123", base.SourceCommit, "100", "2"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for _, id := range []string{"0", "-1", "01", "1.5", "9007199254740992"} {
 		t.Run("noncanonical id "+id, func(t *testing.T) {
@@ -89,6 +94,21 @@ func TestNightlyInputReadersRejectAmbiguousUnsafeAndUnboundedRecords(t *testing.
 	if err != nil || selected != profile {
 		t.Fatal(selected, err)
 	}
+	for _, field := range []string{"security_status", "blocked_reason"} {
+		raw, encodeErr := json.Marshal([]NightlyProfile{profile})
+		if encodeErr != nil {
+			t.Fatal(encodeErr)
+		}
+		var documents []map[string]any
+		if decodeErr := json.Unmarshal(raw, &documents); decodeErr != nil {
+			t.Fatal(decodeErr)
+		}
+		documents[0][field] = "self-declared approval"
+		write(profilePath, documents)
+		_, err = loadNightlyProfile(t.Context(), profilePath, profile.Name)
+		assertNightlyCode(t, err, e.CodeVerifyFailed)
+	}
+	write(profilePath, []NightlyProfile{profile})
 	write(buildPath, build)
 	decoded, err := loadNightlyBuild(t.Context(), buildPath)
 	if err != nil || decoded != build {
@@ -325,10 +345,10 @@ func TestNightlyExactDownloadsAndOwnerCarrierRestore(t *testing.T) {
 	}
 }
 
-func TestNightlyCancellationAndSecurityBlockPrecedeArtifactWork(t *testing.T) {
+func TestNightlyCancellationSourceBindingAndCapabilitiesPrecedeArtifactWork(t *testing.T) {
 	profile, build := nightlyIdentityFixture()
 	plan, _ := nightlyCompiledFixture(t, profile, build)
-	for _, scenario := range []string{"canceled", "security blocked", "wrong trusted source path"} {
+	for _, scenario := range []string{"canceled", "wrong trusted source path", "unsupported runtime target", "unsupported network"} {
 		t.Run(scenario, func(t *testing.T) {
 			selected, locator := profile, build
 			ctx := t.Context()
@@ -338,16 +358,20 @@ func TestNightlyCancellationAndSecurityBlockPrecedeArtifactWork(t *testing.T) {
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			}
-			if scenario == "security blocked" {
-				selected.SecurityStatus = "blocked"
-				selected.BlockedReason = "security check failed"
-				locator.Profile = selected
-				code = e.CodeEngineCapability
-			}
 			if scenario == "wrong trusted source path" {
 				selected.Definition = "definitions/other/definition.json"
 				locator.Profile = selected
 				code = e.CodePipelineDrift
+			}
+			if scenario == "unsupported runtime target" {
+				selected.RuntimeTarget = "unsupported"
+				locator.Profile = selected
+				code = e.CodeEngineCapability
+			}
+			if scenario == "unsupported network" {
+				selected.Network = "unsupported"
+				locator.Profile = selected
+				code = e.CodeEngineCapability
 			}
 			workspace := t.TempDir()
 			if err := os.Chmod(workspace, 0o700); err != nil {

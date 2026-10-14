@@ -115,6 +115,14 @@ func TestPrivateToolchainRebrandingBoundary(t *testing.T) {
 	}{
 		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true},
 		{"published legacy subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true},
+		{"nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true},
+		{"nightly legacy subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true},
+		{"upstream nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true},
+		{"upstream nightly legacy subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true},
+		{"nightly prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64-mirror", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false},
+		{"nightly child prefix", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64/other", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false},
+		{"foreign nightly owner", "ghcr.io/other/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false},
+		{"foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/other/nke-recipes/m2-candidate/toolchains/packer", false},
 		{"different publication owner", "ghcr.io/example/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false},
 		{"sibling repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes-mirror/m2-candidate/toolchains/packer", false},
 		{"non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/other/packer", false},
@@ -127,6 +135,56 @@ func TestPrivateToolchainRebrandingBoundary(t *testing.T) {
 			}
 			if githubPrivateToolchain(plan, test.image+":latest") {
 				t.Fatal("unpinned image admitted")
+			}
+		})
+	}
+	plan.Environment.GitHubARC = "unsupported"
+	if githubPrivateToolchain(plan, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:"+strings.Repeat("a", 64)) {
+		t.Fatal("unsupported ARC policy received private image preparation")
+	}
+}
+
+func TestMaintainedNightlyPrivateImageCredentialBoundary(t *testing.T) {
+	for _, profile := range []string{"nvke-nightly-arm64", "nvke-nightly-upstream-ovn-arm64"} {
+		t.Run(profile, func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-"+profile+"/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			disks, fetches := 0, 0
+			for _, job := range document.Jobs {
+				prepared := false
+				prepareIndex, executionIndex := -1, -1
+				for index, step := range job.Steps {
+					if step.Env[githubImageToken] != "" {
+						if prepared || job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
+							step.Env[githubImageToken] != "${{ github.token }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
+							t.Fatal("toolchain credential escaped its separate read-only preparation step")
+						}
+						prepared = true
+						prepareIndex = index
+						if job.Environment == githubARCEnvironment {
+							disks++
+						} else {
+							fetches++
+						}
+						continue
+					}
+					if executionIndex < 0 && (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) {
+						executionIndex = index
+					}
+				}
+				if prepared && executionIndex <= prepareIndex {
+					t.Fatal("toolchain preparation did not precede source or producer execution")
+				}
+			}
+			if disks != 1 || fetches == 0 {
+				t.Fatalf("missing private preparation for native disk or its source vendors: %d/%d", disks, fetches)
 			}
 		})
 	}

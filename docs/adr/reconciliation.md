@@ -990,20 +990,29 @@ orchestration under ADR-16, not runtime authority inside the supply-chain core.
 Named generated bundles isolate these project producers from the retained M2
 workflow and manifests.
 
-Both initial profile declarations remain blocked by the coordinator before
-dispatch or native resource allocation. Independently dispatched generated
-producers retain their ordinary default-branch manual admission; the coordinator
-does not disable or authorize that route. Proposed Helm and independent Cosign ARM64 assets have
-recorded findings from the pinned binary vulnerability scan, and the site chart
-producer still names a local-only Helm image without a hosted registry binding.
-The CLI, controller and chart source pins and suite revision are aligned at
-`04a6ed26c1e51d70167669a6882a04080eefadc7`, which includes the release renderer;
-matching named bundles pass drift checks. Existing ARC disk production and NVKE's
-kind plus ARM64 VM lane have completed externally, as linked in the nightly guide.
-Those capabilities do not need to be presented as unvalidated prerequisites.
-The new profile's tool bindings and scan findings, its host/network preflight and
-a recorded combined manual cycle remain outstanding. No acceptance of the new
-nightly service is claimed.
+The two maintained profiles select native ARM64 KVM guests and explicit NVIDIA-fork
+or upstream OVN. Selection validates these capabilities and exact suite revisions;
+there is no caller-supplied security approval marker. ADR-13 keeps artifact vulnerability
+scanning and clearance outside v1; the existing repository vulnerability gate is unchanged.
+The chart sources replace the local-only image ID with the existing registry-addressable
+Go toolchain and checksum-pinned Helm 4.1.4 acquisition. Vendoring captures the executable
+and pinned dependency archives; packaging consumes the held source closure offline.
+Installer Helm 4.2.4, operator Helm 4.1.4 and independent Cosign 3.1.3 retain explicit
+checksum bindings. Acquisition integrity does not grant vulnerability clearance.
+The generated nightly source-fetch and native disk jobs prepare their selected private
+M2 toolchains through the existing read-only image-preparation owner. Temporary pull
+credentials are removed before source or producer execution; the nightly output
+namespace does not require republishing the existing pinned toolchains.
+The CLI, controller and chart source pins remain at
+`04a6ed26c1e51d70167669a6882a04080eefadc7`, which includes the release renderer.
+The independently pinned suite selects checked NVKE revision
+`17eee6e02541d20ffdb8611ffa3754a07f7d8116`, including runtime `^TestE2E$`
+selection. Its intervening changes affect runtime test entrypoints and unit fixtures;
+CLI, controller and chart producer code is unchanged.
+Existing ARC disk production and NVKE's kind plus ARM64 VM lane have completed
+externally, as linked in the nightly guide. The new job retains host/network preflight
+and publication verification. The first combined nightly cycle is unrecorded, so no
+external acceptance of the new nightly service is claimed.
 Forge/DSX/Redstone targets and the special TestGrid publisher remain deferred.
 Unsigned runtime reports do not mint qualified conformance or promotion receipts.
 

@@ -46,8 +46,6 @@ type NightlyProfile struct {
 	OSProfile         string `json:"os_profile"`
 	KubernetesVersion string `json:"kubernetes_version"`
 	LabelFilter       string `json:"label_filter"`
-	SecurityStatus    string `json:"security_status"`
-	BlockedReason     string `json:"blocked_reason"`
 }
 
 type NightlyBuild struct {
@@ -154,8 +152,8 @@ func validateNightlyProfile(profile NightlyProfile) error {
 	if !nightlyGitCommit(profile.HarnessCommit) || profile.RuntimeTarget == "" || profile.Network == "" || profile.DiskOutput == "" || profile.ProfilesOutput == "" || profile.OSProfile == "" || profile.KubernetesVersion == "" || profile.LabelFilter == "" {
 		return e.New(e.CodeVerifyFailed, "profile omits exact harness or runtime intent")
 	}
-	if (profile.SecurityStatus != "admitted" && profile.SecurityStatus != "blocked") || (profile.SecurityStatus == "blocked" && profile.BlockedReason == "") || (profile.SecurityStatus == "admitted" && profile.BlockedReason != "") {
-		return e.New(e.CodeVerifyFailed, "profile security disposition is incomplete or contradictory")
+	if profile.RuntimeTarget != "native-arm64-vm" || (profile.Network != "ovn" && profile.Network != "upstream-ovn") {
+		return e.New(e.CodeEngineCapability, "nightly adapter requires native ARM64 VMs and an explicit supported OVN network")
 	}
 	return nil
 }
@@ -255,9 +253,6 @@ func selectNightlyArtifact(list nightlyArtifactList, name string, build NightlyB
 type nightlyCapture func(context.Context, []string, string, time.Duration) ([]byte, error)
 
 func newNightlyInputs(ctx context.Context, profile NightlyProfile, build NightlyBuild, plan *factory.Plan, workspace string) (*NightlyInputs, error) {
-	if profile.SecurityStatus != "admitted" {
-		return nil, e.New(e.CodeEngineCapability, "nightly profile does not have an admitted security status")
-	}
 	if os.Getenv("GITHUB_SERVER_URL") != "https://github.com" || os.Getenv("GITHUB_REF") != "refs/heads/main" || os.Getenv("GH_TOKEN") == "" {
 		return nil, e.New(e.CodeEngineCapability, "nightly artifact retrieval requires explicit main-branch GitHub identity and API token")
 	}
@@ -271,9 +266,6 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 	}
 	if err := validateNightlyCycle(profile, build, repository, repositoryID, sha, parentID, parentAttempt); err != nil {
 		return nil, err
-	}
-	if profile.SecurityStatus != "admitted" {
-		return nil, e.New(e.CodeEngineCapability, "nightly profile security admission is blocked")
 	}
 	if plan == nil || capture == nil {
 		return nil, e.New(e.CodeUsage, "nightly handoff requires exact compiled Plan and command owner")

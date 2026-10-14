@@ -13,25 +13,35 @@ and runtime profiles. Each project selects its own complete output set. The
 ordinary generated M2 workflow retains its default paths; named bundles use the
 existing generator and manifest owner. The coordinator is authored separately.
 
-## Current admission and acceptance
+## Runtime and tool bindings
 
-Both initial profiles are **blocked in the coordinator before dispatch or native
-resource allocation**. They declare NVIDIA-fork OVN and upstream OVN ARM64 candidates
-for the kind plus VM target. These declarations do not establish working nightly
-service. Current blockers are:
+The two initial profiles select NVIDIA-fork OVN and upstream OVN ARM64 candidates
+for kind management plus real KVM tenant VMs. Selection validates the maintained
+profile, exact suite revision, native runtime target and network. There is no
+self-declared security approval field. Artifact authentication, source matching,
+native-host preflight and owned-resource cleanup remain required.
 
-- Installer Helm 4.2.4 and the newest stable 4.3.0 assets fail the pinned binary
-  vulnerability scan. Their source trees contain external fixture symlinks that
-  the current hosted source transport rejects before vendoring. The repository
-  has no admitted module-archive or fixture-preparation source contract. No
-  transport relaxation or security waiver is supplied here.
-- The independent Cosign 3.1.3 ARM64 verifier matches its official release
-  checksum but fails the pinned binary vulnerability scan. A checksum alone
-  does not admit it for execution.
-- The site chart producers retain a bare local ARM64 Helm image ID
-  (`sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0`),
-  with no verified registry reference or hosted availability. An admitted hosted
-  chart toolchain is still required; no replacement image or waiver is supplied.
+Both Definitions select the profile-owned site catalog at reviewed NVKE commit
+`04a6ed26c1e51d70167669a6882a04080eefadc7` for the CLI, controller image,
+controller chart and NKTP chart. The suite checkout selects checked NVKE revision
+`17eee6e02541d20ffdb8611ffa3754a07f7d8116`, which includes the runtime
+`^TestE2E$` selection fix. The intervening changes affect runtime test entrypoints
+and unit-test fixtures; CLI, controller and chart producer code is unchanged.
+Product source and consumer harness revisions remain separately pinned.
+The chart producers use the existing registry-addressable Go image and acquire
+Helm 4.1.4 by its existing operator-catalog archive and executable digests.
+Vendoring captures that executable and the pinned chart dependencies in the
+source closure; packaging uses the captured executable offline. Installer Helm
+4.2.4 and operator Helm 4.1.4 retain their separate acquired-executable bindings.
+The independent runtime verifier is checksum-pinned Cosign 3.1.3 for Linux ARM64.
+Generated source-fetch and disk jobs use the existing read-only preparation step
+for the selected private M2 toolchains. Its temporary registry credentials are
+removed before source or producer execution.
+
+The existing repository vulnerability gate remains required. ADR-13 keeps
+artifact vulnerability scanning and vulnerability clearance outside the v1
+product scope. Previously recorded binary scan findings are not a newly imposed
+nightly approval protocol, and this pipeline grants no vulnerability clearance.
 
 Existing runner and tool functionality has already been exercised. NVKR's
 [ARM64](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963/job/112511485529)
@@ -40,36 +50,17 @@ disk jobs completed on their ARC KVM pools, and that historical Run completed
 [release signature verification](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963/job/112539131258).
 NVKE's existing
 [kind plus ARM64 VM job](https://github.com/dsx-ai-factory/nvke/actions/runs/38459969744/job/115512893269)
-also completed on `arc-arm64-kvm`. Existing NVKE CI uses Helm 4.2.4 and has
-executed its deployment and E2E scenarios. These results establish the existing
-capabilities; the binary-scan findings above are separate from functionality.
-The new nightly job retains its host and network preflight. Its combined
-publication-to-runtime cycle has not yet been recorded, and historical NVKR
-records do not establish current-schema Release acceptance.
+also completed on `arc-arm64-kvm`. These results establish those capabilities.
+The new combined publication-to-runtime nightly cycle has not yet been recorded;
+historical NVKR records do not establish current-schema Release acceptance.
 
-Both nightly Definitions now select the profile-owned site catalog at reviewed
-NVKE commit `04a6ed26c1e51d70167669a6882a04080eefadc7` for the CLI,
-controller image, controller chart and NKTP chart. The suite checkout selects the
-same exact revision. Source contracts, module metadata, chart locks and the native
-profiles Dockerfile guard were rechecked; the explicitly older profile producers
-retain their own source pins. This source alignment and bundle validation do not
-establish hosted toolchain access, completed production builds or runtime success.
-
-Changing an admission marker does not fix these blockers. Admission requires
-reviewed pins, passing security and compatibility checks, generated bundle
-checks, and a manual full cycle with both test and cleanup evidence. Forge YTL,
-AZ61, DSX and Redstone profiles remain subsequent work. Their component closures,
-access, usable capacity and cleanup ownership require independent admission.
-The special TestGrid integration remains deferred.
-
-Generated producer workflows retain their separate default-branch manual entry
-contract. The coordinator's admission marker does not disable that entry or
-establish security acceptance of its inputs. These candidates must remain
-unactivated until their recorded prerequisites are resolved.
+Forge YTL, AZ61, DSX and Redstone profiles remain subsequent work. Each needs its
+own component closure, runtime configuration, access, usable capacity and cleanup
+ownership. The special TestGrid integration remains deferred.
 
 ## One cycle
 
-1. Select an admitted profile on the default branch.
+1. Select a maintained profile on the default branch.
 2. Dispatch its maintained generated producer once. Retain the exact run ID
    returned by dispatch; never use a latest-run search or retry an ambiguous
    POST. Join that run while checking repository, commit, workflow and attempt.

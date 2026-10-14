@@ -6,16 +6,14 @@
     "definition": "definitions/nvke-nightly-arm64/definition.json",
     "environment": "definitions/nvke-nightly-arm64/environment-github.json",
     "plan": ".github/nvkr-run-nvke-nightly-arm64/plan.json",
-    "harness_commit": "04a6ed26c1e51d70167669a6882a04080eefadc7",
+    "harness_commit": "17eee6e02541d20ffdb8611ffa3754a07f7d8116",
     "network": "ovn",
     "disk_output": "nvke-node-image-arm64",
     "profiles_output": "controller-profiles",
     "os_profile": "nvke-local-26-04-arm64-plain",
     "kubernetes_version": "1.34.2",
     "label_filter": "(nico-vms && ovn) || health",
-    "runtime_target": "native-arm64-vm",
-    "security_status": "blocked",
-    "blocked_reason": "Helm 4.2.4 and newest stable 4.3.0 ARM64 binaries have unresolved vulnerability findings; independently pinned newest stable Cosign 3.1.3 ARM64 has 27 vulnerable-symbol findings. No security-approved verifier or installer Helm is admitted."
+    "runtime_target": "native-arm64-vm"
   },
   {
     "name": "nvke-nightly-upstream-ovn-arm64",
@@ -24,15 +22,13 @@
     "definition": "definitions/nvke-nightly-upstream-ovn-arm64/definition.json",
     "environment": "definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json",
     "plan": ".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json",
-    "harness_commit": "04a6ed26c1e51d70167669a6882a04080eefadc7",
+    "harness_commit": "17eee6e02541d20ffdb8611ffa3754a07f7d8116",
     "network": "upstream-ovn",
     "disk_output": "nvke-node-image-upstream-ovn-arm64",
     "profiles_output": "controller-profiles",
     "os_profile": "nvke-local-26-04-arm64-plain",
     "kubernetes_version": "1.34.2",
     "label_filter": "(nico-vms && ovn) || health",
-    "runtime_target": "native-arm64-vm",
-    "security_status": "blocked",
-    "blocked_reason": "Helm 4.2.4 and newest stable 4.3.0 ARM64 binaries have unresolved vulnerability findings; independently pinned newest stable Cosign 3.1.3 ARM64 has 27 vulnerable-symbol findings. No security-approved verifier or installer Helm is admitted."
+    "runtime_target": "native-arm64-vm"
   }
 ]

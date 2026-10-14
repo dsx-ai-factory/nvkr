@@ -35,16 +35,38 @@ sources:
   nvke-controller-helm:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: 0.21.x
-    # Existing pinned Helm toolchain bytes retained from the source-aligned
-    # producer. This pin is not a clean security or runtime-compatibility claim.
+    # Reuse the hosted Go image and operator-catalog's exact Helm acquisition.
+    # The fetch owner seals the tool alongside its distinct source closure.
     toolchainImagesByArch:
-      arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
-    vendorCommand: [helm, dependency, build, controller/deploy/charts/controller]
+      arm64: docker.io/library/golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    vendorCommand:
+      - sh
+      - -euc
+      - |
+        test ! -e nvkr-chart-tools
+        mkdir -m 0755 nvkr-chart-tools
+        archive=/tmp/nvkr-chart-helm-arm64.tar.gz
+        timeout --kill-after=10s 240s curl --fail --silent --show-error --location \
+          --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
+          --retry 2 --retry-max-time 180 --max-filesize 268435456 \
+          https://get.helm.sh/helm-v4.1.4-linux-arm64.tar.gz --output "$archive"
+        printf '%s  %s\n' \
+          13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1 "$archive" \
+          | sha256sum --quiet -c -
+        tar -xOzf "$archive" linux-arm64/helm > nvkr-chart-tools/helm
+        tar -xOzf "$archive" linux-arm64/LICENSE > nvkr-chart-tools/LICENSE
+        printf '%s\n' \
+          '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  nvkr-chart-tools/helm' \
+          | sha256sum --quiet -c -
+        chmod 0555 nvkr-chart-tools/helm
+        pins="$(sha256sum controller/deploy/charts/controller/Chart.yaml)"
+        timeout --kill-after=10s 120s ./nvkr-chart-tools/helm dependency build controller/deploy/charts/controller
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
   nvke-nktp-helm:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: 0.21.x
     toolchainImagesByArch:
-      arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
+      arm64: docker.io/library/golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
     # The source-owned Chart.lock selects the dependency versions. Fetch checks
     # their captured archive digests before offline packaging. These pins do not
     # authenticate upstream signatures or make the dependencies source builds.
@@ -52,15 +74,31 @@ sources:
       - sh
       - -euc
       - |
+        test ! -e nvkr-chart-tools
+        mkdir -m 0755 nvkr-chart-tools
+        archive=/tmp/nvkr-chart-helm-arm64.tar.gz
+        timeout --kill-after=10s 240s curl --fail --silent --show-error --location \
+          --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
+          --retry 2 --retry-max-time 180 --max-filesize 268435456 \
+          https://get.helm.sh/helm-v4.1.4-linux-arm64.tar.gz --output "$archive"
+        printf '%s  %s\n' \
+          13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1 "$archive" \
+          | sha256sum --quiet -c -
+        tar -xOzf "$archive" linux-arm64/helm > nvkr-chart-tools/helm
+        tar -xOzf "$archive" linux-arm64/LICENSE > nvkr-chart-tools/LICENSE
+        printf '%s\n' \
+          '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  nvkr-chart-tools/helm' \
+          | sha256sum --quiet -c -
+        chmod 0555 nvkr-chart-tools/helm
         export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
         export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
         # These are the three exact URLs in the selected source's Chart.yaml.
         # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
         pins="$(sha256sum nktp/deploy/charts/nktp/Chart.yaml nktp/deploy/charts/nktp/Chart.lock)"
-        helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
-        helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
-        helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
-        helm dependency build nktp/deploy/charts/nktp --skip-refresh
+        timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
+        timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
+        timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
+        timeout --kill-after=10s 180s ./nvkr-chart-tools/helm dependency build nktp/deploy/charts/nktp --skip-refresh
         printf '%s\n' "$pins" | sha256sum -c -
         set -- nktp/deploy/charts/nktp/charts/*.tgz
         if [ "$#" -ne 3 ]; then
@@ -123,7 +161,14 @@ components:
             digest: image.digest
     # Keep the installer's source-tree chart version, not the older release's
     # 0.1.1 override. The final package is bound to the produced controller digest.
-    buildCommand: [helm, package, controller/deploy/charts/controller, --destination=charts/]
+    buildCommand:
+      - sh
+      - -euc
+      - |
+        printf '%s\n' \
+          '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
+          | sha256sum --quiet -c -
+        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package controller/deploy/charts/controller --destination=charts/
   nktp-chart:
     fromSource: true
     source: nvke-nktp-helm
@@ -131,4 +176,11 @@ components:
     outputType: tarball
     artifactPath: charts/nktp-0.0.0.tgz
     writeDir: charts
-    buildCommand: [helm, package, nktp/deploy/charts/nktp, --destination=charts/]
+    buildCommand:
+      - sh
+      - -euc
+      - |
+        printf '%s\n' \
+          '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
+          | sha256sum --quiet -c -
+        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp/deploy/charts/nktp --destination=charts/

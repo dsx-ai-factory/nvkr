@@ -185,6 +185,10 @@ disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and `packages: read`.
+The maintained M2 and two NVKE nightly publication prefixes also reuse the already-published
+`ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` pins. Reusing these
+toolchain subjects does not relocate them into the nightly output namespace or admit unrelated
+publication owners or toolchain repositories.
 Only that step receives the ephemeral workflow token. The helper admits the complete Plan,
 native platform and disk host requirements before pulling; it uses a private temporary Docker
 configuration and deletes it on success or failure before source or producer execution.

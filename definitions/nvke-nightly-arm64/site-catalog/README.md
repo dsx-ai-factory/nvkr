@@ -21,18 +21,30 @@ CLI vendoring verifies that CLI, controller API, chart-module and management-eng
 are unchanged after the standard Go download, verify and vendor commands. The chart module has no
 `go.sum`; absence remains an explicit guard. No module files are rewritten to make the build pass.
 
-The existing rootless BuildKit and Helm toolchain pins are retained. The chart producers select the
-bare local ARM64 Helm image ID
-`sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0`; no
-registry reference or verified hosted availability accompanies it. An admitted hosted toolchain is a
-remaining prerequisite; this catalog supplies no guessed registry image or security waiver. A pin
-alone is not a security or compatibility result. NKTP dependency chart archives remain acquired materials,
-with the existing byte hashes; these checks do not authenticate their upstream signatures. Native
-profiles remain separate explicitly pinned producers, including their existing exact Dockerfile guard.
+Both chart sources use the existing hosted Go 1.27.2 image
+`docker.io/library/golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c`.
+Its registry image has a native Linux ARM64 variant, no custom entrypoint and no implicit volumes.
+Fetch acquires the existing operator catalog's official Helm 4.1.4 ARM64 archive, verifying archive
+SHA-256 `13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1` and executable
+SHA-256 `4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d` before execution.
+The exact executable and its archive's license enter each distinct source closure under
+`nvkr-chart-tools/`, with executable mode `0555`. The fetch owner authenticates the complete returned
+tree and modes into its closure receipt; the build owner rechecks that closure before making the
+source snapshot read-only. Build invokes `/src/nvkr-chart-tools/helm` directly after repeating its
+executable checksum. No ambient `PATH` lookup, image entrypoint override or extra build environment
+variable selects the chart tool. Final Helm OCI packaging uses NVKR's existing observed-archive and
+image-binding owners. The installer output's separate Helm 4.2.4 selection remains unchanged.
 
-Both profiles remain security-blocked at the nightly coordinator, direct script and runtime entry.
-Generated manual producer workflows retain their existing main-branch admission; no producer was
-dispatched. Source preparation and generated-bundle checks do not execute product or verification
-tools, prove runtime compatibility, or establish a qualified release. The reviewed source
-commit and owner-issued tree/epoch values are recorded in `pins.lock.yaml`; no branch name or
-guessed release tag substitutes for that pin.
+The compiled vendor and package commands were executed against the exact NVKE source above in native
+Linux ARM64 Docker with that pulled Go image. Fetch used a read-only root, private HOME and temporary
+storage, dropped capabilities and no new privileges. NKTP's `Chart.yaml`, `Chart.lock` and three
+dependency-archive checks passed. Offline packaging used network denial and read-only source, producing
+`nke-controller-0.0.0.tgz` and `nktp-0.0.0.tgz`; Helm reported `v4.1.4+g05fa379`. A changed executable
+failed its checksum before packaging and emitted no chart. These are container command tests, not a
+complete held-source `ExecNode`, hosted producer Run, signed publication or runtime E2E result.
+
+NKTP dependency charts remain acquired materials with their existing byte hashes; these checks do
+not authenticate upstream signatures. Native profiles and rootless BuildKit retain their separate
+explicit pins. No toolchain image was built or published, no nightly producer was dispatched and no
+qualified release is established. The reviewed source commit and owner-issued tree/epoch values remain
+in `pins.lock.yaml`; no branch name or guessed release tag substitutes for that pin.

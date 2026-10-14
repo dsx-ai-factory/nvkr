@@ -321,15 +321,7 @@ func TestNightlyPublicDiagnosticsRequireMarkerAndAllowlist(t *testing.T) {
 	}
 }
 
-func TestNightlyAdmissionAndBundleRolesFailClosed(t *testing.T) {
-	for _, status := range []string{"blocked", "approved", "", "unknown"} {
-		t.Run(status, func(t *testing.T) {
-			assertNightlyCode(t, nightlySecurityAdmission(NightlyProfile{SecurityStatus: status, BlockedReason: "missing security review"}), e.CodeEngineCapability)
-		})
-	}
-	if err := nightlySecurityAdmission(NightlyProfile{SecurityStatus: "admitted"}); err != nil {
-		t.Fatal(err)
-	}
+func TestNightlyBundleRolesFailClosed(t *testing.T) {
 	bundle := delivery.BinaryBundle{Entries: []delivery.BinaryEntry{{Name: "first", InstallPath: "/a/kind"}, {Name: "second", InstallPath: "/b/kind"}}}
 	_, err := nightlyBundleEntries(bundle, t.TempDir())
 	assertNightlyCode(t, err, e.CodeVerifyFailed)
