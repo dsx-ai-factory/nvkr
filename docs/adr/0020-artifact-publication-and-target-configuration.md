@@ -104,6 +104,8 @@ An importing descriptor walk retains its verified disk owner through the same ph
 of reopening and hashing that inode again for selection. A standalone producer wrapper is selected and
 verified in one payload pass. Every copy/export still rehashes its held bytes; separate hosted publication
 and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
+The evidence-attestation handoff consumes the private preparation under §6, transferring unchanged blobs
+without another payload copy. It still revalidates the complete source and final closures.
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
@@ -184,7 +186,7 @@ module implements its transport representation as an OCI image index with artifa
 `application/vnd.nvkr.publication-root.v4`: every child is an exact OCI manifest or nested index, and the canonical
 root config binds each child's name, kind, artifact type, OCI descriptor digest, exact payload or root blob
 digest, semantic digest, size, and optional platform. The registry tag is only a discovery hint; the publisher
-returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Pull materializes and verifies the
+returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Full-layout pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
 The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.
@@ -201,6 +203,30 @@ suggestion, mode, ordinary SHA-256, and size. Its one deterministic
 ORAS can download it and ordinary `tar` can unpack it. Debian packages may also be projected into a deterministic
 Acquire-By-Hash repository; that APT Projection is not a new release artifact, and an unsigned `Release` file is
 development-only.
+
+Diagnostic `release pull --output <name> --out <directory>` obtains one named output directly from the pinned
+registry release root. It checks the complete bounded release metadata/evidence closure before format admission,
+then downloads only the selected output's complete payload closure. Delivery checks exact descriptors and
+format-specific payload membership before exposing the new destination. The supported projections are:
+
+| Output format | Projection directly beneath the destination |
+|---|---|
+| `executable` | Exact regular bundle files by recorded name, SHA-256, size and mode; absolute installation suggestions are not followed |
+| `disk-image` | `<output-name>.qcow2` containing the exact plain or declared LUKS2-encrypted QCOW2 payload bytes; no decryption |
+| `helm-oci` | `<output-name>.tgz` containing the unchanged compressed chart archive |
+| `oci` | A standard OCI layout retaining exact native OCI or Docker schema-2 manifests, configs and layers; an aggregate OCI index includes every declared native platform and its full payload closure |
+| `apt-repository` | The complete checked repository tree of regular files and owner-readable, searchable directories; every file, including indexes, is digest-bound to the archive, and links and special files are rejected |
+
+The destination parent must already exist, and existing destinations are rejected.
+Failure or cancellation before commit exposes no destination. A failed parent-directory sync after commit
+reports failure even though the complete destination may exist. Delivery owns admission, metadata and payload
+checks, destination publication and private temporary-data cleanup; lifecycle bounds the overall deadline.
+Unknown selections fail with a coded usage error; malformed or unsupported format metadata fails with a coded
+error before payload or destination work. The command does not accept a local layout, infer a host platform,
+select only one aggregate platform, install or execute downloaded files, or load images into a runtime. It runs on macOS and
+Linux and checks byte integrity only: signatures and consumer policy remain unverified, no verification receipt
+is issued, and no accepted Release or stronger evidence lane is implied. Explicit `artifact-publication`
+verification retains its complete payload and policy checks; `authenticity` retains its signature/evidence-only scope.
 
 The public CLI constructor emits only a visibly `diagnostic` root and requires `--allow-diagnostic` before push.
 It cannot set publication identity, publication-manifest digest, or clearance digest. Qualified publishing is
@@ -282,6 +308,27 @@ unchanged native container image, Helm artifact or exact-QCOW2 wrapper. The OCI 
 standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NVKR-specific
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
+
+SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
+exclusive ownership with no concurrent users or writers; source and destination must share a filesystem.
+Admission rejects overlapping paths, unexpected layout entries, symlinks within the source tree and
+hardlinked files before signing. The inventory has the existing bounded OCI blob count.
+Delivery prepares and checks the signed bundles and new metadata before claiming the source directory,
+and checks its original file inventory before and after ownership transfer. Claiming atomically moves that
+exact source directory into private staging without replacement. Only unchanged blobs reachable from the
+final closure are moved into the final stage; old preparation metadata and raw SBOM objects are discarded.
+The complete final closure is inspected before atomic no-replace publication. Payload bytes and their
+descriptors remain unchanged, while signed
+bundles and publication metadata derive the final root identity. No hardlink connects a retained source
+layout to the final layout.
+
+Before the source is claimed, failure preserves it. After the claim, delivery owns cleanup of the private
+trees on returned failure; retry requires restoring or rebuilding the preparation. Interruption can leave
+private staging but cannot publish a partially attested final layout. This is disposable workflow ownership,
+not a durable resume protocol or authority recovered from a pathname. Callers must stop using the consumed
+preparation; the handoff does not revoke independently held writable descriptors. Every later publication
+or consumption boundary still authenticates its exact bytes. SBOM attestation and registry credentials
+remain on generic hosted runners, outside the ARC producer boundary.
 
 The explicit GitHub-only `publication.mode: per-output-v1` uses one output-local publication route per
 required output, retaining the full compiled Plan. Each route observes its exact payload and producer records,

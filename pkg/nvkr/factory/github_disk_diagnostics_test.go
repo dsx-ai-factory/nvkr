@@ -157,7 +157,7 @@ func TestARCInspectionDiagnosticUploadIsSeparateFromEvidence(t *testing.T) {
 				t.Fatal(err)
 			}
 			var document githubWorkflowDocument
-			if err := yaml.UnmarshalStrict(bundle.Files[GitHubWorkflowPath], &document); err != nil {
+			if err := yaml.UnmarshalStrict(expandedGitHubWorkflow(t, bundle), &document); err != nil {
 				t.Fatal(err)
 			}
 			count := 0
@@ -391,7 +391,7 @@ func TestGitHubDiskDiagnosticsAndDeadlineSemantics(t *testing.T) {
 						stage = candidate
 					}
 				}
-				steps := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs[stage.ID].Steps
+				steps := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs[stage.ID].Steps
 				index := slices.IndexFunc(steps, func(s githubStep) bool { return s.Name == "Upload failed Packer diagnostics" })
 				if index < 0 {
 					t.Fatal("no diagnostic upload")

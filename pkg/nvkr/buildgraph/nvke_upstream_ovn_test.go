@@ -53,7 +53,7 @@ func TestNVKEUpstreamOVNGraphs(t *testing.T) {
 			t.Fatalf("%s lost exact upstream source pin", name)
 		}
 		command := strings.Join(component.BuildCommand, "\n")
-		if strings.Contains(command, ovnForkCommit) || strings.Contains(command, "1.5.18") || strings.Contains(command, "/src/charts/") {
+		if strings.Contains(command, ovnForkCommit) || strings.Contains(command, ovnForkStream) || strings.Contains(command, "/src/charts/") {
 			t.Fatalf("%s retains fork-specific source/package inputs", name)
 		}
 		if err := exec.CommandContext(t.Context(), "bash", "-n", "-c", component.BuildCommand[2]).Run(); err != nil {
@@ -204,7 +204,7 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 			t.Fatal("upstream profile installs the wrong stream")
 		}
 	}
-	if strings.Contains(string(raw), "1.5.18") {
+	if strings.Contains(string(raw), ovnForkStream) {
 		t.Fatal("upstream profile retains NVIDIA package stream")
 	}
 	if !strings.Contains(string(raw), "set image-url http://172.30.0.1:18080/nvke-node-image-upstream-ovn-arm64.qcow2") {
@@ -217,7 +217,7 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := strings.NewReplacer("nke-cni-ovn-images-1.5.18", "nke-cni-ovn-images-1.4.0", "nke-cni-ovn-charts-1.5.18", "nke-cni-ovn-charts-1.4.0", "nvke-node-image-arm64.qcow2", "nvke-node-image-upstream-ovn-arm64.qcow2").Replace(string(baselinePatch))
+	expected := strings.NewReplacer("nke-cni-ovn-images-"+ovnForkStream, "nke-cni-ovn-images-1.4.0", "nke-cni-ovn-charts-"+ovnForkStream, "nke-cni-ovn-charts-1.4.0", "nvke-node-image-arm64.qcow2", "nvke-node-image-upstream-ovn-arm64.qcow2").Replace(string(baselinePatch))
 	if string(raw) != expected {
 		t.Fatal("upstream profile alters unrelated bootstrap behavior")
 	}

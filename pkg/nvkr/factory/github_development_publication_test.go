@@ -4,14 +4,12 @@
 package factory
 
 import (
-	"maps"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"sigs.k8s.io/yaml"
 )
 
@@ -81,7 +79,7 @@ func TestGitHubDevelopmentPublicationScopesRealStages(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			if plan.Qualification != TierPipelineAttested || document.Concurrency.CancelInProgress {
 				t.Fatal("signed development lost real evidence or can cancel publication")
 			}
@@ -184,7 +182,7 @@ func TestGitHubDevelopmentPublicationRejectsScopeTampering(t *testing.T) {
 		{"finalizer writer", "", func(job *githubJob) { job.Env["NVKR_CREDENTIAL"] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			id := selected[test.kind]
 			if test.kind == "" {
 				id = "nvkr-lifecycle-run"
@@ -196,11 +194,8 @@ func TestGitHubDevelopmentPublicationRejectsScopeTampering(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			raw = append([]byte("# qualification: "+plan.Qualification.String()+"\n# planDigest: "+bundle.PlanDigest+"\n"), raw...)
-			changed := *bundle
-			changed.Files = maps.Clone(bundle.Files)
-			changed.Files[bundle.WorkflowPath], changed.WorkflowDigest = raw, pipeline.FileDigest(raw)
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+			changed := relowerGitHubTestBundle(t, plan, bundle, raw)
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
 }
@@ -250,7 +245,7 @@ func TestMaintainedM2DevelopmentPreservesCompleteGraphAndPrivateToolchainReads(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	disks, fetches := 0, 0
 	for _, job := range document.Jobs {
 		if job.Permissions["packages"] == "write" {

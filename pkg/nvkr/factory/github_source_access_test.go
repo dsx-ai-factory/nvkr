@@ -18,7 +18,6 @@ import (
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
@@ -58,7 +57,7 @@ func TestGitHubSourceCredentialIsFetchStepOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	var workflow githubWorkflowDocument
-	if err := yaml.UnmarshalStrict(bundle.Files[GitHubWorkflowPath], &workflow); err != nil {
+	if err := yaml.UnmarshalStrict(expandedGitHubWorkflow(t, bundle), &workflow); err != nil {
 		t.Fatal(err)
 	}
 	found := 0
@@ -79,21 +78,50 @@ func TestGitHubSourceCredentialIsFetchStepOnly(t *testing.T) {
 	if found != 1 {
 		t.Fatalf("expected one credential-bearing step, got %d", found)
 	}
-	for _, test := range []struct{ name, old, replacement string }{
-		{"wrong-secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER_TOKEN"},
-		{"bypassed-token-check", "factory github run-node --plan", "factory execute-node --plan"},
-		{"wrong-mirror", "url.https://github.com/test-owner/private-source.insteadOf", "url.https://github.com/other/source.insteadOf"},
+	_, nodeJobs, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobID := nodeJobs[fetch.ID]
+	member, part := githubTestSharedInvocation(t, bundle, jobID, "execute", fetch.ID)
+	for _, test := range []struct {
+		name   string
+		mutate func(*testing.T) *GeneratedBundle
+	}{
+		{"wrong-secret", func(t *testing.T) *GeneratedBundle {
+			return mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+				call := githubTestYAMLStep(t, githubTestYAMLField(t, root, "jobs", jobID, "steps"), "uses", "./"+strings.TrimSuffix(member, "/action.yml"))
+				token := githubTestYAMLField(t, call, "with", "nvkr-source-token")
+				if token.Value != "${{ secrets.NKE_SOURCE_TOKEN }}" {
+					t.Fatal("fixture lost its source credential binding")
+				}
+				token.Value = "${{ secrets.OTHER_TOKEN }}"
+			})
+		}},
+		{"bypassed-token-check", func(t *testing.T) *GeneratedBundle {
+			return mutateGitHubBundleYAML(t, bundle, member, func(root *yamlv3.Node) {
+				step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_execute")
+				run := githubTestYAMLField(t, step, "run")
+				if strings.Count(run.Value, "factory github run-node --plan") != 1 {
+					t.Fatal("fixture source execution omits the admitted helper")
+				}
+				run.Value = strings.Replace(run.Value, "factory github run-node --plan", "factory execute-node --plan", 1)
+			})
+		}},
+		{"wrong-mirror", func(t *testing.T) *GeneratedBundle {
+			return mutateGitHubActionParameters(t, bundle, jobID, part, func(values map[string]string) {
+				const key = "execute_env_GIT_CONFIG_KEY_0"
+				if values[key] != "url.https://github.com/test-owner/private-source.insteadOf" {
+					t.Fatal("fixture source execution omits its exact mirror")
+				}
+				values[key] = "url.https://github.com/other/source.insteadOf"
+			})
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			changed := *bundle
-			changed.Files = make(map[string][]byte, len(bundle.Files))
-			for name, raw := range bundle.Files {
-				changed.Files[name] = raw
-			}
-			changed.Files[GitHubWorkflowPath] = bytes.Replace(bundle.Files[GitHubWorkflowPath], []byte(test.old), []byte(test.replacement), 1)
-			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[GitHubWorkflowPath])
+			changed := test.mutate(t)
 			var coded *e.Error
-			if err := ValidateGitHubBundle(context.Background(), plan, &changed); !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+			if err := ValidateGitHubBundle(context.Background(), plan, changed); !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 				t.Fatalf("expected credential isolation rejection, got %v", err)
 			}
 		})
@@ -179,7 +207,7 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	found := map[string]int{}
 	bootstraps := 0
 	for id, job := range document.Jobs {
@@ -216,13 +244,8 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 		{"missing presence check", strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0"), "true"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			changed := *bundle
-			changed.Files = make(map[string][]byte, len(bundle.Files))
-			for name, raw := range bundle.Files {
-				changed.Files[name] = raw
-			}
 			var tree yamlv3.Node
-			if err := yamlv3.Unmarshal(bundle.Files[GitHubWorkflowPath], &tree); err != nil {
+			if err := yamlv3.Unmarshal(expandedGitHubWorkflow(t, bundle), &tree); err != nil {
 				t.Fatal(err)
 			}
 			mutated := false
@@ -244,18 +267,11 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			changed.Files[GitHubWorkflowPath], err = compactGitHubWorkflow(raw)
-			if err != nil {
-				t.Fatal(err)
-			}
+			changed := relowerGitHubTestBundle(t, plan, bundle, raw)
 			if err := validateGitHubWorkflowSize(changed.Files[GitHubWorkflowPath]); err != nil {
 				t.Fatal(err)
 			}
-			if bytes.Equal(changed.Files[GitHubWorkflowPath], bundle.Files[GitHubWorkflowPath]) {
-				t.Fatal("mutation did not apply")
-			}
-			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[GitHubWorkflowPath])
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
 }

@@ -97,6 +97,13 @@ func Inspect(ctx context.Context, archive []byte) (Identity, error) {
 		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir {
 			return Identity{}, e.New(e.CodeVerifyFailed, "Helm archive entry %q is not a regular file or directory", header.Name)
 		}
+		// PAX sparse files retain TypeReg while tar.Reader synthesizes holes
+		// above the expanded-byte limiter. Admit only ordinary file bodies.
+		for key := range header.PAXRecords {
+			if strings.HasPrefix(key, "GNU.sparse.") {
+				return Identity{}, e.New(e.CodeVerifyFailed, "Helm archive entry %q is sparse", header.Name)
+			}
+		}
 		if header.Size < 0 || header.Size > maxHelmArchiveBytes || (header.Typeflag == tar.TypeDir && header.Size != 0) {
 			return Identity{}, e.New(e.CodeVerifyFailed, "invalid Helm archive entry size")
 		}

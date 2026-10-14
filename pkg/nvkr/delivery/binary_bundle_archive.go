@@ -5,6 +5,8 @@ package delivery
 
 import (
 	"archive/tar"
+	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -100,12 +102,23 @@ func (writer layoutWriter) addBundleLayer(ctx context.Context, captures []captur
 }
 
 func extractBundleLayer(ctx context.Context, held *heldfile.File, out string, bundle BinaryBundle) error {
+	return extractBundleLayerWith(ctx, held, bundle, func(entry BinaryEntry) (*os.File, error) {
+		return os.OpenFile(filepath.Join(out, entry.Name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, fs.FileMode(entry.Mode))
+	})
+}
+
+// The caller owns a private destination and its atomic commit. A held-directory
+// creator shares the archive walker without reopening caller-replaceable paths.
+func extractBundleLayerWith(ctx context.Context, held *heldfile.File, bundle BinaryBundle, create func(BinaryEntry) (*os.File, error)) error {
 	return walkBundleLayer(ctx, held, bundle, func(entry BinaryEntry, payload io.Reader) error {
-		file, err := os.OpenFile(filepath.Join(out, entry.Name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, fs.FileMode(entry.Mode))
+		file, err := create(entry)
 		if err != nil {
 			return e.Wrap(e.CodeInternal, err, "creating extracted binary %q", entry.Name)
 		}
 		_, copyErr := io.Copy(file, payload)
+		if copyErr == nil {
+			copyErr = file.Chmod(fs.FileMode(entry.Mode))
+		}
 		if copyErr == nil {
 			copyErr = file.Sync()
 		}
@@ -129,6 +142,11 @@ func walkBundleLayer(ctx context.Context, held *heldfile.File, bundle BinaryBund
 	if len(bundle.Entries) > maxDeliveryObjects {
 		return e.New(e.CodeEngineCapability, "binary-bundle entry count exceeds its bound")
 	}
+	// Bound expanded tar bytes, including extension headers that archive/tar can
+	// consume internally before returning Next. The metadata allowance covers
+	// generated PAX names and framing without allowing unbounded gzip expansion.
+	const metadataAllowance int64 = 8 << 20
+	expandedBound := metadataAllowance
 	want := make(map[string]BinaryEntry, len(bundle.Entries))
 	for _, entry := range bundle.Entries {
 		if !canonicalToken(entry.Name) || strings.ContainsAny(entry.Name, "/\\") || entry.Name == "." || entry.Name == ".." ||
@@ -138,18 +156,25 @@ func walkBundleLayer(ctx context.Context, held *heldfile.File, bundle BinaryBund
 		if entry.Size > maxDeliveryFileBytes {
 			return e.New(e.CodeEngineCapability, "binary-bundle member %q exceeds its byte bound", entry.Name)
 		}
+		if expandedBound > maxDeliveryFileBytes+metadataAllowance-entry.Size {
+			return e.New(e.CodeVerifyFailed, "binary-bundle archive exceeds its expanded byte bound")
+		}
+		expandedBound += entry.Size
 		name := "files/" + entry.Name
 		if _, exists := want[name]; exists {
 			return e.New(e.CodeVerifyFailed, "binary-bundle config repeats member %q", entry.Name)
 		}
 		want[name] = entry
 	}
-	gzipReader, err := gzip.NewReader(contextReader{ctx: ctx, reader: io.NewSectionReader(held, 0, held.Size())})
+	compressed := bufio.NewReader(contextReader{ctx: ctx, reader: io.NewSectionReader(held, 0, held.Size())})
+	gzipReader, err := gzip.NewReader(compressed)
 	if err != nil {
 		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "opening binary-bundle gzip layer"))
 	}
 	defer func() { _ = gzipReader.Close() }()
-	tarReader := tar.NewReader(contextReader{ctx: ctx, reader: gzipReader})
+	gzipReader.Multistream(false)
+	expanded := &io.LimitedReader{R: contextReader{ctx: ctx, reader: gzipReader}, N: expandedBound + 1}
+	tarReader := tar.NewReader(expanded)
 	seen := map[string]bool{}
 	for {
 		if err := deliveryContext(ctx); err != nil {
@@ -168,7 +193,7 @@ func walkBundleLayer(ctx context.Context, held *heldfile.File, bundle BinaryBund
 		}
 		seen[header.Name] = true
 		hash := sha256.New()
-		member := &io.LimitedReader{R: tarReader, N: entry.Size}
+		member := &io.LimitedReader{R: contextReader{ctx: ctx, reader: tarReader}, N: entry.Size}
 		if err := visit(entry, io.TeeReader(member, hash)); err != nil {
 			return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "reading binary-bundle member %q", entry.Name))
 		}
@@ -186,6 +211,24 @@ func walkBundleLayer(ctx context.Context, held *heldfile.File, bundle BinaryBund
 		}
 		sort.Strings(missing)
 		return e.New(e.CodeReleaseIncomplete, "binary-bundle layer omits entries: %s", strings.Join(missing, ", "))
+	}
+	// tar stops at its terminator. Drain permitted zero padding to authenticate
+	// the gzip checksum, while rejecting hidden entries and concatenated members.
+	var padding, zeros [32 << 10]byte
+	for {
+		n, err := expanded.Read(padding[:])
+		if expanded.N == 0 || !bytes.Equal(padding[:n], zeros[:n]) {
+			return e.New(e.CodeVerifyFailed, "binary-bundle archive exceeds its bound or contains trailing data")
+		}
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "checking binary-bundle gzip trailer"))
+		}
+	}
+	if _, err := compressed.Peek(1); !errors.Is(err, io.EOF) {
+		return classifyContext(ctx, e.New(e.CodeVerifyFailed, "binary-bundle layer contains trailing compressed data"))
 	}
 	return deliveryContext(ctx)
 }

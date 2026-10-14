@@ -42,7 +42,9 @@ toolchain access, source access and protected-environment policy require indepen
 `../nightly-profiles.json` selects this project's generated producer and exact NVKE suite revision.
 The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
 publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
-vulnerability-clearance claim. The suite revision is
-`17eee6e02541d20ffdb8611ffa3754a07f7d8116`, including its `^TestE2E$` runtime entrypoint
-selection; product source pins remain independently fixed. The first combined nightly cycle remains
-unrecorded.
+vulnerability-clearance claim. The suite and all four site-product sources select
+`a8391755d12d99f859783c6cf390338debd1e085`, including its `^TestE2E$` runtime entrypoint
+selection and candidate-input fixes. This candidate comes from open NVKE PR #1580;
+it is not a merged-main or human-approval claim. The shared revision follows ADR-23's
+proposed matching-revision rule without establishing overall interface adoption.
+The first combined nightly cycle remains unrecorded.

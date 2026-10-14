@@ -53,7 +53,7 @@ func TestDeliveryRuntimeSourcesGeneratedRuntime(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			workflow := string(bundle.Files[GitHubWorkflowPath])
+			workflow := string(expandedGitHubWorkflow(t, bundle))
 			if !strings.Contains(workflow, githubRunnerCommand(plan, "run-node", "node", node.ID)) || strings.Contains(workflow, "podman run") || strings.Contains(workflow, "docker run") {
 				t.Fatal("workflow does not delegate runtime selection to helper")
 			}

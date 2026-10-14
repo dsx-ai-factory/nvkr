@@ -144,6 +144,8 @@ func TestRefreshRealLocalPinSetJourney(t *testing.T) {
 	cfg, promote := maintenanceFixture(t)
 	baseline := readFixture(t, "catalog/pins.lock.yaml")
 	oldPlan := readFixture(t, ".github/nvkr-run/plan.json")
+	oldWorkflow := readFixture(t, ".github/workflows/nvkr-run.yml")
+	oldManifest := readFixture(t, ".github/nvkr-run/manifest.json")
 	result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false)
 	if err != nil || result.Changed || !bytes.Equal(baseline, readFixture(t, "catalog/pins.lock.yaml")) {
 		t.Fatalf("no-op: %+v %v", result, err)
@@ -170,6 +172,12 @@ func TestRefreshRealLocalPinSetJourney(t *testing.T) {
 	}
 	if bytes.Equal(oldPlan, readFixture(t, ".github/nvkr-run/plan.json")) {
 		t.Fatal("changed pins did not regenerate")
+	}
+	if !bytes.Equal(oldWorkflow, readFixture(t, ".github/workflows/nvkr-run.yml")) {
+		t.Fatal("routine source-pin refresh changed workflow topology or presentation")
+	}
+	if bytes.Equal(oldManifest, readFixture(t, ".github/nvkr-run/manifest.json")) {
+		t.Fatal("changed pins did not update the generated bundle manifest")
 	}
 	current := readFixture(t, "catalog/pins.lock.yaml")
 	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", false)

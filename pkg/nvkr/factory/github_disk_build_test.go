@@ -80,7 +80,7 @@ func TestGitHubDiskBuildOnlyGeneration(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				workflow := string(bundle.Files[GitHubWorkflowPath])
+				workflow := string(expandedGitHubWorkflow(t, bundle))
 				for _, absent := range []string{"Retain inspection diagnostics", "id-token: write", "packages: write", "nkd-release", "factory github run-node --plan .github/nvkr-run/plan.json --node package/"} {
 					if strings.Contains(workflow, absent) {
 						t.Fatalf("build-only workflow contains %q", absent)

@@ -13,7 +13,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
 
 func githubDevelopmentTestPlan(t *testing.T) *Plan {
@@ -69,7 +69,7 @@ func TestGitHubDevelopmentRenderingSeparatesPolicyAndLayout(t *testing.T) {
 			if bundle.PlanPath != wantPlan || bundle.WorkflowPath != wantWorkflow || bundle.ManifestPath != wantManifest {
 				t.Fatalf("unexpected bundle layout: %+v", bundle)
 			}
-			document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			if document.Name != wantName || document.Concurrency.CancelInProgress != development || len(document.On) != 1 {
 				t.Fatalf("incorrect workflow identity or admission: %+v", document)
 			}
@@ -109,28 +109,56 @@ func TestGitHubDevelopmentRejectsWorkflowPolicyTampering(t *testing.T) {
 		t.Fatal(err)
 	}
 	condition := "github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/')"
+	bootstrap, bootstrapMember := githubTestBootstrap(t, bundle)
+	stages, _, err := githubStages(plan)
+	if err != nil || len(stages) == 0 {
+		t.Fatalf("fixture has no execution stages: %v", err)
+	}
+	executeMember, _ := githubTestSharedInvocation(t, bundle, stages[0].ID, "execute", stages[0].Nodes[0].ID)
 	for _, test := range []struct {
-		name, before, after string
-		code                e.Code
+		name, member string
+		mutate       func(*testing.T, *yamlv3.Node)
+		code         e.Code
 	}{
-		{"bootstrap guard", "    if: ${{ " + condition + " }}\n", "", e.CodeInvalidCatalog},
-		{"finalizer guard", "always() && " + condition, "always()", e.CodeEngineCapability},
-		{"tag admission", "startsWith(github.ref, 'refs/heads/')", "startsWith(github.ref, 'refs/')", e.CodeInvalidCatalog},
-		{"pull request trigger", "workflow_dispatch: {}", "workflow_dispatch: {}\n  pull_request: {}", e.CodeEngineCapability},
-		{"cancellation", "cancel-in-progress: true", "cancel-in-progress: false", e.CodeEngineCapability},
-		{"production Plan substitution", "factory github run-node --plan " + GitHubDevelopmentPlanPath, "factory github run-node --plan " + FactoryPlanPath, e.CodeEngineCapability},
-		{"added shell command", "--root . --check", "--root . --check; printf unexpected", e.CodeEngineCapability},
+		{"bootstrap guard", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			job := githubTestYAMLField(t, root, "jobs", bootstrap)
+			if githubTestYAMLField(t, job, "if").Value != "${{ "+condition+" }}" {
+				t.Fatal("fixture bootstrap lacks development admission")
+			}
+			githubYAMLRemove(job, "if")
+		}, e.CodeInvalidCatalog},
+		{"finalizer guard", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "jobs", "nvkr-lifecycle-run", "if").Value = "${{ always() }}"
+		}, e.CodeEngineCapability},
+		{"tag admission", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "jobs", bootstrap, "if").Value = "${{ " + strings.Replace(condition, "refs/heads/", "refs/", 1) + " }}"
+		}, e.CodeInvalidCatalog},
+		{"pull request trigger", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubYAMLSet(githubTestYAMLField(t, root, "on"), "pull_request", githubYAMLMap())
+		}, e.CodeEngineCapability},
+		{"cancellation", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "concurrency", "cancel-in-progress").Value = "false"
+		}, e.CodeEngineCapability},
+		{"production Plan substitution", executeMember, func(t *testing.T, root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_execute")
+			run := githubTestYAMLField(t, step, "run")
+			if strings.Count(run.Value, GitHubDevelopmentPlanPath) != 1 {
+				t.Fatal("fixture execution lacks its development Plan")
+			}
+			run.Value = strings.Replace(run.Value, GitHubDevelopmentPlanPath, FactoryPlanPath, 1)
+		}, e.CodeEngineCapability},
+		{"added shell command", bootstrapMember, func(t *testing.T, root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "validate-catalog")
+			run := githubTestYAMLField(t, step, "run")
+			if strings.Count(run.Value, "--root . --check") != 1 {
+				t.Fatal("fixture bootstrap lacks its exact regeneration gate")
+			}
+			run.Value = strings.Replace(run.Value, "--root . --check", "--root . --check; printf unexpected", 1)
+		}, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			changed := *bundle
-			changed.Files = maps.Clone(bundle.Files)
-			raw := bytes.Replace(bundle.Files[bundle.WorkflowPath], []byte(test.before), []byte(test.after), 1)
-			if bytes.Equal(raw, bundle.Files[bundle.WorkflowPath]) {
-				t.Fatal("mutation did not change fixture")
-			}
-			changed.Files[bundle.WorkflowPath] = raw
-			changed.WorkflowDigest = pipeline.FileDigest(raw)
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), test.code)
+			changed := mutateGitHubBundleYAML(t, bundle, test.member, func(root *yamlv3.Node) { test.mutate(t, root) })
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), test.code)
 		})
 	}
 }

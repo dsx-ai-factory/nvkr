@@ -12,12 +12,14 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/assemble"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"sigs.k8s.io/yaml"
 )
 
 func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
@@ -64,12 +66,94 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			workflow := string(bundle.Files[factory.GitHubWorkflowPath])
-			if plan.Environment.RuntimeBinary() != tc.resolved || !strings.Contains(workflow,
-				"factory github run-node --plan "+bundle.PlanPath+" --node cwe/build-cwe") {
-				t.Fatalf("CWE launch does not execute the plan carrying its admitted %s runtime", tc.resolved)
+			if plan.Environment.RuntimeBinary() != tc.resolved {
+				t.Fatalf("CWE Plan lost its admitted %s runtime", tc.resolved)
 			}
+			if err := factory.ValidateGitHubBundle(ctx, plan, bundle); err != nil {
+				t.Fatal(err)
+			}
+			assertGitHubSharedNodeInvocation(t, bundle, "cwe/build-cwe")
 		})
+	}
+}
+
+// Inspect the concrete call, its canonical selector data and the referenced
+// template together. Factory validation authenticates their complete expansion.
+func assertGitHubSharedNodeInvocation(t *testing.T, bundle *factory.GeneratedBundle, selector string) {
+	t.Helper()
+	type step struct {
+		ID   string            `json:"id"`
+		Uses string            `json:"uses"`
+		Run  string            `json:"run"`
+		With map[string]string `json:"with"`
+		Env  map[string]string `json:"env"`
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []step `json:"steps"`
+		} `json:"jobs"`
+	}
+	if err := yaml.Unmarshal(bundle.Files[bundle.WorkflowPath], &workflow); err != nil {
+		t.Fatal(err)
+	}
+	var data struct {
+		Entries map[string]struct {
+			Template string            `json:"template"`
+			Values   map[string]string `json:"values"`
+		} `json:"entries"`
+	}
+	if err := canonical.UnmarshalExact(bundle.Files[factory.GitHubActionDataPath], &data); err != nil {
+		t.Fatal(err)
+	}
+	found := 0
+	for jobID, job := range workflow.Jobs {
+		for _, call := range job.Steps {
+			binding := call.With["parameters"]
+			if binding == "" {
+				continue
+			}
+			const prefix = "${{ fromJSON(steps.nvkr-context.outputs.data)['"
+			part := strings.TrimSuffix(strings.TrimPrefix(binding, prefix), "'] }}")
+			if binding != prefix+part+"'] }}" || data.Entries[jobID].Template != "stage-context" {
+				t.Fatal("shared execution lacks an exact stage-context binding")
+			}
+			var values map[string]string
+			if err := canonical.UnmarshalExact([]byte(data.Entries[jobID].Values[part]), &values); err != nil {
+				t.Fatal(err)
+			}
+			if values["execute_present"] != "true" || values["execute_selector"] != selector {
+				continue
+			}
+			found++
+			if !strings.HasPrefix(call.Uses, "./") {
+				t.Fatal("node selector is not passed to a generated local action")
+			}
+			var action struct {
+				Runs struct {
+					Steps []step `json:"steps"`
+				} `json:"runs"`
+			}
+			if err := yaml.Unmarshal(bundle.Files[strings.TrimPrefix(call.Uses, "./")+"/action.yml"], &action); err != nil {
+				t.Fatal(err)
+			}
+			executors := 0
+			for _, operation := range action.Runs.Steps {
+				if operation.ID != "operation_execute" {
+					continue
+				}
+				executors++
+				want := "./nvkr-exec factory github run-node --plan " + bundle.PlanPath + ` --node "$NVKR_ACTION_SELECTOR"`
+				if strings.TrimSpace(operation.Run) != want || operation.Env["NVKR_ACTION_SELECTOR"] != "${{ fromJSON(inputs.parameters).execute_selector }}" {
+					t.Fatal("shared execution changed the Plan-bound helper or quoted node selector")
+				}
+			}
+			if executors != 1 {
+				t.Fatalf("node invocation has %d execution roles, want one", executors)
+			}
+		}
+	}
+	if found != 1 {
+		t.Fatalf("workflow has %d invocations of %q, want one", found, selector)
 	}
 }
 

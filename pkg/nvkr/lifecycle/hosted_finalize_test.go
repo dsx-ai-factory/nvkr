@@ -299,7 +299,7 @@ func TestFinalizeGeneratedCompletesPipelineRunFromExactHostedClosure(t *testing.
 		}
 	}
 	if prepared, ok := artifacts["prepared/release"]; ok {
-		if _, err := delivery.AttestEvidence(ctx, prepared.Path, artifacts["package/release"].Path, fixtureSBOMAttestation(t)); err != nil {
+		if _, err := delivery.AttestPreparedEvidence(ctx, prepared.Path, artifacts["package/release"].Path, fixtureSBOMAttestation(t)); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -26,7 +26,7 @@ func TestPublicationCloseJoinsEvidenceVisitor(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			root, _ := releasePublicationFixture(t)
 			destination := filepath.Join(t.TempDir(), "attested")
-			result, err := AttestEvidence(t.Context(), root, destination, func(_ context.Context, subject string, document []byte) ([]byte, error) {
+			result, err := AttestPreparedEvidence(t.Context(), root, destination, func(_ context.Context, subject string, document []byte) ([]byte, error) {
 				return imageIndexFixtureAttestation(subject, document)
 			})
 			if err != nil {

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -163,7 +163,7 @@ func TestMaintainedNightlyPrivateImageCredentialBoundary(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			disks, fetches := 0, 0
 			for _, job := range document.Jobs {
 				prepared := false
@@ -207,7 +207,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	disks, fetches := 0, 0
 	for _, job := range document.Jobs {
 		for _, step := range job.Steps {
@@ -228,23 +228,48 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if disks != 4 || fetches == 0 {
 		t.Fatalf("missing preparation for native disks or their source vendors: %d/%d", disks, fetches)
 	}
-	for _, test := range []struct{ name, before, after string }{
-		{"write scope", "packages: read", "packages: write"},
-		{"wrong credential", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ github.token }}'", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'"},
-		{"wrong helper", "factory github prepare-images --plan", "factory github run-node --plan"},
+	stages, _, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobID := ""
+	for _, stage := range stages {
+		if stage.DiskOutput != "" && len(githubStagePrivateImages(plan, stage)) > 0 {
+			jobID = stage.ID
+			break
+		}
+	}
+	if jobID == "" {
+		t.Fatal("fixture lacks a native private-image preparation job")
+	}
+	member, _ := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
+	for _, test := range []struct {
+		name, member string
+		mutate       func(*testing.T, *yamlv3.Node)
+	}{
+		{"write scope", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "jobs", jobID, "permissions", "packages").Value = "write"
+		}},
+		{"wrong credential", member, func(t *testing.T, root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")
+			token := githubTestYAMLField(t, step, "env", githubImageToken)
+			if token.Value != "${{ github.token }}" {
+				t.Fatalf("fixture image token differs: %q", token.Value)
+			}
+			token.Value = "${{ secrets.NKE_SOURCE_TOKEN }}"
+		}},
+		{"wrong helper", member, func(t *testing.T, root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")
+			run := githubTestYAMLField(t, step, "run")
+			if strings.Count(run.Value, "factory github prepare-images --plan") != 1 {
+				t.Fatal("fixture image preparation omits its exact helper")
+			}
+			run.Value = strings.Replace(run.Value, "factory github prepare-images --plan", "factory github run-node --plan", 1)
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			changed := *bundle
-			changed.Files = make(map[string][]byte, len(bundle.Files))
-			for name, value := range bundle.Files {
-				changed.Files[name] = value
-			}
-			changed.Files[GitHubWorkflowPath] = bytes.Replace(bundle.Files[GitHubWorkflowPath], []byte(test.before), []byte(test.after), 1)
-			if bytes.Equal(changed.Files[GitHubWorkflowPath], bundle.Files[GitHubWorkflowPath]) {
-				t.Fatal("mutation did not change workflow")
-			}
-			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[GitHubWorkflowPath])
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+			changed := mutateGitHubBundleYAML(t, bundle, test.member, func(root *yamlv3.Node) { test.mutate(t, root) })
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
 }

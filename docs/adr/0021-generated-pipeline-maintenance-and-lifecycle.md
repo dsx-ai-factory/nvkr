@@ -26,8 +26,8 @@ This ADR fixes maintenance.
 
 ### 1. The emitted pipeline is a generated artifact, not an owned scaffold
 
-`run generate` is the normal owner of committed workflows, complete plans and manifests. Every
-owned file regenerates byte-for-byte from exact Definition, Environment, catalog pins, generator version and
+`run generate` is the normal owner of committed workflows, generated local actions and invocation data, complete plans and
+manifests. Every owned file regenerates byte-for-byte from exact Definition, Environment, catalog pins, generator version and
 engine. Drift checks repeat the recorded Definition and Environment inputs without substituting a different
 catalog, path or engine. Definition v5 outputs select exact producers directly, with either a native `platform`
 or an OCI aggregate `platforms` set. The v5 Plan/artifact graph embeds one producer graph per native build target: a native
@@ -84,6 +84,32 @@ vectors, roots and credentials remain external inputs whose exact references/pol
 and silently claimed as generator-owned. Future artifact/result digests belong in runtime observations; the
 generator must not invent them. Changes to input mode, environment or output graph regenerate in one reviewed
 change. Generated files are not editable scaffolds.
+
+The GitHub bundle includes shared composite templates beneath `.github/nvkr-run/actions/` and canonical
+invocation values in `.github/nvkr-run/action-data.json`, with corresponding members in the development
+layout. The generator selects fixed semantic interfaces for
+execution, preparation, collection and transfer. Grouped jobs repeat those calls; declared optional slots
+and further individual transfer calls handle differing output counts without shape-specific or numbered
+variant actions. Invocation values use named operation roles rather than step positions. These interfaces
+lower Plan-derived steps without introducing another executable Plan or authored extension surface.
+The helper-preparation, execution, bootstrap and controlled-transfer
+families and their invocation-data member appear in the same commit manifest as the top-level workflow and
+Plan. Their exact bytes, safe relative paths and modes participate in regeneration, drift
+checks and prior-manifest retirement. The workflow digest still describes the top-level workflow bytes;
+it is not a substitute for validating the complete manifest-owned action closure.
+
+The entry workflow references the fixed Plan and manifest paths without repeating the Plan digest. Its
+provider source-fetch IDs and scheduling order describe the target and actual consumer cohort rather than
+changing source pins. Exact executable identities remain in the Plan and generated invocation data.
+Templates contain fixed helper operations and pinned provider actions; the runtime descriptor operation
+admits the Plan and regenerates the selected values rather than trusting the checked-in data as authority.
+Routine pin or Plan changes can therefore leave the workflow bytes unchanged while the complete bundle
+and ownership manifest change. This stability is conditional on unchanged topology, labels, action
+interfaces and visible execution policy; checkout pins, pins of required inline transports and inline
+operator-setup changes remain workflow changes. The closing summary's references keep finalization and
+the final Run upload inline, so an upload-action pin change affects the maintained workflow. ADR-18 §8
+defines the full boundary. Every input update still requires complete regeneration and
+the same all-member drift check; an unchanged workflow file does not establish an up-to-date bundle.
 
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 
@@ -156,6 +182,11 @@ not establish compatibility.
 
 ### 4. Deferred customization: extension overlay and callable form
 
+Generated shared composite templates and invocation data are internal lowering artifacts owned by the existing
+generator. They accept only generated input bindings and do not admit operator-supplied actions, arbitrary commands or
+replacement job policies. Their callers retain visible topology, permissions and credential references;
+validation checks the expanded steps and exact bytes of every generated member (ADR-18 §8).
+
 General extensions and reusable callable producer workflows remain deferred design options. The sole
 admitted reusable exception is the fixed M3 native smoke worker invoked by its generated same-repository
 qualifier at the same commit. It exposes no arbitrary steps, runner labels, commands or reusable refs.
@@ -205,6 +236,9 @@ or organizational acceptance, and do not relax source, worker or final-signer ad
 Any broader extension requires explicit input ownership, deterministic identity, credential admission and
 transport contracts before implementation. They cannot restore
 removed Recipe layers or mixins; catalog overlay v3 remains whole-producer replacement.
+Producer matrix scheduling likewise needs an explicit dependency and complete provider-result contract
+before admission; the fixed qualification worker matrix does not admit producer matrices, and extracting
+existing steps into generated actions does not change their scheduling contract.
 
 Editing generated files directly remains out of contract. Current pipeline changes belong in the Definition,
 Environment or owning compiler/renderer and pass the same byte-exact regeneration gate.

@@ -6,17 +6,45 @@ package delivery
 import (
 	"bytes"
 	"context"
+	"errors"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
-// AttestEvidence builds a new immutable release layout containing only bundled
-// SBOM attestations. The callback owns cryptographic creation and verification;
-// this module enforces exact document, subject, membership and byte closure.
-func AttestEvidence(ctx context.Context, source, out string, attest func(context.Context, string, []byte) ([]byte, error)) (Result, error) {
+// AttestPreparedEvidence consumes a private preparation layout into a new release
+// layout, replacing raw SBOMs with bundles without copying unchanged payloads.
+// The caller transfers exclusive ownership: source must have no other consumers
+// or writers. Callback failures leave source in place. After the private claim,
+// failures discard the consumed layout; callers must restore or rebuild it.
+//
+// The callback owns cryptographic creation and verification; this module enforces
+// exact document, subject, membership and byte closure. Paths and the returned
+// Result are descriptions, not a retained immutable verification capability.
+func AttestPreparedEvidence(ctx context.Context, source, out string, attest func(context.Context, string, []byte) ([]byte, error)) (result Result, err error) {
+	defer func() {
+		if err != nil {
+			var coded *e.Error
+			if !errors.As(err, &coded) {
+				err = e.Wrap(e.CodeInternal, err, "attesting prepared evidence")
+			}
+			err = classifyContext(ctx, err)
+		}
+	}()
+	if err := deliveryContext(ctx); err != nil {
+		return Result{}, err
+	}
 	if attest == nil {
 		return Result{}, e.New(e.CodeEngineCapability, "SBOM attestation adapter is required")
+	}
+	requestedOutput := out
+	source, out, err = preparedAttestationPaths(ctx, source, out)
+	if err != nil {
+		return Result{}, err
+	}
+	inventory, err := preparedLayoutInventory(ctx, source)
+	if err != nil {
+		return Result{}, err
 	}
 	inspection, err := Inspect(ctx, source)
 	if err != nil {
@@ -29,7 +57,7 @@ func AttestEvidence(ctx context.Context, source, out string, attest func(context
 	if err != nil {
 		return Result{}, err
 	}
-	stage, commit, cleanup, err := stageLayout(out)
+	stage, _, cleanup, err := stageLayout(out)
 	if err != nil {
 		return Result{}, err
 	}
@@ -38,10 +66,11 @@ func AttestEvidence(ctx context.Context, source, out string, attest func(context
 	root := inspection.Root
 	root.Objects = append([]PublishedObject(nil), root.Objects...)
 	var direct []Descriptor
+	unchanged := map[string]bool{}
 	for i, object := range root.Objects {
 		descriptor := Descriptor{MediaType: publishedManifestMediaType(object), Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
 		if object.Evidence == nil {
-			if err := writer.copyClosure(ctx, source, descriptor); err != nil {
+			if err := verifyDescriptor(ctx, source, descriptor, unchanged); err != nil {
 				return Result{}, err
 			}
 			if object.Output == nil {
@@ -56,7 +85,7 @@ func AttestEvidence(ctx context.Context, source, out string, attest func(context
 		if object.ArtifactType != "application/vnd.cyclonedx+json" {
 			return Result{}, e.New(e.CodeVerifyFailed, "prepared evidence must be a CycloneDX document")
 		}
-		_, document, err := ReadObject(ctx, source, object.Name)
+		document, err := preparedEvidenceDocument(ctx, source, object)
 		if err != nil {
 			return Result{}, err
 		}
@@ -89,13 +118,31 @@ func AttestEvidence(ctx context.Context, source, out string, attest func(context
 	if err != nil {
 		return Result{}, err
 	}
-	if _, err := Inspect(ctx, stage); err != nil {
+	if err := consumePreparedBlobs(ctx, source, stage, inventory, unchanged); err != nil {
 		return Result{}, err
 	}
-	if err := commit(); err != nil {
+	final, err := Inspect(ctx, stage)
+	if err != nil {
 		return Result{}, err
 	}
-	return Result{LayoutPath: out, RootDigest: digest, SemanticDigest: semantic}, nil
+	if final.RootDigest != digest {
+		return Result{}, e.New(e.CodeVerifyFailed, "attested layout changed before publication")
+	}
+	if err := publishAttestedLayout(ctx, stage, out); err != nil {
+		return Result{}, err
+	}
+	return Result{LayoutPath: requestedOutput, RootDigest: digest, SemanticDigest: semantic}, nil
+}
+
+func preparedEvidenceDocument(ctx context.Context, source string, object PublishedObject) ([]byte, error) {
+	manifest, err := flatManifest(ctx, source, object)
+	if err != nil {
+		return nil, err
+	}
+	if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.ArtifactType != object.ArtifactType {
+		return nil, e.New(e.CodeVerifyFailed, "prepared SBOM differs from its exact evidence binding")
+	}
+	return readBlob(ctx, source, manifest.Layers[0], sbom.MaxDocumentBytes)
 }
 
 // EvidenceDocument returns the canonical CycloneDX document from either a

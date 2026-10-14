@@ -22,7 +22,7 @@ func TestNamedProducerFinalizerPreservesPlanAndQualificationHandoff(t *testing.T
 			if err != nil {
 				t.Fatal(err)
 			}
-			job := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs["nvkr-lifecycle-run"]
+			job := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs["nvkr-lifecycle-run"]
 			runs := joinRuns(job.Steps)
 			if !strings.Contains(runs, "--plan "+shellQuote(githubBundleLayout(name).planPath)) ||
 				!strings.Contains(runs, " --handoff "+githubQualificationHandoffPath) ||

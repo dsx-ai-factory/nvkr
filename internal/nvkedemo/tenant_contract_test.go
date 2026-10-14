@@ -23,7 +23,7 @@ import (
 
 func TestTenantSelectsMaintainedOVNChartStream(t *testing.T) {
 	request := NewTenantRequest("owned")
-	if request.CNI != "ovn-kubernetes" || request.CNIVersion != "1.5.18" {
+	if request.CNI != "ovn-kubernetes" || request.CNIVersion != siteOVNVersion {
 		t.Fatalf("tenant must select the packaged NVIDIA OVN chart stream: %+v", request)
 	}
 }
@@ -32,9 +32,9 @@ func TestTenantNetworkSelectionIsExplicitAndPreservesTopology(t *testing.T) {
 	for _, test := range []struct {
 		name, network, cni, version string
 	}{
-		{"default", "", "ovn-kubernetes", "1.5.18"},
-		{"maintained", "ovn", "ovn-kubernetes", "1.5.18"},
-		{"upstream diagnostic", "upstream-ovn", "ovn-kubernetes", "1.4.0"},
+		{"default", "", "ovn-kubernetes", siteOVNVersion},
+		{"maintained", "ovn", "ovn-kubernetes", siteOVNVersion},
+		{"upstream diagnostic", "upstream-ovn", "ovn-kubernetes", upstreamSiteOVNVersion},
 		{"temporary diagnostic", "kind-calico", "calico", "3.30.1"},
 		{"unknown", "calico", "", ""},
 	} {
@@ -50,7 +50,7 @@ func TestTenantNetworkSelectionIsExplicitAndPreservesTopology(t *testing.T) {
 			if err != nil || request.CNI != test.cni || request.CNIVersion != test.version {
 				t.Fatalf("request selected unexpected CNI: %+v %v", request, err)
 			}
-			request.CNI, request.CNIVersion = "ovn-kubernetes", "1.5.18"
+			request.CNI, request.CNIVersion = "ovn-kubernetes", siteOVNVersion
 			if !reflect.DeepEqual(request, NewTenantRequest("owned")) {
 				t.Fatal("network selection changed unrelated tenant topology")
 			}

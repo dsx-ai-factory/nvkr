@@ -65,7 +65,7 @@ func TestGitHubLongDiskStepKeepsHelperAndJobBudgets(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			found := false
 			for _, stage := range stages {
 				if stage.DiskOutput == "" {
@@ -76,10 +76,12 @@ func TestGitHubLongDiskStepKeepsHelperAndJobBudgets(t *testing.T) {
 				if stage.diskExecutionBudget != 7*time.Hour || job.TimeoutMinutes != 445 {
 					t.Fatalf("execution budget %s/job %d, want seven hours/445 minutes", stage.diskExecutionBudget, job.TimeoutMinutes)
 				}
+				executors := 0
 				for index, step := range job.Steps {
 					if step.ID != "run-disk" {
 						continue
 					}
+					executors++
 					if step.TimeoutMinutes != 0 {
 						t.Fatalf("unsupported disk step timeout %d", step.TimeoutMinutes)
 					}
@@ -87,6 +89,9 @@ func TestGitHubLongDiskStepKeepsHelperAndJobBudgets(t *testing.T) {
 						job.Steps[index].TimeoutMinutes = timeout
 						assertFactoryErrorCode(t, validateGitHubStageExecution(plan, stage, job.Steps), e.CodeEngineCapability)
 					}
+				}
+				if executors != 1 {
+					t.Fatalf("native disk stage has %d live executors, want one", executors)
 				}
 			}
 			if !found {

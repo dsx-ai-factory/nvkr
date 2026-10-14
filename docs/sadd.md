@@ -323,6 +323,17 @@ workspace, new identity or serialized verification capability is introduced. Con
 source compatibility, installation formats and offline completeness. Unpublished packages remain Run
 artifacts; this interface describes publications and does not assemble a release from a local workspace.
 
+Diagnostic output pulling reuses that complete metadata/evidence validation, then retrieves and checks only
+one exact named output's complete payload closure into a new caller-selected directory. Executables retain
+their recorded filenames and modes, disks and charts retain their exact payload bytes (including declared
+LUKS2 disk ciphertext without decryption), OCI layouts retain native OCI/Docker image bytes and every declared
+aggregate platform, and APT outputs retain repository trees.
+Delivery owns admission, metadata and payload checks, safe file membership, preserved permission modes,
+destination publication and temporary cleanup; lifecycle supplies the overall deadline. Existing destinations
+are rejected, and malformed or unsupported format metadata fails with a coded error before payload or
+destination work. Pulling executes or installs nothing and grants no signature or policy acceptance. The
+explicit Release verifier remains the authenticated consumer boundary.
+
 Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
 unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
 one image output with a sorted finite platform set; the compiler freezes a native Build, result and SBOM use
@@ -542,6 +553,24 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+GitHub keeps named jobs, dependencies, runners, permissions and failure/time boundaries visible in the
+top-level workflow. Manifest-owned composite actions expose fixed interfaces for node/source execution,
+preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
+individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
+invocation-data member holds parameters with named operation roles. The runtime descriptor operation
+recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
+with no executable script inputs. Controlled transport
+wrappers contain one upload/download and retain their
+provider controls on the caller; native preflight, checkout, operator setup, timed producers and steps with
+referenced outcomes/outputs stay inline. This includes finalization and the final Run upload used by the
+closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
+reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
+while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
+complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
+bytes, preserving credential scope and per-job finalizer results. Producer matrix and general callable
+scheduling remain deferred (ADR-18 §8); ADR-21 admits only the separate fixed native qualification worker
+and its selected-platform matrix.
+
 An explicit GitHub development Environment selects a separate fixed bundle. It shares the
 compiler, helper and complete output checks with production, while keeping its Plan, workflow and
 ownership manifest separate. Branch testing therefore does not replace the maintained publication bundle.
@@ -912,8 +941,14 @@ does not establish that a large-image workflow fits a hosted runner.
 For the live disk group, capacity planning must include materialized sources, toolchains, build scratch, produced
 image, package representation and, in strict mode, inspection temporaries that coexist. Keeping packaging with
 the producer preserves live ownership; it does not remove these storage requirements. Separate hosted jobs must
-also budget retained carriers, authenticated restoration snapshots, extracted inputs and publication or
-verification temporaries. No numeric capacity or duration target is invented here.
+also budget retained carriers, extracted inputs and publication or verification temporaries. Restoration
+hashes extraction and rechecks the same held carrier before publishing, avoiding a full tar snapshot.
+Evidence attestation consumes the private preparation and moves unchanged payload blobs into the final layout
+after preparing the signed evidence. Thus restoration retains a carrier plus extracted payload, and outgoing
+packing retains the final payload plus its carrier; attestation introduces no extra unchanged payload copy.
+Failure after attestation claims the preparation requires restore/build retry (ADR-20 §6). These local
+lifetimes do not bound provider ZIP handling, other coexisting files or later registry-fetched verification
+snapshots, and no measured hosted capacity or duration target is claimed.
 
 Runner requirements are modeled with a generic per-step request, not as builder-specific metadata. Minimum CPU,
 memory and ephemeral storage, eligible host platforms, typed host capabilities, and an executor wall-time budget

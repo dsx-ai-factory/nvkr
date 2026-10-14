@@ -93,7 +93,7 @@ func TestGitHubDiskBuildFinalizerUsesSelectedNativePool(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				job := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nvkr-lifecycle-run"]
+				job := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs["nvkr-lifecycle-run"]
 				wantRunner, wantTimeout, wantEnvironment := githubBootstrapRunner(githubARCRunner(platform)), githubSupportJobTimeoutMinutes, ""
 				if buildOnly {
 					wantRunner, wantTimeout, wantEnvironment = githubARCRunner(platform), githubDiskBuildFinalizerTimeoutMinutes, githubARCEnvironment

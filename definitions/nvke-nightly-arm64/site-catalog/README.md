@@ -2,13 +2,15 @@
 
 This profile-owned catalog selects the CLI, controller image, controller chart and NKTP chart for both
 ARM64 nightly Definitions. It starts from `../../nvke-local-dev-arm64/site-catalog`; that retained local
-catalog is unchanged. Each source role keeps its distinct vendor closure. The four source roles are pinned through `catalog pin --commit` to the reviewed NVKE commit
-`04a6ed26c1e51d70167669a6882a04080eefadc7`, with owner-issued tree
-`340e9452fb1d5d962d5553fb2d49b9bc86f82366` and committer epoch `1791924640`. This is an
-exact source revision, without a release-tag claim.
+catalog is unchanged. Each source role keeps its distinct vendor closure. The four source roles are pinned through `catalog pin --commit` to the NVKE candidate commit
+`a8391755d12d99f859783c6cf390338debd1e085`, with owner-issued tree
+`3dea15e95f96f3d5133c50935d7a0818907bfd33` and committer epoch `1792011564`. Both nightly
+suite selections use that same source revision. It comes from open NVKE PR #1580,
+without a release-tag, merged-main membership or human-approval claim.
 
-The producer mappings follow the source-owned contracts rechecked at NVKE PR #1580's pushed
-`04a6ed26c1e51d70167669a6882a04080eefadc7` head:
+The producer mappings follow the source-owned contracts at NVKE candidate revision
+`a8391755d12d99f859783c6cf390338debd1e085`. Its delta from the previous product source
+contains only eight adapter, test and documentation files; producer code is unchanged:
 
 | Output | Source contract |
 | --- | --- |
@@ -35,16 +37,18 @@ executable checksum. No ambient `PATH` lookup, image entrypoint override or extr
 variable selects the chart tool. Final Helm OCI packaging uses NVKR's existing observed-archive and
 image-binding owners. The installer output's separate Helm 4.2.4 selection remains unchanged.
 
-The compiled vendor and package commands were executed against the exact NVKE source above in native
-Linux ARM64 Docker with that pulled Go image. Fetch used a read-only root, private HOME and temporary
+The compiled vendor and package commands were executed against the previous NVKE source
+`04a6ed26c1e51d70167669a6882a04080eefadc7` in native Linux ARM64 Docker with that pulled
+Go image. Fetch used a read-only root, private HOME and temporary
 storage, dropped capabilities and no new privileges. NKTP's `Chart.yaml`, `Chart.lock` and three
 dependency-archive checks passed. Offline packaging used network denial and read-only source, producing
 `nke-controller-0.0.0.tgz` and `nktp-0.0.0.tgz`; Helm reported `v4.1.4+g05fa379`. A changed executable
 failed its checksum before packaging and emitted no chart. These are container command tests, not a
 complete held-source `ExecNode`, hosted producer Run, signed publication or runtime E2E result.
+They do not establish a fresh source receipt or complete Run for the current candidate.
 
 NKTP dependency charts remain acquired materials with their existing byte hashes; these checks do
 not authenticate upstream signatures. Native profiles and rootless BuildKit retain their separate
 explicit pins. No toolchain image was built or published, no nightly producer was dispatched and no
-qualified release is established. The reviewed source commit and owner-issued tree/epoch values remain
+qualified release is established. The candidate source commit and owner-issued tree/epoch values remain
 in `pins.lock.yaml`; no branch name or guessed release tag substitutes for that pin.

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -445,7 +446,7 @@ func TestUnpackRejectsSymlinkAndFIFOArchiveBeforeRootIO(t *testing.T) {
 	}
 }
 
-func TestTransportSnapshotKeepsHeldArchiveAcrossPathReplacement(t *testing.T) {
+func TestTransportDigestKeepsHeldArchiveAcrossPathReplacement(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "carrier.tar")
 	if err := os.WriteFile(path, []byte("held carrier bytes"), 0o600); err != nil {
 		t.Fatal(err)
@@ -461,18 +462,13 @@ func TestTransportSnapshotKeepsHeldArchiveAcrossPathReplacement(t *testing.T) {
 	if err := unix.Mkfifo(path, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	digest, snapshot, err := snapshotTransport(context.Background(), held, info,
-		filepath.Join(t.TempDir(), "snapshot"))
-	if err != nil {
-		t.Fatalf("held transport snapshot followed replacement path: %v", err)
-	}
-	defer snapshot.Close()
 	current, currentInfo, err := stableTransportDigest(context.Background(), held, info)
 	if err != nil {
 		t.Fatalf("held transport recheck followed replacement path: %v", err)
 	}
-	if current != digest || !os.SameFile(info, currentInfo) {
-		t.Fatalf("held transport identity changed: initial %s current %s", digest, current)
+	want := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("held carrier bytes")))
+	if current != want || !os.SameFile(info, currentInfo) {
+		t.Fatalf("held transport identity changed: want %s current %s", want, current)
 	}
 }
 
@@ -810,11 +806,15 @@ func TestOpenTransportTarSourceBoundsBothCarrierShapes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		source, closeSource, err := openTransportTarSource(file, true)
+		source, closeSource, err := openTransportTarSource(t.Context(), file, true)
 		if err != nil {
 			t.Fatal(err)
 		}
-		limited, ok := source.(*transportLimitReader)
+		contextual, ok := source.(transportContextReader)
+		if !ok {
+			t.Fatalf("%s carrier is not context-bound: %T", name, source)
+		}
+		limited, ok := contextual.reader.(*transportLimitReader)
 		if !ok {
 			t.Fatalf("%s carrier is unbounded: %T", name, source)
 		}

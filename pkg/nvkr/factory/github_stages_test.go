@@ -13,7 +13,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"sigs.k8s.io/yaml"
 )
 
@@ -139,7 +138,7 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	artifacts := make(map[string]Artifact, len(plan.Graph.Artifacts))
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
@@ -206,8 +205,9 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 
 func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 	tests := []struct {
-		name   string
-		mutate func([]githubStep, []int) []githubStep
+		name     string
+		unshared bool
+		mutate   func([]githubStep, []int) []githubStep
 	}{
 		{
 			name: "omitted logical node",
@@ -217,7 +217,8 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 			},
 		},
 		{
-			name: "reordered logical nodes",
+			name:     "reordered logical nodes",
+			unshared: true,
 			mutate: func(steps []githubStep, execute []int) []githubStep {
 				steps[execute[0]], steps[execute[1]] = steps[execute[1]], steps[execute[0]]
 				return steps
@@ -238,7 +239,7 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			stages, _, err := githubStages(plan)
 			if err != nil {
 				t.Fatal(err)
@@ -260,15 +261,14 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			workflow = append([]byte("# qualification: "+plan.Qualification.String()+"\n# planDigest: "+bundle.PlanDigest+"\n"), workflow...)
-			mutated := *bundle
-			mutated.Files = make(map[string][]byte, len(bundle.Files))
-			for name, raw := range bundle.Files {
-				mutated.Files[name] = append([]byte(nil), raw...)
+			lower := relowerGitHubTestBundle
+			if test.unshared {
+				// The mismatched execution/collection pair is intentionally
+				// outside the shared interface so the validator owns rejection.
+				lower = unsharedGitHubTestBundle
 			}
-			mutated.Files[GitHubWorkflowPath] = workflow
-			mutated.WorkflowDigest = pipeline.FileDigest(workflow)
-			err = ValidateGitHubBundle(context.Background(), plan, &mutated)
+			mutated := lower(t, plan, bundle, workflow)
+			err = ValidateGitHubBundle(context.Background(), plan, mutated)
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 				t.Fatalf("want %s, got %v", e.CodeEngineCapability, err)
@@ -278,55 +278,106 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 }
 
 func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) {
-	tests := []struct {
-		name   string
-		mutate func([]byte) []byte
+	for _, test := range []struct {
+		name       string
+		entrypoint bool
+		mutate     func(*githubWorkflowDocument) bool
 	}{
 		{
 			name: "appended bootstrap shell",
-			mutate: func(raw []byte) []byte {
-				return bytes.Replace(raw, []byte(" --root . --check\n"), []byte(" --root . --check && printf injected\n"), 1)
+			mutate: func(document *githubWorkflowDocument) bool {
+				for _, id := range sortedKeys(document.Jobs) {
+					job := document.Jobs[id]
+					for index, step := range job.Steps {
+						if strings.Contains(step.Run, " --root . --check") {
+							job.Steps[index].Run = strings.TrimSpace(step.Run) + " && printf injected\n"
+							document.Jobs[id] = job
+							return true
+						}
+					}
+				}
+				return false
 			},
 		},
 		{
-			name: "injected stage step",
-			mutate: func(raw []byte) []byte {
-				return bytes.Replace(raw, []byte("      - name: 'Fetch pinned source"), []byte("      - name: Injected shell\n        run: printf injected\n      - name: 'Fetch pinned source"), 1)
+			name:       "injected stage step",
+			entrypoint: true,
+			mutate: func(document *githubWorkflowDocument) bool {
+				for _, id := range sortedKeys(document.Jobs) {
+					job := document.Jobs[id]
+					for index, step := range job.Steps {
+						if strings.HasPrefix(step.Name, "Fetch pinned source") {
+							steps := append([]githubStep(nil), job.Steps[:index]...)
+							steps = append(steps, githubStep{Name: "Injected shell", Run: "printf injected"})
+							job.Steps = append(steps, job.Steps[index:]...)
+							document.Jobs[id] = job
+							return true
+						}
+					}
+				}
+				return false
 			},
 		},
 		{
 			name: "protected environment on bootstrap",
-			mutate: func(raw []byte) []byte {
-				return bytes.Replace(raw, []byte("    timeout-minutes: 15\n    steps:\n"), []byte("    timeout-minutes: 15\n    environment: 'nkd-release'\n    steps:\n"), 1)
+			mutate: func(document *githubWorkflowDocument) bool {
+				for _, id := range sortedKeys(document.Jobs) {
+					if strings.HasPrefix(id, "build-runner-") {
+						job := document.Jobs[id]
+						job.Environment = githubReleaseEnvironment
+						document.Jobs[id] = job
+						return true
+					}
+				}
+				return false
 			},
 		},
 		{
 			name: "protected environment on finalizer",
-			mutate: func(raw []byte) []byte {
-				return bytes.Replace(raw, []byte("    timeout-minutes: 15\n    needs: ["), []byte("    timeout-minutes: 15\n    environment: 'nkd-release'\n    needs: ["), 1)
+			mutate: func(document *githubWorkflowDocument) bool {
+				job, ok := document.Jobs["nvkr-lifecycle-run"]
+				job.Environment = githubReleaseEnvironment
+				document.Jobs["nvkr-lifecycle-run"] = job
+				return ok
 			},
 		},
-	}
-	for _, test := range tests {
+	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan := githubLifecycleTestPlan(t)
 			bundle, err := RenderGitHub(context.Background(), plan)
 			if err != nil {
 				t.Fatal(err)
 			}
-			original := bundle.Files[GitHubWorkflowPath]
-			workflow := test.mutate(original)
-			if bytes.Equal(workflow, original) {
-				t.Fatal("mutation changed no workflow bytes")
+			raw := expandedGitHubWorkflow(t, bundle)
+			if test.entrypoint {
+				// Inject an unknown operation beside a real shared action call.
+				// Retaining the member set exercises executable-byte validation.
+				raw = bundle.Files[GitHubWorkflowPath]
 			}
-			mutated := *bundle
-			mutated.Files = make(map[string][]byte, len(bundle.Files))
-			for name, raw := range bundle.Files {
-				mutated.Files[name] = append([]byte(nil), raw...)
+			document := decodeGitHubWorkflow(t, raw)
+			baseline, err := yaml.Marshal(document)
+			if err != nil {
+				t.Fatal(err)
 			}
-			mutated.Files[GitHubWorkflowPath] = workflow
-			mutated.WorkflowDigest = pipeline.FileDigest(workflow)
-			err = ValidateGitHubBundle(context.Background(), plan, &mutated)
+			if !test.mutate(&document) {
+				t.Fatal("mutation did not find the intended workflow authority")
+			}
+			workflow, err := yaml.Marshal(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Equal(workflow, baseline) {
+				t.Fatal("mutation did not change workflow semantics")
+			}
+			var mutated *GeneratedBundle
+			if test.entrypoint {
+				header := "# qualification: " + plan.Qualification.String() + "\n# plan: " + bundle.PlanPath + "\n# manifest: " + bundle.ManifestPath + "\n"
+				workflow = append([]byte(header), workflow...)
+				mutated = mutateGitHubBundleFile(t, bundle, bundle.WorkflowPath, func([]byte) []byte { return workflow })
+			} else {
+				mutated = relowerGitHubTestBundle(t, plan, bundle, workflow)
+			}
+			err = ValidateGitHubBundle(context.Background(), plan, mutated)
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 				t.Fatalf("want %s, got %v", e.CodeEngineCapability, err)
