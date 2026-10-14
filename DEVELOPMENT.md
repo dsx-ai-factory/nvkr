@@ -324,6 +324,7 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
 | Producer execution, observations and qualified receipts | `pipeline`, `profile` |
 | External test output descriptions, wrapper validation and deterministic serialization (no execution or authority) | `pkg/nvkr/testresults` |
+| Configured diagnostic check selection and local upstream conformance execution | `validation`, `conformance` — delegate source/artifact authentication to `lifecycle` |
 | Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
 | Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `trust`, `sign` |
 | Release authority and delivery | `release`, `status`, `delivery` |

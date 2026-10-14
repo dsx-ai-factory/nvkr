@@ -53,6 +53,15 @@ func CheckQualificationRun(ctx context.Context, runURL, policyPath string, optio
 	if err != nil {
 		return nil, nil, err
 	}
+	return checkQualificationRunWithPolicy(ctx, locator, policy, options)
+}
+
+// The caller has frozen the independently selected policy exactly once.
+func checkQualificationRunWithPolicy(ctx context.Context, locator qualificationorigin.RunLocator, policy QualificationPolicy, options QualificationRuntimeOptions) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
+	return checkQualificationRunWithPolicyAndReference(ctx, locator, policy, options, "")
+}
+
+func checkQualificationRunWithPolicyAndReference(ctx context.Context, locator qualificationorigin.RunLocator, policy QualificationPolicy, options QualificationRuntimeOptions, reference string) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
 	provider := qualificationorigin.NewGitHub(options.GitHubToken)
 	source, err := provider.AuthenticateRun(ctx, locator, policy.Source)
 	if err != nil {
@@ -62,6 +71,12 @@ func CheckQualificationRun(ctx context.Context, runURL, policyPath string, optio
 	if err != nil {
 		_ = source.Close()
 		return nil, nil, err
+	}
+	if reference != "" {
+		if err := requireQualificationHandoffReference(raw, reference); err != nil {
+			_ = source.Close()
+			return nil, nil, err
+		}
 	}
 	receipt, report, err := CheckQualificationHandoff(ctx, raw, source, policy, options)
 	if err != nil {

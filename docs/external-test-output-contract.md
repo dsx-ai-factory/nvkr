@@ -3,14 +3,20 @@
 `pkg/nvkr/testresults` describes outputs supplied by external test producers. Its lane is **none
 (descriptive)**. It supplies an interface, wrapper validation and deterministic serialization, with no
 producer implementation, execution, report parser, file collector, signing or qualification integration.
+The separate generic diagnostic workflow below supplies one concrete producer without changing that
+descriptive contract or activating qualified-verifier execution.
 [Reconciliation](adr/reconciliation.md) owns implementation and disabled-path status.
 
 ## Producer boundary
 
-`Producer.Produce(context.Context) (Output, error)` is the external implementation interface.
-[ADR-16 §6](adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
-owns its execution and authority boundary. The fields below describe its output, never an executable
-workflow or permission to run a suite.
+`Producer.Produce(context.Context) (Output, error)` permits external implementations to execute
+outside the qualified verifier. Implementations own suite/harness configuration, arguments, permitted
+environment, access requirements and child-process lifecycle. No implementation ships at this boundary.
+User-invoked diagnostic adapters remain separate from qualification verification; see
+[ADR-16's passive handoff](adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+and [ADR-05's trust-object separation](adr/0005-trust-object-model-and-digest-authentication.md#4-publisher-evidence-and-later-observations-are-different-trust-objects).
+The output-description package supplies no dispatcher or cluster provisioning. Diagnostic check
+selection is explicit in a separate profile, not inferred from these descriptions.
 
 `Output` uses schema `nvkr.dev/test-results-output/v1`. It describes `ProducerIdentity`,
 `SuiteSelection`, optional `HarnessIdentity`, `Reports []ReportReference`,
@@ -29,7 +35,7 @@ installed artifact, successful cleanup or passing result.
 
 A producer may reference original JUnit XML, CTRF JSON, or both. `ReportReference` declares format,
 profile, opaque location, exact SHA-256 and byte length. Validation never opens that location or
-recomputes its digest. A future collector must independently check the original bytes. Independent
+recomputes its digest. A collector must independently check the original bytes. Independent
 JUnit/CTRF files need no conversion link. Optional `DerivedFrom` names another included original
 reference, with one derivation step only; it proves no conversion. No report bytes are rewritten.
 
@@ -45,6 +51,74 @@ is MIT. Referencing that source establishes neither dependency approval nor form
 Authoritative format validation is deferred. The dependency set has no JSON Schema validator, and
 no JUnit profile parser is supplied. Wrapper validation does not interpret result counts, evaluate
 coverage or judge results passing. A format label is not a validity claim.
+
+## Run configured diagnostic checks
+
+`nvkr validate` delegates through SDK `Client.Validate` to `validation.RunFiles`. No argument runs
+the profile's configured admitted checks; one positional name selects that configured check. Supply
+flags before the optional check name, following the existing CLI parser convention:
+
+```sh
+nvkr validate --config validation.json --workspace .nvkr/validation
+nvkr validate --config validation.json --workspace .nvkr/validation kube-conformance
+```
+
+The profile explicitly selects a published source and independently selected policy. Replace the
+reference placeholder with the immutable publication root; there is no automatic latest lookup:
+
+```json
+{
+  "source": {
+    "kind": "published",
+    "reference": "<publication-repository>@sha256:<reviewed-root-digest>",
+    "policy": "qualification.yaml"
+  },
+  "checks": [{"name": "kube-conformance", "harness": "hydrophone", "config": "conformance.json"}]
+}
+```
+
+Registry authentication is explicit. The CLI selects anonymous access only when `NVKR_REGISTRY`,
+`NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD` are all absent. Otherwise supply the complete
+host-scoped tuple; partial credentials fail owning admission. SDK callers must set
+`ValidationOptions.Registry.Anonymous = true` or supply complete matching scoped credentials.
+Ambient Docker configuration and credential helpers are not used by this published-source adapter.
+Provider read credentials remain independently explicit; no registry/provider secret reaches cluster tools.
+
+Relative policy and check-configuration paths resolve beside the profile. Lifecycle owns publication,
+source-Run lookup and artifact authentication; customers need no GitHub Run URL. An unsigned local
+Run or record cannot restore that receipt. Source kind `local` returns `CodeEngineCapability` until
+an owning local diagnostic capability exists; no local behavior is approximated by hosted authentication.
+Only `kube-conformance` with `hydrophone` is admitted. Other configured checks/harnesses, including
+user/AI adapters, currently return `CodeUnsupported` before provider or harness work. New producers can
+implement the shared interface but require explicit adapter admission; no plugin framework, shell
+configuration, Definition/product detector or implicit applicability rule is implemented.
+
+The Hydrophone configuration is `{"runner": <conformance.Options>, "timeouts": {...}}` with duration
+strings `run`, `command`, `cleanup`, `startup` (defaults `2h`, `1m`, `5m`, `5m`). Runner fields are
+`hydrophone`, `kubectl`, `kubeconfig` (each `path`/exact byte `digest`), `context`, `cniSelector`, pinned
+`image`, declared `imageVersion`, pinned `busyboxImage`, `suiteName`, declared `harnessVersion`,
+`role: local`, `disposableCluster: true` and explicit `targets`. Environment overrides are unsupported.
+Each target specifies `output`, `namespace`, `labelSelector`, `container`, and positive
+`requiredReplicas`. Relative tool/kubeconfig paths resolve beside that configuration. Use native static
+Linux executables and a self-contained owner-only kubeconfig on an existing disposable cluster.
+The acknowledgement is operator responsibility, not proof of locality/exclusive ownership.
+
+The current binding supports selected native OCI images only. Before/after API checks match PodSpec
+and image-ID to the authenticated native manifest selected by node platform, and compare mapped
+cluster/pod/node/container identity and restart counts. They describe those two snapshots, not
+continuous identity during execution, installed-byte attestation or coverage of unmapped outputs/index
+children. No cluster is provisioned. Site/tenant execution is unavailable because
+[pinned Hydrophone `5fe47daaff5fe025215cb257118dc2a0e643e1d6`](https://github.com/kubernetes-sigs/hydrophone/blob/5fe47daaff5fe025215cb257118dc2a0e643e1d6/cmd/root.go)
+has name-based automatic normal cleanup; wrapper recovery retains UID preconditions.
+
+Hydrophone directly runs the upstream Ginkgo conformance suite and fetches original JUnit. The initial
+adapter selects that narrow route. [Sonobuoy](https://sonobuoy.io/docs/v0.56.7/plugins/) offers broader
+plugin orchestration and [archive/result processing](https://sonobuoy.io/docs/v0.56.7/results/); it was
+not rejected because of a demonstrated technical failure. That additional control plane is not required
+by this initial adapter. No report parsing, CTRF conversion or passing verdict is supplied. The CLI
+emits a canonical array of output descriptions, preserving partial outputs and original errors. These
+outputs never activate qualification signing or publication; external execution of this rewritten route
+is not yet established.
 
 ## Optional post-publication bindings
 
@@ -62,8 +136,7 @@ identities and subject digests are validated by their existing owners without au
 
 ## Validation and serialization
 
-`Output.Validate()` checks wrapper shape and declarations; success does not guarantee the aggregate
-document fits the serialized byte limit. `Encode(Output)` validates, defensively
+`Output.Validate()` checks wrapper shape and declarations. `Encode(Output)` validates, defensively
 copies and sorts descriptions through the existing canonical codec. `Decode([]byte)` admits at most
 16 MiB, validates exact canonical bytes and rejects non-normalized collection order. Selection,
 report and subject collections are bounded to 1,024 entries each; environment facts to 10,000.
@@ -77,5 +150,6 @@ Deterministic serialization supplies no new digest family or structured identity
 publisher evidence. Existing validation-vector v3 (including `ConformanceClaim` and
 `ValidationVectorRef`) and qualification-evidence v2 remain unchanged. This output cannot authorize
 artifact verification, qualification signing, promotion or release, nor establish current cluster health.
-Concrete producer integration, file retention, format adapters, coverage policy and authenticated
-external handoff remain unimplemented; no CLI/SDK execution or external runtime acceptance is claimed.
+The explicit diagnostic route supplies scoped producer execution and raw file retention. Other
+producer integration, format adapters, coverage policy and authenticated external handoff remain
+unimplemented. No qualified-verifier execution or external runtime acceptance is claimed.

@@ -1,0 +1,152 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package conformance
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+)
+
+func configurationBytes(t *testing.T) []byte {
+	t.Helper()
+	options := optionsFixture()
+	options.Hydrophone.Path = "tools/hydrophone"
+	options.Kubectl.Path = "tools/kubectl"
+	options.Kubeconfig.Path = "private/kubeconfig"
+	options.Targets = []DeploymentTarget{{Output: "image", Namespace: "nvke", LabelSelector: "app=nvke", Container: "nvke", RequiredReplicas: 1}}
+	config := Configuration{Runner: options}
+	config.Timeouts.Run = "11m"
+	raw, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func TestConfigurationLoadingUsesSelectedPathsAndDurationBounds(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "runner.json")
+	if err := os.WriteFile(path, configurationBytes(t), 0600); err != nil {
+		t.Fatal(err)
+	}
+	options, err := loadConfiguration(t.Context(), path, "selected-workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.Hydrophone.Path != filepath.Join(root, "tools/hydrophone") || options.Kubectl.Path != filepath.Join(root, "tools/kubectl") || options.Kubeconfig.Path != filepath.Join(root, "private/kubeconfig") {
+		t.Fatalf("relative paths did not resolve beside configuration: %+v", options)
+	}
+	workspace, err := filepath.Abs("selected-workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if options.WorkspaceRoot != workspace || options.RunTimeout != 11*time.Minute || options.CommandTimeout != time.Minute || options.CleanupTimeout != 5*time.Minute || options.StartupTimeout != 5*time.Minute || options.Artifacts != nil {
+		t.Fatalf("runtime configuration or receipt ownership differs: %+v", options)
+	}
+}
+
+func TestConfigurationRejectsAmbiguousAndAuthorityInputs(t *testing.T) {
+	valid := string(configurationBytes(t))
+	for _, tc := range []struct{ name, raw string }{
+		{"duplicate document key", `{"runner":{},"runner":{}}`},
+		{"trailing document", valid + ` {}`},
+		{"unknown field", strings.TrimSuffix(valid, "}") + `,"receipt":{}}`},
+		{"forged receipt", strings.Replace(valid, `"runner":{`, `"runner":{"artifacts":{},`, 1)},
+		{"runner workspace override", strings.Replace(valid, `"runner":{`, `"runner":{"workspaceRoot":"/foreign",`, 1)},
+		{"runner timeout override", strings.Replace(valid, `"runner":{`, `"runner":{"runTimeout":1,`, 1)},
+		{"invalid duration", strings.Replace(valid, `"11m"`, `"forever"`, 1)},
+		{"unbounded duration", strings.Replace(valid, `"11m"`, `"0s"`, 1)},
+		{"oversized", strings.Repeat(" ", (1<<20)+1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "runner.json")
+			if err := os.WriteFile(path, []byte(tc.raw), 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := loadConfiguration(t.Context(), path, "/must-not-create")
+			requireCode(t, err, e.CodeUsage)
+		})
+	}
+}
+
+func TestRunReferenceFilesAdmissionDoesNotReadConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name                           string
+		ctx                            context.Context
+		run, policy, config, workspace string
+		code                           e.Code
+	}{
+		{"nil context", nil, "run", "policy", "/must-not-open", "workspace", e.CodeUsage},
+		{"missing run", t.Context(), "", "policy", "/must-not-open", "workspace", e.CodeUsage},
+		{"missing policy", t.Context(), "run", "", "/must-not-open", "workspace", e.CodeUsage},
+		{"missing configuration", t.Context(), "run", "policy", "", "workspace", e.CodeUsage},
+		{"missing workspace", t.Context(), "run", "policy", "/must-not-open", "", e.CodeUsage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := RunReferenceFiles(tc.ctx, tc.run, tc.policy, tc.config, lifecycle.QualificationRuntimeOptions{WorkspaceRoot: tc.workspace})
+			requireCode(t, err, tc.code)
+			if output.SchemaVersion != "" {
+				t.Fatal("admission emitted partial output")
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	output, err := RunReferenceFiles(ctx, "run", "policy", "/must-not-open", lifecycle.QualificationRuntimeOptions{WorkspaceRoot: "workspace"})
+	requireCode(t, err, e.CodeTimeout)
+	if output.SchemaVersion != "" || !errors.Is(err, context.Canceled) {
+		t.Fatal("cancellation lost or emitted output")
+	}
+}
+
+func TestRunReferenceFilesRejectsWrongLocalPinsBeforeRunAuthentication(t *testing.T) {
+	options := buildFixture(t, "success")
+	for _, tc := range []struct {
+		name string
+		edit func(*Options)
+	}{
+		{"Hydrophone", func(o *Options) { o.Hydrophone.Digest = "sha256:" + strings.Repeat("c", 64) }},
+		{"kubectl", func(o *Options) { o.Kubectl.Digest = "sha256:" + strings.Repeat("c", 64) }},
+		{"kubeconfig", func(o *Options) { o.Kubeconfig.Digest = "sha256:" + strings.Repeat("c", 64) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := options
+			tc.edit(&o)
+			raw, err := json.Marshal(Configuration{Runner: o})
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "runner.json")
+			if err := os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			// A valid locator with an unreadable policy proves local byte admission
+			// precedes the existing policy/provider owner, which must not be reached.
+			output, err := RunReferenceFiles(t.Context(), "registry.example.test/release@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "/must-not-open-policy", path, lifecycle.QualificationRuntimeOptions{WorkspaceRoot: t.TempDir()})
+			requireCode(t, err, e.CodeUnpinnedInput)
+			if output.SchemaVersion != "" {
+				t.Fatal("bad local pin emitted output")
+			}
+		})
+	}
+}
+
+func TestRunReferenceFilesRefusesWrongLocatorBeforeConfiguration(t *testing.T) {
+	for _, reference := range []string{"https://github.com/example/nvkr/actions/runs/42/attempts/2", "registry.example.test/release:latest"} {
+		output, err := RunReferenceFiles(t.Context(), reference, "/must-not-open-policy", "/must-not-open-config", lifecycle.QualificationRuntimeOptions{WorkspaceRoot: "/must-not-create"})
+		requireCode(t, err, e.CodeUnverifiedRef)
+		if output.SchemaVersion != "" {
+			t.Fatal("wrong publication locator emitted reports")
+		}
+	}
+}

@@ -413,6 +413,10 @@ type Credential struct {
 	Password string
 }
 
+// Validate admits the existing complete-or-empty registry credential shape.
+// It performs no I/O and grants no registry host or signing authority.
+func (c Credential) Validate() error { return c.validate() }
+
 func (c Credential) empty() bool {
 	return c.Registry == "" && c.Username == "" && c.Password == ""
 }
@@ -775,21 +779,19 @@ func (s *CosignOCISigner) runStock(ctx context.Context, args, environment []stri
 }
 
 // writeDockerConfig materializes the registry credential as a private Docker
-// config directory and returns its path (empty when no credential is set).
+// config directory and returns its path. Empty credentials produce an explicit
+// empty auth map, preventing ambient Docker or Podman credential discovery.
 func (s *CosignOCISigner) writeDockerConfig(ctx context.Context, workspace string) (string, error) {
-	if s.credential.empty() {
-		return "", nil
-	}
 	dir := filepath.Join(workspace, dockerConfigDirName)
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "creating private registry credential directory")
 	}
-	auth := base64.StdEncoding.EncodeToString([]byte(s.credential.Username + ":" + s.credential.Password))
-	document, err := json.Marshal(map[string]any{
-		"auths": map[string]any{
-			s.credential.Registry: map[string]string{"auth": auth},
-		},
-	})
+	auths := map[string]any{}
+	if !s.credential.empty() {
+		auth := base64.StdEncoding.EncodeToString([]byte(s.credential.Username + ":" + s.credential.Password))
+		auths[s.credential.Registry] = map[string]string{"auth": auth}
+	}
+	document, err := json.Marshal(map[string]any{"auths": auths})
 	if err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "encoding private registry credential")
 	}
@@ -800,7 +802,8 @@ func (s *CosignOCISigner) writeDockerConfig(ctx context.Context, workspace strin
 }
 
 // ociCosignEnvironment is the qualified cosign environment plus exclusive
-// control of registry authentication. It keeps the ambient scrub of the
+// control of registry authentication. HOME is private because the upstream
+// Docker keychain checks HOME before DOCKER_CONFIG. It keeps the ambient scrub of the
 // sign-blob/verify-blob adapters (loader injection, COSIGN_*, SIGSTORE_*, TUF_*,
 // SOURCE_DATE_EPOCH) and additionally removes every ambient registry-credential
 // control, so the only credential in scope is the one this adapter wrote.
@@ -815,13 +818,13 @@ func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 			name = entry[:i]
 		}
 		switch strings.ToUpper(name) {
-		case "DOCKER_CONFIG", "DOCKER_AUTH_CONFIG", "REGISTRY_AUTH_FILE", "REGISTRY_AUTH_TOKEN":
+		case "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR", "DOCKER_CONFIG", "DOCKER_AUTH_CONFIG", "REGISTRY_AUTH_FILE", "REGISTRY_AUTH_TOKEN":
 			continue
 		}
 		out = append(out, entry)
 	}
 	if dockerConfigDir != "" {
-		out = append(out, "DOCKER_CONFIG="+dockerConfigDir)
+		out = append(out, "HOME="+filepath.Dir(dockerConfigDir), "DOCKER_CONFIG="+dockerConfigDir)
 	}
 	return out
 }
