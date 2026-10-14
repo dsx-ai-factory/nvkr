@@ -21,6 +21,7 @@ import (
 
 // Selection names exactly one output's ordinary producers.
 type Selection struct {
+	Debian       *target.Debian
 	Components   []string
 	Platform     string
 	OutputFormat string
@@ -29,12 +30,41 @@ type Selection struct {
 // Validate admits the explicit request shape before a caller reads catalog data.
 // Catalog membership and exact target routes are checked by Resolve.
 func (selection Selection) Validate() error {
-	if err := target.ValidatePlatform(selection.Platform); err != nil {
-		return err
+	if selection.OutputFormat == catalog.OutputDebianPackage {
+		if len(selection.Components) != 1 {
+			return e.New(e.CodeInvalidCatalog, "Debian output requires exactly one source producer")
+		}
+		if selection.Platform != "" {
+			if err := target.ValidatePlatform(selection.Platform); err != nil {
+				return err
+			}
+		}
+		if selection.Debian != nil && selection.Debian.Platform != "" && selection.Platform != "" && selection.Debian.Platform != selection.Platform {
+			return e.New(e.CodeInvalidCatalog, "Debian selection declares conflicting platforms")
+		}
+		candidate := target.Debian{Distribution: target.DefaultDebianDistribution, Platform: target.DefaultDebianPlatform}
+		if selection.Debian != nil {
+			if selection.Debian.Distribution != "" {
+				candidate.Distribution = selection.Debian.Distribution
+			}
+			if selection.Debian.Platform != "" {
+				candidate.Platform = selection.Debian.Platform
+			}
+		}
+		if err := candidate.Validate(); err != nil {
+			return err
+		}
+	} else {
+		if selection.Debian != nil {
+			return e.New(e.CodeInvalidCatalog, "Debian target requires a Debian output")
+		}
+		if err := target.ValidatePlatform(selection.Platform); err != nil {
+			return err
+		}
 	}
 	switch selection.OutputFormat {
 	case "", definition.OutputExecutable, definition.OutputOCI, definition.OutputAPT,
-		definition.OutputHelm, definition.OutputDiskImage:
+		definition.OutputHelm, definition.OutputDiskImage, catalog.OutputDebianPackage:
 	default:
 		return e.New(e.CodeInvalidCatalog, "output format %q is unsupported", selection.OutputFormat)
 	}
@@ -57,6 +87,7 @@ func (selection Selection) Validate() error {
 // Resolved is a description of selected, validated producer inputs. It carries no
 // execution or evidence authority; Compile validates it again before lowering.
 type Resolved struct {
+	Debian     *target.Debian
 	Platform   string
 	Components []catalog.NamedComponent
 }
@@ -70,6 +101,9 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 	if err := cat.Validate(); err != nil {
 		return nil, err
 	}
+	if selection.OutputFormat == catalog.OutputDebianPackage {
+		return resolveDebianSelection(cat, selection)
+	}
 	resolved := &Resolved{Platform: selection.Platform}
 	names := append([]string(nil), selection.Components...)
 	sort.Strings(names)
@@ -77,6 +111,9 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 		component, ok := cat.Components[name]
 		if !ok {
 			return nil, e.New(e.CodeInvalidCatalog, "unknown selected component %q", name)
+		}
+		if component.OutputType == catalog.OutputDebianPackage {
+			return nil, e.New(e.CodeEngineCapability, "Debian producer requires explicit standalone Debian selection; OS/image target joins are not implemented")
 		}
 		if err := requireComponentRoute(name, component, selection.Platform); err != nil {
 			return nil, err
@@ -190,6 +227,7 @@ func DiskRootName(components []catalog.NamedComponent) (string, error) {
 // cloneComponent preserves exact strings, including malformed bytes that downstream
 // graph validation must reject. A JSON round-trip would repair invalid UTF-8.
 func cloneComponent(component catalog.Component) catalog.Component {
+	component.Debian = catalog.CloneDebianSpec(component.Debian)
 	component.Embeds = catalog.CloneEmbeddedComponents(component.Embeds)
 	component.Platforms = slices.Clone(component.Platforms)
 	if component.Helm != nil {
@@ -252,7 +290,18 @@ func validateResolved(resolved *Resolved) error {
 	if err := cat.Validate(); err != nil {
 		return err
 	}
+	if resolved.Debian != nil {
+		names := make([]string, 0, len(resolved.Components))
+		for _, component := range resolved.Components {
+			names = append(names, component.Name)
+		}
+		_, err := Resolve(cat, Selection{Components: names, Platform: resolved.Platform, OutputFormat: catalog.OutputDebianPackage, Debian: resolved.Debian})
+		return err
+	}
 	for _, component := range resolved.Components {
+		if component.OutputType == catalog.OutputDebianPackage {
+			return e.New(e.CodeInvalidCatalog, "resolved Debian producer lacks its exact target")
+		}
 		if err := requireComponentRoute(component.Name, component.Component, resolved.Platform); err != nil {
 			return err
 		}

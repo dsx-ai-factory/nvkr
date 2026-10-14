@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: nvsentinel-ubuntu-26.04-amd64-candidate
+utilityPlatform: linux/amd64
+utilityContainer: docker.io/library/nvkr-nvsentinel-ubuntu-26.04-amd64@sha256:fb19d5e7aa08d6d870eabff80fb012d6edf1c73cebad636f3d977bbbc7ad5eb8
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared
+# Native AMD64 tool bytes measured under emulation; native execution is still required.
+diskInspectionProfiles:
+  linux/amd64:
+    image: localhost/nvkr-debian-inspection@sha256:3fc02bfc28a25ebd4c575221458a5de5de4bf45b77c66c4fcc4d6154d5682e0f
+    inspectorDigest: sha256:31f25fbb70ef79d8c5487c0d8a41613b6db5c93eb391b73f990ddaa04e6ba052
+    codecDigest: sha256:634320b91165669917123e8e79cce1c4d00cee0a4aa4d662d7c0a8186479b3fb
+    guestfishDigest: sha256:65739abd86dbf919cbdff5ef9bb144079bd0e97dc4c9023c9455d6b8538add8c
+    scannerDigest: sha256:abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f
+    packageReaderDigest: sha256:fc9dde782ca8309b65ab92e61d13318bf463cd1aa71daa8967b87b81b48b63d2
+    resources:
+      cpuMillis: 2000
+      memoryMiB: 12288
+      ephemeralStorageMiB: 8192
+    timeoutSeconds: 600
+    maxFilesystemBytes: 268435456
+    scratchStorage: private-volume

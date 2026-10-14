@@ -61,6 +61,9 @@ func admitExecutionNode(ctx context.Context, plan *Plan, nodeID string) (Node, e
 	if err := plan.Validate(); err != nil {
 		return Node{}, err
 	}
+	if err := rejectUnjoinedDebianPlan(plan, "factory execute-node"); err != nil {
+		return Node{}, err
+	}
 	if err := admitDevelopmentHostedContext(plan); err != nil {
 		return Node{}, err
 	}

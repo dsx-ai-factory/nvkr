@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"sync"
 
@@ -23,15 +24,17 @@ type NodeSession struct {
 }
 
 type nodeSessionState struct {
-	mu            sync.Mutex
-	ctx           context.Context
-	cancel        context.CancelFunc
-	closed        bool
-	done          chan struct{}
-	active        sync.WaitGroup
-	calls         map[context.Context]context.CancelFunc
-	sources       map[string]*preparedSourceCache
-	packerRuntime *nodeSessionPackerRuntime
+	mu             sync.Mutex
+	ctx            context.Context
+	cancel         context.CancelFunc
+	closed         bool
+	done           chan struct{}
+	active         sync.WaitGroup
+	calls          map[context.Context]context.CancelFunc
+	sources        map[string]*preparedSourceCache
+	packerRuntime  *nodeSessionPackerRuntime
+	debianArchives *debianArchiveOwner
+	closeErr       error
 }
 
 func NewNodeSession(ctx context.Context) (*NodeSession, error) {
@@ -101,15 +104,51 @@ func (handle *NodeSession) ExecNode(node ir.Node, options RunOptions) (*Artifact
 }
 
 func (handle *NodeSession) Close() {
+	_ = handle.closeOwned()
+}
+
+// RequireOpenContext checks this concrete session's current lifetime. It issues
+// no producer, Run or evidence authority; execution registers its own operation.
+func (handle *NodeSession) RequireOpenContext(ctx context.Context) error {
+	return handle.RequireOwnerContext(ctx, handle)
+}
+
+// RequireOwnerContext compares concrete original session state and checks its
+// current lifetime. A decoded facade or another session cannot substitute for it.
+// This comparison issues no execution or evidence receipt.
+func (handle *NodeSession) RequireOwnerContext(ctx context.Context, other *NodeSession) error {
+	if err := requireRunContext(ctx, "node session lifetime"); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "checking node session lifetime")
+	}
 	if handle == nil || handle.state == nil {
-		return
+		return e.New(e.CodeEngineCapability, "node session has no original owner")
+	}
+	if other == nil || other.state != handle.state {
+		return e.New(e.CodeVerifyFailed, "node session belongs to another original owner")
+	}
+	handle.state.mu.Lock()
+	defer handle.state.mu.Unlock()
+	if handle.state.closed || handle.state.ctx.Err() != nil {
+		return e.New(e.CodeEngineCapability, "node session owner is closed or canceled")
+	}
+	return nil
+}
+
+// Private retained producers preserve cleanup errors for their owning boundary.
+// The existing public session facade keeps its void Close contract.
+func (handle *NodeSession) closeOwned() error {
+	if handle == nil || handle.state == nil {
+		return nil
 	}
 	session := handle.state
 	session.mu.Lock()
 	if session.closed {
 		session.mu.Unlock()
 		<-session.done
-		return
+		return session.closeErr
 	}
 	session.closed = true
 	// AfterFunc propagates owner-parent cancellation, but its callback is
@@ -118,17 +157,29 @@ func (handle *NodeSession) Close() {
 	for _, cancel := range session.calls {
 		cancel()
 	}
+	session.debianArchives.cancelOperations()
 	session.cancel()
 	session.mu.Unlock()
 	session.active.Wait()
+	closeErr := session.debianArchives.Close()
 	for _, cache := range session.sources {
 		cache.close()
 	}
 	if session.packerRuntime != nil {
 		<-session.packerRuntime.ready
 		if session.packerRuntime.runtime != nil && session.packerRuntime.runtime.capability != nil {
-			_ = session.packerRuntime.runtime.close()
+			closeErr = errors.Join(closeErr, session.packerRuntime.runtime.close())
 		}
 	}
+	if closeErr != nil {
+		closeErr = e.Wrap(e.CodeInternal, closeErr, "closing producer session capabilities")
+	}
+	session.closeErr = closeErr
 	close(session.done)
+	return closeErr
 }
+
+// CloseChecked cancels and joins the same session lifetime as Close and preserves
+// capability cleanup failures for an owning Run. The existing void Close facade
+// remains unchanged.
+func (handle *NodeSession) CloseChecked() error { return handle.closeOwned() }

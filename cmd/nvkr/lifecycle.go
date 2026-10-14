@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -139,11 +140,19 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "attempts-root", Value: ".nvkr/runs"}, &cli.StringFlag{Name: "runner-source", Value: "."},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
 			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
+			&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "bound preparation, execution and output observation"},
 			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1},
 			&cli.StringFlag{Name: "ui", Value: "auto", Usage: "auto, plain, or tui presentation"},
 			&cli.BoolFlag{Name: "json", Usage: "emit one safe descriptive local Run result"},
 			&cli.BoolFlag{Name: "no-color", Usage: "disable terminal colors (also honors NO_COLOR)"}), Action: func(c *cli.Context) error {
-			return runLocalCommand(c, executeLocal)
+			if c.Duration("timeout") <= 0 {
+				return e.New(e.CodeUsage, "local run requires a positive timeout")
+			}
+			ctx, cancel := context.WithTimeout(c.Context, c.Duration("timeout"))
+			defer cancel()
+			bounded := *c
+			bounded.Context = ctx
+			return runLocalCommand(&bounded, executeLocal)
 		}},
 	}}
 }

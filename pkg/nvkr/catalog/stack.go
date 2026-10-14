@@ -277,6 +277,7 @@ func materializeReplacement(name string, original Component, replacement Compone
 	var out Component
 	if replacement.Component != nil {
 		out = *replacement.Component
+		out.Debian = CloneDebianSpec(out.Debian)
 	} else {
 		if strings.TrimSpace(replacement.Version) == "" {
 			return Component{}, fmt.Errorf("component %q supplier replacement has no version", name)
@@ -306,9 +307,9 @@ func materializeReplacement(name string, original Component, replacement Compone
 }
 
 func cloneCatalog(in *Catalog) (*Catalog, error) {
-	raw, err := json.Marshal(in)
+	raw, err := canonical.Marshal(in)
 	if err != nil {
-		return nil, e.Wrap(e.CodeInternal, err, "cloning catalog stack base")
+		return nil, e.Wrap(e.CodeInvalidCatalog, err, "cloning exact catalog stack base")
 	}
 	var out Catalog
 	if err := json.Unmarshal(raw, &out); err != nil {

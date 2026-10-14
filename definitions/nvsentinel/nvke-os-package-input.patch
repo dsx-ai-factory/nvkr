@@ -1,0 +1,118 @@
+--- a/os-image/packer/scripts/compose-image-inputs.py
++++ b/os-image/packer/scripts/compose-image-inputs.py
+@@ -33,6 +33,7 @@
+     parser.add_argument("--output", type=pathlib.Path, required=True)
+     parser.add_argument("--source-date-epoch", type=int, required=True)
+     parser.add_argument("--architecture", choices=("amd64", "arm64"), required=True)
++    parser.add_argument("--nvsentinel-package", type=pathlib.Path)
+     return parser.parse_args()
+ 
+ 
+@@ -260,6 +261,17 @@
+             install_file(args.source_files_dir / name, stage / name, mode)
+ 
+         names: set[str] = set()
++        if args.nvsentinel_package is not None:
++            name = "nvsentinel-platform-connectors.deb"
++            size = install_file(
++                args.nvsentinel_package, debs / name, 0o644,
++                max_bytes=min(MAX_PACKAGE_BYTES, MAX_TOTAL_PACKAGE_BYTES - total_bytes),
++            )
++            if size == 0:
++                raise SystemExit("NVSentinel package is empty")
++            total_bytes += size
++            require_architecture(debs / name, args.architecture)
++            names.add(name)
+         for binding in ARCHIVE_BINDINGS:
+             previous_names = names.copy()
+             total_bytes = stage_archive_debs(args.materials_dir / binding, debs, names, total_bytes)
+--- a/os-image/packer/scripts/provision.sh
++++ b/os-image/packer/scripts/provision.sh
+@@ -75,6 +75,11 @@
+   exit 1
+ fi
+ sudo dpkg -i "${spire_agent_deb}"
++
++# Install the source-built host package supplied through the existing image inputs.
++if [[ -f "${SRC}/debs/nvsentinel-platform-connectors.deb" ]]; then
++  sudo dpkg -i "${SRC}/debs/nvsentinel-platform-connectors.deb"
++fi
+ 
+ # Give cloud-image importers a stable root-filesystem identifier. Do not rely
+ # on a device path because it can change between the build VM and a target.
+--- a/os-image/packer/scripts/test_external_materials.py
++++ b/os-image/packer/scripts/test_external_materials.py
+@@ -71,7 +71,7 @@
+     def tearDown(self):
+         self.temporary.cleanup()
+ 
+-    def run_compose(self, output: Path, umask: int = -1, architecture: str = "amd64"):
++    def run_compose(self, output: Path, umask: int = -1, architecture: str = "amd64", nvsentinel_package=None):
+         environment = os.environ.copy()
+         environment["PATH"] = f"{self.tools}:{environment['PATH']}"
+         return subprocess.run(
+@@ -87,6 +87,7 @@
+                 str(output),
+                 "--source-date-epoch",
+                 "1787932620",
++                *([] if nvsentinel_package is None else ["--nvsentinel-package", str(nvsentinel_package)]),
+             ],
+             env=environment,
+             check=False,
+@@ -94,6 +95,29 @@
+             text=True,
+             umask=umask,
+         )
++
++    def test_nvsentinel_package_preserves_bytes_in_existing_debs_directory(self):
++        package = self.root / "nvsentinel.deb"
++        payload = b"unchanged source-produced package bytes\n"
++        package.write_bytes(payload)
++        output = self.root / "with-nvsentinel.tar"
++        result = self.run_compose(output, nvsentinel_package=package)
++        self.assertEqual(result.returncode, 0, result.stderr)
++        with tarfile.open(output) as archive:
++            self.assertEqual(archive.extractfile("debs/nvsentinel-platform-connectors.deb").read(), payload)
++            self.assertIsNotNone(archive.getmember("debs/Packages"))
++
++    def test_nvsentinel_package_rejects_empty_or_wrong_architecture(self):
++        package = self.root / "nvsentinel.deb"
++        for invalid in ("empty", "wrong architecture"):
++            with self.subTest(invalid=invalid):
++                package.write_bytes(b"" if invalid == "empty" else b"package bytes")
++                if invalid == "wrong architecture":
++                    write_executable(self.tools / "dpkg-deb", '#!/bin/sh\ncase "$2" in */nvsentinel-platform-connectors.deb) printf \'arm64\\n\';; *) printf \'all\\n\';; esac\n')
++                output = self.root / "invalid-nvsentinel.tar"
++                result = self.run_compose(output, nvsentinel_package=package)
++                self.assertNotEqual(result.returncode, 0)
++                self.assertFalse(output.exists())
+ 
+     def test_composes_deterministic_archive(self):
+         first = self.root / "first.tar"
+@@ -270,7 +294,7 @@
+                     output = self.root / "budget.tar"
+                     if existing:
+                         output.write_bytes(b"prior output")
+-                    arguments = SimpleNamespace(architecture="amd64", materials_dir=self.materials, source_files_dir=self.source_files,
++                    arguments = SimpleNamespace(nvsentinel_package=None, architecture="amd64", materials_dir=self.materials, source_files_dir=self.source_files,
+                                                 output=output, source_date_epoch=1787932620)
+                     with patch.object(module, "parse_args", return_value=arguments), \
+                             patch.object(module.shutil, "which", return_value="fixture"), \
+@@ -312,7 +336,7 @@
+                 agent.write_bytes(initial)
+                 output = self.root / "changed-agent.tar"
+                 output.write_bytes(b"prior output")
+-                arguments = SimpleNamespace(architecture="amd64", materials_dir=self.materials, source_files_dir=self.source_files,
++                arguments = SimpleNamespace(nvsentinel_package=None, architecture="amd64", materials_dir=self.materials, source_files_dir=self.source_files,
+                                             output=output, source_date_epoch=1787932620)
+                 original_install = module.install_file
+ 
+@@ -524,7 +548,7 @@
+         spec = importlib.util.spec_from_file_location("compose_image_inputs", SCRIPTS / "compose-image-inputs.py")
+         module = importlib.util.module_from_spec(spec)
+         spec.loader.exec_module(module)
+-        arguments = SimpleNamespace(architecture="amd64", materials_dir=self.materials, source_files_dir=self.source_files,
++        arguments = SimpleNamespace(nvsentinel_package=None, architecture="amd64", materials_dir=self.materials, source_files_dir=self.source_files,
+                                     output=self.root / "preflight.tar", source_date_epoch=1787932620)
+         with patch.object(module, "parse_args", return_value=arguments), \
+                 patch.object(module.shutil, "which", side_effect=lambda tool: None if tool == "dpkg-scanpackages" else "fixture"):

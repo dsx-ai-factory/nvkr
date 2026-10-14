@@ -151,6 +151,41 @@ versionStamp:
 These are build inputs, not labels added after the build. For the pinned tag `cli/v0.1.0-rc.2`,
 `.ModuleTag` is `v0.1.0-rc.2`; `.Version` is `0.1.0-rc.2`.
 
+## Native Debian producers
+
+A `debian-package` component declares complete `debian.routes`, each with a distribution/platform `target`,
+digest-pinned `toolchainImage`, source-owned `buildCommand`, `artifactPath` and private `writeDir`.
+Commands and installation layout belong to the source. Common command/path/toolchain fields cannot compete
+with route fields. The complete route set must be sorted and unique and cover every declared platform.
+Source-specific distribution inputs belong in exact route arguments; only the existing `{{.Arch}}` token
+is substituted. A distribution profile key is separate from the APT publication suite and package version.
+
+Direct compiler selection resolves standalone defaults to `ubuntu-24.04` and `linux/amd64` only when that
+exact route exists, then binds the selected target and source archive path into Build identity. A Definition
+may select one such producer with `format: debian-package`, optional `debian.distribution` and optional
+standalone `platform`. The compiled Plan retains and rederives the resolved target and required raw archive;
+local standalone execution additionally requires a matching native Linux host, bounded context, complete
+private-volume inspection profile and selected catalog scanner. Its original producer/content/terminal
+owners preserve package bytes and inspected evidence through the lifecycle transaction. Direct-node and
+GitHub execution remain gated. Actual OS/image dependency binding, ABI compatibility, signing, publication
+and installation acceptance remain deferred. See
+[ADR-12](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0012-criteria-model-and-aicr-activation.md)
+and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
+
+The selected NVSentinel integration is a reusable catalog with separate image, Helm chart and native Debian
+producers sharing a coordinated source pin. A Definition chooses the required outputs; choosing Debian does
+not build or deploy the Kubernetes outputs implicitly. Image and chart producers retain their own source
+commands, dependency pins and image-slot contracts. Their schema names do not establish working NVSentinel
+builds, and a source-created Debian archive is not an image or a chart.
+
+The planned OS-recipe route consumes that Debian archive as an explicit material. Its complete compiled
+consumer target supplies distribution and architecture; conflicts fail before work. The image recipe owns
+installation, runtime configuration and the transition from DaemonSets to host services. The package's exact
+bytes and evidence must remain bound through consumption. A platform-connectors candidate catalog now
+compiles four Ubuntu 24.04/26.04 and AMD64/ARM64 selections through NVKR with local toolchain image
+IDs. Package metadata and execution, remaining image/Helm producers, authenticated consumer
+target/material joins and real source/package/image acceptance remain unfinished.
+
 ## Run the local lab
 
 Use macOS or Linux with Bash 3.2+, Git, Make, `jq`, GNU `timeout` or `gtimeout`, a SHA-256 utility

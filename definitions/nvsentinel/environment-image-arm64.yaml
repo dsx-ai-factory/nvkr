@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: nvsentinel-platform-connectors-image-arm64-local
+utilityPlatform: linux/arm64
+utilityContainer: docker.io/library/nvkr-nvsentinel-ubuntu-24.04-arm64@sha256:3ebca79a900100ed1ef6ee9903b7d26a0ee45320a9dff49f91610142d8d11581
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared

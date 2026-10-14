@@ -248,8 +248,9 @@ func (container *DiskInspectionContainer) observeBinding(ctx context.Context) er
 
 // BindingContext checks that the capability remains open and unchanged. Image
 // identity is the runtime-reported image ID, not an independently approved pin.
-// The recorded Podman config identity binds rootfs content; the unexercised
-// Docker route does not establish which image-store identity .Id represents.
+// The recorded Podman config identity binds rootfs content. Docker can report a
+// store-specific platform identity; launch uses the declared repository digest
+// rather than assuming that observed ID is also a locatable image reference.
 func (container *DiskInspectionContainer) BindingContext(ctx context.Context) (string, string, string, error) {
 	if err := requireRunContext(ctx, "disk inspection runtime binding"); err != nil {
 		return "", "", "", err
@@ -565,7 +566,7 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	if selection.compositionKind != "" {
 		report.limit = MaxDiskContentReportBytes
 	}
-	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...)...); err != nil {
+	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, selection.Image, name, attempt, subject)...)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(createDiagnostic.Bytes()), e.CodeEngineCapability, "creating disk inspection container")
 	}
 	creationUncertain = false

@@ -20,8 +20,9 @@ routes. Neither requires an NVKR Recipe, deployment topology, or a generic crite
 
 ### 1. Concrete target platforms
 
-Every native Definition output declares `platform: linux/amd64` or `linux/arm64`; no wildcard, missing value or
-host-derived default is admitted. Catalog components declare sorted supported `platforms`, with complete exact
+Ordinary native Definition outputs declare `platform: linux/amd64` or `linux/arm64`; no wildcard, missing value or
+host-derived default is admitted. The explicit standalone Debian exception is defined in section 2.
+Catalog components declare sorted supported `platforms`, with complete exact
 pin/toolchain routes for those declarations. Selecting an unsupported route fails before external work.
 `pkg/nvkr/target` owns the platform and architecture domains.
 
@@ -37,7 +38,100 @@ capability policy are execution contracts, not target defaults. Source builds re
 model; a foreign host requires its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
 from the explicit target. Other command values are never inferred from deployment context.
 
-### 2. AICR rendering — deferred
+### 2. Debian producer targets and local execution
+
+The separate `target.ResolveDebian` description resolver accepts an exact source-declared finite set of
+distribution/platform routes. Distribution is an opaque source-owned distribution/ABI profile key, not an
+APT publication suite, toolchain tag or Debian package version. Standalone omissions resolve to profile
+`ubuntu-24.04` and `linux/amd64`; explicit values may select another declared route. This is a documented
+compatibility baseline, not a statement of NVIDIA-wide policy. Missing default support fails instead of
+choosing another route or using the execution host's architecture.
+
+A package dependency instead inherits both fields from a complete consuming OS/image target. Explicit
+architecture or distribution conflicts fail; an incomplete consumer cannot use the standalone defaults.
+The resolver validates the entire canonically sorted unique route set, including unselected declarations,
+and returns a value description. Source pins, target-specific toolchain pins, the consumer binding and actual
+ABI compatibility still require their owning boundaries; the label does not prove them.
+
+The catalog admits an explicit `debian-package` source producer with `debian.routes`: each complete route
+contains its typed target, exact digest-pinned toolchain, source-owned argv, artifact path and private output
+directory. Competing common command/path/toolchain fields are rejected. Every declared component platform
+needs a route; the entire finite set is admitted before selection, including unselected pins and commands.
+Distribution-specific source inputs are exact route argv, not a new template grammar or inferred environment
+variable. Existing `{{.Arch}}` substitution still comes from the selected platform. Debian control Version is
+not inferred from the normalized source tag.
+
+Direct `buildgraph.Selection` may select exactly one such producer through explicit `debian-package` format.
+Resolution freezes the concrete target and owns copies of route argv. Compilation revalidates the resolved
+description and lowers that source-owned archive path without an executable/APT wrapper. The typed target,
+selected command and toolchain enter the IR logical projection and `nvkr.build` identity. Equivalent omitted
+and explicit defaults have the same identity; changing distribution or architecture changes it. Source and
+toolchain transport mirrors retain the same identity when their exact content pins remain unchanged.
+Catalog snapshots bind every route; whole-producer overlays own copies and canonical cloning rejects
+malformed text rather than changing it.
+
+Definition also admits exactly one source producer in `format: debian-package`, with an optional
+`debian.distribution` profile key and optional standalone `platform`. Only this format admits those omissions;
+ordinary output admission is unchanged. Factory compilation records the resolved typed target and platform
+in its BuildPlan, independently from the authored omissions. Plan validation rederives the target, selected
+routes and complete graph from the original Definition and catalog snapshot; caller-modified target fields
+cannot replace that derivation. Its required output references the raw source archive, with no executable/APT
+wrapper or ordinary metadata-only SBOM operation. Exact canonical Plan round-tripping preserves the binding.
+
+Local execution admits one standalone inspected Debian output under ADR-10/13 on a matching native Linux
+host. It joins the original producer, retained-content SBOM, terminal receipt and unsigned local predicate;
+lifecycle retains the exact package and evidence through its existing durable transaction. An authenticated
+compiled OS/image consumer target, ABI compatibility and install acceptance remain unimplemented.
+Every direct factory node request, GitHub generation, whole-graph pipeline execution and standalone pipeline
+node execution still rejects this output before work. Publication or signing rejects before catalog I/O.
+Scanner-only compilation requires a complete native Environment private-volume inspection profile before
+catalog I/O; explicit/default producer/utility conflicts fail there. The selected catalog scanner executable
+pin and platform must match that profile. The offline SBOM node binds the raw archive, producer result and
+acquired scanner; terminal observation depends on the inspected SBOM. Full Plan rederivation retains these
+bindings. Ordinary path-based SBOM work cannot consume a serialized producer description as authority.
+APT/OCI destinations remain transport settings outside the producer's Build identity.
+
+The selected NVSentinel integration follows the generic catalog model: separate image, Helm and Debian
+producer components share coordinated source pins and are selected as separate named outputs. A customer's
+OS recipe instead consumes the exact Debian archive as a material. Its original compiled consumer supplies
+the complete target; neither a caller description nor an APT suite supplies that binding. This is the
+requested integration design. A candidate platform-connectors catalog now declares Ubuntu 24.04 and
+26.04 routes for both Linux architectures, a pinned development source and a packaging patch. All four
+selections compile through NVKR with measured local repository digest references. The human selected explicit
+local development package Version and Maintainer fields; these make no upstream release or maintainer claim.
+The Ubuntu 24.04 and 26.04 ARM64 platform-connectors Runs record real source-created packages, pinned
+content inspection and unsigned local evidence. Independent native installation/help/removal checks pass
+on both releases without starting services. Native AMD64 execution, source/dependency security acceptance,
+live service behavior and host-service migration remain unfinished; this is not an admitted OS-image build path.
+
+The separate platform-connectors image selection compiles both Linux architectures through the same source
+pin and an authenticated ko recipe patch. Its native ARM64 catalog Run completed an offline OCI image
+build and pinned Syft inventory containing 103 components; independent OCI import and the image help
+command passed without starting a service. The supporting ko source/dependency candidate is explicitly
+local and differs from the upstream-declared tool version; it grants no release or organizational approval.
+The source Helm selection also compiles both architectures and binds the chart's platform-connectors image
+slot to a named native image output in the same Run. A backward-compatible source patch adds an optional
+digest value without changing authentication, RBAC or the existing tag default. Its native ARM64 Run produced
+the bound chart and image; independent chart export/render confirmed the exact image digest and unchanged
+bundled subchart files. The chart inventory covers declarations, not the complete deployed image closure.
+Native AMD64 execution, Helm deployment and authenticated OS recipe consumption remain unfinished.
+
+Four local OS Definitions now select the existing NVKE host-package material and composer/Packer route.
+The matching source-built platform-connectors DEB enters the composer's existing `debs/` staging and the
+source-owned provisioner installs it during bake; the consumer does not rebuild or repack the package.
+The selected composer and non-FDE root use pinned NVKE development source `115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17`,
+with its actual Packer build name and material schema. The kubeadm supplier selects that same OS download-recovery fix; other suppliers retain their source pins.
+These are compiled customer input candidates, without an executed QCOW bake. The selected Packer image
+is absent from the current local daemon, and the Ubuntu 24.04 candidates still need an existing NVKE-agent
+package builder compatible with that guest; the retained baseline CGO builder uses Ubuntu 26.04. Neither
+the standalone NVSentinel install checks nor compilation establishes that separate agent's compatibility.
+
+ADR-10's collector, original session and exclusive named invocation retain the source-created bytes through
+checked cleanup. The local scheduler uses that original completion for profile-bound inspection and final
+observation under ADR-13; descriptions cannot recreate it. Controlled native tests establish ownership and
+exact-byte/evidence joins, not real Debian tooling, NVSentinel installation or consumer compatibility.
+
+### 3. AICR rendering — deferred
 
 This ADR previously also owned an accelerated-runtime rendering path: a catalog-declared `aicrProfiles` map, an
 output-owned `aicr` producer selecting a pinned upstream profile and generator, output-owned `aicr.bundle`
@@ -64,4 +158,8 @@ Target route admission has an explicit owner and no selector fallback.
 ## Acceptance evidence
 
 `pkg/nvkr/target` and `pkg/nvkr/ir` cover concrete targets, exact pins, and fail-before-output admission.
+Debian resolver/compiler contract tests cover default equivalence, target-sensitive and transport-pure identity,
+complete route admission, strict catalog loading, snapshot/overlay ownership and early execution rejection.
+Consumer inheritance/conflicts are resolver contracts only; no actual OS/image binding, package build,
+toolchain runtime, ABI or installation acceptance is established.
 Repository checks and external evidence limits are recorded in reconciliation.

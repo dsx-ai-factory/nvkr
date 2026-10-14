@@ -1,0 +1,39 @@
+diff --git a/distros/kubernetes/nvsentinel/templates/daemonset.yaml b/distros/kubernetes/nvsentinel/templates/daemonset.yaml
+index cca6883..3dede91 100644
+--- a/distros/kubernetes/nvsentinel/templates/daemonset.yaml
++++ b/distros/kubernetes/nvsentinel/templates/daemonset.yaml
+@@ -58,7 +58,7 @@ spec:
+       {{- end }}
+       containers:
+         - name: platform-connector
+-          image: "{{ .Values.platformConnector.image.repository }}:{{ .Values.platformConnector.image.tag | default .Values.global.image.tag | default .Chart.AppVersion }}"
++          image: "{{ .Values.platformConnector.image.repository }}{{ if .Values.platformConnector.image.digest }}@{{ .Values.platformConnector.image.digest }}{{ else }}:{{ .Values.platformConnector.image.tag | default .Values.global.image.tag | default .Chart.AppVersion }}{{ end }}"
+           imagePullPolicy: {{ .Values.platformConnector.image.pullPolicy }}
+           securityContext:
+             runAsUser: 0
+diff --git a/distros/kubernetes/nvsentinel/templates/platform-connector-deployment-deployment.yaml b/distros/kubernetes/nvsentinel/templates/platform-connector-deployment-deployment.yaml
+index 9cf15c8..c4ac183 100644
+--- a/distros/kubernetes/nvsentinel/templates/platform-connector-deployment-deployment.yaml
++++ b/distros/kubernetes/nvsentinel/templates/platform-connector-deployment-deployment.yaml
+@@ -70,7 +70,7 @@ spec:
+       {{- end }}
+       containers:
+         - name: platform-connector-deployment
+-          image: "{{ .Values.platformConnector.image.repository }}:{{ .Values.platformConnector.image.tag | default .Values.global.image.tag | default .Chart.AppVersion }}"
++          image: "{{ .Values.platformConnector.image.repository }}{{ if .Values.platformConnector.image.digest }}@{{ .Values.platformConnector.image.digest }}{{ else }}:{{ .Values.platformConnector.image.tag | default .Values.global.image.tag | default .Chart.AppVersion }}{{ end }}"
+           imagePullPolicy: {{ .Values.platformConnector.image.pullPolicy }}
+           securityContext:
+             runAsUser: 65532
+diff --git a/distros/kubernetes/nvsentinel/values.yaml b/distros/kubernetes/nvsentinel/values.yaml
+index 1fec662..3b15e42 100644
+--- a/distros/kubernetes/nvsentinel/values.yaml
++++ b/distros/kubernetes/nvsentinel/values.yaml
+@@ -472,6 +472,8 @@ platformConnector:
+     repository: ghcr.io/nvidia/nvsentinel/platform-connectors
+     pullPolicy: IfNotPresent
+     tag: ""
++    # An exact OCI digest takes precedence over tag; empty preserves existing behavior.
++    digest: ""
+ 
+   resources:
+     limits:

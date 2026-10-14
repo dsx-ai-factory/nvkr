@@ -500,10 +500,15 @@ func (result *LocalRunResult) Close() error {
 	// waiting for its permit. The scanner owns bounded stop-and-join cleanup.
 	result.diskMu.Lock()
 	result.diskClosing = true
+	debian := result.debian
 	if result.diskInspectionCancel != nil {
 		result.diskInspectionCancel()
 	}
 	result.diskMu.Unlock()
+	var debianErr error
+	if debian != nil {
+		debianErr = debian.closeOwned()
+	}
 	// No new reservation can pass after diskClosing is set. A completion
 	// already committing must record its outcomes before its held Run closes.
 	result.diskPublicationWait.Wait()
@@ -513,14 +518,14 @@ func (result *LocalRunResult) Close() error {
 	result.diskMu.Lock()
 	if result.diskClosed {
 		result.diskMu.Unlock()
-		return nil
+		return debianErr
 	}
 	result.diskClosed = true
 	completions := result.diskCompletions
 	result.diskCompletions = nil
 	result.materialConsumptions = nil
 	result.diskMu.Unlock()
-	var closeErr error
+	closeErr := debianErr
 	for _, completion := range completions {
 		if completion.Payload != nil {
 			closeErr = errors.Join(closeErr, completion.Payload.Close())

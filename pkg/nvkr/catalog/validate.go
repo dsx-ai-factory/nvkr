@@ -170,6 +170,9 @@ func validateComponent(name string, c Component) error {
 	if err := validateEmbeddedDeclaration(c.Embeds, c.FromSource); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "component %q embeds", name)
 	}
+	if c.Debian != nil || c.OutputType == OutputDebianPackage {
+		return validateDebianProducer(name, c)
+	}
 	if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
 		return err
 	}

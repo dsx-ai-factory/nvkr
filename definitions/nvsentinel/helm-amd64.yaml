@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvsentinel-image-bound-helm-amd64-candidate
+catalog:
+  base: ./catalog
+sbomTool: syft-amd64
+outputs:
+  - name: nvsentinel-chart
+    platform: linux/amd64
+    components: [nvsentinel-chart]
+    format: helm-oci
+    helm:
+      images:
+        platform-connectors: platform-connectors-image
+  - name: platform-connectors-image
+    platform: linux/amd64
+    components: [nvsentinel-platform-connectors-image]
+    format: oci

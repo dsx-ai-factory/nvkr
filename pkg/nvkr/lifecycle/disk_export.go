@@ -186,6 +186,9 @@ func (transaction *diskExportTransaction) observe(ctx context.Context, slot requ
 		return Artifact{}, e.New(e.CodeEngineCapability,
 			"durable disk export requires a held local execution result")
 	}
+	if slot.Kind == OutputDebianPackage {
+		return transaction.observeDebian(ctx, slot, plan, execution)
+	}
 	if slot.Kind != OutputDiskImage {
 		return Artifact{}, e.New(e.CodeInternal,
 			"durable disk export received non-disk output %q", slot.Name)
@@ -194,36 +197,10 @@ func (transaction *diskExportTransaction) observe(ctx context.Context, slot requ
 	if err != nil {
 		return Artifact{}, err
 	}
-	relative, err := filepath.Rel(transaction.workspace, path)
+	file, err := transaction.openStage(path)
 	if err != nil {
-		return Artifact{}, e.Wrap(e.CodeInternal, err,
-			"deriving durable disk output %q", slot.Name)
+		return Artifact{}, err
 	}
-	parent, target, err := securepath.CreateParentBeneath(transaction.workspace, relative)
-	if err != nil {
-		return Artifact{}, e.Wrap(e.CodeImmutableViolation, err,
-			"resolving durable disk output %q", slot.Name)
-	}
-	var stat unix.Stat_t
-	if err := unix.Fstatat(int(parent.Fd()), target, &stat, unix.AT_SYMLINK_NOFOLLOW); err == nil {
-		_ = parent.Close()
-		return Artifact{}, e.New(e.CodeImmutableViolation,
-			"durable disk output %q already exists", slot.Name)
-	} else if err != unix.ENOENT {
-		_ = parent.Close()
-		return Artifact{}, e.Wrap(e.CodeImmutableViolation, err,
-			"checking durable disk output %q", slot.Name)
-	}
-	file, temporary, err := securepath.CreateTemporarySibling(parent)
-	if err != nil {
-		_ = parent.Close()
-		return Artifact{}, e.Wrap(e.CodeImmutableViolation, err,
-			"staging durable disk output %q", slot.Name)
-	}
-	stage := &diskExportStage{parent: parent, temporary: temporary, target: target, path: path,
-		syncParent:  func(file *os.File) error { return file.Sync() },
-		closeParent: func(file *os.File) error { return file.Close() }}
-	transaction.stages = append(transaction.stages, stage)
 	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind,
 		ArtifactID: slot.MemberArtifactID, BuildDigest: slot.BuildDigest,
 		Components: append([]string(nil), slot.Components...)}
@@ -346,4 +323,124 @@ func LocalDiskOutputPath(workspace, outputName string) (string, error) {
 			"local disk output requires an attempt workspace and canonical output name")
 	}
 	return filepath.Join(workspace, localDiskOutputDirectory, outputName+".qcow2"), nil
+}
+
+func (transaction *diskExportTransaction) openStage(path string) (*os.File, error) {
+	relative, err := filepath.Rel(transaction.workspace, path)
+	if err != nil {
+		return nil, e.Wrap(e.CodeInternal, err,
+			"deriving durable output %q", path)
+	}
+	parent, target, err := securepath.CreateParentBeneath(transaction.workspace, relative)
+	if err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err,
+			"resolving durable output %q", path)
+	}
+	var stat unix.Stat_t
+	if err := unix.Fstatat(int(parent.Fd()), target, &stat, unix.AT_SYMLINK_NOFOLLOW); err == nil {
+		_ = parent.Close()
+		return nil, e.New(e.CodeImmutableViolation,
+			"durable output %q already exists", path)
+	} else if err != unix.ENOENT {
+		_ = parent.Close()
+		return nil, e.Wrap(e.CodeImmutableViolation, err,
+			"checking durable output %q", path)
+	}
+	file, temporary, err := securepath.CreateTemporarySibling(parent)
+	if err != nil {
+		_ = parent.Close()
+		return nil, e.Wrap(e.CodeImmutableViolation, err,
+			"staging durable output %q", path)
+	}
+	stage := &diskExportStage{parent: parent, temporary: temporary, target: target, path: path,
+		syncParent:  func(file *os.File) error { return file.Sync() },
+		closeParent: func(file *os.File) error { return file.Close() }}
+	transaction.stages = append(transaction.stages, stage)
+	return file, nil
+}
+
+type debianPayloadExporter interface {
+	ExportDebianLifecyclePayload(context.Context, *factory.Plan, factory.LifecycleOutputPlan, io.Writer) (factory.DebianOutputObservation, []byte, []byte, error)
+}
+
+func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slot requiredOutput, plan *factory.Plan, execution diskPayloadExporter) (Artifact, error) {
+	if ctx == nil {
+		return Artifact{}, e.New(e.CodeUsage, "native package staging requires context")
+	}
+	if err := ctx.Err(); err != nil {
+		return Artifact{}, e.Wrap(e.CodeTimeout, err, "native package staging canceled")
+	}
+	exporter, ok := execution.(debianPayloadExporter)
+	if !ok {
+		return Artifact{}, e.New(e.CodeEngineCapability, "native package staging requires original execution owner")
+	}
+	if !namePattern.MatchString(slot.Name) {
+		return Artifact{}, e.New(e.CodeVerifyFailed, "native package staging requires exact named output")
+	}
+	path := filepath.Join(transaction.workspace, localDiskOutputDirectory, slot.Name+".deb")
+	file, err := transaction.openStage(path)
+	if err != nil {
+		return Artifact{}, err
+	}
+	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID, BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...)}
+	observation, document, predicate, exportErr := exporter.ExportDebianLifecyclePayload(ctx, plan, expected, file)
+	if exportErr == nil {
+		exportErr = finishNativeStage(file)
+	} else {
+		exportErr = errors.Join(exportErr, file.Close())
+	}
+	if exportErr != nil {
+		code := e.CodeVerifyFailed
+		var coded *e.Error
+		if errors.As(exportErr, &coded) {
+			code = coded.Code
+		}
+		if ctx.Err() != nil {
+			code = e.CodeTimeout
+			exportErr = errors.Join(exportErr, ctx.Err())
+		}
+		return Artifact{}, e.Wrap(code, exportErr, "staging native package output")
+	}
+	if len(slot.Components) != 1 || observation.Component != slot.Components[0] || observation.Subject != slot.MemberArtifactID || observation.BuildDigest != slot.BuildDigest {
+		return Artifact{}, e.New(e.CodeVerifyFailed, "native package staging changes original named output")
+	}
+	for _, item := range []struct {
+		suffix string
+		data   []byte
+	}{{".cdx.json", document}, {".production-predicate.json", predicate}} {
+		if err := ctx.Err(); err != nil {
+			return Artifact{}, e.Wrap(e.CodeTimeout, err, "native package evidence canceled")
+		}
+		if len(item.data) == 0 {
+			return Artifact{}, e.New(e.CodeProvenanceMissing, "native package staging has incomplete evidence")
+		}
+		file, err := transaction.openStage(filepath.Join(transaction.workspace, localDiskOutputDirectory, slot.Name+item.suffix))
+		if err != nil {
+			return Artifact{}, err
+		}
+		written, writeErr := file.Write(item.data)
+		if writeErr == nil && written != len(item.data) {
+			writeErr = io.ErrShortWrite
+		}
+		if writeErr == nil {
+			writeErr = finishNativeStage(file)
+		} else {
+			writeErr = errors.Join(writeErr, file.Close())
+		}
+		if writeErr != nil {
+			return Artifact{}, e.Wrap(e.CodeVerifyFailed, writeErr, "staging native package evidence")
+		}
+	}
+	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest, BuildDigest: observation.BuildDigest, Components: append([]string(nil), slot.Components...), Reference: path}, nil
+}
+
+func finishNativeStage(file *os.File) error {
+	err := file.Sync()
+	if err == nil {
+		err = file.Chmod(0444)
+	}
+	if err == nil {
+		err = file.Sync()
+	}
+	return errors.Join(err, file.Close())
 }

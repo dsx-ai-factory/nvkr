@@ -278,7 +278,7 @@ ownership and SELinux workspace labeling follow the
 This is the fork's NVIDIA image flavor, `dist/images/Dockerfile.ubuntu.nv`, with
 the `BASE_IMAGE` pinned by digest to public `docker.io/library/ubuntu:24.04`.
 Options `OVS_SOURCE=doca` and `DOCA_RELEASE=latest` install Mellanox DOCA based
-Open vSwitch. OVN (`OVN_SOURCE=uca`), kubectl and runtime dependencies inside 
+Open vSwitch. OVN (`OVN_SOURCE=uca`), kubectl and runtime dependencies inside
 that Dockerfile are acquired through APT.
 The image lane has network access, source-owned build stamps and mutable
 APT inputs. The image producer logs these limitations; this is diagnostic text,

@@ -393,7 +393,79 @@ The separate `InspectDebianArchiveMetadata` diagnostic always uses the constant 
 supplies no format or identity proof. Syft parses a private read-only copy of the held bytes, rechecked against
 the digest after scanning. Its result uses the diagnostic method `syft-debian-archive-metadata/v1`, which
 dependency SBOM attachment and serialized BOM validation reject. Package/control metadata cannot become
-payload dependency evidence. The ordinary path-based `InspectDependencies` and held-only
+payload dependency evidence. The separate `DiskInspectionRuntime.InspectDebianPackageContent` operation
+reuses the complete admitted Linux content-inspection profile and pinned `dpkg-deb` reader. It requires
+an exact archive digest, positive length within the reader's 1 GiB bound and a concrete consumer platform.
+The runtime reserves capacity before opening the caller path, owns an anonymous exact-byte snapshot,
+validates Package/Version/Architecture and expands the package data filesystem for scanner discovery and
+file hashing. The native inspection host and consumer architecture remain separate. Subject/runtime
+revalidation and owned cleanup must complete before an immutable content observation is returned.
+`DiskContentDocument` can describe that observation's exact archive subject through its existing admitted
+method; this adds no scanner-method exception. The operation neither rewrites the package nor executes
+its maintainer scripts. Control-script inventory, complete dependency coverage, original producer/Run joins,
+standalone factory packaging, signing, publication and install acceptance are not established by this API.
+Controlled snapshot/runtime tests do not establish a real complete package or container-service run.
+
+`InspectDebianProducerContent` instead borrows the concrete, opaque `DebianProducerArchive` issued by
+successful private producer completion. It retains that archive operation through the existing held-content
+inspection and cleanup. The original frozen producer instruction supplies the consumer platform; no caller
+path, kind or platform can select replacement bytes or a different target. Capacity accounts for an
+already-retained subject without creating another archive snapshot. The returned observation must match
+the original archive digest/length, host-package kind and resolved platform. Session close cancels and joins
+the scan before releasing its bytes; inspector close cancels inspection while retaining the Run-owned
+archive. The SBOM wrapper uses the existing bound-report decoder and scanner method. Zero-value and
+decoded handles cannot restore issuer authority. This inspection operation adds no path/result constructor
+or execution issuer. The local scheduler composes it with separate original-Run terminal and lifecycle
+owners; the inspection API alone supplies none of that authority. Controlled ELF
+fixtures prove the retained-input and cleanup contract, not actual Debian inventory or installation.
+
+Private factory completion retains producer-issued bytes under original Run/instruction/Build/subject/
+source bindings. Its private inspection operation now borrows that original named completion and the
+Environment-owned native inspection profile, checks exact byte/target/runtime/scanner bindings, and composes
+`DiskContentDocument` with the fully rederived source subject. The stored document uses `BOM.Marshal` and
+its complete 32 MiB policy; mutation of a returned document cannot alter the stored bytes. Run close or
+caller cancellation joins scanning and checked cleanup with no new document. Closing the borrowed inspector
+leaves the Run's producer archive intact. These are inspected-content descriptions, not terminal receipts or
+release authorization. Controlled ELF/Git fixtures prove ownership and document composition, not real
+Debian tooling, exhaustive control coverage or installation.
+
+The separate private terminal operation issues a process-local `DebianOutputReceipt` only for that
+original live Run and named output. It freezes the original output before runtime or byte work and reserves
+its terminal claim before inspection revalidation; competing claims fail, while failure or cancellation
+releases the reservation. Issuance rechecks the original executor, prepared-source input, retained archive,
+inspection profile/runtime and bounded document, independently streams and compares the complete archive
+SHA-256 and length, and binds the typed SBOM digest with the original Plan, Build and target.
+Every receipt description or export repeats these checks. Decoded descriptions and equal-byte siblings
+cannot recreate it; Run close cancels and joins exports and revokes aliases. Writer failure or cancellation
+returns no successful observation and preserves both causes. Caller staging may contain partial bytes;
+the operation commits no pathname. An arbitrary blocking writer must return before close can join it.
+Controlled native fixtures cover these contracts, not real Debian tooling or installation. The local scheduler
+uses the original receipt to stage the raw archive, inspected document and unsigned predicate through the
+existing lifecycle output/record transaction. Successful original Run cleanup precedes durable commit;
+failed joins or commits roll back payload and evidence. Authenticated producer provenance, qualification
+and release/publication authority remain deferred.
+The separate local provenance description now reuses ADR-09's predicate with original producer times,
+complete Plan dependencies and prepared-source digest, paired with this exact terminal observation. It
+retains the unsigned local/dry-run builder scope and opens no signing or release gate.
+
+The compiled Debian scanner selection requires the native producer and utility platform to agree, a complete
+Environment private-volume inspection profile, and the exact selected catalog scanner executable pin. Its
+offline SBOM node retains archive/result/scanner edges and profile image through complete Plan
+rederivation. Debian inspection precedes terminal observation, which requires the inspected SBOM; the
+SBOM node cannot depend on that downstream observation. Local scheduling consumes the original retained
+completion, not ordinary path-based SBOM work or serialized descriptions. Direct-node/hosted execution
+and signing/publication remain closed. Missing profiles and target conflicts fail before catalog work.
+
+For the compiled standalone Debian producer, `PerArtifact` revalidates the complete resolved graph and
+matches its Build identity before taking the selected toolchain from the lowered build node. The source
+subject retains the resolved distribution profile and platform without changing the catalog's route
+declarations. These are source/recipe descriptions, not observed Debian control metadata, producer receipts
+or dependency discovery. In particular its source-tag version does not supply the Debian package Version.
+The existing `WithSourceSubject` composition can retain that description only when the exact archive subject
+and Build agree with an issued content document. The private original-Run operation now checks this join;
+local scheduling uses these original joins; real package acceptance remains unexercised.
+
+The ordinary path-based `InspectDependencies` and held-only
 `InspectHeldDependencies` APIs retain hint-free host-file scanning; OCI scanning is unaffected.
 The Syft v1.51.1 discovery premise is version-specific: rerun the opt-in regression when changing either
 the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
@@ -402,10 +474,9 @@ Factory callers retain the ordinary dependency API; no maintained factory output
 Debian metadata diagnostic. Factory SBOM nodes inspect producer bytes before APT wrapping, and the existing
 executable/APT routes do not preserve a source-created Debian package. The diagnostic does not admit such
 a delivery route. The authoritative Debian material reader remains digest-pinned
-`dpkg-deb`, with platform checks and bounded payload expansion in the disk owner. A standalone Debian
-delivery format, declared-format propagation through path and held APIs, and payload coverage through that
-owner remain deferred. This diagnostic does not validate target architecture, preserve a source package,
-enable direct APT publication, or prove installation.
+`dpkg-deb`, with platform checks and bounded payload expansion. The local standalone native route preserves
+source-created bytes through that held-input content owner and separate terminal/lifecycle joins. This
+metadata diagnostic supplies none of that authority, enables no APT publication and proves no installation.
 
 For Helm source archives and exact acquired archives selected as Helm outputs, a generic manifest reader inventories bundled `Chart.yaml` declarations and chart
 dependency declarations/locks. It never executes

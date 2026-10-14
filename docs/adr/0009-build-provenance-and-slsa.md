@@ -108,6 +108,18 @@ matching Cosign's protobuf JSON serialization without losing nanoseconds. This p
 from changing the saved predicate's timestamp strings; exact-predicate verification remains strict.
 Local invocation identifiers retain their existing rendering. Signing mode remains inside the predicate
 so dry-run evidence cannot lose its meaning when copied.
+
+The private Debian producer completion now records its actual UTC time window around original bound
+execution, including checked producer cleanup. Its separate local provenance operation freezes the opaque
+terminal receipt before admission, repeats original Run/Plan/output/byte/content checks, and renders this
+existing predicate with the local builder identity and dry-run signing mode. It binds the complete original
+Plan's dependencies and weakest build type, plus the authenticated prepared-source digest; the terminal
+observation separately identifies the exact archive, named Build/target and inspected SBOM. Caller Run
+fields, ambient GitHub variables and a replaced receipt facade cannot select another invocation.
+Missing or reversed original times, cancellation and closed owners return no evidence. These are unsigned
+local descriptions, not a hosted or qualified claim, signer receipt or publication authorization. Controlled
+native fixtures establish ownership and serialization only; real package execution remains unexercised.
+
 ADR-20's pipeline-attested partial-retry admission preserves each exact signed predicate and its original
 attempt identity. A later attempt of the same GitHub run may consume it only after authenticating the
 unchanged Plan, workflow, subject and evidence; release assembly records its own current invocation and

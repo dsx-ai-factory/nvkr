@@ -225,6 +225,7 @@ type ExternalEvidence struct {
 // loader produces it from the raw registry entry + its source + the lock.
 type Component struct {
 	Embeds *EmbeddedComponents `json:"embeds,omitempty"`
+	Debian *DebianSpec         `json:"debian,omitempty"`
 	Helm   *HelmPackaging      `json:"helm,omitempty"`
 	// Platforms is the sorted, nonempty allowlist of supported output targets.
 	Platforms  []string `json:"platforms"`

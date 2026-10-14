@@ -149,7 +149,10 @@ const IndexSchemaVersion = "nvkr.dev/sbom-index/v2"
 // These documents describe observed composition. Publisher-qualified flows use
 // BuildVerifiedFromReport and its PerArtifact method to obtain evidence receipts.
 func PerArtifact(res *buildgraph.Resolved, buildDigest string, artifactHashes map[string]string) (map[string]*BOM, *Index, error) {
-	comps := append([]catalog.NamedComponent(nil), res.Components...)
+	comps, err := perArtifactSourceComponents(res, buildDigest)
+	if err != nil {
+		return nil, nil, err
+	}
 	sort.Slice(comps, func(i, j int) bool { return comps[i].Name < comps[j].Name })
 	boms := make(map[string]*BOM, len(comps))
 	idx := &Index{SchemaVersion: IndexSchemaVersion, BuildDigest: buildDigest}
@@ -158,6 +161,14 @@ func PerArtifact(res *buildgraph.Resolved, buildDigest string, artifactHashes ma
 			continue // an exclusion has no artifact SBOM
 		}
 		b := fromComponentForArch(nc, buildDigest, artifactHashes[nc.Name], target.Arch(res.Platform))
+		if nc.OutputType == catalog.OutputDebianPackage {
+			b.Metadata.Component.Properties = append(b.Metadata.Component.Properties,
+				Property{Name: "nvkr:debianDistribution", Value: res.Debian.Distribution},
+				Property{Name: "nvkr:platform", Value: res.Debian.Platform})
+			sort.Slice(b.Metadata.Component.Properties, func(i, j int) bool {
+				return b.Metadata.Component.Properties[i].Name < b.Metadata.Component.Properties[j].Name
+			})
+		}
 		d, err := b.Digest()
 		if err != nil {
 			return nil, nil, err

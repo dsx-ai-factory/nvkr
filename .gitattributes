@@ -1,2 +1,8 @@
 # Preserve the exact generated summary captured as diagnostic evidence.
 docs/evidence/2026-10-03-ci-log-readability/injected-failure-summary.md whitespace=-blank-at-eof
+
+# Unified-diff context prefixes precede blank lines and tabs; Git validates the patched source.
+definitions/nvsentinel/catalog/*.patch whitespace=-blank-at-eol,-space-before-tab
+definitions/nvsentinel/nvke-os-package-input.patch whitespace=-blank-at-eol,-space-before-tab
+definitions/nvsentinel/os-catalog/*.patch whitespace=-blank-at-eol,-space-before-tab
+toolchains/nvsentinel-ko/dependency-security.patch whitespace=-blank-at-eol,-space-before-tab

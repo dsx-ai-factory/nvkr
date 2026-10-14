@@ -87,7 +87,7 @@ func outputRequirements(output authored.DefinitionOutput, builds map[string]Buil
 	}
 	for _, selection := range selections {
 		build, ok := builds[selection.Name]
-		if !ok || build.Platform != selection.Platform || !reflect.DeepEqual(build.Components, selection.Components) {
+		if !ok || (selection.Format != authored.OutputDebianPackage && build.Platform != selection.Platform) || !reflect.DeepEqual(build.Components, selection.Components) {
 			// Disk graphs include transitive material components; their selected closure is
 			// checked by the native lifecycle validator and catalog recompilation.
 			if !ok || output.Format != authored.OutputDiskImage || build.Platform != selection.Platform {

@@ -15,7 +15,9 @@ this does not change the authenticated image identity or rewrite templates.
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
-Separately selected execution settings, publication namespace, credential references, and signing identity policy.
+Separately selected execution settings, required publication transports and namespace, credential references,
+and signing identity policy. Selecting an unavailable transport fails before work; a supported sibling cannot
+substitute for it.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies; the workflow adapter consumes their locked commits.
@@ -97,6 +99,32 @@ _Avoid_: Artifact digest, graph-file hash
 The concrete platform for an output's bytes, currently `linux/amd64` or `linux/arm64`. Catalog support and pin
 selection must admit it explicitly, independently of the host on which a producer executes.
 _Avoid_: Host platform, query criterion
+
+**Debian target description**:
+An exact source-owned distribution/ABI profile key paired with a concrete artifact platform. Standalone
+omissions resolve to `ubuntu-24.04` and `linux/amd64` only when the exact route exists; consumer descriptions
+inherit the complete OS/image target and reject conflicts. Explicit source routes and Definition/Plan
+compilation bind that resolved target into Build identity and rederive the full selection/catalog graph.
+An actual authenticated OS consumer/material join and ABI compatibility remain deferred.
+
+Local standalone execution requires a matching native Linux host, bounded context, complete private-volume
+inspection profile and selected catalog scanner. The original session and Run own authenticated prepared
+source, held runtime/toolchain observations, exclusive named invocation, bounded sealed archive bytes and
+checked cleanup. Inspection precedes terminal observation, which binds the exact archive and inspected
+SBOM to the original Plan/Build/target/output. Descriptions and equal-byte siblings cannot restore those
+owners; Run close cancels and joins all producer, inspection and export work before releasing handles.
+
+Lifecycle retains the raw package, inspected document and unsigned local predicate through its existing
+output/record transaction after successful original Run cleanup. This artifact is unqualified, without
+authenticated production provenance or release authority. Direct-node/hosted execution, ordinary path-based
+SBOM work, signing and publication remain gated. Controlled native fixtures prove ownership, bytes and
+cleanup, not real Debian/NVSentinel installation or native AMD64 acceptance.
+
+The selected NVSentinel integration keeps image, Helm and Debian producers separately selectable, with
+coordinated source pins and planned OS-recipe consumption. A platform-connectors candidate compiles four
+Ubuntu 24.04/26.04 × AMD64/ARM64 selections; actual package metadata, complete execution/installation,
+remaining producers and consumer integration remain unfinished.
+_Avoid_: APT suite, toolchain tag, package version, ABI proof
 
 **Execution plan**:
 The complete generated closure of admitted Definition and Environment values, independently required outputs,

@@ -11,10 +11,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/urfave/cli/v2"
 )
 
 func lifecycleCommandRepo(t *testing.T) {
@@ -160,5 +162,59 @@ func assertLifecycleCommandCode(t *testing.T, err error, want e.Code) {
 	var coded *e.Error
 	if !errors.As(err, &coded) || coded.Code != want {
 		t.Fatalf("error = %v, want %s", err, want)
+	}
+}
+
+func TestLocalRunCLIProvidesOwnedDeadline(t *testing.T) {
+	lifecycleCommandRepo(t)
+	for _, tc := range []struct {
+		name    string
+		flag    string
+		parent  time.Duration
+		maximum time.Duration
+	}{
+		{"default", "", 0, time.Hour},
+		{"explicit", "1m", 0, time.Minute},
+		{"earlier parent", "1m", 15 * time.Second, 15 * time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			if tc.parent != 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tc.parent)
+				defer cancel()
+			}
+			called := false
+			var received context.Context
+			execute := func(ctx context.Context, _ *lifecycle.PreparedRun, _ lifecycle.LocalOptions) (*lifecycle.Run, error) {
+				called = true
+				received = ctx
+				deadline, ok := ctx.Deadline()
+				remaining := time.Until(deadline)
+				if !ok || remaining <= 0 || remaining > tc.maximum {
+					t.Fatalf("deadline = %v, remaining = %v, maximum = %v", ok, remaining, tc.maximum)
+				}
+				return nil, e.New(e.CodeUnavailable, "test executor reached")
+			}
+			args := []string{"nvkr", "run", "local", "--definition", "definitions/nvke-v1/definition.yaml", "--environment", "definitions/nvke-v1/environment-local.yaml", "--attempt", "bounded-cli-test"}
+			if tc.flag != "" {
+				args = append(args, "--timeout", tc.flag)
+			}
+			app := &cli.App{Commands: []*cli.Command{cmdRunWithLocalExecutor(execute)}}
+			err := app.RunContext(ctx, args)
+			assertLifecycleCommandCode(t, err, e.CodeUnavailable)
+			if !called || !errors.Is(received.Err(), context.Canceled) {
+				t.Fatalf("executor called = %v; owned context not canceled on command exit", called)
+			}
+		})
+	}
+}
+
+func TestLocalRunCLIRejectsInvalidTimeoutBeforeInputIO(t *testing.T) {
+	for _, timeout := range []string{"0", "-1s"} {
+		t.Run(timeout, func(t *testing.T) {
+			_, err := invokeLifecycleCLI(t, "run", "local", "--definition", "missing.yaml", "--environment", "missing.yaml", "--attempt", "timeout-test", "--timeout", timeout)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+		})
 	}
 }
