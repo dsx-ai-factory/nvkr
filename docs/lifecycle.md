@@ -448,11 +448,11 @@ approved repository and workflow, and the repository's actual default branch. It
 artifact download endpoints is required. The owned transport ignores proxy environment variables; an
 admitted artifact download location receives a fresh request without GitHub API credentials.
 
-Generated real-signing `per-output-v1` workflows save one `handoff.json` after complete finalization. It contains the
+Generated production real-signing `per-output-v1` workflows save one `handoff.json` after complete finalization. It contains the
 original Plan, the compiler-read Definition and Environment, base and output-specific catalogs, overlays,
 registries, locks, patches and directory facts, plus the original predicate bytes keyed by the root and every
 delivered payload reference. The collector joins bounded aggregate metadata and saved output-route records
-without reading payload packages. The handoff contains no consumer policy. Unsigned, dry-run and legacy aggregate workflows do not produce it;
+without reading payload packages. The handoff contains no consumer policy. Development, unsigned, dry-run and legacy aggregate workflows do not produce it;
 an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
 Legacy aggregate builds/publication remain available, but they lack invocation-bound release metadata and
 the per-output route records needed for M3 qualification; direct qualification rejects that capability before publication work.

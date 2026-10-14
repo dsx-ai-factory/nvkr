@@ -104,10 +104,10 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	layout := githubBundleLayout(plan.Environment.GitHubBundle)
+	layout := githubLayoutFor(plan)
 	if bundle.Engine != EngineGitHub || bundle.WorkflowPath != layout.workflowPath ||
 		bundle.ManifestPath != layout.manifestPath || bundle.PlanPath != layout.planPath {
-		return nil, e.New(e.CodePipelineDrift, "generated Run paths differ from the Plan's admitted GitHub namespace")
+		return nil, e.New(e.CodePipelineDrift, "generated bundle paths do not match the admitted Environment")
 	}
 	if err := admitGitHubRequirements(plan, bundle.Engine+" bundle validation"); err != nil {
 		return nil, err

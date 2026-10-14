@@ -16,6 +16,26 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
+func TestDevelopmentQualificationHandoffRejectedBeforeWorkspaceRead(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		plan func(*testing.T) *Plan
+	}{
+		{"unsigned", githubDevelopmentTestPlan},
+		{"signed", githubDevelopmentPublicationTestPlan},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := tc.plan(t)
+			assertFactoryErrorCode(t, AdmitQualificationHandoff(plan), e.CodeEngineCapability)
+			reference, predicates, err := CollectQualificationEvidence(t.Context(), filepath.Join(t.TempDir(), "absent-workspace"), plan)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if reference != "" || predicates != nil {
+				t.Fatal("development handoff returned partial qualification evidence")
+			}
+		})
+	}
+}
+
 func qualificationEvidenceFixture(t *testing.T, perOutput bool) (*Plan, string, map[string]Artifact, map[string][]byte) {
 	t.Helper()
 	if perOutput {

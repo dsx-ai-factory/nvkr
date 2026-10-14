@@ -71,13 +71,16 @@ func TestNamedGitHubBundleChangesPlanIdentityWithoutReplacingSigningPolicy(t *te
 func TestNamedGitHubBundlesCoexistRegenerateAndRetireIndependently(t *testing.T) {
 	root := t.TempDir()
 	bundles := map[string]*GeneratedBundle{}
-	for _, name := range []string{"", "nvke-nightly", "other-project"} {
+	for _, name := range []string{"", "nvke-nightly", "other-project", "development"} {
 		plan := namedGitHubTestPlan(t, name)
+		if name == "development" {
+			plan = githubDevelopmentTestPlan(t)
+		}
 		bundle, err := RenderGitHub(t.Context(), plan)
 		if err != nil {
 			t.Fatal(err)
 		}
-		layout := githubBundleLayout(name)
+		layout := githubLayoutFor(plan)
 		if bundle.WorkflowPath != layout.workflowPath || bundle.PlanPath != layout.planPath || bundle.ManifestPath != layout.manifestPath {
 			t.Fatal("bundle paths disagree with selected Environment namespace")
 		}
@@ -103,28 +106,31 @@ func TestNamedGitHubBundlesCoexistRegenerateAndRetireIndependently(t *testing.T)
 			t.Fatal(err)
 		}
 	}
-	nightly := bundles["nvke-nightly"]
-	prior := *nightly
-	prior.Files = make(map[string][]byte, len(nightly.Files)+1)
-	for name, raw := range nightly.Files {
-		prior.Files[name] = raw
-	}
-	obsolete := filepath.ToSlash(filepath.Join(filepath.Dir(nightly.ManifestPath), "retired", "old.json"))
-	prior.Files[obsolete] = []byte("old graph\n")
-	if err := WriteGeneratedBundle(t.Context(), root, &prior); err != nil {
-		t.Fatal(err)
-	}
-	if err := WriteGeneratedBundle(t.Context(), root, nightly); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(root, obsolete)); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("own obsolete record survived retirement: %v", err)
-	}
-	for _, bundle := range bundles {
-		if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
-			t.Fatalf("retirement disturbed a coexisting namespace: %v", err)
+	for _, name := range []string{"nvke-nightly", "development"} {
+		selected := bundles[name]
+		prior := *selected
+		prior.Files = make(map[string][]byte, len(selected.Files)+1)
+		for name, raw := range selected.Files {
+			prior.Files[name] = raw
+		}
+		obsolete := filepath.ToSlash(filepath.Join(filepath.Dir(selected.ManifestPath), "retired", "old.json"))
+		prior.Files[obsolete] = []byte("old graph\n")
+		if err := WriteGeneratedBundle(t.Context(), root, &prior); err != nil {
+			t.Fatal(err)
+		}
+		if err := WriteGeneratedBundle(t.Context(), root, selected); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(root, obsolete)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("own obsolete record survived retirement: %v", err)
+		}
+		for _, bundle := range bundles {
+			if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+				t.Fatalf("retirement disturbed a coexisting namespace: %v", err)
+			}
 		}
 	}
+	nightly := bundles["nvke-nightly"]
 	if err := os.WriteFile(filepath.Join(root, nightly.WorkflowPath), []byte("hand edit\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

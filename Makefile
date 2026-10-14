@@ -10,6 +10,9 @@ DEMO_TEST_BIN ?= bin/nvke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
+# Dispatch is explicit about the repository: a checkout may have a fork and upstream.
+PIPELINE_DEV_REPO ?=
+export PIPELINE_DEV_REPO
 # Module source dirs only (never the vendored trees checked out under .nvkr/).
 GOSRC       := client cmd internal pkg
 GOFILES     := $(shell find $(GOSRC) -type f -name '*.go' -print)
@@ -170,10 +173,11 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # build output. Keep LICENSE_UNCHECKED in step with LICENSE_IGNORES.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
-	-ignore '.github/workflows/nvkr-run-*.yml' -ignore '.github/workflows/nvkr-smoke.yml' -ignore '**/*.tmpl' \
+	-ignore '.github/workflows/nvkr-run-*.yml' \
+	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -196,8 +200,8 @@ license-header-check: ## Fail when a source file has no license header.
 		done); \
 	 [ -z "$$missing" ] || { echo "ERROR: no license line in the first 20 lines of:"; echo "$$missing" | sed 's/^/    /'; echo "Run 'make license'; add the header by hand to a Makefile or *.jq." >&2; exit 1; }
 
-.PHONY: workflows-check
-workflows-check: ## Verify committed producer and qualification generation (ADR-21 drift gate).
+.PHONY: workflow-generator
+workflow-generator: go-version-check
 	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
 	@# in .github/nvkr-run/plan.json as `generatorVersion`. Building via `make build`,
 	@# whose version comes from `git describe`, therefore always reports drift. Build
@@ -206,6 +210,9 @@ workflows-check: ## Verify committed producer and qualification generation (ADR-
 	CGO_ENABLED=0 go build -trimpath \
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
+
+.PHONY: workflows-check
+workflows-check: workflow-generator pipeline-dev-check ## Check committed producer, qualification and development bundles for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
 	@# Definitions. The generator still authenticates the complete bundle and inputs.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
@@ -221,6 +228,37 @@ workflows-check: ## Verify committed producer and qualification generation (ADR-
 		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
 		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json \
 		--root . --check
+
+.PHONY: workflows-generate
+workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate producer, qualification and development bundles with their canonical generator stamp.
+	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
+	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
+	 bin/nvkr-exec run generate --engine github \
+		--definition "$$definition" --environment "$$environment" \
+		--qualification-policy definitions/nvke-m2/qualification.yaml \
+		--root .
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-arm64/definition.json \
+		--environment definitions/nvke-nightly-arm64/environment-github.json --root .
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
+		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json --root .
+
+.PHONY: pipeline-dev-generate
+pipeline-dev-generate: workflow-generator ## Regenerate the full feature-branch development pipeline.
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-m2/definition.yaml \
+		--environment definitions/nvke-m2/environment-github-dev.yaml --root .
+
+.PHONY: pipeline-dev-check
+pipeline-dev-check: workflow-generator ## Check development workflow generation without changing files.
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-m2/definition.yaml \
+		--environment definitions/nvke-m2/environment-github-dev.yaml --root . --check
+
+.PHONY: pipeline-dev-run
+pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).
+	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
 check: go-version-check fmt-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.

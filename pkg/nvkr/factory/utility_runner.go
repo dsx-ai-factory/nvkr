@@ -26,6 +26,7 @@ type utilityRunnerLocation struct {
 	user                     string
 	home                     bool
 	publicationRunContext    bool
+	developmentRunContext    bool
 }
 
 // executeUtilityNode is shared by local orchestration and hosted helper steps.
@@ -46,6 +47,11 @@ func executeUtilityNode(ctx context.Context, node Node, location utilityRunnerLo
 	if location.publicationRunContext {
 		// Only public runner identity crosses this offline packaging boundary.
 		for _, key := range []string{"GITHUB_ACTIONS", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_WORKFLOW_REF", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"} {
+			args = append(args, "-e", key)
+		}
+	}
+	if location.developmentRunContext {
+		for _, key := range []string{"GITHUB_EVENT_NAME", "GITHUB_REF"} {
 			args = append(args, "-e", key)
 		}
 	}

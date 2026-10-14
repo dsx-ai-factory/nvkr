@@ -51,6 +51,11 @@ type signerFor func(ctx context.Context, plan *Plan, node Node, artifacts map[st
 // (the same convention executePublish uses), and handed to the adapter as data;
 // the adapter never reads the ambient environment for a secret.
 func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map[string]Artifact) (sign.OCISigner, error) {
+	if plan.Environment.GitHubDevelopment {
+		if _, err := runtimeTarget(plan, node.Target); err != nil {
+			return nil, err
+		}
+	}
 	signing := plan.Environment.Signing
 	if signing == nil {
 		return nil, e.New(e.CodeTrustPolicyMissing, "factory node %q has no delivery signing profile", node.ID)
@@ -88,7 +93,10 @@ func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map
 // process's environment. A target that declares a credentialRef and finds no
 // credential fails closed before anonymous or ambient-keychain access.
 func registryCredential(plan *Plan, node Node) (sign.Credential, error) {
-	target := plan.Targets[node.Target]
+	target, err := runtimeTarget(plan, node.Target)
+	if err != nil {
+		return sign.Credential{}, err
+	}
 	if target.CredentialRef == "" {
 		return sign.Credential{}, nil
 	}
@@ -147,6 +155,9 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if err != nil {
 		return err
 	}
+	if err := admitDevelopmentSubject(plan, node.Target, subject); err != nil {
+		return err
+	}
 	// The reference file says WHAT was published; the routed layout is the bytes we
 	// believe were published. Re-deriving the index digest from the layout and
 	// refusing any disagreement is what keeps a signature from binding an identity
@@ -163,6 +174,9 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 		return e.New(e.CodeVerifyFailed,
 			"factory sign node %q: routed layout digest %s does not equal published digest %s",
 			node.ID, inspection.RootDigest, subject.Digest)
+	}
+	if err := admitDevelopmentMetadata(plan, inspection); err != nil {
+		return err
 	}
 	if signing.Mode == SigningModeCosign && inspection.Root.Release != nil {
 		if err := delivery.RequireAttestedEvidence(inspection); err != nil {
@@ -225,7 +239,10 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if err != nil {
 		return err
 	}
-	target := plan.Targets[node.Target]
+	target, err := runtimeTarget(plan, node.Target)
+	if err != nil {
+		return err
+	}
 	registryOptions := delivery.RegistryOptions{
 		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous,
 		Username: credential.Username, Password: credential.Password,
@@ -244,6 +261,9 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	}
 	subject, err := readPublicationSubject(ctx, reference.Path)
 	if err != nil {
+		return err
+	}
+	if err := admitDevelopmentSubject(plan, node.Target, subject); err != nil {
 		return err
 	}
 	signed, err := readSigningRecord(ctx, signature.Path)
@@ -363,7 +383,7 @@ func productionPredicateFor(plan *Plan, _ *definition.Signing, startedOn, finish
 	if err != nil {
 		return nil, err
 	}
-	run, err := factoryRunContext(planDigest, startedOn, finishedOn)
+	run, err := publicationRunContext(plan, planDigest, startedOn, finishedOn)
 	if err != nil {
 		return nil, err
 	}
@@ -391,6 +411,11 @@ func ProductionPredicate(plan *Plan, run provenance.RunContext) ([]byte, error) 
 // factory lets hosted finalization reconstruct and compare the exact predicate
 // semantics instead of trusting a matching file hash.
 func productionPredicateForRun(plan *Plan, signing *definition.Signing, run provenance.RunContext) ([]byte, error) {
+	if plan.Environment.GitHubDevelopment {
+		if _, _, _, err := developmentRun(plan, run); err != nil {
+			return nil, err
+		}
+	}
 	planDigest, err := plan.IdentityDigest()
 	if err != nil {
 		return nil, err

@@ -172,6 +172,18 @@ provider access restrictions remain operator obligations.
 
 ## Generate and check the maintained workflow
 
+The same Definition also supplies the committed feature-branch development workflow through
+`environment-github-dev.yaml`. It retains all 37 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
+Only execution/publication policy changes: separate development environments and credentials, the
+`nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
+`ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;
+`make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr` dispatches a clean pushed branch.
+See [pipeline development](../../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for operator
+setup, full-attempt retries and the default-branch cleanup owner. This lane does not establish production
+or qualified acceptance, and no hosted development execution is recorded yet.
+Development emits its Run record without a qualification handoff and does not generate the production
+qualifier/smoke-worker pair.
+
 Run from the repository root with the pinned Go toolchain and authorized access to the exact NVKE tree.
 Catalog loading re-derives source-owned pin sets and may need Git access even for generation.
 

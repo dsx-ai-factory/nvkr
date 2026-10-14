@@ -72,6 +72,8 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 [acceptance specification](epics-v1-spec.md).
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
+Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
+dispatch, separate generated development bundles, artifact downloads and short retention.
 Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
 [CI test performance](ci-test-performance.md) for the current profiling follow-up.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and

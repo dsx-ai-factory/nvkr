@@ -73,6 +73,34 @@ func TestWorkflowRejectsMalformedGeneratorBeforeInput(t *testing.T) {
 	}
 }
 
+func TestWorkflowPatchSelectsTheGeneratedBundleLayout(t *testing.T) {
+	cfg, _ := maintenanceFixture(t)
+	baseline := readFixture(t, cfg.Environment)
+	for _, test := range []struct {
+		name, extra, directory, workflow, excluded string
+	}{
+		{"production", "", ".github/nvkr-run", ".github/workflows/nvkr-run.yml", "nvkr-dev"},
+		{"development", "githubDevelopment: true\n", ".github/nvkr-dev", ".github/workflows/nvkr-dev.yml", "nvkr-run"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			writeFixture(t, cfg.Environment, append(append([]byte(nil), baseline...), test.extra...))
+			raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			paths := "'catalog/pins.lock.yaml' '" + test.directory + "' '" + test.workflow + "'"
+			for _, prefix := range []string{"git add -- ", "git diff --cached --binary -- "} {
+				if !bytes.Contains(raw, []byte(prefix+paths)) {
+					t.Fatalf("review patch omits selected bundle paths: %s", raw)
+				}
+			}
+			if bytes.Contains(raw, []byte(test.excluded)) {
+				t.Fatalf("review patch includes a different bundle owner: %s", raw)
+			}
+		})
+	}
+}
+
 func TestLocalValidationRejectsHostedEnvironmentBeforeMutationOrOutput(t *testing.T) {
 	cfg, _ := maintenanceFixture(t)
 	baseline := readFixture(t, cfg.Environment)
@@ -81,6 +109,7 @@ func TestLocalValidationRejectsHostedEnvironmentBeforeMutationOrOutput(t *testin
 	for _, tc := range []struct{ name, extra string }{
 		{"source authentication", "sourceAccess:\n  https://maintenance.example.invalid/source:\n    mirror: https://maintenance.example.invalid/source\n    credentialRef: github:SOURCE_TOKEN\n"},
 		{"hosted dispatch", "githubDispatchBranches: [candidate]\n"},
+		{"development", "githubDevelopment: true\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			writeFixture(t, cfg.Environment, append(append([]byte(nil), baseline...), tc.extra...))

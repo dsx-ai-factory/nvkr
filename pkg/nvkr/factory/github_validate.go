@@ -79,14 +79,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := validateGitHubScriptLimits(document); err != nil {
 		return err
 	}
-	if document.Name != "nvkr-run-"+plan.Name || document.Permissions["contents"] != "read" || len(document.Permissions) != 1 {
+	if document.Name != githubWorkflowName(plan) || document.Permissions["contents"] != "read" || len(document.Permissions) != 1 {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow name/triggers/root permissions are incomplete")
 	}
 	if _, ok := document.On["workflow_dispatch"]; !ok {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits workflow_dispatch")
 	}
-	if len(document.On) != 1 || document.Concurrency.Group != "nvkr-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress {
-		return e.New(e.CodeEngineCapability, "GitHub Run requires manual dispatch only and non-canceling workflow concurrency")
+	if len(document.On) != 1 || document.Concurrency.Group != "nvkr-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress != githubCancelInProgress(plan) {
+		return e.New(e.CodeEngineCapability, "GitHub Run requires manual dispatch only and concurrency matching its development policy")
 	}
 	if !strings.Contains(string(workflow), "# qualification: "+plan.Qualification.String()) ||
 		!strings.Contains(string(workflow), "# planDigest: "+bundle.PlanDigest) {
@@ -189,6 +189,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	catalogEnv := githubCatalogSourceEnvironment(plan)
 	for jobID, job := range document.Jobs {
+		if plan.Environment.GitHubDevelopment && job.Permissions["packages"] == "write" {
+			return e.New(e.CodeEngineCapability, "development job %q cannot grant workflow-token package writes", jobID)
+		}
 		for key := range job.Env {
 			if strings.HasPrefix(key, "NVKR_PIN_SOURCE_TOKEN_") {
 				return e.New(e.CodeEngineCapability, "catalog credential cannot be job-scoped")
@@ -207,14 +210,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				continue
 			}
 			if stage, ok := byNodeForJob(stages, jobID); ok && len(githubStagePrivateImages(plan, stage)) > 0 &&
-				strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID, plan) {
+				strings.TrimSpace(step.Run) == githubRunnerCommand(plan, "prepare-images", "stage", stage.ID) {
 				if !reflect.DeepEqual(step.Env, githubImageEnvironment()) || step.If != "" || step.ContinueOnError || step.Uses != "" {
 					return e.New(e.CodeEngineCapability, "private image preparation requires only its exact read credential")
 				}
 				continue
 			}
 			if jobID == "nvkr-lifecycle-run" && step.ID == "recover-artifacts" {
-				if !reflect.DeepEqual(step.Env, map[string]string{"NVKR_JOB_RESULTS": "${{ toJSON(needs) }}"}) || strings.TrimSpace(step.Run) != githubRunnerCommand("recover", "", "", plan) || step.ContinueOnError || step.If != "" || step.Uses != "" {
+				if !reflect.DeepEqual(step.Env, map[string]string{"NVKR_JOB_RESULTS": "${{ toJSON(needs) }}"}) || strings.TrimSpace(step.Run) != githubRunnerCommand(plan, "recover", "", "") || step.ContinueOnError || step.If != "" || step.Uses != "" {
 					return e.New(e.CodeEngineCapability, "GitHub recovery must receive only exact provider job results")
 				}
 				continue
@@ -238,7 +241,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 					return e.New(e.CodeEngineCapability, "GitHub job %q source environment differs at %s", jobID, key)
 				}
 			}
-			if stage, ok := byNodeForJob(stages, jobID); !ok || len(stage.Nodes) != 1 || strings.TrimSpace(step.Run) != githubRunnerCommand("run-node", "node", stage.Nodes[0].ID, plan) {
+			if stage, ok := byNodeForJob(stages, jobID); !ok || len(stage.Nodes) != 1 || strings.TrimSpace(step.Run) != githubRunnerCommand(plan, "run-node", "node", stage.Nodes[0].ID) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q must refuse an empty source credential", jobID)
 			}
 			foundSource = true
@@ -284,7 +287,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	for runner, jobID := range bootstrap {
 		job, ok := document.Jobs[jobID]
 		wantCondition := ""
-		if len(catalogEnv) > 0 {
+		if plan.Environment.GitHubDevelopment || len(catalogEnv) > 0 {
 			wantCondition = "${{ " + githubDispatchCondition(plan) + " }}"
 		}
 		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
@@ -318,10 +321,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		job, ok := document.Jobs[jobID]
 		wantEnvironment := ""
 		if stage.DiskOutput != "" {
-			wantEnvironment = githubARCEnvironment
+			wantEnvironment = githubARCEnvironmentFor(plan)
 		}
 		if githubProtectedPublication(plan, node) {
-			wantEnvironment = githubReleaseEnvironment
+			wantEnvironment = githubReleaseEnvironmentFor(plan)
 		}
 		if job.Environment != wantEnvironment {
 			return e.New(e.CodeEngineCapability, "GitHub job %q deployment environment must be %q", jobID, wantEnvironment)
@@ -356,9 +359,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if job.If != wantCondition {
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on an admitted branch", jobID)
 		}
+		if plan.Environment.GitHubDevelopment {
+			if err := validateGitHubRegistryEnvironment(plan, node.Kind, node.Target, jobID, job); err != nil {
+				return err
+			}
+		}
 		if node.Kind == NodePublish {
 			target := plan.Targets[node.Target]
-			if strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
+			if !plan.Environment.GitHubDevelopment && strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
 				return e.New(e.CodeEngineCapability, "GitHub publish job %q lacks explicit packages:write", jobID)
 			}
 			if !strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "" {
@@ -376,7 +384,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			if node.Kind == NodeAttestEvidence && (job.Env["NVKR_CREDENTIAL"] != "" || job.Env["NVKR_REGISTRY_USER"] != "") {
 				return e.New(e.CodeEngineCapability, "SBOM attestation job must not receive registry credentials")
 			}
-			expected := githubSigningPermissions(node.Kind, plan.Environment.Signing.Mode)
+			expected := githubSigningPermissionsFor(plan, node.Kind)
 			if len(job.Permissions) != len(expected) {
 				return e.New(e.CodeEngineCapability,
 					"GitHub signing job %q holds %d permissions; %s signing requires exactly %v",
@@ -394,7 +402,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			}
 		}
 		for _, output := range node.Outputs {
-			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("pack-outputs", "node", node.ID, plan)) ||
+			if !hasExactGitHubRun(job.Steps, githubRunnerCommand(plan, "pack-outputs", "node", node.ID)) ||
 				!actions.stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
 			}
@@ -404,13 +412,25 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			return err
 		}
 		for _, input := range carrierInputs {
-			if !hasExactGitHubRun(job.Steps, githubRunnerCommand("restore-inputs", "stage", stage.ID, plan)) {
+			if !hasExactGitHubRun(job.Steps, githubRunnerCommand(plan, "restore-inputs", "stage", stage.ID)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not restore exact input %q", jobID, input)
 			}
 		}
 	}
 	if len(plan.LifecycleOutputs) > 0 {
 		job := document.Jobs["nvkr-lifecycle-run"]
+		if PerOutputPublication(plan) {
+			permissions := map[string]string{"contents": "read"}
+			if !plan.Environment.GitHubDevelopment {
+				permissions["packages"] = "read"
+			}
+			if job.Environment != githubReleaseEnvironmentFor(plan) || !reflect.DeepEqual(job.Permissions, permissions) {
+				return e.New(e.CodeEngineCapability, "GitHub finalizer requires its exact protected read-only publication scope")
+			}
+			if err := validateGitHubRegistryEnvironment(plan, NodeVerifyPublication, "release", "nvkr-lifecycle-run", job); err != nil {
+				return err
+			}
+		}
 		var expected bytes.Buffer
 		if err := writeGitHubFinalizerRestoreSteps(&expected, plan, nodeJobs); err != nil {
 			return err
@@ -454,6 +474,21 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	if !bytes.Equal(workflow, expected.Files[expected.WorkflowPath]) {
 		return e.New(e.CodeEngineCapability, "GitHub workflow differs from its exact admitted rendering")
+	}
+	return nil
+}
+
+func validateGitHubRegistryEnvironment(plan *Plan, kind, target, jobID string, job githubJob) error {
+	expected, err := githubRegistryEnvironment(plan, kind, target)
+	if err != nil {
+		return err
+	}
+	for _, key := range []string{"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER"} {
+		want, wanted := expected[key]
+		got, present := job.Env[key]
+		if got != want || wanted != present {
+			return e.New(e.CodeEngineCapability, "GitHub job %q registry credential scope differs at %s", jobID, key)
+		}
 	}
 	return nil
 }
@@ -614,7 +649,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 	if len(githubStagePrivateImages(plan, stage)) > 0 {
 		prepared := false
 		for _, step := range steps {
-			if strings.TrimSpace(step.Run) == githubRunnerCommand("prepare-images", "stage", stage.ID, plan) {
+			if strings.TrimSpace(step.Run) == githubRunnerCommand(plan, "prepare-images", "stage", stage.ID) {
 				if prepared || !reflect.DeepEqual(step.Env, githubImageEnvironment()) {
 					return e.New(e.CodeEngineCapability, "private toolchain preparation must occur exactly once with scoped credentials")
 				}
@@ -644,7 +679,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		}
 		for i, step := range steps {
 			if step.ID == "run-disk" {
-				if executors != 0 || step.Run != githubRunnerCommand("run-disk", "output", stage.DiskOutput, plan) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != githubDiskStepTimeoutMinutes(stage) {
+				if executors != 0 || step.Run != githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != githubDiskStepTimeoutMinutes(stage) {
 					return e.New(e.CodeEngineCapability, "disk stage requires its bounded unconditional live executor")
 				}
 				executors++

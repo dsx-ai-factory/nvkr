@@ -39,6 +39,13 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	if strings.HasPrefix(image, prefix+"/toolchains/") {
 		return true
 	}
+	// Development publication does not move already-pinned native toolchains.
+	// Only the maintained NVKR development namespace may prepare these two
+	// retained toolchain roots, using the separate read-only workflow token.
+	if plan.Environment.GitHubDevelopment && prefix == "ghcr.io/dsx-ai-factory/nvkr/development" {
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
+			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+	}
 	// Maintained nightly outputs reuse the same published, pinned M2 tooling.
 	// Output publication does not relocate those subjects or authorize other owners.
 	switch prefix {

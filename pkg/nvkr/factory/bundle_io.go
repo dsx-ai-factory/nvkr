@@ -89,7 +89,7 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 // cannot grant write or retirement ownership over another generated bundle.
 func validateBundleNamespace(bundle *GeneratedBundle) error {
 	name := ""
-	if bundle.WorkflowPath != GitHubWorkflowPath {
+	if bundle.WorkflowPath != GitHubWorkflowPath && bundle.WorkflowPath != GitHubDevelopmentWorkflowPath {
 		name = strings.TrimSuffix(strings.TrimPrefix(bundle.WorkflowPath, ".github/workflows/nvkr-run-"), ".yml")
 		if name == "" {
 			return e.New(e.CodeInvalidCatalog, "generated Run has an invalid namespace")
@@ -99,6 +99,9 @@ func validateBundleNamespace(bundle *GeneratedBundle) error {
 		return err
 	}
 	layout := githubBundleLayout(name)
+	if bundle.WorkflowPath == GitHubDevelopmentWorkflowPath {
+		layout = githubDevelopmentLayout
+	}
 	if bundle.WorkflowPath != layout.workflowPath || bundle.ManifestPath != layout.manifestPath || bundle.PlanPath != layout.planPath {
 		return e.New(e.CodeInvalidCatalog, "generated Run paths do not share one admitted namespace")
 	}

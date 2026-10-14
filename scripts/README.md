@@ -6,6 +6,15 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 
 ## Definition → Run
 
+For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
+development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
+remote commit and an active registered `nvkr-dev.yml`, then dispatches that branch explicitly. It performs
+no commit, push, environment-policy update or registry cleanup. `--check` runs only its provider preflight.
+See [pipeline development](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for full M2 branch
+execution, separate development signing/publication credentials, and attempt-scoped registry cleanup.
+Controlled dispatch-adapter tests run with `make test-ci-tools`; registry cleanup is owned by the Go
+development module and the separate default-branch cleanup workflow.
+
 Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nvke-demo.md) for
 `nvke-demo e2e`: build selected artifacts through `nvkr`, then deploy those
 completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux

@@ -55,21 +55,27 @@ Under that scratch root, inspect:
 - `.github/nvkr-run/plan.json`: the canonical Plan consumed by the workflow.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
-Those are the default paths when the Environment omits `githubBundle` or sets it
-to an empty string. To generate a separate project bundle, author `githubBundle`
-in that Environment. A name contains at most 48 lowercase letters, digits and
+Those are the default production paths when the Environment omits `githubBundle`
+or sets it to an empty string and leaves `githubDevelopment` false. To generate
+a separate production project bundle, author `githubBundle` in that Environment.
+A name contains at most 48 lowercase letters, digits and
 hyphens, with alphanumeric ends. Its paths are derived by the generator:
 
 | Environment selection | Workflow | Generated records directory |
 |---|---|---|
-| Omitted or empty `githubBundle` | `.github/workflows/nvkr-run.yml` | `.github/nvkr-run/` |
-| `githubBundle: <name>` | `.github/workflows/nvkr-run-<name>.yml` | `.github/nvkr-run-<name>/` |
+| Production, omitted or empty `githubBundle` | `.github/workflows/nvkr-run.yml` | `.github/nvkr-run/` |
+| Production, `githubBundle: <name>` | `.github/workflows/nvkr-run-<name>.yml` | `.github/nvkr-run-<name>/` |
+| `githubDevelopment: true`, empty `githubBundle` | `.github/workflows/nvkr-dev.yml` | `.github/nvkr-dev/` |
 
 Each records directory contains its own `plan.json` and `manifest.json`. Default
 and named bundles can coexist; each owns only its files and retirement. The
 selection changes Environment and Plan identity without changing component Build
 identity. Set the signing policy for the chosen workflow explicitly; selecting a
 bundle name never rewrites that policy or permits authored generated paths.
+Development uses its separate branch, signing, publication and retention policy;
+it does not authorize production acceptance. Combining `githubDevelopment: true`
+with a nonempty `githubBundle` returns `CodeEngineCapability` before catalog
+resolution or generated-output work. See the [feature-branch development loop](https://github.com/dsx-ai-factory/nvkr/blob/98ef3ec595d86d017345a0e2d635b388d1429b49/DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch).
 
 `--check` regenerates in memory and compares exact bytes without writing files. Use the same CLI build
 and inputs for both commands; the generator version contributes to generated content. Change authored
