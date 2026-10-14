@@ -56,7 +56,12 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if roots != 1 || len(plan.Builds[0].ResolvedComponents) != 11 {
+	wantComponents := strings.Fields(`
+		dsx-imds-node-attestor-agent nvke-agent nvke-cni-calico nvke-cni-ovn nvke-image-inputs nvke-kubeadm-distro
+		nvke-node-fde-amd64 nvke-patched-installer-iso-amd64 nvke-spire-agent ovn-kube-ubuntu ovn-kubernetes-chart
+		spire-agent-upstream spire-tpm-attestor-upstream spire-tpm-pubhash-upstream ubuntu-installer-iso-amd64`)
+	if roots != 1 || !slices.Equal(plan.Builds[0].Components, wantComponents) ||
+		len(plan.Builds[0].ResolvedComponents) != len(wantComponents) {
 		t.Fatal("FDE iteration lost its exact root and material closure")
 	}
 	root := t.TempDir()
@@ -98,7 +103,19 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantNames := strings.Fields(`
-		controller-chart csi-node-driver-registrar-image csi-node-driver-registrar-image-arm64 cwe
+		capi-controller-image capi-controller-image-arm64
+		capi-kubeadm-bootstrap-image capi-kubeadm-bootstrap-image-arm64
+		capi-kubeadm-control-plane-image capi-kubeadm-control-plane-image-arm64 capnico-controller
+		cert-manager-cainjector-image cert-manager-cainjector-image-arm64
+		cert-manager-controller-image cert-manager-controller-image-arm64
+		cert-manager-webhook-image cert-manager-webhook-image-arm64
+		cluster-api-provider-provisioned controller-chart controller-profiles
+		csi-node-driver-registrar-image csi-node-driver-registrar-image-arm64 cwe
+		nktp nktp-collector-image nktp-collector-image-arm64
+		nktp-kube-state-metrics-image nktp-kube-state-metrics-image-arm64
+		nktp-kubectl-image nktp-kubectl-image-arm64 nktp-lgtm-image nktp-lgtm-image-arm64
+		nktp-metrics-server-image nktp-metrics-server-image-arm64 nktp-node-exporter-image nktp-node-exporter-image-arm64
+		nktp-operator-image nktp-operator-image-arm64 nktp-target-allocator-image nktp-target-allocator-image-arm64
 		nvke-node-fde-amd64 nvke-node-fde-arm64 nvke-node-image-amd64 nvke-node-image-arm64
 		nvkectl nvkectl-linux-arm64 operator-tools postgresql postgresql-image postgresql-image-arm64
 		spiffe-csi-image spiffe-csi-image-arm64 spire spire-agent-image spire-agent-image-arm64
@@ -110,8 +127,8 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 	for _, output := range plan.LifecycleOutputs {
 		names = append(names, output.Name)
 	}
-	if !slices.Equal(names, wantNames) || len(plan.Builds) != 38 {
-		t.Fatalf("maintained M2 must retain its original 35 outputs plus both FDE outputs: names=%v, builds=%d", names, len(plan.Builds))
+	if !slices.Equal(names, wantNames) || len(plan.Builds) != 73 {
+		t.Fatalf("maintained M2 must retain all 69 outputs and 73 builds: names=%v, builds=%d", names, len(plan.Builds))
 	}
 	if plan.Qualification != factory.TierPipelineAttested || !factory.PerOutputPublication(plan) ||
 		plan.Environment.Signing == nil || plan.Environment.DiskEvidence != "build-provenance-v1" {
@@ -134,8 +151,9 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 				t.Fatal("missing FDE build", name)
 			}
 			build := plan.Builds[index]
-			wantComponents := []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro",
-				name, tc.patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", tc.installer}
+			wantComponents := []string{"dsx-imds-node-attestor-agent", "nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro",
+				name, tc.patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart",
+				"spire-agent-upstream", "spire-tpm-attestor-upstream", "spire-tpm-pubhash-upstream", tc.installer}
 			if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != len(wantComponents) {
 				t.Fatalf("unexpected native FDE closure: platform=%s components=%v", build.Platform, build.Components)
 			}
@@ -183,7 +201,11 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 				t.Fatal("missing original non-FDE build")
 			}
 			plain := plan.Builds[plainIndex]
-			wantComponents[5] = tc.plain
+			rootIndex := slices.Index(wantComponents, name)
+			if rootIndex < 0 {
+				t.Fatal("expected FDE closure omits its disk root")
+			}
+			wantComponents[rootIndex] = tc.plain
 			if !slices.Equal(plain.Components, wantComponents) || plain.CatalogSnapshot.Components[tc.plain].Disk.Encryption != "none" ||
 				plain.BuildDigest == build.BuildDigest {
 				t.Fatal("original non-FDE closure changed or shares FDE Build identity")
