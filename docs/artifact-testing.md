@@ -74,7 +74,11 @@ artifact. Bounded timeout, SIGINT and SIGTERM experiments removed the owned
 containers and default workspaces. The wrong-version executable failed with exit 2. The broken executable emitted
 contract failures, then hit a 45-second adapter bound because an upstream signal
 test blocks opening a FIFO when the executable exits before opening it. Neither
-negative produced a success record; the bounded adapter failure removed its container. A fresh import of maintained NVKE `ed9fb09b` through
+negative produced a success record; the bounded adapter failure removed its container.
+A focused fix is proposed in [NVKE #1637](https://github.com/dsx-ai-factory/nvke/pull/1637).
+With that patch explicitly overlaid on the candidate, the good artifact passed all
+nine contracts; the broken binary's FIFO test failed in 0.02 seconds and the
+complete command returned 2 in 31.8 seconds using reused test dependencies. A fresh import of maintained NVKE `ed9fb09b` through
 local Git transport verified its exact tree and rejected its missing entrypoint.
 The initial remote fetch for that negative reached its external time bound.
 
