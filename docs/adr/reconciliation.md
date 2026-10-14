@@ -1017,12 +1017,17 @@ inline final Run upload, so upload-action pin changes affect this workflow. Chec
 permissions, secret references, timeouts, qualification and inline setup remain visible change boundaries.
 Complete bundle regeneration and drift checking remain mandatory. Complete native-preflight, pinned-checkout,
 shared-preparation and structurally identical uncontrolled operation calls use descriptive aliases;
-preparation and operation parameters select their own job context. Static expansion resolves aliases into
+preparation and operation parameters select their own job context. Identical complete host sequences of
+native preflight, pinned credential-free checkout, current-job preparation and one or two uncontrolled
+node calls also share descriptive anchors. Source calls, authored setup and controlled steps remain outside
+the sequence form. Static expansion resolves aliases into
 independent nodes before substitution so sibling selectors and credentials cannot be mutated together.
 Operation calls with provider controls stay explicit. The combined candidate retains all members under
 the existing workflow-size bound; this is local generation/expansion evidence, not hosted execution.
-The current production workflow is 457,407 bytes (42,593 bytes of provider headroom); development is
-437,464 bytes. The maintained rendering test fails above a 95% soft budget, before the unchanged
+The current production workflow is 390,337 bytes (109,663 bytes of provider headroom); development is
+370,394 bytes. Both retain 562 jobs. The named ARM64 nightly workflows are 175,850 and 176,953 bytes,
+each retaining 254 jobs. Whole-step sharing preserves the complete expanded values of all four workflows.
+The maintained rendering test fails above a 95% soft budget, before the unchanged
 500,000-byte provider admission bound, directing membership changes to compaction work.
 Matrix scheduling and reusable callable workflows remain deferred, and no fresh hosted execution of this
 composite layout is recorded. Oversized workflows still fail before writes. Native offline disk preparation

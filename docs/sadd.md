@@ -568,7 +568,10 @@ closing summary; shared recovery precedes inline finalization. Static Plan/manif
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
-bytes, preserving credential scope and per-job finalizer results. Producer matrix and general callable
+bytes, preserving credential scope and per-job finalizer results. Identical complete host step sequences
+can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
+and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
+job's parameters; job policy and dependencies remain inline. Producer matrix and general callable
 scheduling remain deferred (ADR-18 §8); ADR-21 admits only the separate fixed native qualification worker
 and its selected-platform matrix.
 

@@ -108,8 +108,12 @@ structural equality checks, including their parameter selector and credential re
 the operation and job-local part, while the job and expanded role labels retain the selected producer. Controlled diagnostic
 steps retain their original caller labels. Static expansion resolves aliases into independent copies before
 substituting per-job parameters, so one job cannot mutate another's input or credential bindings. Job
-permissions, conditions, dependencies and runtime selection remain inline. This changes presentation only,
-not execution membership, evidence or the provider's workflow-size bound.
+permissions, conditions, dependencies and runtime selection remain inline. Identical complete host step
+sequences may also share descriptive anchors when they contain only native preflight, credential-free
+pinned checkout, current-job preparation and one or two uncontrolled node calls. Complete structural
+equality is required; source credentials, authored setup and provider-controlled steps cannot enter this
+sequence form. This changes presentation only, not execution membership, evidence or the provider's
+workflow-size bound.
 
 The entry workflow references the fixed Plan and manifest paths without repeating the Plan digest. Its
 provider source-fetch IDs and scheduling order describe the target and actual consumer cohort rather than

@@ -178,6 +178,16 @@ func githubResolveAliases(node *yamlv3.Node, active map[*yamlv3.Node]bool) (*yam
 // Fixed preflight, runner preparation and complete semantic calls get readable
 // aliases only after structural equality. Job policy and dependencies stay inline.
 func anchorGitHubPreflight(plan *Plan, jobs *yamlv3.Node, actions githubActionRefs) error {
+	// Rebuild presentation aliases from independent nodes. Whole-sequence sharing
+	// must not remove an earlier definition that a later step alias still needs.
+	resolved, err := githubResolveAliases(jobs, map[*yamlv3.Node]bool{})
+	if err != nil {
+		return err
+	}
+	*jobs = *resolved
+	if err := anchorGitHubStepSequences(plan, jobs, actions); err != nil {
+		return err
+	}
 	first := map[string]*yamlv3.Node{}
 	for index := 1; index < len(jobs.Content); index += 2 {
 		steps := githubYAMLField(jobs.Content[index], "steps")

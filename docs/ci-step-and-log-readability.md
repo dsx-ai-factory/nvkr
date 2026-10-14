@@ -27,9 +27,12 @@ paths from another step pass through explicit inputs. Referenced outcomes and ou
 scope, including the finalization step and final Run upload read by the closing summary. Recovery uses the
 shared `recover-inputs` action before inline finalization. These templates and invocation values are regenerated and checked with the workflow; they do not introduce another
 authored configuration surface.
-Repeated native preflight, pinned checkout and helper/parameter preparation steps use descriptive aliases.
-Preparation selects the current provider job with `github.job`; permissions, dependencies and execution or
-transport calls stay explicit.
+Repeated native preflight, pinned checkout, helper/parameter preparation and identical uncontrolled
+operation calls use descriptive aliases. Complete identical host sequences of preflight, credential-free
+checkout, current-job preparation and one or two node calls can share a `steps-<runner>-node` or
+`steps-<runner>-two-nodes` anchor. Preparation selects the current provider job with `github.job` even
+when its sequence is shared. Permissions, conditions and dependencies stay explicit; authored setup,
+source credentials and controlled transport stay outside the sequence form.
 
 Workflow headers refer to fixed Plan and manifest paths. Source-fetch job names and ordering follow the
 target and actual consuming components; resolved commands and logs still identify exact pin-bound Plan nodes.

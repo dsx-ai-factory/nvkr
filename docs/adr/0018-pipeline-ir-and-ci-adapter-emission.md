@@ -991,9 +991,15 @@ the top-level workflow is unchanged. This lowering replaces numbered YAML anchor
 top-level policy and dependencies remain
 ordinary readable YAML. Complete, identical native-platform preflight, pinned checkout and shared job
 preparation steps may use descriptive aliases: `check-native-linux-amd64`, `check-native-linux-arm64`,
-`checkout-workflow-source` and `prepare-stage-<runner-artifact>`. Preparation retains the same caller step ID
-and binds its job selector through `github.job` in each job. Scalar values, permissions, dependency sets and
-execution/transport action calls are not aliased.
+`checkout-workflow-source` and `prepare-stage-<runner-artifact>`. Complete uncontrolled semantic operation
+calls may also share an alias after structural equality, including their parameter and credential bindings.
+Preparation retains the same caller step ID and binds its job selector through `github.job` in each job.
+An entire identical host step sequence may share a descriptive `steps-<runner>-node` or
+`steps-<runner>-two-nodes` anchor when it contains only the exact native preflight, credential-free pinned
+checkout, current-job helper preparation and one or two uncontrolled `execute-node` calls. Source calls,
+additional credential inputs, authored setup and controlled transfers are outside this sequence form.
+Aliases resolve into independent nodes before per-job parameter substitution. Scalar values, job permissions,
+conditions and dependency sets remain inline. This presentation change retains the exact provider-job set.
 
 Producer matrix scheduling and general reusable `workflow_call` pipelines remain deferred. The separately
 owned fixed native qualification worker and its exact selected-platform matrix are admitted by ADR-21 §4;
