@@ -21,7 +21,10 @@ import (
 
 // OperatorStatus contains only the owner's validated public cluster projection.
 // It describes a timestamped observation, not retention or readiness authority.
-type OperatorStatus struct{ text string }
+type OperatorStatus struct {
+	text        string
+	walkthrough bool
+}
 
 // A current diagnostic observation is not the already-completed tenant
 // acceptance result. Only this owner-issued marker may be ignored by its
@@ -30,6 +33,16 @@ var errOperatorHealthUnconfirmed = errors.New("current diagnostic health unconfi
 
 // Text returns the formatted public observation, never raw Kubernetes responses.
 func (status OperatorStatus) Text() string { return status.text }
+
+// Walkthrough identifies owner-generated recorded observations for presentation
+// only; it grants no runtime or cleanup authority.
+func (status OperatorStatus) Walkthrough() bool { return status.walkthrough }
+
+// OperatorStatusPager requests a bounded viewing interval for interactive pages.
+// Noninteractive writers receive the same complete observation without waiting.
+type OperatorStatusPager interface {
+	OperatorStatusPageDuration() time.Duration
+}
 
 // OperatorStatusWriter lets a presenter preserve the result separately from
 // filtered subprocess logs. Ordinary writers still receive the same text.

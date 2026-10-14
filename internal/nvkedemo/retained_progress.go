@@ -21,10 +21,11 @@ const retainedProgressLimit = 32 << 10
 // Frames contain only the existing public progress projection, never captured
 // subprocess diagnostics. Sequence gaps are visible errors, not hidden stalls.
 type retainedProgressFrame struct {
-	Sequence uint64         `json:"sequence"`
-	Text     string         `json:"text,omitempty"`
-	Event    *ProgressEvent `json:"event,omitempty"`
-	Status   string         `json:"operatorStatus,omitempty"`
+	Sequence    uint64         `json:"sequence"`
+	Text        string         `json:"text,omitempty"`
+	Event       *ProgressEvent `json:"event,omitempty"`
+	Status      string         `json:"operatorStatus,omitempty"`
+	Walkthrough bool           `json:"walkthrough,omitempty"`
 }
 
 type retainedProgress struct {
@@ -66,11 +67,13 @@ func (progress *retainedProgress) WriteOperatorStatus(status OperatorStatus) err
 	if status.Text() == "" {
 		return nvkrerr.New(nvkrerr.CodePreflightFailed, "retained cluster presentation requires an owner-generated observation")
 	}
-	if !progress.append(retainedProgressFrame{Status: status.Text()}) {
+	if !progress.append(retainedProgressFrame{Status: status.Text(), Walkthrough: status.Walkthrough()}) {
 		return nvkrerr.New(nvkrerr.CodePreflightFailed, "retained cluster observation exceeds its bounded presentation envelope")
 	}
 	return nil
 }
+
+func (*retainedProgress) OperatorStatusPageDuration() time.Duration { return 3 * time.Second }
 
 func (progress *retainedProgress) Write(raw []byte) (int, error) {
 	n := len(raw)
@@ -113,6 +116,9 @@ func (progress *retainedProgress) SudoAuthentication() func(context.Context) err
 
 func relayRetainedProgress(out io.Writer, cursor *uint64, frames []retainedProgressFrame) error {
 	for _, frame := range frames {
+		if frame.Walkthrough && frame.Status == "" {
+			return nvkrerr.New(nvkrerr.CodePreflightFailed, "retained walkthrough requires its typed observation")
+		}
 		if frame.Sequence <= *cursor {
 			continue
 		}
@@ -133,7 +139,7 @@ func relayRetainedProgress(out io.Writer, cursor *uint64, frames []retainedProgr
 				return nvkrerr.New(nvkrerr.CodePreflightFailed, "retained cluster observation has an invalid presentation envelope")
 			}
 			if out != nil {
-				if err := writeOperatorStatus(out, OperatorStatus{text: frame.Status}); err != nil {
+				if err := writeOperatorStatus(out, OperatorStatus{text: frame.Status, walkthrough: frame.Walkthrough}); err != nil {
 					return err
 				}
 			}

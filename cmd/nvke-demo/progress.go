@@ -84,10 +84,11 @@ type checkedWriter struct {
 	sudoAuth    func(context.Context) error
 	// One bounded latest line per public result category, independent of the
 	// dashboard's activity ring. Success statements replay only after success.
-	results        [6]string
-	operatorStatus string
-	guests         [2]nvkedemo.TenantGuestObservation
-	guestsReported bool
+	results           [6]string
+	operatorStatus    string
+	walkthroughStatus string
+	guests            [2]nvkedemo.TenantGuestObservation
+	guestsReported    bool
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.
@@ -134,6 +135,9 @@ func (w *checkedWriter) retainResult(line string) {
 
 // Called with w.mu held, after the screen has restored scrolling output.
 func (w *checkedWriter) replayResults(success bool) {
+	if w.walkthroughStatus != "" {
+		w.emit("\nRecorded walkthrough observed before cleanup; historical observations.\n" + w.walkthroughStatus)
+	}
 	if w.operatorStatus != "" {
 		w.emit("\nCluster snapshot observed during this invocation; historical, not a claim that services remain running.\n" + w.operatorStatus)
 	}
@@ -154,13 +158,42 @@ func (w *checkedWriter) WriteOperatorStatus(status nvkedemo.OperatorStatus) erro
 	if w.err != nil {
 		return w.err
 	}
-	text := status.Text()
+	return w.writeOperatorPresentation(status.Text(), status.Walkthrough())
+}
+
+// Called under w.mu after the owner-issued status has crossed the public seam.
+func (w *checkedWriter) writeOperatorPresentation(text string, walkthrough bool) error {
 	if text == "" {
 		return w.fail("cluster presentation requires a bounded owner-generated observation")
 	}
-	w.operatorStatus = text
+	if len(text) > 64<<10 {
+		return w.fail("cluster presentation exceeds its bounded observation size")
+	}
+	if walkthrough {
+		if len(w.walkthroughStatus)+len(text) > 96<<10 {
+			return w.fail("recorded walkthrough exceeds its bounded presentation size")
+		}
+		w.walkthroughStatus += text
+	} else {
+		w.operatorStatus = text
+	}
+	if dashboard, ok := w.out.(*dashboard); ok {
+		dashboard.mu.Lock()
+		dashboard.operatorPage = ""
+		if walkthrough {
+			dashboard.operatorPage = text
+		}
+		dashboard.mu.Unlock()
+	}
 	w.emit(text)
 	return w.err
+}
+
+func (w *checkedWriter) OperatorStatusPageDuration() time.Duration {
+	if _, ok := w.out.(*dashboard); ok {
+		return 3 * time.Second
+	}
+	return 0
 }
 
 func (w *checkedWriter) Write(data []byte) (int, error) {

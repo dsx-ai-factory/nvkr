@@ -330,6 +330,21 @@ The YAML equivalent is the strictly typed `run.cleanup: true`; the default is
 false, and an explicit `--cleanup=false` overrides it. Cleanup is never a
 silent fallback from retention to a different network or input selection.
 
+For a recording, add `--walkthrough` to that same `e2e --cleanup`
+invocation. TUI remains the default; `--plain` is optional scrolling output. The `e2e`
+introduction explains the selected authored inputs and links their source documentation before
+the dashboard; it is read-only presentation, not runtime admission. After the existing workload
+and DNS checks, the adapter runs bounded
+read-only kubectl observations against both explicit owned kubeconfigs before
+natural tenant deletion. The public view shows Ready node roles, all-namespace
+pod status and restarts, actual Deployment/DaemonSet/StatefulSet inventory,
+selected component rollouts, and the existing `nvkr-smoke` Job completion,
+zero-retry policy, container exit/restarts and bounded DNS success marker. It
+does not rerun the Job. Kubeconfig contents, node addresses, pod identities, raw
+DNS output and private diagnostics remain private. A failed walkthrough fails
+the recording and still runs the existing mandatory owned cleanup. The YAML
+equivalent is `run.walkthrough: true`; default workflows are unchanged.
+
 The new retained-owner CLI and live access presentation have focused contract
 tests and native process/control fixtures. Those fixtures do not prove a fresh
 NVKE retained deployment, SSH-logout persistence or acceptance of this revision.

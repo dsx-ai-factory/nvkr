@@ -20,11 +20,13 @@ import (
 
 type retainedTypedStatusBuffer struct {
 	bytes.Buffer
-	statuses int
+	statuses    int
+	walkthrough bool
 }
 
 func (out *retainedTypedStatusBuffer) WriteOperatorStatus(status OperatorStatus) error {
 	out.statuses++
+	out.walkthrough = status.Walkthrough()
 	_, err := out.WriteString(status.Text())
 	return err
 }
@@ -102,6 +104,7 @@ func TestRetainedOperatorStatusRejectsInvalidOrOversizeEnvelopes(t *testing.T) {
 		})
 	}
 	for _, frame := range []retainedProgressFrame{
+		{Sequence: 1, Walkthrough: true},
 		{Sequence: 1, Status: "public fixture", Text: "ambiguous log"},
 		{Sequence: 1, Status: "public fixture", Event: &ProgressEvent{}},
 		{Sequence: 1, Status: strings.Repeat("x", retainedProgressLimit+1)},
@@ -112,6 +115,26 @@ func TestRetainedOperatorStatusRejectsInvalidOrOversizeEnvelopes(t *testing.T) {
 		if err := relayRetainedProgress(&out, &cursor, []retainedProgressFrame{frame}); !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed || out.Len() != 0 || cursor != 0 {
 			t.Fatal("invalid envelope reached a presenter", err)
 		}
+	}
+}
+
+func TestRetainedWalkthroughKindSurvivesWireCodec(t *testing.T) {
+	progress := &retainedProgress{}
+	if err := progress.WriteOperatorStatus(OperatorStatus{text: "get pods -A\n", walkthrough: true}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(progress.frames())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var frames []retainedProgressFrame
+	if err := json.Unmarshal(raw, &frames); err != nil {
+		t.Fatal(err)
+	}
+	var out retainedTypedStatusBuffer
+	var cursor uint64
+	if err := relayRetainedProgress(&out, &cursor, frames); err != nil || !out.walkthrough || out.String() != "get pods -A\n" {
+		t.Fatal("relay erased walkthrough presentation kind", err)
 	}
 }
 

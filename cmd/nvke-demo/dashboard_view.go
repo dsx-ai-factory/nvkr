@@ -69,6 +69,7 @@ type dashboardSnapshot struct {
 	elapsed                       time.Duration
 	phases                        [6]dashboardPhase
 	activity                      []string
+	operatorPage                  string
 	tenant, current               string
 	focus, offset                 int
 	registered, ready             int
@@ -1030,6 +1031,20 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	screen.SetStyle(tcell.StyleDefault.Background(palette.Background).Foreground(palette.Foreground))
 	screen.Clear()
 	d.header.SetText(fmt.Sprintf("[lightcyan::b] NVKE · local ARM64 build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]", max(time.Duration(0), now.Sub(s.started)).Truncate(time.Second)))
+	if s.operatorPage != "" && !canceling && !s.confirmCancel && !s.confirmForce {
+		d.activityView.SetTitle(" Recorded kubectl walkthrough · actual observations ")
+		d.activityView.SetWrap(false)
+		d.activityView.SetText(tview.Escape(s.operatorPage))
+		d.activityView.SetRect(0, 3, width, content)
+		d.activityView.ScrollToBeginning()
+		d.header.SetRect(0, 0, width, min(3, height))
+		d.footer.SetText(" Recorded observations · pages advance automatically before cleanup\n q / Ctrl-C confirm cancel; owned cleanup remains mandatory")
+		d.footer.SetRect(0, max(0, height-2), width, min(2, height))
+		d.activityView.Draw(screen)
+		d.header.Draw(screen)
+		d.footer.Draw(screen)
+		return
+	}
 	if dashboardBuildActive(s) && !canceling {
 		d.drawBuild(screen, s, now, width, height)
 		return
