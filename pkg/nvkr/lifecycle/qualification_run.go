@@ -107,7 +107,11 @@ func newQualificationConsumer(reference string, policy QualificationPolicy, opti
 	if binary == "" {
 		binary = "cosign"
 	}
-	return newQualificationReferenceConsumer(reference, ConsumerOptions{CosignBinary: binary, CosignDigest: policy.Cosign.Digest,
+	digest, err := policy.Cosign.ExecutableDigest("linux/" + runtime.GOARCH)
+	if err != nil {
+		return nil, err
+	}
+	return newQualificationReferenceConsumer(reference, ConsumerOptions{CosignBinary: binary, CosignDigest: digest,
 		WorkspaceRoot: options.WorkspaceRoot, Credential: options.Credential, Registry: options.Registry})
 }
 

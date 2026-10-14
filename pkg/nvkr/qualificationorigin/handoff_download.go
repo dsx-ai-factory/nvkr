@@ -145,10 +145,17 @@ func (artifact qualificationArtifact) validate(name string, origin Description) 
 }
 
 func (g *GitHub) downloadQualificationArchive(ctx context.Context, source *SourceRun, repository string, id json.Number) ([]byte, error) {
+	return g.downloadArtifactArchive(ctx, source.Require, repository, id, maxQualificationArchiveBytes)
+}
+
+// downloadArtifactArchive is the shared credential-isolating artifact transport.
+// The private liveness callback borrows an already authenticated owner; no
+// exported transport seam can mint either source or invocation authority.
+func (g *GitHub) downloadArtifactArchive(ctx context.Context, require func() error, repository string, id json.Number, maxBytes int64) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, handoffTransportError(ctx, "qualification archive download")
 	}
-	if err := source.Require(); err != nil {
+	if err := require(); err != nil {
 		return nil, err
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, g.api+"/repos/"+repository+"/actions/artifacts/"+string(id)+"/zip", nil)
@@ -167,7 +174,7 @@ func (g *GitHub) downloadQualificationArchive(ctx context.Context, source *Sourc
 	location := response.Header.Get("Location")
 	status := response.StatusCode
 	_ = response.Body.Close()
-	if err := source.Require(); err != nil {
+	if err := require(); err != nil {
 		return nil, err
 	}
 	if ctx.Err() != nil {
@@ -197,20 +204,20 @@ func (g *GitHub) downloadQualificationArchive(ctx context.Context, source *Sourc
 	if response.StatusCode != http.StatusOK {
 		return nil, e.New(e.CodeFetchFailed, "qualification archive download returned HTTP %d", response.StatusCode)
 	}
-	if response.ContentLength > maxQualificationArchiveBytes {
+	if response.ContentLength > maxBytes {
 		return nil, e.New(e.CodeVerifyFailed, "qualification archive download exceeds its byte bound")
 	}
-	raw, err := io.ReadAll(io.LimitReader(handoffContextReader{ctx: ctx, reader: response.Body}, maxQualificationArchiveBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(handoffContextReader{ctx: ctx, reader: response.Body}, maxBytes+1))
 	if err != nil {
 		return nil, handoffTransportError(ctx, "reading qualification archive")
 	}
-	if len(raw) > maxQualificationArchiveBytes {
+	if int64(len(raw)) > maxBytes {
 		return nil, e.New(e.CodeVerifyFailed, "qualification archive download exceeds its byte bound")
 	}
 	if response.ContentLength >= 0 && int64(len(raw)) != response.ContentLength {
 		return nil, e.New(e.CodeVerifyFailed, "qualification archive download is truncated")
 	}
-	if err := source.Require(); err != nil {
+	if err := require(); err != nil {
 		return nil, err
 	}
 	return raw, nil

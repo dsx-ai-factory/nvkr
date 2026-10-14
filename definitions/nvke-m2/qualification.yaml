@@ -1,0 +1,134 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Maintained policy for the 35-output candidate, reviewed with the generated workflows.
+# Pins are independent of producer artifacts. Real producer/hosted acceptance follows merge.
+# cosign v3.1.3 binaries match the official release assets and cosign_checksums.txt:
+# https://github.com/sigstore/cosign/releases/tag/v3.1.3
+# Smoke images are native manifests from Docker Official Debian trixie-20261005-slim.
+# Their utility/isolation probes passed; this does not establish hosted acceptance.
+# Review tool profiles and deployment-image scope whenever Definition membership changes.
+schemaVersion: nvkr.dev/qualification-policy/v1
+source:
+  repository: dsx-ai-factory/nvkr
+  workflow: .github/workflows/nvkr-run.yml
+  defaultBranch: main
+qualificationWorkflow: .github/workflows/nvkr-qualify.yml
+cosign:
+  version: v3.1.3
+  platformDigests:
+    linux/amd64: sha256:4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71
+    linux/arm64: sha256:c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a
+smoke:
+  workflow: .github/workflows/nvkr-smoke.yml
+  images:
+    linux/amd64: index.docker.io/library/debian@sha256:918311b7b6c4c6f68b232ba516584925f6c78ad82b6fd534b98979df6438e483
+    linux/arm64: index.docker.io/library/debian@sha256:a2ca65377c251208de42e1a2722cb949211236c161b634f6f3663754e2d06850
+  tools:
+    helm: helm-version
+    kubectl: kubectl-client-version-json
+    nvkectl: nvkectl-version-json
+  # These exact OCI outputs are deployment images, outside loose-executable smoke.
+  # Their signatures, provenance and membership remain required; any authored embedded metadata is checked strictly.
+  # Helm and disk outputs have their own fixed non-tool format rule and are not listed here.
+  nonToolOutputs:
+    - output: csi-node-driver-registrar-image
+      kind: oci
+      components: [csi-node-driver-registrar-image]
+      reason: deployment-image
+    - output: csi-node-driver-registrar-image-arm64
+      kind: oci
+      components: [csi-node-driver-registrar-image]
+      reason: deployment-image
+    - output: cwe
+      kind: oci
+      components: [nvke-controller]
+      reason: deployment-image
+    - output: postgresql-image
+      kind: oci
+      components: [postgresql-image]
+      reason: deployment-image
+    - output: postgresql-image-arm64
+      kind: oci
+      components: [postgresql-image]
+      reason: deployment-image
+    - output: spiffe-csi-image
+      kind: oci
+      components: [spiffe-csi-image]
+      reason: deployment-image
+    - output: spiffe-csi-image-arm64
+      kind: oci
+      components: [spiffe-csi-image]
+      reason: deployment-image
+    - output: spire-agent-image
+      kind: oci
+      components: [spire-agent-image]
+      reason: deployment-image
+    - output: spire-agent-image-arm64
+      kind: oci
+      components: [spire-agent-image]
+      reason: deployment-image
+    - output: spire-bash-image
+      kind: oci
+      components: [spire-bash-image]
+      reason: deployment-image
+    - output: spire-bash-image-arm64
+      kind: oci
+      components: [spire-bash-image]
+      reason: deployment-image
+    - output: spire-controller-manager-image
+      kind: oci
+      components: [spire-controller-manager-image]
+      reason: deployment-image
+    - output: spire-controller-manager-image-arm64
+      kind: oci
+      components: [spire-controller-manager-image]
+      reason: deployment-image
+    - output: spire-oidc-image
+      kind: oci
+      components: [spire-oidc-image]
+      reason: deployment-image
+    - output: spire-oidc-image-arm64
+      kind: oci
+      components: [spire-oidc-image]
+      reason: deployment-image
+    - output: spire-server-image
+      kind: oci
+      components: [spire-server-image]
+      reason: deployment-image
+    - output: spire-server-image-arm64
+      kind: oci
+      components: [spire-server-image]
+      reason: deployment-image
+    - output: spire-tpm-server-image
+      kind: oci
+      components: [spire-tpm-server-image]
+      reason: deployment-image
+    - output: spire-tpm-server-image-arm64
+      kind: oci
+      components: [spire-tpm-server-image]
+      reason: deployment-image
+    - output: temporal-admin-tools-image
+      kind: oci
+      components: [temporal-admin-tools-image]
+      reason: deployment-image
+    - output: temporal-admin-tools-image-arm64
+      kind: oci
+      components: [temporal-admin-tools-image]
+      reason: deployment-image
+    - output: temporal-server-image
+      kind: oci
+      components: [temporal-server-image]
+      reason: deployment-image
+    - output: temporal-server-image-arm64
+      kind: oci
+      components: [temporal-server-image]
+      reason: deployment-image
+    - output: temporal-ui-image
+      kind: oci
+      components: [temporal-ui-image]
+      reason: deployment-image
+    - output: temporal-ui-image-arm64
+      kind: oci
+      components: [temporal-ui-image]
+      reason: deployment-image

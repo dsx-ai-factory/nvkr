@@ -43,14 +43,15 @@ const (
 	RoleClearance        SignerRole = "release-clearance"
 	// RoleReproduction and RoleCompatibility keep release-gate signer policies
 	// distinct from the release-set and clearance authorities.
-	RoleReproduction  SignerRole = "release-reproduction"
-	RoleCompatibility SignerRole = "release-compatibility"
+	RoleReproduction    SignerRole = "release-reproduction"
+	RoleCompatibility   SignerRole = "release-compatibility"
+	RoleToolSmokeWorker SignerRole = "tool-smoke-worker"
 )
 
 func (r SignerRole) valid() bool {
 	switch r {
 	case RoleValidationVector, RoleBuilderProfile, RoleStatus, RoleConformance, RolePromotionPolicy,
-		RoleReleaseSet, RoleClearance, RoleReproduction, RoleCompatibility:
+		RoleReleaseSet, RoleClearance, RoleReproduction, RoleCompatibility, RoleToolSmokeWorker:
 		return true
 	default:
 		return false
@@ -174,6 +175,26 @@ type DocumentVerificationRequest struct {
 	AllowedIdentities []string
 	OIDCIssuer        string
 	TrustedRootDigest string
+	// GitHubInvocation optionally requires exact Fulcio claims for the calling
+	// workflow and Run attempt. It supplements, never replaces, AllowedIdentities
+	// (the signer workflow SAN) and OIDCIssuer. These expected values must come
+	// from independently authenticated invocation policy, not the signed document.
+	GitHubInvocation *GitHubInvocationConstraints
+}
+
+// GitHubInvocationConstraints names the exact GitHub invocation expected in the
+// certificate used to verify a document. BuildConfigURI is the top-level workflow
+// URI (https://github.com/owner/repo/.github/workflows/file.yml@refs/heads/branch);
+// BuildConfigDigest is its lowercase 40-character workflow_sha, not the candidate
+// artifact's source commit. RunInvocationURI includes /runs/ID/attempts/N.
+//
+// A reusable workflow's certificate SAN identifies job_workflow_ref instead.
+// Callers must independently restrict that signer identity with AllowedIdentities
+// and authorize its code revision. These fields are descriptions, not receipts.
+type GitHubInvocationConstraints struct {
+	RunInvocationURI  string
+	BuildConfigURI    string
+	BuildConfigDigest string
 }
 
 // VerificationEvidence contains claims captured from the certificate that the
@@ -191,6 +212,10 @@ type VerificationEvidence struct {
 	CertificateBlobSHA256 string
 	BundleSHA256          string
 	TrustedRootBlobSHA256 string
+	// GitHubInvocation is present only when the adapter verified the requested
+	// exact invocation claims in the same certificate used for signature
+	// verification. This is diagnostic evidence, not a transferable capability.
+	GitHubInvocation *GitHubInvocationConstraints
 }
 
 // DocumentVerifier is the real verification seam. Production injects the qualified
@@ -261,6 +286,8 @@ type AuthenticateRequest struct {
 	Offline    bool
 	Role       SignerRole
 	Policy     RolePolicy
+	// GitHubInvocation is independent caller policy, never recovered from the document.
+	GitHubInvocation *GitHubInvocationConstraints
 }
 
 // DocumentReceipt can only be produced as authenticated by Authenticate. Critical
@@ -315,6 +342,11 @@ func (a *DocumentAuthenticator) Authenticate(ctx context.Context, req Authentica
 	if err := documentContextError(ctx, "authenticating trust document"); err != nil {
 		return DocumentReceipt{}, err
 	}
+	var expectedInvocation *GitHubInvocationConstraints
+	if req.GitHubInvocation != nil {
+		frozen := *req.GitHubInvocation
+		expectedInvocation = &frozen
+	}
 	if a == nil || a.verifier == nil {
 		return DocumentReceipt{}, e.New(e.CodeInternal,
 			"authenticated-document verifier is unavailable")
@@ -343,6 +375,11 @@ func (a *DocumentAuthenticator) Authenticate(ctx context.Context, req Authentica
 	defer cleanup()
 
 	identities, issuer := req.Policy.constraints()
+	var invocation *GitHubInvocationConstraints
+	if expectedInvocation != nil {
+		frozen := *expectedInvocation
+		invocation = &frozen
+	}
 	ev, err := a.verifier.VerifyDocument(ctx, DocumentVerificationRequest{
 		SnapshotPath:      snapshotPath,
 		ExactBytes:        append([]byte(nil), raw...),
@@ -352,6 +389,7 @@ func (a *DocumentAuthenticator) Authenticate(ctx context.Context, req Authentica
 		AllowedIdentities: identities,
 		OIDCIssuer:        issuer,
 		TrustedRootDigest: req.Policy.trustedRootDigest,
+		GitHubInvocation:  invocation,
 	})
 	if err != nil {
 		return DocumentReceipt{}, err
@@ -361,6 +399,9 @@ func (a *DocumentAuthenticator) Authenticate(ctx context.Context, req Authentica
 	}
 	if err := assertSnapshotUnchanged(ctx, snapshotPath, raw); err != nil {
 		return DocumentReceipt{}, err
+	}
+	if expectedInvocation != nil && (ev.GitHubInvocation == nil || *ev.GitHubInvocation != *expectedInvocation) {
+		return DocumentReceipt{}, e.New(e.CodeUntrustedSigner, "verification did not bind the exact GitHub invocation")
 	}
 	if !isSHA256Digest(ev.CertificateSHA256) {
 		return DocumentReceipt{}, e.New(e.CodeSignatureInvalid,

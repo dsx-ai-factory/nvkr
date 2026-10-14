@@ -28,6 +28,9 @@ func TestQualificationPolicyValidation(t *testing.T) {
 		edit func(*QualificationPolicy)
 		code e.Code
 	}{
+		{"exact bootstrap version", func(p *QualificationPolicy) { p.Cosign.Version = "v3.0.2" }, ""},
+		{"mutable bootstrap version", func(p *QualificationPolicy) { p.Cosign.Version = "latest" }, e.CodeUnpinnedInput},
+		{"bootstrap URL injection", func(p *QualificationPolicy) { p.Cosign.Version = "v3.0.2/../../other" }, e.CodeUnpinnedInput},
 		{"artifact checks only", func(*QualificationPolicy) {}, ""},
 		{"independent qualifier", func(p *QualificationPolicy) { p.QualificationWorkflow = ".github/workflows/qualify.yml" }, ""},
 		{"required suite declaration", func(p *QualificationPolicy) { p.RequiredSuites = []string{"nvke"} }, ""},

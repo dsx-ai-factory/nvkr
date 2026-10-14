@@ -166,7 +166,9 @@ pipeline-attested build/evidence qualification; it does not reuse a reserved qua
 
 | Object | Canonical schema | Frozen family kind | Attestation predicate type |
 |---|---|---|---|
-| Qualification evidence | `nvkr.dev/qualification-evidence/v1` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v1` |
+| Qualification evidence | `nvkr.dev/qualification-evidence/v2` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v2` |
+| Qualification policy | `nvkr.dev/qualification-policy/v1` | `nvkr.qualification-policy` | Independently selected configuration; no evidence predicate |
+| Native smoke worker | `nvkr.dev/tool-smoke-worker/v1` | `nvkr.tool-smoke-worker` | Detached signed document; no qualification attachment |
 
 The document binds the authenticated originating repository, Run, attempt, commit, workflow/ref and build
 invocation; the separately authenticated qualification invocation; gate version; Definition, Environment,
@@ -176,6 +178,21 @@ pass/fail only. Applicable checks must pass before publication; non-applicable c
 applicability result. External suites outside this MVP use `not-evaluated` with reason `outside MVP scope`;
 this is never interpreted as passed. Disk scope states producer-only evidence and no content inspection.
 Unknown fields, versions or verdicts, duplicate members, noncanonical bytes and inexact bindings fail closed.
+
+The complete qualification-policy identity includes source and qualifier workflow selection, the distinct
+same-repository native smoke workflow, every platform executable/image pin, fixed tool profiles, explicit
+non-tool output scope and external-suite requirements. Local executable paths are locators, excluded from
+this identity; exact executable byte pins remain included. Object-owned set collections are sorted before
+hashing. The existing release Verification Policy digest keeps its separate meaning.
+
+A native smoke-worker document binds the full artifact-check description, exact source and qualifier
+invocations, complete qualification-policy identity, measured native platform/runtime/image and exact
+per-member byte identities, expected and observed versions and fixed command profiles. It carries no
+qualification signing authority. The final owner authenticates the distinct worker certificate identity,
+issuer, exact qualifier Run-attempt URI and top-level workflow configuration URI/commit from the same
+verified certificate, then validates complete, disjoint member coverage. Generated transport names and
+unsigned report fields never restore a smoke receipt. These registrations state the wire contracts;
+reconciliation separately records runtime, worker authentication and hosted acceptance implementation.
 
 The M4 release-manifest document remains deferred and requires its own registered canonical schema and
 domain-separated identity before implementation. Pretty-printed JSON hashes are insufficient for either

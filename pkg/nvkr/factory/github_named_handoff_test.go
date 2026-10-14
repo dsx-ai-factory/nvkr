@@ -4,19 +4,17 @@
 package factory
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestNightlyProducerFinalizerPreservesNamedPlanAndQualificationHandoff(t *testing.T) {
-	profiles := []map[string]string{
-		{"name": "nvke-nightly-arm64", "plan": ".github/nvkr-run-nvke-nightly-arm64/plan.json"},
-		{"name": "nvke-nightly-upstream-ovn-arm64", "plan": ".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json"},
-	}
-	for _, profile := range profiles {
-		t.Run(profile["name"], func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), filepath.Join("../../..", profile["plan"]))
+func TestNamedProducerFinalizerPreservesPlanAndQualificationHandoff(t *testing.T) {
+	for _, name := range []string{"project-a", "project-b"} {
+		t.Run(name, func(t *testing.T) {
+			plan := referenceTestPlan(t)
+			plan.Environment.GitHubBundle = name
+			var err error
+			plan.EnvironmentDigest, err = plan.Environment.Digest()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -26,7 +24,7 @@ func TestNightlyProducerFinalizerPreservesNamedPlanAndQualificationHandoff(t *te
 			}
 			job := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs["nvkr-lifecycle-run"]
 			runs := joinRuns(job.Steps)
-			if !strings.Contains(runs, "--plan "+shellQuote(profile["plan"])) ||
+			if !strings.Contains(runs, "--plan "+shellQuote(githubBundleLayout(name).planPath)) ||
 				!strings.Contains(runs, " --handoff "+githubQualificationHandoffPath) ||
 				strings.Contains(runs, "--plan "+shellQuote(FactoryPlanPath)) {
 				t.Fatal("nightly finalizer lost its named Plan or complete qualification handoff")

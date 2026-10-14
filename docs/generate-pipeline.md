@@ -75,10 +75,38 @@ bundle name never rewrites that policy or permits authored generated paths.
 and inputs for both commands; the generator version contributes to generated content. Change authored
 inputs and regenerate instead of editing generated files.
 
-The generator emits manual `workflow_dispatch` pipelines, with no cron or
-callable-workflow trigger. A separately authored downstream CI coordinator can
+The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
+or callable producer trigger. A separately authored downstream CI coordinator can
 schedule dispatches; that scheduling and runtime-test ownership are separate
 from generated bundle ownership.
+
+Adding `--qualification-policy` also generates the admitted M3 qualifier and its
+fixed native smoke worker. The qualifier uses `workflow_run`; the worker uses
+`workflow_call` from that same-repository qualifier at the same commit. Their
+independent policy, credentials and ownership are separate from the producer
+bundle and the downstream nightly E2E adapter. They add no generated cron or
+general callable producer interface.
+Current qualification policy admission selects the default producer workflow,
+`.github/workflows/nvkr-run.yml`; named-producer qualification is not an admitted
+configuration. The named nightly producers instead use the separate downstream
+E2E adapter.
+
+## Recover interrupted qualification generation
+
+When generation includes `--qualification-policy`, an interrupted write can leave files such as
+`.github/nvkr-qualification/manifest.stage`. `--check` reports the incomplete generation without repairing
+it. Changing policy or other inputs before retrying can produce `CodeWriteConflict`: the saved stage does
+not match the newly requested generation, so the writer preserves it and the published files.
+
+1. Restore the exact Definition, Environment, catalogs and pins, qualification policy, and CLI build used
+   by the interrupted command. Keep the same paths and output root.
+2. Repeat that original `run generate` command without `--check`, then run it with `--check` to confirm
+   recovery completed.
+3. Reapply the intended policy or input changes, regenerate, and check again.
+
+Do not delete stage files or ownership manifests to force an update. If the original inputs cannot be
+established, retain the files for investigation instead of guessing their ownership. The producer and
+qualification bundles have separate owners; their writes are not one atomic directory transaction.
 
 Generation neither submits the workflow to GitHub nor builds, signs, or publishes artifacts. Continue with
 [Plan inspection and comparison](plan-and-graph-inspection.md) or the [Run lifecycle](lifecycle.md).

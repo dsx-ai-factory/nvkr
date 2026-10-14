@@ -21,6 +21,7 @@ each concept to a worked example.
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Find published outputs and verify a consumer claim | [Release quickstart](release-quickstart.md) |
 | Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
+| Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../definitions/nvke-m2/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
