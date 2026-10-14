@@ -48,6 +48,7 @@ records source availability and remaining gaps.
 | Reviewable updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
+| Preparatory external test output references and validation limits | [External test output contract](portable-test-evidence-execution.md) |
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nvke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nvke-os-live-inspection.md) |
 

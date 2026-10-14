@@ -75,6 +75,22 @@ The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retai
 files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
 requires no GitHub secret; private passphrases remain unsupported.
 
+## Preparatory external test output boundary
+
+`pkg/nvkr/testresults` supplies an output-description contract for original JUnit XML and CTRF JSON
+references and available producer metadata. Its validator admits wrapper/reference/metadata shape only;
+references and metadata are declarations until independently checked. No new lifecycle object,
+structured identity, authenticated receipt or passing verdict is issued. Optional bindings reuse
+`lifecycle.ExactInputDescription` and `sign.Subject` descriptions; existing validation-vector v3 and
+qualification-evidence v2 remain unchanged and cannot be authorized by this output.
+
+Authoritative format validation is deferred: no JUnit profile parser or CTRF JSON Schema validator is
+implemented by this change. Concrete producer execution, environment observation, file capture and
+retention, signing/registry transport, CLI/SDK workflows, qualification and Verification Policy integration
+remain disabled or unimplemented at this boundary. Contract tests do not establish external producer,
+Kubernetes runtime or service acceptance. The [contract reference](../portable-test-evidence-execution.md)
+pins the upstream format source and records these limits.
+
 ## M3 MVP scope and acceptance boundary
 
 The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826) retains

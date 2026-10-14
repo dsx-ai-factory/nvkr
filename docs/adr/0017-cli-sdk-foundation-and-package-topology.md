@@ -26,6 +26,16 @@ belongs to the downstream deployment owner and is not part of the Definition or 
 sets, clearance, publication roots, and qualification records are generated/authenticated internals available
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
+External test producers have a preparatory output-description boundary under `pkg/nvkr/testresults`.
+It references original JUnit XML, CTRF JSON, or both, and preserves the distinction between declared,
+observed and missing metadata. These descriptions grant no receipt or lifecycle authority. Contract
+validation covers the wrapper and references only; format validation, concrete producers, runtime,
+file capture, signing, publication and lifecycle integration remain deferred. The relationship to public
+Verification Policy is deferred. The [external test output reference](../portable-test-evidence-execution.md)
+owns format-source references and current limits. Optional bindings reuse existing input/subject
+descriptions; validation-vector v3 and qualification-evidence v2 stay unchanged. No new digest family,
+authored object or qualification signing capability is introduced.
+
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
 set; the compiler derives one native producer target per member and one required image-index output
