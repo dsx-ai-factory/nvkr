@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
 func TestArtifactTestInputCommand(t *testing.T) {
@@ -37,14 +37,26 @@ func TestArtifactTestInputCommand(t *testing.T) {
 			if err := json.Unmarshal([]byte(raw), &inputs); err != nil {
 				t.Fatal(err)
 			}
-			want, err := factory.LoadCLIArtifactTestInputs(t.Context(), ".github/nvkr-run/plan.json", output)
+			plan, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(&inputs, want) {
+			var want factory.CLIArtifactTestInputs
+			for _, build := range plan.Builds {
+				if build.Name != output {
+					continue
+				}
+				component := build.CatalogSnapshot.Components["nvkectl"]
+				want = factory.CLIArtifactTestInputs{Output: output, BuildDigest: build.BuildDigest, Platform: build.Platform, Repo: component.Repo, Commit: component.Commit, TreeHash: component.TreeHash, ExpectedVersion: component.VersionStamp["NKECTL_VERSION"]}
+				for _, node := range build.Graph.Nodes {
+					if node.Kind == ir.KindBuild && node.Component == "nvkectl" {
+						want.ToolchainImage = node.Toolchain
+					}
+				}
+			}
+			if inputs != want {
 				t.Fatalf("wire inputs: %+v, want %+v", inputs, want)
 			}
-
 		})
 	}
 }
@@ -71,5 +83,19 @@ func TestArtifactTestInputCommandRefusals(t *testing.T) {
 				t.Fatalf("refusal emitted %q", raw)
 			}
 		})
+	}
+}
+
+func TestArtifactTestInputCommandFlags(t *testing.T) {
+	lifecycleCommandRepo(t)
+	for _, args := range [][]string{
+		{"run", "artifact-test-inputs"},
+		{"run", "artifact-test-inputs", "--unknown"},
+		{"run", "artifact-test-inputs", "--plan"},
+	} {
+		raw, err := invokeLifecycleCLI(t, args...)
+		if err == nil || json.Valid([]byte(raw)) {
+			t.Fatalf("invalid flags emitted success: %q, %v", raw, err)
+		}
 	}
 }
