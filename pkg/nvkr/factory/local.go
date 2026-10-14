@@ -87,6 +87,7 @@ type LocalRunResult struct {
 	diskPublicationWait    sync.WaitGroup
 	diskCompletions        []diskProducerCompletion
 	materialConsumptions   map[string]producerConsumption
+	debian                 *debianRunState
 }
 
 // QualificationLane returns the evidence lane recorded by this local execution.
@@ -117,6 +118,11 @@ type localProducerSessionCloser interface {
 // in its pinned container. Source receipts remain reusable across local attempts.
 // The caller owns the returned result and must Close it after observation.
 func RunLocal(ctx context.Context, plan *Plan, options LocalRunOptions) (*LocalRunResult, error) {
+	var freezeErr error
+	plan, freezeErr = freezeLocalDebianPlan(plan)
+	if freezeErr != nil {
+		return nil, freezeErr
+	}
 	options = withLocalDefaults(options)
 	if hasLocalVMBuild(plan) && !options.DryRun {
 		return runLocal(ctx, plan, options, productionLocalRunDeps())
@@ -132,6 +138,11 @@ func RunLocal(ctx context.Context, plan *Plan, options LocalRunOptions) (*LocalR
 // held-workspace, capacity, and KVM checks to RunLocal. It performs no
 // filesystem mutation and does not build a runner.
 func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error {
+	var freezeErr error
+	plan, freezeErr = freezeLocalDebianPlan(plan)
+	if freezeErr != nil {
+		return freezeErr
+	}
 	options = withLocalDefaults(options)
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return err
@@ -139,11 +150,17 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return err
 	}
+	if err := requireLocalDebianRuntimeOption(plan, options); err != nil {
+		return err
+	}
 	if options.DryRun {
 		return nil
 	}
 	if err := admitLocalDiskPublication(plan); err != nil {
 		return err
+	}
+	if hasLocalDebianBuild(plan) {
+		return admitLocalRuntime(ctx, options)
 	}
 	vmBuild := hasLocalVMBuild(plan)
 	if vmBuild && runtime.GOOS != "linux" {
@@ -199,10 +216,24 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	result *LocalRunResult,
 	returnErr error,
 ) {
+	if hasLocalDebianBuild(plan) {
+		raw, err := canonical.Marshal(plan)
+		if err != nil {
+			return nil, err
+		}
+		var frozen Plan
+		if err := canonical.UnmarshalExact(raw, &frozen); err != nil {
+			return nil, err
+		}
+		plan = &frozen
+	}
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return nil, err
 	}
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
+		return nil, err
+	}
+	if err := requireLocalDebianRuntimeOption(plan, options); err != nil {
 		return nil, err
 	}
 	if !options.DryRun {
@@ -263,6 +294,16 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err != nil {
 		return nil, err
 	}
+	if hasLocalDebianBuild(plan) {
+		if err := bindDebianRunSession(ctx, plan, result, options.producers); err != nil {
+			return nil, err
+		}
+		for _, output := range plan.LifecycleOutputs {
+			if err := result.debian.admitBoundProducer(ctx, result, plan, output, options.Runtime); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if hasLocalVMBuild(plan) {
 		if options.vmResolver == nil {
 			return nil, e.New(e.CodeEngineCapability, "factory local VM driver resolver is unavailable")
@@ -292,7 +333,31 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err := ensureLocalWorkspace(ctx, options.Workspace, planDigest); err != nil {
 		return nil, err
 	}
+	if hasLocalDebianBuild(plan) {
+		if err := result.debian.openDirectory(); err != nil {
+			return nil, err
+		}
+		result.debian.sourceWorkspace, err = pipeline.HoldSourceWorkspace(ctx)
+		if err != nil {
+			return nil, err
+		}
+		workspace, err := result.debian.directory.Open(".")
+		if err != nil {
+			return nil, e.Wrap(e.CodeEngineCapability, err, "opening native package inspection workspace")
+		}
+		// The concrete inspector borrows this descriptor for later host capacity
+		// observations. Keep it live through inspection/export and inspector Close.
+		result.debian.inspectionWorkspace = workspace
+		inspection, openErr := OpenDiskEvidenceRuntime(ctx, plan, options.Runtime, workspace)
+		result.debian.ownedInspection = inspection
+		if openErr != nil {
+			return nil, openErr
+		}
+	}
 	platforms := localRunnerPlatforms(ordered)
+	if hasLocalDebianBuild(plan) {
+		platforms = nil
+	}
 	if hasLocalVMBuild(plan) {
 		if deps.admitVMBuilds == nil || deps.admitRunners == nil {
 			return nil, e.New(e.CodeInternal, "factory local VM admission is incomplete")
@@ -316,9 +381,12 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 			return nil, err
 		}
 	}
-	runners, err := deps.prepareRunner(ctx, plan, options, platforms)
-	if err != nil {
-		return nil, err
+	runners := map[string]string{}
+	if !hasLocalDebianBuild(plan) {
+		runners, err = deps.prepareRunner(ctx, plan, options, platforms)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// One scheduling pass covers producers and utility work. A batch contains only
@@ -389,7 +457,14 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if err != nil {
 		return nil, err
 	}
-	if err := writeFactoryFile(ctx, filepath.Join(options.Workspace, "run.json"), raw, 0o644); err != nil {
+	if hasLocalDebianBuild(plan) {
+		if err := result.debian.directory.Remove("run.json"); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, e.Wrap(e.CodeImmutableViolation, err, "resetting native Run description")
+		}
+		if err := result.debian.writeOwnedFile(ctx, filepath.Join(options.Workspace, "run.json"), raw, 0444); err != nil {
+			return nil, err
+		}
+	} else if err := writeFactoryFile(ctx, filepath.Join(options.Workspace, "run.json"), raw, 0o644); err != nil {
 		return nil, err
 	}
 	completed = true
@@ -437,6 +512,19 @@ func admittedLocalDiskProducer(plan *Plan, options *LocalRunOptions) diskProduce
 // failure. A successful result retains its payload capabilities for lifecycle
 // observation; only the producer session is closed before returning it.
 func finishLocalRun(result *LocalRunResult, producers localProducerSessionCloser, completed bool, returnErr error) error {
+	if result != nil && result.debian != nil {
+		// Only the original private owner can transfer this session. No public
+		// Debian scheduler admission is enabled by this lifetime branch.
+		if completed && returnErr == nil {
+			returnErr = result.debian.requireOriginalSession(result, producers)
+			if returnErr == nil {
+				return nil
+			}
+		}
+		// Custody already owns a frozen copy of the original session. Never
+		// close the supplied mutable facade again, including on failure.
+		return joinFactoryCleanupError(returnErr, result.Close(), "closing native Debian Run custody")
+	}
 	if !completed {
 		if closeErr := result.Close(); closeErr != nil {
 			code := e.CodeInternal
@@ -472,6 +560,20 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 	result := LocalNodeResult{ID: node.ID, Kind: node.Kind}
 	if err := ctx.Err(); err != nil {
 		return result, e.Wrap(e.CodeTimeout, err, "local node canceled")
+	}
+	if hasLocalDebianBuild(plan) {
+		if err := executeLocalDebianNode(ctx, plan, node, options, owner); err != nil {
+			code := e.CodeBuildFailed
+			var coded *e.Error
+			if errors.As(err, &coded) {
+				code = coded.Code
+			} else if ctx.Err() != nil {
+				code = e.CodeTimeout
+			}
+			return result, e.Wrap(code, err, "native package node %s", node.ID)
+		}
+		result.Status = "ok"
+		return result, nil
 	}
 	directPacker, err := isDirectPackerDiskNode(plan, node)
 	if err != nil {
@@ -576,7 +678,7 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if err := plan.Validate(); err != nil {
 		return err
 	}
-	if err := rejectUnjoinedDebianPlan(plan, "local factory execution"); err != nil {
+	if err := admitLocalDebianPlan(ctx, plan); err != nil {
 		return err
 	}
 	if err := rejectUnsupportedRuntimeStorage(plan, "local factory execution"); err != nil {

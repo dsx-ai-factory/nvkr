@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -23,6 +24,9 @@ import (
 func runContainerRuntime(opts RunOptions, args ...string) error {
 	if opts.execution != nil && opts.execution.runtime != nil {
 		return opts.execution.runtime.run(opts.ctx(), opts.Stdout, opts.Stderr, args...)
+	}
+	if opts.debianRuntime != nil {
+		return opts.debianRuntime.run(opts.ctx(), opts.Stdout, opts.Stderr, args...)
 	}
 	cmd := execCmd(opts, opts.Runtime, args...)
 	cmd.Stdout = opts.Stdout
@@ -44,6 +48,7 @@ type reaper struct {
 	stop           chan struct{}
 	done           chan struct{}
 	stopOnce       sync.Once
+	cleanupErr     error
 }
 
 const (
@@ -114,11 +119,18 @@ func (r *reaper) setRuntime(runtimePath string, runtime *heldRuntimeExecutable) 
 }
 
 func (r *reaper) close() {
+	_ = r.closeChecked()
+}
+
+// The retained-producer boundary must observe cleanup failures before
+// transferring bytes. Legacy callers retain their best-effort close behavior.
+func (r *reaper) closeChecked() error {
 	if r == nil {
-		return
+		return nil
 	}
 	r.stopOnce.Do(func() { close(r.stop) })
 	<-r.done
+	return r.cleanupErr
 }
 
 // cleanup takes one closed-world snapshot under the registry mutex, then performs
@@ -156,6 +168,7 @@ func (r *reaper) cleanup() {
 		grace = remaining / 2
 	}
 	if grace <= 0 {
+		r.cleanupErr = e.New(e.CodeTimeout, "container cleanup has no remaining termination budget")
 		return
 	}
 	// Every registered container receives an independent removal attempt under the
@@ -164,14 +177,18 @@ func (r *reaper) cleanup() {
 	commandCtx, commandCancel := context.WithDeadline(ctx, deadline.Add(-grace))
 	defer commandCancel()
 	var cleanup sync.WaitGroup
+	failures := make([]error, len(names))
 	cleanup.Add(len(names))
-	for _, name := range names {
+	for index, name := range names {
 		go func() {
 			defer cleanup.Done()
-			_ = cleanupCommand(commandCtx, grace, docker, runtimeExecutable, []string{name})
+			if err := cleanupCommand(commandCtx, grace, docker, runtimeExecutable, []string{name}); err != nil {
+				failures[index] = e.Wrap(e.CodeBuildFailed, err, "removing owned container %q", name)
+			}
 		}()
 	}
 	cleanup.Wait()
+	r.cleanupErr = errors.Join(failures...)
 }
 
 type reaperCleanupCommand func(context.Context, time.Duration, string, *heldRuntimeExecutable, []string) error

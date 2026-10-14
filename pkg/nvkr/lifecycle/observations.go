@@ -43,7 +43,7 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 	observed := make([]Artifact, 0, len(slots))
 	for _, slot := range slots {
 		// Held disk observation must not depend on reopenable path descriptions.
-		if slot.Kind != OutputDiskImage && localized == nil {
+		if slot.Kind != OutputDiskImage && slot.Kind != OutputDebianPackage && localized == nil {
 			if plan == nil {
 				return nil, e.New(e.CodeInternal, "typed lifecycle package observation requires its owning plan")
 			}
@@ -61,7 +61,7 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 		}
 		var artifact Artifact
 		var err error
-		if slot.Kind == OutputDiskImage && stage != nil {
+		if (slot.Kind == OutputDiskImage || slot.Kind == OutputDebianPackage) && stage != nil {
 			artifact, err = stage(ctx, slot, plan, execution)
 		} else {
 			artifact, err = observeOutput(ctx, slot, localized, plan, execution, workspace)
@@ -77,6 +77,9 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[string]factory.Artifact,
 	plan *factory.Plan, execution diskPayloadObserver, workspace string,
 ) (Artifact, error) {
+	if slot.Kind == OutputDebianPackage {
+		return Artifact{}, e.New(e.CodeEngineCapability, "Debian output requires original Run staging")
+	}
 	if slot.Kind == OutputDiskImage {
 		if execution == nil {
 			return Artifact{}, e.New(e.CodeEngineCapability,

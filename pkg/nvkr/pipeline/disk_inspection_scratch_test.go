@@ -214,6 +214,9 @@ func TestDiskInspectionScratchOwnsPrivateDiskVolume(t *testing.T) {
 					t.Fatalf("automatic mounts not suppressed: %v", args)
 				}
 				if len(args) > 1 && args[1] == "create" {
+					if !slices.Contains(args, selection.Image) || slices.Contains(args, "sha256:"+strings.Repeat("a", 64)) {
+						t.Fatalf("scratch launch must use the admitted repository pin, not the observed ID: %v", args)
+					}
 					for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--cap-add=CHOWN", "--security-opt=no-new-privileges", "--user=0:0", "--cpu-period=100000", "--cpu-quota=230000"} {
 						if !slices.Contains(args, required) {
 							t.Fatalf("missing %s in %v", required, args)

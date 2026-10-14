@@ -7,6 +7,7 @@ import (
 	"context"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // InspectDebianPackageContent explicitly selects Debian metadata validation and
@@ -25,6 +26,23 @@ func (runtime *DiskInspectionRuntime) InspectDebianPackageContent(ctx context.Co
 		return nil, e.New(e.CodeEngineCapability, "Debian package content inspection requires an admitted runtime")
 	}
 	observation, err := runtime.container.InspectDebianPackageContent(ctx, path, digest, size, platform)
+	if err != nil {
+		return nil, err
+	}
+	return contentFromContainerObservation(observation)
+}
+
+// InspectDebianProducerContent inspects only an original retained producer archive.
+// Its frozen instruction supplies the consumer platform; Run/named-output and
+// provenance authority remain separate from the inspected content observation.
+func (runtime *DiskInspectionRuntime) InspectDebianProducerContent(ctx context.Context, archive *pipeline.DebianProducerArchive) (*DiskContentInspection, error) {
+	if err := validateSBOMContext(ctx); err != nil {
+		return nil, err
+	}
+	if runtime == nil || runtime.container == nil {
+		return nil, e.New(e.CodeEngineCapability, "producer content inspection requires an admitted runtime")
+	}
+	observation, err := runtime.container.InspectDebianProducerContent(ctx, archive)
 	if err != nil {
 		return nil, err
 	}

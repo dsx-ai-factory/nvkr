@@ -42,7 +42,9 @@ stat -f -c '%a %S' /tmp
 `
 
 // openDiskInspectionScratch runs only the fixed capacity/preparation operation
-// from the already-admitted image. It completes before any subject streaming.
+// from the already-admitted image. Launch uses its exact repository reference;
+// the runtime-observed ID remains a binding and may not be a store lookup key.
+// Preparation completes before any subject streaming.
 func openDiskInspectionScratch(ctx context.Context, runtime packerContainerRuntime, selection DiskInspectionSelection, imageID, attempt string) (result *diskInspectionScratch, returnErr error) {
 	if err := requireRunContext(ctx, "inspection scratch admission"); err != nil {
 		return nil, err
@@ -89,7 +91,7 @@ func openDiskInspectionScratch(ctx context.Context, runtime packerContainerRunti
 		"--no-healthcheck", "--init", "--pids-limit=32", "--memory=64m", "--memory-swap=64m",
 		diskInspectionCPUPeriodArg, diskInspectionCPUQuotaArg(selection.Resources.CPUMillis),
 		"--volume", volume + ":/tmp:nocopy", "--env", "PATH=/usr/bin:/bin", "--env", "LC_ALL=C",
-		"--entrypoint=/bin/sh", imageID, "-ec", diskInspectionScratchPrepare}
+		"--entrypoint=/bin/sh", selection.Image, "-ec", diskInspectionScratchPrepare}
 	var output, diagnostic diskInspectionBuffer
 	if err := adapter.Run(ctx, nil, &output, &diagnostic, args...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.Bytes()), e.CodeEngineCapability, "creating inspection scratch preparer")

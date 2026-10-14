@@ -41,6 +41,9 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if len(buildPlan.ResolvedComponents) == 0 {
 		return e.New(e.CodePipelineDrift, "factory sbom node %q has no resolved components to bill", node.ID)
 	}
+	if buildPlan.Debian != nil {
+		return e.New(e.CodeEngineCapability, "Debian SBOM requires its original live Run and retained archive inspection")
+	}
 	if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
 		return e.New(e.CodeProvenanceMissing, "disk evidence requires the original live execution and reconciled receipt")
 	}
@@ -181,6 +184,12 @@ func (plan *Plan) validateSBOMGraph() error {
 	}
 	for _, node := range plan.Graph.Nodes {
 		if node.Kind != NodeSBOM {
+			continue
+		}
+		if build, ok := debianInspectionBuild(plan, node.BuildTarget); ok {
+			if err := validateDebianInspectionNode(plan, build, node, artifacts); err != nil {
+				return err
+			}
 			continue
 		}
 		if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {

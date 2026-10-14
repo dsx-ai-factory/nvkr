@@ -20,8 +20,22 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 		return err
 	}
 	for _, output := range definition.Outputs {
-		if output.Format == authored.OutputDebianPackage && (environment.Publication != nil || environment.Signing != nil || definition.SBOMTool != "") {
-			return e.New(e.CodeEngineCapability, "Debian scanning/publication/signing requires final-byte archive evidence joins")
+		if output.Format == authored.OutputDebianPackage && (environment.Publication != nil || environment.Signing != nil) {
+			return e.New(e.CodeEngineCapability, "Debian publication/signing requires final-byte archive evidence joins")
+		}
+
+		if output.Format == authored.OutputDebianPackage && definition.SBOMTool != "" {
+			platforms := output.TargetPlatforms()
+			if len(platforms) != 1 || platforms[0] != environment.UtilityPlatform {
+				return e.New(e.CodeEngineCapability, "Debian scanner requires its exact native producer/utility platform before catalog work")
+			}
+			profile, ok := environment.DiskInspectionProfiles[environment.UtilityPlatform]
+			if !ok {
+				return e.New(e.CodeEngineCapability, "Debian scanner requires its complete native Environment inspection profile")
+			}
+			if err := requireProductionDiskScratch(profile); err != nil {
+				return err
+			}
 		}
 	}
 	if publication := environment.Publication; publication != nil {

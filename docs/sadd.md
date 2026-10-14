@@ -249,16 +249,34 @@ The compiler derives each output's graph from its exact selected components and 
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
 
-The Debian target description resolver has contract coverage for configurable standalone profile/platform
-selection and exact inheritance from a consuming OS/image. Its documented defaults are `ubuntu-24.04` and
-`linux/amd64`, subject to an explicit source-declared route; it never selects the execution host or substitutes
-another supported target. The catalog's explicit Debian source routes bind exact per-target toolchain pins,
-argv and archive paths; direct graph compilation carries the resolved typed target in logical Build identity
-without a binary/APT wrapper. Definition/factory compilation freezes and rederives that target from authored
-intent and exact catalog snapshots, retaining the raw producer archive as its required output. Distribution
-profile labels do not prove ABI compatibility. Actual OS/image target binding, held archive retention and
-final-byte inspection/evidence joins remain deferred under ADR-12. Local Run/node execution and GitHub
-generation reject this kind before work; configured scanning/signing/publication rejects before catalog I/O.
+The Debian target resolver admits configurable standalone profile/platform selection and exact consumer
+inheritance descriptions. Defaults are `ubuntu-24.04` and `linux/amd64` only for an explicit declared route.
+Source-owned route argv, toolchain and raw archive paths bind the target into logical Build identity without
+a binary/APT wrapper. Definition/factory snapshots rederive the complete selection and required output.
+Distribution labels do not prove ABI compatibility or an authenticated consumer target.
+
+Local execution admits one inspected Debian output on a matching native Linux host with a bounded context,
+complete private-volume profile and matching catalog scanner. It freezes the full Plan before blocking
+admission, then joins original session/source/toolchain/named invocation and sealed bytes through checked
+producer cleanup, retained-content SBOM, terminal observation and unsigned local provenance. Confined
+workspace handles own scheduler metadata and remain live through inspector/export cleanup. Run close
+cancels custody calls, joins the original session and outer work, then closes inspection/workspace handles.
+Equal bytes or serialized descriptions cannot replace those owners or replay an invocation.
+
+Lifecycle uses its existing output/record transaction to stage the exact raw package, CycloneDX document
+and unsigned predicate. Successful original Run cleanup precedes durable commit; failures roll back payload
+and evidence. Direct-node, whole-pipeline, hosted, signing and publication routes remain closed. Controlled
+native ARM64 scheduler and transaction fixtures establish ownership/bytes/cancellation/cleanup contracts,
+not a real Debian/NVSentinel package, daemon or installation, native AMD64 acceptance, authenticated
+production provenance or OS consumer/material/ABI compatibility.
+
+The selected NVSentinel integration keeps image, Helm and native Debian producers separately selectable in
+a reusable catalog with coordinated source pins. The planned OS-recipe route consumes the exact Debian
+output under the original compiled consumer target. Source-owned builds, installation/host-service migration
+and authenticated material/evidence joins remain required. The platform-connectors candidate catalog
+now compiles Ubuntu 24.04/26.04 selections for AMD64/ARM64 through NVKR with local toolchain image IDs;
+package metadata, actual package execution, remaining image/Helm producers and real image acceptance
+remain unfinished.
 
 A `disk-image` named output explicitly selects one root producer with validated disk-image metadata and every
 component in that root's transitive material closure. Resolution rejects a missing or second disk root, an

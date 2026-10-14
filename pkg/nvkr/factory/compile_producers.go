@@ -15,7 +15,7 @@ import (
 )
 
 func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph *ir.Graph, selected map[string]bool,
-	utilityContainer, utilityPlatform string, diskPublication bool, nodes map[string]Node, artifacts map[string]Artifact) error {
+	utilityContainer, utilityPlatform string, inspectionSelected bool, nodes map[string]Node, artifacts map[string]Artifact) error {
 	target := targetSpec.Name
 	byID := map[string]ir.Node{}
 	selectedFetch := map[string]bool{}
@@ -117,16 +117,16 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 	artifacts[observationID] = Artifact{ID: observationID, Name: target + "-terminal-observation",
 		Kind: string(TierTerminalObservation), Producer: verifyID, BuildTarget: target,
 		Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", target, "terminal-observation.json"))}
-	if targetSpec.Format == authored.OutputDebianPackage || (targetSpec.Format == authored.OutputDiskImage && !diskPublication) {
+	if (targetSpec.Format == authored.OutputDebianPackage || targetSpec.Format == authored.OutputDiskImage) && !inspectionSelected {
 		// The ordinary per-component SBOM operation does not establish disk
 		// reconciliation or final Debian package content. These compiled plans
 		// retain raw producer subjects without claiming the unjoined evidence.
 		return nil
 	}
 
-	// SBOM node (ADR-13 §1 / ADR-13): one per build target, gated on the
-	// terminal observation, binding a CycloneDX SBOM per built component to that
-	// component's producer-result digest. It bills only what was built.
+	// SBOM node (ADR-13): one per build target, binding inspected content to
+	// original producer bytes. Ordinary outputs inspect after observation; a
+	// Debian terminal receipt instead requires the retained-content document first.
 	resultInputs := make([]string, 0, len(producerOutputs))
 	for _, id := range producerOutputs {
 		if strings.HasPrefix(id, "result/") {
@@ -137,6 +137,15 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 		sbomNodeID := target + "/sbom"
 		sbomArtifactID := "sbom/" + target
 		inputs := uniqueSorted(append(resultInputs, observationID))
+		if targetSpec.Format == authored.OutputDebianPackage {
+			// The original Debian terminal receipt includes inspected content.
+			// Inspect retained producer bytes first; observation cannot be an
+			// inspection prerequisite when it requires that same document.
+			inputs = uniqueSorted(resultInputs)
+			terminal := nodes[verifyID]
+			terminal.Inputs = uniqueSorted(append(terminal.Inputs, sbomArtifactID))
+			nodes[verifyID] = terminal
+		}
 		nodes[sbomNodeID] = Node{ID: sbomNodeID, Kind: NodeSBOM, BuildTarget: target,
 			Network: ir.NetworkNone, RunsOn: runsOn, Container: utilityContainer,
 			Platform: utilityPlatform, Inputs: inputs, Outputs: []string{sbomArtifactID}}

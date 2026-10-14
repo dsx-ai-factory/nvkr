@@ -43,6 +43,17 @@ any selection containing it with `CodeEngineCapability` before catalog or execut
 OCI namespace or credentials for an APT-only request. Plan validation, generation and execution repeat
 that admission. Direct APT service destinations, credentials, repository signing and authenticated read-back
 remain unimplemented; selection is not an enabled publisher or service approval.
+The native Debian extension keeps signing customer-controlled through Environment configuration.
+Its disclosed transport defaults are the existing cosign path for OCI and standard OpenPGP/GPG repository
+metadata signing for APT. The OCI path retains explicit customer identity/issuer policy; APT must retain
+customer signing-service/key references and exact public-key trust bindings. Private signing keys are not
+catalog or Plan data. Consumer verification policy separately authenticates the expected signer and payload.
+NVIDIA-specific services are optional adapters, not hard-coded signing authorities. Local development without
+publication/signing remains explicitly unsigned and unqualified. Required publication must fail before work
+when signing or trust inputs are absent; it cannot silently downgrade to unsigned output. APT/GPG adapter
+configuration, key management and authenticated read-back remain deferred, so these defaults do not admit
+APT publication today.
+
 Explicit OCI selection is independently bound to Environment and Plan identity without changing native or
 aggregate logical Build identity. Compiler snapshots own the selection independently of caller mutations.
 `publication.repositoryPrefix` is an explicitly

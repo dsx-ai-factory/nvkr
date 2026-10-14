@@ -25,6 +25,54 @@ import (
 // over WriteDir, so any number of build nodes can run concurrently without clobbering
 // each other or mutating the shared source.
 func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, returnErr error) {
+	var debianLease *debianArchiveLease
+	var debianArchive *DebianProducerArchive
+	if n.OutputType == "debian-package" {
+		if err := validateDebianArchiveProducer(n); err != nil {
+			return nil, err
+		}
+		if opts.Package || opts.execution != nil || opts.Qualification != nil {
+			return nil, e.New(e.CodeEngineCapability, "Debian producer retention cannot wrap archives or admit qualified execution")
+		}
+		var err error
+		debianLease, err = opts.debianArchives.reserve(opts.ctx(), MaxDebianPackageBytes)
+		if err != nil {
+			return nil, err
+		}
+		n, err = debianLease.prepare(opts.ctx(), n)
+		if err != nil {
+			return nil, errors.Join(err, debianLease.Close())
+		}
+		if opts.debianExecutor != nil {
+			if err := opts.debianExecutor.matchesInstruction(opts.debianSubject, n); err != nil {
+				return nil, errors.Join(err, debianLease.Close())
+			}
+			debianLease.executor, debianLease.subject = opts.debianExecutor.state, opts.debianSubject
+		} else if opts.debianSubject != "" {
+			return nil, errors.Join(e.New(e.CodeProvenanceMissing, "Debian subject has no original executor"), debianLease.Close())
+		}
+		owned, finish, err := debianLease.begin(opts.ctx(), debianProduce)
+		if err != nil {
+			return nil, errors.Join(err, debianLease.Close())
+		}
+		opts.Ctx = owned
+		// Registered first, so producer-owned source/material cleanup completes before
+		// the successful result transfers its retained capability. Failure keeps
+		// neither a descriptive result nor a live archive reservation.
+		defer func() {
+			operationErr := owned.Err()
+			finish()
+			if returnErr == nil && operationErr != nil {
+				returnErr = e.Wrap(e.CodeTimeout, operationErr, "completing retained Debian producer")
+			}
+			if returnErr != nil || result == nil {
+				returnErr = errors.Join(returnErr, debianLease.Close())
+				result = nil
+				return
+			}
+			result.debian = debianArchive
+		}()
+	}
 	if err := admitBuildKit(n, opts); err != nil {
 		return nil, err
 	}
@@ -116,6 +164,11 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 
 	cname := containerName(n)
 	args := []string{"run", "--rm", "--name", cname}
+	if opts.debianRuntime != nil {
+		// Retained native production owns checked explicit removal; successful
+		// client return cannot silently drop its container from the reaper.
+		args = []string{"run", "--name", cname}
+	}
 	if buildKit != nil {
 		args = []string{"create", "--name", cname}
 		buildKit.resources.containers = append(buildKit.resources.containers, cname)
@@ -185,7 +238,9 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 			return nil, err
 		}
 	}
-	opts.reap.forget(cname)
+	if opts.debianRuntime == nil {
+		opts.reap.forget(cname)
+	}
 
 	binPath := artifactHostPath(opts, n)
 	artifactRel := artifactOutputRelative(n)
@@ -194,7 +249,16 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 			return nil, e.Wrap(e.CodeBuildFailed, err, "persisting artifact for %s", n.Component)
 		}
 	}
-	sum, size, _, err := hashRegularBeneathContext(opts.ctx(), outRoot, artifactRel)
+	var sum string
+	var size int64
+	if debianLease != nil {
+		debianArchive, err = collectDebianProducerArchive(opts.ctx(), n, snapshot, outRoot, artifactRel, debianLease)
+		if err == nil {
+			sum, size, err = debianArchive.identity(opts.ctx())
+		}
+	} else {
+		sum, size, _, err = hashRegularBeneathContext(opts.ctx(), outRoot, artifactRel)
+	}
 	if err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "collecting artifact for %s", n.Component)
 	}

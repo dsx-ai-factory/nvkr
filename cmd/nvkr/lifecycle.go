@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -95,24 +96,30 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "attempts-root", Value: ".nvkr/runs"}, &cli.StringFlag{Name: "runner-source", Value: "."},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
 			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
+			&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "bound preparation, execution and output observation"},
 			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1}), Action: func(c *cli.Context) error {
+			if c.Duration("timeout") <= 0 {
+				return e.New(e.CodeUsage, "local run requires a positive timeout")
+			}
+			ctx, cancel := context.WithTimeout(c.Context, c.Duration("timeout"))
+			defer cancel()
 			var activity *buildactivity.Sink
 			if c.IsSet("build-activity-fd") {
 				if c.Bool("dry-run") || c.Bool("publish") {
 					return e.New(e.CodeUsage, "build activity is available only for local execution")
 				}
 				var err error
-				activity, err = buildactivity.AdoptFD(c.Context, c.Int("build-activity-fd"))
+				activity, err = buildactivity.AdoptFD(ctx, c.Int("build-activity-fd"))
 				if err != nil {
 					return err
 				}
 				defer func() { _ = activity.Close() }()
 			}
-			prepared, err := lifecycle.PrepareFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
+			prepared, err := lifecycle.PrepareFiles(ctx, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
 			if err != nil {
 				return err
 			}
-			result, err := executeLocal(c.Context, prepared, lifecycle.LocalOptions{AttemptsRoot: c.String("attempts-root"), RunnerSource: c.String("runner-source"), Jobs: c.Int("jobs"), Runtime: c.String("runtime"), Go: c.String("go"), Publish: c.Bool("publish"), DryRun: c.Bool("dry-run"), Stdout: os.Stdout, Stderr: os.Stderr, Activity: activity})
+			result, err := executeLocal(ctx, prepared, lifecycle.LocalOptions{AttemptsRoot: c.String("attempts-root"), RunnerSource: c.String("runner-source"), Jobs: c.Int("jobs"), Runtime: c.String("runtime"), Go: c.String("go"), Publish: c.Bool("publish"), DryRun: c.Bool("dry-run"), Stdout: os.Stdout, Stderr: os.Stderr, Activity: activity})
 			if err != nil {
 				if result != nil && result.Status == lifecycle.RunComplete {
 					if reportErr := printLocalRunResult(c, result); reportErr != nil {

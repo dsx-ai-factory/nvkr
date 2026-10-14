@@ -38,7 +38,7 @@ capability policy are execution contracts, not target defaults. Source builds re
 model; a foreign host requires its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
 from the explicit target. Other command values are never inferred from deployment context.
 
-### 2. Debian producer compilation; execution joins deferred
+### 2. Debian producer targets and local execution
 
 The separate `target.ResolveDebian` description resolver accepts an exact source-declared finite set of
 distribution/platform routes. Distribution is an opaque source-owned distribution/ABI profile key, not an
@@ -78,13 +78,58 @@ routes and complete graph from the original Definition and catalog snapshot; cal
 cannot replace that derivation. Its required output references the raw source archive, with no executable/APT
 wrapper or ordinary metadata-only SBOM operation. Exact canonical Plan round-tripping preserves the binding.
 
-Actual OS/image target binding, final-byte inspection/evidence joins, held archive retention and native
-delivery remain unimplemented. Local Run admission, every factory node-execution request, GitHub generation,
-whole-graph pipeline execution and standalone pipeline node execution reject this output kind before work.
-Configured scanning, publication or signing rejects before catalog I/O until those joins are implemented;
-there is no successful empty evidence operation. Before opening the gates, join the source-created archive
-to independent content inspection, producer provenance and package-output observations. APT/OCI destinations
-remain transport settings outside the producer's Build identity.
+Local execution admits one standalone inspected Debian output under ADR-10/13 on a matching native Linux
+host. It joins the original producer, retained-content SBOM, terminal receipt and unsigned local predicate;
+lifecycle retains the exact package and evidence through its existing durable transaction. An authenticated
+compiled OS/image consumer target, ABI compatibility and install acceptance remain unimplemented.
+Every direct factory node request, GitHub generation, whole-graph pipeline execution and standalone pipeline
+node execution still rejects this output before work. Publication or signing rejects before catalog I/O.
+Scanner-only compilation requires a complete native Environment private-volume inspection profile before
+catalog I/O; explicit/default producer/utility conflicts fail there. The selected catalog scanner executable
+pin and platform must match that profile. The offline SBOM node binds the raw archive, producer result and
+acquired scanner; terminal observation depends on the inspected SBOM. Full Plan rederivation retains these
+bindings. Ordinary path-based SBOM work cannot consume a serialized producer description as authority.
+APT/OCI destinations remain transport settings outside the producer's Build identity.
+
+The selected NVSentinel integration follows the generic catalog model: separate image, Helm and Debian
+producer components share coordinated source pins and are selected as separate named outputs. A customer's
+OS recipe instead consumes the exact Debian archive as a material. Its original compiled consumer supplies
+the complete target; neither a caller description nor an APT suite supplies that binding. This is the
+requested integration design. A candidate platform-connectors catalog now declares Ubuntu 24.04 and
+26.04 routes for both Linux architectures, a pinned development source and a packaging patch. All four
+selections compile through NVKR with measured local repository digest references. The human selected explicit
+local development package Version and Maintainer fields; these make no upstream release or maintainer claim.
+The Ubuntu 24.04 and 26.04 ARM64 platform-connectors Runs record real source-created packages, pinned
+content inspection and unsigned local evidence. Independent native installation/help/removal checks pass
+on both releases without starting services. Native AMD64 execution, source/dependency security acceptance,
+live service behavior and host-service migration remain unfinished; this is not an admitted OS-image build path.
+
+The separate platform-connectors image selection compiles both Linux architectures through the same source
+pin and an authenticated ko recipe patch. Its native ARM64 catalog Run completed an offline OCI image
+build and pinned Syft inventory containing 103 components; independent OCI import and the image help
+command passed without starting a service. The supporting ko source/dependency candidate is explicitly
+local and differs from the upstream-declared tool version; it grants no release or organizational approval.
+The source Helm selection also compiles both architectures and binds the chart's platform-connectors image
+slot to a named native image output in the same Run. A backward-compatible source patch adds an optional
+digest value without changing authentication, RBAC or the existing tag default. Its native ARM64 Run produced
+the bound chart and image; independent chart export/render confirmed the exact image digest and unchanged
+bundled subchart files. The chart inventory covers declarations, not the complete deployed image closure.
+Native AMD64 execution, Helm deployment and authenticated OS recipe consumption remain unfinished.
+
+Four local OS Definitions now select the existing NVKE host-package material and composer/Packer route.
+The matching source-built platform-connectors DEB enters the composer's existing `debs/` staging and the
+source-owned provisioner installs it during bake; the consumer does not rebuild or repack the package.
+The selected composer and non-FDE root use pinned NVKE development source `115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17`,
+with its actual Packer build name and material schema. The kubeadm supplier selects that same OS download-recovery fix; other suppliers retain their source pins.
+These are compiled customer input candidates, without an executed QCOW bake. The selected Packer image
+is absent from the current local daemon, and the Ubuntu 24.04 candidates still need an existing NVKE-agent
+package builder compatible with that guest; the retained baseline CGO builder uses Ubuntu 26.04. Neither
+the standalone NVSentinel install checks nor compilation establishes that separate agent's compatibility.
+
+ADR-10's collector, original session and exclusive named invocation retain the source-created bytes through
+checked cleanup. The local scheduler uses that original completion for profile-bound inspection and final
+observation under ADR-13; descriptions cannot recreate it. Controlled native tests establish ownership and
+exact-byte/evidence joins, not real Debian tooling, NVSentinel installation or consumer compatibility.
 
 ### 3. AICR rendering — deferred
 

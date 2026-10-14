@@ -135,6 +135,9 @@ func TestDiskInspectionCommandsSuppressPodmanAutomaticMounts(t *testing.T) {
 				if args[0] != wantCommands[index] {
 					t.Fatalf("operation %d = %v, want %s", index, args, wantCommands[index])
 				}
+				if args[0] == "create" && !slices.Contains(args, testDiskInspectionSelection(t).Image) {
+					t.Fatalf("inspection launch lost its admitted repository reference: %v", args)
+				}
 				if args[0] == "start" && args[len(args)-1] != strings.Repeat("a", 64) {
 					t.Fatalf("start did not use immutable create ID: %v", args)
 				}

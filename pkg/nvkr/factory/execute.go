@@ -129,6 +129,10 @@ func planIndex(plan *Plan) (map[string]Node, map[string]Artifact) {
 }
 
 func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout io.Writer) error {
+	return executeToolAcquireWithWriter(ctx, node, output, stdout, writeFactoryFile)
+}
+
+func executeToolAcquireWithWriter(ctx context.Context, node Node, output Artifact, stdout io.Writer, write func(context.Context, string, []byte, os.FileMode) error) error {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, node.URL, nil)
 	if err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "creating tool request")
@@ -178,7 +182,7 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 		if int64(len(member)) > maxFactoryToolBytes {
 			return e.New(e.CodeVerifyFailed, "tool %s exceeds %d bytes", node.ID, maxFactoryToolBytes)
 		}
-		if err := writeFactoryFile(ctx, output.Path, member, 0o555); err != nil {
+		if err := write(ctx, output.Path, member, 0o555); err != nil {
 			return err
 		}
 		fmt.Fprintf(stdout, "acquired %s: raw executable %s\n", node.ID, node.ExecutableDigest)
@@ -199,7 +203,7 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 	if pipeline.FileDigest(member) != node.ExecutableDigest {
 		return e.New(e.CodeVerifyFailed, "tool %s executable does not match %s", node.ID, node.ExecutableDigest)
 	}
-	if err := writeFactoryFile(ctx, output.Path, member, 0o555); err != nil {
+	if err := write(ctx, output.Path, member, 0o555); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "acquired %s: archive %s, executable %s\n", node.ID, node.Digest, node.ExecutableDigest)
