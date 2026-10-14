@@ -5,6 +5,34 @@ narration for the existing `nvkr` and `nvke-demo` Go CLIs, not a shell wrapper. 
 [runnable command guide](nvkr-demo.md) open. Prepare binaries and select actual Run/recording evidence
 before the meeting; a large build should start before the presentation slot.
 
+## Explain what the ARM demo actually does
+
+Use this short explanation while introducing the recording:
+
+1. **Check the host.** “The Go CLI checks the native ARM64 Docker setup, required images, administrator
+   access and build resources. Docker and QEMU/libvirt are host prerequisites; VM tools are checked before
+   provisioning.”
+2. **Prepare pinned tools and inputs.** “It pulls the pinned build images, fetches selected sources and
+   dependencies, and builds the tools selected by the catalog. These include Kind, kubectl, Helm,
+   clusterctl and ORAS.”
+3. **Build the artifacts.** “NVKR executes dependency-ready work in parallel. It produces the CLI,
+   container images, charts and ARM64 QCOW2 disk. Packer uses a temporary QEMU build VM while assembling
+   that disk; this build VM is separate from the later tenant.”
+4. **Start management in Kind.** “The demo extracts and checks the selected Kubernetes tools, then creates
+   one Kind management cluster in Docker. It delivers selected images through a local registry and installs
+   NVKE controllers, Cluster API and backing services.”
+5. **Create the tenant in QEMU.** “NVKE sends provisioning requests through the local infrastructure
+   simulator. Its libvirt backend starts two QEMU VMs from the produced QCOW2 disk: one control plane and
+   one worker. These VMs form the tenant Kubernetes cluster.”
+6. **Show the cluster working.** “The demo waits for both tenant nodes to become Ready, runs its existing
+   workload and DNS check, and displays read-only kubectl observations of nodes, pods, rollouts and the Job.”
+7. **Delete and clean up.** “With cleanup selected, NVKE deletes the tenant through its normal workflow.
+   The demo waits for deletion and stops its owned management, registry and simulator resources, then restores
+   the host networking it changed.”
+
+Kind hosts management services in Docker containers. The tenant runs in separate QEMU VMs managed by
+libvirt. NVKR owns build and artifact delivery; NVKE owns installation and the tenant lifecycle.
+
 ## 0:00–3:00 — Recipe, catalog, pins and Environment
 
 Say: “Start with what we want to deliver. The Definition selects named outputs from reusable catalog
@@ -46,8 +74,9 @@ nvke-demo e2e --repo <selected checkout> --nvke-clone <source clone>
   --network ovn --walkthrough --cleanup
 ```
 
-Say: “This Go command builds the complete selected artifact Run, then passes those exact outputs to
-NVKE. Jobs controls concurrency among dependency-ready operations.” The placeholder command is narration;
+Say: “This Go command prepares pinned build tools and sources, builds the complete selected artifact
+Run, then passes those exact outputs to NVKE. Jobs controls concurrency among dependency-ready operations.
+The OS-image producer uses Packer and a temporary QEMU VM to assemble the QCOW2 disk.” The placeholder command is narration;
 use the runnable invocation and exact paths from the guide for execution. The walkthrough prints the concept
 and documentation opening without pauses, retains the default TUI, then adds read-only observations after
 the unchanged workload/DNS check.
@@ -88,9 +117,10 @@ Do not confuse this temporary registry with a public signed software Release.
 Narrate the accepted recording or actual owned live session: management services in Kind, two separate
 QCOW2 tenant nodes, the workload and cluster DNS, then natural tenant deletion and joined cleanup.
 
-Say: “Kind hosts the management services; it is not the tenant. The tenant control-plane and worker
-are real VMs booting the produced disk. We check both nodes Ready and execute the existing workload/DNS
-check inside the tenant. Finally NVKE deletes the tenant through its normal workflow.”
+Say: “Kind runs the management Kubernetes cluster in Docker. NVKE's local infrastructure simulator
+provisions the tenant through libvirt: two QEMU VMs boot the produced QCOW2 disk, one control plane and
+one worker. We check both nodes Ready and execute the existing workload/DNS check inside the tenant.
+Finally NVKE deletes the tenant through its normal workflow.”
 
 Name the actual networking selection. NVIDIA OVN is the default. If the evidence uses upstream OVN, say:
 “This is the explicitly selected upstream diagnostic; it does not validate the NVIDIA fork.”
@@ -123,7 +153,7 @@ Point to [runnable commands](nvkr-demo.md), [catalog authoring](catalogs-and-com
 [pipeline generation](generate-pipeline.md) and [release verification](release-quickstart.md).
 Take questions about the demonstrated workflow and the concrete remaining work.
 
-## Evidence boundaries to keep on one card
+## Presenter preparation
 
 A Plan or rendered workflow is not execution. A local diagnostic publication is not a signed Release.
 A signature is not qualification or production readiness. Full tenant acceptance needs the same fresh
