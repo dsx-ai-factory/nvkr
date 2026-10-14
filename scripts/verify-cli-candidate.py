@@ -244,6 +244,24 @@ def main(args):
                          "--mount", a.bind_mount(workspace / "nvke", "/src", True), "--mount", a.bind_mount(workspace / "nvkectl", "/artifact/nvkectl", True), selected,
                          "sh", "-ec", "if touch /src/probe; then exit 90; fi; if printf x >>/artifact/nvkectl; then exit 91; fi; if touch /probe; then exit 92; fi; if timeout 3 bash -c 'echo x >/dev/tcp/1.1.1.1/443'; then exit 93; fi; uname -m"]
                 run(probe, root / "isolation.log", 30)
+            if suite == "cli" and args.mode == "scalar":
+                broken = root / "broken"
+                broken.write_text("#!/bin/sh\nexit 7\n")
+                broken.chmod(0o555)
+                execution_argv = commands[1]["command"]
+                prefix = execution_argv[:execution_argv.index(selected)]
+                old_mount = a.bind_mount(workspace / "nvkectl", "/artifact/nvkectl", True)
+                prefix[prefix.index(old_mount)] = a.bind_mount(broken, "/artifact/nvkectl", True)
+                name = prefix[prefix.index("--name") + 1]
+                filtered = prefix + ["--env", "NVKECTL=/artifact/nvkectl", "--env", "NVKECTL_EXPECTED_VERSION=" + SOURCE,
+                                     selected, "go", "test", "-count=1", "-timeout=1m", "-json", "-run", "^TestReportFailure$", "./cmd/nvkectl"]
+                ordinary_log = root / "ordinary-only.jsonl"
+                with ordinary_log.open("w") as output:
+                    a.run_container(filtered, name, stdout=output)
+                accepted = a.summarize_tests(ordinary_log, "cli")
+                assert accepted["topLevelTests"] == 1, accepted
+                write(root / "completeness-limitation.json", {"brokenBinarySha256": sha(broken),
+                      "checkerAccepted": accepted, "requiredBinaryContractsRan": False, "reusedVerifiedTestCaches": True})
             shutil.rmtree(workspace / "cache")
         assert sha(artifact) == before
         write(root / "proof.json", {"nvkrCommit": subprocess.check_output(["git", "-c", "safe.directory=" + str(REPO), "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip(),

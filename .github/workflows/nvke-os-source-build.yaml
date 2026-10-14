@@ -73,6 +73,7 @@ jobs:
           path: |
             ${{ github.workspace }}/.nvkr/cli-proof/*.json
             ${{ github.workspace }}/.nvkr/cli-proof/*.log
+            ${{ github.workspace }}/.nvkr/cli-proof/*.jsonl
             ${{ github.workspace }}/.nvkr/cli-proof/*.tgz
             ${{ github.workspace }}/.nvkr/cli-proof/inputs
           if-no-files-found: warn
