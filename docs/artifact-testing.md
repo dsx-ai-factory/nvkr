@@ -56,26 +56,52 @@ Test containers receive neither helper nor Git credentials.
 
 ## Validation and remaining work
 
-Local ARM64 validation on 2026-10-13 reused the recipe-built artifact from
-[NVKE 6768541b](https://github.com/dsx-ai-factory/nvke/commit/6768541bef826f60bd7b151937046c2dc4882293).
-The updated adapter passed six contracts and 460 top-level CLI tests across
-27 packages, with no failures/skips and unchanged staged bytes. This was an
-artifact reuse, not a new build or production-pin refresh. Its SHA-256 remained
-`33776b39a264ae92b59097b72ce9f15ba3e6c5c789d9c7e844ca58ac9db35b19`.
-Local logs/results are retained under `.nvkr/cli-artifact-proof/go-plan-*.log`
-and the printed workspaces; they are not published immutable CI evidence.
+On 2026-10-14, a fresh candidate recipe build and two independent cold-cache
+adapter runs used NVKE `be36d63c23cbfd609dc54a9f036110b7f2afa1b0` (tree
+`1a0e69257152ed766424c37c3ce1a539a2f0aa59`). Both ran natively in Docker's Linux
+ARM64 VM on a macOS ARM64 host: nine process contracts and 530 top-level CLI
+tests across 30 packages passed, with no failures or skips. The nine contracts
+listed in the imported source were independently matched against both logs.
+Each run shallow-imported fresh source and began with empty dependency/build
+caches; the executable was newly built through NVKR, not taken from an earlier Run.
+Its SHA-256 before and after was
+`a6af3fc46cb5f30ba1fe1e6a46f768fbcea7ec43433abcb2d523fc6d816fdb35`.
 
-Go compiler/loader fixtures cover both architectures, scalar/map toolchains,
-map precedence, allowed relocation and rejection of altered transport. Adapter
-regressions cover source import, mounts, offline execution, results, staging and
-cancellation. Map-specific and relocated images have not been executed as runners.
+Real Docker execution accepted source/artifact mounts containing spaces, colons,
+commas and quotes. Inspection and write/network probes confirmed read-only
+artifact/source/root filesystem, offline execution and acquisition without the
+artifact. Bounded timeout, SIGINT and SIGTERM experiments removed the owned
+containers and default workspaces. The wrong-version executable failed with exit 2. The broken executable emitted
+contract failures, then hit a 45-second adapter bound because an upstream signal
+test blocks opening a FIFO when the executable exits before opening it. Neither
+negative produced a success record; the bounded adapter failure removed its container. A fresh import of maintained NVKE `ed9fb09b` through
+local Git transport verified its exact tree and rejected its missing entrypoint.
+The initial remote fetch for that negative reached its external time bound.
 
-The maintained production CLI pin lacks `test-artifact`. Upstream adoption,
-pin/toolchain/linker/vendoring refresh and Plan regeneration remain prerequisites.
+Raw build, suite and negative logs, canonical Plan, candidate inputs, Docker
+inspection, inventories and before/after digests are retained locally in
+`.nvkr/validation-20261014/`; these are local observations, not immutable CI artifacts.
+The candidate selected output `nvkectl`, platform `linux/arm64`, expected version
+`be36d63c23cbfd609dc54a9f036110b7f2afa1b0`, and image
+`golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c`.
+
+The checker still accepts an ordinary-test-only completed result in the expected
+package. A filtered real upstream `TestReportFailure` run with a broken supplied
+executable demonstrates that limitation; it is not acceptance of either official
+suite. Exhaustive contract identity needs an upstream-owned interface before
+stronger suite acceptance can be claimed. The diagnostic does not copy a list
+of NVKE contract names into its production checker.
+
+Go compiler/loader fixtures cover AMD64 and ARM64 metadata, scalar/map selection,
+precedence/fallback, permitted relocation and unsupported producers. Native
+AMD64 runtime and map-specific/relocated runner execution remain unverified.
+Renamed `NVKECTL_VERSION` stamps are rejected by the current IR allowlist;
+candidate inputs use admitted legacy stamps and translate them in the build command.
+
+[NVKE #1578](https://github.com/dsx-ai-factory/nvke/pull/1578) remained open at the
+validated revision. The maintained production CLI pin `ed9fb09b` lacks
+`test-artifact`; upstream adoption and an explicit pin/toolchain/linker/vendoring
+refresh with Plan regeneration remain prerequisites. Production pins were unchanged.
 Before evidence-bearing integration, source/execution ownership must move into
-existing Go owners and the exact named-output digest must be authenticated from
-its Run. Source import and test execution remain Python diagnostics here.
-
-Merge-triggered CI, CLI/controller/chart deployment in kind, CAPD lifecycle and
-CAPNICo lanes remain later milestones. This change adds no production pins,
-generated workflows, deployment or conformance evidence.
+existing Go owners and named-output membership must be authenticated from its Run.
+Future CI wiring must be owned by NVKR's workflow generator.

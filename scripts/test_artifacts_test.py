@@ -51,6 +51,12 @@ class ArtifactAdapterTest(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 adapter.load_cli_inputs(self.root / "plan.json")
 
+    def test_malformed_helper_response(self):
+        for response in ("[]", "{}", '{"repo":7}', '{"repo":'):
+            with self.subTest(response=response), patch.object(adapter.subprocess, "check_output", return_value=response):
+                with self.assertRaises(ValueError):
+                    adapter.load_cli_inputs(self.root / "plan.json")
+
     def test_version_alias(self):
         self.assertEqual(adapter.expected_version({"versionStamp": {"NKECTL_VERSION": "v1"}}), "v1")
         self.assertEqual(adapter.expected_version({"versionStamp": {"NVKECTL_VERSION": "v1", "NKECTL_VERSION": "v1"}}), "v1")
@@ -75,7 +81,14 @@ class ArtifactAdapterTest(unittest.TestCase):
                 self.assertEqual(counts["topLevelTests"], 1)
                 acquire, offline = calls
                 self.assertNotIn("/artifact/nvkectl", " ".join(acquire))
-                self.assertIn("none", offline)
+                self.assertEqual(offline[offline.index("--network") + 1], "none")
+                self.assertIn("--read-only", offline)
+                self.assertEqual(offline[offline.index("--cap-drop") + 1], "ALL")
+                self.assertEqual(offline[offline.index("--security-opt") + 1], "no-new-privileges")
+                self.assertIn("NVKECTL=/artifact/nvkectl", offline)
+                self.assertIn("NVKECTL_EXPECTED_VERSION=" + adapter.expected_version(self.component), offline)
+                self.assertEqual(acquire[-3:], ["go", "mod", "download"])
+                self.assertEqual(acquire[-4], self.component["toolchainImage"])
                 self.assertIn("GOPROXY=off", offline)
                 self.assertIn("GO=go", offline)
                 self.assertIn(target, offline)
@@ -99,6 +112,69 @@ class ArtifactAdapterTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     adapter.summarize_tests(path, "contract")
 
+    def test_malformed_and_truncated_results(self):
+        path = self.root / "tests.jsonl"
+        for bad in ('{"Action":', '{}', '[]', '{"Action":"pass","Package":3}',
+                    '{"Action":"run","Package":"p","Test":4}',
+                    '{"Action":"pass","Package":"p","Test":[]}'):
+            with self.subTest(bad=bad):
+                path.write_text("\n".join(json.dumps(e) for e in self.events()) + "\n" + bad)
+                with self.assertRaises(ValueError):
+                    adapter.summarize_tests(path, "contract")
+
+    def test_package_guard_is_not_contract_inventory(self):
+        # Record the diagnostic limitation without hard-coding upstream test names.
+        path = self.root / "tests.jsonl"
+        for suite, package in (("contract", "command-line-arguments"),
+                               ("cli", "github.com/dsx-ai-factory/nvke/cli/cmd/nvkectl")):
+            events = self.events(package)
+            for event in events[:2]:
+                event["Test"] = "TestOrdinaryUnitOnly"
+            path.write_text("\n".join(json.dumps(e) for e in events))
+            self.assertEqual(adapter.summarize_tests(path, suite)["topLevelTests"], 1)
+
+    def test_real_go_helper_consumer(self):
+        helper = self.root / "nvkr"
+        subprocess.run(["go", "build", "-o", str(helper), "./cmd/nvkr"], cwd=ROOT, check=True, timeout=120)
+        plan = ROOT / ".github/nvkr-run/plan.json"
+        for output, platform in (("nvkectl", "linux/amd64"), ("nvkectl-linux-arm64", "linux/arm64")):
+            component, actual, selected, digest = adapter.load_cli_inputs(plan, output, helper)
+            self.assertEqual((actual, selected), (platform, output))
+            self.assertEqual(component["commit"], self.component["commit"])
+            self.assertEqual(component["treeHash"], self.component["treeHash"])
+            self.assertTrue(digest.startswith("sha256:"))
+        for output in (None, "missing"):
+            with self.assertRaises(subprocess.CalledProcessError):
+                adapter.load_cli_inputs(plan, output, helper)
+
+    def test_main_failures_publish_no_success(self):
+        artifact = self.root / "artifact"
+        artifact.write_bytes(b"binary")
+        artifact.chmod(0o755)
+        plan = self.root / "plan.json"
+        plan.write_text("{}")
+        for phase in ("load_cli_inputs", "import_test_source", "test_binary"):
+            for error in (subprocess.CalledProcessError(7, "command"), subprocess.TimeoutExpired("command", 1)):
+                for keep in (False, True):
+                    with self.subTest(phase=phase, error=type(error).__name__, keep=keep):
+                        args = ["adapter", "--artifact", str(artifact), "--plan", str(plan)] + (["--keep"] if keep else [])
+                        with patch.object(adapter, "REPOSITORY", self.root), patch.object(sys, "argv", args), patch.object(adapter, "load_cli_inputs", return_value=(self.component, "linux/arm64", "nvkectl", "sha256:" + "a" * 64)), patch.object(adapter, "import_test_source"), patch.object(adapter, "test_binary"), patch.object(adapter, phase, side_effect=error):
+                            self.assertEqual(adapter.cli(), 7 if isinstance(error, subprocess.CalledProcessError) else 1)
+                        self.assertEqual(list(self.root.rglob("result.json")), [])
+
+    def test_replay_failure_preserves_command_exit(self):
+        workspace = self.root / "replay"
+        workspace.mkdir()
+        original_open = Path.open
+        def open_log(path, *args, **kwargs):
+            if path.name == "tests.jsonl" and not args:
+                raise OSError("unreadable replay")
+            return original_open(path, *args, **kwargs)
+        with patch.object(adapter, "run_container", side_effect=[None, subprocess.CalledProcessError(7, "docker")]), patch.object(Path, "open", open_log):
+            with self.assertRaises(subprocess.CalledProcessError) as raised:
+                adapter.test_binary(workspace, self.root / "artifact", self.component, "linux/arm64", "contract")
+        self.assertEqual(raised.exception.returncode, 7)
+
     def test_source_import_and_rejections(self):
         repo = self.root / "upstream"
         repo.mkdir()
@@ -115,6 +191,8 @@ class ArtifactAdapterTest(unittest.TestCase):
         checkout = self.root / "checkout"
         adapter.import_test_source(checkout, component)
         self.assertTrue((checkout / ".git/shallow").exists())
+        self.assertEqual(subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip(), component["commit"])
+        self.assertEqual((checkout / "cli/Makefile").read_bytes(), makefile.read_bytes())
         with self.assertRaisesRegex(ValueError, "tree does not match"):
             adapter.import_test_source(self.root / "wrong-tree", dict(component, treeHash="a" * 40))
         makefile.write_text("test:\n\t@true\n")

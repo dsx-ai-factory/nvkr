@@ -60,6 +60,9 @@ def load_cli_inputs(plan_path, output=None, nvkr=None):
         command += ["--output", output]
     raw = subprocess.check_output(command, text=True, timeout=30)
     inputs = json.loads(raw)
+    fields = ("repo", "commit", "treeHash", "toolchainImage", "expectedVersion", "platform", "output", "buildDigest")
+    if not isinstance(inputs, dict) or any(not isinstance(inputs.get(key), str) or not inputs[key] for key in fields):
+        raise ValueError("malformed artifact-test-inputs response")
     component = {key: inputs[key] for key in ("repo", "commit", "treeHash", "toolchainImage")}
     component["versionStamp"] = {"NVKECTL_VERSION": inputs["expectedVersion"]}
     return component, inputs["platform"], inputs["output"], inputs["buildDigest"]
@@ -110,11 +113,19 @@ def run_container(command, name, **kwargs):
 
 def summarize_tests(log_path, suite):
     """Reject empty, skipped, failed, or incomplete required Go test runs."""
+    with log_path.open() as log:
+        return summarize_events(log, suite)
+
+
+def summarize_events(lines, suite):
     started, passed, packages = set(), set(), set()
-    for line in log_path.read_text().splitlines():
-        if not line.startswith("{"):
+    for line in lines:
+        line = line.strip()
+        if not line.startswith(("{", "[")):
             continue  # Make command echo and prerequisite output.
         event = json.loads(line)
+        if not isinstance(event, dict) or not isinstance(event.get("Action"), str) or not isinstance(event.get("Package"), str) or ("Test" in event and not isinstance(event["Test"], str)):
+            raise ValueError("malformed Go test event")
         action, package, test = event.get("Action"), event.get("Package"), event.get("Test")
         if action in ("fail", "skip"):
             raise ValueError(f"required suite {action}: {package} {test or ''}")
@@ -163,7 +174,12 @@ def test_binary(workspace, artifact_path, component, platform, suite):
             run_container(offline, name, stdout=log)
     finally:
         if log_path.exists():
-            print(log_path.read_text(), end="", flush=True)
+            try:
+                with log_path.open() as log:
+                    for line in log:
+                        print(line, end="", flush=True)
+            except OSError as error:
+                print(f"test-artifacts: log replay failed: {error}", file=sys.stderr)
     return summarize_tests(log_path, suite)
 
 
