@@ -338,7 +338,10 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	if len(node.Inputs) != 1 || len(node.Outputs) != 1 {
 		return e.New(e.CodePipelineDrift, "publish node %q is not unary", node.ID)
 	}
-	target := plan.Targets[node.Target]
+	target, err := runtimeTarget(plan, node.Target)
+	if err != nil {
+		return err
+	}
 	if target.Kind != TargetOCI {
 		return e.New(e.CodeEngineCapability, "factory publication target kind %q has no remote adapter", target.Kind)
 	}
@@ -357,6 +360,9 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 			return err
 		}
 		if err := delivery.RequireAttestedEvidence(inspection); err != nil {
+			return err
+		}
+		if err := admitDevelopmentMetadata(plan, inspection); err != nil {
 			return err
 		}
 	}

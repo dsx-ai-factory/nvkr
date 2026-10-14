@@ -57,6 +57,15 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	if err := os.CopyFS(filepath.Join(stage, "ovn-kubernetes"), os.DirFS(source)); err != nil {
 		t.Fatal(err)
 	}
+	alias := filepath.Join(stage, "ovn-kubernetes", "values-single-node-zone.yaml")
+	if target, err := os.Readlink(alias); err == nil {
+		if target != "values.yaml" {
+			t.Fatalf("unexpected chart alias target %q", target)
+		}
+		if err := os.Remove(alias); err != nil {
+			t.Fatal(err)
+		}
+	}
 	archive := filepath.Join(stage, "chart.tar")
 	if err := transportarchive.Pack(ctx, archive, stage, []string{"ovn-kubernetes"}); err != nil {
 		t.Fatal(err)
@@ -86,7 +95,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 		t.Fatal("binding changed upstream subchart bytes")
 	}
 	for _, repository := range []string{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/ovn-image-arm64", "mirror.example.test/ovn"} {
-		args := []string{"template", "ovn", chart, "--set", "global.useImageDigest=true", "--set", "global.skipCallToK8s=true", "--set", "global.enableNgnExtension=false", "--set-string", "global.imagePullSecretName=", "--set-string", "k8sAPIServer=https://127.0.0.1:6443", "--set-string", "podNetwork=10.244.0.0/16"}
+		args := []string{"template", "ovn", chart, "--set", "global.useImageDigest=true", "--set", "global.skipCallToK8s=true", "--set-string", "global.imagePullSecretName=", "--set-string", "k8sAPIServer=https://127.0.0.1:6443", "--set-string", "podNetwork=10.244.0.0/16"}
 		for _, image := range mapping.Images {
 			repositoryPath := strings.TrimSuffix(image.Values.Digest, ".sha256") + ".repository"
 			args = append(args, "--set-string", repositoryPath+"="+repository)
@@ -163,7 +172,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	server := httptest.NewServer(registry.New(registry.Logger(log.New(io.Discard, "", 0))))
 	defer server.Close()
 	repository := strings.TrimPrefix(server.URL, "http://") + "/ovn-chart-arm64"
-	ref, err := name.NewTag(repository+":1.5.18", name.StrictValidation, name.Insecure)
+	ref, err := name.NewTag(repository+":2.4.0", name.StrictValidation, name.Insecure)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,13 +180,13 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	pulled := t.TempDir()
-	cmd := exec.CommandContext(ctx, helm, "pull", "oci://"+repository, "--version", "1.5.18", "--plain-http", "--destination", pulled, "--registry-config", filepath.Join(pulled, "registry.json"))
+	cmd := exec.CommandContext(ctx, helm, "pull", "oci://"+repository, "--version", "2.4.0", "--plain-http", "--destination", pulled, "--registry-config", filepath.Join(pulled, "registry.json"))
 	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("real Helm OCI pull: %v\n%s", err, out)
 	}
-	raw, err := os.ReadFile(filepath.Join(pulled, "ovn-chart-arm64-1.5.18.tgz"))
+	raw, err := os.ReadFile(filepath.Join(pulled, "ovn-chart-arm64-2.4.0.tgz"))
 	if err != nil {
 		t.Fatal(err)
 	}

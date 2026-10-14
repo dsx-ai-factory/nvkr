@@ -26,8 +26,8 @@ This ADR fixes maintenance.
 
 ### 1. The emitted pipeline is a generated artifact, not an owned scaffold
 
-`run generate` is the normal owner of committed workflows, complete plans and manifests. Every
-owned file regenerates byte-for-byte from exact Definition, Environment, catalog pins, generator version and
+`run generate` is the normal owner of committed workflows, generated local actions and invocation data, complete plans and
+manifests. Every owned file regenerates byte-for-byte from exact Definition, Environment, catalog pins, generator version and
 engine. Drift checks repeat the recorded Definition and Environment inputs without substituting a different
 catalog, path or engine. Definition v5 outputs select exact producers directly, with either a native `platform`
 or an OCI aggregate `platforms` set. The v5 Plan/artifact graph embeds one producer graph per native build target: a native
@@ -39,6 +39,19 @@ workflow are removed. Cluster-composition files and nodes are also removed; rege
 owned members through the same prior-manifest checks described below. Changed graph/plan and lifecycle records use their new schema majors; old records
 cannot be relabeled into current identities.
 
+The Environment's explicit GitHub development mode selects a second fixed generated layout:
+`.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/plan.json`, and `.github/nvkr-dev/manifest.json`.
+The production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
+compiler, renderer, exact validation and writer. The admitted Environment selects these paths; callers
+cannot relocate one bundle into the other layout. Each manifest owns only its own payloads and lock, so
+regeneration or retirement of one leaves the other intact. Helper commands and container launches bind the
+Plan at that layout and recheck its digest. Development mode changes Environment/Plan identity, not
+transport-independent logical Build identity. Its execution and retention policy is owned by ADR-18.
+Signed development also binds the disposable namespace and signer policy in this immutable Plan. Actual
+run-attempt destinations are derived by the execution owner under ADR-20; runtime substitutions never
+rewrite generated inputs or bypass drift checks. The maintained development bundle uses the complete M2
+Definition with its separate development Environment.
+
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
 plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
@@ -49,6 +62,32 @@ and silently claimed as generator-owned. Future artifact/result digests belong i
 generator must not invent them. Changes to input mode, environment or output graph regenerate in one reviewed
 change. Generated files are not editable scaffolds.
 
+The GitHub bundle includes shared composite templates beneath `.github/nvkr-run/actions/` and canonical
+invocation values in `.github/nvkr-run/action-data.json`, with corresponding members in the development
+layout. The generator selects fixed semantic interfaces for
+execution, preparation, collection and transfer. Grouped jobs repeat those calls; declared optional slots
+and further individual transfer calls handle differing output counts without shape-specific or numbered
+variant actions. Invocation values use named operation roles rather than step positions. These interfaces
+lower Plan-derived steps without introducing another executable Plan or authored extension surface.
+The helper-preparation, execution, bootstrap and controlled-transfer
+families and their invocation-data member appear in the same commit manifest as the top-level workflow and
+Plan. Their exact bytes, safe relative paths and modes participate in regeneration, drift
+checks and prior-manifest retirement. The workflow digest still describes the top-level workflow bytes;
+it is not a substitute for validating the complete manifest-owned action closure.
+
+The entry workflow references the fixed Plan and manifest paths without repeating the Plan digest. Its
+provider source-fetch IDs and scheduling order describe the target and actual consumer cohort rather than
+changing source pins. Exact executable identities remain in the Plan and generated invocation data.
+Templates contain fixed helper operations and pinned provider actions; the runtime descriptor operation
+admits the Plan and regenerates the selected values rather than trusting the checked-in data as authority.
+Routine pin or Plan changes can therefore leave the workflow bytes unchanged while the complete bundle
+and ownership manifest change. This stability is conditional on unchanged topology, labels, action
+interfaces and visible execution policy; checkout pins, pins of required inline transports and inline
+operator-setup changes remain workflow changes. The closing summary's references keep finalization and
+the final Run upload inline, so an upload-action pin change affects the maintained workflow. ADR-18 §8
+defines the full boundary. Every input update still requires complete regeneration and
+the same all-member drift check; an unchanged workflow file does not establish an up-to-date bundle.
+
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 
 `run generate --check` re-emits in memory using the recorded Definition/Environment selection and compares
@@ -57,14 +96,21 @@ missing, extra or divergent owned files. Execution admission verifies the commit
 graph. The dedicated generated Run directory must contain only expected payloads, its manifest and the
 persistent lock inode; unexpected files or directories and symlinks fail the check. Handwritten workflows
 outside that directory remain operator-owned. The unused qualified `bundle` command, bundle manifest and
-transport-plan writer are removed; no parallel generated format is retained.
+transport-plan writer are removed. The opt-in M3 qualification pair has its own narrowly scoped ownership
+manifest; it does not replace or reinterpret the producer Plan bundle.
 
 Committed bundle members and `exec-node`'s diagnostic canonical graph are opened as bounded, nonblocking,
 no-follow regular file capabilities and revalidated against their live pathname after reading. A symlink, FIFO,
 oversized member or inode substitution fails closed before hashing or execution.
 
 A separately generated meta-lint workflow and automatic semantic explanation inside `--check` remain deferred.
-The maintained repository gate invokes `run generate --check` directly. Read-only `run diff` separately compares
+The maintained repository gate invokes `run generate --check` for both committed layouts using their exact
+recorded inputs and canonical generator stamp. Repository development tooling regenerates these bundles,
+checks a clean named branch against the explicit GitHub repository's current commit, and requests manual
+dispatch of the development workflow. It does not commit, push, edit deployment policies or authenticate
+an eventual provider result. GitHub must first register the workflow on the default branch; a moving remote
+branch after preflight remains a provider dispatch race and the resulting Run SHA must be inspected.
+Read-only `run diff` separately compares
 two fully validated canonical Plans: it reports changed named Build identities, classifies every changed field,
 keys named collections without array-shift noise, and preserves command/patch order. Concise text counts all
 changes; detailed text and descriptive JSON retain the full comparison. `run graph` exports complete linked
@@ -113,10 +159,63 @@ not establish compatibility.
 
 ### 4. Deferred customization: extension overlay and callable form
 
-Extensions and reusable callable workflows remain deferred design options. They have no current command,
-renderer or injected extension implementation. Introducing either requires explicit input ownership,
-deterministic identity, credential admission and transport contracts before implementation. They cannot restore
+Generated shared composite templates and invocation data are internal lowering artifacts owned by the existing
+generator. They accept only generated input bindings and do not admit operator-supplied actions, arbitrary commands or
+replacement job policies. Their callers retain visible topology, permissions and credential references;
+validation checks the expanded steps and exact bytes of every generated member (ADR-18 §8).
+
+General extensions and reusable callable producer workflows remain deferred design options. The sole
+admitted reusable exception is the fixed M3 native smoke worker invoked by its generated same-repository
+qualifier at the same commit. It exposes no arbitrary steps, runner labels, commands or reusable refs.
+The independently selected qualification policy and trusted compiled producer inputs determine its exact
+worker identity, native images, executable pins, source-read secret names and SHA-pinned actions. Source
+secrets are explicitly mapped and scoped to trusted owner steps; there is no blanket secret inheritance.
+Worker permissions allow reads and its own report signature, while registry publication belongs only to
+the final qualifier. Reusability here binds a distinct signing identity, not a customization surface.
+
+The final owner runs after a completed worker success or failure so an ordinary smoke failure reaches the
+complete per-output refusal diagnostics. Its condition independently repeats trusted successful source
+admission, permits only those two dependency results and uses `!cancelled()` to override GitHub's implicit
+success check without running after cancellation. Skipped or unknown dependency states are not admitted.
+[GitHub's status-condition contract](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#status-check-functions)
+owns that scheduling behavior. Scheduling the owner supplies no authority: exact provider job success and
+signed complete worker evidence remain mandatory before publication. Failed worker execution and evidence
+upload are never converted to successful job status.
+
+Before rendering, lifecycle joins exact tool/non-tool policy membership and native platforms to the
+compiled Plan. Impossible policy scope fails before any workflow write. The worker matrix is exactly the
+selected executable platform set, while the final signer remains AMD64 with its independent executable pin.
+`run generate --qualification-policy` admits and renders this pair before writes, then composes it with
+the normal producer generation. The worker is a generated reusable GitHub Actions workflow, not an additional
+handwritten integration. The maintained candidate uses `definitions/nvke-m2/qualification.yaml` to emit
+`.github/workflows/nvkr-qualify.yml` and `.github/workflows/nvkr-smoke.yml` alongside its producer bundle.
+Its separate manifest owns exactly the two workflows. A persistent kernel lock serializes writes; bounded
+stages are synced and the manifest is committed last. Replacement or
+retirement requires prior ownership and exact bytes. Recovery may accept only prior-owned bytes or the
+newly regenerated bytes; arbitrary edits fail closed. The read-only check creates neither locks nor output
+directories. A partial cross-owner generation is detectable drift, not a valid completed generation.
+A leftover qualification stage must match a prefix of the selected generation's exact bytes. A policy or
+input change that makes the stage disagree returns `CodeWriteConflict` and preserves staged and published
+bytes; the writer cannot infer authority to discard another generation. Restore the interrupted generation's
+original authored inputs, pins, policy and generator version, repeat generation and confirm `--check`, then
+reapply the intended changes and regenerate. If those original inputs cannot be established, preserve the
+ambiguous state for investigation; deleting stages or ownership records is not the recovery protocol.
+The `nvkr.dev/generated-qualification/v1` manifest records the trusted Plan and full policy digests,
+producer/qualifier/worker paths and both workflow byte hashes and modes. Worker and final qualifier admission
+verify this manifest, policy binding and exact finite owner directory before candidate or signing work. This
+read-only runtime check does not recompile source inputs or repair drift.
+
+The reviewed policy and generated pair may merge before real hosted acceptance. The fresh producer run and
+positive/negative hosted and independent-consumer exercises follow merge; their evidence remains required
+before production-readiness claims. Generation, repository checks and merge do not establish hosted behavior
+or organizational acceptance, and do not relax source, worker or final-signer admission.
+
+Any broader extension requires explicit input ownership, deterministic identity, credential admission and
+transport contracts before implementation. They cannot restore
 removed Recipe layers or mixins; catalog overlay v3 remains whole-producer replacement.
+Producer matrix scheduling likewise needs an explicit dependency and complete provider-result contract
+before admission; the fixed qualification worker matrix does not admit producer matrices, and extracting
+existing steps into generated actions does not change their scheduling contract.
 
 Editing generated files directly remains out of contract. Current pipeline changes belong in the Definition,
 Environment or owning compiler/renderer and pass the same byte-exact regeneration gate.
@@ -232,7 +331,9 @@ is checked before authored-input or output I/O. No new provider-executed or qual
 Acceptance requires every owned generated file to participate in the byte-exact check. Substitution of external
 profile, evidence or trust inputs must fail at the owning authenticated consumer. A complete process-race and
 kill-point matrix for stage/fsync/rename/manifest commit remains deferred; it must prove interruption cannot
-appear valid. Future extensions, callable workflows and meta-lint generation require their own evidence before
-admission. Two worktree branches updating the same lock must preserve the ordinary Git merge-conflict path.
+appear valid. Future extensions, general callable producer workflows and meta-lint generation require their own evidence
+before admission. The fixed M3 worker pair requires its own byte-exact generation, ownership and negative
+admission tests; local rendering does not establish provider job names, reusable-workflow certificate claims
+or hosted qualification acceptance. Two worktree branches updating the same lock must preserve the ordinary Git merge-conflict path.
 The CLI contract test must also prove the legacy `--toolchain` option cannot be mistaken for a component
 toolchain update.

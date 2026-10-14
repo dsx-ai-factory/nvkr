@@ -21,10 +21,16 @@ import (
 )
 
 // Publication owns an exact, independently checked publication closure. Its
-// anonymous file capabilities survive source-path replacement. Only defensive
-// output descriptions leave this owner; Close releases all held bytes.
+// anonymous file capabilities survive source-path replacement. It exposes
+// defensive descriptions and read-only streams. Close joins active operations
+// before releasing held bytes; shallow handle copies share its lifetime.
 // It establishes membership and integrity, not signer or release authorization.
 type Publication struct {
+	*publicationState
+}
+
+// Shallow handle copies share synchronization, held bytes and revocation.
+type publicationState struct {
 	mu           sync.RWMutex
 	closed       bool
 	files        []*heldfile.File
@@ -33,6 +39,7 @@ type Publication struct {
 	inspection   Inspection
 	outputs      []Output
 	platforms    map[string]publicationPlatform
+	executables  map[string]publicationExecutable
 }
 
 type publicationPlatform struct{ OS, Arch string }
@@ -58,7 +65,7 @@ func openPublication(ctx context.Context, root, expectedRoot string,
 		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating publication inspection workspace")
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
-	publication := &Publication{diskPayloads: map[string]*os.File{}}
+	publication := &Publication{publicationState: &publicationState{diskPayloads: map[string]*os.File{}}}
 	failed := true
 	defer func() {
 		if failed {
@@ -164,6 +171,10 @@ func openPublication(ctx context.Context, root, expectedRoot string,
 	}
 	publication.inspection, publication.outputs = inspection, outputs
 	publication.platforms = platforms
+	publication.executables, err = retainPublicationExecutables(ctx, layout, inspection, publication.files)
+	if err != nil {
+		return nil, err
+	}
 	failed = false
 	return publication, nil
 }
@@ -213,7 +224,7 @@ func PullPublication(ctx context.Context, reference, workspace string, options R
 }
 
 func (publication *Publication) Close() error {
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return nil
 	}
 	publication.mu.Lock()
@@ -232,6 +243,7 @@ func (publication *Publication) Close() error {
 	}
 	publication.diskFiles = nil
 	publication.diskPayloads = nil
+	publication.executables = nil
 	if result != nil {
 		return e.Wrap(e.CodeVerifyFailed, result, "closing publication snapshots")
 	}
@@ -241,7 +253,7 @@ func (publication *Publication) Close() error {
 // Artifacts projects exact named outputs, binding their transport references to
 // this root. The content subject never includes those repository locators.
 func (publication *Publication) Artifacts(reference string) ([]Output, string, error) {
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return nil, "", e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()
@@ -268,7 +280,7 @@ func (publication *Publication) Artifacts(reference string) ([]Output, string, e
 }
 
 func (publication *Publication) RequireAttestedEvidence() error {
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()
@@ -288,7 +300,7 @@ func (publication *Publication) WriteDiskPayload(ctx context.Context, outputName
 	if err := deliveryContext(ctx); err != nil {
 		return 0, err
 	}
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return 0, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	if destination == nil {
@@ -337,7 +349,7 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 			observed, found := disks[object.DescriptorDigest]
 			if !found || observed.ManifestDigest != object.DescriptorDigest || observed.ArtifactType != object.ArtifactType ||
 				observed.Platform != object.OS+"/"+object.Arch || output.Disk == nil || observed.PayloadDigest != output.Disk.PayloadDigest ||
-				observed.Size != output.Disk.Size || observed.Encryption != "none" {
+				observed.Size != output.Disk.Size || observed.Encryption != output.Disk.Encryption {
 				return nil, e.New(e.CodeVerifyFailed, "disk output differs from its wrapper binding")
 			}
 			platforms[output.Name] = publicationPlatform{OS: "linux", Arch: strings.TrimPrefix(observed.Platform, "linux/")}

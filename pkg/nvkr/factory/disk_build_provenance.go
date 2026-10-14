@@ -77,6 +77,10 @@ func (owner *LocalRunResult) packageDiskBuildProvenance(ctx context.Context, pla
 	if err != nil {
 		return err
 	}
+	encryption, err := plannedDiskPublicationEncryption(plan, expected)
+	if err != nil {
+		return err
+	}
 	trace, err := owner.observeDiskMaterials(ctx, plan, expected)
 	if err != nil {
 		return err
@@ -111,7 +115,7 @@ func (owner *LocalRunResult) packageDiskBuildProvenance(ctx context.Context, pla
 	if err != nil {
 		return err
 	}
-	if observed.Digest != view.Subject.Digest || observed.Size != view.Subject.Size || observed.Format != "qcow2" || observed.Encryption != "none" {
+	if observed.Digest != view.Subject.Digest || observed.Size != view.Subject.Size || observed.Format != "qcow2" || observed.Encryption != encryption {
 		return e.New(e.CodeVerifyFailed, "disk export changed its traced producer subject")
 	}
 	if err := capture.finish(); err != nil {
@@ -120,7 +124,7 @@ func (owner *LocalRunResult) packageDiskBuildProvenance(ctx context.Context, pla
 	_, err = publishReconciledDiskPackage(ctx, workspace, output.Path, evidence, capture.close,
 		func(ctx context.Context, path string) (delivery.Result, error) {
 			return delivery.BuildDiskArtifact(ctx, path, delivery.DiskArtifactRequest{Path: capture.path,
-				Digest: observed.Digest, Size: observed.Size, Platform: platform, Format: "qcow2", Encryption: "none", ArtifactType: output.MediaType})
+				Digest: observed.Digest, Size: observed.Size, Platform: platform, Format: "qcow2", Encryption: observed.Encryption, ArtifactType: output.MediaType})
 		})
 	return err
 }

@@ -33,10 +33,10 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const ovnForkCommit = "26cc199de8e814a7fe6d899a770fc04df0bbc2f9"
+const ovnForkCommit = "12ca20e67b516f1a023da85a22deeaf8d2d70d0b"
 
 // ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
-const ovnForkStream = "1.5.18"
+const ovnForkStream = "2.4.0"
 
 // Both source trees use a vendored JSON adapter incompatible with Go 1.27.
 const ovnGoBuilder = "quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564"
@@ -217,13 +217,25 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 	}{
 		{component: "ovn-kube-ubuntu", fragments: []string{
 			"name=localhost/nvke/ovn-kubernetes:git-" + pin.Commit,
+			"filename=Dockerfile.ubuntu.nv",
 			// The fork's vendored JSON adapter needs Go 1.26, not Go 1.27's
 			// changed JSON v2 API. This is the measured patched 1.26.9 builder.
 			"build-arg:BUILDER_IMAGE=" + ovnGoBuilder,
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
+			// The Dockerfile defaults to the fork's private FIPS/STIG base and
+			// Artifactory; these overrides keep the producer credential-free.
+			"build-arg:BASE_IMAGE=docker.io/library/ubuntu:24.04@sha256:",
+			"build-arg:OVS_SOURCE=doca",
+			"build-arg:OVN_SOURCE=uca",
+			"build-arg:CLOUD_ARCHIVE=gazpacho",
+			"build-arg:UCA_OVN_VER=26.03.0-2~cloud0",
+			"build-arg:DOCA_RELEASE=3.5.0",
+			// The Dockerfile interpolates K8S_VER straight into the pkgs.k8s.io
+			// path, which requires the leading "v"; a bare minor returns 403.
+			"build-arg:K8S_VER=v1.36",
 		}},
 		{component: "ovn-kubernetes-chart", fragments: []string{
-			"grep -qx 'version: " + ovnForkStream + "' /src/charts/ovn-kubernetes/Chart.yaml",
+			"grep -qx 'version: " + ovnForkStream + `' "$chart/Chart.yaml"`,
 		}},
 		{component: "nvke-cni-ovn", fragments: []string{
 			"readonly stream=" + ovnForkStream,
@@ -429,28 +441,28 @@ func TestNVKEOVNForkLive(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		check := `set -euo pipefail
+		check := fmt.Sprintf(`set -euo pipefail
 tar -xf /input/bundle.tar -C /tmp
 for kind in charts images; do
-  package=/tmp/nvke-cni-ovn-${kind}-1.5.18_1+git.26cc199de8e8_$GOARCH.deb
+  package=/tmp/nke-cni-ovn-${kind}-%[1]s_%[2]s_$GOARCH.deb
   test "$(dpkg-deb -f "$package" Architecture)" = "$GOARCH"
-  test "$(dpkg-deb -f "$package" Package)" = "nvke-cni-ovn-$kind-1.5.18"
-  test "$(dpkg-deb -f "$package" Version)" = "1+git.26cc199de8e8"
-  test "$(dpkg-deb -f "$package" Maintainer)" = 'NVKE <nke-dev@exchange.nvidia.com>'
+  test "$(dpkg-deb -f "$package" Package)" = "nke-cni-ovn-$kind-%[1]s"
+  test "$(dpkg-deb -f "$package" Version)" = "%[2]s"
+  test "$(dpkg-deb -f "$package" Maintainer)" = 'NKE <nke-dev@exchange.nvidia.com>'
   dpkg-deb -x "$package" /tmp/root
   dpkg-deb -e "$package" "/tmp/control-$kind"
 done
 test -f /tmp/root/etc/dgx/ovn-kubernetes/Chart.yaml
 test -f /tmp/root/etc/dgx/ovn-kubernetes/values-nke.yaml
 bash -n /tmp/control-images/postinst
-cd /tmp/root/usr/lib/nke/cni-ovn/1.5.18
-sha256sum --strict --quiet -c ovn-images_1.5.18_linux_$GOARCH.tgz.sha256
-gzip -t ovn-images_1.5.18_linux_$GOARCH.tgz
-test "$(gzip -dc ovn-images_1.5.18_linux_$GOARCH.tgz | sha256sum | cut -d' ' -f1)" = "$OVN_IMAGE_SHA256"
+cd /tmp/root/usr/lib/nke/cni-ovn/%[1]s
+sha256sum --strict --quiet -c ovn-images_%[1]s_linux_$GOARCH.tgz.sha256
+gzip -t ovn-images_%[1]s_linux_$GOARCH.tgz
+test "$(gzip -dc ovn-images_%[1]s_linux_$GOARCH.tgz | sha256sum | cut -d' ' -f1)" = "$OVN_IMAGE_SHA256"
 /tools/helm template ovn /tmp/root/etc/dgx/ovn-kubernetes \
   -f /tmp/root/etc/dgx/ovn-kubernetes/values-nke.yaml \
   --set k8sAPIServer=https://127.0.0.1:6443 --set podNetwork=10.244.0.0/16
-`
+`, ovnForkStream, "1+git."+ovnForkCommit[:12])
 		name := fmt.Sprintf("nvkr-ovn-check-%d-%s", os.Getpid(), filepath.Base(t.TempDir()))
 		t.Cleanup(func() {
 			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
@@ -614,7 +626,7 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 					t.Fatal("missing OVN postinst heredoc")
 				}
 				hook, _, found = strings.Cut(rest, "\nEOF\n")
-				if !found || !strings.Contains(hook, "ovn-images_1.5.18_linux_"+arch+".tgz") {
+				if !found || !strings.Contains(hook, "ovn-images_"+ovnForkStream+"_linux_"+arch+".tgz") {
 					t.Fatal("missing native OVN postinst hook")
 				}
 			}
@@ -670,7 +682,7 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 					}
 					// Relocate only host paths into test-owned scratch. External commands
 					// are controlled fixtures; the actual pipeline and failure handler run.
-					script := strings.ReplaceAll(hook, "/usr/lib/nke/cni-ovn/1.5.18", root)
+					script := strings.ReplaceAll(hook, "/usr/lib/nke/cni-ovn/"+ovnForkStream, root)
 					script = strings.ReplaceAll(script, "/var/log/nke-cni-ovn-postinst.log", logPath)
 					script = strings.ReplaceAll(script, "/usr/local/bin/ctr", filepath.Join(root, "local-ctr"))
 					// Allow subprocess scheduling under the concurrent full-package gate;

@@ -358,17 +358,13 @@ func inspectDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 			"disk lifecycle output %q producer did not execute under its exact Plan", expected.Name)
 	}
 	result, payload := completion.Result, completion.Payload
-	if result.Component != root || result.OutputType != authored.OutputDiskImage ||
-		result.Qualification != pipeline.ArtifactUnqualified || result.Toolchain != producer.Toolchain ||
-		result.BuilderType != producer.BuilderType || result.EngineClass != producer.BuilderType ||
-		result.Path != producer.ArtifactPath || result.AbsPath != "" || result.TransportPath != "" ||
-		result.Ref != "" || result.Packaged ||
-		result.ProfileDigest != "" || result.ExecutionBinding != "" ||
-		!canonical.IsDigest(result.InputDigest) || !canonical.IsDigest(result.SHA256) || result.Size <= 0 ||
-		!canonical.IsDigest(payload.digest) || payload.size <= 0 ||
+	if err := validateDiskProducerDescription(producer, result); err != nil {
+		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, err
+	}
+	if !canonical.IsDigest(payload.digest) || payload.size <= 0 ||
 		result.SHA256 != payload.digest || result.Size != payload.size {
 		return DiskPayloadObservation{}, pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed,
-			"disk lifecycle output %q producer result differs from its compiled producer", expected.Name)
+			"disk lifecycle output %q producer result differs from its held payload", expected.Name)
 	}
 	observation := DiskPayloadObservation{
 		Digest: payload.digest, Size: payload.size, BuildDigest: build.BuildDigest,
@@ -405,6 +401,21 @@ func inspectDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 			"disk lifecycle output %q does not carry an admitted QCOW2 header", expected.Name)
 	}
 	return observation, result, nil
+}
+
+// Both live export and hosted byte observation enforce the same exact producer
+// description. This validates metadata; it does not manufacture a live receipt.
+func validateDiskProducerDescription(producer ir.Node, result pipeline.ArtifactResult) error {
+	if result.Component != producer.Component || result.OutputType != authored.OutputDiskImage ||
+		result.Qualification != pipeline.ArtifactUnqualified || result.Toolchain != producer.Toolchain ||
+		result.BuilderType != producer.BuilderType || result.EngineClass != producer.BuilderType ||
+		result.Path != producer.ArtifactPath || result.AbsPath != "" || result.TransportPath != "" ||
+		result.Ref != "" || result.Packaged ||
+		result.ProfileDigest != "" || result.ExecutionBinding != "" ||
+		!canonical.IsDigest(result.InputDigest) || !canonical.IsDigest(result.SHA256) || result.Size <= 0 {
+		return e.New(e.CodeVerifyFailed, "disk producer result differs from its compiled producer")
+	}
+	return nil
 }
 
 // ObserveDiskLifecyclePayload consumes one still-open local execution result and

@@ -51,13 +51,68 @@ bin/nvkr run generate \
 
 Under that scratch root, inspect:
 
-- `.github/workflows/nvkr-run.yml`: GitHub Actions jobs and their dependencies.
+- `.github/workflows/nvkr-run.yml`: named GitHub Actions jobs, dependencies, runners and credential policies.
+- `.github/nvkr-run/actions/`: shared actions with fixed interfaces for execution, preparation and transport.
+- `.github/nvkr-run/action-data.json`: generated invocation parameters selected by stable job/segment keys.
 - `.github/nvkr-run/plan.json`: the canonical Plan consumed by the workflow.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
 `--check` regenerates in memory and compares exact bytes without writing files. Use the same CLI build
 and inputs for both commands; the generator version contributes to generated content. Change authored
 inputs and regenerate instead of editing generated files.
+
+Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
+Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect
+the shared operations it calls, then find its invocation key in `action-data.json` for exact node and carrier
+values. Calls such as `execute-node`, `execute-source` and `collect-node-outputs` name the operation rather
+than a generated shape. Grouped jobs reuse the node interface for each operation; optional slots and further
+individual upload calls preserve every output without adding output-count variants. Invocation parameters
+have named roles. The helper recomputes those values from the admitted Plan at runtime; this data is generated,
+not another file to author. Templates contain fixed commands
+and pinned actions, not scripts supplied as parameters. Native preflight, checkout, operator setup and timed
+producer execution remain inline. A controlled transfer delegates to an action containing one upload or
+download, with its condition, timeout and failure policy still visible on the caller. Steps whose outcomes
+or outputs are referenced remain inline, including finalization and the final Run upload read by the closing
+summary. Recovery uses the shared `recover-inputs` action before that inline finalization. Source credentials are passed explicitly and consumed only by the
+original source step, separately from packing and uploads.
+Repeated native preflight, checkout and helper/parameter preparation steps use descriptive aliases such as
+`*check-native-linux-amd64`, `*checkout-workflow-source` and `*prepare-stage-<runner-artifact>`.
+Preparation selects the current job through `github.job`; job policies, dependencies and operation calls
+remain explicit.
+
+The header points to fixed Plan and manifest files. Provider source-fetch names and ordering follow the
+target and its consuming components, so routine source, artifact, toolchain or generator
+updates can leave this workflow unchanged while generated data and action bodies change. This holds when
+topology, labels, action interfaces and visible policy stay the same. A checkout-pin update, a split or merge
+of shared source consumers, or a change to runners, runtime containers/services, permissions, secret
+references, time limits, qualification or inline setup can still change the workflow. Transport pins remain
+outside the workflow only when their calls can be extracted; the required inline final Run upload makes
+upload-action pin updates visible in the maintained workflow. Always regenerate
+and check the complete bundle after an input change, even when the workflow file has no diff.
+
+The shared actions and invocation data are part of the same bundle: commit them with the workflow, Plan and
+manifest when adopting a generated pipeline. `--check` covers every template and data file, and regeneration
+retires unchanged obsolete actions through the previous manifest. Editing an action directly produces drift just like editing the
+workflow. Producer jobs retain explicit dependencies and separate results; producer matrices and general
+callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native
+worker and selected-platform matrix (ADR-21).
+
+## Recover interrupted qualification generation
+
+When generation includes `--qualification-policy`, an interrupted write can leave files such as
+`.github/nvkr-qualification/manifest.stage`. `--check` reports the incomplete generation without repairing
+it. Changing policy or other inputs before retrying can produce `CodeWriteConflict`: the saved stage does
+not match the newly requested generation, so the writer preserves it and the published files.
+
+1. Restore the exact Definition, Environment, catalogs and pins, qualification policy, and CLI build used
+   by the interrupted command. Keep the same paths and output root.
+2. Repeat that original `run generate` command without `--check`, then run it with `--check` to confirm
+   recovery completed.
+3. Reapply the intended policy or input changes, regenerate, and check again.
+
+Do not delete stage files or ownership manifests to force an update. If the original inputs cannot be
+established, retain the files for investigation instead of guessing their ownership. The producer and
+qualification bundles have separate owners; their writes are not one atomic directory transaction.
 
 Generation neither submits the workflow to GitHub nor builds, signs, or publishes artifacts. Continue with
 [Plan inspection and comparison](plan-and-graph-inspection.md) or the [Run lifecycle](lifecycle.md).

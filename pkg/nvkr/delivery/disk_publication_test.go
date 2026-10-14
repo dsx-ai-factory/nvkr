@@ -120,7 +120,7 @@ func TestDiskPublicationPreservesManifestAndPayloadSubjects(t *testing.T) {
 			}
 			var attested []string
 			final := filepath.Join(t.TempDir(), "attested")
-			result, err := AttestEvidence(t.Context(), root, final, func(_ context.Context, subject string, document []byte) ([]byte, error) {
+			result, err := AttestPreparedEvidence(t.Context(), root, final, func(_ context.Context, subject string, document []byte) ([]byte, error) {
 				attested = append(attested, subject)
 				return diskFixtureBundle(t, subject, document), nil
 			})
@@ -209,7 +209,7 @@ func TestDiskPublicationLargeInventoryAttestationReadback(t *testing.T) {
 	}
 	final := filepath.Join(t.TempDir(), "attested")
 	expanded := false
-	result, err := AttestEvidence(t.Context(), prepared, final, func(_ context.Context, subject string, document []byte) ([]byte, error) {
+	result, err := AttestPreparedEvidence(t.Context(), prepared, final, func(_ context.Context, subject string, document []byte) ([]byte, error) {
 		bundle := diskFixtureBundle(t, subject, document)
 		if len(bundle) > sbom.MaxDocumentBytes {
 			expanded = true

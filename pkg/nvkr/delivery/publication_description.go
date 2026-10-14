@@ -35,8 +35,9 @@ type PublicationDescription struct {
 
 type PublicationOutput struct {
 	Output
-	ArtifactType  string         `json:"artifactType"`
-	BuildSubjects []BuildSubject `json:"buildSubjects"`
+	Publication   *PublicationOrigin `json:"publication,omitempty"`
+	ArtifactType  string             `json:"artifactType"`
+	BuildSubjects []BuildSubject     `json:"buildSubjects"`
 }
 
 type PublicationEvidence struct {
@@ -63,7 +64,7 @@ type PublicationSource struct {
 // Returned slices are independent of both the source layout and the live owner.
 // A claimed qualification is reported as metadata, never authenticated here.
 func (publication *Publication) Description(reference string) (PublicationDescription, error) {
-	if publication == nil {
+	if publication == nil || publication.publicationState == nil {
 		return PublicationDescription{}, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()
@@ -119,8 +120,13 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 		output.Reference = outputRefs[output.Name]
 		platform := platforms[output.Name]
 		output.OS, output.Arch = platform.OS, platform.Arch
+		var origin *PublicationOrigin
+		if object.Output.Publication != nil {
+			value := *object.Output.Publication
+			origin = &value
+		}
 		view.Outputs = append(view.Outputs, PublicationOutput{
-			Output: output, ArtifactType: object.ArtifactType,
+			Output: output, Publication: origin, ArtifactType: object.ArtifactType,
 			BuildSubjects: append([]BuildSubject{}, object.Output.BuildSubjects...),
 		})
 	}

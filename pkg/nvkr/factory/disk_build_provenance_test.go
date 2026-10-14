@@ -22,103 +22,110 @@ func TestARCCompletesPreparedDiskPublication(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("held disk publication requires Linux")
 	}
-	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
-		t.Run(platform, func(t *testing.T) {
-			plan, owner := diskMaterialTraceFixtureWithPublicationMode(t, false, false, platform, "none", "test-acquisitions.tar", true, "per-output-v1")
-			nodes, artifacts := planIndex(plan)
-			if err := executeHeldDiskObservation(t.Context(), plan, nodes["node-image/terminal-observe"], artifacts, owner); err != nil {
-				t.Fatal(err)
-			}
-			if err := completeGitHubDiskPublication(t.Context(), plan, plan.LifecycleOutputs[0], owner, nil, nil, GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
-				t.Fatal(err)
-			}
-			node := nodes["package/"+outputPublicationPackage("node-image")]
-			inspection, err := delivery.Inspect(t.Context(), artifacts[node.Outputs[0]].Path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			disks := 0
-			for _, object := range inspection.Root.Objects {
-				if object.Kind == PackageDiskImage && object.Name == "node-image" {
-					disks++
-				}
-			}
-			if disks != 1 {
-				t.Fatalf("prepared publication contains %d selected disks", disks)
-			}
-		})
-	}
-}
-
-func TestDiskBuildProvenancePublication(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
-		for _, failure := range []string{"", "missing consumption", "closed owner", "changed result"} {
-			t.Run(platform+"/"+failure, func(t *testing.T) {
-				plan, owner := diskMaterialTraceFixtureWithCapture(t, false, false, platform, "none", "test-acquisitions.tar", true)
-				expected := plan.LifecycleOutputs[0]
+	for _, encryption := range []string{"none", "luks2"} {
+		for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+			t.Run(encryption+"/"+platform, func(t *testing.T) {
+				plan, owner := diskMaterialTraceFixtureWithPublicationMode(t, false, false, platform, encryption, "test-acquisitions.tar", true, "per-output-v1")
 				nodes, artifacts := planIndex(plan)
 				if err := executeHeldDiskObservation(t.Context(), plan, nodes["node-image/terminal-observe"], artifacts, owner); err != nil {
 					t.Fatal(err)
 				}
-				switch failure {
-				case "missing consumption":
-					delete(owner.materialConsumptions, "node-image/build-agent")
-				case "closed owner":
-					if err := owner.Close(); err != nil {
-						t.Fatal(err)
-					}
-				case "changed result":
-					if err := os.WriteFile(artifacts["result/node-image/agent"].Path, []byte("{}"), 0600); err != nil {
-						t.Fatal(err)
+				if err := completeGitHubDiskPublication(t.Context(), plan, plan.LifecycleOutputs[0], owner, nil, nil, GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
+					t.Fatal(err)
+				}
+				node := nodes["package/"+outputPublicationPackage("node-image")]
+				inspection, err := delivery.Inspect(t.Context(), artifacts[node.Outputs[0]].Path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				disks := 0
+				for _, object := range inspection.Root.Objects {
+					if object.Kind == PackageDiskImage && object.Name == "node-image" {
+						if object.Output == nil || object.Output.Disk == nil || object.Output.Disk.Encryption != encryption || object.Output.Disk.EvidenceMode != sbom.DiskBuildProvenance {
+							t.Fatalf("prepared publication lost exact disk binding: %+v", object.Output)
+						}
+						disks++
 					}
 				}
-				err := CompleteHostedDiskPublication(t.Context(), plan, expected, owner, nil)
-				if failure == "" && runtime.GOOS != "linux" {
-					assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
-					return
+				if disks != 1 {
+					t.Fatalf("prepared publication contains %d selected disks", disks)
 				}
-				if failure != "" {
-					want := e.CodeVerifyFailed
+			})
+		}
+	}
+}
+
+func TestDiskBuildProvenancePublication(t *testing.T) {
+	for _, encryption := range []string{"none", "luks2"} {
+		for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+			for _, failure := range []string{"", "missing consumption", "closed owner", "changed result"} {
+				t.Run(encryption+"/"+platform+"/"+failure, func(t *testing.T) {
+					plan, owner := diskMaterialTraceFixtureWithCapture(t, false, false, platform, encryption, "test-acquisitions.tar", true)
+					expected := plan.LifecycleOutputs[0]
+					nodes, artifacts := planIndex(plan)
+					if err := executeHeldDiskObservation(t.Context(), plan, nodes["node-image/terminal-observe"], artifacts, owner); err != nil {
+						t.Fatal(err)
+					}
 					switch failure {
+					case "missing consumption":
+						delete(owner.materialConsumptions, "node-image/build-agent")
 					case "closed owner":
-						want = e.CodeGateUnmet
+						if err := owner.Close(); err != nil {
+							t.Fatal(err)
+						}
 					case "changed result":
-						want = e.CodePipelineDrift
+						if err := os.WriteFile(artifacts["result/node-image/agent"].Path, []byte("{}"), 0600); err != nil {
+							t.Fatal(err)
+						}
 					}
-					assertFactoryErrorCode(t, err, want)
-					if _, err := os.Stat(artifacts["package/node-image"].Path); !os.IsNotExist(err) {
-						t.Fatal("failed publication left a package")
+					err := CompleteHostedDiskPublication(t.Context(), plan, expected, owner, nil)
+					if failure == "" && runtime.GOOS != "linux" {
+						assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+						return
 					}
-					return
-				}
-				if err != nil {
-					t.Fatal(err)
-				}
-				out, err := ObserveDiskPublicationPayload(t.Context(), plan, expected, artifacts)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if out.Disk.EvidenceMode != sbom.DiskBuildProvenance {
-					t.Fatal("release lost evidence scope")
-				}
-				held, err := delivery.OpenSingleDiskArtifact(t.Context(), artifacts["package/node-image"].Path, platform, 64<<30)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := held.Close(); err != nil {
-					t.Fatal(err)
-				}
-				for _, component := range expected.Components {
-					raw, err := os.ReadFile(filepath.Join(artifacts["sbom/node-image"].Path, component+".cdx.json"))
+					if failure != "" {
+						want := e.CodeVerifyFailed
+						switch failure {
+						case "closed owner":
+							want = e.CodeGateUnmet
+						case "changed result":
+							want = e.CodePipelineDrift
+						}
+						assertFactoryErrorCode(t, err, want)
+						if _, err := os.Stat(artifacts["package/node-image"].Path); !os.IsNotExist(err) {
+							t.Fatal("failed publication left a package")
+						}
+						return
+					}
 					if err != nil {
 						t.Fatal(err)
 					}
-					if !strings.Contains(string(raw), "not-performed") || strings.Contains(string(raw), "disk-reconciled") {
-						t.Fatal("dishonest scope")
+					out, err := ObserveDiskPublicationPayload(t.Context(), plan, expected, artifacts)
+					if err != nil {
+						t.Fatal(err)
 					}
-				}
-				assertFactoryErrorCode(t, CompleteHostedDiskPublication(t.Context(), plan, expected, owner, nil), e.CodeImmutableViolation)
-			})
+					if out.Disk.EvidenceMode != sbom.DiskBuildProvenance || out.Disk.Encryption != encryption {
+						t.Fatal("release lost evidence scope")
+					}
+					held, err := delivery.OpenSingleDiskArtifact(t.Context(), artifacts["package/node-image"].Path, platform, 64<<30)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := held.Close(); err != nil {
+						t.Fatal(err)
+					}
+					for _, component := range expected.Components {
+						raw, err := os.ReadFile(filepath.Join(artifacts["sbom/node-image"].Path, component+".cdx.json"))
+						if err != nil {
+							t.Fatal(err)
+						}
+						if !strings.Contains(string(raw), "not-performed") || strings.Contains(string(raw), "disk-reconciled") {
+							t.Fatal("dishonest scope")
+						}
+					}
+					assertFactoryErrorCode(t, CompleteHostedDiskPublication(t.Context(), plan, expected, owner, nil), e.CodeImmutableViolation)
+				})
+			}
 		}
 	}
 }

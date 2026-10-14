@@ -2,7 +2,7 @@
 
 This is the Definition used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
-into one release with **35 named outputs**. This remains a candidate; completed pipeline delivery and
+into one release with **37 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
 
 ## Selected artifacts and their owners
@@ -12,7 +12,7 @@ full product acceptance are separate facts.
 | CLI | `../nvke-v1/catalog` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared independent CLI module pin |
 | Controller and charts | `../nvke-controller/catalog` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `catalog` | AMD64 Helm and kubectl executables, selected from the NVKE distribution lock |
-| Node images | `os-catalog`, `native-toolchains.yaml` | Separate native AMD64 and ARM64 non-FDE QCOW2s, with explicit material producers |
+| Node images | `os-catalog`, `native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers |
 | Deployment images | `image-catalog` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 
 The catalogs and their machine-managed locks own exact commits, versions, archive/member hashes and
@@ -35,7 +35,7 @@ at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived th
 proof; that acceptance is separately recorded. The hosted candidate publication result is recorded below;
 independent consumer acceptance remains unresolved.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
-`non-fde/apt-acquisitions.tar`, which the catalog declares through `packer.acquisitionArchive`.
+`non-fde/apt-acquisitions.tar` or `fde/apt-acquisitions.tar`, which each producer declares through `packer.acquisitionArchive`.
 The source's composition command receives the required explicit native `--architecture` argument.
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
 under `nke.dev/os-image-materials/v1`; every selected material and disk target retains its own architecture.
@@ -47,7 +47,7 @@ admits only `main`; the temporary PR #97 branch-test exception has been removed 
 cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
 capacity, not observed allocation. `native-toolchains.yaml` substitutes the exact published native
-Packer pin for the nine selected AMD64 producers only, retaining the separate BuildKit pin.
+Packer pin for the nine plain-image AMD64 producers plus the FDE root, retaining the separate BuildKit pin.
 The OS catalog directly retains its published ARM64 Docker Packer pin.
 The two inspector profiles use measured executable hashes and published native image manifests.
 Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
@@ -67,13 +67,14 @@ it declares no storage-driver field or ambient runtime-variable workaround. Stor
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
-The current candidate selects `diskEvidence: build-provenance-v1`, authenticating both held disks and their
-material producers without deep inspection. Profiles remain available for strict mode but are not pulled or
-executed in this mode; its signed evidence reports inspection as `not-performed`. Ilya Kislenko's October 7
-task-chat instruction preserves main/#106's producer-provenance M2 floor and full scan plus material
-reconciliation for M3 ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+The current candidate selects `diskEvidence: build-provenance-v1`, authenticating all four held disks and their
+material producers without deep inspection. Profiles remain available for plain-image strict mode but are not pulled or
+executed in this mode; its signed evidence reports inspection as `not-performed`. The approved October 12
+M3 MVP retains this producer-provenance floor. Full disk inspection and material reconciliation are deferred
+beyond that MVP ([ADR-13](../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)
+and [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052)).
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
-extension, and both disk outputs remain mandatory for completion of this Definition.
+extension, and all four disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
 M2 candidate requires publication, signatures and consumer verification for every selected output.
 The [failed delivery attempt](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md)
@@ -111,18 +112,31 @@ that run used a different exact branch exception and is not evidence for this PR
 
 Each disk selects its root and complete material closure: agent, Kubernetes distribution, Calico, OVN,
 SPIRE, installer ISO and aggregate inputs. The source composer receives an explicit native architecture.
-The direct-Packer contract opts into APT capture and declares `non-fde/apt-acquisitions.tar` under the
+The direct-Packer contract opts into APT capture and declares the matching plain or FDE acquisition archive under the
 source-owned material projection. Capture byte correspondence alone does not authenticate repository
 origin or establish a complete installed-software inventory.
 
 The Environment explicitly selects `diskEvidence: build-provenance-v1`. M2 authenticates the held disk
 and its live producer/material subjects and signs evidence describing the deferred inspection scope.
-Deep content inspection and reconciliation move to M3. The existing strict inspection profiles remain
-available, but this M2 mode neither prepares nor invokes the inspector. A successful M2 pipeline still
+Deep content inspection and reconciliation are deferred beyond the approved M3 MVP. The existing strict
+inspection profiles remain available for plain disks, but this mode neither prepares nor invokes the inspector.
+A successful M2 pipeline still
 requires every named output, exact-subject evidence, publication, signing and verification; deferral
 cannot substitute for those gates or establish qualified reproduction.
 
 ## Native execution and publication
+
+`nvke-node-fde-amd64` and `nvke-node-fde-arm64` select the pinned source's
+`nke-node-fde.qemu.nke-fde` target and `fde/nke-node.qcow2` output. They reuse each architecture's existing
+material producers and native toolchain. Each explicitly declares the public bootstrap `luks_passphrase: changeit`;
+no private passphrase or new secret channel is admitted. Build-provenance publication binds `luks2` through
+the wrapper and signed release metadata. Strict FDE inspection/publication and qualified reproduction remain
+unsupported. The [source audit](../nvke-fde/fde-audit.md) explains why these shared-key candidate images make
+no deployed confidentiality claim, even after TPM enrollment. `swtpm` is not required for the bake.
+
+The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
+completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64
+FDE bake, or this combined 37-output pipeline. Those operational acceptance checks remain outstanding.
 
 `environment-github.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
 `arc-amd64-kvm` and `arc-arm64-kvm`, with required native KVM. Each execution class requests 8 CPUs,
@@ -131,8 +145,8 @@ budgets, not observed allocation or general runner-capacity guarantees. Docker u
 and producer-declared build-network controls; no ambient storage-driver workaround is selected.
 
 `os-catalog` directly retains the historical published ARM64 Docker Packer candidate.
-`native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine selected
-source-map consumers, preserving OVN's separate BuildKit pin. These historical images do not establish
+`native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine M2
+source-map consumers and the FDE root, preserving OVN's separate BuildKit pin. These historical images do not establish
 reproduction of the current Dockerfile or bootstrap compiler. Internal Packer/inspector images were
 published under the user's scoped candidate exception. Their source locks retain unresolved general
 license/security approval gates; the exception does not mark those reviews complete. See
@@ -158,6 +172,18 @@ provider access restrictions remain operator obligations.
 
 ## Generate and check the maintained workflow
 
+The same Definition also supplies the committed feature-branch development workflow through
+`environment-github-dev.yaml`. It retains all 37 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
+Only execution/publication policy changes: separate development environments and credentials, the
+`nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
+`ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;
+`make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr` dispatches a clean pushed branch.
+See [pipeline development](../../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for operator
+setup, full-attempt retries and the default-branch cleanup owner. This lane does not establish production
+or qualified acceptance, and no hosted development execution is recorded yet.
+Development emits its Run record without a qualification handoff and does not generate the production
+qualifier/smoke-worker pair.
+
 Run from the repository root with the pinned Go toolchain and authorized access to the exact NVKE tree.
 Catalog loading re-derives source-owned pin sets and may need Git access even for generation.
 
@@ -165,11 +191,15 @@ Catalog loading re-derives source-owned pin sets and may need Git access even fo
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
   --definition definitions/nvke-m2/definition.yaml \
   --environment definitions/nvke-m2/environment-github.yaml \
+  --qualification-policy definitions/nvke-m2/qualification.yaml \
   --engine github --root .
 make workflows-check
 ```
 
-These commands regenerate the workflow, Plan and manifest; they do not execute the pipeline.
+These commands regenerate the producer workflow, Plan and manifest plus the separately owned qualifier
+and smoke worker. The worker is the generated reusable GitHub Actions workflow `nvkr-smoke.yml`, invoked
+by `nvkr-qualify.yml` at the same commit; it is not a separately authored pipeline. The qualification manifest
+records both workflow files. Generation and drift checks do not execute any producer or qualification job.
 The generator rejects a workflow above 500,000 bytes before writing. YAML compaction preserves the
 expanded job graph and credential boundaries. Changes to authored inputs must regenerate these files;
 never edit the bundle by hand.
@@ -179,6 +209,41 @@ and `catalog pin-artifacts`. Do not copy historical preparation commands that wo
 temporary SPIRE selection. The opt-in full graph integration runs with
 `NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1` and authorized pinned-source access; ordinary tests receive no
 private-source credentials. Pinning and graph tests establish their own contracts, not production launch.
+
+## Qualification readiness
+
+The simplified [artifact check](../../docs/lifecycle.md#authenticate-an-m3-candidate) takes a Run URL and a
+reusable policy. Upstream embedded-component manifests are not a qualification prerequisite. The maintained
+catalogs omit the optional declarations, so their metadata checks are `not-applicable`. Any declaration added
+later must strictly match its referenced map at the pinned source revision, including exact membership,
+versions and known source pins. That comparison reads raw upstream metadata; it cannot establish effective
+composition after patches, configuration or material substitutions, or verify installed contents.
+
+Source, patch, configuration and selected material identities remain bound to production evidence. Exact
+producer Run/attempt, output membership, signatures, provenance and applicable delivered-tool smoke remain
+required. No source or artifact pin changes are needed merely to satisfy the optional metadata check.
+
+The [candidate policy](qualification.yaml) records concrete cosign version/executable hashes, native
+smoke-image manifest digests, three tool profiles and 25 exact deployment-image scope decisions. These
+independently authored trust selections are reviewed with the generated workflow pair; they are not inherited
+from the producing Run. The [hosted setup guide](../../docs/lifecycle.md#publish-qualification-evidence)
+explains the policy and generated worker. Concrete pins and repository validation do not establish
+organizational approval or hosted acceptance.
+
+The verifier is [cosign v3.1.3](https://github.com/sigstore/cosign/releases/tag/v3.1.3); both Linux
+executables were downloaded and their hashes matched the release asset metadata and checksum file. Smoke
+uses Docker Official Debian `trixie-20261005-slim`, pinned to the native
+[AMD64 manifest](https://github.com/debuerreotype/docker-debian-artifacts/blob/a3751996111ce2c1c904050c84440184535e23b1/trixie/slim/oci/index.json)
+and [ARM64 manifest](https://github.com/debuerreotype/docker-debian-artifacts/blob/cf1f4a45447842b45e9952e0f018ae734a7341c7/trixie/slim/oci/index.json).
+Both passed the required utility, environment and container-isolation probes. Catalog-pinned Helm and
+kubectl bytes passed their fixed version commands. ARM64 utility execution was native; AMD64 probes used
+local emulation. No fresh nvkectl artifact or hosted qualification was exercised by these checks.
+
+The reviewed implementation, policy and generated workflows may merge before the real acceptance runs.
+After merge, run a fresh complete producer attempt with its original handoff, followed by native delivered-tool
+checks, hosted positive/negative qualification and independent complete-set consumer verification. Those
+results remain unproved and required before production-readiness or operational-acceptance claims. Earlier
+successful builds and local contract tests do not replace them. Runtime authority checks remain unchanged.
 
 ## Recorded delivery and remaining acceptance
 
@@ -193,7 +258,8 @@ mentions CAPNICo, while the catalog's provisioned-provider build is a different 
 content-image selection supplies no portable tag/digest. Neither should be guessed into required membership
 or silently treated as deferred. Embedded SPIRE and chart-side SPIRE containers are distinct artifacts;
 one cannot satisfy the other's evidence row. These unresolved ownership/payload questions remain product
-acceptance gaps, alongside full M3 disk evidence and organizational toolchain reviews.
+acceptance gaps, alongside M3 build/evidence qualification, delivered-tool smoke and organizational toolchain
+reviews. Full disk inspection is a separate deferred capability, not an M3 MVP prerequisite.
 
 [Reconciliation](../../docs/adr/reconciliation.md) owns current implementation/evidence status;
 [the epic specification](../../docs/epics-v1-spec.md) owns product acceptance. This README owns the

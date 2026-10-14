@@ -663,7 +663,10 @@ func DetectAndUnpackChartRoot(ctx context.Context, archive, root string) (string
 
 // Unpack extracts an untrusted carrier into a private staging directory,
 // accepts only the producer's declared paths, and publishes them only after the full
-// archive has been validated. Traversal, hard links, devices, duplicate entries,
+// archive has been validated. The exact stream extracted is hashed, including
+// trailing carrier bytes, and matched against a stable rehash of the held source
+// before publication; extraction never needs a second full archive on disk.
+// Traversal, hard links, devices, duplicate entries,
 // escaping symlinks, missing roots, and destination overwrite all fail closed.
 // The carrier must be plain tar; a gzip-compressed carrier fails closed here
 // (see DetectAndUnpackChartRoot for the one caller that needs compression).
@@ -721,12 +724,15 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	if err := os.Chmod(stage, 0o700); err != nil {
 		return e.Wrap(e.CodeInternal, err, "securing transport staging directory")
 	}
-	snapshotDigest, file, err := snapshotTransport(ctx, archiveFile, archiveInfo,
-		filepath.Join(stage, "carrier.tar"))
-	if err != nil {
-		return err
+	if _, err := archiveFile.Seek(0, io.SeekStart); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "rewinding held transport archive")
 	}
-	defer file.Close()
+	// Hash the exact raw bytes consumed by extraction. The bound is the size
+	// admitted above, not a fresh stat or a tar member's declared size, so a
+	// growing source cannot expand the extraction budget.
+	rawSource := &io.LimitedReader{R: archiveFile, N: archiveInfo.Size()}
+	extractedHash := sha256.New()
+	file := io.TeeReader(transportContextReader{ctx: ctx, reader: rawSource}, extractedHash)
 
 	// Bind extraction writes to the held staging directory, including resolution
 	// through symlinks. Lexical validation alone is not a filesystem boundary.
@@ -737,7 +743,7 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	defer func() { _ = stageRoot.Close() }()
 	tarSource, closeTarSource, err := openTransportTarSource(file, allowCompressed)
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening held transport archive")
+		return transportError(ctx, e.CodeVerifyFailed, err, "opening held transport archive")
 	}
 	defer closeTarSource()
 	tr := tar.NewReader(tarSource)
@@ -754,7 +760,7 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 			break
 		}
 		if err != nil {
-			return e.Wrap(e.CodeVerifyFailed, err, "reading transport archive")
+			return transportError(ctx, e.CodeVerifyFailed, err, "reading transport archive")
 		}
 		entries++
 		if entries > maxTransportEntries {
@@ -844,6 +850,16 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 			return e.New(e.CodeVerifyFailed, "transport path %s has forbidden tar type %d", name, header.Typeflag)
 		}
 	}
+	// tar.Reader stops at its end marker and may leave padding or other trailing
+	// carrier bytes unread. Drain the bounded decoding stream to authenticate all
+	// raw bytes and, for Helm, validate the gzip checksum and decompressed bound.
+	if _, err := copyTransport(ctx, io.Discard, tarSource); err != nil {
+		return transportError(ctx, e.CodeVerifyFailed, err, "finishing transport archive")
+	}
+	if rawSource.N != 0 {
+		return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
+	}
+	extractedDigest := "sha256:" + hex.EncodeToString(extractedHash.Sum(nil))
 	modeNames := make([]string, 0, len(directoryModes))
 	for name := range directoryModes {
 		modeNames = append(modeNames, name)
@@ -876,7 +892,7 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	if err != nil {
 		return transportError(ctx, e.CodeVerifyFailed, err, "rechecking transport archive")
 	}
-	if !os.SameFile(archiveInfo, currentInfo) || currentDigest != snapshotDigest {
+	if !os.SameFile(archiveInfo, currentInfo) || currentDigest != extractedDigest {
 		return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
 	}
 	return publishTransportRoots(ctx, stage, rootAbs, cleanAllowed, publishTransportNoReplace)
@@ -1000,49 +1016,6 @@ func publishTransportRoots(ctx context.Context, stage, root string, paths []stri
 		}
 	}
 	return nil
-}
-
-func snapshotTransport(ctx context.Context, source *os.File, expected fs.FileInfo,
-	destination string,
-) (string, *os.File, error) {
-	if source == nil || expected == nil {
-		return "", nil, e.New(e.CodeInternal, "transport snapshot has no held source")
-	}
-	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return "", nil, e.Wrap(e.CodeVerifyFailed, err, "rewinding held transport archive")
-	}
-	opened, err := source.Stat()
-	if err != nil || !securepath.SameMetadata(expected, opened) {
-		return "", nil, e.New(e.CodeVerifyFailed, "transport archive changed before snapshot")
-	}
-	out, err := os.OpenFile(destination, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o400)
-	if err != nil {
-		return "", nil, e.Wrap(e.CodeInternal, err, "creating private transport snapshot")
-	}
-	fail := func(err error) (string, *os.File, error) {
-		_ = out.Close()
-		_ = os.Remove(destination)
-		return "", nil, err
-	}
-	if err := os.Remove(destination); err != nil {
-		return fail(e.Wrap(e.CodeInternal, err, "unlinking private transport snapshot"))
-	}
-	hash := sha256.New()
-	written, copyErr := copyTransportExact(ctx, io.MultiWriter(out, hash), source, expected.Size())
-	after, statErr := source.Stat()
-	if copyErr != nil {
-		return fail(transportError(ctx, e.CodeVerifyFailed, copyErr, "snapshotting transport archive"))
-	}
-	if statErr != nil {
-		return fail(transportError(ctx, e.CodeVerifyFailed, statErr, "restating transport archive"))
-	}
-	if written != expected.Size() || !securepath.SameMetadata(expected, after) {
-		return fail(e.New(e.CodeVerifyFailed, "transport archive changed while snapshotting"))
-	}
-	if _, err := out.Seek(0, io.SeekStart); err != nil {
-		return fail(e.Wrap(e.CodeInternal, err, "rewinding private transport snapshot"))
-	}
-	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), out, nil
 }
 
 func stableTransportDigest(ctx context.Context, file *os.File, expected fs.FileInfo) (string, fs.FileInfo, error) {

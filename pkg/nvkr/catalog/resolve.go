@@ -23,6 +23,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 	}
 	c := Component{
 		Debian:          CloneDebianSpec(raw.Debian),
+		Embeds:          CloneEmbeddedComponents(raw.Embeds),
 		Helm:            raw.Helm,
 		Platforms:       append([]string(nil), raw.Platforms...),
 		FromSource:      raw.FromSource,

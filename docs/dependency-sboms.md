@@ -80,7 +80,8 @@ See [the registry graph](publication-architecture.md) for every remaining manife
 Current contract coverage and hosted publication evidence are recorded in
 [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md). Signed producer evidence in the M2 disk mode explicitly records
 deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
-The strict disk inventory/reconciliation contract is separate and remains an M3 requirement.
+The M3 MVP preserves producer-only disk evidence. Strict disk inventory/reconciliation is separate deferred
+hardening; qualification of source metadata does not prove installed disk contents.
 
 ## Verification on real outputs
 

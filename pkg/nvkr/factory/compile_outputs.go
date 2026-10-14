@@ -8,6 +8,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -39,6 +40,19 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 		}
 	}
 	if publication := environment.Publication; publication != nil {
+		if environment.GitHubDevelopment {
+			namespace, err := development.ParseNamespace(publication.RepositoryPrefix)
+			if err != nil {
+				return err
+			}
+			for _, output := range definition.Outputs {
+				for _, leaf := range []string{output.Name, "releases-" + output.Name} {
+					if err := namespace.ValidateLeaf(leaf); err != nil {
+						return err
+					}
+				}
+			}
+		}
 		for _, name := range sortedKeys(publication.ImageTags) {
 			matches := 0
 			for _, output := range definition.Outputs {

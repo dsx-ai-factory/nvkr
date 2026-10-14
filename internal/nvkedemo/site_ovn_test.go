@@ -87,10 +87,10 @@ func TestSiteOVNChartAdmissionReadsBoundAcceptedBytesWithoutOutputs(t *testing.T
 			if err != nil {
 				t.Fatal(err)
 			}
-			files := map[string][]byte{"ovn-kubernetes/Chart.yaml": []byte("apiVersion: v2\nname: ovn-kubernetes\nversion: 1.5.18\n"), "ovn-kubernetes/values.yaml": values}
+			files := map[string][]byte{"ovn-kubernetes/Chart.yaml": []byte("apiVersion: v2\nname: ovn-kubernetes\nversion: " + siteOVNVersion + "\n"), "ovn-kubernetes/values.yaml": values}
 			switch scenario {
 			case "identity":
-				files["foreign/Chart.yaml"] = []byte("apiVersion: v2\nname: foreign\nversion: 1.5.18\n")
+				files["foreign/Chart.yaml"] = []byte("apiVersion: v2\nname: foreign\nversion: " + siteOVNVersion + "\n")
 				files["foreign/values.yaml"] = values
 				delete(files, "ovn-kubernetes/Chart.yaml")
 				delete(files, "ovn-kubernetes/values.yaml")
@@ -228,7 +228,7 @@ func TestUpstreamOVNRequiresDistinctCompletedOutputSlots(t *testing.T) {
 			if network == "upstream-ovn" && (version != "1.4.0" || imageName != "upstream-ovn-image-arm64" || chartName != "upstream-ovn-chart-arm64" || disk != "nvke-node-image-upstream-ovn-arm64") {
 				t.Fatal("upstream selection reused baseline outputs")
 			}
-			if network == "ovn" && (version != "1.5.18" || imageName != "ovn-image-arm64" || chartName != "ovn-chart-arm64" || disk != DiskOutputName) {
+			if network == "ovn" && (version != siteOVNVersion || imageName != "ovn-image-arm64" || chartName != "ovn-chart-arm64" || disk != DiskOutputName) {
 				t.Fatal("maintained output selection changed")
 			}
 			foreign := "ovn"
@@ -391,7 +391,7 @@ func TestSiteOVNValuesPreserveEveryBoundImageAndDisableForeignComponents(t *test
 				}
 			}
 			global := values["global"].(map[string]any)
-			if global["useImageDigest"] != true || global["enableNgnExtension"] != false || global["imagePullSecretName"] != "" || values["podNetwork"] != managementPodCIDR+"/26" || values["serviceNetwork"] != managementServiceCIDR {
+			if global["useImageDigest"] != true || global["imagePullSecretName"] != "" || values["podNetwork"] != managementPodCIDR+"/26" || values["serviceNetwork"] != managementServiceCIDR {
 				t.Fatal("OVN values differ from admitted local topology")
 			}
 		})

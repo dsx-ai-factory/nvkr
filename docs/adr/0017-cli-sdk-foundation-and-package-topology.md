@@ -52,10 +52,15 @@ can inspect that Plan. The ordinary local scheduler rejects disk publication wit
 runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
 ADR-18 separately admits generated native ARC jobs for unencrypted direct-Packer outputs. The recorded
 M2 candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
-deferring inspection, under a validation-branch exception. General hosted VM adapters, FDE and qualified
-execution remain capability-gated. The strict live full-disk evidence/publication path has guarded APIs
+deferring inspection, under a validation-branch exception. A separate native ARC build-only route omits
+publication and signing, retains exact raw QCOW2 bytes and producer records, and finalizes a static-unqualified
+Run. It admits ADR-10's explicitly public-bootstrap FDE producer as well as plain disks. Native ARC also admits
+public-bootstrap FDE publication with explicit `build-provenance-v1` evidence and exact encryption metadata
+binding. General hosted VM adapters, secret-valued FDE, encrypted inspection, strict FDE publication and
+qualified execution remain capability-gated.
+The strict live full-disk evidence/publication path has guarded APIs
 without a successful real NVKE join; main-only execution, independent full-payload disk consumption,
-M3 inventory/qualification and organizational acceptance remain separate gaps in
+strict inventory hardening, M3 qualification acceptance and organizational acceptance remain separate gaps in
 [reconciliation](reconciliation.md).
 
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
@@ -119,6 +124,51 @@ canonical, trust, evidence, status and release invariants. `client/v1` is a cont
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
 
+For M3-A, `run check-artifacts --run <exact-attempt-URL> --policy <path>` delegates to
+`lifecycle.CheckQualificationRun`; the only optional command input is the private workspace. Lifecycle owns
+strict policy loading and the full handoff orchestration. `qualificationorigin` discovers the commit from
+the exact successful GitHub attempt, applies the independent repository/workflow/default-branch policy and
+issues a closeable source receipt. It downloads only that attempt's bounded, provider-digest-bound archive,
+whose sole member is the generated `handoff.json`. An artifact name or decoded description grants no authority.
+
+Factory captures the complete compiler-read authored closure and replays it from memory through the existing
+compiler. Original logical paths, base and output catalog overrides, overlays, registries, locks, patches and
+directory facts are preserved. Capture uses no-follow source reads; each file is bounded to 4 MiB, the
+aggregate to 32 MiB and file/directory/listing facts to 1,024 entries, with the catalog traversal-depth limit.
+Replay cannot fall back to a checkout. Catalog retains its bounded pinned-upstream Git authentication and embedded
+declaration checks, so replay is not offline. Lifecycle compares the recompiled Plan with the saved original.
+The generated signed `per-output-v1` producer exports original predicates only after successful finalization.
+Unsigned/dry-run and legacy aggregate producers cannot emit a qualification handoff; aggregate publication
+remains available without M3 qualification. Consumer policy and verifier pins remain separately selected.
+
+`lifecycle.Consumer.CheckQualification` joins the authenticated source to the verified publication, exact
+Definition/Environment/Plan, every named output and authenticated build evidence. Factory owns
+production-predicate semantics; signing owns cryptographic verification. The immutable artifact-check receipt
+retains the verified publication and frozen Plan. Its idempotent closure is shared by shallow copies: it
+revokes admission, cancels and joins registered operations, then releases held payloads. The receipt grants
+no smoke-execution or signing authority. The direct consumer and `CheckQualificationHandoff` operations borrow
+the caller's source receipt; source closure also revokes the check receipt. The Run adapter and retained
+`CheckQualificationFiles` diagnostic adapter transfer their source owner to the returned receipt. All
+qualification adapters share independent canonical registry-host admission for explicit pull credentials;
+the candidate cannot select the credential destination. Anonymous and host-scoped keychain reads remain
+available. Defensive
+diagnostics cannot restore authority after closure. The independent `qualification` publisher contract
+consumes authenticated check and smoke receipts; its public descriptions are not receipt constructors.
+`run qualify --policy <path>` delegates to `qualification.PublishTriggeredRun`, which derives its source
+from the authenticated hosted event. The generated hidden native worker command also takes only that
+policy; it is not an independently authored lifecycle input. Pipeline owns isolated held-byte execution,
+lifecycle owns fixed version evaluation and authenticated complete worker aggregation, and qualification
+owns worker report signing and final subject-bound publication. Native and aggregate receipts borrow A and
+the qualifier invocation, preserve shared revocation, and expose only defensive descriptions. The old
+file-based publishing adapter is capability-gated before I/O; A's file diagnostics remain supported.
+`run generate --qualification-policy <path>` composes the producer generator with the qualification-owned
+workflow pair and manifest. `lifecycle.ValidateQualificationSmokePlan` owns the pure policy/Plan scope
+join shared by generation and runtime; adapters cannot choose a different applicability rule. Generation
+selects exactly the executable native platforms, retaining the final AMD64 signer requirement. The CLI
+only selects the use case and presents its result.
+ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
+acceptance boundaries.
+
 `status.AcceptDiagnosticCheckpoint` owns protected minimum reads, exact document authentication, checkpoint
 verification and receipt-derived byte-CAS persistence before interpreting withdrawal. Its caller-supplied epoch
 and returned decision remain diagnostic; this operation adds no trusted-time or release authority.
@@ -133,9 +183,51 @@ these maintenance descriptions cannot grant execution or release authority.
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
 separating per-output Build Digest changes from execution and transport changes. It issues no authority.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse|export`, with
-`--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
-available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
+`progress` owns bounded descriptive snapshots of admitted operations and named
+outputs, supplied by factory scheduling and lifecycle output-observation boundaries.
+It also carries detached public command-result descriptions (titles, fields, items
+and navigation links). These values are presentation contracts, not additional
+Run membership or SDK inspection methods; CLI adapters project recorded metadata.
+It calls no renderer or caller-controlled writer from producer updates. Lossy
+wakeups and bounded public activity cannot change frozen membership or finalization.
+`internal/runpresenter` owns terminal admission, rendering, cancellation requests and
+joined screen/event/worker lifetimes. It has no receipt or deployment ownership.
+Live CLI result/error pairs independently select final reporting and exit status;
+complete retained output plus cleanup failure remains a complete Run and a failed
+command. These transient descriptions add no field to signed/canonical identities.
+The CLI captures a bounded tail of interactive producer stdout/stderr in memory,
+without producer-side filesystem or renderer callbacks. A failed command replays
+that tail to ordinary stderr after terminal restoration and owner joining, with
+truncation marked. Raw diagnostics never enter safe snapshots or panes. This
+does not create durable general-purpose logs or replay successful console output;
+existing Packer diagnostic retention remains separately owned.
+
+Lifecycle's `InspectRun` owns bounded, no-follow canonical record inspection and
+projects safe file-recorded metadata and attempt-marker descriptions through the
+SDK. A record must exist and name its containing attempt directory; absence
+fails with a coded verification error and never establishes interruption or
+excludes a live owner. Inspection admits only currently producible lanes, not
+qualified lifecycle records. It validates the existing output slot bindings, without opening payload
+locators, restoring execution authority or inferring current availability/health.
+The CLI may show these views as plain/JSON or an explicitly selected read-only
+terminal explorer. Of the 24 public command leaves, 22 admit an explicitly selected result browser;
+`run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics. The hidden native
+worker is not a public command.
+Owning operations, including maintenance transactions
+and verification, finish and release receipts before this read-only view opens.
+Typed names, identity fields, counts and navigation links are descriptions; they
+exclude transport locations, private paths and raw error/value text. Closing a
+result view neither repeats nor reverses the operation, and owning status codes
+remain authoritative; Ctrl+C closes a read-only viewer and cancels only live work.
+Existing non-interactive and explicitly plain output bytes, including exact Plan
+JSON, are preserved. Interactive `run local` defaults to the dashboard and does
+not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
+terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
+
+Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify`,
+and `release verify|inspect|browse|export`. Producer operations select authored inputs with `--definition` and
+`--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
+and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
 current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
@@ -228,7 +320,8 @@ future qualified publication needs an authenticated commit protocol before expos
 ### 4. Package topology and single-owner rule
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
-  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, and `trust`.
+  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
+  `qualificationorigin`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not

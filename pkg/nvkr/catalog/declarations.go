@@ -52,28 +52,29 @@ type registryDoc struct {
 // rawComponent is a component as authored: it references a source by name and
 // carries version-stamp templates, not resolved pins.
 type rawComponent struct {
-	Debian          *DebianSpec        `json:"debian,omitempty"`
-	Helm            *HelmPackaging     `json:"helm,omitempty"`
-	PinnedBy        string             `json:"pinnedBy,omitempty"`
-	Platforms       []string           `json:"platforms"`
-	FromSource      bool               `json:"fromSource"`
-	Source          string             `json:"source,omitempty"`
-	BuilderType     string             `json:"builderType,omitempty"`    // oci-hermetic (default) | nix | buildkit-rootless | vm-image (ADR-10)
-	BuildNetwork    string             `json:"buildNetwork,omitempty"`   // none (default) | default; default is admitted separately by Environment
-	ToolchainImage  string             `json:"toolchainImage,omitempty"` // component-specific exact builder image
-	Flake           *FlakePin          `json:"flake,omitempty"`          // required iff builderType==nix
-	CGO             bool               `json:"cgo,omitempty"`
-	OutputType      string             `json:"outputType,omitempty"`
-	Disk            *DiskSpec          `json:"disk,omitempty"`
-	Packer          *PackerConfig      `json:"packer,omitempty"`
-	BuildCommand    []string           `json:"buildCommand,omitempty"`
-	Materials       map[string]string  `json:"materials,omitempty"`
-	ArtifactPath    string             `json:"artifactPath,omitempty"`
-	WriteDir        string             `json:"writeDir,omitempty"`
-	VersionStamp    map[string]string  `json:"versionStamp,omitempty"` // Go text/template values
-	Patches         []patchDeclaration `json:"patches,omitempty"`
-	Prebuilt        *Prebuilt          `json:"prebuilt,omitempty"` // the no-compile lane
-	ExclusionReason string             `json:"exclusionReason,omitempty"`
+	Debian          *DebianSpec         `json:"debian,omitempty"`
+	Embeds          *EmbeddedComponents `json:"embeds,omitempty"`
+	Helm            *HelmPackaging      `json:"helm,omitempty"`
+	PinnedBy        string              `json:"pinnedBy,omitempty"`
+	Platforms       []string            `json:"platforms"`
+	FromSource      bool                `json:"fromSource"`
+	Source          string              `json:"source,omitempty"`
+	BuilderType     string              `json:"builderType,omitempty"`    // oci-hermetic (default) | nix | buildkit-rootless | vm-image (ADR-10)
+	BuildNetwork    string              `json:"buildNetwork,omitempty"`   // none (default) | default; default is admitted separately by Environment
+	ToolchainImage  string              `json:"toolchainImage,omitempty"` // component-specific exact builder image
+	Flake           *FlakePin           `json:"flake,omitempty"`          // required iff builderType==nix
+	CGO             bool                `json:"cgo,omitempty"`
+	OutputType      string              `json:"outputType,omitempty"`
+	Disk            *DiskSpec           `json:"disk,omitempty"`
+	Packer          *PackerConfig       `json:"packer,omitempty"`
+	BuildCommand    []string            `json:"buildCommand,omitempty"`
+	Materials       map[string]string   `json:"materials,omitempty"`
+	ArtifactPath    string              `json:"artifactPath,omitempty"`
+	WriteDir        string              `json:"writeDir,omitempty"`
+	VersionStamp    map[string]string   `json:"versionStamp,omitempty"` // Go text/template values
+	Patches         []patchDeclaration  `json:"patches,omitempty"`
+	Prebuilt        *Prebuilt           `json:"prebuilt,omitempty"` // the no-compile lane
+	ExclusionReason string              `json:"exclusionReason,omitempty"`
 
 	BuildRequirements *execution.Requirements `json:"buildRequirements,omitempty"` // generic build-step runner request
 }

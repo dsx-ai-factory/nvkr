@@ -34,7 +34,7 @@ func fixtureSBOMAttestation(t *testing.T) func(context.Context, string, []byte) 
 func attestFixtureLayout(t *testing.T, source string) (string, delivery.Result) {
 	t.Helper()
 	out := filepath.Join(t.TempDir(), "attested")
-	result, err := delivery.AttestEvidence(t.Context(), source, out, fixtureSBOMAttestation(t))
+	result, err := delivery.AttestPreparedEvidence(t.Context(), source, out, fixtureSBOMAttestation(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestAttestationConversionRejectsWrongSubjectOrDocument(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out := filepath.Join(t.TempDir(), "rejected")
-			_, err := delivery.AttestEvidence(t.Context(), source, out, func(ctx context.Context, digest string, document []byte) ([]byte, error) {
+			_, err := delivery.AttestPreparedEvidence(t.Context(), source, out, func(ctx context.Context, digest string, document []byte) ([]byte, error) {
 				if tc.fail {
 					return nil, e.New(e.CodeSignatureInvalid, "fixture refusal")
 				}

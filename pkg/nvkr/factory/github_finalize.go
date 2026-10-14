@@ -8,7 +8,41 @@ import (
 	"fmt"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
+
+const githubDiskBuildFinalizerTimeoutMinutes = 120
+
+// Build-only finalization restores the complete raw disk/material/source closure.
+// Keep its storage on the one disk output's explicitly selected ARC pool. A
+// mixed-output closure has no admitted aggregate scratch-capacity contract.
+func githubDiskBuildFinalizerRunner(plan *Plan) (string, error) {
+	if !GitHubDiskBuildOnly(plan) || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Kind != PackageDiskImage || len(plan.Builds) != 1 {
+		return "", e.New(e.CodeEngineCapability, "GitHub build-only disk finalization requires exactly one disk output")
+	}
+	var runner string
+	for _, node := range plan.Builds[0].Graph.Nodes {
+		if node.BuilderType != ir.BuilderVMImage || node.ExecutionBinding == nil {
+			continue
+		}
+		binding := node.ExecutionBinding
+		if runner != "" || binding.Class.RunsOn == "" || binding.Class.RunsOn != githubARCRunner(string(binding.Class.HostPlatform)) {
+			return "", e.New(e.CodeEngineCapability, "GitHub build-only disk finalization requires one admitted native ARC root")
+		}
+		runner = binding.Class.RunsOn
+	}
+	if runner == "" {
+		return "", e.New(e.CodeEngineCapability, "GitHub build-only disk finalization has no admitted native ARC root")
+	}
+	return runner, nil
+}
+
+func githubFinalizerTimeoutMinutes(plan *Plan) int {
+	if GitHubDiskBuildOnly(plan) {
+		return githubDiskBuildFinalizerTimeoutMinutes
+	}
+	return githubSupportJobTimeoutMinutes
+}
 
 // writeGitHubFinalizerRestoreSteps emits the complete carrier download and restore
 // sequence for the lifecycle finalizer. actions/download-artifact v8.0.1 expands
@@ -44,6 +78,6 @@ func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs ma
 		return err
 	}
 	fmt.Fprintf(out, "      - name: Download artifacts and evidence\n        uses: %s\n        continue-on-error: true\n        with:\n          pattern: %s\n          path: .nvkr/carriers\n          merge-multiple: 'true'\n", actions.Download, yamlSingle(pattern))
-	fmt.Fprintf(out, "      - name: Recover planned carriers\n        id: recover-artifacts\n        env:\n          NVKR_JOB_RESULTS: ${{ toJSON(needs) }}\n        run: %s\n", githubRunnerCommand("recover", "", ""))
+	fmt.Fprintf(out, "      - name: Recover planned carriers\n        id: recover-artifacts\n        env:\n          NVKR_JOB_RESULTS: ${{ toJSON(needs) }}\n        run: %s\n", githubRunnerCommand(plan, "recover", "", ""))
 	return nil
 }

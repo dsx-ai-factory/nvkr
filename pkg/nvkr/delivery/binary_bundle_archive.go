@@ -100,16 +100,56 @@ func (writer layoutWriter) addBundleLayer(ctx context.Context, captures []captur
 }
 
 func extractBundleLayer(ctx context.Context, held *heldfile.File, out string, bundle BinaryBundle) error {
-	gzipReader, err := gzip.NewReader(io.NewSectionReader(held, 0, held.Size()))
-	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening binary-bundle gzip layer")
+	return walkBundleLayer(ctx, held, bundle, func(entry BinaryEntry, payload io.Reader) error {
+		file, err := os.OpenFile(filepath.Join(out, entry.Name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, fs.FileMode(entry.Mode))
+		if err != nil {
+			return e.Wrap(e.CodeInternal, err, "creating extracted binary %q", entry.Name)
+		}
+		_, copyErr := io.Copy(file, payload)
+		if copyErr == nil {
+			copyErr = file.Sync()
+		}
+		if err := errors.Join(copyErr, file.Close()); err != nil {
+			return e.Wrap(e.CodeVerifyFailed, err, "extracting binary %q", entry.Name)
+		}
+		return nil
+	})
+}
+
+// walkBundleLayer owns the complete archive grammar for extraction and held
+// member streaming. A visitor must consume its bounded member synchronously;
+// neither the reader nor a partial write establishes a successful check.
+func walkBundleLayer(ctx context.Context, held *heldfile.File, bundle BinaryBundle, visit func(BinaryEntry, io.Reader) error) error {
+	if err := deliveryContext(ctx); err != nil {
+		return err
 	}
-	defer func() { _ = gzipReader.Close() }()
-	tarReader := tar.NewReader(gzipReader)
+	if held == nil || visit == nil {
+		return e.New(e.CodeGateUnmet, "binary-bundle traversal requires held bytes and a visitor")
+	}
+	if len(bundle.Entries) > maxDeliveryObjects {
+		return e.New(e.CodeEngineCapability, "binary-bundle entry count exceeds its bound")
+	}
 	want := make(map[string]BinaryEntry, len(bundle.Entries))
 	for _, entry := range bundle.Entries {
-		want["files/"+entry.Name] = entry
+		if !canonicalToken(entry.Name) || strings.ContainsAny(entry.Name, "/\\") || entry.Name == "." || entry.Name == ".." ||
+			entry.Size < 0 || entry.Mode == 0 || entry.Mode > 0o777 || !isDigest(entry.SHA256) {
+			return e.New(e.CodeVerifyFailed, "binary-bundle entry is not an exact regular-file binding")
+		}
+		if entry.Size > maxDeliveryFileBytes {
+			return e.New(e.CodeEngineCapability, "binary-bundle member %q exceeds its byte bound", entry.Name)
+		}
+		name := "files/" + entry.Name
+		if _, exists := want[name]; exists {
+			return e.New(e.CodeVerifyFailed, "binary-bundle config repeats member %q", entry.Name)
+		}
+		want[name] = entry
 	}
+	gzipReader, err := gzip.NewReader(contextReader{ctx: ctx, reader: io.NewSectionReader(held, 0, held.Size())})
+	if err != nil {
+		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "opening binary-bundle gzip layer"))
+	}
+	defer func() { _ = gzipReader.Close() }()
+	tarReader := tar.NewReader(contextReader{ctx: ctx, reader: gzipReader})
 	seen := map[string]bool{}
 	for {
 		if err := deliveryContext(ctx); err != nil {
@@ -120,27 +160,21 @@ func extractBundleLayer(ctx context.Context, held *heldfile.File, out string, bu
 			break
 		}
 		if err != nil {
-			return e.Wrap(e.CodeVerifyFailed, err, "reading binary-bundle tar layer")
+			return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "reading binary-bundle tar layer"))
 		}
 		entry, ok := want[header.Name]
-		if !ok || seen[header.Name] || header.Typeflag != tar.TypeReg || header.Size != entry.Size || uint32(header.Mode) != entry.Mode {
+		if !ok || seen[header.Name] || header.Typeflag != tar.TypeReg || header.Size != entry.Size || header.Mode != int64(entry.Mode) {
 			return e.New(e.CodeVerifyFailed, "binary-bundle tar contains an undeclared or mismatched entry %q", header.Name)
 		}
 		seen[header.Name] = true
-		destination := filepath.Join(out, entry.Name)
-		file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, fs.FileMode(entry.Mode))
-		if err != nil {
-			return e.Wrap(e.CodeInternal, err, "creating extracted binary %q", entry.Name)
-		}
 		hash := sha256.New()
-		written, copyErr := io.CopyN(io.MultiWriter(file, hash), contextReader{ctx: ctx, reader: tarReader}, entry.Size)
-		if copyErr == nil {
-			copyErr = file.Sync()
+		member := &io.LimitedReader{R: tarReader, N: entry.Size}
+		if err := visit(entry, io.TeeReader(member, hash)); err != nil {
+			return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "reading binary-bundle member %q", entry.Name))
 		}
-		closeErr := file.Close()
 		got := "sha256:" + hex.EncodeToString(hash.Sum(nil))
-		if copyErr != nil || closeErr != nil || written != entry.Size || got != entry.SHA256 {
-			return e.New(e.CodeVerifyFailed, "extracted binary %q does not match its config", entry.Name)
+		if member.N != 0 || got != entry.SHA256 {
+			return e.New(e.CodeVerifyFailed, "binary-bundle member %q does not match its config", entry.Name)
 		}
 	}
 	if len(seen) != len(want) {
@@ -153,5 +187,5 @@ func extractBundleLayer(ctx context.Context, held *heldfile.File, out string, bu
 		sort.Strings(missing)
 		return e.New(e.CodeReleaseIncomplete, "binary-bundle layer omits entries: %s", strings.Join(missing, ", "))
 	}
-	return nil
+	return deliveryContext(ctx)
 }

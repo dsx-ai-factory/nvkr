@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: nvke-fde-github
+  description: Native build-only FDE iteration; raw QCOW2 and static-unqualified Run, without registry publication, signing or disk inspection.
+githubARC: native-kvm-v1
+githubDispatchBranches:
+  - codex/fde-image-pipeline
+githubRunners:
+  linux/amd64: ubuntu-24.04
+executionClasses:
+  - name: arc-amd64-kvm
+    runsOn: arc-amd64-kvm
+    hostPlatform: linux/amd64
+    resources:
+      cpuMillis: 8000
+      memoryMiB: 10240
+      ephemeralStorageMiB: 65536
+    maxTimeoutSeconds: 21600
+    capabilities: [kvm]
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared
+sourceAccess:
+  https://github.com/dsx-ai-factory/nvke.git:
+    credentialRef: github:NKE_SOURCE_TOKEN
+    mirror: https://github.com/dsx-ai-factory/nvke
+utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
+utilityPlatform: linux/amd64

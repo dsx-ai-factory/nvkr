@@ -204,7 +204,7 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 		"teleport-ent=18.6.4",
 		"nke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
 		"nke-cni-calico-images-3.30.1 nke-cni-calico-manifests-3.30.1",
-		"nke-cni-ovn-images-1.5.18 nke-cni-ovn-charts-1.5.18",
+		"nke-cni-ovn-images-2.4.0 nke-cni-ovn-charts-2.4.0",
 	}
 	if len(commands) != len(packages) {
 		t.Fatal("source-owned package selection changed")
@@ -547,7 +547,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 						}
 					}
 					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
-						node.Patches[0].SHA256 != "sha256:9cde5f449ddb3be36cc0b42b26a4e8c499c9ea366f650c95463eebd81e8775a7" {
+						node.Patches[0].SHA256 != "sha256:6cbf4dd9524fed1533c25d470e44504532e709fa24f4536e6538a1644777c0fd" {
 						t.Fatal("Plan must retain the exact authenticated source patch")
 					}
 					command := node.Patches[0].Content

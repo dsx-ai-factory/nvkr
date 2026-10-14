@@ -140,11 +140,25 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 			releaseExportCmd(),
 			{
 				Name: "inspect", Usage: "inspect an exact local OCI release layout without granting authority",
-				Flags: []cli.Flag{&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "layout", Required: true}},
-				Action: func(c *cli.Context) error {
+				Flags: append([]cli.Flag{&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "layout", Required: true}}, commandPresentationFlags()...),
+				Action: func(c *cli.Context) (returnedErr error) {
+					view, err := selectCommandPresentation(c)
+					if err != nil {
+						return err
+					}
+					shown := false
+					defer func() {
+						if returnedErr != nil && view.tui && !shown {
+							returnedErr = showCommandResult(c, view, releaseFailureDisplay("Release inspection"), returnedErr)
+						}
+					}()
 					artifacts, err := lifecycle.InspectReleaseLayout(c.Context, c.String("reference"), c.String("layout"))
 					if err != nil {
 						return err
+					}
+					if view.tui {
+						shown = true
+						return showCommandResult(c, view, releaseArtifactsDisplay("Release inspection", "Local closure membership and payload integrity checked; signatures and policy were not verified.", artifacts), nil)
 					}
 					raw, err := canonical.Marshal(artifacts)
 					if err != nil {
@@ -156,7 +170,7 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 			},
 			{
 				Name: "verify", Usage: "verify one pinned reference under an explicit Verification Policy scope",
-				Flags: []cli.Flag{
+				Flags: append([]cli.Flag{
 					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true},
 					&cli.StringFlag{Name: "scope", Required: true, Usage: "authenticity (signatures and evidence; payload integrity not checked), artifact-publication (includes payload integrity), or release (capability-gated)"},
 					&cli.StringFlag{Name: "minimum-disk-evidence", Usage: "minimum accepted disk evidence: strict or build-provenance-v1 (default: build-provenance-v1 for pipeline-attested; strict for qualified)"},
@@ -165,8 +179,18 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require with --definition and --plan"},
 					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment; unreadable or undecodable Plan bytes report pipeline drift, while validation errors keep their code"},
 					&cli.StringFlag{Name: "workspace", Value: ".nvkr/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
-				},
-				Action: func(c *cli.Context) error {
+				}, commandPresentationFlags()...),
+				Action: func(c *cli.Context) (returnedErr error) {
+					view, err := selectCommandPresentation(c)
+					if err != nil {
+						return err
+					}
+					shown := false
+					defer func() {
+						if returnedErr != nil && view.tui && !shown {
+							returnedErr = showCommandResult(c, view, releaseFailureDisplay("Release verification"), returnedErr)
+						}
+					}()
 					exactInputCount := 0
 					for _, name := range []string{"definition", "environment", "plan"} {
 						if !c.IsSet(name) {
@@ -198,6 +222,10 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 						description, err := authenticate(c.Context, c.String("reference"), policy, options)
 						if err != nil {
 							return err
+						}
+						if view.tui {
+							shown = true
+							return showCommandResult(c, view, authenticatedReleaseDisplay(description), nil)
 						}
 						raw, err := canonical.Marshal(description)
 						if err != nil {
@@ -243,6 +271,10 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 					result, err := verify(c.Context, c.String("reference"), policy, options, expectation)
 					if err != nil {
 						return err
+					}
+					if view.tui {
+						shown = true
+						return showCommandResult(c, view, verifiedReleaseDisplay(result), nil)
 					}
 					var raw []byte
 					if result.ExactInputs != nil {

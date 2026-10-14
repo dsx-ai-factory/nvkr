@@ -8,11 +8,98 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
+
+func TestGitHubDiskStepTimeoutRespectsProviderMaximum(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		budget      time.Duration
+		wantMinutes int
+	}{
+		{"short deadline rounded up with cleanup", time.Minute + time.Second, 7},
+		{"exact provider maximum", 355 * time.Minute, 360},
+		{"one second beyond maximum", 355*time.Minute + time.Second, 0},
+		{"long native disk deadline", 17 * time.Hour, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			stage := githubStage{diskExecutionBudget: test.budget}
+			if got := githubDiskStepTimeoutMinutes(stage); got != test.wantMinutes {
+				t.Fatalf("step timeout %d, want %d", got, test.wantMinutes)
+			}
+		})
+	}
+}
+
+func TestGitHubLongDiskStepKeepsHelperAndJobBudgets(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			base := githubDiskBuildPlan(t, platform, "luks2")
+			environment := base.Environment.Clone()
+			for index := range environment.ExecutionClasses {
+				environment.ExecutionClasses[index].MaxTimeoutSeconds = 21600
+			}
+			cat := base.CatalogSnapshot
+			component := cat.Components["image"]
+			component.BuildRequirements = execution.Clone(component.BuildRequirements)
+			component.BuildRequirements.TimeoutSeconds = 21600
+			cat.Components["image"] = component
+			stack, err := catalog.ApplyStack(cat)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := Compile(t.Context(), base.Definition, environment, stack, "dev (unknown)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.DefinitionPath, plan.EnvironmentPath = base.DefinitionPath, base.EnvironmentPath
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stages, _, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			found := false
+			for _, stage := range stages {
+				if stage.DiskOutput == "" {
+					continue
+				}
+				found = true
+				job := document.Jobs[stage.ID]
+				if stage.diskExecutionBudget != 7*time.Hour || job.TimeoutMinutes != 445 {
+					t.Fatalf("execution budget %s/job %d, want seven hours/445 minutes", stage.diskExecutionBudget, job.TimeoutMinutes)
+				}
+				executors := 0
+				for index, step := range job.Steps {
+					if step.ID != "run-disk" {
+						continue
+					}
+					executors++
+					if step.TimeoutMinutes != 0 {
+						t.Fatalf("unsupported disk step timeout %d", step.TimeoutMinutes)
+					}
+					for _, timeout := range []int{360, 425} {
+						job.Steps[index].TimeoutMinutes = timeout
+						assertFactoryErrorCode(t, validateGitHubStageExecution(plan, stage, job.Steps), e.CodeEngineCapability)
+					}
+				}
+				if executors != 1 {
+					t.Fatalf("native disk stage has %d live executors, want one", executors)
+				}
+			}
+			if !found {
+				t.Fatal("missing native disk stage")
+			}
+		})
+	}
+}
 
 func TestGitHubDiskBudgetRejectsSummedAndInspectionBounds(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {

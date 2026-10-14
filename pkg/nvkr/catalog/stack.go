@@ -189,9 +189,17 @@ func LoadOverlayContext(ctx context.Context, path string) (Overlay, error) {
 		}
 		return Overlay{}, e.Wrap(e.CodeInvalidCatalog, err, "reading catalog overlay %s", path)
 	}
+	return DecodeOverlay(raw)
+}
+
+// DecodeOverlay strictly admits bounded saved overlay bytes without file access.
+func DecodeOverlay(raw []byte) (Overlay, error) {
+	if int64(len(raw)) > OverlayMaxBytes {
+		return Overlay{}, e.New(e.CodeInvalidCatalog, "catalog overlay exceeds its byte bound")
+	}
 	var overlay Overlay
 	if err := yaml.UnmarshalStrict(raw, &overlay); err != nil {
-		return Overlay{}, e.Wrap(e.CodeInvalidCatalog, err, "parsing catalog overlay %s", path)
+		return Overlay{}, e.Wrap(e.CodeInvalidCatalog, err, "parsing catalog overlay")
 	}
 	if err := overlay.Validate(); err != nil {
 		return Overlay{}, err

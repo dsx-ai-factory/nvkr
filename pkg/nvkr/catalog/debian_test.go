@@ -84,6 +84,11 @@ func TestDebianProducerRoutesAreCompleteAndPinned(t *testing.T) {
 		want e.Code
 	}{
 		{"valid", func(*Component) {}, ""},
+		{"valid embedded declaration", func(c *Component) { c.Embeds = embeddedFixture() }, ""},
+		{"invalid embedded declaration", func(c *Component) {
+			c.Embeds = embeddedFixture()
+			c.Embeds.Manifest = "../versions.yaml"
+		}, e.CodeInvalidCatalog},
 		{"missing spec", func(c *Component) { c.Debian = nil }, e.CodeInvalidCatalog},
 		{"empty routes", func(c *Component) { c.Debian.Routes = nil }, e.CodeInvalidCatalog},
 		{"duplicate route", func(c *Component) { c.Debian.Routes = append(c.Debian.Routes, c.Debian.Routes[0]) }, e.CodeInvalidCatalog},

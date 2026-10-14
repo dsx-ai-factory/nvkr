@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/discoverytags"
@@ -99,6 +100,9 @@ type DebianOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
+	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
+	// configured, isolated signed publications under a disposable attempt namespace.
+	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`
 	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
 	// configuration, not provider isolation or runtime-capacity evidence.
 	GitHubARC string `json:"githubARC,omitempty"`
@@ -273,6 +277,21 @@ func (environment Environment) Validate() error {
 	if environment.APIVersion != EnvironmentAPIVersion || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
 	}
+	if environment.GitHubDevelopment {
+		if err := environment.validateGitHubDevelopment(); err != nil {
+			return err
+		}
+	}
+	if environment.GitHubDevelopment && (len(environment.Runtime.Setup) != 0 || len(environment.Runtime.Variables) != 0) {
+		return e.New(e.CodeEngineCapability, "githubDevelopment does not support runtime setup or variables; credentials must remain in their scoped source and image preparation steps")
+	}
+	if environment.GitHubDevelopment && environment.RunsOn != "" {
+		// ARC execution is selected only through its explicit native policy and
+		// execution classes, never through the legacy label override.
+		if _, err := GitHubRunnerPlatform(environment.RunsOn); err != nil {
+			return err
+		}
+	}
 	if environment.UtilityContainer == "" || (environment.UtilityPlatform != "linux/amd64" && environment.UtilityPlatform != "linux/arm64") {
 		return e.New(e.CodeUnpinnedSource, "environment requires a digest-pinned utilityContainer and linux/amd64|linux/arm64 utilityPlatform")
 	}
@@ -375,6 +394,31 @@ func (environment Environment) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+func (environment Environment) validateGitHubDevelopment() error {
+	if len(environment.GitHubDispatchBranches) != 0 {
+		return e.New(e.CodeEngineCapability, "githubDevelopment does not support githubDispatchBranches")
+	}
+	publication, signing := environment.Publication, environment.Signing
+	if publication == nil && signing == nil {
+		if environment.GitHubARC != "" || environment.DiskEvidence != "" {
+			return e.New(e.CodeEngineCapability, "development disk execution requires isolated signed publication")
+		}
+		return nil
+	}
+	if publication == nil || signing == nil || publication.Mode != "per-output-v1" || signing.Mode != "cosign" ||
+		publication.CredentialRef != development.WriteCredentialRef || publication.Anonymous || publication.PlainHTTP || len(publication.ImageTags) != 0 {
+		return e.New(e.CodeEngineCapability, "development publication requires per-output-v1, cosign and its dedicated registry write credential without anonymous access, plain HTTP or image tags")
+	}
+	namespace, err := development.ParseNamespace(publication.RepositoryPrefix)
+	if err != nil {
+		return err
+	}
+	if signing.Identity != namespace.Identity() || signing.Issuer != development.Issuer {
+		return e.New(e.CodeEngineCapability, "development signing requires its exact repository nvkr-dev workflow identity and GitHub issuer")
+	}
 	return nil
 }
 

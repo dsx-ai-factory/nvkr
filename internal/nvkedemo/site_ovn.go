@@ -26,7 +26,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const siteOVNVersion = "1.5.18"
+const siteOVNVersion = "2.4.0"
 const upstreamSiteOVNVersion = "1.4.0"
 const siteOVSName = "nvkr-site-ovs"
 
@@ -272,7 +272,7 @@ func siteOVNValuesForNetwork(network string, raw []byte, reference, api, tag str
 		"tags": siteOVNTags(), "k8sAPIServer": api,
 		"podNetwork": managementPodCIDR + "/26", "serviceNetwork": managementServiceCIDR,
 		"mtu": 1400,
-		"global": map[string]any{"skipCallToK8s": true, "enableNgnExtension": false,
+		"global": map[string]any{"skipCallToK8s": true,
 			"imagePullSecretName": "", "imageRepositoryPrefix": "", "useImageDigest": true},
 	}
 	if mode == "upstream-ovn" {

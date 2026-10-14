@@ -21,10 +21,17 @@ substitute for it.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies; the workflow adapter consumes their locked commits.
+An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
+native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
+registry namespaces. Unsigned development remains static-unqualified. Neither setting grants production
+acceptance, provider access or qualified evidence.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
 One execution attempt against frozen inputs and required outputs, recording progress, observed artifacts, evidence, and failures.
+Live progress and file-recorded inspection are descriptive views. Producer completion,
+activity and terminal presentation do not establish retained output membership,
+release verification or runtime health; the owning result and error remain separate.
 _Avoid_: Plan, release, proof of qualification
 
 **Artifact**:
@@ -59,6 +66,9 @@ _Avoid_: Observed artifact, delivery route
 A named output containing exactly one disk-producing catalog root plus every explicitly selected component in
 that root's material closure. The disk format and encryption metadata describe the delivered bytes independently
 of the builder that produces them.
+An explicitly public bootstrap FDE disk can be retained diagnostically or published with build-provenance
+evidence. Neither grants inspected-content, reproduction or deployed confidentiality claims.
+TPM keyslot enrollment does not rotate the volume key shared by clones of that disk.
 _Avoid_: Container image, builder type, running node
 
 **Aggregate OS producer**:
@@ -127,6 +137,16 @@ _Avoid_: Authored definition, execution observation
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
+Its workflow, shared composite templates and generated invocation data share one ownership manifest and
+byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
+interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
+from the admitted Plan at runtime. Neither scripts supplied as data nor separately authored lifecycle inputs are admitted.
+The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
+visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
+the complete bundle still requires regeneration and checking.
+Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
+Development and production use separate fixed bundle layouts selected by their Environment, with the same
+compiler and independent ownership manifests. A development bundle is not a release authorization.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
 **Catalog maintenance candidate**:
@@ -182,10 +202,30 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 accepts producer
-provenance with its remaining delivery gates; M3 requires strict inspection and material reconciliation.
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
+retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
+Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
+match its referenced pinned upstream metadata. That comparison does not establish effective customized or
+installed composition; exact source, patch, configuration and material bindings remain required.
 Historical signed `deferred-m3` documents retain their original bytes and uninspected scope.
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
+
+**Build/evidence qualification**:
+Checks for the complete selected artifact set against its exact producing Run, attempt, commit and inputs,
+including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
+has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
+the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact Run
+attempt and an independent consumer policy. The generated handoff carries original inputs and evidence for
+recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
+The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
+joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+Native workers exercise every selected delivered tool with fixed version checks in isolated containers and
+sign exact member observations. The final qualifier authenticates complete native coverage under the same
+independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
+they are not caller-authored pass records or release authorization.
+External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
+subject-bound evidence.
+_Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.

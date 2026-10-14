@@ -630,7 +630,11 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 		PredicateType: ProvenancePredicateType,
 	}
 
-	identity, issuer, ran, err := s.verifyOCIBundles(ctx, subject, CosignSignaturePredicateType, resolved, workspace, environment)
+	// The expected production predicate belongs to the provenance attestation;
+	// the artifact signature has its own distinct predicate and evidence type.
+	signaturePolicy := resolved
+	signaturePolicy.ExpectedPredicate = nil
+	identity, issuer, ran, err := s.verifyOCIBundles(ctx, subject, CosignSignaturePredicateType, signaturePolicy, workspace, environment)
 	if err != nil {
 		return VerificationRecord{}, err
 	}

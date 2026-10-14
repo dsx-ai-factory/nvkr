@@ -104,7 +104,7 @@ make tidy           # go mod tidy + gofmt
 # single package / single test
 go test ./pkg/nvkr/factory/... -run TestName -count=1
 
-# generated-bundle drift check (current Makefile target: maintained M2 candidate inputs)
+# generated-bundle drift check (repeats the committed Plan's input selection)
 make workflows-check
 
 # Fern operator docs (pages in docs/index.yml; needs node + `npm install -g fern-api@latest`)
@@ -200,9 +200,26 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 
 Use `docs/README.md` for documentation, `demos/README.md` for presentations and guided demos, and
 `scripts/README.md` for operational scripts. Generate alternate examples into scratch roots. `definitions/nvke-v1/`
-contains the retained three-output NVKE inputs; `definitions/nvke-m2/` supplies the current checked-in candidate
-selected by `make workflows-check`, not a ratified canonical-product decision. `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json`
-are generated. `toolchains/` owns toolchain sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
+contains the retained three-output NVKE inputs; `definitions/nvke-m2/` supplies the maintained release candidate,
+and `definitions/nvke-fde/` supplies the build-only FDE selection. `make workflows-check` repeats the exact input
+paths in the committed Plan. A branch's selection is not a ratified canonical-product decision.
+`.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json` are generated. `toolchains/` owns toolchain
+sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
+
+`.agents/skills/nvkr-operator/` is the customer agent entry point; maintainers keep it consistent with
+`CONTEXT.md`, reconciliation, current task guides and CLI help when those contracts change.
+
+After renaming a linked guide, audit the skill's relative links from each containing Markdown file.
+From the repository root, inventory links using standard `grep`:
+
+```sh
+grep -nF '](' .agents/skills/nvkr-operator/SKILL.md \
+  .agents/skills/nvkr-operator/references/*.md README.md docs/README.md
+```
+
+Review each local target against the current tree and each section against its target document. This is a
+manual audit, not a Markdown parser or automated broken-link gate. `make docs-check` covers only the Fern
+pages listed in `docs/index.yml`, which do not include this skill or the documentation map.
 
 ## Completion gate
 

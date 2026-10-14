@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  description: Build-only feature-branch pipeline; unqualified outputs expire after one day.
+  name: nvke-github-dev
+githubDevelopment: true
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared
+sourceAccess:
+  https://github.com/dsx-ai-factory/nvke:
+    credentialRef: github:NKE_SOURCE_TOKEN
+    mirror: https://github.com/dsx-ai-factory/nvke
+utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
+utilityPlatform: linux/amd64

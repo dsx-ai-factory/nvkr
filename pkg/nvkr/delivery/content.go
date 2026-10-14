@@ -54,6 +54,17 @@ type DiskOutput struct {
 	Outcome       string `json:"outcome"`
 }
 
+// Published LUKS2 is limited to producer-provenance evidence. The transport
+// declaration never establishes inspection, key hygiene or confidentiality.
+// Raw diagnostic outputs may omit evidence; release boundaries may not.
+func (disk *DiskOutput) validatePublicationEncryption() error {
+	if disk == nil || !supportedDiskEncryption(disk.Encryption) ||
+		(disk.Encryption == "luks2" && disk.EvidenceMode != "build-provenance-v1") {
+		return e.New(e.CodeVerifyFailed, "published disk encryption requires plain or producer-provenance LUKS2 evidence")
+	}
+	return nil
+}
+
 var outputNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 
 func (output Output) Validate() error {

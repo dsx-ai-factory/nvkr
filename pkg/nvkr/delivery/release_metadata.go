@@ -135,8 +135,11 @@ func validateReleaseMetadata(root PublicationRoot) error {
 		case "disk-image":
 			kind, media = "disk-image", o.ArtifactType
 			if media != MediaDiskImage || o.Output.Disk == nil || !isDigest(o.Output.Disk.PayloadDigest) ||
-				o.Output.Disk.PayloadDigest != o.BlobDigest || o.Output.Disk.Encryption != "none" || o.Output.TransportPath != "" {
-				return e.New(e.CodeVerifyFailed, "published disk requires an exact unencrypted payload binding")
+				o.Output.Disk.PayloadDigest != o.BlobDigest || o.Output.TransportPath != "" {
+				return e.New(e.CodeVerifyFailed, "published disk requires an exact payload binding")
+			}
+			if err := o.Output.Disk.validatePublicationEncryption(); err != nil {
+				return err
 			}
 			if err := (Output{Name: o.Name, Kind: kind, Digest: o.DescriptorDigest, BuildDigest: o.Output.BuildDigest,
 				Components: o.Output.Components, Disk: o.Output.Disk}).Validate(); err != nil {

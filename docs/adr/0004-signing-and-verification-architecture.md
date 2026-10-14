@@ -146,8 +146,13 @@ successful signing or verification record. Registry credentials use a private re
 never argv. Dry-run executes no signer and contacts no registry for signing; it records intended argv and
 `dryRun: true`, retaining `static-unqualified` evidence.
 
-The build signer's identity is a fixed committed workflow path and default-branch ref under an explicit issuer.
-It authenticates who produced the artifact; Build Digest separately identifies the selected logical graph. The separate
+The production build signer's identity is a fixed committed workflow path and admitted branch ref under an explicit issuer.
+Signed development uses the separate `nvkr-dev.yml` branch identity and reserved disposable namespace
+specified by ADR-18/20. It performs the same signature, provenance and SBOM checks under that development
+trust policy. A production consumer pinned to `nvkr-run.yml` does not accept those certificates; selecting
+development signing grants no production or qualified acceptance. Registry cleanup does not erase public
+transparency records or relax the existing disclosure/identity-service prerequisites.
+Signer identity authenticates who produced the artifact; Build Digest separately identifies the selected logical graph. The separate
 build/evidence qualification workflow has its own identity; build provenance and qualification evidence cannot
 substitute for one another. Consumer instructions publish both identities and use stock
 `cosign verify-attestation` with the explicit signature or SLSA predicate type. Downloaded bundles are also

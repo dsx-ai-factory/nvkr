@@ -56,7 +56,7 @@ func TestReferenceReleaseGraphHasNoAggregatePayloadEdges(t *testing.T) {
 			count++
 		}
 	}
-	if count != 6 {
+	if count != 6+3*len(plan.LifecycleOutputs) {
 		t.Fatalf("finalizer downloads %d artifacts", count)
 	}
 	for _, output := range plan.LifecycleOutputs {
@@ -87,7 +87,7 @@ func TestReferenceReleaseGraphHasNoAggregatePayloadEdges(t *testing.T) {
 	if strings.Contains(string(bundle.Files[GitHubWorkflowPath]), "refs/heads/feat/") {
 		t.Fatal("branch exception")
 	}
-	finalizer := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nvkr-lifecycle-run"]
+	finalizer := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs["nvkr-lifecycle-run"]
 	if finalizer.Environment != githubReleaseEnvironment || finalizer.Permissions["packages"] != "read" || finalizer.Permissions["id-token"] != "" {
 		t.Fatal("finalizer must use protected release credentials with read-only registry access")
 	}

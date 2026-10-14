@@ -164,6 +164,7 @@ func TestMixedLocalUtilityAdmissionRejectsEachUnsupportedRoute(t *testing.T) {
 			p.Environment.SourceAccess = map[string]authored.SourceAccess{"https://example.test/source": {CredentialRef: "secret"}}
 		}, "cannot admit hosted credentials or dispatch policy"},
 		{"dispatch policy", func(p *Plan, _ *Node) { p.Environment.GitHubDispatchBranches = []string{"candidate"} }, "cannot admit hosted credentials or dispatch policy"},
+		{"development policy", func(p *Plan, _ *Node) { p.Environment.GitHubDevelopment = true }, "cannot admit hosted credentials or dispatch policy"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())
