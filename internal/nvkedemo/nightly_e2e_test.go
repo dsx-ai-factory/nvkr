@@ -149,12 +149,7 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 		if ctx.Err() != nil {
 			resultErr = errors.Join(resultErr, e.Wrap(e.CodeTimeout, ctx.Err(), "nightly cycle canceled before its final verdict"))
 		}
-		resultErr = errors.Join(resultErr, privateJSON(filepath.Join(public, "cycle.json"), map[string]any{
-			"profile": profile.Name, "releaseSubject": subject, "phase": phase,
-			"runtimePassed": phase == "runtime" && resultErr == nil, "qualificationAuthority": "none",
-			"producerRun": build.ProducerRun, "producerAttempt": build.ProducerAttempt, "sourceCommit": build.SourceCommit,
-			"coordinatorRun": build.CoordinatorRun, "coordinatorAttempt": build.CoordinatorAttempt,
-		}))
+		resultErr = errors.Join(resultErr, writeNightlyCycle(cleanup, public, profile, build, subject, phase, resultErr))
 	}()
 	root := os.Getenv("GITHUB_WORKSPACE")
 	if !filepath.IsAbs(root) {
@@ -285,7 +280,7 @@ func nightlySource(ctx context.Context, runner Runner, source, commit string) er
 			return e.Wrap(e.CodeVerifyFailed, commandErr, "checking trusted suite source")
 		}
 		if check[0] == "rev-parse" && strings.TrimSpace(output.String()) != commit || check[0] == "status" && output.Len() != 0 {
-			return e.New(e.CodeVerifyFailed, "suite source differs from its reviewed pin or contains additional source files")
+			return e.New(e.CodeVerifyFailed, "suite source differs from its configured pin or contains additional source files")
 		}
 	}
 	if err = sourcegit.CheckWorktreeIndex(ctx, baseline, source, 100000); err != nil {
@@ -293,7 +288,7 @@ func nightlySource(ctx context.Context, runner Runner, source, commit string) er
 	}
 	for _, entrypoint := range []string{"controller/hack/ci/nico-vms-candidate.sh", "controller/hack/ci/nico-vms-e2e.sh"} {
 		if _, err = boundedRegularRead(filepath.Join(source, entrypoint), diagnosticLimit); err != nil {
-			return e.Wrap(e.CodeVerifyFailed, err, "admitting reviewed suite entrypoint %s", entrypoint)
+			return e.Wrap(e.CodeVerifyFailed, err, "admitting pinned suite entrypoint %s", entrypoint)
 		}
 	}
 	return nil
@@ -451,6 +446,24 @@ func nightlyMaterials(ctx context.Context, runner Runner, profile NightlyProfile
 	return bindings, nil
 }
 
+func writeNightlyCycle(ctx context.Context, public string, profile NightlyProfile, build NightlyBuild, subject, phase string, resultErr error) error {
+	if ctx == nil {
+		return e.New(e.CodeUsage, "nightly cycle report requires a context")
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "nightly cycle report canceled")
+	}
+	if err := privateJSON(filepath.Join(public, "cycle.json"), map[string]any{
+		"profile": profile.Name, "releaseSubject": subject, "phase": phase,
+		"runtimePassed": phase == "runtime" && resultErr == nil, "qualificationAuthority": "none",
+		"producerRun": build.ProducerRun, "producerAttempt": build.ProducerAttempt, "sourceCommit": build.SourceCommit,
+		"coordinatorRun": build.CoordinatorRun, "coordinatorAttempt": build.CoordinatorAttempt,
+	}); err != nil {
+		return e.Wrap(e.CodeImmutableViolation, err, "writing private nightly cycle report")
+	}
+	return nil
+}
+
 // The publication owner reads and verifies the held native image, applies
 // upstream whiteout semantics and admits bounded regular profile files.
 func nightlyProfiles(ctx context.Context, publication *delivery.Publication, release lifecycle.Release, output, work string) (string, error) {
@@ -461,7 +474,7 @@ func nightlyProfiles(ctx context.Context, publication *delivery.Publication, rel
 	if err := os.Mkdir(destination, 0o700); err != nil {
 		return "", e.Wrap(e.CodeImmutableViolation, err, "creating private profiles destination")
 	}
-	if err := publication.ExtractImageFiles(ctx, output, "linux/arm64", []string{"profiles", "runbooks"}, destination); err != nil {
+	if err := publication.ExtractImageFiles(ctx, output, "linux/arm64", []string{"profiles"}, destination); err != nil {
 		return "", err
 	}
 	if _, err := boundedRegularRead(filepath.Join(destination, "profiles/osProfiles/metadata.yaml"), diagnosticLimit); err != nil {

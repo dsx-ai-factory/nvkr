@@ -52,6 +52,9 @@ func githubWorkflowName(plan *Plan) string {
 	if plan.Environment.GitHubDevelopment {
 		return "nvkr-dev-" + plan.Name
 	}
+	if plan.Environment.GitHubBundle != "" {
+		return "nvkr-project-" + plan.Environment.GitHubBundle
+	}
 	return "nvkr-run-" + plan.Name
 }
 

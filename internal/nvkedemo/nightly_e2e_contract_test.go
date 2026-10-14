@@ -4,9 +4,13 @@
 package nvkedemo
 
 import (
+	"archive/tar"
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,7 +26,304 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
+	"github.com/google/go-containerregistry/pkg/v1/layout"
+	"github.com/google/go-containerregistry/pkg/v1/mutate"
+	"github.com/google/go-containerregistry/pkg/v1/static"
+	"github.com/google/go-containerregistry/pkg/v1/types"
+	"go.yaml.in/yaml/v3"
 )
+
+func TestNightlyAuthoredRuntimeStepConsumesActualCycleWriter(t *testing.T) {
+	raw, err := os.ReadFile("../../.github/workflows/nvkr-nightly.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct{ Name, Run string }
+		}
+	}
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	runtimeStepShell := ""
+	for _, step := range workflow.Jobs["runtime-test"].Steps {
+		if step.Name == "Authenticate the publication and run the existing NVKE Go suite" {
+			if runtimeStepShell != "" {
+				t.Fatal("ambiguous authored runtime step")
+			}
+			runtimeStepShell = step.Run
+		}
+	}
+	if runtimeStepShell == "" {
+		t.Fatal("missing authored runtime step")
+	}
+	// Only Go is substituted. Execute the entire authored step, including its
+	// list check and real jq postcondition. A zero-exit skipped Go invocation
+	// alone must never satisfy the authored step's successful-cycle check.
+	goFixture := `go() {
+  case "$*" in
+    *"-list "*) printf '%s\n' TestNightlyPublishedCandidate ;;
+    *"-run "*) printf '%s\n' "$FIXTURE_GO_RESULT" ;;
+    *) return 91 ;;
+  esac
+}
+`
+	for _, test := range []struct {
+		name, phase, envKey, envValue string
+		result                        error
+		skip                          bool
+		edit                          func(map[string]any)
+		pass                          bool
+	}{
+		{name: "successful writer", phase: "runtime", pass: true},
+		{name: "successful Go skip without cycle", skip: true},
+		{name: "wrong profile", phase: "runtime", envKey: "NVKR_NIGHTLY_PROFILE", envValue: "other"},
+		{name: "wrong source", phase: "runtime", envKey: "GITHUB_SHA", envValue: strings.Repeat("b", 40)},
+		{name: "wrong phase", phase: "preparation"},
+		{name: "wrong coordinator run", phase: "runtime", envKey: "GITHUB_RUN_ID", envValue: "124"},
+		{name: "wrong coordinator attempt", phase: "runtime", envKey: "GITHUB_RUN_ATTEMPT", envValue: "3"},
+		{name: "failed runtime or cleanup", phase: "runtime", result: errors.New("joined cleanup failed")},
+		{name: "wrong authority", phase: "runtime", edit: func(cycle map[string]any) { cycle["qualificationAuthority"] = "qualified" }},
+		{name: "numeric coordinator run", phase: "runtime", edit: func(cycle map[string]any) { cycle["coordinatorRun"] = 123 }},
+		{name: "numeric coordinator attempt", phase: "runtime", edit: func(cycle map[string]any) { cycle["coordinatorAttempt"] = 2 }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			public := t.TempDir()
+			profile := NightlyProfile{Name: "fixture-profile"}
+			build := NightlyBuild{CoordinatorRun: "123", CoordinatorAttempt: "2", ProducerRun: 456, ProducerAttempt: 1, SourceCommit: strings.Repeat("a", 40)}
+			if !test.skip {
+				if err := writeNightlyCycle(t.Context(), public, profile, build, "fixture-subject", test.phase, test.result); err != nil {
+					t.Fatal(err)
+				}
+				if test.edit != nil {
+					path := filepath.Join(public, "cycle.json")
+					raw, err := os.ReadFile(path)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var cycle map[string]any
+					if err := json.Unmarshal(raw, &cycle); err != nil {
+						t.Fatal(err)
+					}
+					test.edit(cycle)
+					raw, err = json.Marshal(cycle)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := privateReplace(path, raw); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			values := map[string]string{"PATH": os.Getenv("PATH"), "NVKR_NIGHTLY_REPORTS": public,
+				"NVKR_NIGHTLY_PROFILE": profile.Name, "GITHUB_RUN_ID": build.CoordinatorRun,
+				"GITHUB_RUN_ATTEMPT": build.CoordinatorAttempt, "GITHUB_SHA": build.SourceCommit,
+				"FIXTURE_GO_RESULT": "--- PASS: TestNightlyPublishedCandidate"}
+			if test.skip {
+				values["FIXTURE_GO_RESULT"] = "--- SKIP: TestNightlyPublishedCandidate"
+			}
+			if test.envKey != "" {
+				values[test.envKey] = test.envValue
+			}
+			env := SetEnv(nil, values)
+			bash, err := commandPath("bash", env)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := commandPath("jq", env); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, bash, "-c", goFixture+runtimeStepShell)
+			command.Env = env
+			if err := ownedcmd.ConfigureCancellation(command, time.Second); err != nil {
+				t.Fatal(err)
+			}
+			output, err := command.CombinedOutput()
+			if (err == nil) != test.pass {
+				t.Fatalf("authored runtime step pass=%t, want %t: %v\n%s", err == nil, test.pass, err, output)
+			}
+		})
+	}
+}
+
+func TestNightlyCycleWriterRejectsUnavailableContextAndDestination(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, test := range []struct {
+		name string
+		ctx  context.Context
+		code e.Code
+	}{
+		{"nil context", nil, e.CodeUsage},
+		{"canceled context", ctx, e.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			public := t.TempDir()
+			assertNightlyCode(t, writeNightlyCycle(test.ctx, public, NightlyProfile{}, NightlyBuild{}, "", "runtime", nil), test.code)
+			if _, err := os.Stat(filepath.Join(public, "cycle.json")); !os.IsNotExist(err) {
+				t.Fatal("refused writer exposed cycle", err)
+			}
+		})
+	}
+	assertNightlyCode(t, writeNightlyCycle(t.Context(), filepath.Join(t.TempDir(), "missing"), NightlyProfile{}, NightlyBuild{}, "", "runtime", nil), e.CodeImmutableViolation)
+}
+
+func TestNightlyProfilesUsePinnedNestedRunbooksLayout(t *testing.T) {
+	// Exact upstream bytes copied from nvke-profiles pin 8fb2d53368823bd386b4fbd55b4ab6d3c0931345,
+	// controller/profiles/example/Dockerfile. This is a byte/layout fixture check,
+	// not a Dockerfile interpreter or an upstream-image execution claim.
+	dockerfile, err := os.ReadFile("testdata/pinned-profiles.Dockerfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := fmt.Sprintf("%x", sha256.Sum256(dockerfile))
+	if pin != "789f7ad1e406b82f0f55a52152eff7b08846b4122582145fade588c7d931cc3e" ||
+		!strings.Contains(string(dockerfile), "\nCOPY profiles/ /profiles/\nCOPY runbooks/ /profiles/runbooks/\n") {
+		t.Fatal("profiles fixture differs from the source-owned pinned Dockerfile layout")
+	}
+	for _, catalog := range []string{"profiles-catalog", "upstream-ovn-profiles-catalog"} {
+		raw, err := os.ReadFile(filepath.Join("../../definitions/nvke-local-dev-arm64", catalog, "registry.yaml"))
+		if err != nil || !strings.Contains(string(raw), pin+"  controller/profiles/example/Dockerfile") {
+			t.Fatal("producer Dockerfile pin differs from the layout fixture", catalog, err)
+		}
+	}
+	for _, metadata := range []bool{true, false} {
+		t.Run(fmt.Sprintf("metadata=%t", metadata), func(t *testing.T) {
+			publication, release := nightlyProfilesPublicationFixture(t, metadata)
+			defer publication.Close()
+			destination, err := nightlyProfiles(t.Context(), publication, release, "controller-profiles", t.TempDir())
+			if !metadata {
+				assertNightlyCode(t, err, e.CodeVerifyFailed)
+				if destination != "" {
+					t.Fatal("missing metadata returned profiles assets")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range []string{"profiles/osProfiles/metadata.yaml", "profiles/configProfiles/worker.yaml", "profiles/runbooks/setup.yaml"} {
+				if raw, err := os.ReadFile(filepath.Join(destination, path)); err != nil || len(raw) == 0 {
+					t.Fatal(path, string(raw), err)
+				}
+			}
+			for _, path := range []string{"runbooks", "etc"} {
+				if _, err := os.Stat(filepath.Join(destination, path)); !os.IsNotExist(err) {
+					t.Fatal("unexpected top-level image root exported", path, err)
+				}
+			}
+		})
+	}
+}
+
+func nightlyProfilesPublicationFixture(t *testing.T, metadata bool) (*delivery.Publication, lifecycle.Release) {
+	t.Helper()
+	// Exact source-owned Dockerfile layout, checksum 789f7ad1e406b82f0f55a52152eff7b08846b4122582145fade588c7d931cc3e:
+	// Alpine base; COPY profiles/ /profiles/; COPY runbooks/ /profiles/runbooks/.
+	// Synthetic bytes exercise the real OCI/delivery owners without rebuilding
+	// an upstream image or fetching an unrelated registry fixture.
+	var raw bytes.Buffer
+	archive := tar.NewWriter(&raw)
+	for _, file := range []struct{ path, content string }{
+		{"etc/alpine-release", "3.24.1\n"},
+		{"profiles/configProfiles/worker.yaml", "kind: ConfigProfile\n"},
+		{"profiles/runbooks/setup.yaml", "kind: Runbook\n"},
+		{"profiles/osProfiles/metadata.yaml", "kind: OSProfileMetadata\n"},
+	} {
+		if !metadata && file.path == "profiles/osProfiles/metadata.yaml" {
+			continue
+		}
+		if err := archive.WriteHeader(&tar.Header{Name: file.path, Mode: 0644, Typeflag: tar.TypeReg, Size: int64(len(file.content))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := archive.Write([]byte(file.content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	image := mutate.ConfigMediaType(mutate.MediaType(empty.Image, types.OCIManifestSchema1), types.OCIConfigJSON)
+	image, err := mutate.AppendLayers(image, static.NewLayer(raw.Bytes(), types.OCIUncompressedLayer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := image.ConfigFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.OS, config.Architecture = "linux", "arm64"
+	config.Config.Cmd = []string{"/bin/sh"}
+	image, err = mutate.ConfigFile(image, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(t.TempDir(), "image")
+	index, err := layout.Write(source, empty.Index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := index.AppendImage(image); err != nil {
+		t.Fatal(err)
+	}
+	inspected, err := delivery.InspectContainerImage(t.Context(), source, "linux/arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	build := "sha256:" + strings.Repeat("a", 64)
+	output := delivery.Output{Name: "controller-profiles", Kind: "oci", Digest: inspected.ManifestDigest, BuildDigest: build, Components: []string{"profiles"}}
+	content, err := delivery.ContentDigest([]delivery.Output{output})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bom, err := sbom.NewSubject(build, "profiles", inspected.ManifestDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bom, err = sbom.ForSubject(bom, inspected.ManifestDigest, "build-output", inspected.ManifestDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, err := bom.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	semantic, err := bom.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "publication")
+	result, err := delivery.BuildPublicationRoot(t.Context(), root, delivery.PublicationRequest{
+		Release: &delivery.ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build, ContentSubject: content},
+		Objects: []delivery.ObjectInput{
+			{Name: output.Name, Kind: "container-image", Path: source, Layout: true, ArtifactType: delivery.MediaOCIManifest,
+				SemanticDigest: inspected.ManifestDigest, BlobDigest: inspected.RootDigest, OS: "linux", Arch: "arm64",
+				Output: &delivery.OutputBinding{Repository: output.Name, Format: "oci", BuildDigest: build, Components: output.Components,
+					BuildSubjects: []delivery.BuildSubject{{Component: "profiles", Digest: inspected.ManifestDigest}}}},
+			{Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json",
+				LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: semantic, Bytes: document,
+				Evidence: &delivery.EvidenceBinding{Outputs: []string{output.Name}, Component: "profiles", Stage: "build-output", SubjectKind: "oci-manifest", SubjectDigest: inspected.ManifestDigest}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publication, err := delivery.OpenPublication(t.Context(), root, result.RootDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Extraction must continue through held image capabilities, not path reads.
+	if err := os.Rename(root, root+"-original"); err != nil {
+		t.Fatal(err)
+	}
+	return publication, lifecycle.Release{Artifacts: []lifecycle.Artifact{{Name: output.Name, Kind: lifecycle.OutputOCI,
+		Digest: inspected.ManifestDigest, Reference: "registry.example/team/profiles@" + inspected.ManifestDigest}}}
+}
 
 func nightlyRuntimeRelease() lifecycle.Release {
 	release := lifecycle.Release{}

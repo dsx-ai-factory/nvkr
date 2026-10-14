@@ -178,6 +178,42 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	}
 }
 
+func TestQualificationTriggerExcludesNamedProducerOfSameDefinition(t *testing.T) {
+	plan, policy := generationFixture(t)
+	qualifier, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	top := decodeQualificationWorkflow(t, qualifier.files[policy.QualificationWorkflow])
+	trigger, ok := top.On["workflow_run"].(map[string]any)
+	if !ok {
+		t.Fatal("qualifier omits the workflow_run trigger")
+	}
+	names, ok := trigger["workflows"].([]any)
+	if !ok || len(names) != 1 || names[0] != "nvkr-run-"+plan.Name {
+		t.Fatalf("qualifier changed its sole default producer selection: %v", trigger)
+	}
+	for _, name := range []string{plan.Name, "other-project"} {
+		t.Run(name, func(t *testing.T) {
+			named := *plan
+			named.Environment.GitHubBundle = name
+			var digestErr error
+			named.EnvironmentDigest, digestErr = named.Environment.Digest()
+			if digestErr != nil {
+				t.Fatal(digestErr)
+			}
+			producer, renderErr := factory.RenderGitHub(t.Context(), &named)
+			if renderErr != nil {
+				t.Fatal(renderErr)
+			}
+			workflow := decodeQualificationWorkflow(t, producer.Files[producer.WorkflowPath])
+			if workflow.Name != "nvkr-project-"+name || workflow.Name == names[0] {
+				t.Fatalf("named producer can trigger the default qualifier: %q", workflow.Name)
+			}
+		})
+	}
+}
+
 // The explicit status function defeats GitHub's implicit success() dependency
 // gate. The exact allowlist excludes skipped, canceled and unknown worker states;
 // repeating every source guard keeps failure diagnostics inside the trusted trigger.

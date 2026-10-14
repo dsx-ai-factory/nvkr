@@ -69,6 +69,12 @@ hyphens, with alphanumeric ends. Its paths are derived by the generator:
 | Production, `githubBundle: <name>` | `.github/workflows/nvkr-run-<name>.yml` | `.github/nvkr-run-<name>/` |
 | `githubDevelopment: true`, empty `githubBundle` | `.github/workflows/nvkr-dev.yml` | `.github/nvkr-dev/` |
 
+Named production workflows display as `nvkr-project-<name>`. Default production
+retains `nvkr-run-<Definition name>` and development retains
+`nvkr-dev-<Definition name>`. These distinct names separate workflow-based concurrency
+and keep named producers outside the default qualifier's display-name trigger, even
+when the bundles select the same Definition. File paths remain as listed above.
+
 Each records directory contains its own `plan.json` and `manifest.json`. Default
 and named bundles can coexist; each owns only its files and retirement. The
 selection changes Environment and Plan identity without changing component Build

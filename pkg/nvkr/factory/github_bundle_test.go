@@ -45,6 +45,45 @@ func TestDefaultGitHubBundleRetainsCommittedBytes(t *testing.T) {
 	}
 }
 
+func TestNamedGitHubWorkflowNamesDoNotCollideWithDefault(t *testing.T) {
+	defaultPlan := githubTestPlan(t)
+	defaultBundle, err := RenderGitHub(t.Context(), defaultPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultName := decodeGitHubWorkflow(t, defaultBundle.Files[defaultBundle.WorkflowPath]).Name
+	if defaultName != "nvkr-run-"+defaultPlan.Name {
+		t.Fatal("default workflow display name changed")
+	}
+	names := map[string]bool{defaultName: true}
+	for _, name := range []string{defaultPlan.Name, "other-project"} {
+		t.Run(name, func(t *testing.T) {
+			plan := *defaultPlan
+			plan.Environment.GitHubBundle = name
+			plan.EnvironmentDigest, err = plan.Environment.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, renderErr := RenderGitHub(t.Context(), &plan)
+			if renderErr != nil {
+				t.Fatal(renderErr)
+			}
+			workflowName := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Name
+			if workflowName != "nvkr-project-"+name || names[workflowName] {
+				t.Fatalf("named producer shares a display/concurrency identity: %q", workflowName)
+			}
+			names[workflowName] = true
+			if bundle.WorkflowPath != githubBundleLayout(name).workflowPath {
+				t.Fatal("display naming changed the named workflow path")
+			}
+			changed := mutateGitHubBundleFile(t, bundle, bundle.WorkflowPath, func(raw []byte) []byte {
+				return bytes.Replace(raw, []byte("name: "+workflowName+"\n"), []byte("name: "+defaultName+"\n"), 1)
+			})
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), &plan, changed), e.CodeInvalidCatalog)
+		})
+	}
+}
+
 func TestNamedGitHubBundleChangesPlanIdentityWithoutReplacingSigningPolicy(t *testing.T) {
 	plan := signedTestPlan(t, cosignSigningProfile(), ghcrTarget())
 	before, err := plan.Digest()

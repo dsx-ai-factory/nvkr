@@ -45,6 +45,11 @@ byte-for-byte. A nonempty name contains at most 48 lowercase letters, digits and
 with alphanumeric ends; it derives `.github/workflows/nvkr-run-<name>.yml` and
 `.github/nvkr-run-<name>/{plan,manifest}.json`. Authored paths are unsupported. Namespace
 selection changes Environment and Plan identity without changing producer Build identity.
+The named producer's workflow display name is `nvkr-project-<name>`, disjoint from
+the default `nvkr-run-<Definition name>` and development `nvkr-dev-<Definition name>`.
+This keeps same-Definition bundles separate under GitHub's workflow-based concurrency
+and prevents a named producer from matching the default qualifier's display-name trigger.
+Workflow file paths and explicit signing identities retain the namespace contract above.
 Every generated execution, recovery and utility-container command selects that exact
 Plan path; validation rejects a bundle whose paths differ from the admitted Environment.
 Signing identity and issuer remain explicit Environment policy and are never rewritten

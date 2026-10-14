@@ -146,8 +146,11 @@ Their execution classes select exactly
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
 Production and standalone diagnostic disk jobs use the `nkd-arc` protected Environment, with pool access
-restricted to the reviewed workflow on the default branch and any exact branches explicitly admitted by
-`githubDispatchBranches`. The separate signed-development policy is described below.
+restricted to reviewed producer workflows on the default branch and any exact branches explicitly admitted by
+`githubDispatchBranches`. The separate signed-development policy is described below. The separately authored
+downstream E2E adapter has its own trust and provider-admission requirements in this section's
+[repository NVKE E2E adapter](#repository-nvke-e2e-adapter-outside-generated-execution) subsection;
+producer admission does not establish admission of that downstream workflow.
 
 With publication and signing omitted, the same native policy also admits a **build-only diagnostic**
 workflow at `static-unqualified`. It accepts plain disks and ADR-10's explicit public-bootstrap LUKS2

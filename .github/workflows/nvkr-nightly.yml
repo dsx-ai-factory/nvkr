@@ -256,8 +256,8 @@ jobs:
           go test ./internal/nvkedemo -list '^TestNightlyPublishedCandidate$' \
             | grep -Fx TestNightlyPublishedCandidate
           go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$' -timeout 330m -count=1 -v
-          jq -e --arg profile "$NVKR_NIGHTLY_PROFILE" --argjson run "$GITHUB_RUN_ID" \
-            --argjson attempt "$GITHUB_RUN_ATTEMPT" --arg sha "$GITHUB_SHA" '
+          jq -e --arg profile "$NVKR_NIGHTLY_PROFILE" --arg run "$GITHUB_RUN_ID" \
+            --arg attempt "$GITHUB_RUN_ATTEMPT" --arg sha "$GITHUB_SHA" '
             .profile == $profile and .phase == "runtime" and .runtimePassed == true and
             .coordinatorRun == $run and .coordinatorAttempt == $attempt and
             .sourceCommit == $sha and .qualificationAuthority == "none"

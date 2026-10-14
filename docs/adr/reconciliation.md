@@ -1320,7 +1320,11 @@ workflow and manifests.
 Named-bundle contract tests in `pkg/nvkr/factory/github_bundle_test.go` and
 `pkg/nvkr/definition/github_bundle_test.go` cover default behavior, coexistence,
 independent drift/retirement, cross-namespace refusal, exact utility Plan paths
-and name admission before catalog resolution. Those contracts do not prove hosted
+and name admission before catalog resolution. Named producers use the disjoint
+`nvkr-project-<bundle>` display-name namespace. Same-Definition contracts cover
+distinct workflow/concurrency names, display-name validation and exclusion from
+the default qualifier's `workflow_run` selection; default/development display names
+and all workflow paths are preserved. Those contracts do not prove hosted
 execution, complete crash recovery or acceptance of scheduled downstream tests.
 
 NVKE owns guest/cluster provisioning, assertions and teardown. The parent harness

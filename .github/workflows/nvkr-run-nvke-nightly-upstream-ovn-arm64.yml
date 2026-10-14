@@ -2,7 +2,7 @@
 # plan: .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json
 # manifest: .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/manifest.json
 # qualification: pipeline-attested (runtime receipts are not fabricated)
-name: nvkr-run-nvke-nightly-upstream-ovn-arm64
+name: nvkr-project-nvke-nightly-upstream-ovn-arm64
 'on':
   workflow_dispatch: {}
 permissions:
