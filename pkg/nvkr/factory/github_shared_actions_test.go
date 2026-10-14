@@ -348,9 +348,10 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 		changed.Files[GitHubActionDataPath] = raw
 	}
 	for _, test := range []struct {
-		name   string
-		code   e.Code
-		mutate func(*GeneratedBundle)
+		name       string
+		code       e.Code
+		diagnostic string
+		mutate     func(*GeneratedBundle)
 	}{
 		{name: "missing data member", code: e.CodePipelineDrift, mutate: func(changed *GeneratedBundle) {
 			delete(changed.Files, GitHubActionDataPath)
@@ -405,7 +406,7 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 				t.Fatal("fixture has no active execution name parameter")
 			})
 		}},
-		{name: "unplanned selector", code: e.CodeEngineCapability, mutate: func(changed *GeneratedBundle) {
+		{name: "unplanned selector", code: e.CodeEngineCapability, diagnostic: "must execute exact node", mutate: func(changed *GeneratedBundle) {
 			rewriteData(changed, func(data *githubActionDataDocument) {
 				for _, job := range sortedKeys(data.Entries) {
 					entry := data.Entries[job]
@@ -462,7 +463,11 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 			changed := *bundle
 			changed.Files = maps.Clone(bundle.Files)
 			test.mutate(&changed)
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), test.code)
+			err := ValidateGitHubBundle(t.Context(), plan, &changed)
+			assertFactoryErrorCode(t, err, test.code)
+			if test.diagnostic != "" && !strings.Contains(err.Error(), test.diagnostic) {
+				t.Fatalf("mutation reached the wrong admission guard: %v", err)
+			}
 		})
 	}
 }
