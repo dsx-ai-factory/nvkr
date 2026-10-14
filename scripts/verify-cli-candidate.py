@@ -205,6 +205,7 @@ def main(args):
         chosen = json.loads(subprocess.check_output([nvkr, "run", "artifact-test-inputs", "--plan", str(plan)], text=True))
         assert chosen["commit"] == SOURCE and chosen["treeHash"] == TREE
         assert chosen["toolchainImage"] == selected and chosen["platform"] == "linux/" + args.arch, chosen
+        run(["tar", "-czf", str(root / "candidate-inputs.tgz"), "-C", str(root), "inputs"])
         run([nvkr, "run", "local", *authored, "--attempt", "fresh", "--attempts-root", str(root / "runs"), "--ui", "plain"], root / "build.log", 2400)
         artifact = root / "runs/fresh/nvkectl/out/nvkectl/nvkectl"
         before = sha(artifact)
@@ -298,6 +299,7 @@ def main(args):
             write(registry_path, registry_input)
             wrong_plan = root / "wrong-version-plan.json"
             run([nvkr, "run", "plan", *authored, "--json"], wrong_plan)
+            run(["tar", "-czf", str(root / "wrong-version-inputs.tgz"), "-C", str(root), "inputs"])
             run([nvkr, "run", "local", *authored, "--attempt", "wrong-version", "--attempts-root", str(root / "runs"), "--ui", "plain"], root / "wrong-version-build.log", 2400)
             wrong_artifact = root / "runs/wrong-version/nvkectl/out/nvkectl/nvkectl"
             # Real recipe-built executable, deliberately tested against the original version binding.
