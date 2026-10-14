@@ -83,13 +83,16 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 					t.Fatalf("%s does not retain the approved source commit/tree/epoch", name)
 				}
 			}
-			// SPIRE packaging consumes the source-built DSX plugin as a material.
+			// Temporary SPIRE-only rollback is tracked in NVKE issue #1641.
 			spire := cat.Components["nvke-spire-agent"]
-			if spire.Commit != approvedSource || spire.TreeHash != agent.TreeHash || spire.SourceDate != agent.SourceDate {
-				t.Fatal("SPIRE packaging must retain the capture-capable source including the DSX plugin")
+			if spire.Commit != "726f76944404e1106626b8333d3576bdf67b575b" || spire.TreeHash != "3d6ea77f85d5da2648038425f805a598e23464ba" || spire.SourceDate != 1790192178 {
+				t.Fatal("temporary SPIRE source pin changed")
 			}
-			if spire.Materials["dsx-imds-agent"] != "dsx-imds-node-attestor-agent" || len(spire.Materials) != 4 || len(spire.VendorCommand) != 0 {
-				t.Fatal("SPIRE must consume four authenticated materials instead of downloading its DSX plugin")
+			if len(spire.Materials) != 0 || len(spire.VendorCommand) == 0 {
+				t.Fatal("temporary SPIRE producer must retain its source-owned acquisition contract without DSX materials")
+			}
+			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
+				t.Fatal("temporary SPIRE selection unexpectedly reintroduced DSX")
 			}
 			if agent.Commit != approvedSource || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.2.1-81-gff21ba8") {
 				t.Fatal("handwritten agent version no longer matches its exact source pin; revalidate owning source version before repinning")
@@ -108,24 +111,12 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			}
 			found := false
 			compositionFound := false
-			pluginFound, spireFound := false, false
+			spireFound := false
 			for _, node := range graph.Nodes {
-				if node.Kind == ir.KindBuild && node.Component == "dsx-imds-node-attestor-agent" {
-					pluginFound = true
-					if node.SourceCommit != "76b0ba906b7d3bc7002d3d431f1f0e1819743aab" ||
-						node.Platform != output.Platform || node.Network != ir.NetworkNone {
-						t.Fatal("DSX plugin must build offline from its selected source on the native target")
-					}
-				}
 				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
 					spireFound = true
-					if node.SourceCommit != approvedSource || node.Network != ir.NetworkNone || len(node.Materials) != 4 {
-						t.Fatal("SPIRE packaging must consume four materials offline at its selected source")
-					}
-					for _, binding := range node.Materials {
-						if spire.Materials[binding.Binding] != binding.Component || !slices.Contains(node.Needs, binding.Producer) {
-							t.Fatal("SPIRE input lost its exact producer dependency")
-						}
+					if node.SourceCommit != spire.Commit || node.Network != ir.NetworkNone || len(node.Materials) != 0 {
+						t.Fatal("SPIRE packaging must use the exact temporary source and its acquired closure offline")
 					}
 				}
 				if node.Kind == ir.KindBuild && node.Component == "nvke-image-inputs" {
@@ -141,7 +132,7 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 						}
 					}
 					if !spireMaterial {
-						t.Fatal("image composition must consume the complete SPIRE package")
+						t.Fatal("image composition must consume the selected SPIRE package")
 					}
 				}
 				if node.Kind != ir.KindBuild || node.Component != root {
@@ -201,8 +192,8 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			if !compositionFound {
 				t.Fatal("image-input composition producer missing from graph")
 			}
-			if !pluginFound || !spireFound {
-				t.Fatal("disk graph must retain the source-built DSX plugin and complete SPIRE packaging")
+			if !spireFound {
+				t.Fatal("disk graph must retain the selected SPIRE packaging producer")
 			}
 		})
 	}

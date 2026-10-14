@@ -16,7 +16,6 @@ outputs:
       overlays: [../nvke-m2/native-toolchains.yaml]
     format: disk-image
     components:
-      - dsx-imds-node-attestor-agent
       - nvke-agent
       - nvke-cni-calico
       - nvke-cni-ovn
@@ -27,7 +26,4 @@ outputs:
       - nvke-spire-agent
       - ovn-kube-ubuntu
       - ovn-kubernetes-chart
-      - spire-agent-upstream
-      - spire-tpm-attestor-upstream
-      - spire-tpm-pubhash-upstream
       - ubuntu-installer-iso-amd64

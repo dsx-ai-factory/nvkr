@@ -57,32 +57,18 @@ native image digests. Do not maintain a second digest table in documentation. Po
 retain their source-owned index digests as well as the selected native child pins; acquisition checks
 actual parent-to-child membership before using the native image.
 
-The OS, Calico, kubeadm and SPIRE packaging sources use the capture-capable NVKE commit.
-The earlier temporary SPIRE pin that omitted the DSX plugin is removed. The OS catalog builds
-`dsx-imds-node-attestor-agent` from the exact pinned `project-dsx-identity` source with vendored Go
-dependencies and no build network. SPIRE packaging consumes that binary plus digest-pinned upstream
-SPIRE and TPM-plugin archives through ordinary material bindings. It invokes the source-owned Debian
-packager offline, then passes the complete package to `nvke-image-inputs` and Packer. Packer does not
-clone the DSX source or acquire its plugin. The package's original paths, units and install-time checksum
-generation remain source-owned; newly built plugin bytes do not reuse the historical S3 checksum.
+OS assembly, agent, Calico and kubeadm retain the capture-capable NVKE commit. SPIRE packaging alone
+temporarily selects the prior NVKE commit `726f76944404e1106626b8333d3576bdf67b575b`, with its matching
+source-owned acquisition and Debian packaging commands. It stages SPIRE `1.14.1` and TPM plugin `1.9.0`,
+then packages them offline before image-input composition and Packer. This is a packaging-source rollback,
+not a change to the SPIRE server/container outputs or the OS/agent source pins.
 
-The DSX repository is private. Authorized source acquisition and source builds do not approve OSS
-distribution: public-release inclusion still needs its owner's confirmation. Production and development
-Environments route a separate fine-grained `DSX_SOURCE_TOKEN`, restricted to this repository, only to authenticated DSX fetch jobs. The workflow credential's
-actual DSX read access and a full hosted image build with the restored package remain unverified.
-There is also a native local source-admission blocker: this exact DSX tree declares submodules, whereas
-ADR-18's ordinary local source route rejects nonempty `.gitmodules` and gitlinks. The plugin does not
-need their contents, but that alone does not authorize ignoring them. No metadata removal, source-pin
-substitution or admission relaxation is included here; a supported source projection or upstream source
-contract is required before these local disk selections can execute the restored plugin through NVKR.
-Local offline checks built both plugin architectures and extracted both DEBs to verify the embedded
-plugin bytes; AMD64 was cross-compiled and both packages used a local diagnostic toolchain, not the
-maintained Packer image. These checks do not establish native AMD64 execution or package behavior on a
-booted node. Pulling the maintained ARM64 Packer image was denied by registry scope, so its runtime
-validation remains pending.
-The pinned vulnerability scanner, run with Go 1.27.2 against this plugin's vendored closure, reports
-12 reachable vulnerabilities across six modules. Upstream dependency remediation and security review
-remain required; neither successful compilation nor packaging clears those findings.
+The older package omits DSX IMDS, which current NVKE requires. This temporary selection is explicitly
+incomplete relative to that product requirement, not a claim of full NVKE parity. Restoration is tracked
+in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641): agree on supported source admission,
+triage the selected DSX dependency findings and confirm the source/binary and distribution contracts.
+The blocked DSX source-build producer, its material-only components and its unused source credentials
+are not selected or retained in this catalog. Source and security admission are not weakened.
 The [merged-source handoff](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
 records NVKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
@@ -218,8 +204,8 @@ Assembly authenticates same-Plan, same-workflow metadata and evidence; it does n
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities, but
 hosted mixed-attempt reuse remains unexercised.
 
-Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE
-or the separately provisioned, DSX-only `DSX_SOURCE_TOKEN`; native build jobs receive source bytes without either
+Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE;
+native build jobs receive source bytes without that
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
 before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
 package. Restrict `nkd-arc`, `nkd-release` and the signing identity to the selected refs. Maintained inputs
@@ -259,14 +245,15 @@ records both workflow files. Generation and drift checks do not execute any prod
 The generator rejects a workflow above 500,000 bytes before writing. YAML compaction preserves the
 expanded job graph and credential boundaries. Changes to authored inputs must regenerate these files;
 never edit the bundle by hand.
-The current production workflow is 462,507 bytes, leaving 37,493 bytes below that limit; development is
-442,400 bytes. The maintained rendering regression rejects growth above 95% of the provider limit so
+The current production workflow is 457,407 bytes, leaving 42,593 bytes below that limit; development is
+437,464 bytes. The maintained rendering regression rejects growth above 95% of the provider limit so
 further membership expansion must first preserve compaction headroom. This is a maintenance guard,
 not a different provider or runtime limit.
 
 Source/artifact maintenance belongs to reviewed catalog changes using `catalog pin`, `catalog bump`
-and `catalog pin-artifacts`. Do not copy historical preparation commands that would silently restore the
-temporary incomplete SPIRE selection. The opt-in full graph integration runs with
+and `catalog pin-artifacts`. SPIRE intentionally retains the temporary selection described above;
+review [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) before changing that contract.
+The opt-in full graph integration runs with
 `NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1` and authorized pinned-source access; ordinary tests receive no
 private-source credentials. Pinning and graph tests establish their own contracts, not production launch.
 

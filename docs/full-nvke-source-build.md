@@ -20,7 +20,7 @@ The catalogs introduced by
 [OVN outputs](../definitions/nvke-ovn-source/README.md). The local demo selects
 the OVN fork producers for the disk's chart/image packages. The other direct-source
 OS producers are not yet integrated into that selection. M2 still uses the source-owned package-folder
-producers; adding its independent DSX material does not integrate the remaining direct-source catalog.
+producers and temporarily retains the older plugin-free SPIRE package; the remaining direct-source catalog is not integrated.
 The remaining migration is not completed by merging those
 candidate catalogs.
 
@@ -35,7 +35,7 @@ candidate catalogs.
 | OVN image/chart/packages | The local demo selects PR #113's pinned DSX fork producers for its OS material closure, with matching profile and tenant chart stream | Fresh Packer/boot acceptance and maintained M2 integration. Independently published outputs are separate from embedded-disk bytes unless original-owner reuse is established. The fork's standard Ubuntu Dockerfile still uses APT; not every embedded subcomponent is Git-built |
 | Twelve deployment runtime images | Current M2 image catalog acquires pinned native images | Source-build/image-package producers for the selected PostgreSQL, Temporal, SPIRE, CSI and related inputs. OS source producers alone do not replace these acquired images |
 | Upstream charts/operator tools | Current laptop catalog acquires four charts and Helm/kubectl | Source chart producers and source-built operator tools; retain correct values/image bindings and chart dependencies |
-| DSX IMDS | M2 selects private `project-dsx-identity` at `76b0ba906b7d3bc7002d3d431f1f0e1819743aab` and feeds a source-built agent into SPIRE packaging | Ordinary local source admission rejects that tree's submodules; reachable dependency vulnerabilities and OSS-inclusion approval remain unresolved. Standalone plugin builds do not establish source admission, boot behavior or distribution clearance |
+| DSX IMDS | Current NVKE requires this plugin; M2 temporarily retains the older SPIRE package without it | [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks supported source admission, dependency remediation/disposition and source/binary/distribution confirmation. The older package is not a complete NVKE build |
 | OS material assembly | Existing OS graph produces image-inputs and stages them for source-owned Packer | Connect direct-source binary/image packages, remove package-folder calls including indirect agent packaging, and preserve the source-owned material contract |
 | Shared published/embedded image/chart bytes | [Issue #116](https://github.com/dsx-ai-factory/nvkr/issues/116) records the missing generic handoff | An authenticated original-owner cross-output reuse contract. Independent rebuilds cannot be relabeled as identical published bytes |
 | Local OS runtime | Native Colima Docker/TCG can execute the declared disk graph; Docker Desktop on macOS is not supported by this launcher | Complete source smoke, direct-source material integration and tenant/workload acceptance. A disk build does not prove these gates |

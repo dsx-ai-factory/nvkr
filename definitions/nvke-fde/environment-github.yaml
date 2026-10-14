@@ -25,9 +25,6 @@ runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
 sourceAccess:
-  https://github.com/dsx-ai-factory/project-dsx-identity:
-    credentialRef: github:DSX_SOURCE_TOKEN
-    mirror: https://github.com/dsx-ai-factory/project-dsx-identity
   https://github.com/dsx-ai-factory/nvke.git:
     credentialRef: github:NKE_SOURCE_TOKEN
     mirror: https://github.com/dsx-ai-factory/nvke

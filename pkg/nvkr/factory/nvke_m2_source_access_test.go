@@ -19,7 +19,7 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 	const repository = "https://github.com/dsx-ai-factory/nvke.git"
 	const mirror = "https://github.com/dsx-ai-factory/nvke"
 	const dsxRepository = "https://github.com/dsx-ai-factory/project-dsx-identity"
-	privateRepositories := map[string]string{repository: mirror, dsxRepository: dsxRepository}
+	privateRepositories := map[string]string{repository: mirror}
 	environment, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "environment-github.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -27,8 +27,14 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 	if access, ok := environment.SourceAccess[mirror]; !ok || access.Mirror != mirror || access.CredentialRef != "github:NKE_SOURCE_TOKEN" {
 		t.Fatal("existing CLI/controller source access was changed")
 	}
-	if access, ok := environment.SourceAccess[dsxRepository]; !ok || access.Mirror != dsxRepository || access.CredentialRef != "github:DSX_SOURCE_TOKEN" {
-		t.Fatal("DSX source access must retain its exact repository-scoped projection")
+	for _, path := range []string{filepath.Join(root, "environment-github.yaml"), filepath.Join(root, "environment-github-dev.yaml"), "../../../definitions/nvke-fde/environment-github.yaml"} {
+		selected, err := definition.LoadEnvironment(t.Context(), path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, exists := selected.SourceAccess[dsxRepository]; exists {
+			t.Fatal("temporary SPIRE rollback must not retain unused DSX credential access", path)
+		}
 	}
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
 	if err != nil {
@@ -62,6 +68,9 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 			plan := &Plan{Definition: authored, Environment: environment, Builds: []BuildPlan{{Name: output.Name, CatalogSnapshot: cat, Graph: graph}}}
 			privateFetches := make(map[string]int)
 			for _, source := range graph.Nodes {
+				if source.Repo == dsxRepository || source.Component == "dsx-imds-node-attestor-agent" {
+					t.Fatal("temporary SPIRE rollback must not schedule a DSX fetch or build")
+				}
 				node := Node{BuildTarget: output.Name, IRNode: source.ID, Kind: NodeBuild}
 				if source.Kind == ir.KindFetch {
 					node.Kind = NodeFetch
@@ -75,16 +84,12 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 					continue
 				}
 				privateFetches[source.Repo]++
-				credential := "${{ secrets.NKE_SOURCE_TOKEN }}"
-				if source.Repo == dsxRepository {
-					credential = "${{ secrets.DSX_SOURCE_TOKEN }}"
-				}
-				if projected[sourceTokenEnv] != credential || projected["GIT_CONFIG_VALUE_0"] != source.Repo || projected["GIT_CONFIG_KEY_0"] != "url."+selectedMirror+".insteadOf" || projected["GIT_CONFIG_KEY_2"] != "credential."+selectedMirror+".helper" {
+				if projected[sourceTokenEnv] != "${{ secrets.NKE_SOURCE_TOKEN }}" || projected["GIT_CONFIG_VALUE_0"] != source.Repo || projected["GIT_CONFIG_KEY_0"] != "url."+selectedMirror+".insteadOf" || projected["GIT_CONFIG_KEY_2"] != "credential."+selectedMirror+".helper" {
 					t.Errorf("private source fetch %s has no exact approved credential/mirror projection", source.ID)
 				}
 			}
-			if privateFetches[repository] != 4 || privateFetches[dsxRepository] != 1 {
-				t.Fatalf("private source fetches = %v, want four NVKE sources and the independent DSX source", privateFetches)
+			if privateFetches[repository] != 4 || len(privateFetches) != 1 {
+				t.Fatalf("private source fetches = %v, want four NVKE source closures only", privateFetches)
 			}
 		})
 	}

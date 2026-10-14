@@ -7,20 +7,6 @@ metadata:
   name: nvke-m2-os
   description: Non-FDE and public-bootstrap FDE NVKE node images from explicit authenticated component outputs.
 sources:
-  dsx-imds:
-    repo: https://github.com/dsx-ai-factory/project-dsx-identity
-    # Exact commit pin only; no DSX release stream has been selected.
-    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
-    vendorCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-        pins="$(sha256sum go.mod go.sum)"
-        go mod download
-        GOPROXY=off go mod verify
-        GOPROXY=off go mod vendor
-        printf '%s\n' "$pins" | sha256sum -c -
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: 0.1.x
@@ -98,44 +84,13 @@ sources:
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
-components:
-  spire-agent-upstream:
-    platforms: [linux/amd64, linux/arm64]
-    source: nvke-spire-agent-source
-    outputType: tarball
-    prebuilt:
-      url: https://github.com/spiffe/spire/releases/download/v1.14.1/spire-1.14.1-linux-{{.Arch}}-musl.tar.gz
-      evidence: {none: true}
-  spire-tpm-attestor-upstream:
-    platforms: [linux/amd64, linux/arm64]
-    source: nvke-spire-agent-source
-    outputType: tarball
-    prebuilt:
-      url: https://github.com/spiffe/spire-tpm-plugin/releases/download/v1.9.0/spire_tpm_plugin_tpm_attestor_agent_linux_{{.Arch}}_v1.9.0.tar.gz
-      evidence: {none: true}
-  spire-tpm-pubhash-upstream:
-    platforms: [linux/amd64, linux/arm64]
-    source: nvke-spire-agent-source
-    outputType: tarball
-    prebuilt:
-      url: https://github.com/spiffe/spire-tpm-plugin/releases/download/v1.9.0/spire_tpm_plugin_get_tpm_pubhash_linux_{{.Arch}}_v1.9.0.tar.gz
-      evidence: {none: true}
-  dsx-imds-node-attestor-agent:
-    platforms: [linux/amd64, linux/arm64]
-    fromSource: true
-    source: dsx-imds
-    cgo: false
-    outputType: host-package
-    buildCommand:
+    vendorCommand:
       - bash
-      - -euc
+      - -ec
       - |
-        export CGO_ENABLED=0 GOOS=linux GOARCH={{.Arch}}
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-        go build -trimpath -buildvcs=false -ldflags=-buildid= \
-          -o nvkr-output/dsx-imds-node-attestor-agent ./cmd/dsx-imds-node-attestor-agent
-    writeDir: nvkr-output
-    artifactPath: nvkr-output/dsx-imds-node-attestor-agent
+        make -C os-image/packages/spire-agent bundle nfpm \
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+components:
   nvke-agent:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
@@ -530,33 +485,17 @@ components:
     fromSource: true
     source: nvke-spire-agent-source
     outputType: tarball
-    materials:
-      dsx-imds-agent: dsx-imds-node-attestor-agent
-      spire-agent: spire-agent-upstream
-      tpm-attestor: spire-tpm-attestor-upstream
-      tpm-pubhash: spire-tpm-pubhash-upstream
     buildCommand:
       - bash
       - -ec
       - |
-        mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent /src/nvkr-output/upstream
+        mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent
         cp -a os-image/packages/spire-agent /src/nvkr-output/work/os-image/packages/
         cp -a os-image/files /src/nvkr-output/work/os-image/
-        tar -xzf /nvkr/inputs/materials/spire-agent --no-same-owner \
-          -C /src/nvkr-output/upstream spire-1.14.1/bin/spire-agent
-        tar -xzf /nvkr/inputs/materials/tpm-attestor --no-same-owner \
-          -C /src/nvkr-output/upstream tpm_attestor_agent
-        tar -xzf /nvkr/inputs/materials/tpm-pubhash --no-same-owner \
-          -C /src/nvkr-output/upstream get_tpm_pubhash
-        mkdir -p /src/nvkr-output/bundle
-        install -m 0755 /src/nvkr-output/upstream/spire-1.14.1/bin/spire-agent \
-          /src/nvkr-output/upstream/tpm_attestor_agent /src/nvkr-output/upstream/get_tpm_pubhash \
-          /nvkr/inputs/materials/dsx-imds-agent /src/nvkr-output/bundle/
-        mv /src/nvkr-output/bundle/dsx-imds-agent /src/nvkr-output/bundle/dsx-imds-node-attestor-agent
-        SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=2 \
+        SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
           NFPM_BIN=/usr/local/bin/nfpm \
           /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
-          {{.Arch}} /src/nvkr-output/bundle \
+          {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \
           /src/nvkr-output/spire-agent
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
           --numeric-owner -C /src/nvkr-output/spire-agent \

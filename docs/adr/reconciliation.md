@@ -1012,8 +1012,8 @@ preparation and operation parameters select their own job context. Static expans
 independent nodes before substitution so sibling selectors and credentials cannot be mutated together.
 Operation calls with provider controls stay explicit. The combined candidate retains all members under
 the existing workflow-size bound; this is local generation/expansion evidence, not hosted execution.
-The current production workflow is 462,507 bytes (37,493 bytes of provider headroom); development is
-442,400 bytes. The maintained rendering test fails above a 95% soft budget, before the unchanged
+The current production workflow is 457,407 bytes (42,593 bytes of provider headroom); development is
+437,464 bytes. The maintained rendering test fails above a 95% soft budget, before the unchanged
 500,000-byte provider admission bound, directing membership changes to compaction work.
 Matrix scheduling and reusable callable workflows remain deferred, and no fresh hosted execution of this
 composite layout is recorded. Oversized workflows still fail before writes. Native offline disk preparation
@@ -1215,20 +1215,16 @@ Native children are locked separately from source-owned index parents, and mater
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
-Current inputs restore the capture-capable SPIRE package and source-build the DSX IMDS plugin from its
-separate Git pin, then bind it with acquired upstream SPIRE/TPM archives into offline packaging before
-image composition. Local checks built both plugin targets and verified their bytes in extracted native
-DEBs; AMD64 was cross-compiled and packaging used a local diagnostic toolchain. NKTP dependency
-acquisition and offline Helm packaging were also exercised locally. No combined hosted Run of these
-additions, native AMD64 plugin execution or DSX OSS distribution approval is established. The maintained
-ARM64 Packer image pull was denied by registry scope; local diagnostic success does not validate that pin.
-Ordinary local DSX acquisition is also blocked by ADR-18's existing refusal of nonempty `.gitmodules`
-and gitlinks. A standalone plugin build without submodule contents does not admit the enclosing source
-tree. These inputs do not remove metadata or relax admission; supported source projection or an upstream
-source contract remains necessary before claiming a native local NVKR build of the restored package.
-The repository-pinned vulnerability scanner also reports 12 reachable vulnerabilities across six modules
-for this DSX agent at Go 1.27.2. Its source pin has not been silently replaced or patched; upstream
-remediation and review remain open. The separate NVKR repository scan is clean.
+Current inputs temporarily retain the prior SPIRE packaging source `726f76944404e1106626b8333d3576bdf67b575b`
+and its source-owned acquisition/packaging commands. OS assembly, agent, Calico, kubeadm and native
+Packer capture retain their existing pins and contracts. The older SPIRE package omits DSX IMDS,
+which current NVKE requires; this is an explicitly incomplete compatibility selection, not full product parity.
+The blocked DSX producer, its material-only selections and unused source credentials are removed.
+[NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks supported DSX source admission,
+dependency-finding triage and confirmation of source/binary and distribution contracts. No source gate,
+submodule rejection or security requirement is weakened to admit that dependency. Standalone plugin
+compilation does not establish those contracts or native execution/boot acceptance. NKTP acquisition and
+offline Helm packaging were exercised locally; no combined hosted Run of these release additions is claimed.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,

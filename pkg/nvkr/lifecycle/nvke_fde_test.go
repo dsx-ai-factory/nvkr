@@ -57,9 +57,9 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 		}
 	}
 	wantComponents := strings.Fields(`
-		dsx-imds-node-attestor-agent nvke-agent nvke-cni-calico nvke-cni-ovn nvke-image-inputs nvke-kubeadm-distro
+		nvke-agent nvke-cni-calico nvke-cni-ovn nvke-image-inputs nvke-kubeadm-distro
 		nvke-node-fde-amd64 nvke-patched-installer-iso-amd64 nvke-spire-agent ovn-kube-ubuntu ovn-kubernetes-chart
-		spire-agent-upstream spire-tpm-attestor-upstream spire-tpm-pubhash-upstream ubuntu-installer-iso-amd64`)
+		ubuntu-installer-iso-amd64`)
 	if roots != 1 || !slices.Equal(plan.Builds[0].Components, wantComponents) ||
 		len(plan.Builds[0].ResolvedComponents) != len(wantComponents) {
 		t.Fatal("FDE iteration lost its exact root and material closure")
@@ -151,9 +151,9 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 				t.Fatal("missing FDE build", name)
 			}
 			build := plan.Builds[index]
-			wantComponents := []string{"dsx-imds-node-attestor-agent", "nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro",
+			wantComponents := []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro",
 				name, tc.patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart",
-				"spire-agent-upstream", "spire-tpm-attestor-upstream", "spire-tpm-pubhash-upstream", tc.installer}
+				tc.installer}
 			if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != len(wantComponents) {
 				t.Fatalf("unexpected native FDE closure: platform=%s components=%v", build.Platform, build.Components)
 			}

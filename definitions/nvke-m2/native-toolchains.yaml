@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nvke-m2-native-toolchains
-requiresCatalogDigest: sha256:5e47715f42a45d93f7186f6fd7b9693c1c80eb3e922b9f289bd5ad8abaf56c97
+requiresCatalogDigest: sha256:7b2edee8f03952f7efd8af71fd4a1beb43d4d883d7502d59398c6e50761db73c
 # Candidate-only exception: https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md.
 toolchainSubstitutions:
   - arch: amd64
