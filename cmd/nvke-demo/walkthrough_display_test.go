@@ -10,6 +10,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
+	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestWalkthroughPagesStayVisibleAndSurviveLaterLiveStatus(t *testing.T) {
@@ -63,5 +67,64 @@ func TestWalkthroughPresentationAggregateBound(t *testing.T) {
 	}
 	if err := w.writeOperatorPresentation(strings.Repeat("x", 64<<10), true); err == nil || ctx.Err() == nil {
 		t.Fatal("unbounded walkthrough retained")
+	}
+}
+
+func TestFailedWalkthroughReleasesPageForCleanupAndRetainsReplay(t *testing.T) {
+	for _, width := range []int{80, 160} {
+		t.Run(fmt.Sprint(width), func(t *testing.T) {
+			_, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			view := newDashboard()
+			view.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFinished, Name: "tenant-provisioning"})
+			writer := &checkedWriter{out: view, observer: view, cancel: cancel, started: time.Now(), phases: make(map[string]time.Time)}
+			page := "Walkthrough page 2/5 · observed before cleanup\nSite / Kind management\n$ kubectl --kubeconfig <site> get pods -A -o json\nObserved partial pod inventory\n"
+			if err := writer.writeOperatorPresentation(page, true); err != nil {
+				t.Fatal(err)
+			}
+			screen := dashboardScreen(t, width)
+			screen.SetSize(width, 42)
+			view.draw(screen, time.Now(), false)
+			if !strings.Contains(dashboardText(screen), "Recorded kubectl walkthrough") {
+				t.Fatal("walkthrough page was not initially visible")
+			}
+			// Background observations can arrive during the page's display interval.
+			// They must not dismiss it as if the workflow had advanced.
+			for _, event := range []nvkedemo.ProgressEvent{
+				{Kind: nvkedemo.OSBuildLogs, BuildLogs: buildactivity.Record{Version: 1, Operation: "os/build-disk"}},
+				{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane}, {Role: nvkedemo.TenantGuestWorker}}},
+				{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", RegisteredNodes: 2, ReadyNodes: 2},
+				{Kind: nvkedemo.ProcessStarted, Name: "build-all"},
+				{Kind: nvkedemo.ProcessExited, Name: "build-all"},
+				{Kind: "unknown", Name: "tenant-cleanup"},
+			} {
+				writer.Report(event)
+				if view.snapshot().operatorPage != page {
+					t.Fatalf("metadata %q dismissed the walkthrough page", event.Kind)
+				}
+			}
+			// The owner can fail before WriteLiveStatus and still enter cleanup.
+			// No successful final snapshot is needed to release this partial page.
+			failure := nvkrerr.New(nvkrerr.CodePreflightFailed, "walkthrough observation failed")
+			writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "tenant-cleanup"})
+			view.draw(screen, time.Now(), false)
+			text := dashboardText(screen)
+			if !strings.Contains(text, "Clean up the owned tenant") || strings.Contains(text, "Recorded kubectl walkthrough") {
+				t.Fatal("cleanup hidden behind the failed walkthrough page", text)
+			}
+			if snapshot := view.snapshot(); snapshot.operatorPage != "" || snapshot.phases[5].state != "running" {
+				t.Fatal("cleanup did not replace the dedicated page", snapshot.operatorPage, snapshot.phases[5])
+			}
+			var restored bytes.Buffer
+			if err := finishDashboardProgress(writer, &restored, "", failure, nil); err != failure {
+				t.Fatal("presentation changed the owning failure", err)
+			}
+			if !strings.Contains(restored.String(), page) || !strings.Contains(restored.String(), "historical observations") {
+				t.Fatal("cleanup discarded partial walkthrough replay", &restored)
+			}
+			if strings.Contains(restored.String(), "Demo command returned successfully") {
+				t.Fatal("failed walkthrough replay claimed success")
+			}
+		})
 	}
 }

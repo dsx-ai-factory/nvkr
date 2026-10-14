@@ -371,6 +371,15 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 	default:
 		return
 	}
+	// A workflow boundary resumes the live phase view even when a failed
+	// walkthrough never reaches its final live snapshot. Background metadata
+	// returns above and cannot dismiss a page during its display interval.
+	// The independent walkthroughStatus buffer still owns historical replay.
+	if dashboard, ok := w.out.(*dashboard); ok {
+		dashboard.mu.Lock()
+		dashboard.operatorPage = ""
+		dashboard.mu.Unlock()
+	}
 	if w.observer != nil {
 		w.observer.Report(event)
 	}
