@@ -79,6 +79,12 @@ packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.
 
+The shared OS catalog now declares the source-built DSX IMDS plugin and complete SPIRE package.
+These local disk selections include their material dependencies. They are not yet runtime-accepted:
+the DSX pin's submodule declarations are refused by ordinary local source admission, and its dependency
+scan has open findings. See the [M2 source limitations](../nvke-m2/README.md#additional-release-members-and-their-source-contracts).
+No local NVKE checkout or runner profile is repinned by this catalog update.
+
 The combined selection also produces standalone OVN OCI image and image-bound
 Helm OCI outputs. They have their own build identities; do not assume their bytes
 equal the disk's embedded image/chart unless original-owner reuse is established.

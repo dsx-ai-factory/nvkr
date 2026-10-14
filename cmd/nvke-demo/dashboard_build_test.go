@@ -371,7 +371,20 @@ func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := d.snapshot()
-	if s.buildTruncated || len(s.buildVertices) == 0 || len(s.buildEdges) == 0 || s.phases[1].state != "running" {
+	// The maintained selection may outgrow the launcher's deliberate display
+	// bounds. Preserve its explicit incomplete-display marker, not an assumption
+	// that every complete Release fits in the diagnostic view.
+	_, summary, found := strings.Cut(string(raw), "Build display: ")
+	var totals struct {
+		Vertices  int  `json:"vertices"`
+		Edges     int  `json:"edges"`
+		Truncated bool `json:"truncated"`
+	}
+	if !found || json.Unmarshal([]byte(summary), &totals) != nil {
+		t.Fatal("launcher projection omitted its bounded-display summary")
+	}
+	if s.buildTruncated != totals.Truncated || len(s.buildVertices) != totals.Vertices ||
+		len(s.buildEdges) != totals.Edges || len(s.buildVertices) == 0 || len(s.buildEdges) == 0 || s.phases[1].state != "running" {
 		t.Fatal("maintained Plan projection lost links or promoted execution authority")
 	}
 	vertices := make(map[string]bool, len(s.buildVertices))

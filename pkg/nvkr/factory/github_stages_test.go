@@ -306,7 +306,7 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 				for _, id := range sortedKeys(document.Jobs) {
 					job := document.Jobs[id]
 					for index, step := range job.Steps {
-						if strings.HasPrefix(step.Name, "Fetch pinned source") {
+						if step.Uses == "./"+githubSharedDirectory+"execute-node" || step.Uses == "./"+githubSharedDirectory+"execute-source" {
 							steps := append([]githubStep(nil), job.Steps[:index]...)
 							steps = append(steps, githubStep{Name: "Injected shell", Run: "printf injected"})
 							job.Steps = append(steps, job.Steps[index:]...)

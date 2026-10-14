@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Maintained policy for the 35-output candidate, reviewed with the generated workflows.
+# Maintained policy for the 69-output candidate, reviewed with the generated workflows.
 # Pins are independent of producer artifacts. Real producer/hosted acceptance follows merge.
 # cosign v3.1.3 binaries match the official release assets and cosign_checksums.txt:
 # https://github.com/sigstore/cosign/releases/tag/v3.1.3
@@ -32,6 +32,66 @@ smoke:
   # Their signatures, provenance and membership remain required; any authored embedded metadata is checked strictly.
   # Helm and disk outputs have their own fixed non-tool format rule and are not listed here.
   nonToolOutputs:
+    - output: capi-controller-image
+      kind: oci
+      components: [capi-controller-image]
+      reason: deployment-image
+    - output: capi-controller-image-arm64
+      kind: oci
+      components: [capi-controller-image]
+      reason: deployment-image
+    - output: capi-kubeadm-bootstrap-image
+      kind: oci
+      components: [capi-kubeadm-bootstrap-image]
+      reason: deployment-image
+    - output: capi-kubeadm-bootstrap-image-arm64
+      kind: oci
+      components: [capi-kubeadm-bootstrap-image]
+      reason: deployment-image
+    - output: capi-kubeadm-control-plane-image
+      kind: oci
+      components: [capi-kubeadm-control-plane-image]
+      reason: deployment-image
+    - output: capi-kubeadm-control-plane-image-arm64
+      kind: oci
+      components: [capi-kubeadm-control-plane-image]
+      reason: deployment-image
+    - output: capnico-controller
+      kind: oci
+      components: [capnico-controller]
+      reason: deployment-image
+    - output: cert-manager-cainjector-image
+      kind: oci
+      components: [cert-manager-cainjector-image]
+      reason: deployment-image
+    - output: cert-manager-cainjector-image-arm64
+      kind: oci
+      components: [cert-manager-cainjector-image]
+      reason: deployment-image
+    - output: cert-manager-controller-image
+      kind: oci
+      components: [cert-manager-controller-image]
+      reason: deployment-image
+    - output: cert-manager-controller-image-arm64
+      kind: oci
+      components: [cert-manager-controller-image]
+      reason: deployment-image
+    - output: cert-manager-webhook-image
+      kind: oci
+      components: [cert-manager-webhook-image]
+      reason: deployment-image
+    - output: cert-manager-webhook-image-arm64
+      kind: oci
+      components: [cert-manager-webhook-image]
+      reason: deployment-image
+    - output: cluster-api-provider-provisioned
+      kind: oci
+      components: [cluster-api-provider-provisioned]
+      reason: deployment-image
+    - output: controller-profiles
+      kind: oci
+      components: [nvke-nico-reference-profiles]
+      reason: deployment-image
     - output: csi-node-driver-registrar-image
       kind: oci
       components: [csi-node-driver-registrar-image]
@@ -43,6 +103,70 @@ smoke:
     - output: cwe
       kind: oci
       components: [nvke-controller]
+      reason: deployment-image
+    - output: nktp-collector-image
+      kind: oci
+      components: [nktp-collector-image]
+      reason: deployment-image
+    - output: nktp-collector-image-arm64
+      kind: oci
+      components: [nktp-collector-image]
+      reason: deployment-image
+    - output: nktp-kube-state-metrics-image
+      kind: oci
+      components: [nktp-kube-state-metrics-image]
+      reason: deployment-image
+    - output: nktp-kube-state-metrics-image-arm64
+      kind: oci
+      components: [nktp-kube-state-metrics-image]
+      reason: deployment-image
+    - output: nktp-kubectl-image
+      kind: oci
+      components: [nktp-kubectl-image]
+      reason: deployment-image
+    - output: nktp-kubectl-image-arm64
+      kind: oci
+      components: [nktp-kubectl-image]
+      reason: deployment-image
+    - output: nktp-lgtm-image
+      kind: oci
+      components: [nktp-lgtm-image]
+      reason: deployment-image
+    - output: nktp-lgtm-image-arm64
+      kind: oci
+      components: [nktp-lgtm-image]
+      reason: deployment-image
+    - output: nktp-metrics-server-image
+      kind: oci
+      components: [nktp-metrics-server-image]
+      reason: deployment-image
+    - output: nktp-metrics-server-image-arm64
+      kind: oci
+      components: [nktp-metrics-server-image]
+      reason: deployment-image
+    - output: nktp-node-exporter-image
+      kind: oci
+      components: [nktp-node-exporter-image]
+      reason: deployment-image
+    - output: nktp-node-exporter-image-arm64
+      kind: oci
+      components: [nktp-node-exporter-image]
+      reason: deployment-image
+    - output: nktp-operator-image
+      kind: oci
+      components: [nktp-operator-image]
+      reason: deployment-image
+    - output: nktp-operator-image-arm64
+      kind: oci
+      components: [nktp-operator-image]
+      reason: deployment-image
+    - output: nktp-target-allocator-image
+      kind: oci
+      components: [nktp-target-allocator-image]
+      reason: deployment-image
+    - output: nktp-target-allocator-image-arm64
+      kind: oci
+      components: [nktp-target-allocator-image]
       reason: deployment-image
     - output: postgresql-image
       kind: oci

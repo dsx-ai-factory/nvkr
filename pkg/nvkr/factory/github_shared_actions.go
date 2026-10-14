@@ -142,7 +142,14 @@ func shareGitHubActions(plan *Plan, raw []byte, files map[string][]byte, actions
 					with = githubYAMLMap()
 				}
 				githubYAMLSet(with, "parameters", githubYAMLString(githubParametersExpression(key)))
-				projected := githubYAMLMap("name", githubYAMLString(invocation.Name), "uses", githubYAMLString("./"+path), "with", with)
+				// The job and inner role labels retain the selected producer's name.
+				// A stable interface label lets identical complete calls share a YAML
+				// anchor without naming a different producer in a sibling job.
+				label := githubYAMLValue(invocation.Body, "name")
+				if controlled {
+					label = invocation.Name
+				}
+				projected := githubYAMLMap("name", githubYAMLString(label), "uses", githubYAMLString("./"+path), "with", with)
 				for _, field := range githubTransferControlFields {
 					if value := githubYAMLField(call, field); value != nil {
 						githubYAMLSet(projected, field, value)

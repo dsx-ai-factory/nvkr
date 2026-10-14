@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -63,6 +64,81 @@ func githubActionInterfaceFixture(actions githubActionRefs, fixtures []githubInt
 		}
 	}
 	return source.Bytes()
+}
+
+func TestGitHubSemanticCallAliasesKeepIndependentJobParameters(t *testing.T) {
+	actions := testActionRefs(t, githubTestPlan(t))
+	raw := githubActionInterfaceFixture(actions, []githubInterfaceFixture{
+		{name: "first", nodes: 1, carriers: 1},
+		{name: "second", nodes: 1, carriers: 1},
+		{name: "grouped", nodes: 2, carriers: 2},
+	})
+	workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(workflow, []byte("*operation-execute-node-part-1")) {
+		t.Fatal("identical complete operation calls must share their semantic alias")
+	}
+	for range 2 {
+		expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Action inputs have string semantics; lowering normalizes scalar inputs
+		// such as retention-days from YAML integers to strings.
+		if !reflect.DeepEqual(decodeGitHubWorkflow(t, expanded), decodeGitHubWorkflow(t, raw)) {
+			t.Fatal("shared calls changed independent job parameters or mutated their descriptor")
+		}
+	}
+	assertGitHubCompositeReadableYAML(t, "workflow", workflow)
+}
+
+func TestGitHubSemanticCallAliasesRequireIdenticalUncontrolledCalls(t *testing.T) {
+	for _, test := range []struct {
+		name, field, value string
+		shared             bool
+	}{
+		{name: "identical", shared: true},
+		{name: "different credential", field: "credential", value: "${{ secrets.OTHER_SOURCE }}"},
+		{name: "different selector", field: "parameters", value: githubParametersExpression("part-2")},
+		{name: "step ID", field: "id", value: "source"},
+		{name: "condition", field: "if", value: "${{ always() }}"},
+		{name: "timeout", field: "timeout-minutes", value: "5"},
+		{name: "continue on error", field: "continue-on-error", value: "true"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			call := func() *yamlv3.Node {
+				return githubYAMLMap("name", githubYAMLString("execute source"),
+					"uses", githubYAMLString("./"+githubSharedDirectory+"execute-source"),
+					"with", githubYAMLMap("parameters", githubYAMLString(githubParametersExpression("part-1")),
+						"credential", githubYAMLString("${{ secrets.SOURCE }}")))
+			}
+			first, second := call(), call()
+			switch test.field {
+			case "":
+			case "credential", "parameters":
+				githubYAMLSet(githubYAMLField(second, "with"), test.field, githubYAMLString(test.value))
+			default:
+				// Even identical controls stay explicit rather than aliased.
+				githubYAMLSet(first, test.field, githubYAMLString(test.value))
+				githubYAMLSet(second, test.field, githubYAMLString(test.value))
+			}
+			jobs := githubYAMLMap("first", githubYAMLMap("steps", &yamlv3.Node{Kind: yamlv3.SequenceNode, Content: []*yamlv3.Node{first}}),
+				"second", githubYAMLMap("steps", &yamlv3.Node{Kind: yamlv3.SequenceNode, Content: []*yamlv3.Node{second}}))
+			if err := anchorGitHubPreflight(&Plan{}, jobs, testActionRefs(t, githubTestPlan(t))); err != nil {
+				t.Fatal(err)
+			}
+			step := githubYAMLField(githubYAMLField(jobs, "second"), "steps").Content[0]
+			if (step.Kind == yamlv3.AliasNode) != test.shared {
+				t.Fatal("semantic alias changed a credential, selector or controlled invocation")
+			}
+		})
+	}
 }
 
 func TestGitHubSemanticInterfacesReuseAcrossNodeAndCarrierCounts(t *testing.T) {

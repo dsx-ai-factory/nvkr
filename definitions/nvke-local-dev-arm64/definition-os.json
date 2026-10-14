@@ -6,7 +6,7 @@
   "kind": "Definition",
   "metadata": {
     "name": "nvke-local-dev-arm64-os",
-    "description": "Local ARM64 non-FDE TCG disk and its material closure; no publication or signing; retains mixed SPIRE exception."
+    "description": "Local ARM64 non-FDE TCG disk and its material closure; no publication or signing; source-built DSX plugin requires admitted source acquisition."
   },
   "outputs": [
     {
@@ -17,6 +17,7 @@
         ]
       },
       "components": [
+        "dsx-imds-node-attestor-agent",
         "nvke-agent",
         "nvke-cni-calico",
         "nvke-cni-ovn",
@@ -27,6 +28,9 @@
         "nvke-spire-agent",
         "ovn-kube-ubuntu",
         "ovn-kubernetes-chart",
+        "spire-agent-upstream",
+        "spire-tpm-attestor-upstream",
+        "spire-tpm-pubhash-upstream",
         "ubuntu-installer-iso"
       ],
       "format": "disk-image",

@@ -41,8 +41,8 @@ func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPoli
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "deployment-image"})
 		}
 	}
-	if len(policy.Smoke.NonToolOutputs) != 25 {
-		t.Fatal("maintained candidate fixture changed its reviewed OCI scope")
+	if len(policy.Smoke.NonToolOutputs) != 56 {
+		t.Fatal("maintained candidate fixture changed its declared OCI membership")
 	}
 	return plan, policy
 }

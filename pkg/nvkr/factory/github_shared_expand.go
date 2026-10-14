@@ -29,6 +29,14 @@ func materializeGitHubSharedActions(plan *Plan, raw []byte, files map[string][]b
 	if err := yamlv3.Unmarshal(raw, &document); err != nil || len(document.Content) != 1 {
 		return nil, nil, e.New(e.CodePipelineDrift, "invalid shared GitHub workflow")
 	}
+	// Every job evaluates the same call in its own provider context. Resolve
+	// aliases before substituting inputs so one expansion cannot mutate a
+	// sibling's shared parameter selector or credential reference.
+	resolved, err := githubResolveAliases(&document, map[*yamlv3.Node]bool{})
+	if err != nil {
+		return nil, nil, err
+	}
+	document = *resolved
 	jobs := githubYAMLField(document.Content[0], "jobs")
 	if jobs == nil || jobs.Kind != yamlv3.MappingNode {
 		return nil, nil, e.New(e.CodePipelineDrift, "shared GitHub workflow requires jobs")

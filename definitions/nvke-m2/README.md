@@ -2,7 +2,7 @@
 
 This is the Definition used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
-into one release with **37 named outputs**. This remains a candidate; completed pipeline delivery and
+into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
 
 ## Selected artifacts and their owners
@@ -14,20 +14,64 @@ full product acceptance are separate facts.
 | Operator tools | `catalog` | AMD64 Helm and kubectl executables, selected from the NVKE distribution lock |
 | Node images | `os-catalog`, `native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers |
 | Deployment images | `image-catalog` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
+| CAPNICo | `release-catalog` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
+| Provisioned infrastructure provider | `../nvke-controller/catalog` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
+| Reference config profiles | `release-catalog` | `controller-profiles`, one AMD64/ARM64 content image containing the two NICO reference config profiles and their runbooks, not production fleet configuration |
+| Telemetry | `release-catalog` | Source-packaged `nktp` with its three vendored dependencies; eight required/optional runtime images for each native architecture, including the enabled Target Allocator and the uninstall hook's kubectl |
+| Bootstrap runtime images | `release-catalog` | CAPI core, kubeadm bootstrap/control-plane and three cert-manager images, each with separate AMD64 and ARM64 outputs |
+
+### Additional release members and their source contracts
+
+These are declarative catalog additions, not NVKE-specific compiler behavior. The existing generic
+BuildKit, source-vendor, Helm and acquired-image routes build or acquire them. Each OCI index requires
+both native subjects; acquired images retain separate native outputs because aggregation currently admits
+built OCI exports only. The architecture-independent NKTP chart is packaged once. Existing outputs remain required.
+
+| Member | Authoritative selection | Boundary |
+|---|---|---|
+| CAPNICo | NVKE's selected `controller/deploy/nke-sbom/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
+| NKTP chart and dependencies | The same NVKE `v0.21.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select chart `0.1.0-rc.2` and three exact dependencies | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
+| NKTP images | Selected source values and authenticated dependency charts: collector/operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
+| Reference profiles | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly reference-only: the control-plane profile skips its pre-join reboot. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
+| CAPI and cert-manager images | Selected NVKE `make/tool-versions.mk` chooses CAPI `v1.12.3`; its published provider manifests name the three controllers, and its clusterctl config selects cert-manager `v1.19.3` | Acquired runtime images only. Provider manifests/metadata and installation remain a separate consumer contract |
+
+This does not silently update the retained controller/CLI to current NVKE main. That newer code reads
+`MachineImage`, `ClusterRelease` and `NodePoolRelease` resources; the retained controller still reads legacy
+OS profile files. The config-only reference image is not a complete provisioning configuration for that
+older controller. Fleet payload selection, migration to the newer controller and delivery of the Kubernetes
+release resources remain explicit follow-ups, not acceptance established by adding these artifacts.
 
 The catalogs and their machine-managed locks own exact commits, versions, archive/member hashes and
 native image digests. Do not maintain a second digest table in documentation. PostgreSQL and SPIRE Bash
 retain their source-owned index digests as well as the selected native child pins; acquisition checks
 actual parent-to-child membership before using the native image.
 
-The OS, Calico and kubeadm sources remain machine-pinned to that capture-capable commit.
-For the temporary branch build test, only `nvke-spire-agent-source` is pinned to
-`726f76944404e1106626b8333d3576bdf67b575b` using `catalog pin --commit`. That older package
-omits the DSX IMDS plugin whose S3 download returned HTTP 403 on both hosted architectures.
-This mixed-source candidate tests the build path; it is not the intended complete M2 image.
-The exception's acceptance owner, expiry and production-content approval are not recorded. Exiting the exception
-requires restoring the intended DSX IMDS payload with verified native materials and both-architecture content
-checks, or a named, explicitly approved content-scope decision; a successful build cannot silently approve omission.
+The OS, Calico, kubeadm and SPIRE packaging sources use the capture-capable NVKE commit.
+The earlier temporary SPIRE pin that omitted the DSX plugin is removed. The OS catalog builds
+`dsx-imds-node-attestor-agent` from the exact pinned `project-dsx-identity` source with vendored Go
+dependencies and no build network. SPIRE packaging consumes that binary plus digest-pinned upstream
+SPIRE and TPM-plugin archives through ordinary material bindings. It invokes the source-owned Debian
+packager offline, then passes the complete package to `nvke-image-inputs` and Packer. Packer does not
+clone the DSX source or acquire its plugin. The package's original paths, units and install-time checksum
+generation remain source-owned; newly built plugin bytes do not reuse the historical S3 checksum.
+
+The DSX repository is private. Authorized source acquisition and source builds do not approve OSS
+distribution: public-release inclusion still needs its owner's confirmation. Production and development
+Environments route its source credential only to authenticated fetch jobs. The workflow credential's
+actual DSX read access and a full hosted image build with the restored package remain unverified.
+There is also a native local source-admission blocker: this exact DSX tree declares submodules, whereas
+ADR-18's ordinary local source route rejects nonempty `.gitmodules` and gitlinks. The plugin does not
+need their contents, but that alone does not authorize ignoring them. No metadata removal, source-pin
+substitution or admission relaxation is included here; a supported source projection or upstream source
+contract is required before these local disk selections can execute the restored plugin through NVKR.
+Local offline checks built both plugin architectures and extracted both DEBs to verify the embedded
+plugin bytes; AMD64 was cross-compiled and both packages used a local diagnostic toolchain, not the
+maintained Packer image. These checks do not establish native AMD64 execution or package behavior on a
+booted node. Pulling the maintained ARM64 Packer image was denied by registry scope, so its runtime
+validation remains pending.
+The pinned vulnerability scanner, run with Go 1.27.2 against this plugin's vendored closure, reports
+12 reachable vulnerabilities across six modules. Upstream dependency remediation and security review
+remain required; neither successful compilation nor packaging clears those findings.
 The [merged-source handoff](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
 records NVKE #1211 as approved and merged, and the exact selected commit as protected `main`
 at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
@@ -136,7 +180,7 @@ no deployed confidentiality claim, even after TPM enrollment. `swtpm` is not req
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64
-FDE bake, or this combined 37-output pipeline. Those operational acceptance checks remain outstanding.
+FDE bake, or this combined 69-output pipeline. Those operational acceptance checks remain outstanding.
 
 `environment-github.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
 `arc-amd64-kvm` and `arc-arm64-kvm`, with required native KVM. Each execution class requests 8 CPUs,
@@ -173,7 +217,7 @@ provider access restrictions remain operator obligations.
 ## Generate and check the maintained workflow
 
 The same Definition also supplies the committed feature-branch development workflow through
-`environment-github-dev.yaml`. It retains all 37 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
+`environment-github-dev.yaml`. It retains all 69 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
 Only execution/publication policy changes: separate development environments and credentials, the
 `nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
 `ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;
@@ -205,8 +249,8 @@ expanded job graph and credential boundaries. Changes to authored inputs must re
 never edit the bundle by hand.
 
 Source/artifact maintenance belongs to reviewed catalog changes using `catalog pin`, `catalog bump`
-and `catalog pin-artifacts`. Do not copy historical preparation commands that would silently undo the
-temporary SPIRE selection. The opt-in full graph integration runs with
+and `catalog pin-artifacts`. Do not copy historical preparation commands that would silently restore the
+temporary incomplete SPIRE selection. The opt-in full graph integration runs with
 `NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1` and authorized pinned-source access; ordinary tests receive no
 private-source credentials. Pinning and graph tests establish their own contracts, not production launch.
 
@@ -224,7 +268,7 @@ producer Run/attempt, output membership, signatures, provenance and applicable d
 required. No source or artifact pin changes are needed merely to satisfy the optional metadata check.
 
 The [candidate policy](qualification.yaml) records concrete cosign version/executable hashes, native
-smoke-image manifest digests, three tool profiles and 25 exact deployment-image scope decisions. These
+smoke-image manifest digests, three tool profiles and 56 exact deployment-image scope decisions. These
 independently authored trust selections are reviewed with the generated workflow pair; they are not inherited
 from the producing Run. The [hosted setup guide](../../docs/lifecycle.md#publish-qualification-evidence)
 explains the policy and generated worker. Concrete pins and repository validation do not establish
@@ -253,13 +297,12 @@ exception absent from the maintained main-only inputs. Independent full-payload 
 main-only execution and hosted mixed-attempt retry acceptance remain unexercised. Earlier deep inspections
 timed out; the successful candidate used the explicit build-provenance mode.
 
-The required checkpoint for NVKE images outside the disk remains separately owned. The pinned deploy tree
-mentions CAPNICo, while the catalog's provisioned-provider build is a different project. Its fleet-profile
-content-image selection supplies no portable tag/digest. Neither should be guessed into required membership
-or silently treated as deferred. Embedded SPIRE and chart-side SPIRE containers are distinct artifacts;
-one cannot satisfy the other's evidence row. These unresolved ownership/payload questions remain product
-acceptance gaps, alongside M3 build/evidence qualification, delivered-tool smoke and organizational toolchain
-reviews. Full disk inspection is a separate deferred capability, not an M3 MVP prerequisite.
+CAPNICo, the provisioned provider, NKTP and the reference config-profile image are explicit required
+members, not substitutes for each other or claims of deployed acceptance. Production fleet-profile
+selection and provider/resource delivery remain separate gaps described above. Embedded SPIRE and
+chart-side SPIRE containers are distinct artifacts; one cannot satisfy the other's evidence row.
+M3 build/evidence qualification, delivered-tool smoke and organizational toolchain reviews remain product
+acceptance work. Full disk inspection is a separate deferred capability, not an M3 MVP prerequisite.
 
 [Reconciliation](../../docs/adr/reconciliation.md) owns current implementation/evidence status;
 [the epic specification](../../docs/epics-v1-spec.md) owns product acceptance. This README owns the

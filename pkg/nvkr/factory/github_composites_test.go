@@ -267,6 +267,20 @@ func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte) {
 					t.Fatal("native preflight alias names a different platform or operation")
 				}
 			default:
+				if strings.HasPrefix(anchor, "operation-") {
+					uses := githubYAMLValue(target, "uses")
+					prefix := "./" + githubSharedDirectory
+					family := strings.TrimPrefix(uses, prefix)
+					binding := githubYAMLValue(githubYAMLField(target, "with"), "parameters")
+					selectorPrefix := "${{ fromJSON(steps." + githubContextStepID + ".outputs.data)['"
+					part := strings.TrimSuffix(strings.TrimPrefix(binding, selectorPrefix), "'] }}")
+					if !strings.HasPrefix(uses, prefix) || binding != githubParametersExpression(part) ||
+						!githubActionPart(part) || anchor != "operation-"+family+"-"+part ||
+						githubYAMLValue(target, "name") != strings.ReplaceAll(family, "-", " ") {
+						t.Fatal("operation alias changes its semantic interface or current-job parameter selector")
+					}
+					break
+				}
 				if !strings.HasPrefix(anchor, "prepare-stage-") {
 					t.Errorf("%s contains non-semantic or unapproved alias %q", name, anchor)
 					break

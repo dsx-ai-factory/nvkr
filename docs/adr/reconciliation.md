@@ -55,8 +55,9 @@ contracts and retained-disk diagnostics exist, but a successful real native NVKE
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
-The maintained M2 candidate selects 37 named outputs, retaining the previous 35 and adding native AMD64
-and ARM64 public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
+The maintained M2 candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
+reference config profiles, the provisioned infrastructure provider, NKTP and native bootstrap/telemetry
+images. Both native architectures retain plain and public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
 `build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected
 output membership must agree. Strict inspection/publication, qualified reproduction and private-passphrase
 FDE remain closed. The consumer's strict evidence policy still rejects producer-only disks. This integration
@@ -274,7 +275,7 @@ that remains outstanding after merge.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
 with the same compiler, complete graph and helper. The committed development bundle now uses the full
-37-output M2 Definition, including all four native plain/public-bootstrap FDE disk outputs, output-local publication, SBOM attestation,
+69-output M2 Definition, including all four native plain/public-bootstrap FDE disk outputs, output-local publication, SBOM attestation,
 cosign signing, verification, metadata assembly and finalization. It retains the candidate's existing disk
 and source limitations; development execution cannot approve those production exceptions. Development
 finalization retains its Run record without emitting the production qualification handoff; explicit handoff
@@ -913,8 +914,8 @@ repository/builder and preparation/signing/consuming-attempt ordering. Contracts
 attempts, re-signing and finalizer reuse; hosted retry acceptance remains unexercised. Cross-run reuse,
 remote rollback and an atomic multi-repository transaction are not provided. Failed/missing provider jobs
 still prevent completion. Production finalization restores the six aggregate/tool control carriers plus each output’s
-original publication reference, signing record and predicate for the qualification handoff: 117 control
-carriers for the 37-output candidate, without restoring output payload packages. Development finalization
+original publication reference, signing record and predicate for the qualification handoff, without
+restoring output payload packages. Development finalization
 retains only the six aggregate/tool controls because it emits no qualification handoff. Assembly/finalization need
 registry read access, not OIDC or package-write
 permission. Production rejects arbitrary static credentials; the explicit development mode uses its admitted
@@ -1005,8 +1006,12 @@ updates can retain identical workflow bytes when topology, labels/interfaces and
 unchanged. Transport-pin stability additionally requires no affected inline call; the summary requires an
 inline final Run upload, so upload-action pin changes affect this workflow. Checkout pins, cohort splits/merges, runtime containers/services, runner/capability routes,
 permissions, secret references, timeouts, qualification and inline setup remain visible change boundaries.
-Complete bundle regeneration and drift checking remain mandatory. Complete native-preflight, pinned-checkout
-and shared-preparation steps use descriptive aliases; preparation selects its job through `github.job`.
+Complete bundle regeneration and drift checking remain mandatory. Complete native-preflight, pinned-checkout,
+shared-preparation and structurally identical uncontrolled operation calls use descriptive aliases;
+preparation and operation parameters select their own job context. Static expansion resolves aliases into
+independent nodes before substitution so sibling selectors and credentials cannot be mutated together.
+Operation calls with provider controls stay explicit. The combined candidate retains all members under
+the existing workflow-size bound; this is local generation/expansion evidence, not hosted execution.
 Matrix scheduling and reusable callable workflows remain deferred, and no fresh hosted execution of this
 composite layout is recorded. Oversized workflows still fail before writes. Native offline disk preparation
 shares the ARC group to avoid restoring its full material closure on publication runners. Consumed carrier deletion reduces duplicate
@@ -1060,7 +1065,7 @@ or verification's later registry-fetched disk snapshot. No hosted rerun has exer
 and it establishes neither a measured hosted storage envelope nor independent FDE consumption.
 
 ## Native ARC disk route
-The single checked-in `nvkr-run.yml` selects the 37-output M2 Definition and its main-only publication
+The single checked-in `nvkr-run.yml` selects the 69-output M2 Definition and its main-only publication
 Environment, including plain and public-bootstrap FDE disks on both native architectures. The Makefile drift
 gate repeats the exact Definition and Environment paths recorded in the committed Plan. Dispatch does not
 choose among Definitions. Alternate selections can be generated into a scratch root with their matching
@@ -1196,14 +1201,30 @@ cutover, hosted publication, independent consumer acceptance or qualification.
 ## Maintained input and schema boundaries
 
 The [M2 Definition instructions](../../definitions/nvke-m2/README.md) own example-specific selection and input
-preparation. The candidate requires 37 named outputs: thirteen CLI/controller/chart/operator/disk outputs plus twelve
-third-party runtime images per native architecture. The chosen runtime-image set follows pinned deployment
-values, not chart defaults; chart-test images and NVKE images outside the disk retain explicit owner questions.
+preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
+CAPNICo and reference profiles, the existing provisioned infrastructure provider, source-packaged NKTP,
+and fourteen acquired runtime-image components delivered separately for both native architectures.
+The selected NVKE/CAPI sources and NKTP dependency charts own their versions; Helm test-only images are
+excluded. The profile image is reference-only, not fleet configuration or a complete legacy OSProfile set.
+Provider manifests, image-reference relocation and installation remain consumer work, not delivery proved here.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
-[acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain source
-approval, mixed-source candidate and HTTP-403 limits without copying locks into this ledger.
+[acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
+Current inputs restore the capture-capable SPIRE package and source-build the DSX IMDS plugin from its
+separate Git pin, then bind it with acquired upstream SPIRE/TPM archives into offline packaging before
+image composition. Local checks built both plugin targets and verified their bytes in extracted native
+DEBs; AMD64 was cross-compiled and packaging used a local diagnostic toolchain. NKTP dependency
+acquisition and offline Helm packaging were also exercised locally. No combined hosted Run of these
+additions, native AMD64 plugin execution or DSX OSS distribution approval is established. The maintained
+ARM64 Packer image pull was denied by registry scope; local diagnostic success does not validate that pin.
+Ordinary local DSX acquisition is also blocked by ADR-18's existing refusal of nonempty `.gitmodules`
+and gitlinks. A standalone plugin build without submodule contents does not admit the enclosing source
+tree. These inputs do not remove metadata or relax admission; supported source projection or an upstream
+source contract remains necessary before claiming a native local NVKR build of the restored package.
+The repository-pinned vulnerability scanner also reports 12 reachable vulnerabilities across six modules
+for this DSX agent at Go 1.27.2. Its source pin has not been silently replaced or patched; upstream
+remediation and review remain open. The separate NVKR repository scan is clean.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,

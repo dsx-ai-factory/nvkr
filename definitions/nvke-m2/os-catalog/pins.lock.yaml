@@ -1,6 +1,21 @@
 # Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
 apiVersion: nvkr.dev/lock/v1
 artifacts:
+  spire-agent-upstream:
+    digests:
+      amd64: sha256:0278af1e083fda58a6dfd09f97d41b5c34b011dca2fd53dc79d0e418996ed0ba
+      arm64: sha256:94ec569b697323b067db05565ff098eb3d8fa217dad40f367c961e239d54858d
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+  spire-tpm-attestor-upstream:
+    digests:
+      amd64: sha256:64c9ed83857e802571f9e4c8377994bfb9d220708bcefe6b50674b2eee4bfbd2
+      arm64: sha256:b85502354358cd919691be022eb0f5678f5fdb9e84d86a2d1819362e18e796ae
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+  spire-tpm-pubhash-upstream:
+    digests:
+      amd64: sha256:e70d183f48f6941c41525e690649f7003df69235d4eae6ab1a668dbb00948a47
+      arm64: sha256:c0145069cb87d9b57563de66004c2aa0d10d9e87869046caf0faefe677efa1a8
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
   ubuntu-installer-iso:
     digests:
       arm64: sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168
@@ -11,6 +26,11 @@ artifacts:
     tag: 26.04.1
 kind: PinLock
 pins:
+  dsx-imds:
+    commit: 76b0ba906b7d3bc7002d3d431f1f0e1819743aab
+    sourceDateEpoch: 1791569664
+    tag: 76b0ba906b7d3bc7002d3d431f1f0e1819743aab
+    treeHash: 16f14e27becfa33750bcf2498593752a0cf2615e
   nvke-cni-calico-source:
     commit: ff21ba8c07cafff74b68e238a8876af11e5beded
     sourceDateEpoch: 1791257393
@@ -27,10 +47,10 @@ pins:
     tag: ff21ba8c07cafff74b68e238a8876af11e5beded
     treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
   nvke-spire-agent-source:
-    commit: 726f76944404e1106626b8333d3576bdf67b575b
-    sourceDateEpoch: 1790192178
-    tag: 726f76944404e1106626b8333d3576bdf67b575b
-    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
   ovn-kubernetes:
     commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
     sourceDateEpoch: 1788540677
