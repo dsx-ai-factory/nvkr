@@ -50,6 +50,11 @@ func LoadCLIArtifactTestInputs(ctx context.Context, path, output string) (*CLIAr
 		return nil, e.New(e.CodeEngineCapability, "CLI artifact tests require Linux AMD64 or ARM64")
 	}
 	component := selected.CatalogSnapshot.Components["nvkectl"]
+	for _, output := range plan.Definition.Outputs {
+		if output.Name == selected.Name && output.Format != "executable" {
+			return nil, e.New(e.CodeEngineCapability, "CLI artifact tests require an executable output")
+		}
+	}
 	version := ""
 	for _, key := range []string{"NVKECTL_VERSION", "NKECTL_VERSION"} {
 		value, present := component.VersionStamp[key]
@@ -74,7 +79,7 @@ func LoadCLIArtifactTestInputs(ctx context.Context, path, output string) (*CLIAr
 			producer = node
 		}
 	}
-	if producer == nil || producer.BuilderType != ir.BuilderOCIHermetic || producer.Toolchain == "" || !component.FromSource {
+	if producer == nil || producer.BuilderType != ir.BuilderOCIHermetic || producer.Toolchain == "" || !component.FromSource || producer.OutputType != "host-package" {
 		return nil, e.New(e.CodeEngineCapability, "CLI artifact tests require a source-built container toolchain")
 	}
 	return &CLIArtifactTestInputs{
