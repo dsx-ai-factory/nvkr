@@ -27,10 +27,15 @@ func ImportLocal(ctx context.Context, environment []string, directory, repositor
 		return e.Wrap(e.CodeTimeout, err, "source import canceled")
 	}
 	// LocalCommand deliberately rejects Git search-path separators in its
-	// explicit directory. Import in a fresh system scratch directory, then move
-	// only the verified tree into the diagnostic workspace (which may contain
-	// colons). A cross-filesystem move fails closed without a partial checkout.
-	scratch, err := os.MkdirTemp("", "nvkr-test-source-")
+	// explicit directory. Prefer private scratch on the workspace filesystem,
+	// using its closest ancestor without a separator when the path has colons.
+	// Publish only the verified checkout by rename; an unusual mount boundary
+	// between that ancestor and the workspace still fails without partial output.
+	scratchRoot := filepath.Dir(directory)
+	for strings.ContainsRune(scratchRoot, os.PathListSeparator) {
+		scratchRoot = filepath.Dir(scratchRoot)
+	}
+	scratch, err := os.MkdirTemp(scratchRoot, ".nvkr-test-source-")
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "creating diagnostic source scratch")
 	}
@@ -44,11 +49,14 @@ func ImportLocal(ctx context.Context, environment []string, directory, repositor
 		defer cancel()
 		cmd, err := LocalCommand(bounded, environment, checkout, args...)
 		if err != nil {
-			return "", e.Wrap(e.CodeFetchFailed, err, "preparing diagnostic source %s", args[0])
+			return "", err // Preserve the source owner's capability/admission code.
 		}
 		var output bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &output, stderr
 		if err := ownedcmd.Run(bounded, cmd); err != nil {
+			if bounded.Err() != nil {
+				return "", e.Wrap(e.CodeTimeout, bounded.Err(), "diagnostic source command canceled")
+			}
 			return "", e.Wrap(e.CodeFetchFailed, err, "importing diagnostic source")
 		}
 		return strings.TrimSpace(output.String()), nil
