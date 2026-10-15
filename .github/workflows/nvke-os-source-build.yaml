@@ -106,6 +106,9 @@ jobs:
             sudo --non-interactive "$binary" run artifact-test --artifact "$artifact" --plan "$plan" \
               --suite "$suite" --keep > "$proof/$suite.log" 2>&1
           done
+          # The completed diagnostics retain private root-owned directories.
+          # Transfer these records only after both adapter processes exit.
+          sudo chown -R "$(id -u):$(id -g)" .nvkr
           for workspace in .nvkr/artifact-tests/cli-*; do
             suite="$(sudo jq -r .suite "$workspace/result.json")"
             sudo cp "$workspace/result.json" "$proof/$suite-result.json"
