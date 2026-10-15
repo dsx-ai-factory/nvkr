@@ -55,6 +55,8 @@ jobs:
             ./pkg/nvkr/pipeline ./pkg/nvkr/factory ./cmd/nvkr \
             -run 'Test(ImportLocal|ArtifactDiagnostic|Reaper|ExecCmdCancellation|CombinedOutputPreservesContextCancellation|OutputCleansDescendants)' -count=1 \
             > .nvkr/cli-go-proof/race.log 2>&1
+      - name: Uncached Go repository tests
+        run: go test -p=2 ./... -count=1 > .nvkr/cli-go-proof/uncached-tests.log 2>&1
       - name: Fresh recipe build and both cold-cache Go adapter suites
         env:
           NVKR_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
