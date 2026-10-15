@@ -89,7 +89,8 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           action: ${{ github.job }}
-      - name: Fetch pinned source for capnico-controller (capnico-controller-arm64)
+      - &operation-execute-node-part-1
+        name: execute node part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
@@ -103,10 +104,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build capnico-controller (capnico-controller-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-capnico-controller-arm64-terminal-observe:
     name: 'Verify built artifacts: capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -123,10 +121,7 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           action: ${{ github.job }}
-      - name: 'Verify built artifacts: capnico-controller-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-cluster-api-provider-provisioned-arm-d53e503b7714:
     name: 'Fetch pinned source for cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -137,7 +132,8 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)
+      - &operation-execute-source-part-1
+        name: execute source part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
         with:
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
@@ -152,10 +148,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-cluster-api-provider-provisioned-arm-3b87ea206e23:
     name: 'Verify built artifacts: cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -166,10 +159,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: cluster-api-provider-provisioned-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-controller-chart-fetch-nvke-controller-chart:
     name: 'Fetch pinned source for nvke-controller-chart (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
@@ -180,11 +170,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-controller-chart (controller-chart)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-controller-chart-build-nvke-controller-chart:
     name: 'Build nvke-controller-chart (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
@@ -195,10 +181,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nvke-controller-chart (controller-chart)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-controller-chart-terminal-observe:
     name: 'Verify built artifacts: controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -209,10 +192,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: controller-chart'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-controller-profiles-fetch-nvke-local-profiles:
     name: 'Fetch pinned source for nvke-local-profiles (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
@@ -223,11 +203,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-local-profiles (controller-profiles)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-controller-profiles-build-nvke-local-profiles:
     name: 'Build nvke-local-profiles (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
@@ -238,10 +214,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nvke-local-profiles (controller-profiles)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-controller-profiles-terminal-observe:
     name: 'Verify built artifacts: controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -252,10 +225,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: controller-profiles'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e:
     name: 'Acquire pinned csi-node-driver-registrar-image-arm64/pull-csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -266,10 +236,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned csi-node-driver-registrar-image-arm64/pull-csi-node-driver-registrar-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-csi-node-driver-registrar-image-arm6-60cd5fc35fc9:
     name: 'Verify built artifacts: csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -280,10 +247,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: csi-node-driver-registrar-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-cwe-fetch-nvke-controller:
     name: 'Fetch pinned source for nvke-controller (cwe)'
     runs-on: 'ubuntu-24.04-arm'
@@ -294,11 +258,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-controller (cwe)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-cwe-build-nvke-controller:
     name: 'Build nvke-controller (cwe)'
     runs-on: 'ubuntu-24.04-arm'
@@ -309,10 +269,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nvke-controller (cwe)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-cwe-terminal-observe:
     name: 'Verify built artifacts: cwe'
     runs-on: 'ubuntu-24.04'
@@ -323,10 +280,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: cwe'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-fetch-clusterctl:
     name: 'Fetch pinned source for clusterctl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -337,10 +291,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for clusterctl (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-build-clusterctl:
     name: 'Build clusterctl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -351,10 +302,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build clusterctl (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-fetch-kind:
     name: 'Fetch pinned source for kind (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -365,10 +313,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for kind (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-build-kind:
     name: 'Build kind (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -379,10 +324,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build kind (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-fetch-kubectl:
     name: 'Fetch pinned source for kubectl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -393,10 +335,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for kubectl (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-build-kubectl:
     name: 'Build kubectl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -407,10 +346,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build kubectl (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-fetch-oras:
     name: 'Fetch pinned source for oras (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -421,10 +357,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for oras (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-build-oras:
     name: 'Build oras (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -435,10 +368,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build oras (installer-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-pull-helm:
     name: 'Acquire pinned installer-tools-arm64/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
@@ -449,10 +379,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned installer-tools-arm64/pull-helm
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-installer-tools-arm64-terminal-observe:
     name: 'Verify built artifacts: installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -463,10 +390,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: installer-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7:
     name: 'Fetch pinned source for nico-sim, nico-sim-runtime-assets, nico-simctl (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -480,11 +404,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nico-sim, nico-sim-runtime-assets, nico-simctl (nicosim-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-nicosim-tools-arm64-build-nico-sim:
     name: 'Build nico-sim (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -498,10 +418,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nico-sim (nicosim-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52:
     name: 'Build nico-sim-runtime-assets (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -515,10 +432,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nico-sim-runtime-assets (nicosim-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nicosim-tools-arm64-build-nico-simctl:
     name: 'Build nico-simctl (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -532,10 +446,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nico-simctl (nicosim-tools-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nicosim-tools-arm64-terminal-observe:
     name: 'Verify built artifacts: nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -546,10 +457,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: nicosim-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nktp-fetch-nktp-chart:
     name: 'Fetch pinned source for nktp-chart (nktp)'
     runs-on: 'ubuntu-24.04-arm'
@@ -560,11 +468,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nktp-chart (nktp)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-nktp-build-nktp-chart:
     name: 'Build nktp-chart (nktp)'
     runs-on: 'ubuntu-24.04-arm'
@@ -575,10 +479,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nktp-chart (nktp)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nktp-terminal-observe:
     name: 'Verify built artifacts: nktp'
     runs-on: 'ubuntu-24.04'
@@ -589,10 +490,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: nktp'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nvke-node-image-upstream-ovn-arm64-f-1aec0b309b7c:
     name: 'Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -606,11 +504,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-upstream-ovn-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-disk-nvke-node-image-upstream-ovn-arm64:
     name: 'Build and package producer evidence for nvke-node-image-upstream-ovn-arm64'
     runs-on: 'arc-arm64-kvm'
@@ -630,11 +524,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
           action: ${{ github.job }}
-      - name: Download 12 required input carriers
+      - name: prepare inputs part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-inputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: Prepare private native toolchains
+      - name: prepare images part-2
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-images
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
@@ -648,63 +542,63 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
-      - name: 'Prepare output carriers: Build nvke-agent (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-3
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-      - name: 'Prepare output carriers: Build nvke-cni-calico (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-4
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
-      - name: 'Prepare output carriers: Build ovn-kubernetes-chart (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-5
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
-      - name: 'Prepare output carriers: Build nvke-kubeadm-distro (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-6
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
-      - name: 'Prepare output carriers: Build nvke-spire-agent (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-7
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
-      - name: 'Prepare output carriers: Build ovn-kube-ubuntu (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-8
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
-      - name: 'Prepare output carriers: Build nvke-cni-ovn (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-9
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
-      - name: 'Prepare output carriers: Build nvke-image-inputs (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-10
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
-      - name: 'Prepare output carriers: Acquire pinned nvke-node-image-upstream-ovn-arm64/pull-ubuntu-installer-iso'
+      - name: collect node outputs part-11
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
-      - name: 'Prepare output carriers: Build nvke-patched-installer-iso (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-12
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
-      - name: 'Prepare output carriers: Build nvke-node-image (nvke-node-image-upstream-ovn-arm64)'
+      - name: collect node outputs part-13
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
-      - name: 'Prepare output carriers: Verify built artifacts: nvke-node-image-upstream-ovn-arm64'
+      - name: collect node outputs part-14
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
-      - name: 'Prepare output carriers: Generate SBOMs: nvke-node-image-upstream-ovn-arm64'
+      - name: collect node outputs part-15
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
-      - name: 'Prepare output carriers: Package nvke-node-image-upstream-ovn-arm64'
+      - name: collect node outputs part-16
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
-      - name: 'Prepare output carriers: Package publication bundle: publication-nvke-node-image-upstream-ovn-arm64'
+      - name: collect node outputs part-17
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
@@ -721,11 +615,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-cni-calico (nvke-node-image-upstream-ovn-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-nvke-node-image-upstream-ovn-arm64-f-78d2fff1af52:
     name: 'Fetch pinned source for nvke-cni-ovn, ovn-kubernetes-chart (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -736,10 +626,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-cni-ovn, ovn-kubernetes-chart (nvke-node-image-upstream-ovn-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nvke-node-image-upstream-ovn-arm64-f-0b49c5f11821:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -753,11 +640,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-upstream-ovn-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-nvke-node-image-upstream-ovn-arm64-f-8eddb001351f:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -771,11 +654,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvke-spire-agent (nvke-node-image-upstream-ovn-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -786,10 +665,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-upstream-ovn-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nvkectl-fetch-nvkectl:
     name: 'Fetch pinned source for nvkectl (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
@@ -800,11 +676,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for nvkectl (nvkectl)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-source-part-1
   nvkr-nvkectl-build-nvkectl:
     name: 'Build nvkectl (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
@@ -815,10 +687,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build nvkectl (nvkectl)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-nvkectl-terminal-observe:
     name: 'Verify built artifacts: nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -829,10 +698,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: nvkectl'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-operator-tools-pull-helm:
     name: 'Acquire pinned operator-tools/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
@@ -843,10 +709,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned operator-tools/pull-helm
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-operator-tools-pull-kubectl:
     name: 'Acquire pinned operator-tools/pull-kubectl'
     runs-on: 'ubuntu-24.04-arm'
@@ -857,10 +720,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned operator-tools/pull-kubectl
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-operator-tools-terminal-obse-b64909dc9190:
     name: 'Verify and package outputs with Helm image binding: capnico-controller-arm64, cluster-api-provider-provisioned-arm64, controller-chart, controller-profiles, csi-node-driver-registrar-image-arm64, cwe, installer-tools-arm64, nicosim-tools-arm64, nktp, nvkectl, operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -871,51 +731,58 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: operator-tools'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: capnico-controller-arm64'
+      - *operation-execute-node-part-1
+      - &operation-execute-node-part-2
+        name: execute node part-2
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-      - name: 'Package container image: cluster-api-provider-provisioned-arm64'
+      - &operation-execute-node-part-3
+        name: execute node part-3
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-      - name: 'Package container image: controller-profiles'
+      - &operation-execute-node-part-4
+        name: execute node part-4
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
-      - name: 'Package container image: csi-node-driver-registrar-image-arm64'
+      - &operation-execute-node-part-5
+        name: execute node part-5
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
-      - name: 'Package container image: cwe'
+      - &operation-execute-node-part-6
+        name: execute node part-6
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
-      - name: 'Bind image digest and package Helm: controller-chart'
+      - &operation-execute-node-part-7
+        name: execute node part-7
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
-      - name: 'Package binaries: installer-tools-arm64'
+      - &operation-execute-node-part-8
+        name: execute node part-8
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
-      - name: 'Package binaries: nicosim-tools-arm64'
+      - &operation-execute-node-part-9
+        name: execute node part-9
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
-      - name: 'Package Helm bundle: nktp'
+      - &operation-execute-node-part-10
+        name: execute node part-10
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
-      - name: 'Package binaries: nvkectl'
+      - &operation-execute-node-part-11
+        name: execute node part-11
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
-      - name: 'Package binaries: operator-tools'
+      - name: execute node part-12
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
@@ -929,10 +796,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned postgresql-image-arm64/pull-postgresql-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-postgresql-image-arm64-termi-767810e8a49e:
     name: 'Verify and package outputs: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -943,14 +807,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: postgresql-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: postgresql-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-postgresql-pull-postgresql-chart:
     name: 'Acquire pinned postgresql/pull-postgresql-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -961,10 +819,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned postgresql/pull-postgresql-chart
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-postgresql-terminal-observe-555d0da8f385:
     name: 'Verify and package outputs: postgresql'
     runs-on: 'ubuntu-24.04'
@@ -975,14 +830,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: postgresql'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package Helm bundle: postgresql'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image:
     name: 'Acquire pinned spiffe-csi-image-arm64/pull-spiffe-csi-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -993,10 +842,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spiffe-csi-image-arm64/pull-spiffe-csi-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spiffe-csi-image-arm64-termi-d00be006cc85:
     name: 'Verify and package outputs: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1007,14 +853,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spiffe-csi-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: spiffe-csi-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-agent-image-arm64-pull-spire-agent-image:
     name: 'Acquire pinned spire-agent-image-arm64/pull-spire-agent-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1025,10 +865,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire-agent-image-arm64/pull-spire-agent-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-agent-image-arm64-term-612d2fcd65a0:
     name: 'Verify and package outputs: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1039,14 +876,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire-agent-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: spire-agent-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-bash-image-arm64-pull-spire-bash-image:
     name: 'Acquire pinned spire-bash-image-arm64/pull-spire-bash-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1057,10 +888,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire-bash-image-arm64/pull-spire-bash-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-bash-image-arm64-termi-ff2c63c9283e:
     name: 'Verify and package outputs: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1071,14 +899,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire-bash-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: spire-bash-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-controller-manager-image-arm64-92b22b7f2333:
     name: 'Acquire pinned spire-controller-manager-image-arm64/pull-spire-controller-manager-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1089,10 +911,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire-controller-manager-image-arm64/pull-spire-controller-manager-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-controller-manager-ima-ea43a2dafd83:
     name: 'Verify and package outputs: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1103,14 +922,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire-controller-manager-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: spire-controller-manager-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-crds-pull-spire-crds-chart:
     name: 'Acquire pinned spire-crds/pull-spire-crds-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -1121,10 +934,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire-crds/pull-spire-crds-chart
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-crds-terminal-observe-82be9f86e106:
     name: 'Verify and package outputs: spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -1135,14 +945,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire-crds'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package Helm bundle: spire-crds'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-oidc-image-arm64-pull-spire-oidc-image:
     name: 'Acquire pinned spire-oidc-image-arm64/pull-spire-oidc-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1153,10 +957,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire-oidc-image-arm64/pull-spire-oidc-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-oidc-image-arm64-termi-efb32831475e:
     name: 'Verify and package outputs: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1167,14 +968,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire-oidc-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: spire-oidc-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-server-image-arm64-pull-spire-server-image:
     name: 'Acquire pinned spire-server-image-arm64/pull-spire-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1185,10 +980,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire-server-image-arm64/pull-spire-server-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-server-image-arm64-ter-2de675367149:
     name: 'Verify and package outputs: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1199,14 +991,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: spire-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d:
     name: 'Acquire pinned spire-tpm-server-image-arm64/pull-spire-tpm-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1217,10 +1003,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire-tpm-server-image-arm64/pull-spire-tpm-server-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-tpm-server-image-arm64-bf43cd0dcc3a:
     name: 'Verify and package outputs: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1231,14 +1014,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire-tpm-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: spire-tpm-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-spire-pull-spire-chart:
     name: 'Acquire pinned spire/pull-spire-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -1249,10 +1026,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned spire/pull-spire-chart
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-spire-terminal-observe-package-spire:
     name: 'Verify and package outputs: spire'
     runs-on: 'ubuntu-24.04'
@@ -1263,14 +1037,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: spire'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package Helm bundle: spire'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3:
     name: 'Acquire pinned temporal-admin-tools-image-arm64/pull-temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1281,10 +1049,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned temporal-admin-tools-image-arm64/pull-temporal-admin-tools-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-temporal-admin-tools-image-a-a7a48d5a7683:
     name: 'Verify and package outputs: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1295,14 +1060,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: temporal-admin-tools-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: temporal-admin-tools-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29:
     name: 'Acquire pinned temporal-server-image-arm64/pull-temporal-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1313,10 +1072,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned temporal-server-image-arm64/pull-temporal-server-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-temporal-server-image-arm64-656a59441bb1:
     name: 'Verify and package outputs: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1327,14 +1083,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: temporal-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: temporal-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-temporal-ui-image-arm64-pull-temporal-ui-image:
     name: 'Acquire pinned temporal-ui-image-arm64/pull-temporal-ui-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -1345,10 +1095,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned temporal-ui-image-arm64/pull-temporal-ui-image
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-temporal-ui-image-arm64-term-afe0bd0cf410:
     name: 'Verify and package outputs: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1359,14 +1106,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: temporal-ui-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: temporal-ui-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-temporal-pull-temporal-chart:
     name: 'Acquire pinned temporal/pull-temporal-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -1377,10 +1118,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Acquire pinned temporal/pull-temporal-chart
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-temporal-terminal-observe-pa-d14ae446c67c:
     name: 'Verify and package outputs: temporal'
     runs-on: 'ubuntu-24.04'
@@ -1391,14 +1129,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: temporal'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package Helm bundle: temporal'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-tool-cosign:
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
@@ -1409,10 +1141,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Acquire pinned cosign
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-nvke-node-image-3ffe05528fbf:
     name: 'Create and verify SBOM attestations: output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1427,10 +1156,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-nvke-node-image-upstream-ovn-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-nvke-node-image-upstr-b4a1b43e5991:
     name: 'Publish output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1448,10 +1174,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-nvke-node-image-upstream-ovn-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-nvke-node-image-upstream-ovn-arm64:
     name: 'Sign and attest release and deliverables: output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1470,10 +1193,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-nvke-node-image-upstream-ovn-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-tool-syft:
     name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
@@ -1484,10 +1204,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Acquire pinned syft
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-capnico-controller-arm64-sbo-6c5fdf32b88b:
     name: 'Verify artifacts and generate SBOMs: capnico-controller-arm64, cluster-api-provider-provisioned-arm64, controller-chart, controller-profiles, csi-node-driver-registrar-image-arm64, cwe, installer-tools-arm64, nicosim-tools-arm64, nktp, nvkectl, operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1498,50 +1215,17 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: capnico-controller-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Generate SBOMs: cluster-api-provider-provisioned-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-      - name: 'Generate SBOMs: controller-chart'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-      - name: 'Generate SBOMs: controller-profiles'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
-      - name: 'Generate SBOMs: csi-node-driver-registrar-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
-      - name: 'Generate SBOMs: cwe'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
-      - name: 'Generate SBOMs: installer-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
-      - name: 'Generate SBOMs: nicosim-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
-      - name: 'Generate SBOMs: nktp'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
-      - name: 'Generate SBOMs: nvkectl'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
-      - name: 'Generate SBOMs: operator-tools'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
+      - *operation-execute-node-part-6
+      - *operation-execute-node-part-7
+      - *operation-execute-node-part-8
+      - *operation-execute-node-part-9
+      - *operation-execute-node-part-10
+      - *operation-execute-node-part-11
   nvkr-package-publication-capnico-controller-arm64:
     name: 'Package publication bundle: publication-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1552,10 +1236,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-capnico-controller-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-capnico-controller-arm64:
     name: 'Create and verify SBOM attestations: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1570,10 +1251,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-capnico-controller-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-cluster-api-prov-7d1ac851fb60:
     name: 'Package publication bundle: publication-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1584,10 +1262,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-cluster-api-provider-provisioned-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-cluster-api-prov-64867884a7ca:
     name: 'Create and verify SBOM attestations: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1602,10 +1277,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-cluster-api-provider-provisioned-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-controller-chart:
     name: 'Package publication bundle: publication-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1616,10 +1288,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-controller-chart'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-controller-chart:
     name: 'Create and verify SBOM attestations: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1634,10 +1303,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-controller-chart'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-controller-profiles:
     name: 'Package publication bundle: publication-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1648,10 +1314,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-controller-profiles'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-controller-profiles:
     name: 'Create and verify SBOM attestations: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1666,10 +1329,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-controller-profiles'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-csi-node-driver-02a78ae16d16:
     name: 'Package publication bundle: publication-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1680,10 +1340,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-csi-node-driver-registrar-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442:
     name: 'Create and verify SBOM attestations: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1698,10 +1355,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-csi-node-driver-registrar-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-cwe:
     name: 'Package publication bundle: publication-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1712,10 +1366,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-cwe'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-cwe:
     name: 'Create and verify SBOM attestations: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1730,10 +1381,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-cwe'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-installer-tools-arm64:
     name: 'Package publication bundle: publication-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1744,10 +1392,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-installer-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-installer-tools-arm64:
     name: 'Create and verify SBOM attestations: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1762,10 +1407,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-installer-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-nicosim-tools-arm64:
     name: 'Package publication bundle: publication-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1776,10 +1418,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-nicosim-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-nicosim-tools-arm64:
     name: 'Create and verify SBOM attestations: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1794,10 +1433,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-nicosim-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-nktp:
     name: 'Package publication bundle: publication-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1808,10 +1444,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-nktp'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-nktp:
     name: 'Create and verify SBOM attestations: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1826,10 +1459,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-nktp'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-nvkectl:
     name: 'Package publication bundle: publication-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -1840,10 +1470,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-nvkectl'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-nvkectl:
     name: 'Create and verify SBOM attestations: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -1858,10 +1485,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-nvkectl'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-operator-tools:
     name: 'Package publication bundle: publication-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1872,10 +1496,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-operator-tools'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-operator-tools:
     name: 'Create and verify SBOM attestations: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1890,10 +1511,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-operator-tools'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-postgresql-image-arm64-sbom:
     name: 'Generate SBOMs: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1904,10 +1522,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: postgresql-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-postgresql-image-arm64:
     name: 'Package publication bundle: publication-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1918,10 +1533,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-postgresql-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-postgresql-image-arm64:
     name: 'Create and verify SBOM attestations: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1936,10 +1548,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-postgresql-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-postgresql-sbom:
     name: 'Generate SBOMs: postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1950,10 +1559,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: postgresql'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-postgresql:
     name: 'Package publication bundle: publication-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1964,10 +1570,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-postgresql'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-postgresql:
     name: 'Create and verify SBOM attestations: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1982,10 +1585,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-postgresql'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-capnico-controller-arm64:
     name: 'Publish output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2003,10 +1603,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-capnico-controller-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-cluster-api-provider-4b7d31608734:
     name: 'Publish output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2024,10 +1621,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-cluster-api-provider-provisioned-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-controller-chart:
     name: 'Publish output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -2045,10 +1639,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-controller-chart
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-controller-profiles:
     name: 'Publish output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -2066,10 +1657,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-controller-profiles
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb:
     name: 'Publish output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2087,10 +1675,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-csi-node-driver-registrar-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-cwe:
     name: 'Publish output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -2108,10 +1693,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-cwe
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-installer-tools-arm64:
     name: 'Publish output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2129,10 +1711,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-installer-tools-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-nicosim-tools-arm64:
     name: 'Publish output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2150,10 +1729,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-nicosim-tools-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-nktp:
     name: 'Publish output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -2171,10 +1747,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-nktp
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-nvkectl:
     name: 'Publish output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -2192,10 +1765,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-nvkectl
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-operator-tools:
     name: 'Publish output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -2213,10 +1783,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-operator-tools
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-postgresql:
     name: 'Publish output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -2234,10 +1801,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-postgresql
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-postgresql-image-arm64:
     name: 'Publish output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2255,10 +1819,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-postgresql-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-capnico-controller-arm64:
     name: 'Sign and attest release and deliverables: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2277,10 +1838,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-capnico-controller-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-cluster-api-provider-pro-9543d5c3a952:
     name: 'Sign and attest release and deliverables: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2299,10 +1857,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-cluster-api-provider-provisioned-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-controller-chart:
     name: 'Sign and attest release and deliverables: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -2321,10 +1876,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-controller-chart'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-controller-profiles:
     name: 'Sign and attest release and deliverables: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -2343,10 +1895,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-controller-profiles'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9:
     name: 'Sign and attest release and deliverables: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2365,10 +1914,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-csi-node-driver-registrar-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-cwe:
     name: 'Sign and attest release and deliverables: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -2387,10 +1933,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-cwe'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-installer-tools-arm64:
     name: 'Sign and attest release and deliverables: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2409,10 +1952,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-installer-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-nicosim-tools-arm64:
     name: 'Sign and attest release and deliverables: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2431,10 +1971,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-nicosim-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-nktp:
     name: 'Sign and attest release and deliverables: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -2453,10 +1990,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-nktp'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-nvkectl:
     name: 'Sign and attest release and deliverables: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -2475,10 +2009,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-nvkectl'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-operator-tools:
     name: 'Sign and attest release and deliverables: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -2497,10 +2028,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-operator-tools'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-postgresql:
     name: 'Sign and attest release and deliverables: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -2519,10 +2047,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-postgresql'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-postgresql-image-arm64:
     name: 'Sign and attest release and deliverables: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2541,10 +2066,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-postgresql-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spiffe-csi-image-arm64-sbom:
     name: 'Generate SBOMs: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2555,10 +2077,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spiffe-csi-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spiffe-csi-image-arm64:
     name: 'Package publication bundle: publication-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2569,10 +2088,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spiffe-csi-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spiffe-csi-image-arm64:
     name: 'Create and verify SBOM attestations: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2587,10 +2103,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spiffe-csi-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spiffe-csi-image-arm64:
     name: 'Publish output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2608,10 +2121,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spiffe-csi-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spiffe-csi-image-arm64:
     name: 'Sign and attest release and deliverables: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2630,10 +2140,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spiffe-csi-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-agent-image-arm64-sbom:
     name: 'Generate SBOMs: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2644,10 +2151,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire-agent-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-agent-image-arm64:
     name: 'Package publication bundle: publication-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2658,10 +2162,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire-agent-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire-agent-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2676,10 +2177,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire-agent-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-agent-image-arm64:
     name: 'Publish output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2697,10 +2195,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire-agent-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-agent-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2719,10 +2214,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire-agent-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-bash-image-arm64-sbom:
     name: 'Generate SBOMs: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2733,10 +2225,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire-bash-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-bash-image-arm64:
     name: 'Package publication bundle: publication-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2747,10 +2236,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire-bash-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire-bash-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2765,10 +2251,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire-bash-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-bash-image-arm64:
     name: 'Publish output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2786,10 +2269,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire-bash-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-bash-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2808,10 +2288,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire-bash-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-controller-manager-image-arm64-sbom:
     name: 'Generate SBOMs: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2822,10 +2299,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire-controller-manager-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-controller-14366a611047:
     name: 'Package publication bundle: publication-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2836,10 +2310,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire-controller-manager-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire-controller-f3890ce97c17:
     name: 'Create and verify SBOM attestations: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2854,10 +2325,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire-controller-manager-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-controller-mana-4c760c0ddb13:
     name: 'Publish output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2875,10 +2343,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire-controller-manager-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-controller-manager-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2897,10 +2362,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire-controller-manager-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-crds-sbom:
     name: 'Generate SBOMs: spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2911,10 +2373,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire-crds'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-crds:
     name: 'Package publication bundle: publication-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2925,10 +2384,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire-crds'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire-crds:
     name: 'Create and verify SBOM attestations: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2943,10 +2399,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire-crds'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-crds:
     name: 'Publish output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2964,10 +2417,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire-crds
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-crds:
     name: 'Sign and attest release and deliverables: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2986,10 +2436,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire-crds'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-oidc-image-arm64-sbom:
     name: 'Generate SBOMs: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3000,10 +2447,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire-oidc-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-oidc-image-arm64:
     name: 'Package publication bundle: publication-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3014,10 +2458,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire-oidc-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire-oidc-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3032,10 +2473,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire-oidc-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-oidc-image-arm64:
     name: 'Publish output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3053,10 +2491,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire-oidc-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-oidc-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3075,10 +2510,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire-oidc-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-server-image-arm64-sbom:
     name: 'Generate SBOMs: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3089,10 +2521,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-server-image-arm64:
     name: 'Package publication bundle: publication-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3103,10 +2532,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3121,10 +2547,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-server-image-arm64:
     name: 'Publish output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3142,10 +2565,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire-server-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3164,10 +2584,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-tpm-server-image-arm64-sbom:
     name: 'Generate SBOMs: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3178,10 +2595,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire-tpm-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-tpm-server-image-arm64:
     name: 'Package publication bundle: publication-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3192,10 +2606,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire-tpm-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire-tpm-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3210,10 +2621,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire-tpm-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-tpm-server-image-arm64:
     name: 'Publish output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3231,10 +2639,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire-tpm-server-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-tpm-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3253,10 +2658,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire-tpm-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-spire-sbom:
     name: 'Generate SBOMs: spire'
     runs-on: 'ubuntu-24.04'
@@ -3267,10 +2669,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: spire'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire:
     name: 'Package publication bundle: publication-spire'
     runs-on: 'ubuntu-24.04'
@@ -3281,10 +2680,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-spire'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-spire:
     name: 'Create and verify SBOM attestations: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -3299,10 +2695,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-spire'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire:
     name: 'Publish output-spire'
     runs-on: 'ubuntu-24.04'
@@ -3320,10 +2713,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-spire
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire:
     name: 'Sign and attest release and deliverables: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -3342,10 +2732,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-spire'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-temporal-admin-tools-image-arm64-sbom:
     name: 'Generate SBOMs: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3356,10 +2743,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: temporal-admin-tools-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal-admin-t-619203c9c277:
     name: 'Package publication bundle: publication-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3370,10 +2754,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-temporal-admin-tools-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-temporal-admin-t-9e993584a415:
     name: 'Create and verify SBOM attestations: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3388,10 +2769,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-temporal-admin-tools-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal-admin-tools-image-arm64:
     name: 'Publish output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3409,10 +2787,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-temporal-admin-tools-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal-admin-tools-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3431,10 +2806,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-temporal-admin-tools-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-temporal-server-image-arm64-sbom:
     name: 'Generate SBOMs: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3445,10 +2817,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: temporal-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal-server-image-arm64:
     name: 'Package publication bundle: publication-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3459,10 +2828,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-temporal-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-temporal-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3477,10 +2843,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-temporal-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal-server-image-arm64:
     name: 'Publish output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3498,10 +2861,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-temporal-server-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3520,10 +2880,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-temporal-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-temporal-ui-image-arm64-sbom:
     name: 'Generate SBOMs: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3534,10 +2891,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: temporal-ui-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal-ui-image-arm64:
     name: 'Package publication bundle: publication-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3548,10 +2902,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-temporal-ui-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-temporal-ui-image-arm64:
     name: 'Create and verify SBOM attestations: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3566,10 +2917,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-temporal-ui-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal-ui-image-arm64:
     name: 'Publish output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3587,10 +2935,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-temporal-ui-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal-ui-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3609,10 +2954,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-temporal-ui-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-temporal-sbom:
     name: 'Generate SBOMs: temporal'
     runs-on: 'ubuntu-24.04'
@@ -3623,10 +2965,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Generate SBOMs: temporal'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal:
     name: 'Package publication bundle: publication-temporal'
     runs-on: 'ubuntu-24.04'
@@ -3637,10 +2976,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-temporal'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-temporal:
     name: 'Create and verify SBOM attestations: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -3655,10 +2991,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-temporal'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal:
     name: 'Publish output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -3676,10 +3009,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-temporal
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal:
     name: 'Sign and attest release and deliverables: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -3698,10 +3028,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-temporal'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-upstream-ovn-chart-arm64-fetch-ovn-k-15e776834961:
     name: 'Fetch pinned source for ovn-kubernetes-chart (upstream-ovn-chart-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -3712,10 +3039,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for ovn-kubernetes-chart (upstream-ovn-chart-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e:
     name: 'Build ovn-kubernetes-chart (upstream-ovn-chart-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -3726,10 +3050,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build ovn-kubernetes-chart (upstream-ovn-chart-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-upstream-ovn-chart-arm64-ter-d2d87c39005a:
     name: 'Verify artifacts and generate SBOMs: upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3740,14 +3061,8 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: upstream-ovn-chart-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Generate SBOMs: upstream-ovn-chart-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
   nvkr-upstream-ovn-image-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (upstream-ovn-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -3758,10 +3073,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Fetch pinned source for ovn-kube-ubuntu (upstream-ovn-image-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu:
     name: 'Build ovn-kube-ubuntu (upstream-ovn-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -3772,10 +3084,7 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: Build ovn-kube-ubuntu (upstream-ovn-image-arm64)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-process-upstream-ovn-image-arm64-ter-fabcbf6405d8:
     name: 'Verify and package outputs with Helm image binding: upstream-ovn-chart-arm64, upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3786,22 +3095,10 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify built artifacts: upstream-ovn-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-      - name: 'Package container image: upstream-ovn-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-      - name: 'Bind image digest and package Helm: upstream-ovn-chart-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-      - name: 'Generate SBOMs: upstream-ovn-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-node-part-4
   nvkr-package-publication-upstream-ovn-chart-arm64:
     name: 'Package publication bundle: publication-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3812,10 +3109,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-upstream-ovn-chart-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-upstream-ovn-chart-arm64:
     name: 'Create and verify SBOM attestations: output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3830,10 +3124,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-upstream-ovn-chart-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-publication-upstream-ovn-image-arm64:
     name: 'Package publication bundle: publication-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3844,10 +3135,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Package publication bundle: publication-upstream-ovn-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-attest-sboms-output-upstream-ovn-image-arm64:
     name: 'Create and verify SBOM attestations: output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3862,10 +3150,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Create and verify SBOM attestations: output-upstream-ovn-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-upstream-ovn-chart-arm64:
     name: 'Publish output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3883,10 +3168,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-upstream-ovn-chart-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-output-upstream-ovn-image-arm64:
     name: 'Publish output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3904,10 +3186,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish output-upstream-ovn-image-arm64
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-upstream-ovn-chart-arm64:
     name: 'Sign and attest release and deliverables: output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3926,10 +3205,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-upstream-ovn-chart-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-output-upstream-ovn-image-arm64:
     name: 'Sign and attest release and deliverables: output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3948,10 +3224,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: output-upstream-ovn-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-capnico-co-a41756165d77:
     name: 'Verify release and deliverable signatures: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3969,10 +3242,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-capnico-controller-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-cluster-ap-f52c14e947ce:
     name: 'Verify release and deliverable signatures: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3990,10 +3260,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-cluster-api-provider-provisioned-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-controller-chart:
     name: 'Verify release and deliverable signatures: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -4011,10 +3278,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-controller-chart'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-controller-profiles:
     name: 'Verify release and deliverable signatures: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -4032,10 +3296,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-controller-profiles'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-csi-node-d-ed501e7759bf:
     name: 'Verify release and deliverable signatures: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4053,10 +3314,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-csi-node-driver-registrar-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-cwe:
     name: 'Verify release and deliverable signatures: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -4074,10 +3332,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-cwe'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-installer-tools-arm64:
     name: 'Verify release and deliverable signatures: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4095,10 +3350,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-installer-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nicosim-tools-arm64:
     name: 'Verify release and deliverable signatures: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4116,10 +3368,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-nicosim-tools-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nktp:
     name: 'Verify release and deliverable signatures: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -4137,10 +3386,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-nktp'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nvke-node-4ccfed0d3edb:
     name: 'Verify release and deliverable signatures: output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4158,10 +3404,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-nvke-node-image-upstream-ovn-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nvkectl:
     name: 'Verify release and deliverable signatures: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -4179,10 +3422,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-nvkectl'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-operator-tools:
     name: 'Verify release and deliverable signatures: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -4200,10 +3440,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-operator-tools'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-postgresql:
     name: 'Verify release and deliverable signatures: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -4221,10 +3458,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-postgresql'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-postgresql-image-arm64:
     name: 'Verify release and deliverable signatures: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4242,10 +3476,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-postgresql-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spiffe-csi-image-arm64:
     name: 'Verify release and deliverable signatures: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4263,10 +3494,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spiffe-csi-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire:
     name: 'Verify release and deliverable signatures: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -4284,10 +3512,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-agen-690d58615fef:
     name: 'Verify release and deliverable signatures: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4305,10 +3530,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire-agent-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-bash-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4326,10 +3548,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire-bash-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91:
     name: 'Verify release and deliverable signatures: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4347,10 +3566,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire-controller-manager-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-crds:
     name: 'Verify release and deliverable signatures: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -4368,10 +3584,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire-crds'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-oidc-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4389,10 +3602,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire-oidc-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-serv-2ffabff52266:
     name: 'Verify release and deliverable signatures: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4410,10 +3620,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-tpm-fdd5a5adf925:
     name: 'Verify release and deliverable signatures: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4431,10 +3638,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-spire-tpm-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal:
     name: 'Verify release and deliverable signatures: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -4452,10 +3656,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-temporal'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal-a-325229721989:
     name: 'Verify release and deliverable signatures: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4473,10 +3674,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-temporal-admin-tools-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal-s-030929bd4981:
     name: 'Verify release and deliverable signatures: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4494,10 +3692,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-temporal-server-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac:
     name: 'Verify release and deliverable signatures: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4515,10 +3710,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-temporal-ui-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-upstream-o-6a771d3e2e52:
     name: 'Verify release and deliverable signatures: output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4536,10 +3728,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-upstream-ovn-chart-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-upstream-o-49a3c983341d:
     name: 'Verify release and deliverable signatures: output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4557,10 +3746,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: output-upstream-ovn-image-arm64'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-package-release:
     name: 'Assemble release from verified output references'
     runs-on: 'ubuntu-24.04'
@@ -4578,10 +3764,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Assemble release from verified output references
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-publish-release:
     name: 'Publish release'
     runs-on: 'ubuntu-24.04'
@@ -4599,10 +3782,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: Publish release
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-sign-release:
     name: 'Sign and attest release and deliverables: release'
     runs-on: 'ubuntu-24.04'
@@ -4621,10 +3801,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Sign and attest release and deliverables: release'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-verify-publication-release:
     name: 'Verify release and deliverable signatures: release'
     runs-on: 'ubuntu-24.04'
@@ -4642,10 +3819,7 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: 'Verify release and deliverable signatures: release'
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+      - *operation-execute-node-part-1
   nvkr-lifecycle-run:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
@@ -4668,7 +3842,7 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
         continue-on-error: true
-      - name: Recover planned carriers
+      - name: recover inputs part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/recover-inputs
         with:
           nvkr-job-results: ${{ toJSON(needs) }}
