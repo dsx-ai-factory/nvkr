@@ -101,7 +101,7 @@ func admitBuildNetwork(graph *ir.Graph, policy string) error {
 // them. A public toolchain (e.g. golang@sha256:…) never carries this prefix and is left as-is.
 const toolchainMaterializedPrefix = "nvkr-toolchain-"
 
-// relocateToolchainRegistry rewrites each build node's operator-materialized toolchain ref into
+// relocateToolchainRegistry rewrites build and vendoring operator-materialized image refs into
 // the delivery-supplied registry, preserving the @sha256 digest (mirroring airgap.Relocate, so
 // buildDigest — which strips the prefix — is unchanged). When no registry is configured the
 // operator toolchains are left registry-agnostic (they will not pull at runtime until an
@@ -113,20 +113,22 @@ func relocateToolchainRegistry(graph *ir.Graph, registry string) {
 	}
 	for i := range graph.Nodes {
 		node := &graph.Nodes[i]
-		if node.Kind != ir.KindBuild || node.Toolchain == "" {
-			continue
+		switch node.Kind {
+		case ir.KindBuild:
+			node.Toolchain = relocatedToolchainReference(node.Toolchain, registry)
+		case ir.KindFetch:
+			node.VendorImage = relocatedToolchainReference(node.VendorImage, registry)
 		}
-		name := node.Toolchain
-		if at := strings.Index(name, "@"); at >= 0 {
-			name = name[:at]
-		}
-		// A bare name (no registry host / no path separator) carrying our prefix is an
-		// operator toolchain awaiting relocation; everything else is already resolvable.
-		if strings.Contains(name, "/") || !strings.HasPrefix(name, toolchainMaterializedPrefix) {
-			continue
-		}
-		node.Toolchain = registry + "/" + node.Toolchain
 	}
+}
+
+func relocatedToolchainReference(reference, registry string) string {
+	name, _, _ := strings.Cut(reference, "@")
+	// Only bare operator toolchains await relocation; public and qualified refs stay intact.
+	if strings.Contains(name, "/") || !strings.HasPrefix(name, toolchainMaterializedPrefix) {
+		return reference
+	}
+	return registry + "/" + reference
 }
 
 func (plan Plan) validatePlanBuilds() error {
