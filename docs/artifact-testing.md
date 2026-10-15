@@ -10,15 +10,15 @@ Keep the artifact and canonical Plan from the same NVKR build:
 
 ```sh
 GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
-python3 scripts/test-artifacts.py \
+bin/nvkr run artifact-test \
   --artifact /path/to/nvkectl \
   --plan /path/to/matching/plan.json \
   --suite contract --keep
 ```
 
-Requires the repository-pinned Go version to build NVKR, Python 3.12+, Git, and
-Docker. Use `--nvkr /path/to/nvkr` to supply an already-built helper. The default
-helper is `bin/nvkr` in this checkout; no local NVKE clone is required.
+Requires the repository-pinned Go version to build NVKR, Git, and Docker.
+The command calls the Go Plan loader directly; no helper subprocess or local
+NVKE clone is required.
 
 Select `--output NAME` when a Plan contains multiple standalone CLI outputs.
 Linux AMD64 and ARM64 are supported; foreign-architecture execution needs
@@ -31,9 +31,8 @@ must provide Go and Make; Plan validation does not prove those tools are present
 
 ## How it works
 
-1. Ask `nvkr run artifact-test-inputs` to validate the complete canonical Plan and
-   select one CLI producer. Go owns platform-specific toolchain selection and
-   authorized registry relocation. Python does not reconstruct those rules.
+1. Factory validates the complete canonical Plan and selects one CLI producer
+   using the same loader as `nvkr run artifact-test-inputs`.
 2. Shallow-fetch the exact source commit, check its tree and clean worktree, and
    require the upstream `test-artifact` entrypoint.
 3. Copy and hash the supplied executable in a private workspace. Dependency
@@ -47,95 +46,72 @@ must provide Go and Make; Plan validation does not prove those tools are present
 `--keep` retains the printed `.nvkr/artifact-tests/cli-*/` workspace. Source and
 cache exist only after their phases run; `tests.jsonl` is created for test execution
 and `result.json` only on success. Otherwise the workspace is removed on exit.
-Each acquisition/execution command has a 30-minute timeout. Cancellation stops
+Each acquisition/execution command has a 30-minute timeout (`--timeout` overrides
+it). Cancellation stops
 and joins the client and requests container removal; removal is best effort.
 
-Global/system Git configuration is disabled. Private source access can use a
-process-scoped `GIT_ASKPASS` helper or an SSH agent for an SSH source locator.
-Test containers receive neither helper nor Git credentials.
+Source import uses the existing Go local-source policy: global credential helpers
+are projected only into fetch; ambient Git routing, hooks, filters and configuration
+are excluded. Private access uses a developer credential helper or the supported
+explicit local redirect, rather than `GIT_ASKPASS`. Test containers receive no Git
+credentials. The verified scratch checkout must share a filesystem with the
+workspace so it can be moved without exposing a partial import.
+
+Errors use NVKR's coded exit contract; timeouts and cancellation use the timeout
+code, while a failed suite preserves its positive process exit status. A failed
+command never writes a successful result.
 
 ## Validation and remaining work
 
-[Native verification on 2026-10-14](https://github.com/dsx-ai-factory/nvkr/actions/runs/38659640835)
-passed six fresh recipe builds: scalar, per-architecture map and permitted registry
-relocation on native Linux AMD64 and ARM64 hosted runners. NVKR candidate
-`d4aefd3757096c2d276ffbfe0117e417cc06f77b` contains the helper from #156, adapter
-from #138 and the separately reviewed [vendoring relocation fix #172](https://github.com/dsx-ai-factory/nvkr/pull/172).
-Both PR heads remain separate from this diagnostic branch. No emulation was used.
+The Go replacement was exercised on 2026-10-15 from the main-based migration
+working tree (base `c722be5`). A fresh recipe build and both separately imported,
+cold-cache suites passed: **9 process contracts** and **532 top-level CLI tests
+across 30 packages**, with no failures or skips. This was macOS ARM64 hosting
+native Linux ARM64 in Docker's VM; it does not establish native Linux host or
+Darwin executable acceptance.
 
 Exact NVKE candidate `3da7d64940ffe94722a5a913ab5dc26b28430d72`, tree
 `86d6b4cc3a9a021cc6d38aa445ed90f04da2b28b`, combines the supplied-binary interface
 [#1578](https://github.com/dsx-ai-factory/nvke/pull/1578) with the independent
 [FIFO startup fix #1637](https://github.com/dsx-ai-factory/nvke/pull/1637).
-Each build selects output `nvkectl` and version equal to that exact commit.
-
-Every newly built executable passed **9 process contracts** and **532 top-level CLI
-tests across 30 packages**, with zero failures/skips. Each suite separately imported
-fresh source and began with empty dependency and build caches. Its inventory was
-independently reconciled against all nine process contracts declared in the imported
-source. Process contracts execute the supplied binary; other CLI unit tests exercise
-imported source. Neither a retained binary nor warm test caches supplied this proof.
-
-| Native platform | Artifact SHA-256 before and after all suites |
-| --- | --- |
-| Linux AMD64 | `0eea30f2eb1b0291ff6d8314205df06aad42c9e960398e67279b2131fa33ee85` |
-| Linux ARM64 | `df3de95b9df1ac89d6bca75eae7140a295cb0be51f99ed14531cefc784ca727c` |
-
-The scalar image is
+The selected output is `nvkectl`, with version equal to that commit and image
 `golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c`.
-Maps select its native child manifests: AMD64
-`sha256:2d658507a011f1eadc0114d7a421b312b2e77d9042a24036a26e267cc9231677`, ARM64
-`sha256:a83e961ad968e2e7abc2a59554e356f00c2a270a15fbb39f2c84a4caf13be9c3`.
-The relocated case copies that native manifest without changing its digest into a
-disposable loopback registry, then selects `localhost:5000/nvkr-toolchain-cli@DIGEST`.
-All three independently built variants produced the same bytes per architecture.
-This is observed byte reproduction, without qualification.
+Artifact SHA-256 remained
+`df3de95b9df1ac89d6bca75eae7140a295cb0be51f99ed14531cefc784ca727c`.
 
-Real Docker accepted space/colon/comma/quote source and staged-artifact mounts.
-Inspection and write/network probes confirmed read-only source/artifact/root filesystem,
-dropped capabilities, no new privileges, offline execution and acquisition without the
-artifact. On both architectures, timeout/SIGINT/SIGTERM probes returned 1/130/143 and
-removed the owned container and default workspace. A deliberately wrong-version
-**recipe-built** executable and an `exit 7` executable both failed with exit 2;
-fresh remote import of maintained revision `ed9fb09b` failed on its missing entrypoint
-with exit 1. None produced a success result. The fixed FIFO contract failed immediately
-for the broken executable instead of hanging; other signal negatives retain 30-second
-waits. These bounded negatives use separate test workspaces.
+Both Go suites ran from a working directory containing spaces, a colon, a comma
+and a quote. Docker inspection records acquisition without an artifact mount and
+execution with no network, read-only source/artifact/root filesystem, dropped
+capabilities and no new privileges. Local raw records, candidate inputs, Plan,
+fresh artifact and retained results are under `.nvkr/go-adapter-verification/`.
+Native Linux reruns and the final repository gate are tracked separately in #138.
 
-The checker still accepts a completed ordinary-test-only result in the expected
-package. Both native runtimes reproduced that behavior with filtered upstream
-`TestReportFailure` and a broken supplied executable, reusing verified test caches.
-This is a diagnostic limitation, not acceptance of either official suite. Stronger
-exhaustive acceptance requires an upstream-owned inventory or marker; the production
-checker does not copy NVKE test names. The official inventories above were checked
-independently for this exact revision.
-
-Run artifacts retain all six canonical Plans and hashes, exact authored candidate
-inputs, imported trees, test inventories, raw results and Docker inspections.
-A reconciled local copy is in `.nvkr/validation-20261014/full-verification/`.
-The [separate repository Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/38659644233)
-passed on the same candidate, independently of runtime verification. Local candidate
-`make check`, `make build`, focused uncached regressions, workflow lint and whitespace
-checks also passed. Local gates alone do not establish CI readiness or review approval.
-
-The earlier documented macOS ARM64/Docker path also passed a fresh recipe build
-against unpatched interface candidate `be36d63c`: 9 contracts and 530 CLI tests / 30
-packages, with empty caches and unchanged artifact
-`a6af3fc46cb5f30ba1fe1e6a46f768fbcea7ec43433abcb2d523fc6d816fdb35`.
-That was native Linux ARM64 in Docker's VM; Darwin execution and emulation were not
-claimed. Its raw records remain under `.nvkr/validation-20261014/`.
-
-Go compiler/loader fixtures cover both architectures, scalar/map precedence and
+Go regressions cover complete Plan admission before workspace creation, exact
+shallow imports, wrong commit/tree refusal, poisoned ambient Git routing without
+changing the caller checkout, both suite commands, private staging, byte changes,
+result rejection and cleanup. Targeted process-lifetime race tests passed.
+Compiler/loader fixtures cover both architectures, scalar/map precedence and
 fallback, permitted relocation, unsupported producers and complete Plan admission.
-Renamed `NVKECTL_VERSION` stamps are still rejected by the IR allowlist; candidate
-inputs use legacy stamps and translate them in the build command.
+The current main base admits renamed `NVKECTL_VERSION` stamps; loader contracts
+cover renamed/equal aliases and reject conflicting values.
 
-All upstream changes above remain separate PRs. Routine maintained use needs explicit
-source/toolchain/build-input refresh and Plan regeneration after upstream adoption;
-production pins were unchanged. Existing operator-toolchain vendoring needs #172's
-fix: the original recipe failed by pulling the bare image rather than its declared
-mirror. Current #172 main-based macOS full gate encounters unrelated Linux-only
-method lint findings; its Linux Merge Gate passed. Source/execution Go ownership,
-authenticated named-output membership and review approval remain prerequisites for
-stronger product/evidence integration. Diagnostic runtime success does not clear
-those outstanding review concerns.
+The checker deliberately retains the diagnostic limitation that a completed
+ordinary test in the expected package can satisfy the package guard. A Go
+regression records that behavior. Exhaustive acceptance needs an upstream-owned
+inventory or marker; NVKR does not copy upstream test names or authenticate
+supplied executable membership in a Run. Those review concerns remain open.
+
+The [2026-10-14 native run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38659640835)
+and its [separate repository gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/38659644233)
+are historical Python-adapter evidence, not validation of the Go replacement.
+That candidate passed six fresh builds (scalar, native image map and permitted
+registry relocation on native Linux AMD64/ARM64), each with 9 contracts and 532
+CLI tests. Its raw records remain in the run artifacts and locally under
+`.nvkr/validation-20261014/full-verification/`.
+
+#156 and #172 have landed in the current main base. The upstream supplied-binary
+interface still needs adoption before routine maintained use, followed by explicit
+source/toolchain/build-input refresh and Plan regeneration. Production pins are
+unchanged. Diagnostic success grants no conformance or qualification authority;
+authenticated exact-output membership, exhaustive suite acceptance and review
+approval remain prerequisites for stronger integration.
