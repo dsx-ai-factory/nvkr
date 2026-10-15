@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	// Wire ABI emitted by the digest-pinned inspector image. Rename only with
-	// a versioned helper protocol and measured producer/consumer repin together.
-	Prefix              = "NKD_INSPECTION "
+	// New helpers emit NVKR records. The receiver also supports the exact former
+	// prefix for existing digest-pinned images; both use the same closed schema.
+	Prefix              = "NVKR_INSPECTION "
+	legacyPrefix        = "NKD_INSPECTION "
 	MaxRecordBytes      = 512
 	MaxRetainedBytes    = 32 << 10
 	MaxForwardedRecords = 512
@@ -169,7 +170,11 @@ func (receiver *Receiver) Write(raw []byte) (int, error) {
 }
 
 func (receiver *Receiver) accept(line []byte) {
-	if !bytes.HasPrefix(line, []byte(Prefix)) {
+	prefix := Prefix
+	if bytes.HasPrefix(line, []byte(legacyPrefix)) {
+		prefix = legacyPrefix
+	}
+	if !bytes.HasPrefix(line, []byte(prefix)) {
 		receiver.unexpected = true
 		receiver.rememberFailure(append(bytes.Clone(line), '\n'))
 		return
@@ -185,7 +190,7 @@ func (receiver *Receiver) accept(line []byte) {
 		return
 	}
 	receiver.parsedRecords++
-	raw := line[len(Prefix):]
+	raw := line[len(prefix):]
 	var record Record
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()

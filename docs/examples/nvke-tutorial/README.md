@@ -136,7 +136,9 @@ The generated workflow path is `.github/workflows/nvkr-run.yml`, with exact inpu
 at the selected ref and does not choose a different Definition. This alternative's GitHub Environment targets
 the `nvkectl`, `cwe` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/nvkr` and uses the
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
-environment `nkd-release` with a deployment branch policy admitting only `main`. Registry access and NVKE source
+environment `nkd-release` with a deployment branch policy admitting only `main`.
+This is the existing provider identity; use the [environment migration procedure](../../nvkr-rebranding.md#github-environment-migration)
+before changing it to a new name. Registry access and NVKE source
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
 [implementation/evidence record](../../adr/reconciliation.md).
 

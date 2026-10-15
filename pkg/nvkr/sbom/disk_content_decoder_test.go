@@ -108,3 +108,47 @@ func TestBoundDiskContentDecoder(t *testing.T) {
 		}
 	}
 }
+
+func TestBoundDiskContentDecoderProjectsLegacyProperties(t *testing.T) {
+	for _, spelling := range []string{"legacy", "duplicate", "mixed"} {
+		t.Run(spelling, func(t *testing.T) {
+			fixture := contentFixture("disk-image", "arm64", "b")
+			report := fixture.report
+			report.Components[0].Properties = append(report.Components[0].Properties, Property{Name: diskContainedInProperty, Value: "cache/packages.tar@" + fixture.runtimeDigest})
+			for i := range report.Components[0].Properties {
+				report.Components[0].Properties[i].Name = strings.Replace(report.Components[0].Properties[i].Name, "nvkr:", "nkd:", 1)
+			}
+			if spelling != "legacy" {
+				property := report.Components[0].Properties[0]
+				if spelling == "mixed" {
+					property.Name = diskContentClassProperty
+				}
+				report.Components[0].Properties = append(report.Components[0].Properties, property)
+			}
+			raw, err := json.Marshal(report)
+			if err != nil {
+				t.Fatal(err)
+			}
+			original := bytes.Clone(raw)
+			inspection, err := decodeBoundDiskContentReport(raw, fixture.runtimeDigest, fixture.report)
+			if !bytes.Equal(raw, original) {
+				t.Fatal("projection rewrote original report bytes")
+			}
+			if spelling != "legacy" {
+				assertDependencyCode(t, err, e.CodeEnvelopeDecode)
+				if inspection != nil {
+					t.Fatal("ambiguous report minted an inspection")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, property := range inspection.Components()[0].Properties {
+				if !strings.HasPrefix(property.Name, "nvkr:") {
+					t.Fatal("legacy report escaped projection", property.Name)
+				}
+			}
+		})
+	}
+}

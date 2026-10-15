@@ -77,7 +77,7 @@ podman run --rm --pull=never --platform "linux/${inspection_arch}" \
   --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
   --user 65534:65534 --entrypoint sha256sum "${inspection_id}" \
   /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish \
-  /usr/local/bin/syft /usr/bin/dpkg-deb /usr/local/bin/nkd-disk-inspect
+  /usr/local/bin/syft /usr/bin/dpkg-deb /usr/local/bin/nvkr-disk-inspect
 podman run --rm --pull=never --platform "linux/${inspection_arch}" \
   --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
   --user 65534:65534 --entrypoint cat "${inspection_id}" \

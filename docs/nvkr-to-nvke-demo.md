@@ -243,7 +243,7 @@ After SIGKILL/OOM or VM restart:
    unexpected routes cause refusal. Inspect the discrepancy rather than forcing
    removal.
 
-The Go command accepts only version 2 journals. A Python-era version 1 journal
+The Go command accepts version 2 and version 3 journals. A Python-era version 1 journal
 must be restored **before upgrading**, using the last compatible revision
 `3b24beb5cb04df352e74a8d5405bd593871412b5`. If already upgraded, preserve the
 original output and use a separate checkout of that revision on the same Linux
@@ -260,10 +260,15 @@ Run `git worktree add` from a Git checkout containing that commit, not an
 archive-exported directory. The old CLI uses `scripts/nke-local-network.py` from
 the same revision. Current Go recovery diagnoses and refuses version 1; it does
 not migrate journals or execute the removed helper automatically. Do not change
-the journal's version number to bypass this boundary. Go version-2 journals retain
-the original `nkdvm0` bridge, firewall-owner prefix, policy-staging prefix and
-shared per-user coordination lock, so an upgrade does not strand existing grants
-or permit a second session to bypass the original lock.
+the journal's version number to bypass this boundary. New version-3 sessions use
+`nvkevm0`, `nvke-demo-`, `.nvke-policy-` and the renamed per-user lock. Recovery
+of version-2 journals retains the original `nkdvm0` bridge, firewall-owner prefix,
+policy-staging prefix and version number. Both versions hold the original shared
+coordination lock as well as the new lock, so an upgrade does not strand existing
+grants or permit an older session to bypass coordination. New admission rejects
+a bridge from either namespace; recover its original work directory first.
+After creating version-3 state, use version-3-capable recovery before downgrading;
+older binaries cannot interpret that journal.
 
 Restoration takes the same kernel-released lock, never kills serialized PIDs
 and, on the same boot, waits 40 seconds for in-flight bounded sudo work. This

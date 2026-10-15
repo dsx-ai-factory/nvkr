@@ -8,10 +8,12 @@ package nvkedemo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -24,9 +26,17 @@ func TestRecoveredKindSimulatorJournalCheckpointsExactBinding(t *testing.T) {
 	if runtime.GOARCH != "arm64" || os.Getenv("NVKR_TEST_NETWORK_RECOVERY") != "1" {
 		t.Skip("opt-in isolated Linux ARM64 recovery fixture")
 	}
-	for _, gateway := range []string{"172.18.0.1", "172.18.0.2"} {
-		t.Run(gateway, func(t *testing.T) {
+	for _, fixture := range []struct {
+		version int
+		gateway string
+	}{{2, "172.18.0.1"}, {2, "172.18.0.2"}, {3, "172.18.0.1"}, {3, "172.18.0.2"}} {
+		t.Run(fmt.Sprintf("v%d/%s", fixture.version, fixture.gateway), func(t *testing.T) {
+			gateway := fixture.gateway
 			original := networkFixture(t)
+			original.version = fixture.version
+			if fixture.version == 2 {
+				original.Owner = "nkd-demo-" + strings.TrimPrefix(original.Owner, "nvke-demo-")
+			}
 			original.kindGateway = gateway
 			row := kindSimulatorRule(original.Owner, original.KindCIDR, gateway)
 			original.rules = []networkRule{row}
@@ -56,7 +66,7 @@ func TestRecoveredKindSimulatorJournalCheckpointsExactBinding(t *testing.T) {
 				t.Fatal("recovered guard could not persist its original gateway", recovered.persistenceFailures)
 			}
 			state, err := readNetworkState(original.Work)
-			if err != nil || state.KindGateway != gateway {
+			if err != nil || state.KindGateway != gateway || state.Version != fixture.version || networkBridge(state.Owner) != networkBridge(original.Owner) {
 				t.Fatal("checkpoint changed or lost the original gateway", err)
 			}
 			present, deletes := true, 0

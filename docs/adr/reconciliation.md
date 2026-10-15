@@ -858,7 +858,7 @@ TCP/UDP 53 and UDP 67 collision rows additionally require native ARM64 root.
 Ordinary hosted tests do not establish those privileged socket observations.
 These tests do not prove real SIGINT during
 NVKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
-at every build/deployment phase. Network-only recovery uses version-2 journals
+at every build/deployment phase. Network-only recovery uses version-2 or version-3 journals
 and never kills serialized PIDs; restore legacy live controls before upgrading.
 A full tenant crash/restart and recovery matrix remains unverified.
 
@@ -1243,14 +1243,37 @@ provider-renamed `nvke-write` team with verified NVKR repository write access;
 the old `nke-write` slug no longer exists. Published Packer/inspector subjects
 stay at their exact
 `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/` addresses with the
-existing digests. Their plugin path, inspector executable and report properties
-`nkd:diskContentClass`, `nkd:packageFormat`, `nkd:packageArchitecture` and
-`nkd:containedIn` remain the pinned in-image ABI. Host-generated evidence metadata
-continues to use `nvkr:*`. The external package-capture envelope remains
+existing digests. New toolchain source builds use the NVKR plugin directory,
+inspector executable, progress prefix and four report-property names. Fixed
+launchers prefer those paths while supporting the original immutable-image
+layout, without retrying failed commands under another name. The bounded progress
+reader admits both exact prefixes. The bound content decoder projects the four
+legacy report keys to NVKR and rejects duplicate semantic properties, including mixed spellings of one key; it does not
+rewrite original helper bytes, image pins or subject identities. The external package-capture envelope remains
 `nkd.dev/package-acquisitions/v1`, emitted by the selected NVKE producer; internal
-NVKR evidence identities remain distinct. Go network recovery preserves its complete
-version-2 durable host namespace and shared coordination lock. These are explicit
-external/durable contract exceptions, not public namespace aliases.
+NVKR evidence identities remain distinct. New version-3 network sessions use the
+NVKE bridge, owner/staging prefixes and per-user lock. Version-2 recovery retains
+its original namespace and journal version. Both versions also hold the original
+shared lock, and new admission rejects either pre-existing bridge. The remaining
+old names are explicit external/recovery compatibility contracts.
+The 2026-10-15 local validation ran targeted Linux ARM64 race tests, including
+the opt-in `TestRecoveredKindSimulatorJournalCheckpointsExactBinding` for both
+journal versions and both gateway rows. Controlled tests cover mixed-version
+namespace rejection, dual-lock exclusion, exact launcher arguments, failure
+status preservation and ambiguous legacy report properties. The native Packer
+source build passed its diagnostic smoke checks with local image ID
+`sha256:d4c2d53ac28cea2a1f1295f7f298e679ce21870b4c697c387943afaa11f62d3c`.
+The inspector source build produced local image ID
+`sha256:f34960038917db3dce2832133c35868455b3ebb7c2d534d4d5de5c86d27c4550`;
+its renamed executable returned the expected usage error with empty stdout.
+The fixed launchers also exercised the new and retained local ARM64 images with
+network disabled, a read-only root, dropped capabilities and a non-root user:
+Packer listed its plugin under each layout and both inspector entrypoints
+returned the expected usage outcome. These checks do not establish actual
+QCOW2 production, full-content discovery, privileged host mutation/recovery,
+fresh AMD64 images, registry publication or qualification. Maintained registry
+pins and provider environment names remain unchanged.
+
 Retained node, package, Kubernetes and Packer names are compatibility contracts,
 not missing rebranding work. Source repinning or an independently changed ABI
 requires its own validation and is not part of this naming cutover.

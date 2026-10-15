@@ -9,7 +9,9 @@ bytes are required by the FDE image; this does not introduce cross-Run cache reu
 
 The Environment selects Docker/KVM on `arc-amd64-kvm` and admits manual dispatch on
 `codex/fde-image-pipeline` as well as the default branch. GitHub's `nkd-arc` Environment must separately
-admit that exact branch. The source-fetch stages use the existing `NKE_SOURCE_TOKEN`; the producer job
+admit that exact branch. This is the existing provider object; its replacement
+requires the [GitHub environment cutover](../../../docs/nvkr-rebranding.md#github-environment-migration).
+The source-fetch stages use the existing `NKE_SOURCE_TOKEN`; the producer job
 receives source bytes without the token. Native toolchain preparation uses the workflow token with
 read-only package access and removes its temporary registry configuration before execution.
 

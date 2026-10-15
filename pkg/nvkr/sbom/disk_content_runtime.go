@@ -121,10 +121,47 @@ func decodeBoundDiskContentReport(raw []byte, image string, binding diskContentR
 		report.Codec != binding.Codec || report.Guestfish != binding.Guestfish || report.Scanner != binding.Scanner || report.PackageReader != binding.PackageReader || report.MaxFilesystemBytes != binding.MaxFilesystemBytes {
 		return nil, e.New(e.CodeVerifyFailed, "disk content report differs from its exact held subject or runtime")
 	}
+	if err := projectDiskReportProperties(report.Components); err != nil {
+		return nil, err
+	}
 	if err := validateDiskContentReport(report); err != nil {
 		return nil, err
 	}
 	return &DiskContentInspection{report: report, runtimeDigest: image}, nil
+}
+
+// Project only the four exact legacy report keys after subject/runtime binding.
+// This changes a descriptive in-memory view, never the original helper bytes,
+// subject identity or image pin. Mixed/duplicate spellings are ambiguous even
+// when their values agree and must not mint an observation.
+func projectDiskReportProperties(components []Component) error {
+	for i := range components {
+		seen := make(map[string]bool, 4)
+		for j := range components[i].Properties {
+			property := &components[i].Properties[j]
+			name := property.Name
+			switch name {
+			case "nkd:diskContentClass":
+				name = diskContentClassProperty
+			case "nkd:packageFormat":
+				name = diskPackageFormatProperty
+			case "nkd:packageArchitecture":
+				name = diskPackageArchitectureProperty
+			case "nkd:containedIn":
+				name = diskContainedInProperty
+			case diskContentClassProperty, diskPackageFormatProperty, diskPackageArchitectureProperty, diskContainedInProperty:
+			default:
+				continue
+			}
+			if seen[name] {
+				return e.New(e.CodeEnvelopeDecode, "disk content report repeats an inspection property")
+			}
+			seen[name] = true
+			property.Name = name
+		}
+		slices.SortFunc(components[i].Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+	}
+	return nil
 }
 
 func validateDiskContentReport(report diskContentReport) error {
