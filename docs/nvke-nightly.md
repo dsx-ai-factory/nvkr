@@ -129,13 +129,15 @@ establish a completed hosted producer or E2E cycle.
    returned by dispatch; never use a latest-run search or retry an ambiguous
    POST. Join that run while checking repository, commit, workflow and attempt.
 3. Download only that completed run's named lifecycle and publication locator
-   artifacts. Run records and locators remain descriptive until verification.
+   artifacts and, for runtime Plan profiles, its frozen `nvkr-runtime-inputs`.
+   Run records, locators and the frozen Plan remain descriptive until verification.
 4. Authenticate the complete publication, signing identity, production
    provenance, outputs and exact Definition, Environment and Plan. Export held
    bytes only for the originating invocation. Extract native tools, images,
    charts and disk through existing lifecycle and delivery owners.
-5. Use a private checkout at the exact pinned NVKE suite revision. Generate profile
-   resources through NVKE's existing Go owner. Produce the suite's
+5. Use a private checkout at the frozen Plan's shared NVKE producer commit, or
+   the profile's pinned suite revision when runtime Plans are not selected.
+   Generate profile resources through NVKE's existing Go owner. Produce the suite's
    `release-description/v1` input through NVKR's existing export renderer over
    the held publication; the description adds no verification authority.
    Execute its existing
