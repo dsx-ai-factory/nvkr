@@ -15,9 +15,10 @@ Imports the matching pinned NVKE tests and invokes their `test-artifact` target
 against a supplied NVKR-built binary, without rebuilding it. See
 [artifact testing](../docs/artifact-testing.md) for prerequisites, results, and scope.
 This is a trusted-input diagnostic with independently reproduced fresh recipe-build
-and cold-cache suite execution in a native Linux ARM64 Docker VM.
-The current production pin lacks the upstream entrypoint; pin refresh and CI wiring
-remain follow-ups. The guide distinguishes prior results from committed regressions.
+and cold-cache suite execution on native Linux AMD64/ARM64, including the local
+macOS ARM64/Docker VM path.
+The current production pin lacks the upstream entrypoint; upstream adoption and
+explicit maintained-input refresh remain follow-ups. The guide distinguishes prior results from committed regressions.
 
 ## Definition → Run
 
