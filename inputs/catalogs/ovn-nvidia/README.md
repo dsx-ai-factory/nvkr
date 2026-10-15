@@ -13,9 +13,9 @@ regenerate its dependent inputs.
 
 | Boundary         | Existing OS catalog                                     | This candidate option                                                        |
 | ---------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Source           | Upstream `ovn-kubernetes/ovn-kubernetes`, 1.4.x         | DSX fork `release-2.4`, exact commit `12ca20e67b516f1a023da85a22deeaf8d2d70d0b` |
+| Source           | Upstream `ovn-kubernetes/ovn-kubernetes`, 1.4.x         | DSX fork tag `v2.4.1`, commit `9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7` |
 | Image            | Source-owned upstream Ubuntu Dockerfile                 | Fork's source-owned `dist/images/Dockerfile.ubuntu.nv`                       |
-| Chart            | Upstream `helm/ovn-kubernetes`, 1.4.0                   | Fork's checked-in `charts/ovn-kubernetes`, chart version 2.4.0               |
+| Chart            | Upstream `helm/ovn-kubernetes`, 1.4.0                   | Fork's checked-in `charts/ovn-kubernetes`, chart version 2.4.1               |
 | Debian packaging | Calls NVKE `os-image/packages/cni-common` and `cni-ovn` | Offline catalog command using `dpkg-deb` in the digest-pinned compiler image |
 | Consumer         | `ovn` material is a flat tar of Debian packages         | Same package archive shape and package/import paths                          |
 
@@ -39,13 +39,13 @@ bin/nvkr catalog pin --dir inputs/catalogs/ovn-nvidia \
 2. `ovn-kube-ubuntu` invokes the pinned rootless BuildKit adapter on the unchanged,
   source-owned Dockerfile. It builds OVN-Kubernetes from the fork's Go source and
    emits one OCI image archive, named
-   `localhost/nvke/ovn-kubernetes:git-12ca20e67b516f1a023da85a22deeaf8d2d70d0b`.
+   `localhost/nvke/ovn-kubernetes:git-9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7`.
 3. `ovn-kubernetes-chart` archives the checked-in chart and its checked-in subcharts
   offline. `nvke-cni-ovn` consumes both that exact chart archive and image through
    the factory's held-material boundary and packs both Debian packages offline.
    No NVKE package-folder command is invoked.
 
-At this pin the Dockerfile selects its own builder, `golang:1.26` bound to a
+At this pin the Dockerfile selects its own builder, `golang:1.26.9` bound to a
 digest, and never declares or reads a `BUILDER_IMAGE` argument. The catalog still
 passes one, but it cannot change the produced bytes; the effective builder is
 source-owned and changes only with the pin. The fork's vendored JSON adapter uses
@@ -59,8 +59,8 @@ Pinned DSX OVN Git source
   └─ checked-in chart → ovn-kubernetes-chart.tar
        + authenticated image material
        → nvke-cni-ovn.tar
-           ├─ nke-cni-ovn-charts-2.4.0_1+git.12ca20e67b51_<arch>.deb
-           └─ nke-cni-ovn-images-2.4.0_1+git.12ca20e67b51_<arch>.deb
+           ├─ nke-cni-ovn-charts-2.4.1_1+git.9480bbe1377e_<arch>.deb
+           └─ nke-cni-ovn-images-2.4.1_1+git.9480bbe1377e_<arch>.deb
 ```
 
 The chart package installs under `/etc/dgx/ovn-kubernetes`. Its `values-nke.yaml`
@@ -83,16 +83,16 @@ fork's documented `-f` install fails on a missing file rather than silently
 selecting the fork's own published image. Use the chart's bound root values.
 
 The image package installs a deterministic gzip archive and SHA-256 sidecar under
-`/usr/lib/nke/cni-ovn/2.4.0`. Its configuration hook checks the sidecar, bounds
+`/usr/lib/nke/cni-ovn/2.4.1`. Its configuration hook checks the sidecar, bounds
 containerd readiness and import, then imports the archive into the `k8s.io`
 namespace. Import failures fail package configuration.
 
-These packages select stream `2.4.0` and Debian version `1+git.12ca20e67b51`,
-not the pinned NVKE agent's default stream `1.4.0`. `InstallCNI.version=2.4.0`
-selects the existing stream-suffixed chart package; its logical `=2.4.0` suffix
+These packages select stream `2.4.1` and Debian version `1+git.9480bbe1377e`,
+not the pinned NVKE agent's default stream `1.4.0`. `InstallCNI.version=2.4.1`
+selects the existing stream-suffixed chart package; its logical `=2.4.1` suffix
 is informational, not an enforced Debian revision. InstallCNI strips that
 suffix before checking package presence and never runs APT. Install the exact
-package names with `=1+git.12ca20e67b51` separately, for example through
+package names with `=1+git.9480bbe1377e` separately, for example through
 InstallPackages, then validate chart deployment. These packages are not a
 drop-in for an empty-version request using the default stream. See the
 [pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/agent/pkg/agent/proto/node_agent.proto#L525-L545)

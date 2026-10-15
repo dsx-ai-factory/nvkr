@@ -523,9 +523,9 @@ historical M2 Docker candidate, not a newly measured current toolchain. Local Do
 launchers still freeze their freshly validated image into an attempt overlay.
 Static Plan and wrapper tests cover these selections, not a new native bake.
 
-The local OS selects the PR #113 NVKE/NVIDIA OVN fork at pinned commit
-`12ca20e67b516f1a023da85a22deeaf8d2d70d0b`; profile packages and tenant requests
-select its `2.4.0` chart stream. The combined Definition also declares standalone
+The local OS selects the PR #113 NVKE/NVIDIA OVN fork at pinned tag `v2.4.1`,
+commit `9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7`; profile packages and tenant
+requests select its `2.4.1` chart stream. The combined Definition also declares standalone
 OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
 are independently produced; this does not close original-owner cross-output
 reuse or establish equal bytes. The recorded exercises below were performed
@@ -539,25 +539,19 @@ including the fork OS bake, with 29 expected and 29 observed outputs in the
 `unqualified-local-execution` lane. Its exact Run identity and original records
 remain private; no retrievable external artifact is cited here.
 Artifact completion does not establish tenant acceptance or default OVN startup.
-For the current `2.4.0` pin, static catalog/overlay/graph contract checks and a
+For the current `2.4.1` pin, static catalog/overlay/graph contract checks and a
 local pinned-chart Helm rendering with loopback OCI push/pull are recorded, again
-without a retrievable evidence attachment. No Run, OS bake or tenant exercise has
-been executed against it. That pin also ships its single-node-zone values file as
-a link to `values.yaml`. Image binding admits regular files only, and a copy would
-carry the source image digests that binding replaces in `values.yaml`, so an
-install selecting the copy would merge them back over the bound values. The chart
-producer withdraws that member instead; the packaged chart omits it and the
-source-documented install path using it fails closed on a missing file.
+without a retrievable evidence attachment. The equivalent exercises recorded
+earlier against the superseded pin `12ca20e67b516f1a023da85a22deeaf8d2d70d0b` and
+its `2.4.0` stream retain that scope. No Run, OS bake or tenant exercise has
+been executed against the current pin, which also ships its single-node-zone
+values file as a link to `values.yaml`. Image binding admits regular files
+only, and a copy would carry the source image digests that binding replaces in
+`values.yaml`, so an install selecting the copy would merge them back over the
+bound values. The chart producer withdraws that member instead; the packaged
+chart omits it and the source-documented install path using it fails closed on
+a missing file.
 
-The selected fork's Ubuntu runtime omits `firewall-cmd`, while its non-DPU
-executable initialization requires it even when firewalld is disabled.
-[OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1)
-records the source paths and observed startup failure: artifact builds can
-succeed without a Ready tenant. A canonical source-owner fix and reviewed pin
-update are necessary for that NVIDIA selection, but are not shown to be
-sufficient for tenant, workload/DNS or cleanup acceptance. No local catalog
-patch is applied. Neither contract checks nor earlier deployment replays close
-this NVIDIA-specific gate.
 
 Separately, the retained continuous attempt above used the explicitly selected
 `kind-calico` diagnostic and ended with a two-node readiness timeout, not a
@@ -577,19 +571,14 @@ Already-loaded Open vSwitch/Geneve modules are admitted before installer
 acquisition or deployment mutation. The adapter does not issue module-load or
 unload commands, but the privileged source-owned OVS entrypoint can manipulate
 the shared kernel; prerequisite admission is not an isolation boundary.
-The changed site topology has no completed live E2E acceptance. The source-owner
-startup fix, reviewed pin update and fresh dual-cluster runtime checks remain
-required, separately from artifact and adapter tests.
+The changed site topology has no completed live E2E acceptance. Fresh
+dual-cluster runtime checks remain required, separately from artifact and
+adapter tests.
 Read-only rendering of the retained chart with its built Helm 4.2.4 executable
 was reported locally to preserve the selected image digest across all six site
 chart slots. No retrievable rendering artifact is cited for that exercise;
 it does not establish validation of the exact values currently installed by the
-demo, or a running cluster. Owner validation must also cover real node startup: the
-selected [iptables wrapper](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/12ca20e67b516f1a023da85a22deeaf8d2d70d0b/dist/images/iptables-scripts/iptables#L5)
-requires `/host`, whereas the selected
-[node chart](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/12ca20e67b516f1a023da85a22deeaf8d2d70d0b/charts/ovn-kubernetes/charts/ovnkube-single-node-zone/templates/daemonset.yaml#L324)
-mounts `/host/run/dbus`, not that root. This is a source-level compatibility
-gap, not an observed subsequent runtime failure or a local workaround.
+demo, or a running cluster.
 
 The explicit `upstream-ovn` demo option is additive; NVIDIA OVN remains the
 default and no mode silently falls back. Its authored local Definition replaces
