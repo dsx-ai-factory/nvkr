@@ -311,12 +311,17 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, and the separate M3-C `qualification` publisher.
+  `qualificationorigin`, `testresults`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
   own a competing schema, verifier, receipt constructor, or policy decision. Remaining multi-step command
   orchestration is migration debt tracked independently rather than declared absent.
+
+`testresults` owns output descriptions, wrapper validation and deterministic serialization in lane
+**none (descriptive)**. [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns the external-producer boundary; the [output reference](../external-test-output-contract.md)
+owns descriptive fields, format pins and limits. This adds no public lifecycle object or receipt.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 

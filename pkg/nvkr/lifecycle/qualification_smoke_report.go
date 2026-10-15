@@ -29,16 +29,8 @@ func (report NativeToolSmokeReport) Validate() error {
 	if checks.GateVersion != ArtifactCheckGateVersion || len(checks.Outputs) == 0 || len(checks.Outputs) > 1024 || !canonical.IsDigest(checks.CatalogDigest) {
 		return invalid()
 	}
-	for _, digest := range []string{checks.Inputs.PolicyDigest, checks.Inputs.DefinitionDigest, checks.Inputs.EnvironmentDigest, checks.Inputs.PlanDigest, checks.Inputs.ContentSubject} {
-		if !canonical.IsDigest(digest) {
-			return invalid()
-		}
-	}
-	if err := delivery.ValidatePublicationReference(checks.Inputs.ReleaseSubject); err != nil {
+	if err := checks.Inputs.Validate(); err != nil {
 		return err
-	}
-	if strings.Contains(checks.Inputs.ReleaseSubject, "://") {
-		return invalid()
 	}
 	if err := checks.Origin.Validate(); err != nil {
 		return err

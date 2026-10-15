@@ -75,6 +75,15 @@ The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retai
 files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
 requires no GitHub secret; private passphrases remain unsupported.
 
+## Preparatory external test output boundary
+
+`pkg/nvkr/testresults` implements JUnit/CTRF output descriptions, wrapper validation and deterministic
+Encode/Decode in lane **none (descriptive)**. Producer execution, file collection, format parsing,
+authenticated coverage, signing and publication remain unimplemented. Contract tests establish no
+external execution or service acceptance. Validation-vector v3 and qualification-evidence v2 are unchanged.
+[ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns the boundary; the [output reference](../external-test-output-contract.md) owns fields and limits.
+
 ## M3 MVP scope and acceptance boundary
 
 The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826) retains

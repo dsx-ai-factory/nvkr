@@ -333,6 +333,14 @@ outside the NVKR product lifecycle and v1 qualification acceptance. ADR-18 §3 r
 runner and trust constraints. It uses artifact-consumer APIs and issues no conformance receipt;
 it does not change this passive product boundary or establish named-decider ratification.
 
+`testresults.Producer` describes implementations external to NVKR. Those implementations own suite
+configuration, access, execution and process lifecycle; NVKR supplies only output descriptions,
+wrapper validation and deterministic serialization in lane **none (descriptive)**. No producer
+execution, cluster operation, dispatcher or qualification integration is supplied. Unsigned output
+descriptions cannot authorize qualification or promotion, or replace ADR-05's publisher evidence and
+authenticated later observations. The [output reference](../external-test-output-contract.md) owns
+the descriptive fields, format declarations and wire limits.
+
 ## Consequences
 
 **Positive**
