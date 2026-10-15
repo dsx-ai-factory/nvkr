@@ -139,7 +139,7 @@ components:
     platforms: [linux/amd64, linux/arm64]
     outputType: oci-image
     # Reference config profiles only, not fleet configuration or legacy OSProfiles.
-    # Reuse the source-owned Dockerfile with an explicitly selected build context.
+    # Reuse the source-owned Dockerfile with a pinned multiarchitecture base index.
     buildCommand:
       - sh
       - -euc
@@ -152,7 +152,7 @@ components:
           --local context=/src/bin/profiles-context \
           --local dockerfile=/src/controller/test/fixtures \
           --opt 'platform=linux/{{.Arch}}' \
-          --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d \
+          --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
           --output 'type=oci,dest=/src/bin/nico-reference-profiles-fixture-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
 sources:
@@ -191,7 +191,7 @@ sources:
         esac
         curl --fail --location --max-time 120 --output /tmp/helm.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$arch.tar.gz"
         printf '%s  %s\n' "$digest" /tmp/helm.tar.gz | sha256sum -c -
-        tar -xzf /tmp/helm.tar.gz -C /tmp "linux-$arch/helm"
+        tar --no-same-owner -xzf /tmp/helm.tar.gz -C /tmp "linux-$arch/helm"
         mkdir -p .nvkr-tools
         cp "/tmp/linux-$arch/helm" .nvkr-tools/helm
         export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml

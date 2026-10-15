@@ -1294,7 +1294,17 @@ The blocked DSX producer, its material-only selections and unused source credent
 dependency-finding triage and confirmation of source/binary and distribution contracts. No source gate,
 submodule rejection or security requirement is weakened to admit that dependency. Standalone plugin
 compilation does not establish those contracts or native execution/boot acceptance. NKTP acquisition and
-offline Helm packaging were exercised locally; no combined hosted Run of these release additions is claimed.
+offline Helm packaging were exercised locally; no successful combined hosted Run of these release additions is claimed.
+
+[Run `38809161348`](https://github.com/dsx-ai-factory/nvkr/actions/runs/38809161348) at
+`e3743a70b6e0bd19ccf53b7160ab0a5f276d0e66` failed during NKTP Helm extraction and the AMD64
+reference-profile fixture build. Helm archive ownership restoration conflicted with the vendor container's
+dropped capabilities; the fixture's named Alpine context selected an ARM64-only manifest for both targets.
+The catalog now extracts Helm without restoring archive ownership and selects the existing pinned Alpine
+index containing both native children, retaining the previous ARM64 child bytes. These input corrections
+preserve vendor isolation and the source-owned Dockerfile. The two missing-artifact verification failures
+and final completeness rejection were downstream effects; aggregate publication was skipped. A fresh
+complete hosted Run is still required to establish the corrected candidate's execution and publication.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,
