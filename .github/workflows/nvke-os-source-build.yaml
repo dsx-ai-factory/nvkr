@@ -61,10 +61,49 @@ jobs:
           ASKPASS
           chmod 700 "$askpass"
           export GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0
+          # Local recipe fetching projects global credential helpers rather than ASKPASS.
+          recipe_helper="$RUNNER_TEMP/nvke-recipe-helper"
+          cat > "$recipe_helper" <<'HELPER'
+          #!/bin/sh
+          [ "$1" = get ] || exit 0
+          credential_host= credential_path=
+          while IFS='=' read -r credential_key credential_value; do
+            [ -n "$credential_key" ] || break
+            case "$credential_key" in
+              host) credential_host=$credential_value ;;
+              path) credential_path=$credential_value ;;
+            esac
+          done
+          [ "$credential_host" = github.com ] || exit 1
+          case "$credential_path" in dsx-ai-factory/nvke|dsx-ai-factory/nvke.git) ;; *) exit 1 ;; esac
+          printf '%s\n' username=x-access-token
+          printf 'password='
+          cat "$0.token"
+          printf '\n'
+          HELPER
+          sudo install -m 700 "$recipe_helper" "$recipe_helper.root"
+          printf '%s' "$NVKR_SOURCE_TOKEN" | sudo sh -c 'umask 077; cat > "$1"' sh "$recipe_helper.root.token"
+          sudo git config --global credential.https://github.com/dsx-ai-factory/nvke.helper "!$recipe_helper.root"
+          sudo git config --global credential.https://github.com/dsx-ai-factory/nvke.useHttpPath true
+          # Bounded fetch-authentication probe in a closed environment, without ASKPASS or token env.
+          sudo env -i PATH="$PATH" HOME=/root LC_ALL=C GIT_TERMINAL_PROMPT=0 GIT_CONFIG_NOSYSTEM=1 \
+            timeout 60 git ls-remote --exit-code https://github.com/dsx-ai-factory/nvke refs/heads/test/cli-artifact-verification
           # Credentials stay in host Git, never Docker env or mounts.
           sudo --non-interactive --preserve-env=NVKR_SOURCE_TOKEN,GIT_ASKPASS,GIT_TERMINAL_PROMPT,GOTOOLCHAIN,PATH \
             python3 scripts/verify-cli-candidate.py \
             --root "$PWD/.nvkr/cli-proof" --arch "$CANDIDATE_ARCH" --mode "$CANDIDATE_MODE"
+      - name: Remove host credential files
+        if: always()
+        run: |
+          set -euo pipefail
+          sudo git config --global --unset-all credential.https://github.com/dsx-ai-factory/nvke.helper || true
+          sudo git config --global --unset-all credential.https://github.com/dsx-ai-factory/nvke.useHttpPath || true
+          sudo python3 - "$RUNNER_TEMP/nvke-recipe-helper.root" "$RUNNER_TEMP/nvke-recipe-helper.root.token" <<'PY'
+          import sys
+          from pathlib import Path
+          for name in sys.argv[1:]:
+              Path(name).unlink(missing_ok=True)
+          PY
       - name: Retain plans, imported trees, inventories and raw results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
