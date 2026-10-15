@@ -330,6 +330,21 @@ The YAML equivalent is the strictly typed `run.cleanup: true`; the default is
 false, and an explicit `--cleanup=false` overrides it. Cleanup is never a
 silent fallback from retention to a different network or input selection.
 
+For a recording, add `--walkthrough` to that same `e2e --cleanup`
+invocation. TUI remains the default; `--plain` is optional scrolling output. The `e2e`
+introduction explains the selected authored inputs and links their source documentation before
+the dashboard; it is read-only presentation, not runtime admission. After the existing workload
+and DNS checks, the adapter runs bounded
+read-only kubectl observations against both explicit owned kubeconfigs before
+natural tenant deletion. The public view shows Ready node roles, all-namespace
+pod status and restarts, actual Deployment/DaemonSet/StatefulSet inventory,
+selected component rollouts, and the existing `nvkr-smoke` Job completion,
+zero-retry policy, container exit/restarts and bounded DNS success marker. It
+does not rerun the Job. Kubeconfig contents, node addresses, pod identities, raw
+DNS output and private diagnostics remain private. A failed walkthrough fails
+the recording and still runs the existing mandatory owned cleanup. The YAML
+equivalent is `run.walkthrough: true`; default workflows are unchanged.
+
 The new retained-owner CLI and live access presentation have focused contract
 tests and native process/control fixtures. Those fixtures do not prove a fresh
 NVKE retained deployment, SSH-logout persistence or acceptance of this revision.
@@ -1014,7 +1029,7 @@ one tagged NVKE release.
 | --- | --- | --- |
 | Installer, site CLI/controller/charts and diagnostic profiles | [`8fb2d533`](https://github.com/dsx-ai-factory/nvke/commit/8fb2d53368823bd386b4fbd55b4ab6d3c0931345) | [Site lock](../definitions/nvke-local-dev-arm64/site-catalog/pins.lock.yaml), [profiles lock](../definitions/nvke-local-dev-arm64/profiles-catalog/pins.lock.yaml) and the demo's [installer pin](../internal/nvkedemo/model.go) |
 | OS assembly, agent and most NVKE-owned OS material producers | [`ff21ba8c`](https://github.com/dsx-ai-factory/nvke/commit/ff21ba8c07cafff74b68e238a8876af11e5beded) | [OS lock](../definitions/nvke-m2/os-catalog/pins.lock.yaml) and [local OS overlay](../definitions/nvke-local-dev-arm64/os-tcg.json) |
-| SPIRE package exception | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Same OS lock; this older plugin-free package is an explicit [source gap](full-nvke-source-build.md), not the intended complete NVKE baseline |
+| Temporary SPIRE package selection | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Same OS lock; the prior plugin-free producer is retained temporarily. DSX remains a required missing product input, tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641), not full source/content parity. |
 | NICoSim | [`6ffc2e5c`](https://github.com/dsx-ai-factory/nvke/commit/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4) | [Simulator lock](../definitions/nvke-local-dev-arm64/simulator-catalog/pins.lock.yaml) |
 | Provisioned provider (built, not used by this NICoSim tenant) | [`33fb71b2`](https://github.com/dsx-ai-factory/nvke/commit/33fb71b2f4224b470ebc628a9165fc4b92870406) | [Provider lock](../definitions/nvke-controller/catalog/pins.lock.yaml), selecting `v0.21.0` |
 

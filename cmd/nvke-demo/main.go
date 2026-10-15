@@ -246,6 +246,11 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
+			if run.Walkthrough {
+				if err := presentDemoNarration(cmd.Context(), out, build); err != nil {
+					return err
+				}
+			}
 			if !run.Cleanup && actions.retention != nil {
 				if err := actions.retention(cmd.Context()); err != nil {
 					return err
@@ -291,6 +296,7 @@ func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 }
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {
 	flags := command.Flags()
+	flags.BoolVar(&cfg.Walkthrough, "walkthrough", false, "show bounded read-only site, tenant and existing workload observations before cleanup")
 	flags.BoolVar(&cfg.Cleanup, "cleanup", false, "delete the tenant and join/restore owned resources before returning (default: retain environment)")
 	checkoutHelp := "optional clean pinned installer checkout; e2e prepares it when omitted"
 	if existing {
@@ -353,6 +359,9 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 	}
 	if command.Flags().Changed("timeout") {
 		selected.Run.TimeoutSeconds = flags.Run.TimeoutSeconds
+	}
+	if command.Flags().Changed("walkthrough") {
+		selected.Run.Walkthrough = flags.Run.Walkthrough
 	}
 	if command.Flags().Changed("cleanup") {
 		selected.Run.Cleanup = flags.Run.Cleanup

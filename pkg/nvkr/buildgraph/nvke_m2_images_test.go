@@ -41,7 +41,7 @@ func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 // These isolated test catalogs exercise the unchanged tag-backed declarations
 // and native pins through their owning loader. They are not alternative product
 // inputs: TestMaintainedM2DeploymentImageMembership still requires the entire
-// actual catalog to retain all 37 outputs and compile all 24 image subjects.
+// actual catalog to retain all 69 outputs and compile all 24 original image subjects.
 func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
 	provider := catalog.Dir("../../../definitions/nvke-m2/image-catalog").(catalog.ContextDataProvider)
 	registryBytes, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
@@ -202,8 +202,8 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authored.Outputs) != 37 {
-		t.Fatalf("got %d outputs, want thirteen build/chart/tool outputs plus 24 native image members", len(authored.Outputs))
+	if len(authored.Outputs) != 69 {
+		t.Fatalf("got %d outputs, want 37 original outputs plus 32 additional release members", len(authored.Outputs))
 	}
 	provider := catalog.Dir(filepath.Join(root, "image-catalog")).(catalog.ContextDataProvider)
 	cat, err := catalog.LoadContext(t.Context(), provider)

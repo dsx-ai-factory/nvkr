@@ -106,12 +106,12 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				t.Fatalf("one shared implementation has %d calls for %d jobs", calls, count)
 			}
 			for name, raw := range templates {
-				assertGitHubCompositeReadableYAML(t, name, raw)
+				assertGitHubCompositeReadableYAML(t, name, raw, plan)
 				if strings.Contains(name, "/jobs/") || bytes.Contains(raw, []byte("producer-node-")) {
 					t.Fatalf("job-specific implementation remains in %s", name)
 				}
 			}
-			assertGitHubCompositeReadableYAML(t, "workflow", workflow)
+			assertGitHubCompositeReadableYAML(t, "workflow", workflow, plan)
 			expanded, err := expandGitHubActions(plan, workflow, files)
 			if err != nil {
 				t.Fatal(err)

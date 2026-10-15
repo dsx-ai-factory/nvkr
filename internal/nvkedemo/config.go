@@ -46,6 +46,7 @@ type BuildFile struct {
 
 type RunFile struct {
 	Cleanup        bool          `yaml:"cleanup" mapstructure:"cleanup"`
+	Walkthrough    bool          `yaml:"walkthrough" mapstructure:"walkthrough"`
 	Network        string        `yaml:"network" mapstructure:"network"`
 	NVKECheckout   string        `yaml:"nvkeCheckout" mapstructure:"nvkeCheckout"`
 	NVKR           string        `yaml:"nvkr" mapstructure:"nvkr"`
@@ -183,7 +184,7 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if file.Version != 1 || (run.NVKECheckout != "" && !configString(run.NVKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
 		return Config{}, nvkrerr.New(nvkrerr.CodeUsage, "run requires version 1, out, valid optional nvkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	return Config{Cleanup: run.Cleanup, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+	return Config{Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 

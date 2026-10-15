@@ -175,9 +175,8 @@ func githubResolveAliases(node *yamlv3.Node, active map[*yamlv3.Node]bool) (*yam
 	return &copyOfNode, nil
 }
 
-// Only fixed preflight and runner preparation get human-readable aliases. Job
-// policy, dependencies and operation calls stay explicit; no generic value
-// compression turns the workflow into a dictionary of numbered references.
+// Fixed preflight, runner preparation and complete semantic calls get readable
+// aliases only after structural equality. Job policy and dependencies stay inline.
 func anchorGitHubPreflight(plan *Plan, jobs *yamlv3.Node, actions githubActionRefs) error {
 	first := map[string]*yamlv3.Node{}
 	for index := 1; index < len(jobs.Content); index += 2 {
@@ -201,6 +200,18 @@ func anchorGitHubPreflight(plan *Plan, jobs *yamlv3.Node, actions githubActionRe
 					name = "check-native-linux-amd64"
 				case strings.Contains(githubYAMLValue(step, "run"), "Linux/aarch64"):
 					name = "check-native-linux-arm64"
+				}
+			case strings.HasPrefix(githubYAMLValue(step, "uses"), "./"+githubActionsDirectoryFor(plan)+"shared/"):
+				family := strings.TrimPrefix(githubYAMLValue(step, "uses"), "./"+githubActionsDirectoryFor(plan)+"shared/")
+				binding := githubYAMLValue(githubYAMLField(step, "with"), "parameters")
+				prefix := "${{ fromJSON(steps." + githubContextStepID + ".outputs.data)['"
+				part := strings.TrimSuffix(strings.TrimPrefix(binding, prefix), "'] }}")
+				controlled := false
+				for _, field := range githubTransferControlFields {
+					controlled = controlled || githubYAMLField(step, field) != nil
+				}
+				if !controlled && binding == githubParametersExpression(part) && githubActionPart(part) {
+					name = "operation-" + family + "-" + part
 				}
 			}
 			if name == "" {

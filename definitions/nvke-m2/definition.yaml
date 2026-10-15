@@ -11,6 +11,92 @@ catalog:
 sbomTool: syft
 cosignTool: cosign
 outputs:
+  - name: capi-controller-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [capi-controller-image]
+  - name: capi-controller-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [capi-controller-image]
+  - name: capi-kubeadm-bootstrap-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [capi-kubeadm-bootstrap-image]
+  - name: capi-kubeadm-bootstrap-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [capi-kubeadm-bootstrap-image]
+  - name: capi-kubeadm-control-plane-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [capi-kubeadm-control-plane-image]
+  - name: capi-kubeadm-control-plane-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [capi-kubeadm-control-plane-image]
+  - name: capnico-controller
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components:
+      - capnico-controller
+  - name: cert-manager-cainjector-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [cert-manager-cainjector-image]
+  - name: cert-manager-cainjector-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [cert-manager-cainjector-image]
+  - name: cert-manager-controller-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [cert-manager-controller-image]
+  - name: cert-manager-controller-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [cert-manager-controller-image]
+  - name: cert-manager-webhook-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [cert-manager-webhook-image]
+  - name: cert-manager-webhook-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [cert-manager-webhook-image]
+  - name: cluster-api-provider-provisioned
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../nvke-controller/catalog
+    format: oci
+    components:
+      - cluster-api-provider-provisioned
   - name: controller-chart
     platform: linux/amd64
     catalog:
@@ -42,6 +128,117 @@ outputs:
     format: oci
     components:
       - nvke-controller
+  # Reference test data, not the runnable demo's controller-profiles or fleet configuration.
+  - name: nico-reference-profiles-fixture
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components:
+      - nvke-nico-reference-profiles
+  - name: nktp
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: helm-oci
+    components:
+      - nktp-chart
+  - name: nktp-collector-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-collector-image]
+  - name: nktp-collector-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-collector-image]
+  - name: nktp-kube-state-metrics-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-kube-state-metrics-image]
+  - name: nktp-kube-state-metrics-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-kube-state-metrics-image]
+  - name: nktp-kubectl-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-kubectl-image]
+  - name: nktp-kubectl-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-kubectl-image]
+  - name: nktp-lgtm-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-lgtm-image]
+  - name: nktp-lgtm-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-lgtm-image]
+  - name: nktp-metrics-server-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-metrics-server-image]
+  - name: nktp-metrics-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-metrics-server-image]
+  - name: nktp-node-exporter-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-node-exporter-image]
+  - name: nktp-node-exporter-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-node-exporter-image]
+  - name: nktp-operator-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-operator-image]
+  - name: nktp-operator-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-operator-image]
+  - name: nktp-target-allocator-image
+    platform: linux/amd64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-target-allocator-image]
+  - name: nktp-target-allocator-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ./release-catalog
+    format: oci
+    components: [nktp-target-allocator-image]
   - name: nvke-node-fde-amd64
     platform: linux/amd64
     catalog:

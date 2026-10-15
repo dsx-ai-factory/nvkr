@@ -6,6 +6,7 @@ package buildgraph
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -82,10 +83,16 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 					t.Fatalf("%s does not retain the approved source commit/tree/epoch", name)
 				}
 			}
-			// Temporary SPIRE-only rollback avoids the inaccessible DSX IMDS asset.
+			// Temporary SPIRE-only rollback is tracked in NVKE issue #1641.
 			spire := cat.Components["nvke-spire-agent"]
 			if spire.Commit != "726f76944404e1106626b8333d3576bdf67b575b" || spire.TreeHash != "3d6ea77f85d5da2648038425f805a598e23464ba" || spire.SourceDate != 1790192178 {
 				t.Fatal("temporary SPIRE source pin changed")
+			}
+			if len(spire.Materials) != 0 || len(spire.VendorCommand) == 0 {
+				t.Fatal("temporary SPIRE producer must retain its source-owned acquisition contract without DSX materials")
+			}
+			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
+				t.Fatal("temporary SPIRE selection unexpectedly reintroduced DSX")
 			}
 			if agent.Commit != approvedSource || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.2.1-81-gff21ba8") {
 				t.Fatal("handwritten agent version no longer matches its exact source pin; revalidate owning source version before repinning")
@@ -104,12 +111,28 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			}
 			found := false
 			compositionFound := false
+			spireFound := false
 			for _, node := range graph.Nodes {
+				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
+					spireFound = true
+					if node.SourceCommit != spire.Commit || node.Network != ir.NetworkNone || len(node.Materials) != 0 {
+						t.Fatal("SPIRE packaging must use the exact temporary source and its acquired closure offline")
+					}
+				}
 				if node.Kind == ir.KindBuild && node.Component == "nvke-image-inputs" {
 					compositionFound = true
 					arch := strings.TrimPrefix(output.Platform, "linux/")
 					if node.SourceCommit != approvedSource || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
 						t.Fatal("image composition must use the approved source's required native architecture argument")
+					}
+					spireMaterial := false
+					for _, binding := range node.Materials {
+						if binding.Component == "nvke-spire-agent" && slices.Contains(node.Needs, binding.Producer) {
+							spireMaterial = true
+						}
+					}
+					if !spireMaterial {
+						t.Fatal("image composition must consume the selected SPIRE package")
 					}
 				}
 				if node.Kind != ir.KindBuild || node.Component != root {
@@ -168,6 +191,9 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			}
 			if !compositionFound {
 				t.Fatal("image-input composition producer missing from graph")
+			}
+			if !spireFound {
+				t.Fatal("disk graph must retain the selected SPIRE packaging producer")
 			}
 		})
 	}

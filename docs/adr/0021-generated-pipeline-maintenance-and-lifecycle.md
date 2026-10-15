@@ -103,6 +103,14 @@ Plan. Their exact bytes, safe relative paths and modes participate in regenerati
 checks and prior-manifest retirement. The workflow digest still describes the top-level workflow bytes;
 it is not a substitute for validating the complete manifest-owned action closure.
 
+Identical complete semantic calls without provider controls may share descriptive YAML anchors after
+structural equality checks, including their parameter selector and credential references. The outer label names
+the operation and job-local part, while the job and expanded role labels retain the selected producer. Controlled diagnostic
+steps retain their original caller labels. Static expansion resolves aliases into independent copies before
+substituting per-job parameters, so one job cannot mutate another's input or credential bindings. Job
+permissions, conditions, dependencies and runtime selection remain inline. This changes presentation only,
+not execution membership, evidence or the provider's workflow-size bound.
+
 The entry workflow references the fixed Plan and manifest paths without repeating the Plan digest. Its
 provider source-fetch IDs and scheduling order describe the target and actual consumer cohort rather than
 changing source pins. Exact executable identities remain in the Plan and generated invocation data.

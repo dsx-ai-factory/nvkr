@@ -30,6 +30,7 @@ type RunInputs struct {
 // Timeout bounds tenant provisioning; cleanup has separate bounded contexts.
 type Config struct {
 	Cleanup      bool
+	Walkthrough  bool
 	Network      string
 	NVKECheckout string
 	NVKR         string

@@ -61,7 +61,7 @@ resume capabilities. The [demo index](demos/README.md) provides bounded generati
 journeys with their prerequisites.
 
 The bundle records its selected Definition and Environment in `.github/nvkr-run/plan.json`.
-The maintained release selection is the 37-output [M2 candidate](definitions/nvke-m2/README.md), including
+The maintained release selection is the 69-output [M2 candidate](definitions/nvke-m2/README.md), including
 plain and public-bootstrap FDE disks for both native architectures. The separate
 [FDE diagnostic workflow](definitions/nvke-fde/README.md) selects one build-only disk for branch iteration.
 Regenerate with the intended selection after changing its inputs or generator code:
@@ -86,7 +86,7 @@ Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other exa
 
 ## Test pipeline changes on a feature branch
 
-The committed `nvkr-dev.yml` runs the **same 37-output M2 Definition** as the maintained production
+The committed `nvkr-dev.yml` runs the **same 69-output M2 Definition** as the maintained production
 workflow, including native AMD64/ARM64 plain and public-bootstrap FDE disks, SBOM attestation, per-output publication, cosign signing,
 verification and finalization. Its generator and helper come from the dispatched branch. The separate
 `definitions/nvke-m2/environment-github-dev.yaml` selects development credentials, protected environments,

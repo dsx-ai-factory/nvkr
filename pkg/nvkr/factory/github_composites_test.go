@@ -224,18 +224,19 @@ func TestGitHubCompositesPreserveExpandedSemanticsAndProviderControls(t *testing
 						}
 					}
 				}
-				assertGitHubCompositeReadableYAML(t, name, body)
+				assertGitHubCompositeReadableYAML(t, name, body, &Plan{})
 			}
 			if helperFiles != 1 || shellSteps == 0 {
 				t.Fatalf("expected one shared helper action and explicit shell steps; got %d and %d", helperFiles, shellSteps)
 			}
-			assertGitHubCompositeReadableYAML(t, "workflow", workflow)
+			assertGitHubCompositeReadableYAML(t, "workflow", workflow, &Plan{})
 		})
 	}
 }
 
-func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte) {
+func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte, plan *Plan) {
 	t.Helper()
+	sharedPrefix := "./" + githubActionsDirectoryFor(plan) + "shared/"
 	var document yamlv3.Node
 	if err := yamlv3.Unmarshal(raw, &document); err != nil {
 		t.Fatal(err)
@@ -267,6 +268,20 @@ func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte) {
 					t.Fatal("native preflight alias names a different platform or operation")
 				}
 			default:
+				if strings.HasPrefix(anchor, "operation-") {
+					uses := githubYAMLValue(target, "uses")
+					prefix := sharedPrefix
+					family := strings.TrimPrefix(uses, prefix)
+					binding := githubYAMLValue(githubYAMLField(target, "with"), "parameters")
+					selectorPrefix := "${{ fromJSON(steps." + githubContextStepID + ".outputs.data)['"
+					part := strings.TrimSuffix(strings.TrimPrefix(binding, selectorPrefix), "'] }}")
+					if !strings.HasPrefix(uses, prefix) || binding != githubParametersExpression(part) ||
+						!githubActionPart(part) || anchor != "operation-"+family+"-"+part ||
+						githubYAMLValue(target, "name") != strings.ReplaceAll(family, "-", " ")+" "+part {
+						t.Fatal("operation alias changes its semantic interface or current-job parameter selector")
+					}
+					break
+				}
 				if !strings.HasPrefix(anchor, "prepare-stage-") {
 					t.Errorf("%s contains non-semantic or unapproved alias %q", name, anchor)
 					break
@@ -274,9 +289,9 @@ func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte) {
 				with := githubYAMLField(target, "with")
 				uses, artifact := githubYAMLValue(target, "uses"), githubYAMLValue(with, "runner-artifact")
 				wantAnchor := "prepare-stage-" + shortStableName(artifact)
-				if uses == "./"+githubSharedDirectory+"prepare-stage-container" {
+				if uses == sharedPrefix+"prepare-stage-container" {
 					wantAnchor += "-container"
-				} else if uses != "./"+githubSharedDirectory+"prepare-stage" {
+				} else if uses != sharedPrefix+"prepare-stage" {
 					t.Fatal("preparation alias names a different action")
 				}
 				if anchor != wantAnchor || len(target.Content) != 8 || githubYAMLLength(with) != 4 ||

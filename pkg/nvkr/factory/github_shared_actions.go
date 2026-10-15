@@ -142,7 +142,13 @@ func shareGitHubActions(plan *Plan, raw []byte, files map[string][]byte, actions
 					with = githubYAMLMap()
 				}
 				githubYAMLSet(with, "parameters", githubYAMLString(githubParametersExpression(key)))
-				projected := githubYAMLMap("name", githubYAMLString(invocation.Name), "uses", githubYAMLString("./"+path), "with", with)
+				// Distinguish repeated operations within a job while preserving
+				// identical call sharing across jobs. Inner labels name the producer.
+				label := githubYAMLValue(invocation.Body, "name") + " " + key
+				if controlled {
+					label = invocation.Name
+				}
+				projected := githubYAMLMap("name", githubYAMLString(label), "uses", githubYAMLString("./"+path), "with", with)
 				for _, field := range githubTransferControlFields {
 					if value := githubYAMLField(call, field); value != nil {
 						githubYAMLSet(projected, field, value)

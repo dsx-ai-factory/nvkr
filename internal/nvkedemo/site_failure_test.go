@@ -50,7 +50,7 @@ func TestRuntimeFailureRetainsPrivateLogsBeforeCleanup(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			work, tools := privateTestDir(t), privateTestDir(t)
 			pod := sitePod{Metadata: podMetadata{UID: "private-uid", Namespace: "temporal", Name: "private-pod"}}
-			failed := &runtimeReadinessError{dependency: "runtime-temporal-server", pod: pod.Metadata, container: "temporal-worker"}
+			failed := &runtimeReadinessError{dependency: "runtime-test", pod: pod.Metadata, container: "temporal-worker"}
 			if scenario == "changed-uid" {
 				pod.Metadata.UID = "replacement-uid"
 			}

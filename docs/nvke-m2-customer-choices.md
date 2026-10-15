@@ -1,6 +1,6 @@
 # NVKE M2 inputs and customer choices
 
-The [M2 Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/definition.yaml) selects 37 named outputs, including independent
+The [M2 Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/definition.yaml) selects 69 named outputs, including independent
 `linux/amd64` and `linux/arm64` plain and public-bootstrap FDE disks. FDE publication carries build provenance
 without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md#native-execution-and-publication).
 The catalog owns producer commands, material edges and
@@ -13,9 +13,10 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 |---|---|---|
 | Each disk's exact root and complete material set | M2 Definition and `os-catalog/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
 | OS, Calico and kubeadm source | `os-catalog/pins.lock.yaml`, NVKE `ff21ba8c07cafff74b68e238a8876af11e5beded` | Exact commit/tree/epoch; retain this separately from controller/CLI release selection. |
-| Temporary embedded SPIRE exception | Same lock, source `nvke-spire-agent-source` at `726f76944404e1106626b8333d3576bdf67b575b` | Do not call this mixed-source image the intended complete M2 image. The DSX IMDS asset remains excluded by this older package. |
+| Temporary SPIRE packaging selection | Same lock selects `nvke-spire-agent-source` at `726f76944404e1106626b8333d3576bdf67b575b` | The older package omits DSX IMDS. Do not claim full current-NVKE parity; [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks restoration. OS assembly, agent and other sources are unchanged. |
 | Runtime image selection | `image-catalog` plus NVKE deploy values at `33fb71b2f4224b470ebc628a9165fc4b92870406` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
 | Release-component pins | CLI/controller/operator catalogs and their own locks | Validate each source independently; one shared repository URL does not imply one release. |
+| Reference-profile fixture | `release-catalog`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only; not the demo's runnable `controller-profiles` or approved fleet configuration. |
 | Customer replacement | Ordered catalog overlay, bound to its exact predecessor snapshot | Preserve the logical component's output type and supported platforms; validate its new material closure. |
 
 The [M2 input guide](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md) records the detailed source paths and remaining

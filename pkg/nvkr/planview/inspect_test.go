@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
 func maintainedPlan(t *testing.T) *factory.Plan {
@@ -106,7 +107,20 @@ func TestInspectionRejectsInvalidCompletePlans(t *testing.T) {
 	}{
 		{"stale definition", func(p *factory.Plan) { p.Definition.Metadata.Description = "replaced" }, e.CodeUnverifiedRef},
 		{"dangling edge", func(p *factory.Plan) { p.Graph.Nodes[0].Inputs = []string{"absent"} }, e.CodePipelineDrift},
-		{"producer substitution", func(p *factory.Plan) { p.Builds[0].Graph.Nodes[0].Command = []string{"arbitrary"} }, e.CodeUnverifiedRef},
+		{"producer substitution", func(p *factory.Plan) {
+			// Select a command-producing node by kind, not the first output:
+			// acquired outputs may legitimately precede source builds.
+			for build := range p.Builds {
+				for node := range p.Builds[build].Graph.Nodes {
+					producer := &p.Builds[build].Graph.Nodes[node]
+					if producer.Kind == ir.KindBuild && producer.BuilderType != ir.BuilderVMImage {
+						producer.Command = []string{"arbitrary"}
+						return
+					}
+				}
+			}
+			t.Fatal("maintained Plan has no command-producing build to substitute")
+		}, e.CodeUnverifiedRef},
 		{"route substitution", func(p *factory.Plan) {
 			target := p.Targets["release"]
 			target.Ref = "example.invalid/release"

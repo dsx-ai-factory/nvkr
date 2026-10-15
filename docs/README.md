@@ -11,6 +11,7 @@ each concept to a worked example.
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Customer operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md), [presenter narration](nvkr-presenter.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
@@ -26,7 +27,7 @@ each concept to a worked example.
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
-[nine-output deploy example](../definitions/nvke-deploy/README.md), [37-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
+[nine-output deploy example](../definitions/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
 and [OS-image routes](../definitions/nvke-os/README.md). The separate
 [FDE-only diagnostic workflow](../definitions/nvke-fde/README.md) selects one native disk for branch iteration.
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.

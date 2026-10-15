@@ -1,0 +1,114 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  capi-controller-image:
+    digests:
+      amd64: sha256:12b27c978c2539ef0f0990b61d5b68f18286a223578d5b87af23206ed4846b67
+      arm64: sha256:a9db88092c99fe76e1d3b8b233dc812053e00ebcb5661505333c02960d20e6c1
+    imageParentDigest: sha256:f0a0becfadf055e54256b8b5cfb0bbf9efc12d3ad10709ded6fa18087a7a13d9
+    tag: v1.12.3
+  capi-kubeadm-bootstrap-image:
+    digests:
+      amd64: sha256:8598e130e9e02c0800c51e585b1b59f8caa2493361fe1f38319f4779cdea74f8
+      arm64: sha256:e3918ae7d1de45477f691f365cefe1e56c0e0b17cc893b7e29092c8a3c1a8d07
+    imageParentDigest: sha256:39eecf5f2d1267aefe33a821ffa1c8364909a43c608a04b0a7d1092e112386a9
+    tag: v1.12.3
+  capi-kubeadm-control-plane-image:
+    digests:
+      amd64: sha256:3b7f69b4f2027e8e8b4957757ff724bdaa7f9251999e4725b4f08f25ced448f4
+      arm64: sha256:8d29c2aa1a0230b7c1c43ccb24ecb632cd15183226da215c58b56224d96f5fa4
+    imageParentDigest: sha256:9fd66ba05988723d36469f0594fa74f5a1d6af50d49af7652d9e39a4cf029505
+    tag: v1.12.3
+  cert-manager-cainjector-image:
+    digests:
+      amd64: sha256:a164796fa15377d82132df84256471027afbc10aa5483ac35c0c075643c9192a
+      arm64: sha256:ff5ca45851e62d7b5b708da0118e01e16889bee704e719c6c34c9d94bf4c68f4
+    imageParentDigest: sha256:eb1df56668b6e61bd902febe816568e7e47f47276121bc0e1222890871c61e50
+    tag: v1.19.3
+  cert-manager-controller-image:
+    digests:
+      amd64: sha256:c20867070d7f02c1f76c0b98d0d9d6f8fa95d70f504321a68de0a043b236d40e
+      arm64: sha256:f5c25399d3fcdb048759c62ce2d235296233a9977e98fca670f70d48418c1733
+    imageParentDigest: sha256:a07125af5e83ecaa3f48317e79c8fae08f0a36654cec45bf0a3404f651b00387
+    tag: v1.19.3
+  cert-manager-webhook-image:
+    digests:
+      amd64: sha256:083f1824373927c2a806702235c748e0609d06f28cfe66b488da8fbec83c323a
+      arm64: sha256:927383b56b0e1da507d47b1e52c747c7d5ed144594e044caa6c0f51980f80c97
+    imageParentDigest: sha256:2625754083d5e2d682a4582fd3fab41a0aa79e7c732c90491373c4f3be5e65b7
+    tag: v1.19.3
+  nktp-collector-image:
+    digests:
+      amd64: sha256:cfd4b6b5e4beb83cdecbc7cdb8f9d7b890715652d318b420fa28bdd1ebb88c88
+      arm64: sha256:6121ebac1c7512a9f6c4abc826813535d91d3ec37fc7c42b2855f98190568f5d
+    imageParentDigest: sha256:3a8f46e1ff33546d36ddd94ef8721c5807718e25825f3e3f6eb5d552fd24e422
+    tag: v0.21.0
+  nktp-kube-state-metrics-image:
+    digests:
+      amd64: sha256:01171220c7c059afc85034ffe687bfe7249e41c0cc46fbe9a5128503ceee3016
+      arm64: sha256:92b46557c71ecac53825772e4827dbcd9fca876b1950060f8fb2f2ef0d7a27af
+    imageParentDigest: sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b
+    tag: v0.21.0
+  nktp-kubectl-image:
+    digests:
+      amd64: sha256:fac49dca08bb8a598bfc4062b74a120cd9e3b74677723e7845f25ea585b2a005
+      arm64: sha256:eb68ffe84017c8354620ddcb3853caabf3ab8bd43d463a4333d81cc8204d8486
+    imageParentDigest: sha256:090bef429ed1bdb10ebd4e82ac6b1b4695276e3a15cfeef6fa2772daed6deb89
+    tag: v0.21.0
+  nktp-lgtm-image:
+    digests:
+      amd64: sha256:aa8118b2d0fd37798c9612fa4429eae4cf7fdc59d834a6904b0db518b802dd04
+      arm64: sha256:5e30372e9d59d1843d67d4109fd4c574a546d52b0b249e3282eec24db48900c5
+    imageParentDigest: sha256:d6b20e35890ef2f91d13944805939acdaf1e5d3ffbf9f9aed08586312826c815
+    tag: v0.21.0
+  nktp-metrics-server-image:
+    digests:
+      amd64: sha256:6231fb0a1ffab76c92ab880f51a0d11b290f688373647bcedff85af025dfd8a9
+      arm64: sha256:9ece07f21cfaf3c2398bd4e0de1f127cfad23ec40d29ceffd8323b4f34744eb8
+    imageParentDigest: sha256:b2d2efaf5ac3b366ed0f839d2412a2c4279d4fc2a2a733f12c52133faed36c41
+    tag: v0.21.0
+  nktp-node-exporter-image:
+    digests:
+      amd64: sha256:da83fae85603c4e47e6c68369a7d746e2dda683dc35ea2e234b4f171e0d92798
+      arm64: sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea
+    imageParentDigest: sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    tag: v0.21.0
+  nktp-operator-image:
+    digests:
+      amd64: sha256:dee6ece62624c268379a2803b4775ab20495e5ecfb9455331f85f5c50847f10e
+      arm64: sha256:7f9ab2da723be0779e17396954e883e9b238d242e80521375b5080e4b5ec15e2
+    imageParentDigest: sha256:2ceb3b541295e399d5449890edc5f4c352a7c45483caf1940b243794fe3ed99a
+    tag: v0.21.0
+  nktp-target-allocator-image:
+    digests:
+      amd64: sha256:ec23db7e61b9d705f4aecd267d8aa51b9ff92d2c6f50ff69cbf10370538cb4dc
+      arm64: sha256:37553cfe83625530821bd6b5bd7b56ea9cda7584657a3d45914d994a1ca8c638
+    imageParentDigest: sha256:03b70585d71e862edbf311f4592a5e876b056b5f5009ada5345c5625e9ac0382
+    tag: v0.21.0
+kind: PinLock
+pins:
+  capi:
+    commit: 1a1852c74072febc3fbf9823c9dd32f4cd6cc747
+    sourceDateEpoch: 1771324984
+    tag: v1.12.3
+    treeHash: adfe92aa22b7d1bae7cd787cdd0fc722ec5afbc8
+  capnico:
+    commit: 30882520888ab7bb75d125cb7bb9aa89e48acd6a
+    sourceDateEpoch: 1789170151
+    tag: v0.0.45
+    treeHash: 4bc81a40160d655bddaadc1b96f9413703351b0e
+  cert-manager:
+    commit: d4faed26ae12115cceb807cdc12507ebc28980e2
+    sourceDateEpoch: 1770037521
+    tag: v1.19.3
+    treeHash: 93fc671af5ce282080a74116651bf1064694b68b
+  nvke-content:
+    commit: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    sourceDateEpoch: 1790728711
+    tag: v0.21.0
+    treeHash: 3e974db934ea90aba2f4d36e437872a31b39bdf6
+  nvke-nktp:
+    commit: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    sourceDateEpoch: 1790728711
+    tag: v0.21.0
+    treeHash: 3e974db934ea90aba2f4d36e437872a31b39bdf6
