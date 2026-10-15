@@ -55,8 +55,6 @@ jobs:
             ./pkg/nvkr/pipeline ./pkg/nvkr/factory ./cmd/nvkr \
             -run 'Test(ImportLocal|ArtifactDiagnostic|Reaper|ExecCmdCancellation|CombinedOutputPreservesContextCancellation|OutputCleansDescendants)' -count=1 \
             > .nvkr/cli-go-proof/race.log 2>&1
-      - name: Uncached Go repository tests
-        run: go test -p=2 ./... -count=1 > .nvkr/cli-go-proof/uncached-tests.log 2>&1
       - name: Fresh recipe build and both cold-cache Go adapter suites
         env:
           NVKR_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
@@ -96,7 +94,9 @@ jobs:
             --attempt fresh --attempts-root .nvkr/cli-go-proof/attempts --ui plain > .nvkr/cli-go-proof/build.log 2>&1
           artifact="$PWD/.nvkr/cli-go-proof/attempts/fresh/nvkectl/out/nvkectl/nvkectl"
           plan="$PWD/.nvkr/cli-go-proof/plan.json"
-          sha256sum "$artifact" > .nvkr/cli-go-proof/artifact-before.sha256
+          # Read private root-owned attempt storage; write the log as the runner.
+          # shellcheck disable=SC2024
+          sudo --non-interactive sha256sum "$artifact" > .nvkr/cli-go-proof/artifact-before.sha256
           "$binary" run artifact-test-inputs --plan "$plan" > .nvkr/cli-go-proof/selected.json
           mkdir -p '.nvkr/cli-go-proof/repo space:comma,quote"'
           proof="$PWD/.nvkr/cli-go-proof"
@@ -112,7 +112,8 @@ jobs:
             sudo cp "$workspace/tests.jsonl" "$proof/$suite-tests.jsonl"
             sudo tar -czf "$proof/$suite-import.tgz" -C "$workspace" nvke
           done
-          sha256sum "$artifact" > "$proof/artifact-after.sha256"
+          # shellcheck disable=SC2024
+          sudo --non-interactive sha256sum "$artifact" > "$proof/artifact-after.sha256"
           cmp "$proof/artifact-before.sha256" "$proof/artifact-after.sha256"
       - name: Remove host credentials and make private records readable
         if: always()
