@@ -135,10 +135,7 @@ func (graph ArtifactGraph) Validate() error {
 	}
 
 	produced := map[string]string{}
-	indegree := map[string]int{}
-	children := map[string][]string{}
 	for _, node := range graph.Nodes {
-		indegree[node.ID] = 0
 		if !sort.StringsAreSorted(node.Inputs) || !sort.StringsAreSorted(node.Outputs) {
 			return e.New(e.CodeInvalidCatalog, "artifact graph node %q inputs/outputs are not canonical", node.ID)
 		}
@@ -157,7 +154,6 @@ func (graph ArtifactGraph) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "artifact graph contains an artifact not declared by its producer")
 	}
 	for _, node := range graph.Nodes {
-		parents := map[string]bool{}
 		for _, input := range node.Inputs {
 			artifact, ok := artifacts[input]
 			if !ok {
@@ -166,25 +162,51 @@ func (graph ArtifactGraph) Validate() error {
 			if artifact.Producer == node.ID {
 				return e.New(e.CodeInvalidCatalog, "artifact graph node %q consumes its own output %q", node.ID, input)
 			}
-			if !parents[artifact.Producer] {
-				parents[artifact.Producer] = true
+		}
+	}
+	if len(topologicalFactoryNodes(graph)) != len(nodes) {
+		return e.New(e.CodeInvalidCatalog, "artifact graph contains a dataflow cycle")
+	}
+	return nil
+}
+
+// topologicalFactoryNodes is shared by graph admission, local scheduling and
+// hosted stage projection. It assumes valid node/artifact references and returns
+// only reachable ready nodes, so callers detect cycles by checking the count.
+func topologicalFactoryNodes(graph ArtifactGraph) []Node {
+	byID := make(map[string]Node, len(graph.Nodes))
+	producer := make(map[string]string, len(graph.Artifacts))
+	for _, node := range graph.Nodes {
+		byID[node.ID] = node
+	}
+	for _, artifact := range graph.Artifacts {
+		producer[artifact.ID] = artifact.Producer
+	}
+	indegree := make(map[string]int, len(graph.Nodes))
+	children := make(map[string][]string, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		parents := map[string]bool{}
+		for _, input := range node.Inputs {
+			parent := producer[input]
+			if !parents[parent] {
+				parents[parent] = true
 				indegree[node.ID]++
-				children[artifact.Producer] = append(children[artifact.Producer], node.ID)
+				children[parent] = append(children[parent], node.ID)
 			}
 		}
 	}
-	ready := make([]string, 0)
-	for id, degree := range indegree {
-		if degree == 0 {
+	var ready []string
+	for id := range byID {
+		if indegree[id] == 0 {
 			ready = append(ready, id)
 		}
 	}
 	sort.Strings(ready)
-	visited := 0
+	ordered := make([]Node, 0, len(byID))
 	for len(ready) > 0 {
 		id := ready[0]
 		ready = ready[1:]
-		visited++
+		ordered = append(ordered, byID[id])
 		for _, child := range children[id] {
 			indegree[child]--
 			if indegree[child] == 0 {
@@ -193,10 +215,7 @@ func (graph ArtifactGraph) Validate() error {
 			}
 		}
 	}
-	if visited != len(nodes) {
-		return e.New(e.CodeInvalidCatalog, "artifact graph contains a dataflow cycle")
-	}
-	return nil
+	return ordered
 }
 
 func hasAdjacentDuplicate(values []string) bool {

@@ -26,10 +26,11 @@ func cmdResolve() *cli.Command {
 			if err != nil {
 				return err
 			}
-			g, digest, err := resolveGraph(c)
+			resolution, err := resolveBuildResult(c)
 			if err != nil {
 				return showCommandResult(c, view, commandDisplay{Title: "Resolved producers", Note: "Resolution failed; no execution."}, err)
 			}
+			g, digest := resolution.Graph, resolution.BuildDigest
 			if view.tui {
 				return showCommandResult(c, view, resolutionDisplay(g, digest), nil)
 			}
