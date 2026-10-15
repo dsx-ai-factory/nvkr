@@ -12,6 +12,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
+// Validate checks the artifact graph's schema, node declarations, canonical
+// ordering, artifact bindings, and acyclicity. Call Plan.Validate for complete
+// Plan admission, including producer resolution and graph rederivation.
+// Execution and rendering additionally require engine-specific admission.
 func (graph ArtifactGraph) Validate() error {
 	if graph.SchemaVersion != ArtifactGraphSchema || len(graph.Nodes) == 0 || len(graph.Artifacts) == 0 {
 		return e.New(e.CodeInvalidCatalog, "artifact graph schema or contents are invalid")
