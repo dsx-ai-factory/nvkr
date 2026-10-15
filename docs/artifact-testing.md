@@ -46,16 +46,20 @@ must provide Go and Make; Plan validation does not prove those tools are present
 `--keep` retains the printed `.nvkr/artifact-tests/cli-*/` workspace. Source and
 cache exist only after their phases run; `tests.jsonl` is created for test execution
 and `result.json` only on success. Otherwise the workspace is removed on exit.
-Each acquisition/execution command has a 30-minute timeout (`--timeout` overrides
-it). Cancellation stops
+Each dependency/test container has a 30-minute timeout (`--timeout` overrides
+that per-container bound). Each source Git command has its own fixed 30-minute
+bound; `--timeout` does not shorten fetch. Cancellation stops
 and joins the client and requests container removal; removal is best effort.
 
 Source import uses the existing Go local-source policy: global credential helpers
 are projected only into fetch; ambient Git routing, hooks, filters and configuration
 are excluded. Private access uses a developer credential helper or the supported
 explicit local redirect, rather than `GIT_ASKPASS`. Test containers receive no Git
-credentials. The verified scratch checkout must share a filesystem with the
-workspace so it can be moved without exposing a partial import.
+credentials. Scratch uses the workspace parent, or its closest ancestor without
+a Git search-path separator for colon-containing paths. This keeps ordinary
+cross-filesystem workspaces independent of the system temporary filesystem.
+The verified checkout must still share a filesystem with that ancestor for
+atomic publication; an intervening mount boundary fails without partial output.
 
 Errors use NVKR's coded exit contract; timeouts and cancellation use the timeout
 code, while a failed suite preserves its positive process exit status. A failed
@@ -84,12 +88,34 @@ and a quote. Docker inspection records acquisition without an artifact mount and
 execution with no network, read-only source/artifact/root filesystem, dropped
 capabilities and no new privileges. Local raw records, candidate inputs, Plan,
 fresh artifact and retained results are under `.nvkr/go-adapter-verification/`.
-Native Linux reruns and the final repository gate are tracked separately in #138.
+The separate [native Go runtime record](https://github.com/dsx-ai-factory/nvkr/actions/runs/38788495912)
+uses the same Go implementation (`a553c56`) on native Linux AMD64 and ARM64.
+Its diagnostic workflow and candidate inputs stay outside #138. The earlier
+[native Go run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38785478450)
+passed full uncached repository tests, race checks and fresh recipe builds on
+both architectures, then failed during unprivileged checksum collection from
+root-owned attempt storage. The final runtime workflow corrects checksum reads
+and transfers completed private workspaces before collecting their results.
+
+Bounded real Go-command negatives rejected a freshly recipe-built
+`v9.9.9-negative` executable and an `exit 7` executable with suite exit 2.
+Maintained source `ed9fb09b` failed on its missing entrypoint with capability
+exit 29. A two-second container timeout and SIGINT/SIGTERM delivered while a
+container was running returned timeout exit 31. All six cases removed the default
+workspace and owned container and published no success result; raw logs and
+`negative-results.json` are in the same local record directory. The cancellation
+exit contract deliberately differs from the historical Python 130/143 mapping.
 
 Go regressions cover complete Plan admission before workspace creation, exact
 shallow imports, wrong commit/tree refusal, poisoned ambient Git routing without
 changing the caller checkout, both suite commands, private staging, byte changes,
 result rejection and cleanup. Targeted process-lifetime race tests passed.
+The [PR Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/38785476658)
+passed on `5df8a63`. Local formatting, vet, lint, shellcheck, CI-report tests,
+build, other package tests and vulnerability scan passed. Local `make check`
+exhausted its default ten-minute lifecycle package budget; an uncached lifecycle
+rerun with `-timeout=20m -count=1` passed in 596.7 seconds. This records successful
+constituent checks without relabeling the timed-out aggregate invocation.
 Compiler/loader fixtures cover both architectures, scalar/map precedence and
 fallback, permitted relocation, unsupported producers and complete Plan admission.
 The current main base admits renamed `NVKECTL_VERSION` stamps; loader contracts

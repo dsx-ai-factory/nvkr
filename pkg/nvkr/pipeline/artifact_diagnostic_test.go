@@ -132,3 +132,32 @@ func TestArtifactDiagnosticTimeoutCleanup(t *testing.T) {
 		t.Fatalf("%v cleaned=%t", err, cleaned)
 	}
 }
+
+func TestArtifactDiagnosticIndependentWorkspaceNames(t *testing.T) {
+	names := map[string]bool{}
+	for range 2 {
+		workspace := filepath.Join(t.TempDir(), "same-basename")
+		if err := os.Mkdir(workspace, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		var name string
+		err := runArtifactDiagnostic(t.Context(), ArtifactDiagnostic{Workspace: workspace, Image: "image", Version: "v1", Platform: "linux/amd64", Suite: "contract"}, io.Discard, io.Discard,
+			func(_ RunOptions, args ...string) error {
+				if args[0] == "run" {
+					for i, argument := range args {
+						if argument == "--name" {
+							if name != "" && name != args[i+1] {
+								t.Fatal("phases changed invocation ownership")
+							}
+							name = args[i+1]
+						}
+					}
+				}
+				return nil
+			})
+		if err != nil || name == "" || names[name] {
+			t.Fatalf("invocations share container ownership: %q %v", name, err)
+		}
+		names[name] = true
+	}
+}

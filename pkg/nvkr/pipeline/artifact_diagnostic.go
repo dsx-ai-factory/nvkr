@@ -15,6 +15,7 @@ import (
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
 // ArtifactDiagnostic describes a trusted-input test invocation, not an admitted
@@ -53,7 +54,7 @@ func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout
 	if err := os.Mkdir(cache, 0o700); err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "creating empty diagnostic cache")
 	}
-	name := "nvke-artifact-" + filepath.Base(input.Workspace)
+	name := containerName(ir.Node{ID: "artifact-test"})
 	args := []string{"run", "--name", name, "--rm", "--init", "--platform", input.Platform,
 		"--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
 		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--workdir", "/src/cli",
