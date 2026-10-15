@@ -33,10 +33,14 @@ const (
 	packerContainerPATH         = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	// The two fixed layouts are inside the already-admitted immutable image.
 	// Arguments remain positional; no caller text is evaluated as shell code.
+	// Warn on build so version/validation retain their exact clean-output gates.
 	packerPluginEntrypoint = `if [ -d /nvkr/toolchain/packer/plugins ]; then
   export PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins
 elif [ -d /nkd/toolchain/packer/plugins ]; then
   export PACKER_PLUGIN_PATH=/nkd/toolchain/packer/plugins
+  if [ "${2-}" = build ]; then
+    printf '%s\n' 'Warning: deprecated Packer plugin layout; rebuild and measure the NVKR Packer image before updating its pin.' >&2 || :
+  fi
 else
   printf '%s\n' 'NVKR Packer plugin directory is missing' >&2
   exit 2

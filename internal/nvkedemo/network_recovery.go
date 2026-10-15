@@ -232,6 +232,9 @@ func RecoverNetworkGuard(ctx context.Context, runner Runner) (*NetworkGuard, err
 		_ = directory.Close()
 		return nil, err
 	}
+	if s.Version == 2 && runner.Progress != nil {
+		_, _ = fmt.Fprintln(runner.Progress, "Warning: network journal version 2 is deprecated; restore its controls before starting a new version-3 session. Do not edit the journal version.")
+	}
 	g := &NetworkGuard{version: s.Version, Work: work, Owner: s.Owner, BridgeMAC: s.BridgeMAC, BridgeID: s.BridgeID, KindCIDR: s.KindCIDR, BridgeIntent: s.BridgeIntent, BGPIntent: s.BGPIntent, runner: runner, directory: directory, boot: s.Boot, pid: s.PID, helperID: s.HelperID, helperHash: s.HelperHash, helperGranted: s.HelperGranted, policyID: s.PolicyID, staging: s.Staging, sysctls: s.Sysctls, sysctlIntents: s.SysctlIntents, rules: s.Rules, caps: s.Caps, finished: s.Finished, helperPath: qemuHelper, policyPath: qemuPolicy, cleaning: true, journal: true}
 	g.kindGateway = s.KindGateway
 	if err = g.acquireLock(); err != nil {

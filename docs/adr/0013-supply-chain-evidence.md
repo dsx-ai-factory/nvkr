@@ -308,11 +308,12 @@ justify claiming equivalent mount-flag enforcement or a provider-owned storage q
 New helper reports use `nvkr:diskContentClass`, `nvkr:packageFormat`,
 `nvkr:packageArchitecture` and `nvkr:containedIn`. After authenticating the exact
 subject/runtime bindings, the private decoder projects the four corresponding
-`nkd:*` keys from existing pinned images into that descriptive vocabulary. Duplicate semantic properties, including old/new spellings of one key, fail
-closed even if values agree. This does not rewrite the
-original helper bytes or convert historical signed evidence. New toolchain sources
-use the NVKR plugin/inspector paths; fixed launchers retain the two exact old paths
-for existing immutable images and never retry a failed command under another ABI.
+`nkd:*` keys from existing pinned images into that descriptive vocabulary.
+Duplicate semantic properties fail closed even if values agree. Original helper
+bytes and historical signed evidence are never rewritten.
+Accepted legacy interfaces produce a fixed deprecation warning on the operator
+diagnostic channel. The reader admits at most one exact launcher notice separately
+from the progress-record allowance; arbitrary helper warnings remain errors.
 
 Inspection progress is a separate, non-authoritative channel. New helpers emit
 the `NVKR_INSPECTION ` prefix; the reader also accepts the exact former

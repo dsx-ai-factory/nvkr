@@ -74,8 +74,7 @@ The NVKR rebrand allocates the `nvkr.*` family namespace and `nvkr.dev` schemas
 as a breaking framework-namespace cutover. It does not mutate historical `nkd.*`
 identities or signed bytes. Unsupported old namespaces fail strict dispatch;
 there is no implicit alias or conversion. Reserved names below are reserved
-within the NVKR namespace. Historical allocations remain historical. See the
-[cutover contract](../nvkr-rebranding.md) for producer and runtime boundaries.
+within the NVKR namespace. Historical allocations remain historical.
 
 Every structured semantic object's digest is computed with a frozen **family-kind tag** and an unambiguous
 separator: `Digest(kind, obj) = sha256(UTF8(kind) ∥ 0x00 ∥ canonical-bytes)`. `schemaVersion` stays inside the

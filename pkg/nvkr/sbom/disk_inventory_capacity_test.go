@@ -53,7 +53,7 @@ func TestCompleteDiskFileInventoryCapacity(t *testing.T) {
 }
 
 func TestDiskContentReportByteBoundBeforeDecoding(t *testing.T) {
-	inspection, err := decodeBoundDiskContentReport([]byte(strings.Repeat(" ", pipeline.MaxDiskContentReportBytes+1)), "", diskContentReport{})
+	inspection, err := decodeBoundDiskContentReport([]byte(strings.Repeat(" ", pipeline.MaxDiskContentReportBytes+1)), "", diskContentReport{}, nil)
 	assertDependencyCode(t, err, e.CodeEnvelopeDecode)
 	if inspection != nil || !strings.Contains(err.Error(), "exceeds its budget") {
 		t.Fatalf("oversized report reached decoding or returned inventory: %v, %v", inspection, err)

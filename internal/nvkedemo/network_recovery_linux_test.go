@@ -6,6 +6,7 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -53,11 +54,15 @@ func TestRecoveredKindSimulatorJournalCheckpointsExactBinding(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			recovered, err := RecoverNetworkGuard(t.Context(), Runner{Work: original.Work, Env: []string{"PATH=" + tools}})
+			var progress bytes.Buffer
+			recovered, err := RecoverNetworkGuard(t.Context(), Runner{Work: original.Work, Env: []string{"PATH=" + tools}, Progress: &progress})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer recovered.releaseHandles()
+			if got := strings.Contains(progress.String(), "version 2 is deprecated"); got != (fixture.version == 2) {
+				t.Fatalf("incorrect recovery deprecation diagnostic: %q", progress.String())
+			}
 			if recovered.kindGateway != gateway || len(recovered.rules) != 1 || !slices.Equal(recovered.rules[0].Args, row.Args) {
 				t.Fatal("recovery discarded its authenticated Kind route binding")
 			}

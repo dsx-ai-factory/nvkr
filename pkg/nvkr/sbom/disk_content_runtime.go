@@ -85,10 +85,10 @@ func (runtime *DiskInspectionRuntime) InspectHeldContent(ctx context.Context, su
 	if err != nil {
 		return nil, err
 	}
-	return contentFromContainerObservation(observation)
+	return contentFromContainerObservation(observation, runtime.diagnostics)
 }
 
-func contentFromContainerObservation(observation *pipeline.DiskInspectionObservation) (*DiskContentInspection, error) {
+func contentFromContainerObservation(observation *pipeline.DiskInspectionObservation, diagnostics *diskdiagnostic.Collector) (*DiskContentInspection, error) {
 	if observation == nil {
 		return nil, e.New(e.CodeVerifyFailed, "disk content observation is absent")
 	}
@@ -98,12 +98,12 @@ func contentFromContainerObservation(observation *pipeline.DiskInspectionObserva
 		Subject: subject, Size: size, Kind: kind, Platform: platform, Inspector: inspector,
 		Codec: codec, Guestfish: guestfish, Scanner: scanner, PackageReader: packageReader,
 		MaxFilesystemBytes: maxBytes,
-	})
+	}, diagnostics)
 }
 
 // The production caller obtains binding only from the opaque runtime observation.
 // This private decoder seam tests projection, not runtime or receipt issuance.
-func decodeBoundDiskContentReport(raw []byte, image string, binding diskContentReport) (*DiskContentInspection, error) {
+func decodeBoundDiskContentReport(raw []byte, image string, binding diskContentReport, diagnostics *diskdiagnostic.Collector) (*DiskContentInspection, error) {
 	if len(raw) > pipeline.MaxDiskContentReportBytes {
 		return nil, e.New(e.CodeEnvelopeDecode, "disk content report exceeds its budget")
 	}
@@ -121,11 +121,15 @@ func decodeBoundDiskContentReport(raw []byte, image string, binding diskContentR
 		report.Codec != binding.Codec || report.Guestfish != binding.Guestfish || report.Scanner != binding.Scanner || report.PackageReader != binding.PackageReader || report.MaxFilesystemBytes != binding.MaxFilesystemBytes {
 		return nil, e.New(e.CodeVerifyFailed, "disk content report differs from its exact held subject or runtime")
 	}
-	if err := projectDiskReportProperties(report.Components); err != nil {
+	legacy, err := projectDiskReportProperties(report.Components)
+	if err != nil {
 		return nil, err
 	}
 	if err := validateDiskContentReport(report); err != nil {
 		return nil, err
+	}
+	if legacy {
+		diagnostics.MarkDeprecated()
 	}
 	return &DiskContentInspection{report: report, runtimeDigest: image}, nil
 }
@@ -134,34 +138,50 @@ func decodeBoundDiskContentReport(raw []byte, image string, binding diskContentR
 // This changes a descriptive in-memory view, never the original helper bytes,
 // subject identity or image pin. Mixed/duplicate spellings are ambiguous even
 // when their values agree and must not mint an observation.
-func projectDiskReportProperties(components []Component) error {
+func projectDiskReportProperties(components []Component) (bool, error) {
+	legacy := false
 	for i := range components {
+		// Preserve the original wire-order contract as well as the projected
+		// vocabulary's validation. Semantic aliases are checked below first so
+		// ambiguous duplicates retain their owning envelope error.
+		propertyErr := validateProperties("disk content.properties", components[i].Properties)
+		projected := false
 		seen := make(map[string]bool, 4)
 		for j := range components[i].Properties {
 			property := &components[i].Properties[j]
 			name := property.Name
 			switch name {
 			case "nkd:diskContentClass":
+				legacy = true
 				name = diskContentClassProperty
 			case "nkd:packageFormat":
+				legacy = true
 				name = diskPackageFormatProperty
 			case "nkd:packageArchitecture":
+				legacy = true
 				name = diskPackageArchitectureProperty
 			case "nkd:containedIn":
+				legacy = true
 				name = diskContainedInProperty
 			case diskContentClassProperty, diskPackageFormatProperty, diskPackageArchitectureProperty, diskContainedInProperty:
 			default:
 				continue
 			}
 			if seen[name] {
-				return e.New(e.CodeEnvelopeDecode, "disk content report repeats an inspection property")
+				return false, e.New(e.CodeEnvelopeDecode, "disk content report repeats an inspection property")
 			}
 			seen[name] = true
+			projected = projected || property.Name != name
 			property.Name = name
 		}
-		slices.SortFunc(components[i].Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+		if propertyErr != nil {
+			return false, propertyErr
+		}
+		if projected {
+			slices.SortFunc(components[i].Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
+		}
 	}
-	return nil
+	return legacy, nil
 }
 
 func validateDiskContentReport(report diskContentReport) error {

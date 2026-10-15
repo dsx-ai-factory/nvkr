@@ -4,6 +4,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -56,7 +57,9 @@ func TestInspectorEntrypointUsesExactNewOrLegacyExecutable(t *testing.T) {
 			argument := `literal $(exit 99); untouched`
 			cmd := exec.CommandContext(t.Context(), "/bin/sh", "-ec", script, "nvkr-disk-inspect", argument)
 			cmd.Env = append(os.Environ(), "CURRENT_HELPER="+current, "LEGACY_HELPER="+old)
-			output, err := cmd.CombinedOutput()
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
+			output, err := cmd.Output()
 			if !test.current && !test.old {
 				if err == nil {
 					t.Fatal("missing helper was admitted")
@@ -69,6 +72,13 @@ func TestInspectorEntrypointUsesExactNewOrLegacyExecutable(t *testing.T) {
 			}
 			if string(output) != label+"\n"+argument+"\n" {
 				t.Fatalf("selected helper or literal argument differs: %q", output)
+			}
+			wantWarning := ""
+			if !test.current {
+				wantWarning = diskdiagnostic.LegacyWarning + "\n"
+			}
+			if stderr.String() != wantWarning {
+				t.Fatalf("deprecation diagnostic = %q, want %q", stderr.String(), wantWarning)
 			}
 			if test.status == 0 && err != nil {
 				t.Fatal(err)

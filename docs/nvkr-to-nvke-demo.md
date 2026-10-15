@@ -260,15 +260,9 @@ Run `git worktree add` from a Git checkout containing that commit, not an
 archive-exported directory. The old CLI uses `scripts/nke-local-network.py` from
 the same revision. Current Go recovery diagnoses and refuses version 1; it does
 not migrate journals or execute the removed helper automatically. Do not change
-the journal's version number to bypass this boundary. New version-3 sessions use
-`nvkevm0`, `nvke-demo-`, `.nvke-policy-` and the renamed per-user lock. Recovery
-of version-2 journals retains the original `nkdvm0` bridge, firewall-owner prefix,
-policy-staging prefix and version number. Both versions hold the original shared
-coordination lock as well as the new lock, so an upgrade does not strand existing
-grants or permit an older session to bypass coordination. New admission rejects
-a bridge from either namespace; recover its original work directory first.
-After creating version-3 state, use version-3-capable recovery before downgrading;
-older binaries cannot interpret that journal.
+the journal's version number to bypass this boundary. Version-2 recovery preserves
+the original resources and coordination lock. New sessions write version 3;
+restore their network controls before downgrading to an older binary.
 
 Restoration takes the same kernel-released lock, never kills serialized PIDs
 and, on the same boot, waits 40 seconds for in-flight bounded sudo work. This

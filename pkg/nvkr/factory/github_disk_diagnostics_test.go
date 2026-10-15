@@ -117,6 +117,31 @@ func TestInspectionDiagnosticRetention(t *testing.T) {
 	}
 }
 
+func TestInspectionDeprecationReportsOnStderr(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		t.Run(fmt.Sprint(legacy), func(t *testing.T) {
+			workspace, _, err := securepath.OpenDirectory(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer workspace.Close()
+			collector := diskdiagnostic.NewCollector()
+			if legacy {
+				collector.MarkDeprecated()
+			}
+			var stdout, stderr bytes.Buffer
+			finishGitHubInspectionDiagnostics(t.Context(), workspace, "disk", collector, GitHubStepOptions{Stdout: &stdout, Stderr: &stderr})
+			want := ""
+			if legacy {
+				want = diskdiagnostic.LegacyWarning + "\n"
+			}
+			if stdout.Len() != 0 || stderr.String() != want {
+				t.Fatalf("stdout=%q stderr=%q, want only %q on stderr", stdout.String(), stderr.String(), want)
+			}
+		})
+	}
+}
+
 func TestInspectionDiagnosticRetentionContextAdmission(t *testing.T) {
 	for _, mode := range []string{"nil", "canceled", "expired"} {
 		t.Run(mode, func(t *testing.T) {

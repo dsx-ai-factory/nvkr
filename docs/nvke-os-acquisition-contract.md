@@ -23,9 +23,7 @@ standalone verifier's claim.
 | Member path | Digest-derived `packages/<sha256>.deb` | A tar member name, never a filesystem grant |
 | Capture archive identity | NVKR's held-file capability and exact archive hashing | Not a live-Run or final-QCOW2 binding |
 
-The minimal `nkd.dev/package-acquisitions/v1` capture document retains the exact
-schema identifier emitted by the pinned NVKE producer; changing this identifier
-requires a coordinated upstream producer and NVKR consumer update. It is separate from
+The minimal `nkd.dev/package-acquisitions/v1` capture document is separate from
 the build-material manifest. Build inputs have component bindings; guest APT
 events have package archive sizes and repository metadata locations. Neither
 description authenticates an acquisition simply by being well-formed.

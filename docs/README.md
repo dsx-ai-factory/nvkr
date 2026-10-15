@@ -69,10 +69,6 @@ records source availability and remaining gaps.
 separates the completed ownership move from conditional consolidation, and records the remaining parity gaps.
 The [input index](../inputs/README.md) and [catalog ownership map](../inputs/catalogs/README.md) own current locations.
 
-[NVKR/NVKE naming cutover](nvkr-rebranding.md) explains each remaining old-name match,
-the new toolchain/network names, compatibility with existing images and recovery
-journals, and the administrator/repository steps for GitHub environment migration.
-
 [CONTEXT](../CONTEXT.md) owns formal vocabulary; the [SADD](sadd.md) explains architecture and failure behavior.
 The [ADRs](adr) own engineering contracts, and [reconciliation](adr/reconciliation.md) is the current
 implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to the detailed

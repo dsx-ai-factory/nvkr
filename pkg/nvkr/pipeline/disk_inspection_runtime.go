@@ -80,6 +80,9 @@ const (
 	diskInspectionEntrypoint = `if [ -x /usr/local/bin/nvkr-disk-inspect ]; then
   exec /usr/local/bin/nvkr-disk-inspect "$@"
 fi
+if [ -x /usr/local/bin/nkd-disk-inspect ]; then
+  printf '%s\n' '` + diskdiagnostic.LegacyWarning + `' >&2 || :
+fi
 exec /usr/local/bin/nkd-disk-inspect "$@"`
 	diskInspectionPIDsLimit    uint64 = 256
 	diskInspectionApplianceMiB uint64 = 2048

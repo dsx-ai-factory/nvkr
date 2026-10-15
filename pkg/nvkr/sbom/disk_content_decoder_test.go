@@ -6,9 +6,12 @@ package sbom
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -86,7 +89,11 @@ func TestBoundDiskContentDecoder(t *testing.T) {
 					raw = []byte("{")
 					want = e.CodeEnvelopeDecode
 				}
-				inspection, err := decodeBoundDiskContentReport(raw, image, binding)
+				diagnostics := diskdiagnostic.NewCollector()
+				inspection, err := decodeBoundDiskContentReport(raw, image, binding, diagnostics)
+				if diagnostics.DeprecationWarning() != "" {
+					t.Fatal("current or rejected report emitted a deprecation warning")
+				}
 				if want != "" {
 					assertDependencyCode(t, err, want)
 					if inspection != nil {
@@ -118,6 +125,7 @@ func TestBoundDiskContentDecoderProjectsLegacyProperties(t *testing.T) {
 			for i := range report.Components[0].Properties {
 				report.Components[0].Properties[i].Name = strings.Replace(report.Components[0].Properties[i].Name, "nvkr:", "nkd:", 1)
 			}
+			slices.SortFunc(report.Components[0].Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 			if spelling != "legacy" {
 				property := report.Components[0].Properties[0]
 				if spelling == "mixed" {
@@ -130,7 +138,11 @@ func TestBoundDiskContentDecoderProjectsLegacyProperties(t *testing.T) {
 				t.Fatal(err)
 			}
 			original := bytes.Clone(raw)
-			inspection, err := decodeBoundDiskContentReport(raw, fixture.runtimeDigest, fixture.report)
+			diagnostics := diskdiagnostic.NewCollector()
+			inspection, err := decodeBoundDiskContentReport(raw, fixture.runtimeDigest, fixture.report, diagnostics)
+			if got := diagnostics.DeprecationWarning() != ""; got != (spelling == "legacy") {
+				t.Fatal("deprecation warning must describe only an accepted legacy report")
+			}
 			if !bytes.Equal(raw, original) {
 				t.Fatal("projection rewrote original report bytes")
 			}
@@ -150,5 +162,41 @@ func TestBoundDiskContentDecoderProjectsLegacyProperties(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBoundDiskContentDecoderRejectsUnsortedProperties(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		for _, sibling := range []bool{false, true} {
+			t.Run(fmt.Sprintf("legacy=%t/sibling=%t", legacy, sibling), func(t *testing.T) {
+				fixture := contentFixture("disk-image", "arm64", "b")
+				report := fixture.report
+				if legacy {
+					for i := range report.Components[0].Properties {
+						report.Components[0].Properties[i].Name = strings.Replace(report.Components[0].Properties[i].Name, "nvkr:", "nkd:", 1)
+					}
+				}
+				index := 0
+				if sibling {
+					other := cloneComponent(report.Components[0])
+					for i := range other.Properties {
+						other.Properties[i].Name = strings.Replace(other.Properties[i].Name, "nkd:", "nvkr:", 1)
+					}
+					report.Components = append(report.Components, other)
+					index = len(report.Components) - 1
+				}
+				slices.Reverse(report.Components[index].Properties)
+				raw, err := json.Marshal(report)
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics := diskdiagnostic.NewCollector()
+				inspection, err := decodeBoundDiskContentReport(raw, fixture.runtimeDigest, fixture.report, diagnostics)
+				assertDependencyCode(t, err, e.CodeInvalidCatalog)
+				if inspection != nil || diagnostics.DeprecationWarning() != "" {
+					t.Fatal("invalid property ordering minted an observation or deprecation notice")
+				}
+			})
+		}
 	}
 }

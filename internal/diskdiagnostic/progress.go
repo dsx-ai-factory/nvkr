@@ -20,8 +20,10 @@ import (
 const (
 	// New helpers emit NVKR records. The receiver also supports the exact former
 	// prefix for existing digest-pinned images; both use the same closed schema.
-	Prefix              = "NVKR_INSPECTION "
-	legacyPrefix        = "NKD_INSPECTION "
+	Prefix       = "NVKR_INSPECTION "
+	legacyPrefix = "NKD_INSPECTION "
+	// LegacyWarning is fixed host-owned text, never helper-provided detail.
+	LegacyWarning       = "Warning: deprecated disk inspection interface; rebuild and measure the NVKR inspector image before updating its pin."
 	MaxRecordBytes      = 512
 	MaxRetainedBytes    = 32 << 10
 	MaxForwardedRecords = 512
@@ -122,6 +124,7 @@ type Receiver struct {
 	failure       []byte
 	parsedRecords int
 	exhausted     bool
+	legacyNotice  bool
 }
 
 func NewReceiver(collector *Collector) *Receiver { return &Receiver{collector: collector} }
@@ -170,6 +173,17 @@ func (receiver *Receiver) Write(raw []byte) (int, error) {
 }
 
 func (receiver *Receiver) accept(line []byte) {
+	// The fixed launcher emits at most one notice. It contains no JSON and
+	// must not consume the helper's existing maximum progress-record allowance.
+	if bytes.Equal(line, []byte(LegacyWarning)) {
+		if receiver.legacyNotice {
+			receiver.unexpected = true
+		} else {
+			receiver.legacyNotice = true
+			receiver.collector.MarkDeprecated()
+		}
+		return
+	}
 	prefix := Prefix
 	if bytes.HasPrefix(line, []byte(legacyPrefix)) {
 		prefix = legacyPrefix
@@ -208,6 +222,9 @@ func (receiver *Receiver) accept(line []byte) {
 			receiver.unexpected = true
 			return
 		}
+	}
+	if prefix == legacyPrefix && receiver.collector != nil {
+		receiver.collector.MarkDeprecated()
 	}
 	// Subject coordinates come from the original held capability, never from
 	// helper-authored metadata. Empty receiver metadata is not a subject claim.
@@ -303,13 +320,36 @@ func (receiver *Receiver) Summary() string {
 // Collector is a package-issued bounded memory sink, not a caller callback.
 // Subprocess draining never invokes an arbitrary writer or starts a goroutine.
 type Collector struct {
-	mu        sync.Mutex
-	tail      []byte
-	last      []byte
-	truncated bool
+	mu         sync.Mutex
+	tail       []byte
+	last       []byte
+	truncated  bool
+	deprecated bool
 }
 
 func NewCollector() *Collector { return &Collector{} }
+
+// MarkDeprecated remembers legacy-interface use independently of progress caps.
+// It accepts no text and does not change inspection acceptance or evidence.
+func (collector *Collector) MarkDeprecated() {
+	if collector == nil {
+		return
+	}
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	collector.deprecated = true
+}
+
+// DeprecationWarning is reported by the owner after subprocesses have joined.
+// Subprocess draining never invokes a caller's terminal writer.
+func (collector *Collector) DeprecationWarning() string {
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	if collector.deprecated {
+		return LegacyWarning
+	}
+	return ""
+}
 
 func (collector *Collector) markTruncated() {
 	collector.mu.Lock()

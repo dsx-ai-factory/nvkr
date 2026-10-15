@@ -210,9 +210,7 @@ credential. Internal toolchain preparation uses separate ephemeral read-only pac
 before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
 package. Restrict `nkd-arc`, `nkd-release` and the signing identity to the selected refs. Maintained inputs
 admit `main` only and contain no validation-branch dispatch exception. Ephemeral runner isolation and
-provider access restrictions remain operator obligations. These old environment
-names identify existing GitHub objects; follow the [administrator and repository
-cutover](../../../docs/nvkr-rebranding.md#github-environment-migration) before replacing them.
+provider access restrictions remain operator obligations.
 
 ## Generate and check the maintained workflow
 
