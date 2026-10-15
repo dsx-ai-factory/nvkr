@@ -174,10 +174,11 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
 	-ignore '.github/workflows/nvkr-run-*.yml' \
+	-ignore '.github/workflows/nvkr-run__*.yml' -ignore '.github/workflows/nvkr-dev__*.yml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-((run(-[a-z0-9-]+)?|dev)(__[a-z0-9-]+)?|qualify|smoke)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".

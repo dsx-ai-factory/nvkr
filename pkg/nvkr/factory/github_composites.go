@@ -5,6 +5,7 @@ package factory
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
@@ -357,8 +358,12 @@ func githubActionInput(description string) *yamlv3.Node {
 // expandGitHubActions restores the concrete step graph for semantic admission.
 // This is a deliberately closed macro format, not a general Actions interpreter.
 // Exact regeneration additionally authenticates every action and its call sites.
-func expandGitHubActions(plan *Plan, raw []byte, files map[string][]byte) ([]byte, error) {
+func expandGitHubActions(ctx context.Context, plan *Plan, raw []byte, files map[string][]byte) ([]byte, error) {
 	var err error
+	raw, err = expandGitHubReusableWorkflows(ctx, plan, raw, files)
+	if err != nil {
+		return nil, err
+	}
 	raw, files, err = materializeGitHubSharedActions(plan, raw, files)
 	if err != nil {
 		return nil, err

@@ -31,7 +31,7 @@ func TestWorkflowLoweringPreservesExpandedGraph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+	expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ jobs:
 			if err != nil {
 				t.Fatal(err)
 			}
-			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+			expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -172,7 +172,7 @@ jobs:
 			t.Fatal(err)
 		}
 		assertGitHubActionExtraction(t, workflow, files)
-		raw, err = expandGitHubActions(&Plan{}, workflow, files)
+		raw, err = expandGitHubActions(t.Context(), &Plan{}, workflow, files)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,8 +275,7 @@ func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
 	if !bytes.Equal(raw, bundle.Files[GitHubWorkflowPath]) {
 		t.Fatal("committed workflow differs from its complete regenerated Plan")
 	}
-	document := decodeGitHubWorkflow(t, raw)
-	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(document.Jobs))
+	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(githubSerializedJobOrder(t, raw)))
 }
 
 // Render the maintained complete Plan as well as checking its committed bytes:

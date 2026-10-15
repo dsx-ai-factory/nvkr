@@ -154,7 +154,7 @@ func TestGitHubCompositesPreserveExpandedSemanticsAndProviderControls(t *testing
 			if err != nil {
 				t.Fatal(err)
 			}
-			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+			expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -423,7 +423,7 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 				}
 				changedFiles := maps.Clone(files)
 				changedFiles[strings.TrimPrefix(call.Uses, "./")+"/action.yml"] = changedRaw
-				_, err = expandGitHubActions(&Plan{}, workflow, changedFiles)
+				_, err = expandGitHubActions(t.Context(), &Plan{}, workflow, changedFiles)
 				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 			}
 		}
@@ -501,7 +501,7 @@ func TestGitHubCompositesKeepReferencedTransferOutputsInCaller(t *testing.T) {
 			if after[1].Uses != test.uses || after[1].ID != "transfer" {
 				t.Fatal("transfer output producer was hidden behind a composite without declared outputs")
 			}
-			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+			expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}

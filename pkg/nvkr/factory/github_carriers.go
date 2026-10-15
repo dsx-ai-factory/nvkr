@@ -122,7 +122,11 @@ func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 	if err != nil {
 		return err
 	}
-	results, err := parseGitHubProviderResults(ctx, providerResults, jobs)
+	projection, err := githubNeedsForPlan(ctx, plan)
+	if err != nil {
+		return err
+	}
+	results, err := parseGitHubCollectedProviderResults(ctx, providerResults, jobs, projection.Collectors)
 	if err != nil {
 		return err
 	}
@@ -285,10 +289,122 @@ const (
 // unnecessary depth and complexity. Outputs are accepted only as string maps and
 // discarded; provider-controlled values never enter diagnostic messages.
 func parseGitHubProviderResults(ctx context.Context, raw string, expected []string) (map[string]string, error) {
-	if len(raw) > maxGitHubProviderBytes || !utf8.ValidString(raw) {
+	jobs, err := parseGitHubProviderJobs(ctx, raw, expected, &githubProviderBudget{})
+	if err != nil {
+		return nil, err
+	}
+	results := make(map[string]string, len(jobs))
+	for id, job := range jobs {
+		results[id] = job.result
+	}
+	return results, nil
+}
+
+// Collectors only forward provider descriptions. Their exact leaf partition
+// comes from the admitted Plan, never from the reports. A failed collector is
+// rejected before restoration in every lane, even if it supplied complete data.
+func parseGitHubCollectedProviderResults(ctx context.Context, raw string, expected []string, collectors map[string][]string) (map[string]string, error) {
+	if len(collectors) == 0 {
+		return parseGitHubProviderResults(ctx, raw, expected)
+	}
+	if err := githubCarrierContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := validateGitHubCollectorMembers(expected, collectors); err != nil {
+		return nil, err
+	}
+	budget := &githubProviderBudget{}
+	reports, err := parseGitHubProviderJobs(ctx, raw, sortedKeys(collectors), budget)
+	if err != nil {
+		return nil, err
+	}
+	results := make(map[string]string, len(expected))
+	for _, id := range sortedKeys(collectors) {
+		report := reports[id]
+		if report.result != "success" {
+			return nil, e.New(e.CodeInvalidCatalog, "GitHub result collector did not complete successfully")
+		}
+		if len(report.outputs) != 2 || report.outputs["results"] == "" || report.outputs["statuses"] == "" {
+			return nil, e.New(e.CodeInvalidCatalog, "GitHub result collector requires exactly its results and statuses outputs")
+		}
+		leaves, err := parseGitHubProviderJobs(ctx, report.outputs["results"], collectors[id], budget)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateGitHubCollectorStatuses(report.outputs["statuses"], leaves); err != nil {
+			return nil, err
+		}
+		for leaf, job := range leaves {
+			results[leaf] = job.result
+		}
+	}
+	return results, githubCarrierContext(ctx)
+}
+
+func validateGitHubCollectorMembers(expected []string, collectors map[string][]string) error {
+	unclaimed := make(map[string]bool, len(expected))
+	for _, leaf := range expected {
+		if leaf == "" || unclaimed[leaf] {
+			return e.New(e.CodeInvalidCatalog, "GitHub result membership contains an empty or duplicate leaf")
+		}
+		unclaimed[leaf] = true
+	}
+	claimed := 0
+	for id, members := range collectors {
+		if _, collision := unclaimed[id]; id == "" || collision || len(members) == 0 {
+			return e.New(e.CodeInvalidCatalog, "GitHub result collectors require distinct names and nonempty membership")
+		}
+		for _, member := range members {
+			if !unclaimed[member] {
+				return e.New(e.CodeInvalidCatalog, "GitHub result collectors contain an unknown or repeated member")
+			}
+			unclaimed[member] = false
+			claimed++
+		}
+	}
+	if claimed != len(expected) {
+		return e.New(e.CodeInvalidCatalog, "GitHub result collectors omit a required stage or runner bootstrap")
+	}
+	return nil
+}
+
+// Object-filter order is not guaranteed by GitHub. The diagnostic status list
+// must match the exact result multiset; only the results map binds job names.
+func validateGitHubCollectorStatuses(raw string, leaves map[string]githubProviderJob) error {
+	counts := make(map[string]int)
+	for _, job := range leaves {
+		counts[job.result]++
+	}
+	statuses := strings.SplitN(raw, " ", len(leaves)+1)
+	if len(statuses) != len(leaves) {
+		return e.New(e.CodeInvalidCatalog, "GitHub collector status summary differs from its member results")
+	}
+	for _, status := range statuses {
+		if counts[status] == 0 {
+			return e.New(e.CodeInvalidCatalog, "GitHub collector status summary differs from its member results")
+		}
+		counts[status]--
+	}
+	return nil
+}
+
+type githubProviderJob struct {
+	result  string
+	outputs map[string]string
+}
+
+type githubProviderBudget struct {
+	bytes, tokens int
+}
+
+// One budget covers the outer description and all decoded collector reports.
+// Leaf output strings stay inert: this parser does not recursively follow them.
+func parseGitHubProviderJobs(ctx context.Context, raw string, expected []string, budget *githubProviderBudget) (map[string]githubProviderJob, error) {
+	if len(raw) > maxGitHubProviderBytes-budget.bytes || !utf8.ValidString(raw) {
 		return nil, e.New(e.CodeInvalidCatalog, "GitHub job results exceed their size bound or contain invalid UTF-8")
 	}
-	parser := githubProviderParser{ctx: ctx, decoder: json.NewDecoder(strings.NewReader(raw))}
+	budget.bytes += len(raw)
+	parser := githubProviderParser{ctx: ctx, decoder: json.NewDecoder(strings.NewReader(raw)), budget: budget}
 	if err := parser.delimiter('{'); err != nil {
 		return nil, err
 	}
@@ -296,13 +412,13 @@ func parseGitHubProviderResults(ctx context.Context, raw string, expected []stri
 	for _, job := range expected {
 		allowed[job] = true
 	}
-	results := make(map[string]string, len(expected))
+	results := make(map[string]githubProviderJob, len(expected))
 	for parser.decoder.More() {
 		job, err := parser.stringValue()
 		if err != nil {
 			return nil, err
 		}
-		if !allowed[job] || results[job] != "" {
+		if !allowed[job] || results[job].result != "" {
 			return nil, e.New(e.CodeInvalidCatalog, "GitHub job results contain an unexpected or duplicate job")
 		}
 		result, err := parser.job()
@@ -326,15 +442,15 @@ func parseGitHubProviderResults(ctx context.Context, raw string, expected []stri
 type githubProviderParser struct {
 	ctx     context.Context
 	decoder *json.Decoder
-	tokens  int
+	budget  *githubProviderBudget
 }
 
 func (parser *githubProviderParser) token() (json.Token, error) {
 	if err := githubCarrierContext(parser.ctx); err != nil {
 		return nil, err
 	}
-	parser.tokens++
-	if parser.tokens > maxGitHubProviderTokens {
+	parser.budget.tokens++
+	if parser.budget.tokens > maxGitHubProviderTokens {
 		return nil, e.New(e.CodeInvalidCatalog, "GitHub job results exceed their complexity bound")
 	}
 	token, err := parser.decoder.Token()
@@ -367,66 +483,68 @@ func (parser *githubProviderParser) stringValue() (string, error) {
 	return value, nil
 }
 
-func (parser *githubProviderParser) job() (string, error) {
+func (parser *githubProviderParser) job() (githubProviderJob, error) {
 	if err := parser.delimiter('{'); err != nil {
-		return "", err
+		return githubProviderJob{}, err
 	}
 	seen := map[string]bool{}
-	result := ""
+	var job githubProviderJob
 	for parser.decoder.More() {
 		field, err := parser.stringValue()
 		if err != nil {
-			return "", err
+			return githubProviderJob{}, err
 		}
 		if seen[field] {
-			return "", e.New(e.CodeInvalidCatalog, "GitHub job results contain a duplicate field")
+			return githubProviderJob{}, e.New(e.CodeInvalidCatalog, "GitHub job results contain a duplicate field")
 		}
 		seen[field] = true
 		switch field {
 		case "result":
-			result, err = parser.stringValue()
+			job.result, err = parser.stringValue()
 			if err != nil {
-				return "", err
+				return githubProviderJob{}, err
 			}
-			switch result {
+			switch job.result {
 			case "success", "failure", "cancelled", "skipped": //nolint:misspell // GitHub result enum spelling.
 			default:
-				return "", e.New(e.CodeInvalidCatalog, "GitHub job results contain an unsupported result")
+				return githubProviderJob{}, e.New(e.CodeInvalidCatalog, "GitHub job results contain an unsupported result")
 			}
 		case "outputs":
-			if err := parser.outputs(); err != nil {
-				return "", err
+			job.outputs, err = parser.outputs()
+			if err != nil {
+				return githubProviderJob{}, err
 			}
 		default:
-			return "", e.New(e.CodeInvalidCatalog, "GitHub job results contain an unexpected field")
+			return githubProviderJob{}, e.New(e.CodeInvalidCatalog, "GitHub job results contain an unexpected field")
 		}
 	}
 	if err := parser.delimiter('}'); err != nil {
-		return "", err
+		return githubProviderJob{}, err
 	}
-	if result == "" {
-		return "", e.New(e.CodeInvalidCatalog, "GitHub job results omit a result")
+	if job.result == "" {
+		return githubProviderJob{}, e.New(e.CodeInvalidCatalog, "GitHub job results omit a result")
 	}
-	return result, nil
+	return job, nil
 }
 
-func (parser *githubProviderParser) outputs() error {
+func (parser *githubProviderParser) outputs() (map[string]string, error) {
 	if err := parser.delimiter('{'); err != nil {
-		return err
+		return nil, err
 	}
-	seen := map[string]bool{}
+	outputs := map[string]string{}
 	for parser.decoder.More() {
 		field, err := parser.stringValue()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if seen[field] {
-			return e.New(e.CodeInvalidCatalog, "GitHub job outputs contain a duplicate field")
+		if _, seen := outputs[field]; seen {
+			return nil, e.New(e.CodeInvalidCatalog, "GitHub job outputs contain a duplicate field")
 		}
-		seen[field] = true
-		if _, err := parser.stringValue(); err != nil {
-			return err
+		value, err := parser.stringValue()
+		if err != nil {
+			return nil, err
 		}
+		outputs[field] = value
 	}
-	return parser.delimiter('}')
+	return outputs, parser.delimiter('}')
 }

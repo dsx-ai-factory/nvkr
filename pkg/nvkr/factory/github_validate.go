@@ -38,6 +38,7 @@ type githubJob struct {
 	If             string                     `json:"if,omitempty"`
 	Permissions    map[string]string          `json:"permissions,omitempty"`
 	Env            map[string]string          `json:"env,omitempty"`
+	Outputs        map[string]string          `json:"outputs,omitempty"`
 	Steps          []githubStep               `json:"steps"`
 }
 
@@ -69,7 +70,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err != nil {
 		return err
 	}
-	expanded, err := expandGitHubActions(plan, workflow, bundle.Files)
+	expanded, err := expandGitHubActions(ctx, plan, workflow, bundle.Files)
 	if err != nil {
 		return err
 	}
@@ -83,6 +84,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	var document githubWorkflowDocument
 	if err := yaml.UnmarshalStrict(expanded, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
+	}
+	if err := admitGitHubNeeds(ctx, plan, &document); err != nil {
+		return err
 	}
 	if err := validateGitHubScriptLimits(document); err != nil {
 		return err

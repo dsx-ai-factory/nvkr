@@ -284,10 +284,10 @@ that remains outstanding after merge.
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. Qualified clearance, release-specific trusted time and M4 manifests/revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, diagnostic output pulling, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
-| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Maintained candidate qualification is configured for post-merge acceptance; a fresh complete exact-attempt handoff and hosted/independent-consumer evidence remain unproved. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its combined cycle is unrecorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
+| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; closed one-job reusable execution templates, ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Maintained candidate qualification is configured for post-merge acceptance; a fresh complete exact-attempt handoff and hosted/independent-consumer evidence remain unproved. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its combined cycle is unrecorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup | Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
-| 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, output-local ordinary job membership with addition/removal and failure-accounting contracts, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. Semantic-action hosted execution, automatic PR publication and scheduled/private-source service acceptance are unexercised. Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
+| 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, output-local ordinary job membership with addition/removal and failure-accounting contracts, fixed reusable child ownership and stable result-collector membership, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. The split layout has guarded dispatch and isolated result-propagation evidence; complete production execution, automatic PR publication and scheduled/private-source service acceptance remain unexercised. Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 | 23 Artifact test interfaces | Proposed ADR merged in PR #139; upstream interface, Go Plan helper and diagnostic adapter implementation remain separate drafts | [Implementation guide and local CLI proof](https://github.com/dsx-ai-factory/nvkr/blob/65d13f4becb358015dead41fd1bc440d13118556/docs/artifact-testing.md) retain their stated limits. Maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
 
@@ -1004,8 +1004,8 @@ contracts do not establish GHCR interoperability, signing-service behavior,
 runtime compatibility, installation or external acceptance of the new format projections; earlier browsing
 and publication records do not establish that acceptance.
 
-The generator/validator/writer enforce a 500,000-byte workflow limit. The top-level workflow retains named
-jobs, exact dependencies, runner and credential policy, native preflight and checkout. Manifest-owned local
+The generator/validator/writer enforce a 500,000-byte limit for each workflow file. The entry workflow retains
+the original named job slots, prerequisite closure, conditions and credential boundaries. Manifest-owned local
 composite actions expose fixed semantic interfaces for execution, input/image preparation, output collection
 and carrier transfer. Grouped jobs reuse the node interface; declared optional slots and further individual
 upload calls preserve output counts and order without cardinality-specific or numbered variant actions.
@@ -1027,14 +1027,16 @@ unchanged. Transport-pin stability additionally requires no affected inline call
 inline final Run upload, so upload-action pin changes affect this workflow. Checkout pins, cohort splits/merges, runtime containers/services, runner/capability routes,
 permissions, secret references, timeouts, qualification and inline setup remain visible change boundaries.
 Complete bundle regeneration and drift checking remain mandatory. Complete native-preflight, pinned-checkout,
-shared-preparation and structurally identical uncontrolled operation calls use descriptive aliases;
-preparation and operation parameters select their own job context. Identical complete host sequences of
-native preflight, pinned credential-free checkout, current-job preparation and one or two uncontrolled
-node calls also share descriptive anchors. Source calls, authored setup and controlled steps remain outside
-the sequence form. Static expansion resolves aliases into
-independent nodes before substitution so sibling selectors and credentials cannot be mutated together.
-Operation calls with provider controls stay explicit. The combined candidate retains all members under
-the existing workflow-size bound; this is local generation/expansion evidence, not hosted execution.
+shared-preparation and structurally identical uncontrolled operation calls use descriptive aliases.
+Eligible uncredentialed native host sequences move into fixed reusable execution templates, each with one
+unconditional child job and a literal original stage selector. The templates contain the complete native
+preflight, pinned credential-free checkout, helper preparation and one or two uncontrolled node calls.
+Signing, protected Environments, source/private credentials, disk jobs, authored setup and finalization
+remain inline. No signer changes its workflow identity. Structural validation expands each exact closed
+template and restores the original stage selector; aliases resolve into independent nodes before
+substitution. Each bundle owns its child files in the entry workflow's reserved sibling namespace, with
+exact manifest, drift, collision and retirement checks. Templates depend on runner and operation shape,
+not graph position or output count.
 Ordinary scheduling now pairs only the same BuildTarget's terminal observation and directly dependent
 SBOM with compatible offline runtime. An additional input is admitted only for a pinned pipeline tool
 from an independent root acquisition with no BuildTarget, IR instruction or inputs. The pair waits for
@@ -1047,16 +1049,27 @@ An earlier new owner can relocate an identical YAML anchor without changing the 
 Generation uses only the current Plan, without scheduling state from previous generated files. Packaging
 has its own provider success condition, removing accidental unrelated-output barriers; complete finalization
 still requires every job and exact carrier. The projected provider graph is checked for cycles.
-The current production workflow is 393,699 bytes (106,301 bytes of provider headroom); development is
-372,362 bytes. Both have 596 jobs. The named ARM64 nightly workflows are 175,980 and 177,572 bytes,
-each with 266 jobs. Moving from global packing to fixed output-local groups adds 34 jobs to each M2
-workflow and 12 to each nightly workflow; production YAML grows by 3,362 bytes. Logical Plans and shared
-action implementations remain byte-identical. This is a one-time scheduling migration, not an assertion
-that the previous cross-output failure boundaries were preserved.
-The addition/removal regression compiles binary, source and signed per-output publication fixtures with
-new output names sorting before, between and after existing outputs. All nine cases preserve existing
-job IDs, relative emission order, expanded operations, invocation values and shared actions outside
-required aggregate accounting; removing the added output restores the complete original bundle byte-for-byte.
+Redundant direct dependency edges are removed only when the full ancestor closure is preserved. Authored
+setup, runtime variables, images or services mentioning `needs` retain ordinary direct lists. Large
+finalizers use 16 fixed FNV-1a buckets, each limited to 64 jobs, to forward exact original results. Addition
+does not rebalance existing membership; overflow fails before generation returns output. Collectors have no
+token permissions, credentials, checkout or artifacts and introduce no producer execution barrier. Finalization
+requires successful collectors, their exact Plan-derived partition and strict bounded reports before recovery.
+The closing summary counts original outcomes, not collector success. Local contracts cover duplicate,
+missing, extra, failed, skipped, canceled, oversized and inconsistent reports, including build-only Plans.
+
+The current production entry workflow is 381,025 bytes (118,975 bytes below the admission bound);
+development is 359,032 bytes. Each has 596 original jobs, 16 collectors and 277 one-to-one reusable calls,
+with 1,438 dependency edges instead of 2,546. The named ARM64 nightly entries are 177,209 and 180,345 bytes,
+each with 266 original jobs, 16 collectors, 127 reusable calls and 643 edges. Each of the four bundles owns
+three fixed child templates, totaling 12 child files. Logical Plans and shared action implementations remain
+byte-identical. The earlier output-local grouping migration removed accidental unrelated-output failure
+barriers; dependency reduction preserves the resulting ancestor closure.
+The addition/removal regression compiles binary, native binary, collected native binary, source and signed
+per-output publication fixtures with new output names sorting before, between and after existing outputs.
+All 15 cases preserve existing job IDs, relative emission order, expanded operations, invocation values,
+shared actions and child template bytes outside required aggregate accounting. Collected fixtures also
+preserve existing bucket membership; removing the output restores the complete original bundle byte-for-byte.
 Separate contracts retain package success gating, pinned scanner dependencies and finalizer rejection of
 missing, failed or skipped
 package/scanner jobs. All maintained generated workflows have been regenerated, pass their exact drift
@@ -1064,8 +1077,34 @@ checks, and pass actionlint and yamllint. These are local contract and static va
 execution or runtime cost measurements.
 The maintained rendering test fails above a 95% soft budget, before the unchanged
 500,000-byte provider admission bound, directing membership changes to compaction work.
-Matrix scheduling and reusable callable workflows remain deferred, and no fresh hosted execution of this
-composite layout is recorded. Oversized workflows still fail before writes. Native offline disk preparation
+On 2026-10-15, a guarded diagnostic of the original 596-job, 2,546-edge representation at
+`a49dafff794b360f2722d53912dc824243395ae6` still returned a dispatch 502 after replacing execution bodies
+with no-ops. An independent 596-job graph was accepted in
+[Run 38771142805](https://github.com/dsx-ai-factory/nvkr/actions/runs/38771142805)
+at `dca9b19081ab3f4649b80c7c3b218c7cdc4b1540`; full transitive reduction was accepted in
+[Run 38772767000](https://github.com/dsx-ai-factory/nvkr/actions/runs/38772767000)
+at `0b1953a0fc97b08a86cb6389859c51402d10416a`. Both skipped all jobs. These isolate the dependency
+representation as a relevant cause, without establishing a numerical provider limit or a single internal cause.
+The actual regenerated production entry and its three child files were accepted in
+[Run 38775614122](https://github.com/dsx-ai-factory/nvkr/actions/runs/38775614122)
+at `8738d4e0f9137e4a657ab69731f34999cc500650`. All 612 top-level jobs were skipped by their original
+main-only guards. This establishes dispatch admission only, not production execution.
+
+Separate isolated probes exercised reusable success/failure/skipping, explicit stage selection and
+same-attempt artifact transfer in
+[Run 38769110877](https://github.com/dsx-ai-factory/nvkr/actions/runs/38769110877)
+at `d1ae4c9998a5d748d5afc17ac8ef7695cb46e019`, and exact collector forwarding plus original/reduced
+failure and skip behavior in
+[Run 38773205366](https://github.com/dsx-ai-factory/nvkr/actions/runs/38773205366)
+at `554bbc838f7fff660242ade224f4c865f051c0b9`. Their comparison jobs passed; overall failure was
+intentional. A further probe used reusable jobs in the intermediate always-running stage in
+[Run 38775997620](https://github.com/dsx-ai-factory/nvkr/actions/runs/38775997620)
+at `c0e4f55175d47914dda4f50f64c0bd39df7f593c`: its comparison job passed exact collector forwarding and
+all three success/failure/skip comparisons between original and reduced dependencies. Its only failing job
+was the intentional prerequisite failure. These diagnostic probes do not establish complete producer,
+signing, publication, qualification or runtime cost acceptance for the split layout.
+
+Producer matrices and general callable interfaces remain deferred. Oversized workflows still fail before writes. Native offline disk preparation
 shares the ARC group to avoid restoring its full material closure on publication runners. Consumed carrier deletion reduces duplicate
 storage but does not establish a measured hosted storage bound.
 

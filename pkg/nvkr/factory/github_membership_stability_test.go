@@ -5,6 +5,7 @@ package factory
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -22,6 +23,26 @@ func TestGitHubUnrelatedOutputPreservesExistingJobs(t *testing.T) {
 		plan func(*testing.T) *Plan
 	}{
 		{name: "binary", plan: func(t *testing.T) *Plan { return buildTransportPlan(t, "binary") }},
+		{name: "native binary", plan: func(t *testing.T) *Plan {
+			return recompileGitHubStabilityPlan(t, buildTransportPlan(t, "binary"), func(inputs *githubStabilityInputs) {
+				inputs.environment.RunsOn = ""
+				inputs.environment.GitHubRunners = map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"}
+			})
+		}},
+		{name: "collected native binary", plan: func(t *testing.T) *Plan {
+			return recompileGitHubStabilityPlan(t, buildTransportPlan(t, "binary"), func(inputs *githubStabilityInputs) {
+				inputs.environment.RunsOn = ""
+				inputs.environment.GitHubRunners = map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"}
+				inputs.definition.Outputs[0].Name = "bravo"
+				// Cross the direct-result limit even after shared source work and
+				// Verify/SBOM pairing reduce the number of provider jobs.
+				for index := 1; index < 32; index++ {
+					output := inputs.definition.Outputs[0]
+					output.Name = fmt.Sprintf("omega-%02d", index)
+					inputs.definition.Outputs = append(inputs.definition.Outputs, output)
+				}
+			})
+		}},
 		{name: "source", plan: func(t *testing.T) *Plan { return buildTransportPlan(t, "source") }},
 		{name: "per-output publication", plan: func(t *testing.T) *Plan {
 			return recompileGitHubStabilityPlan(t, signedTestPlan(t, cosignSigningProfile(), ghcrTarget()), func(inputs *githubStabilityInputs) {
@@ -45,6 +66,16 @@ func TestGitHubUnrelatedOutputPreservesExistingJobs(t *testing.T) {
 					inputs.definition.Outputs = append(inputs.definition.Outputs, output)
 					slices.SortFunc(inputs.definition.Outputs, func(a, b authored.DefinitionOutput) int { return strings.Compare(a.Name, b.Name) })
 				})
+				if fixture.name == "collected native binary" {
+					projection, err := githubNeedsForPlan(t.Context(), beforePlan)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(projection.Collectors) == 0 {
+						t.Fatalf("large fixture must exercise stable collector membership; got %d original jobs", len(projection.Full[githubFinalizerJobID]))
+					}
+					t.Logf("collector fixture: %d original jobs in %d fixed buckets", len(projection.Full[githubFinalizerJobID]), len(projection.Collectors))
+				}
 				before, err := RenderGitHub(t.Context(), beforePlan)
 				if err != nil {
 					t.Fatal(err)
@@ -84,6 +115,38 @@ func assertGitHubExistingOutputJobs(t *testing.T, beforePlan, afterPlan *Plan, b
 		t.Fatal(err)
 	}
 	globalJobs := map[string]bool{"nvkr-lifecycle-run": true}
+	beforeProjection, err := githubNeedsForPlan(t.Context(), beforePlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterProjection, err := githubNeedsForPlan(t.Context(), afterPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, members := range beforeProjection.Collectors {
+		globalJobs[id] = true
+		for _, member := range members {
+			if !slices.Contains(afterProjection.Collectors[id], member) {
+				t.Errorf("unrelated output moved existing finalizer member %s out of %s", member, id)
+			}
+		}
+	}
+	for id, needs := range beforeProjection.Reduced {
+		if _, collector := beforeProjection.Collectors[id]; collector || id == githubFinalizerJobID {
+			continue
+		}
+		// Aggregate release assembly is exempted with its node kind below.
+		if slices.Equal(needs, afterProjection.Reduced[id]) {
+			continue
+		}
+		aggregate := false
+		for _, node := range beforePlan.Graph.Nodes {
+			aggregate = aggregate || node.Kind == NodeAssembleRelease && beforeJobs[node.ID] == id
+		}
+		if !aggregate {
+			t.Errorf("unrelated output changed emitted prerequisites for %s", id)
+		}
+	}
 	for _, node := range beforePlan.Graph.Nodes {
 		if beforeJobs[node.ID] != afterJobs[node.ID] {
 			t.Errorf("unrelated output changed job for %s: %s -> %s", node.ID, beforeJobs[node.ID], afterJobs[node.ID])
@@ -115,7 +178,7 @@ func assertGitHubExistingOutputJobs(t *testing.T, beforePlan, afterPlan *Plan, b
 	}{
 		// Decoding resolves aliases, whose definition site may move when a
 		// newly inserted job is the first user of an existing shared sequence.
-		{name: "shared", before: before.Files[before.WorkflowPath], after: after.Files[after.WorkflowPath]},
+		{name: "shared", before: expandGitHubStabilityCalls(t, beforePlan, before), after: expandGitHubStabilityCalls(t, afterPlan, after)},
 		{name: "expanded", before: expandedGitHubWorkflow(t, before), after: expandedGitHubWorkflow(t, after)},
 	} {
 		beforeWorkflow := decodeGitHubWorkflow(t, projection.before)
@@ -144,10 +207,19 @@ func assertGitHubExistingOutputJobs(t *testing.T, beforePlan, afterPlan *Plan, b
 		}
 	}
 	for name, raw := range before.Files {
-		if strings.HasPrefix(name, githubActionsDirectory) && !bytes.Equal(raw, after.Files[name]) {
-			t.Errorf("unrelated output changed existing action %s", name)
+		if (strings.HasPrefix(name, githubActionsDirectory) || IsGeneratedGitHubChildWorkflowPath(name)) && !bytes.Equal(raw, after.Files[name]) {
+			t.Errorf("unrelated output changed existing execution template %s", name)
 		}
 	}
+}
+
+func expandGitHubStabilityCalls(t *testing.T, plan *Plan, bundle *GeneratedBundle) []byte {
+	t.Helper()
+	raw, err := expandGitHubReusableWorkflows(t.Context(), plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return logicalGitHubWorkflow(t, plan, raw)
 }
 
 func githubSerializedJobOrder(t *testing.T, raw []byte) []string {

@@ -18,23 +18,20 @@ import (
 )
 
 // A prior manifest is a bounded ownership description, not execution authority.
-// It can retire only matching regular files inside this generator's directory.
-func retiredGeneratedMembers(ctx context.Context, root string, bundle *GeneratedBundle) ([]GeneratedMember, error) {
+// Paths must belong to this exact namespace, including reserved child workflows.
+func priorGeneratedMembers(ctx context.Context, root string, bundle *GeneratedBundle) ([]GeneratedMember, error) {
 	manifestPath, err := generatedDestination(root, bundle.ManifestPath)
 	if err != nil {
 		return nil, err
 	}
-	union := *bundle
-	union.Files = make(map[string][]byte, len(bundle.Files))
-	for name, raw := range bundle.Files {
-		union.Files[name] = raw
-	}
-	var retired []GeneratedMember
 	_, statErr := os.Lstat(manifestPath)
 	if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
 		return nil, e.Wrap(e.CodePipelineDrift, statErr, "reading prior generated Run manifest")
 	}
 	if statErr == nil {
+		if err := validateGeneratedDirectoryChain(root, filepath.ToSlash(filepath.Dir(bundle.ManifestPath))); err != nil {
+			return nil, e.Wrap(e.CodePipelineDrift, err, "prior generated Run manifest has unsafe parents")
+		}
 		raw, err := readGeneratedContext(ctx, manifestPath)
 		if err != nil {
 			return nil, e.Wrap(e.CodePipelineDrift, err, "reading prior generated Run manifest")
@@ -46,17 +43,33 @@ func retiredGeneratedMembers(ctx context.Context, root string, bundle *Generated
 		if prior.SchemaVersion != generatedManifestSchema || prior.Engine != bundle.Engine || prior.WorkflowPath != bundle.WorkflowPath || len(prior.Members) > maxGeneratedDirEntries {
 			return nil, e.New(e.CodePipelineDrift, "prior generated Run manifest has an unsupported layout")
 		}
-		prefix := filepath.ToSlash(filepath.Dir(bundle.ManifestPath)) + "/"
 		previous := ""
 		for _, member := range prior.Members {
-			if !safeGeneratedPath(member.Path) || member.Path <= previous || member.Mode != 0o644 || !canonical.IsDigest(member.SHA256) || member.Path == bundle.ManifestPath || member.Path == bundle.ManifestPath+".lease" || (member.Path != bundle.WorkflowPath && !strings.HasPrefix(member.Path, prefix)) {
+			if !generatedMemberInNamespace(bundle, member.Path) || member.Path <= previous || member.Mode != 0o644 || !canonical.IsDigest(member.SHA256) {
 				return nil, e.New(e.CodePipelineDrift, "prior generated Run manifest has an invalid member %q", member.Path)
 			}
 			previous = member.Path
-			union.Files[member.Path] = nil
-			if _, retained := bundle.Files[member.Path]; !retained {
-				retired = append(retired, member)
-			}
+		}
+		return prior.Members, nil
+	}
+	return nil, nil
+}
+
+func retiredGeneratedMembers(ctx context.Context, root string, bundle *GeneratedBundle) ([]GeneratedMember, error) {
+	prior, err := priorGeneratedMembers(ctx, root, bundle)
+	if err != nil {
+		return nil, err
+	}
+	union := *bundle
+	union.Files = make(map[string][]byte, len(bundle.Files)+len(prior))
+	for name, raw := range bundle.Files {
+		union.Files[name] = raw
+	}
+	var retired []GeneratedMember
+	for _, member := range prior {
+		union.Files[member.Path] = nil
+		if _, retained := bundle.Files[member.Path]; !retained {
+			retired = append(retired, member)
 		}
 	}
 	if err := checkGeneratedDirectoryContents(ctx, root, &union); err != nil {

@@ -916,8 +916,10 @@ admission still covers every stage and bootstrap job; any failed, skipped or mis
 completion. Assembly and finalization have registry-read permission and no OIDC minting or package-write
 permission. All credentials and signing remain outside ARC producer jobs.
 
-The top-level workflow keeps each named job, exact dependency set, runner, timeout, permission, protected
-Environment and execution condition visible. Native-platform preflight remains before checkout. After
+The top-level workflow keeps each named job, prerequisite closure and execution condition visible.
+Credentialed jobs retain their runner, timeout, permissions and protected Environment inline. The closed
+native execution templates below move only eligible uncredentialed job bodies; their fixed runner is in
+the owned child and their timeout remains an explicit caller input. Native-platform preflight remains before checkout. After
 checkout, shared local composite actions expose fixed semantic interfaces for node execution, source
 execution, input preparation, image preparation, output collection and individual carrier transfer.
 `execute-node`, `execute-source`, `prepare-inputs`, `prepare-images` and `collect-node-outputs` describe
@@ -938,7 +940,8 @@ invocation from the renderer before emitting bounded canonical JSON to the provi
 Each job's output is limited to 200,000 UTF-8 bytes, including `data=` and the terminating newline; this is
 not a limit on the complete `action-data.json` file. Generation and runtime reject oversized output before
 opening the provider output file.
-Shared preparation selects the stable provider job through the exact `github.job` context binding.
+Shared preparation selects the stable provider job through the exact `github.job` context binding in an
+inline job, or the literal caller-stage input in an admitted reusable execution job.
 The checked-in data file is an inspectable generated projection, not runtime execution authority. Templates
 map its recomputed parameters through explicit environment values or action inputs; fixed shell commands
 quote their parameter variables instead of evaluating generated command text. Caller-only expressions and
@@ -974,7 +977,8 @@ timeouts, qualification or
 inline operator setup may require a workflow diff. The full bundle must still regenerate and pass its
 byte-exact check after every input update; workflow stability grants no exemption from admission or drift.
 
-Native preflight, pinned checkout, operator-authored environment setup, timed producer execution and steps
+Native preflight and pinned checkout remain explicit steps in their execution job, including the closed
+native templates below. Operator-authored environment setup, timed producer execution and steps
 whose outcomes or outputs are referenced by the caller remain inline. Keeping setup inline preserves its caller contexts and action-path environment; arbitrary setup
 expressions do not become composite inputs. A controlled upload/download may use a local wrapper containing
 exactly one pinned transport step. Its ID, condition, timeout and continue-on-error policy remain on the
@@ -998,7 +1002,9 @@ The caller passes secrets and provider-result expressions as explicit action inp
 only to the original inner step field that consumes it: source credentials remain on source execution,
 private-image credentials remain on preparation, and catalog credentials remain on catalog validation or
 finalization. Packing and uploads gain no credential environment through extraction. Recovery receives the
-caller's exact `toJSON(needs)` value; no matrix result or action output replaces the required provider-job set.
+caller's exact `toJSON(needs)` value. It contains either the original job results or the closed collector
+reports below; normalization preserves the complete original job-to-result mapping. No matrix aggregate
+stands in for a required producer result.
 Actions are statically selected from the generated bundle, with no arbitrary command or action-path input.
 
 Validation checks the closed shared-template and invocation-data set and expands its admitted references
@@ -1019,9 +1025,59 @@ additional credential inputs, authored setup and controlled transfers are outsid
 Aliases resolve into independent nodes before per-job parameter substitution. Scalar values, job permissions,
 conditions and dependency sets remain inline. This presentation change retains the exact provider-job set.
 
+Eligible native host sequences move into fixed, same-commit reusable execution templates. Each caller
+retains its original job ID, label, prerequisite closure and condition and calls exactly one unconditional
+child execution job. Eligibility requires the complete native preflight, credential-free pinned checkout,
+helper preparation and one or two uncontrolled node calls, with no job permissions, environment variables,
+protected Environment, container or services. Bootstrap, source credentials, private-image credential
+preparation, timed/disk execution, signing, publication and finalization remain inline. In particular, no
+OIDC signer moves to a different `job_workflow_ref` identity (ADR-16).
+
+The fixed template name derives from its native runner and one/two-node operation shape, never graph
+position, output count or byte packing. Structural equality is required for every reuse. The caller passes
+only a literal stage selector equal to its own job ID and a bounded integer timeout. The child passes this
+selector into preparation explicitly: its own `github.job` is not the caller's stage. No arbitrary command,
+runner, nested workflow, secret inheritance, output relay, matrix or child condition is admitted. The child
+has only repository-read permission and no concurrency group; Run concurrency belongs to the entry workflow.
+
+The one-to-one split preserves each original provider result slot. Scheduling removes a direct dependency
+only when another retained path reaches that prerequisite; complete ancestor sets and original job
+conditions are unchanged. This reduction applies to execution and release assembly, without changing
+artifact selection or restoration. Authored setup, runtime variables, runtime images or services that
+mention the `needs` context retain their original direct dependency lists. Validation derives both dependency maps from the Plan,
+requires the exact emitted map, then restores logical dependencies in memory for the existing artifact,
+credential and execution checks. It never repairs an arbitrary omitted edge from supplied YAML.
+
+Finalizers with at most 64 required jobs retain direct result collection. Larger finalizers use 16 fixed
+buckets selected by FNV-1a over the stable provider job ID, with at most 64 members per bucket. This hash
+selects diagnostic placement only; it is not an artifact or authority identity. Bucket overflow fails with
+`engine-capability` before returning generated output. Addition or removal does not rebalance existing
+members. Only finalizer accounting depends on collectors; no producer or release job acquires a new
+cross-output execution barrier.
+
+Each collector is a closed, five-minute hosted Ubuntu job with no token permissions, checkout, credentials,
+artifacts or helper execution. Its `always()` condition retains the entry workflow's dispatch policy.
+It forwards `toJSON(needs)` and a diagnostic string of member result values. The finalizer requires the
+exact Plan-derived collector set, successful collectors, and an exact disjoint partition of the original
+job set. A bounded, duplicate-rejecting parser admits one report layer, shares a 1 MiB decoded-byte and
+32,768-token budget, and rejects missing, extra, malformed or inconsistent reports before carrier recovery.
+Summary result counts must match the reported per-job result multiset. Failure, cancellation and skipping
+remain original producer results; successful collection never changes them to success. The closing summary
+counts forwarded producer results rather than collector success. Provider descriptions remain diagnostic;
+existing completeness and artifact authentication gates retain authority.
+
+Validation also admits the closed workflow call and child structure, restores the original stage selector,
+and applies the existing complete graph, credential and transport checks. Exact regeneration authenticates
+every child file. All generated workflow files obey the per-file size limit; the invocation tree has one
+reusable level and at most 50 unique child files, matching
+[GitHub's reusable-workflow constraints](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations#limitations-of-reusable-workflows).
+Local expansion is contract evidence; provider dispatch and result propagation require separately recorded
+hosted evidence. GitHub's internal graph-processing limits are not inferred as a numerical contract from
+successful diagnostic dispatches.
+
 Producer matrix scheduling and general reusable `workflow_call` pipelines remain deferred. The separately
 owned fixed native qualification worker and its exact selected-platform matrix are admitted by ADR-21 §4;
-that exception does not alter producer scheduling. A producer matrix changes dependency
+that exception and the closed one-job execution templates do not admit arbitrary producer scheduling. A producer matrix changes dependency
 barriers and the provider-result shape used by finalization; a callable workflow adds execution-context,
 credential and identity contracts. Neither is a presentation-only substitution for the current exact named
 jobs. Future admission must preserve each named output's execution/evidence slots, failure behavior and

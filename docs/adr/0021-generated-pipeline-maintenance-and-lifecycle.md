@@ -54,8 +54,8 @@ Every generated execution, recovery and utility-container command selects that e
 Plan path; validation rejects a bundle whose paths differ from the admitted Environment.
 Signing identity and issuer remain explicit Environment policy and are never rewritten
 to accommodate a selected workflow filename. Operators must select the matching policy.
-Producer generation emits independent manual-dispatch bundles, with no cron or
-callable producer trigger. Optional qualification generation separately emits
+Producer generation emits independent bundles whose entrypoints support manual dispatch, with no cron or
+callable entrypoint trigger. Their closed reusable execution children are described below. Optional qualification generation separately emits
 the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
 That pair currently admits the default producer workflow only; named producer
 qualification is not part of this namespace contract.
@@ -101,14 +101,22 @@ The helper-preparation, execution, bootstrap and controlled-transfer
 families and their invocation-data member appear in the same commit manifest as the top-level workflow and
 Plan. Their exact bytes, safe relative paths and modes participate in regeneration, drift
 checks and prior-manifest retirement. The workflow digest still describes the top-level workflow bytes;
-it is not a substitute for validating the complete manifest-owned action closure.
+it is not a substitute for validating the complete manifest-owned execution closure.
+
+The same manifest also owns closed reusable execution templates directly beneath `.github/workflows/`.
+Their names are `<entry-stem>__<semantic-template>.yml`; the double underscore separates children from
+valid named-bundle entrypoints. Default, development and named production bundles therefore retain disjoint
+child namespaces. Each template is a single native execution job called at the same commit, with the exact
+stage and timeout bindings admitted by ADR-18 §8. No manifest schema change or second execution identity is
+introduced. Both entry and child workflow files are bounded to 500,000 UTF-8 bytes before output work.
 
 Identical complete semantic calls without provider controls may share descriptive YAML anchors after
 structural equality checks, including their parameter selector and credential references. The outer label names
 the operation and job-local part, while the job and expanded role labels retain the selected producer. Controlled diagnostic
 steps retain their original caller labels. Static expansion resolves aliases into independent copies before
 substituting per-job parameters, so one job cannot mutate another's input or credential bindings. Job
-permissions, conditions, dependencies and runtime selection remain inline. Identical complete host step
+conditions and dependencies remain inline. Permissions and protected runtime selection stay on their original
+credentialed jobs; eligible uncredentialed calls name a fixed native template and explicit timeout. Identical complete host step
 sequences may also share descriptive anchors when they contain only native preflight, credential-free
 pinned checkout, current-job preparation and one or two uncontrolled node calls. Complete structural
 equality is required; source credentials, authored setup and provider-controlled steps cannot enter this
@@ -139,7 +147,13 @@ and the opening Run summary necessarily change with required membership. Source-
 new dependencies remain topology changes. YAML anchor definitions may move to an earlier new owner of an
 identical sequence; this bounded presentation change does not change the expanded existing jobs. Generation
 derives the projection from the current complete Plan without using the previous workflow as an input.
-Producer matrices and callable workflows are not required for this contract and remain deferred.
+The closed reusable execution templates preserve this contract: an independent output cannot rename an
+existing template, alter its bytes or move existing stages between templates. The dependency projection
+preserves each existing prerequisite closure and condition. Finalizer collectors are diagnostic accounting,
+not execution groups: fixed buckets do not move existing members when a new output is added, and their
+complete membership is derived from the current Plan. Crossing the direct-result threshold changes finalizer
+accounting only. ADR-18 §8 owns collector bounds, exact result normalization and authored-context preservation.
+Producer matrices and general callable producer interfaces remain deferred.
 
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 
@@ -147,8 +161,11 @@ Producer matrices and callable workflows are not required for this contract and 
 against committed files. A mismatch fails closed with a distinct coded error (`pipeline-drift`, ADR-03) naming
 missing, extra or divergent owned files. Execution admission verifies the commit manifest before consuming its
 graph. The dedicated generated Run directory must contain only expected payloads, its manifest and the
-persistent lock inode; unexpected files or directories and symlinks fail the check. Handwritten workflows
-outside that directory remain operator-owned. The unused qualified `bundle` command, bundle manifest and
+persistent lock inode; unexpected files or directories and symlinks fail the check. The check also inventories
+the selected owner's reserved child namespace in `.github/workflows/`; missing, changed or unlisted children
+fail closed. Handwritten workflows and other bundle namespaces remain independently owned. Qualification
+admission and its prior-manifest validation reject reserved producer child paths before either owner can
+write or retire them. The unused qualified `bundle` command, bundle manifest and
 transport-plan writer are removed. The opt-in M3 qualification pair has its own narrowly scoped ownership
 manifest; it does not replace or reinterpret the producer Plan bundle.
 
@@ -217,9 +234,11 @@ generator. They accept only generated input bindings and do not admit operator-s
 replacement job policies. Their callers retain visible topology, permissions and credential references;
 validation checks the expanded steps and exact bytes of every generated member (ADR-18 §8).
 
-General extensions and reusable callable producer workflows remain deferred design options. The sole
-admitted reusable exception is the fixed M3 native smoke worker invoked by its generated same-repository
-qualifier at the same commit. It exposes no arbitrary steps, runner labels, commands or reusable refs.
+General extensions and reusable callable producer interfaces remain deferred design options. Two closed
+generated forms are admitted: the one-job native execution templates in ADR-18 §8 and the fixed M3 native
+smoke worker invoked by its generated same-repository qualifier at the same commit. Neither exposes arbitrary
+steps, runner labels, commands or reusable refs. The native execution templates accept no secrets or OIDC
+scope and preserve each caller's result slot; they do not grant the qualification worker's signing authority.
 The independently selected qualification policy and trusted compiled producer inputs determine its exact
 worker identity, native images, executable pins, source-read secret names and SHA-pinned actions. Source
 secrets are explicitly mapped and scoped to trusted owner steps; there is no blanket secret inheritance.
@@ -300,11 +319,18 @@ conflict for two separately compiled bundles.
 
 Retirement reads the previous generated-run/v1 manifest as a bounded ownership description. It validates
 its schema, engine, workflow path, sorted member paths, digests and modes. A member may be retired only
-inside the generator-owned directory and only when it is a regular file whose current bytes and mode still
+inside the generator-owned directory or the exact owner's reserved child workflow namespace, and only when
+it is a regular file whose current bytes and mode still
 match that manifest. Missing obsolete members are tolerated for retry after an interrupted retirement.
 Symlinks, changed obsolete members and unlisted directory members fail closed before payload publication.
 A missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by
 retired members are removed nonrecursively; unknown files are never swept by a recursive cleanup.
+
+A newly introduced child destination must be absent or contain the exact regenerated bytes, the latter
+allowing retry after interrupted publication. Any other preexisting unowned content is refused.
+For a new owner, read-only preflight rejects such a collision before creating its directory or lock; the
+writer repeats this check under its lock before staging. Retained prior-owned members keep the existing
+regeneration repair behavior. An old generator rejects child members it cannot own rather than retiring them.
 
 Payload replacement and retirement are not atomic across the directory. The writer rechecks retired bytes
 before removal, writes the new manifest last, and fsyncs generated directories. A process crash may leave

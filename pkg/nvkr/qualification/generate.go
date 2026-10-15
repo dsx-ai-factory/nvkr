@@ -93,6 +93,11 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err != nil {
 		return "", err
 	}
+	for _, name := range qualificationNames(bundle.files) {
+		if _, overlap := producer.Files[name]; overlap {
+			return "", e.New(e.CodeEngineCapability, "qualification workflow %q overlaps the producer bundle", name)
+		}
+	}
 	if check {
 		if err := factory.CheckGeneratedBundle(ctx, root, producer); err != nil {
 			return "", err
@@ -139,6 +144,10 @@ func admitQualificationGeneration(policy lifecycle.QualificationPolicy, policyPa
 	}
 	if policy.Source.Workflow != factory.GitHubWorkflowPath {
 		return e.New(e.CodeEngineCapability, "qualification generation requires the selected generated producer workflow")
+	}
+	if factory.IsGeneratedGitHubChildWorkflowPath(policy.QualificationWorkflow) ||
+		(policy.Smoke != nil && factory.IsGeneratedGitHubChildWorkflowPath(policy.Smoke.Workflow)) {
+		return e.New(e.CodeEngineCapability, "qualification workflows cannot occupy a generated producer execution namespace")
 	}
 	if policy.Cosign.Version == "" || policy.Cosign.PlatformDigests["linux/amd64"] == "" || policy.Cosign.Digest != "" || (policy.Cosign.Path != "" && policy.Cosign.Path != "cosign") {
 		return e.New(e.CodeUnpinnedInput, "qualification generation requires an exact cosign version locator, the AMD64 final signer pin and every native worker pin, and the fixed cosign executable name")

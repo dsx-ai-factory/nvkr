@@ -77,7 +77,7 @@ func TestGitHubStepSequencesPreserveExpansionAndJobParameters(t *testing.T) {
 		}
 	}
 	for range 2 {
-		expanded, err := expandGitHubActions(plan, workflow, files)
+		expanded, err := expandGitHubActions(t.Context(), plan, workflow, files)
 		if err != nil {
 			t.Fatal(err)
 		}

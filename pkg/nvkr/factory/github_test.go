@@ -248,11 +248,70 @@ func expandedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
 	if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := expandGitHubActions(&plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
+	raw, err := expandGitHubActions(t.Context(), &plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return raw
+	return logicalGitHubWorkflow(t, &plan, raw)
+}
+
+// Retain shared action calls while materializing admitted workflow calls.
+func sharedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
+	t.Helper()
+	var plan Plan
+	if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := expandGitHubReusableWorkflows(t.Context(), &plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return logicalGitHubWorkflow(t, &plan, raw)
+}
+
+// Admit physical scheduling before examining logical artifact dependencies.
+// Preserve the actual expanded programs and YAML styles used by the assertions.
+func logicalGitHubWorkflow(t *testing.T, plan *Plan, raw []byte) []byte {
+	t.Helper()
+	logical := decodeGitHubWorkflow(t, raw)
+	if err := admitGitHubNeeds(t.Context(), plan, &logical); err != nil {
+		t.Fatal(err)
+	}
+	document, jobs, err := githubReusableDocument(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range githubSerializedJobOrder(t, raw) {
+		job, retained := logical.Jobs[id]
+		if !retained {
+			githubYAMLRemove(jobs, id)
+			continue
+		}
+		node := githubYAMLField(jobs, id)
+		if len(job.Needs) == 0 {
+			githubYAMLRemove(node, "needs")
+		} else {
+			needs := &yamlv3.Node{Kind: yamlv3.SequenceNode, Tag: "!!seq", Style: yamlv3.FlowStyle}
+			for _, dependency := range job.Needs {
+				needs.Content = append(needs.Content, githubYAMLString(dependency))
+			}
+			githubYAMLSet(node, "needs", needs)
+		}
+		if id == "nvkr-lifecycle-run" {
+			steps := githubYAMLField(node, "steps")
+			if steps != nil && len(steps.Content) > 0 {
+				last := steps.Content[len(steps.Content)-1]
+				if githubYAMLValue(last, "id") == githubRunEndSummaryID {
+					githubYAMLSet(githubYAMLField(last, "env"), "NVKR_JOB_RESULTS", githubYAMLString(githubRunEndSummary(len(job.Needs)).Env["NVKR_JOB_RESULTS"]))
+				}
+			}
+		}
+	}
+	result, err := encodeGitHubYAML(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
 }
 
 // Mutation fixtures name the exact member instead of searching unrelated jobs,
@@ -344,7 +403,7 @@ func githubTestYAMLStep(t *testing.T, steps *yamlv3.Node, field, value string) *
 
 func githubTestBootstrap(t *testing.T, bundle *GeneratedBundle) (jobID, member string) {
 	t.Helper()
-	document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+	document := decodeGitHubWorkflow(t, sharedGitHubWorkflow(t, bundle))
 	for _, id := range sortedKeys(document.Jobs) {
 		if !strings.HasPrefix(id, "build-runner-") {
 			continue
@@ -372,7 +431,7 @@ func githubTestSharedInvocation(t *testing.T, bundle *GeneratedBundle, jobID, ro
 	if err := canonical.UnmarshalExact(bundle.Files[path.Join(path.Dir(bundle.PlanPath), "action-data.json")], &data); err != nil {
 		t.Fatal(err)
 	}
-	job, exists := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs[jobID]
+	job, exists := decodeGitHubWorkflow(t, sharedGitHubWorkflow(t, bundle)).Jobs[jobID]
 	if !exists {
 		t.Fatalf("fixture omits job %q", jobID)
 	}
@@ -455,12 +514,50 @@ func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle,
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflow = lowerGitHubTestNeeds(t, plan, workflow)
 	changed := *bundle
 	changed.Files = files
 	changed.Files[bundle.PlanPath] = append([]byte(nil), bundle.Files[bundle.PlanPath]...)
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return &changed
+}
+
+// Logical mutation fixtures retain the original dependencies and summary input.
+// Restore only their emitted scheduling representation, leaving mutated job
+// policy, programs and summary fields available to the semantic validator.
+func lowerGitHubTestNeeds(t *testing.T, plan *Plan, raw []byte) []byte {
+	t.Helper()
+	projection, err := githubNeedsForPlan(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projection.Collectors) != 0 {
+		var document yamlv3.Node
+		if err := yamlv3.Unmarshal(raw, &document); err != nil || len(document.Content) != 1 {
+			t.Fatalf("decode logical mutation workflow: %v", err)
+		}
+		finalizer := githubYAMLField(githubYAMLField(document.Content[0], "jobs"), githubFinalizerJobID)
+		steps := githubYAMLField(finalizer, "steps")
+		if steps != nil && len(steps.Content) > 0 {
+			last := steps.Content[len(steps.Content)-1]
+			results := githubYAMLField(githubYAMLField(last, "env"), "NVKR_JOB_RESULTS")
+			expected := len(projection.Full[githubFinalizerJobID])
+			if githubYAMLValue(last, "id") == githubRunEndSummaryID && results != nil &&
+				results.Value == githubRunEndSummary(expected).Env["NVKR_JOB_RESULTS"] {
+				results.Value = githubCollectedRunEndSummary(expected).Env["NVKR_JOB_RESULTS"]
+			}
+		}
+		raw, err = encodeGitHubYAML(&document)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	lowered, err := lowerGitHubNeeds(t.Context(), plan, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lowered
 }
 
 func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
@@ -471,6 +568,9 @@ func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
 	actions := 0
 	for name := range bundle.Files {
 		if name == bundle.PlanPath || name == GitHubWorkflowPath || name == GitHubActionDataPath {
+			continue
+		}
+		if owner, ok := githubChildWorkflowOwner(name); ok && owner == bundle.WorkflowPath {
 			continue
 		}
 		if !strings.HasPrefix(name, ".github/nvkr-run/actions/") || !strings.HasSuffix(name, "/action.yml") {
