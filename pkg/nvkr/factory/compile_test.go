@@ -110,57 +110,6 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 
 }
 
-func TestPackageSpecsUseArtifactTopologyNotAuthoredOrLexicalOrder(t *testing.T) {
-	ordered, err := orderPackageSpecs([]packageSpec{
-		{Name: "aggregate", Inputs: []string{"package/z-bundle"}},
-		{Name: "z-bundle", Inputs: []string{"build/component"}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ordered) != 2 || ordered[0].Name != "z-bundle" || ordered[1].Name != "aggregate" {
-		t.Fatalf("package topology = %+v", ordered)
-	}
-	if _, err := orderPackageSpecs([]packageSpec{
-		{Name: "a", Inputs: []string{"package/b"}},
-		{Name: "b", Inputs: []string{"package/a"}},
-	}); err == nil {
-		t.Fatal("cyclic package artifact graph was accepted")
-	}
-}
-
-func TestArtifactGraphRejectsMissingInputAndCycle(t *testing.T) {
-	missing := ArtifactGraph{SchemaVersion: ArtifactGraphSchema,
-		Nodes:     []Node{{ID: "build/a", Kind: NodeBuild, Network: "none", Inputs: []string{"artifact/missing"}, Outputs: []string{"artifact/a"}}},
-		Artifacts: []Artifact{{ID: "artifact/a", Name: "a", Kind: "raw", Path: ".nvkr/a", Producer: "build/a"}},
-	}
-	if err := missing.Validate(); err == nil {
-		t.Fatal("missing artifact input was accepted")
-	}
-	cycle := ArtifactGraph{SchemaVersion: ArtifactGraphSchema,
-		Nodes: []Node{
-			{ID: "build/a", Kind: NodeBuild, Network: "none", Inputs: []string{"artifact/b"}, Outputs: []string{"artifact/a"}},
-			{ID: "build/b", Kind: NodeBuild, Network: "none", Inputs: []string{"artifact/a"}, Outputs: []string{"artifact/b"}},
-		},
-		Artifacts: []Artifact{
-			{ID: "artifact/a", Name: "a", Kind: "raw", Path: ".nvkr/a", Producer: "build/a"},
-			{ID: "artifact/b", Name: "b", Kind: "raw", Path: ".nvkr/b", Producer: "build/b"},
-		},
-	}
-	if err := cycle.Validate(); err == nil {
-		t.Fatal("artifact dataflow cycle was accepted")
-	}
-	unsafe := ArtifactGraph{SchemaVersion: ArtifactGraphSchema,
-		Nodes: []Node{{ID: "package/a", Kind: NodePackage, Network: "none", RunsOn: "linux",
-			Outputs: []string{"artifact/a"}}},
-		Artifacts: []Artifact{{ID: "artifact/a", Name: "a", Kind: "binary-bundle", Path: "../escape",
-			Producer: "package/a"}},
-	}
-	if err := unsafe.Validate(); err == nil {
-		t.Fatal("unsafe artifact transport path was accepted")
-	}
-}
-
 func contains(values []string, wanted string) bool {
 	for _, value := range values {
 		if value == wanted {

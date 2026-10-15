@@ -24,6 +24,10 @@ func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
 				t.Fatal(err)
 			}
 			assertGeneratedGitHubMembers(t, bundle)
+			var actionData githubActionDataDocument
+			if err := canonical.UnmarshalExact(bundle.Files[GitHubActionDataPath], &actionData); err != nil {
+				t.Fatal(err)
+			}
 			var decoded Plan
 			if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &decoded); err != nil {
 				t.Fatal(err)
@@ -108,25 +112,6 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 			if strings.Contains(wf, forbidden) {
 				t.Fatalf("%s build-only pipeline must not contain %q:\n%s", engine.name, forbidden, wf)
 			}
-		}
-	}
-}
-
-// TestCommittedCanonicalMembersHaveNoTrailingNewline guards every canonical bundle member
-// (Plan and action parameter data) that is decoded with canonical.UnmarshalExact,
-// which rejects a trailing newline. Workflow and action YAML may end with one.
-func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
-	plan := buildOnlyPlan(t, "ubuntu-24.04")
-	b, err := RenderGitHub(context.Background(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for path, raw := range b.Files {
-		if strings.HasSuffix(path, ".yml") {
-			continue
-		}
-		if strings.HasSuffix(string(raw), "\n") {
-			t.Fatalf("canonical member %s ends with a newline; UnmarshalExact will reject it at runtime", path)
 		}
 	}
 }

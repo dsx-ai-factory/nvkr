@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,6 +137,7 @@ func TestPublicationContainsExactBoundSBOMBytes(t *testing.T) {
 }
 
 func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {
+	plan, original, node := publicationSBOMFixture(t)
 	for _, tc := range []struct {
 		name   string
 		change func(*sbom.Index)
@@ -149,8 +151,17 @@ func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {
 		{name: "omitted entry", change: func(i *sbom.Index) { i.Entries = i.Entries[1:] }, code: e.CodeProvenanceMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, artifacts, node := publicationSBOMFixture(t)
-			dir := artifacts["sbom/node-worker"].Path
+			artifacts := maps.Clone(original)
+			set := artifacts["sbom/node-worker"]
+			dir := t.TempDir()
+			if err := os.CopyFS(dir, os.DirFS(set.Path)); err != nil {
+				t.Fatal(err)
+			}
+			set.Path = dir
+			artifacts[set.ID] = set
+			output := artifacts[node.Outputs[0]]
+			output.Path = filepath.Join(t.TempDir(), "publication")
+			artifacts[output.ID] = output
 			raw, err := os.ReadFile(filepath.Join(dir, "index.json"))
 			if err != nil {
 				t.Fatal(err)
@@ -175,7 +186,7 @@ func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {
 			}
 			err = executePackage(t.Context(), plan, node, artifacts, io.Discard)
 			assertFactoryErrorCode(t, err, tc.code)
-			if _, err := os.Stat("publication"); !os.IsNotExist(err) {
+			if _, err := os.Stat(output.Path); !os.IsNotExist(err) {
 				t.Fatal("failed evidence check wrote a publication")
 			}
 		})

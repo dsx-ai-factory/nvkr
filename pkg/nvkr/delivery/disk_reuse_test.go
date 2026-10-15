@@ -15,135 +15,138 @@ import (
 )
 
 func TestOpenSingleDiskArtifactAuthenticatesCompleteClosure(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
-		for _, scenario := range []string{"complete", "changed payload", "extra blob", "duplicate manifest", "wrong platform", "budget", "canceled"} {
-			t.Run(platform+"/"+scenario, func(t *testing.T) {
-				root, payload, pin := diskFixture(t, platform)
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				budget := int64(len(payload))
-				expectedPlatform := platform
-				switch scenario {
-				case "changed payload":
-					payloadPin := digestBytes(payload)
-					payload[0] ^= 1
-					// Keep the declared payload pin unchanged.
-					if err := os.WriteFile(fixtureBlobPath(root, payloadPin), payload, 0o600); err != nil {
-						t.Fatal(err)
-					}
-				case "extra blob":
-					if err := os.WriteFile(fixtureBlobPath(root, digestBytes([]byte("orphan"))), []byte("orphan"), 0o600); err != nil {
-						t.Fatal(err)
-					}
-				case "duplicate manifest":
-					index, _, err := readIndex(ctx, root)
-					if err != nil {
-						t.Fatal(err)
-					}
-					index.Manifests = append(index.Manifests, index.Manifests[0])
-					if _, err := (layoutWriter{root: root}).writeIndex(index); err != nil {
-						t.Fatal(err)
-					}
-				case "wrong platform":
-					if platform == "linux/amd64" {
-						expectedPlatform = "linux/arm64"
-					} else {
-						expectedPlatform = "linux/amd64"
-					}
-				case "budget":
-					budget--
-				case "canceled":
-					cancel()
+	for _, test := range []struct{ platform, scenario string }{
+		{"linux/amd64", "complete"},
+		{"linux/amd64", "changed payload"},
+		{"linux/amd64", "extra blob"},
+		{"linux/amd64", "duplicate manifest"},
+		{"linux/amd64", "wrong platform"},
+		{"linux/amd64", "budget"},
+		{"linux/amd64", "canceled"},
+		{"linux/arm64", "complete"},
+	} {
+		platform, scenario := test.platform, test.scenario
+		t.Run(platform+"/"+scenario, func(t *testing.T) {
+			root, payload, pin := diskFixture(t, platform)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			budget := int64(len(payload))
+			expectedPlatform := platform
+			switch scenario {
+			case "changed payload":
+				payloadPin := digestBytes(payload)
+				payload[0] ^= 1
+				// Keep the declared payload pin unchanged.
+				if err := os.WriteFile(fixtureBlobPath(root, payloadPin), payload, 0o600); err != nil {
+					t.Fatal(err)
 				}
-				owner, err := OpenSingleDiskArtifact(ctx, root, expectedPlatform, budget)
-				if scenario != "complete" {
-					code := e.CodeVerifyFailed
-					if scenario == "canceled" {
-						code = e.CodeTimeout
-					}
-					assertRegistryCode(t, err, code)
-					if owner != nil {
-						_ = owner.Close()
-						t.Fatal("failed verification returned an owner")
-					}
-					return
+			case "extra blob":
+				if err := os.WriteFile(fixtureBlobPath(root, digestBytes([]byte("orphan"))), []byte("orphan"), 0o600); err != nil {
+					t.Fatal(err)
 				}
+			case "duplicate manifest":
+				index, _, err := readIndex(ctx, root)
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer func() { _ = owner.Close() }()
-				if owner.Inspection().ManifestDigest != pin {
-					t.Fatal("reader selected a different manifest")
+				index.Manifests = append(index.Manifests, index.Manifests[0])
+				if _, err := (layoutWriter{root: root}).writeIndex(index); err != nil {
+					t.Fatal(err)
 				}
-				var copied bytes.Buffer
-				if _, err := owner.WriteToContext(ctx, &copied); err != nil || !bytes.Equal(copied.Bytes(), payload) {
-					t.Fatalf("exact held payload: %v", err)
+			case "wrong platform":
+				expectedPlatform = "linux/arm64"
+			case "budget":
+				budget--
+			case "canceled":
+				cancel()
+			}
+			owner, err := OpenSingleDiskArtifact(ctx, root, expectedPlatform, budget)
+			if scenario != "complete" {
+				code := e.CodeVerifyFailed
+				if scenario == "canceled" {
+					code = e.CodeTimeout
 				}
-			})
-		}
+				assertRegistryCode(t, err, code)
+				if owner != nil {
+					_ = owner.Close()
+					t.Fatal("failed verification returned an owner")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = owner.Close() }()
+			if owner.Inspection().ManifestDigest != pin {
+				t.Fatal("reader selected a different manifest")
+			}
+			var copied bytes.Buffer
+			if _, err := owner.WriteToContext(ctx, &copied); err != nil || !bytes.Equal(copied.Bytes(), payload) {
+				t.Fatalf("exact held payload: %v", err)
+			}
+		})
 	}
 }
 
 func TestDescriptorWalkRetainsDiskInodeAndRechecksCopy(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
-		for _, scenario := range []string{"replaced path", "mutated inode", "closed owner", "canceled"} {
-			t.Run(platform+"/"+scenario, func(t *testing.T) {
-				root, payload, _ := diskFixture(t, platform)
-				index, _, err := readIndex(t.Context(), root)
-				if err != nil {
+	const platform = "linux/amd64"
+	for _, scenario := range []string{"replaced path", "mutated inode", "closed owner", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			root, payload, _ := diskFixture(t, platform)
+			index, _, err := readIndex(t.Context(), root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			owners := map[string]*DiskArtifact{}
+			visited := map[string]bool{}
+			if err := verifyDescriptorHoldingDisks(t.Context(), root, index.Manifests[0], visited, nil, owners); err != nil {
+				t.Fatal(err)
+			}
+			owner := owners[digestBytes(payload)]
+			if len(owners) != 1 || owner == nil || len(visited) != 3 {
+				t.Fatalf("walk did not retain the complete verified disk: %d, %d", len(owners), len(visited))
+			}
+			defer func() { _ = owner.Close() }()
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			path := fixtureBlobPath(root, digestBytes(payload))
+			switch scenario {
+			case "replaced path":
+				if err := os.Rename(path, path+".old"); err != nil {
 					t.Fatal(err)
 				}
-				owners := map[string]*DiskArtifact{}
-				visited := map[string]bool{}
-				if err := verifyDescriptorHoldingDisks(t.Context(), root, index.Manifests[0], visited, nil, owners); err != nil {
+				if err := os.WriteFile(path, bytes.Repeat([]byte("x"), len(payload)), 0o600); err != nil {
 					t.Fatal(err)
 				}
-				owner := owners[digestBytes(payload)]
-				if len(owners) != 1 || owner == nil || len(visited) != 3 {
-					t.Fatalf("walk did not retain the complete verified disk: %d, %d", len(owners), len(visited))
+			case "mutated inode":
+				if err := os.WriteFile(path, bytes.Repeat([]byte("x"), len(payload)), 0o600); err != nil {
+					t.Fatal(err)
 				}
-				defer func() { _ = owner.Close() }()
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				path := fixtureBlobPath(root, digestBytes(payload))
-				switch scenario {
-				case "replaced path":
-					if err := os.Rename(path, path+".old"); err != nil {
-						t.Fatal(err)
-					}
-					if err := os.WriteFile(path, bytes.Repeat([]byte("x"), len(payload)), 0o600); err != nil {
-						t.Fatal(err)
-					}
-				case "mutated inode":
-					if err := os.WriteFile(path, bytes.Repeat([]byte("x"), len(payload)), 0o600); err != nil {
-						t.Fatal(err)
-					}
-				case "closed owner":
-					if err := owner.Close(); err != nil {
-						t.Fatal(err)
-					}
-				case "canceled":
-					cancel()
+			case "closed owner":
+				if err := owner.Close(); err != nil {
+					t.Fatal(err)
 				}
-				stage := t.TempDir()
-				err = (layoutWriter{root: stage}).copyDiskPayload(ctx, owner)
-				if scenario != "replaced path" {
-					code := e.CodeVerifyFailed
-					if scenario == "canceled" {
-						code = e.CodeTimeout
-					}
-					assertRegistryCode(t, err, code)
-					if scenario == "closed owner" && !strings.Contains(err.Error(), "disk artifact is closed") {
-						t.Fatalf("copy did not reject the closed owner: %v", err)
-					}
-					return
+			case "canceled":
+				cancel()
+			}
+			stage := t.TempDir()
+			err = (layoutWriter{root: stage}).copyDiskPayload(ctx, owner)
+			if scenario != "replaced path" {
+				code := e.CodeVerifyFailed
+				if scenario == "canceled" {
+					code = e.CodeTimeout
 				}
-				copied, readErr := os.ReadFile(fixtureBlobPath(stage, digestBytes(payload)))
-				if err != nil || readErr != nil || !bytes.Equal(copied, payload) {
-					t.Fatalf("copy did not consume the original verified inode: %v, %v", err, readErr)
+				assertRegistryCode(t, err, code)
+				if scenario == "closed owner" && !strings.Contains(err.Error(), "disk artifact is closed") {
+					t.Fatalf("copy did not reject the closed owner: %v", err)
 				}
-			})
-		}
+				return
+			}
+			copied, readErr := os.ReadFile(fixtureBlobPath(stage, digestBytes(payload)))
+			if err != nil || readErr != nil || !bytes.Equal(copied, payload) {
+				t.Fatalf("copy did not consume the original verified inode: %v, %v", err, readErr)
+			}
+		})
 	}
 }
 

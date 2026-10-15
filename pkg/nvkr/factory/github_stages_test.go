@@ -204,6 +204,16 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 }
 
 func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, _, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stage := requireGroupedGitHubStage(t, stages)
 	tests := []struct {
 		name     string
 		unshared bool
@@ -234,17 +244,7 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			plan := githubTestPlan(t)
-			bundle, err := RenderGitHub(context.Background(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
 			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
-			stages, _, err := githubStages(plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			stage := requireGroupedGitHubStage(t, stages)
 			job := document.Jobs[stage.ID]
 			var execute []int
 			for index, step := range job.Steps {
@@ -278,6 +278,11 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 }
 
 func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) {
+	plan := githubLifecycleTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		name       string
 		entrypoint bool
@@ -343,11 +348,6 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			plan := githubLifecycleTestPlan(t)
-			bundle, err := RenderGitHub(context.Background(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
 			raw := expandedGitHubWorkflow(t, bundle)
 			if test.entrypoint {
 				// Inject an unknown operation beside a real shared action call.
