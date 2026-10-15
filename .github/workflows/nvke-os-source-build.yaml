@@ -53,7 +53,7 @@ jobs:
           set -euo pipefail
           go test -race -p=2 ./internal/sourcegit ./internal/ownedcmd \
             ./pkg/nvkr/pipeline ./pkg/nvkr/factory ./cmd/nvkr \
-            -run 'Test(ImportLocal|ArtifactDiagnostic|Reaper|Command.*Cancel)' -count=1 \
+            -run 'Test(ImportLocal|ArtifactDiagnostic|Reaper|ExecCmdCancellation|CombinedOutputPreservesContextCancellation|OutputCleansDescendants)' -count=1 \
             > .nvkr/cli-go-proof/race.log 2>&1
       - name: Fresh recipe build and both cold-cache Go adapter suites
         env:
