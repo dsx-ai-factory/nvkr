@@ -178,6 +178,42 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	}
 }
 
+func TestQualificationTriggerExcludesNamedProducerOfSameDefinition(t *testing.T) {
+	plan, policy := generationFixture(t)
+	qualifier, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	top := decodeQualificationWorkflow(t, qualifier.files[policy.QualificationWorkflow])
+	trigger, ok := top.On["workflow_run"].(map[string]any)
+	if !ok {
+		t.Fatal("qualifier omits the workflow_run trigger")
+	}
+	names, ok := trigger["workflows"].([]any)
+	if !ok || len(names) != 1 || names[0] != "nvkr-run-"+plan.Name {
+		t.Fatalf("qualifier changed its sole default producer selection: %v", trigger)
+	}
+	for _, name := range []string{plan.Name, "other-project"} {
+		t.Run(name, func(t *testing.T) {
+			named := *plan
+			named.Environment.GitHubBundle = name
+			var digestErr error
+			named.EnvironmentDigest, digestErr = named.Environment.Digest()
+			if digestErr != nil {
+				t.Fatal(digestErr)
+			}
+			producer, renderErr := factory.RenderGitHub(t.Context(), &named)
+			if renderErr != nil {
+				t.Fatal(renderErr)
+			}
+			workflow := decodeQualificationWorkflow(t, producer.Files[producer.WorkflowPath])
+			if workflow.Name != "nvkr-project-"+name || workflow.Name == names[0] {
+				t.Fatalf("named producer can trigger the default qualifier: %q", workflow.Name)
+			}
+		})
+	}
+}
+
 // The explicit status function defeats GitHub's implicit success() dependency
 // gate. The exact allowlist excludes skipped, canceled and unknown worker states;
 // repeating every source guard keeps failure diagnostics inside the trusted trigger.
@@ -444,5 +480,52 @@ func writeQualificationTestFile(t *testing.T, root, name string, raw []byte) {
 	}
 	if err := os.WriteFile(full, raw, 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Producer namespaces are valid ordinary generation inputs, while qualification
+// currently owns only the default producer pair. Reject before either owner writes.
+func TestQualificationGenerationNamedProducerRefusesWithoutOutput(t *testing.T) {
+	plan, policy := generationFixture(t)
+	plan.Environment = plan.Environment.Clone()
+	plan.Environment.GitHubBundle = "nightly"
+	var err error
+	plan.EnvironmentDigest, err = plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.Validate(); err != nil {
+		t.Fatalf("named producer Plan must remain valid: %v", err)
+	}
+	bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+	requireCode(t, err, e.CodeEngineCapability)
+	if bundle != nil {
+		t.Fatal("unsupported named qualification emitted a bundle")
+	}
+	inputs := t.TempDir()
+	environment := plan.Environment.Clone()
+	environmentPath := filepath.Join(inputs, "environment.yaml")
+	for name, value := range map[string]any{"environment.yaml": environment, "qualification.yaml": policy} {
+		raw, err := yaml.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(inputs, name), raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(inputs)
+	for _, check := range []bool{false, true} {
+		t.Run(map[bool]string{false: "write", true: "check"}[check], func(t *testing.T) {
+			output := filepath.Join(t.TempDir(), "uncreated")
+			digest, err := GenerateFiles(t.Context(), "unavailable-definition.yaml", environmentPath, "qualification.yaml", plan.GeneratorVersion, "github", output, check)
+			requireCode(t, err, e.CodeEngineCapability)
+			if digest != "" {
+				t.Fatal("unsupported qualification returned a Plan digest", digest)
+			}
+			if _, err := os.Lstat(output); !os.IsNotExist(err) {
+				t.Fatal("unsupported qualification created output or ownership manifests", err)
+			}
+		})
 	}
 }

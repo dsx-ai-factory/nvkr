@@ -17,6 +17,7 @@
 
 # persistent local coordination inodes for generated workflow bundle updates
 /.github/nvkr-run/*.lease
+/.github/nvkr-run-*/*.lease
 /.github/nvkr-qualification/*.lease
 /.github/nvkr-dev/*.lease
 

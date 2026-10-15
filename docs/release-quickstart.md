@@ -114,6 +114,30 @@ authorize payload export or exact-input matching. Both scopes enforce the select
 `--minimum-disk-evidence strict` requires signed inspected-disk evidence, but authenticity does not inspect
 the disk itself. Neither scope provides qualification or the capability-gated full `release` scope.
 
+To export the verified held closure, also supply the exact producing inputs and
+originating invocation. Set these paths and identities from the accepted producing
+Run; use a fresh directory:
+
+```sh
+: "${PRODUCING_DEFINITION:?Set the exact Definition path}"
+: "${PRODUCING_ENVIRONMENT:?Set the exact Environment path}"
+: "${PRODUCING_PLAN:?Set the complete producing Plan path}"
+: "${EXPECTED_INVOCATION:?Set the exact originating invocation}"
+: "${VERIFIED_LAYOUT:?Set a fresh output directory}"
+bin/nvkr release verify --reference "$RELEASE_REF" \
+  --lane pipeline-attested --scope artifact-publication \
+  --identity "$ACCEPTED_BUILD_IDENTITY_REGEXP" --issuer "$ACCEPTED_OIDC_ISSUER" \
+  --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST" \
+  --definition "$PRODUCING_DEFINITION" --environment "$PRODUCING_ENVIRONMENT" \
+  --plan "$PRODUCING_PLAN" --expected-invocation "$EXPECTED_INVOCATION" \
+  --export-layout "$VERIFIED_LAYOUT"
+```
+
+The lifecycle owner requires its own exact-input receipt before export. Metadata-only
+`release export` does not verify payloads or signer policy. See
+[NVKE nightly workflow](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/nvke-nightly.md)
+for downstream testing and its current admission limits.
+
 From macOS, use the [consumer script](https://github.com/dsx-ai-factory/nvkr/blob/main/scripts/demo-release-consumer.sh) to run the
 artifact-publication verification inside its pinned Linux Docker image. It builds a Linux amd64 `nvkr`
 helper with the repository's pinned Go toolchain; supply a static Linux amd64 cosign

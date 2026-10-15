@@ -438,3 +438,7 @@ Outside v1: non-OCI delivery, upstream from-source replacement builds, acquired 
 verification, vulnerability scanning, deployment topology, cluster E2E qualification, air gap,
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
+
+A downstream nightly end-to-end test is customer CI infrastructure, outside v1
+product acceptance. It can exercise delivered artifacts without expanding the
+build/evidence qualification milestone or supplying independently signed conformance.

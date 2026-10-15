@@ -405,7 +405,7 @@ func TestImageIndexNoReplaceCancellationAndConcurrentClose(t *testing.T) {
 		if err == nil {
 			successes++
 		} else {
-			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			assertRegistryCode(t, err, e.CodeImmutableViolation)
 		}
 	}
 	if successes != 1 {
@@ -415,7 +415,7 @@ func TestImageIndexNoReplaceCancellationAndConcurrentClose(t *testing.T) {
 		t.Fatalf("failed writers leaked stages: %v", entries)
 	}
 	before := mustReadImageFile(t, filepath.Join(out, "index.json"))
-	assertRegistryCode(t, index.WriteLayout(context.Background(), out), e.CodeVerifyFailed)
+	assertRegistryCode(t, index.WriteLayout(context.Background(), out), e.CodeImmutableViolation)
 	if !bytes.Equal(before, mustReadImageFile(t, filepath.Join(out, "index.json"))) {
 		t.Fatal("existing output replaced")
 	}
@@ -515,7 +515,7 @@ func (ctx *imageCancelContext) Err() error {
 	entries, err := os.ReadDir(ctx.parent)
 	if err == nil {
 		for _, entry := range entries {
-			if entry.IsDir() && strings.HasPrefix(entry.Name(), ".nvkr-image-index-") {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), ".nvkr-layout-") {
 				ctx.staged.Store(true)
 				ctx.cancel()
 				break

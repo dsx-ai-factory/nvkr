@@ -214,7 +214,7 @@ From the repository root, inventory links using standard `grep`:
 
 ```sh
 grep -nF '](' .agents/skills/nvkr-operator/SKILL.md \
-  .agents/skills/nvkr-operator/references/*.md README.md docs/README.md
+  .agents/skills/nvkr-operator/references/*.md README.md docs/README.md docs/use-with-agents.md
 ```
 
 Review each local target against the current tree and each section against its target document. This is a

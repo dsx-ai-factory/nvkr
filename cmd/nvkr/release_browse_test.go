@@ -150,6 +150,7 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 	called := false
 	verify := func(_ context.Context, gotReference string, policy lifecycle.VerificationPolicy,
 		options lifecycle.ConsumerOptions, expectation *lifecycle.ExactInputExpectation,
+		_ releaseExportOptions,
 	) (releaseVerificationResult, error) {
 		called = true
 		if gotReference != reference || policy.Lane != lifecycle.LanePipeline ||
@@ -200,6 +201,7 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 			called := false
 			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy,
 				_ lifecycle.ConsumerOptions, expectation *lifecycle.ExactInputExpectation,
+				_ releaseExportOptions,
 			) (releaseVerificationResult, error) {
 				called = true
 				if expectation == nil || policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication || policy.MinimumDiskEvidence != minimum {

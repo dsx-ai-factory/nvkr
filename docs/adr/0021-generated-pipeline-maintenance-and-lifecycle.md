@@ -39,9 +39,33 @@ workflow are removed. Cluster-composition files and nodes are also removed; rege
 owned members through the same prior-manifest checks described below. Changed graph/plan and lifecycle records use their new schema majors; old records
 cannot be relabeled into current identities.
 
+In production mode, Environment's optional `githubBundle` selects an independent generated GitHub namespace.
+Empty preserves `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/{plan,manifest}.json`
+byte-for-byte. A nonempty name contains at most 48 lowercase letters, digits and hyphens,
+with alphanumeric ends; it derives `.github/workflows/nvkr-run-<name>.yml` and
+`.github/nvkr-run-<name>/{plan,manifest}.json`. Authored paths are unsupported. Namespace
+selection changes Environment and Plan identity without changing producer Build identity.
+The named producer's workflow display name is `nvkr-project-<name>`, disjoint from
+the default `nvkr-run-<Definition name>` and development `nvkr-dev-<Definition name>`.
+This keeps same-Definition bundles separate under GitHub's workflow-based concurrency
+and prevents a named producer from matching the default qualifier's display-name trigger.
+Workflow file paths and explicit signing identities retain the namespace contract above.
+Every generated execution, recovery and utility-container command selects that exact
+Plan path; validation rejects a bundle whose paths differ from the admitted Environment.
+Signing identity and issuer remain explicit Environment policy and are never rewritten
+to accommodate a selected workflow filename. Operators must select the matching policy.
+Producer generation emits independent manual-dispatch bundles, with no cron or
+callable producer trigger. Optional qualification generation separately emits
+the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
+That pair currently admits the default producer workflow only; named producer
+qualification is not part of this namespace contract.
+A separately authored downstream CI coordinator may schedule
+dispatches of those bundles; its scheduling, exact-run correlation and runtime
+ownership are outside generation (ADR-16/18).
+
 The Environment's explicit GitHub development mode selects a second fixed generated layout:
 `.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/plan.json`, and `.github/nvkr-dev/manifest.json`.
-The production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
+The default production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
 compiler, renderer, exact validation and writer. The admitted Environment selects these paths; callers
 cannot relocate one bundle into the other layout. Each manifest owns only its own payloads and lock, so
 regeneration or retirement of one leaves the other intact. Helper commands and container launches bind the
@@ -51,6 +75,10 @@ Signed development also binds the disposable namespace and signer policy in this
 run-attempt destinations are derived by the execution owner under ADR-20; runtime substitutions never
 rewrite generated inputs or bypass drift checks. The maintained development bundle uses the complete M2
 Definition with its separate development Environment.
+
+`githubDevelopment: true` with a nonempty `githubBundle` is unsupported and
+returns `CodeEngineCapability` before catalog resolution or generated-output work.
+Unnamed development and named production remain separate supported selections.
 
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
@@ -80,8 +108,12 @@ structural equality checks, including their parameter selector and credential re
 the operation and job-local part, while the job and expanded role labels retain the selected producer. Controlled diagnostic
 steps retain their original caller labels. Static expansion resolves aliases into independent copies before
 substituting per-job parameters, so one job cannot mutate another's input or credential bindings. Job
-permissions, conditions, dependencies and runtime selection remain inline. This changes presentation only,
-not execution membership, evidence or the provider's workflow-size bound.
+permissions, conditions, dependencies and runtime selection remain inline. Identical complete host step
+sequences may also share descriptive anchors when they contain only native preflight, credential-free
+pinned checkout, current-job preparation and one or two uncontrolled node calls. Complete structural
+equality is required; source credentials, authored setup and provider-controlled steps cannot enter this
+sequence form. This changes presentation only, not execution membership, evidence or the provider's
+workflow-size bound.
 
 The entry workflow references the fixed Plan and manifest paths without repeating the Plan digest. Its
 provider source-fetch IDs and scheduling order describe the target and actual consumer cohort rather than
@@ -246,6 +278,10 @@ The legacy `--toolchain` spelling cannot alter component producer pins.
 Catalog lock writes use original-byte compare-and-swap, a persistent kernel lock inode, same-filesystem
 staging, fsync and atomic replacement (ADR-22). Generated Run writes acquire their per-bundle kernel lock,
 stage complete files and fsync them, publish payloads, retire obsolete members, and replace the manifest last.
+Each named namespace owns its distinct manifest and lock. Write and check reject mixed
+namespace paths or members before output work; retirement cannot claim another bundle's
+workflow or generated directory. Default and multiple named bundles may coexist. Changing
+a bundle name creates a separate owner and does not delete the previously named bundle.
 The current generated Run writer serializes same-checkout writers; it does not promise an optimistic CAS
 conflict for two separately compiled bundles.
 
@@ -331,6 +367,7 @@ disallowed; that ambiguity is what makes forgotten-regen drift possible.
 Current generated Run contract evidence in `pkg/nvkr/factory/bundle_io_test.go` covers idempotent generation,
 byte-exact drift checks, unchanged obsolete-member retirement, empty-directory cleanup, and preservation of
 modified or unlisted files. These tests do not establish a complete crash/kill-point matrix.
+Reconciliation records named-bundle contract evidence and its hosted-acceptance limits.
 
 Retired qualified renderer and bundle-transaction tests were removed with their unused implementation. The
 maintained Run writer keeps its ownership, retirement, cancellation and drift tests. Retired-engine admission

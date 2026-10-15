@@ -89,6 +89,9 @@ type APTOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
+	// GitHubBundle selects an independent generated workflow namespace; empty
+	// preserves the original generated Run paths. Paths are never authored.
+	GitHubBundle string `json:"githubBundle,omitempty"`
 	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
 	// configured, isolated signed publications under a disposable attempt namespace.
 	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`
@@ -244,6 +247,12 @@ func (definition Definition) Digest() (string, error) {
 func (environment Environment) Validate() error {
 	if environment.APIVersion != EnvironmentAPIVersion || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
+	}
+	if environment.GitHubDevelopment && environment.GitHubBundle != "" {
+		return e.New(e.CodeEngineCapability, "githubDevelopment does not support a named githubBundle")
+	}
+	if err := ValidateGitHubBundleName(environment.GitHubBundle); err != nil {
+		return err
 	}
 	if environment.GitHubDevelopment {
 		if err := environment.validateGitHubDevelopment(); err != nil {

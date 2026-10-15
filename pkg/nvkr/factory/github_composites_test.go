@@ -251,6 +251,27 @@ func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte, pl
 			if node.Kind == yamlv3.AliasNode {
 				anchor, target = node.Value, node.Alias
 			}
+			if name == "workflow" && target != nil && target.Kind == yamlv3.SequenceNode && strings.HasPrefix(anchor, "steps-") {
+				resolved, err := githubResolveAliases(target, map[*yamlv3.Node]bool{})
+				if err != nil || len(resolved.Content) < 4 || len(resolved.Content) > 5 {
+					t.Fatalf("invalid complete step sequence: %v", err)
+				}
+				if githubYAMLValue(resolved.Content[0], "name") != githubPlatformCheckName ||
+					!strings.HasPrefix(githubYAMLValue(resolved.Content[1], "uses"), "actions/checkout@") ||
+					githubYAMLValue(resolved.Content[2], "id") != githubContextStepID {
+					t.Fatal("step sequence does not retain native preflight, checkout and preparation")
+				}
+				for _, call := range resolved.Content[3:] {
+					if githubYAMLValue(call, "uses") != sharedPrefix+"execute-node" || githubYAMLLength(call) != 6 ||
+						githubYAMLLength(githubYAMLField(call, "with")) != 2 {
+						t.Fatal("step sequence includes a controlled or credential-bearing operation")
+					}
+				}
+				for _, child := range node.Content {
+					visit(child)
+				}
+				return
+			}
 			if name != "workflow" || target == nil || target.Kind != yamlv3.MappingNode {
 				t.Fatalf("%s aliases something other than an approved complete step", name)
 			}

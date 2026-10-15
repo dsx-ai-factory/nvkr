@@ -136,3 +136,27 @@ func commitSmokeWorkerFiles(ctx context.Context, workspace string, files smokeWo
 	}
 	return workerContext(ctx)
 }
+
+func (files smokeWorkerFiles) members() []struct {
+	name  string
+	raw   []byte
+	limit int
+} {
+	return []struct {
+		name  string
+		raw   []byte
+		limit int
+	}{
+		{"worker.json", files.document, 16 << 20}, {"worker.sig", files.signature, 64 << 10},
+		{"worker.pem", files.certificate, 1 << 20}, {"worker.bundle.json", files.bundle, 16 << 20},
+	}
+}
+
+func (files smokeWorkerFiles) validate() error {
+	for _, member := range files.members() {
+		if len(member.raw) == 0 || len(member.raw) > member.limit {
+			return e.New(e.CodeSignatureInvalid, "worker evidence %s is empty or exceeds its bound", member.name)
+		}
+	}
+	return nil
+}

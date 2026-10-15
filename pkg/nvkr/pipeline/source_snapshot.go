@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -189,15 +190,8 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 		return err
 	}
 	if exists {
-		if receipt.Schema != sourceReceiptSchema || receipt.Commit != n.Commit || receipt.TreeHash != n.TreeHash || receipt.VendorSpecDigest != wantVendor {
-			return e.New(e.CodeFetchFailed, "source receipt for %q does not match the pinned fetch declaration", n.Dest)
-		}
-		got, err := sourceTreeDigestContext(opts.ctx(), dir)
-		if err != nil {
-			return e.Wrap(e.CodeFetchFailed, err, "hashing fetched source %s", n.Dest)
-		}
-		if got != receipt.ClosureDigest {
-			return e.New(e.CodeFetchFailed, "source closure drift for %q: got %s want %s", n.Dest, got, receipt.ClosureDigest)
+		if err := verifyRestoredClosure(opts.ctx(), n, dir, wantVendor, receipt); err != nil {
+			return err
 		}
 		return recheckSourceFetchDirectories(n, opts)
 	}
@@ -234,6 +228,86 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 		Schema: sourceReceiptSchema, Commit: n.Commit, TreeHash: n.TreeHash,
 		VendorSpecDigest: wantVendor, ClosureDigest: closure,
 	}, opts.fetchReceiptDirectory)
+}
+
+// InspectRestoredSource checks an unsigned fetch receipt against its current Git
+// declaration and checkout bytes, including tracked worktree correspondence.
+// The restored receipt does not authenticate vendored or untracked bytes against
+// published provenance. It never fetches, vendors, writes or creates a receipt.
+// The digest describes the bytes checked during this call, not future execution
+// authority over the returned pathname. Callers must own its subsequent lifetime.
+func InspectRestoredSource(ctx context.Context, n ir.Node, sourceRoot string) (string, error) {
+	if ctx == nil {
+		return "", e.New(e.CodeUsage, "restored source inspection requires a context")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return "", e.Wrap(e.CodeTimeout, err, "restored source inspection canceled")
+	}
+	if n.Kind != ir.KindFetch || n.Commit == "" || n.TreeHash == "" || n.Dest == "" {
+		return "", e.New(e.CodeInvalidCatalog, "restored source inspection requires an exact fetch declaration")
+	}
+	dir, err := pathWithin(sourceRoot, n.Dest)
+	if err != nil {
+		return "", e.Wrap(e.CodeFetchFailed, err, "resolving restored source")
+	}
+	path, err := sourceReceiptPath(sourceRoot, n.Dest)
+	if err != nil {
+		return "", err
+	}
+	receipt, exists, err := readSourceReceiptContext(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", e.New(e.CodeFetchFailed, "restored source %q has no fetch receipt", n.Dest)
+	}
+	wantVendor, err := fetchVendorSpecDigest(n)
+	if err != nil {
+		return "", err
+	}
+	if err := verifyRestoredClosure(ctx, n, dir, wantVendor, receipt); err != nil {
+		return "", err
+	}
+	if err := (Local{}).verifyTree(dir, n, RunOptions{Ctx: ctx, SourceRoot: sourceRoot}); err != nil {
+		return "", err
+	}
+	// HEAD/tree metadata alone cannot establish that tracked files still match
+	// the pinned tree. A rewritten unsigned closure receipt must not bless edits.
+	// Refuse flags that hide tracked changes before relying on Git status.
+	if err := sourcegit.CheckWorktreeIndex(ctx, os.Environ(), dir, maxSourceClosureEntries); err != nil {
+		return "", err
+	}
+	status, err := sourceFetchGitOut(RunOptions{Ctx: ctx, SourceRoot: sourceRoot}, dir,
+		"status", "--porcelain=v1", "--untracked-files=no")
+	if err != nil {
+		if ctx.Err() != nil || sourceGitBoundaryError(err) {
+			return "", err
+		}
+		return "", e.Wrap(e.CodeFetchFailed, err, "checking restored tracked source correspondence")
+	}
+	if status != "" {
+		return "", e.New(e.CodeFetchFailed, "restored tracked source %q differs from its pinned Git tree", n.Dest)
+	}
+	return receipt.ClosureDigest, nil
+}
+
+func verifyRestoredClosure(ctx context.Context, n ir.Node, dir, wantVendor string, receipt sourceReceipt) error {
+	if receipt.Schema != sourceReceiptSchema || receipt.Commit != n.Commit || receipt.TreeHash != n.TreeHash || receipt.VendorSpecDigest != wantVendor {
+		return e.New(e.CodeFetchFailed, "source receipt for %q does not match the pinned fetch declaration", n.Dest)
+	}
+	got, err := sourceTreeDigestContext(ctx, dir)
+	if err != nil {
+		if ctx.Err() != nil {
+			return e.Wrap(e.CodeTimeout, ctx.Err(), "restored source inspection canceled")
+		}
+		return e.Wrap(e.CodeFetchFailed, err, "hashing fetched source %s", n.Dest)
+	}
+	if got != receipt.ClosureDigest {
+		return e.New(e.CodeFetchFailed, "source closure drift for %q: got %s want %s", n.Dest, got, receipt.ClosureDigest)
+	}
+	return nil
 }
 
 // materializeSource authenticates the fetch receipt, copies the exact closure to
@@ -814,6 +888,9 @@ func readSourceReceiptContext(ctx context.Context, path string, directories ...*
 		}
 	}
 	b, err := readRegularBeneathContext(ctx, root, filepath.Base(path), 1<<20)
+	if ctx.Err() != nil {
+		return out, false, e.Wrap(e.CodeTimeout, ctx.Err(), "reading source receipt canceled")
+	}
 	if err != nil {
 		// The descriptor reader wraps a missing parent/final path.
 		// os.IsNotExist only recognizes a limited set of legacy wrappers; errors.Is

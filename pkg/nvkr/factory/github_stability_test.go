@@ -262,7 +262,12 @@ func TestGitHubWorkflowChangesWhenSchedulingAuthorityChanges(t *testing.T) {
 			mutate: func(inputs *githubStabilityInputs) { inputs.environment.Signing = dryRunSigningProfile() },
 		},
 		{
-			name: "split shared source cohort", fixture: githubTestPlan,
+			name: "split shared source cohort",
+			fixture: func(t *testing.T) *Plan {
+				return recompileGitHubStabilityPlan(t, githubTestPlan(t), func(inputs *githubStabilityInputs) {
+					inputs.definition.Outputs[0].Components = []string{"kubeadm", "kubelet"}
+				})
+			},
 			mutate: func(inputs *githubStabilityInputs) {
 				component := inputs.catalog.Components["kubeadm"]
 				component.Commit = strings.Repeat("b", 40)

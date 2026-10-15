@@ -74,6 +74,13 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err := admitQualificationGeneration(policy, policyPath); err != nil {
 		return "", err
 	}
+	environment, err := lifecycle.LoadEnvironment(ctx, environmentPath)
+	if err != nil {
+		return "", err
+	}
+	if err := admitQualificationBundle(environment.GitHubBundle); err != nil {
+		return "", err
+	}
 	plan, err := lifecycle.CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
 	if err != nil {
 		return "", err
@@ -139,6 +146,13 @@ func admitQualificationGeneration(policy lifecycle.QualificationPolicy, policyPa
 	return nil
 }
 
+func admitQualificationBundle(bundle string) error {
+	if bundle != "" {
+		return e.New(e.CodeEngineCapability, "qualification generation admits only the default producer bundle; named producer qualification is unsupported")
+	}
+	return nil
+}
+
 // RenderWorkflows emits a workflow_run qualifier and its same-commit reusable
 // native worker. Its action pins come from the trusted generation Plan's catalog;
 // source workflow display name comes from that same producer renderer contract.
@@ -153,6 +167,9 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 		return nil, e.New(e.CodeUsage, "qualification generation requires a producer Plan")
 	}
 	if err := plan.Validate(); err != nil {
+		return nil, err
+	}
+	if err := admitQualificationBundle(plan.Environment.GitHubBundle); err != nil {
 		return nil, err
 	}
 	if err := factory.AdmitQualificationHandoff(plan); err != nil {

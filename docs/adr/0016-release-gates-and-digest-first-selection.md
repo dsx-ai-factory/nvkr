@@ -337,6 +337,11 @@ unpinned identities, caller-provided pass booleans, wrong roles, expired evidenc
 closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
 are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
 
+The repository's separately authored NVKE E2E adapter is downstream CI test infrastructure,
+outside the NVKR product lifecycle and v1 qualification acceptance. ADR-18 §3 records its
+runner and trust constraints. It uses artifact-consumer APIs and issues no conformance receipt;
+it does not change this passive product boundary or establish named-decider ratification.
+
 The separate user-invoked `validate` command runs explicit named diagnostic checks in lane **none
 (descriptive)**. `validation` owns profile admission and dispatch; `conformance` implements the
 `kube-conformance` / `hydrophone` adapter. `testresults` owns descriptions and serialization, not

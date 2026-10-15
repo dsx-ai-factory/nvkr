@@ -473,44 +473,48 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 }
 
 func TestWriteGitHubActionDataDerivesBoundedOutputFromPlan(t *testing.T) {
-	plan := githubTestPlan(t)
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data := sharedGitHubActionData(t, bundle)
-	selector := sortedKeys(data.Entries)[0]
-	wantData, err := canonical.Marshal(data.Entries[selector].Values)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := t.TempDir()
-	t.Chdir(root)
-	if err := os.MkdirAll(filepath.Dir(GitHubActionDataPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	untrusted := []byte(`{"entries":{"injected":{"template":"stage-context","values":{"part-1":"malicious command"}}}}`)
-	if err := os.WriteFile(GitHubActionDataPath, untrusted, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	output := filepath.Join(root, "github-output")
-	if err := os.WriteFile(output, []byte("existing=value\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := WriteGitHubActionData(t.Context(), plan, selector, output); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := os.ReadFile(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "existing=value\ndata=" + string(wantData) + "\n"
-	if string(raw) != want || bytes.Count(raw, []byte("\n")) != 2 || len(raw)-len("existing=value\n") > maxGitHubActionDataOutputBytes {
-		t.Fatal("provider output differs from bounded, single-line canonical Plan-derived data")
-	}
-	retained, err := os.ReadFile(GitHubActionDataPath)
-	if err != nil || !bytes.Equal(retained, untrusted) {
-		t.Fatalf("action description modified the checked-in data file: %v", err)
+	for _, name := range []string{"", "project-a", "project-b"} {
+		t.Run(name, func(t *testing.T) {
+			plan := namedGitHubTestPlan(t, name)
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data := sharedGitHubActionData(t, bundle)
+			selector := sortedKeys(data.Entries)[0]
+			wantData, err := canonical.Marshal(data.Entries[selector].Values)
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			t.Chdir(root)
+			if err := os.MkdirAll(filepath.Dir(githubActionDataPathFor(plan)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			untrusted := []byte(`{"entries":{"injected":{"template":"stage-context","values":{"part-1":"malicious command"}}}}`)
+			if err := os.WriteFile(githubActionDataPathFor(plan), untrusted, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			output := filepath.Join(root, "github-output")
+			if err := os.WriteFile(output, []byte("existing=value\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := WriteGitHubActionData(t.Context(), plan, selector, output); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "existing=value\ndata=" + string(wantData) + "\n"
+			if string(raw) != want || bytes.Count(raw, []byte("\n")) != 2 || len(raw)-len("existing=value\n") > maxGitHubActionDataOutputBytes {
+				t.Fatal("provider output differs from bounded, single-line canonical Plan-derived data")
+			}
+			retained, err := os.ReadFile(githubActionDataPathFor(plan))
+			if err != nil || !bytes.Equal(retained, untrusted) {
+				t.Fatalf("action description modified the checked-in data file: %v", err)
+			}
+		})
 	}
 }
 

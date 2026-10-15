@@ -9,7 +9,7 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
-| Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Customer operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
+| Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md), [presenter narration](nvkr-presenter.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
@@ -21,6 +21,7 @@ each concept to a worked example.
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
+| Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../definitions/nvke-m2/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |

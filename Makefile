@@ -173,10 +173,11 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # build output. Keep LICENSE_UNCHECKED in step with LICENSE_IGNORES.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
+	-ignore '.github/workflows/nvkr-run-*.yml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run|qualify|smoke|dev)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -218,7 +219,14 @@ workflows-check: workflow-generator pipeline-dev-check ## Check committed produc
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy definitions/nvke-m2/qualification.yaml \
+		--qualification-policy definitions/nvke-m2/qualification.yaml --root . --check
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-arm64/definition.json \
+		--environment definitions/nvke-nightly-arm64/environment-github.json \
+		--root . --check
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
+		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json \
 		--root . --check
 
 .PHONY: workflows-generate
@@ -229,6 +237,12 @@ workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate produ
 		--definition "$$definition" --environment "$$environment" \
 		--qualification-policy definitions/nvke-m2/qualification.yaml \
 		--root .
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-arm64/definition.json \
+		--environment definitions/nvke-nightly-arm64/environment-github.json --root .
+	bin/nvkr-exec run generate --engine github \
+		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
+		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json --root .
 
 .PHONY: pipeline-dev-generate
 pipeline-dev-generate: workflow-generator ## Regenerate the full feature-branch development pipeline.

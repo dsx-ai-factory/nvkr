@@ -704,6 +704,10 @@ func testPublicationLayout(t *testing.T) (string, string) {
 }
 
 func testPreparedPublicationLayout(t *testing.T) (string, string) {
+	return testPreparedPublicationLayoutForInvocation(t, "")
+}
+
+func testPreparedPublicationLayoutForInvocation(t *testing.T, invocation string) (string, string) {
 	t.Helper()
 	root := t.TempDir()
 	source := filepath.Join(root, "kubectl")
@@ -722,6 +726,11 @@ func testPreparedPublicationLayout(t *testing.T) (string, string) {
 	}
 	artifact := Artifact{Name: "tools", Kind: OutputExecutable, Digest: descriptor.Digest, BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
 	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{Name: "tools", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"kubectl": pipeline.FileDigest([]byte("kubectl"))})
+	if invocation != "" {
+		request.Release.InvocationID = invocation
+		request.Objects[0].Output.Publication = &delivery.PublicationOrigin{Ref: "registry.example.test/tools@" + descriptor.Digest,
+			PreparedInvocationID: invocation, SignedInvocationID: invocation}
+	}
 	layout := filepath.Join(root, "publication")
 	publication, err := delivery.BuildPublicationRoot(context.Background(), layout, request)
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
 func TestRefreshPreservesTimeoutAfterRealPinCommit(t *testing.T) {
@@ -46,6 +45,9 @@ func TestRefreshPreservesTimeoutAfterRealPinCommit(t *testing.T) {
 }
 
 func TestRegenerationCheckPreservesOwnerError(t *testing.T) {
+	// Real pin commits, regeneration and retained failure state are covered by
+	// TestRefreshRealLocalPinSetJourney and TestRefreshFailureBoundaries. Check
+	// this adapter's error propagation without repeating that Git/compile work.
 	for _, tc := range []struct {
 		name string
 		code e.Code
@@ -55,35 +57,30 @@ func TestRegenerationCheckPreservesOwnerError(t *testing.T) {
 		{"invalid definition", e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg, promote := maintenanceFixture(t)
-			promote("1.1.0")
-			beforeLock := readFixture(t, "catalog/pins.lock.yaml")
-			beforePlan := readFixture(t, ".github/nvkr-run/plan.json")
-			update, err := catalog.UpdateSourcePins(t.Context(), catalog.SourcePinRequest{Directory: cfg.Catalog, Sources: cfg.Sources, SameRelease: cfg.SameRelease, RejectRepublishedVersions: true, Bump: true})
-			if err != nil || update.Changed != 3 {
-				t.Fatalf("pin transaction: %+v %v", update, err)
+			cfg := Config{Definition: "definition.yaml", Environment: "environment.yaml"}
+			cause := errors.New("owner failure")
+			if tc.code == e.CodeTimeout {
+				cause = context.Canceled
 			}
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
+			ownerErr := e.Wrap(tc.code, cause, "candidate check failed")
 			calls := 0
-			digest, err := regenerate(ctx, cfg, "test (deadbeef)", func(ctx context.Context, definition, environment, version, engine, root string, check bool) (string, error) {
+			digest, err := regenerate(t.Context(), cfg, "test (deadbeef)", func(ctx context.Context, definition, environment, version, engine, root string, check bool) (string, error) {
 				calls++
+				if ctx != t.Context() || definition != cfg.Definition || environment != cfg.Environment || version != "test (deadbeef)" || engine != "github" || root != "." {
+					t.Fatal("generation changed selected inputs or context")
+				}
 				if check != (calls == 2) {
 					t.Fatalf("unexpected generation/check order: call %d, check %v", calls, check)
 				}
 				if check {
-					switch tc.name {
-					case "canceled":
-						cancel()
-					case "drift":
-						writeFixture(t, ".github/nvkr-run/plan.json", []byte("tampered"))
-					case "invalid definition":
-						writeFixture(t, cfg.Definition, []byte("invalid Definition"))
-					}
+					return "", ownerErr
 				}
-				return lifecycle.GenerateFiles(ctx, definition, environment, version, engine, root, check)
+				return "candidate-digest", nil
 			})
 			assertCode(t, err, tc.code)
+			if !errors.Is(err, ownerErr) || !errors.Is(err, cause) {
+				t.Fatalf("lost owner error: %v", err)
+			}
 			if calls != 2 || digest != "" || !strings.Contains(err.Error(), "candidate regeneration did not reproduce") || !strings.Contains(err.Error(), "retain the disposable checkout") {
 				t.Fatalf("failed final check became a candidate: digest=%s calls=%d error=%v", digest, calls, err)
 			}
@@ -92,9 +89,6 @@ func TestRegenerationCheckPreservesOwnerError(t *testing.T) {
 			}
 			if tc.code == e.CodePipelineDrift && (e.ExitCode(err) != 51 || e.Retryable(err)) {
 				t.Fatalf("drift was reclassified: %v", err)
-			}
-			if bytes.Equal(beforeLock, readFixture(t, "catalog/pins.lock.yaml")) || bytes.Equal(beforePlan, readFixture(t, ".github/nvkr-run/plan.json")) {
-				t.Fatal("lost the separate committed pin/generated-file transactions")
 			}
 		})
 	}

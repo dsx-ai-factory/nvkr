@@ -84,6 +84,9 @@ func TestReleaseVerifyAuthenticityRejectsExactInputsBeforeWork(t *testing.T) {
 		{"--environment", "missing-environment.yaml"},
 		{"--plan", "missing-plan.json"},
 		{"--definition", ""},
+		{"--export-layout", "missing-layout"},
+		{"--expected-invocation", "invocation"},
+		{"--export-layout", "missing-layout", "--expected-invocation", "invocation"},
 		{"--definition", "missing-definition.yaml", "--environment", "missing-environment.yaml", "--plan", "missing-plan.json"},
 	} {
 		t.Run(strings.Join(flags, " "), func(t *testing.T) {
@@ -137,7 +140,7 @@ func authenticityCLIArgs(workspace string) []string {
 
 func rejectFullVerification(t *testing.T) releaseVerifyOperation {
 	t.Helper()
-	return func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+	return func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error) {
 		t.Fatal("authenticity scope invoked full payload verification")
 		return releaseVerificationResult{}, nil
 	}

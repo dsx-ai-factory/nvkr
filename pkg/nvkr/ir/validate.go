@@ -55,6 +55,9 @@ var allowedBuildEnv = map[string]bool{
 	"NKECTL_COMMIT":       true,
 	"NKECTL_DATE":         true,
 	"NKECTL_CAPI_VERSION": true,
+	"NVKECTL_VERSION":     true,
+	"NVKECTL_COMMIT":      true,
+	"NVKECTL_DATE":        true,
 	// Upstream CWE Dockerfile build arguments, rendered from the source lock.
 	"BUILD_VERSION": true,
 	"GIT_VERSION":   true,

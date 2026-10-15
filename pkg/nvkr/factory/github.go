@@ -35,23 +35,37 @@ const (
 	githubMaximumJobTimeoutMinutes      = 360
 )
 
+var githubDevelopmentLayout = generationLayout{workflowPath: GitHubDevelopmentWorkflowPath,
+	manifestPath: GitHubDevelopmentManifestPath, planPath: GitHubDevelopmentPlanPath}
+
 // Paths are selected from the admitted Environment policy, never supplied
 // as an independent workflow override. Development and production own disjoint
 // directories so either can regenerate without retiring the other's members.
 func githubLayoutFor(plan *Plan) generationLayout {
 	if plan.Environment.GitHubDevelopment {
-		return generationLayout{workflowPath: GitHubDevelopmentWorkflowPath,
-			manifestPath: GitHubDevelopmentManifestPath, planPath: GitHubDevelopmentPlanPath}
+		return githubDevelopmentLayout
 	}
-	return generationLayout{workflowPath: GitHubWorkflowPath,
-		manifestPath: GeneratedManifestPath, planPath: FactoryPlanPath}
+	return githubBundleLayout(plan.Environment.GitHubBundle)
 }
 
 func githubWorkflowName(plan *Plan) string {
 	if plan.Environment.GitHubDevelopment {
 		return "nvkr-dev-" + plan.Name
 	}
+	if plan.Environment.GitHubBundle != "" {
+		return "nvkr-project-" + plan.Environment.GitHubBundle
+	}
 	return "nvkr-run-" + plan.Name
+}
+
+func githubBundleLayout(name string) generationLayout {
+	if name == "" {
+		return generationLayout{workflowPath: GitHubWorkflowPath,
+			manifestPath: GeneratedManifestPath, planPath: FactoryPlanPath}
+	}
+	root := ".github/nvkr-run-" + name
+	return generationLayout{workflowPath: ".github/workflows/nvkr-run-" + name + ".yml",
+		manifestPath: root + "/manifest.json", planPath: root + "/plan.json"}
 }
 
 // RenderGitHub emits a locally inspectable workflow and its complete canonical Plan,

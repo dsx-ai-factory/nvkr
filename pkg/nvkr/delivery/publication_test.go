@@ -152,15 +152,26 @@ func TestPublicationRejectsCorruptionAndUnreachableBytes(t *testing.T) {
 				t.Fatal(err)
 			}
 		}},
-		{"replaced blob", func(t *testing.T, root, _ string) {
+		{"replaced nested config", func(t *testing.T, root, _ string) {
 			t.Helper()
-			entries, err := os.ReadDir(filepath.Join(root, "blobs", "sha256"))
+			inspection, err := Inspect(t.Context(), root)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(root, "blobs", "sha256", entries[0].Name()), []byte("other"), 0o600); err != nil {
-				t.Fatal(err)
+			for _, object := range inspection.Root.Objects {
+				if object.Kind != "binary-bundle" {
+					continue
+				}
+				manifest, err := flatManifest(t.Context(), root, object)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(fixtureBlobPath(root, manifest.Config.Digest), []byte("other"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				return
 			}
+			t.Fatal("fixture lacks a nested binary bundle")
 		}},
 		{"unreachable blob", func(t *testing.T, root, _ string) {
 			t.Helper()
@@ -179,6 +190,8 @@ func TestPublicationRejectsCorruptionAndUnreachableBytes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root, digest := releasePublicationFixture(t)
 			tc.mutate(t, root, digest)
+			_, err := Inspect(t.Context(), root)
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
 			publication, err := OpenPublication(t.Context(), root, digest)
 			assertRegistryCode(t, err, e.CodeVerifyFailed)
 			if publication != nil {

@@ -53,6 +53,12 @@ NVKR does not operate a registry, provision clusters, or manage fleet lifecycle.
 access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
 diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
 references and own deployment descriptions and acceptance decisions (ADR-19/20).
+A separately authored repository CI adapter schedules producer Runs and invokes
+NVKE's suite in a separate downstream job outside this product lifecycle and v1
+qualification acceptance (ADR-16/18). NVKE owns guest/cluster provisioning,
+assertions and teardown; the parent harness owns host admission, outer leases,
+disk service and journaled network-control restoration. These trusted-code CI
+diagnostics do not add runtime authority to the artifact-verification core.
 
 ## Assumptions {#assumptions}
 
@@ -565,7 +571,10 @@ closing summary; shared recovery precedes inline finalization. Static Plan/manif
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
-bytes, preserving credential scope and per-job finalizer results. Producer matrix and general callable
+bytes, preserving credential scope and per-job finalizer results. Identical complete host step sequences
+can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
+and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
+job's parameters; job policy and dependencies remain inline. Producer matrix and general callable
 scheduling remain deferred (ADR-18 §8); ADR-21 admits only the separate fixed native qualification worker
 and its selected-platform matrix.
 

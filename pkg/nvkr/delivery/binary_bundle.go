@@ -147,6 +147,25 @@ func ExtractBinaryBundle(ctx context.Context, layoutRoot, name, out string) (Bin
 
 // Only the owner of an independently checked closure may reuse its inspection.
 func extractBinaryBundle(ctx context.Context, layoutRoot string, inspection Inspection, name, out string) (BinaryBundle, error) {
+	return extractBinaryBundleWith(ctx, inspection, name, out, func(descriptor Descriptor, max int64) ([]byte, error) {
+		return readBlob(ctx, layoutRoot, descriptor, max)
+	}, func(descriptor Descriptor) (*heldfile.File, func(), error) {
+		layerPath := filepath.Join(layoutRoot, "blobs", "sha256", strings.TrimPrefix(descriptor.Digest, "sha256:"))
+		held, err := heldfile.OpenContext(ctx, layerPath, heldfile.Options{
+			Label: "binary-bundle layer", ExpectedDigest: descriptor.Digest, MaxBytes: maxDeliveryFileBytes,
+		})
+		return held, func() {
+			if held != nil {
+				_ = held.Close()
+			}
+		}, err
+	})
+}
+
+// The reader and layer capability come from the owner of the checked closure.
+func extractBinaryBundleWith(ctx context.Context, inspection Inspection, name, out string,
+	read func(Descriptor, int64) ([]byte, error), openLayer func(Descriptor) (*heldfile.File, func(), error),
+) (BinaryBundle, error) {
 	var err error
 	var object PublishedObject
 	for _, candidate := range inspection.Root.Objects {
@@ -160,9 +179,9 @@ func extractBinaryBundle(ctx context.Context, layoutRoot string, inspection Insp
 	}
 	var manifestRaw []byte
 	if inspection.Root.Release != nil {
-		manifestRaw, err = readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+		manifestRaw, err = read(Descriptor{MediaType: MediaOCIManifest, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
 	} else {
-		indexRaw, readErr := readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+		indexRaw, readErr := read(Descriptor{MediaType: MediaOCIIndex, Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
 		if readErr != nil {
 			return BinaryBundle{}, readErr
 		}
@@ -170,12 +189,12 @@ func extractBinaryBundle(ctx context.Context, layoutRoot string, inspection Insp
 		if err := json.Unmarshal(indexRaw, &index); err != nil || len(index.Manifests) != 1 {
 			return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary layout must contain one manifest")
 		}
-		manifestRaw, err = readBlob(ctx, layoutRoot, index.Manifests[0], 8<<20)
+		manifestRaw, err = read(index.Manifests[0], 8<<20)
 	}
 	if err != nil {
 		return BinaryBundle{}, err
 	}
-	manifest, bundle, err := readBinaryBundleConfig(ctx, layoutRoot, manifestRaw)
+	manifest, bundle, err := readBinaryBundleConfigWith(manifestRaw, read)
 	if err != nil {
 		return BinaryBundle{}, err
 	}
@@ -186,12 +205,11 @@ func extractBinaryBundle(ctx context.Context, layoutRoot string, inspection Insp
 	if semantic != object.SemanticDigest {
 		return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle semantic identity does not match publication root")
 	}
-	layerPath := filepath.Join(layoutRoot, "blobs", "sha256", strings.TrimPrefix(manifest.Layers[0].Digest, "sha256:"))
-	held, err := heldfile.OpenContext(ctx, layerPath, heldfile.Options{Label: "binary-bundle layer", MaxBytes: maxDeliveryFileBytes})
+	held, closeLayer, err := openLayer(manifest.Layers[0])
 	if err != nil {
 		return BinaryBundle{}, err
 	}
-	defer func() { _ = held.Close() }()
+	defer closeLayer()
 	if held.Digest() != manifest.Layers[0].Digest || held.Size() != manifest.Layers[0].Size {
 		return BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle layer does not match its descriptor")
 	}
@@ -248,11 +266,17 @@ func InspectBinaryBundle(ctx context.Context, root string) (BinaryBundle, Result
 // caller separately checks the surrounding closure and binds these descriptions
 // to either the standalone index or the publication's selected object.
 func readBinaryBundleConfig(ctx context.Context, root string, raw []byte) (ociManifest, BinaryBundle, error) {
+	return readBinaryBundleConfigWith(raw, func(descriptor Descriptor, max int64) ([]byte, error) {
+		return readBlob(ctx, root, descriptor, max)
+	})
+}
+
+func readBinaryBundleConfigWith(raw []byte, read func(Descriptor, int64) ([]byte, error)) (ociManifest, BinaryBundle, error) {
 	var manifest ociManifest
 	if err := json.Unmarshal(raw, &manifest); err != nil || manifest.ArtifactType != MediaBinaryBundle || len(manifest.Layers) != 1 {
 		return ociManifest{}, BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle manifest has an invalid shape")
 	}
-	configRaw, err := readBlob(ctx, root, manifest.Config, 8<<20)
+	configRaw, err := read(manifest.Config, 8<<20)
 	if err != nil {
 		return ociManifest{}, BinaryBundle{}, err
 	}
