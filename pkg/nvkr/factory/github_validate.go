@@ -301,11 +301,19 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	for runner, jobID := range bootstrap {
 		job, ok := document.Jobs[jobID]
+		wantSteps := 5
+		command := generationCommand(plan, EngineGitHub)
+		if plan.Environment.GitHubRuntimePlan {
+			wantSteps = 6
+			if runner == sortedKeys(bootstrap)[0] {
+				command = githubRuntimeGenerationCommand(plan)
+			}
+		}
 		wantCondition := ""
 		if plan.Environment.GitHubDevelopment || len(catalogEnv) > 0 {
 			wantCondition = "${{ " + githubDispatchCondition(plan) + " }}"
 		}
-		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
+		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != wantSteps || job.Steps[0].Uses != actions.Checkout {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
@@ -322,7 +330,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go build -trimpath") ||
 			!strings.Contains(bootstrapRuns, "-ldflags "+shellQuote(linkerFlags)) ||
-			!strings.Contains(bootstrapRuns, generationCommand(plan, EngineGitHub)) {
+			!strings.Contains(bootstrapRuns, command) {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not build and transport the runner", jobID)
 		}
 	}
@@ -356,7 +364,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if len(job.Steps) == 0 || job.Steps[0].Uses != actions.Checkout || !stepUses(job.Steps, actions.Download) {
 			return e.New(e.CodeInvalidCatalog, "GitHub job %q omits pinned checkout or input transport", jobID)
 		}
-		if err := actions.validateHelperPreparedFirst(jobID, job.Steps); err != nil {
+		if err := actions.validateHelperPreparedFirst(jobID, job.Steps, plan); err != nil {
 			return err
 		}
 		for _, step := range job.Steps {
@@ -466,7 +474,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if githubQualificationHandoffEnabled(plan) && !reflect.DeepEqual(job.Steps[len(job.Steps)-1], githubQualificationHandoffStep(actions)) {
 			return e.New(e.CodeEngineCapability, "GitHub finalizer must upload only the complete handoff for this successful exact attempt")
 		}
-		if err := actions.validateHelperPreparedFirst("nvkr-lifecycle-run", job.Steps); err != nil {
+		if err := actions.validateHelperPreparedFirst("nvkr-lifecycle-run", job.Steps, plan); err != nil {
 			return err
 		}
 		var needs []string
@@ -519,10 +527,14 @@ func validateGitHubRegistryEnvironment(plan *Plan, kind, target, jobID string, j
 // not runnable until the dedicated preparation step runs; because the input Restore steps
 // are themselves helper invocations, the preparation must come immediately after the
 // helper download and strictly before the FIRST ./nvkr-exec in the job.
-func (actions githubActionRefs) validateHelperPreparedFirst(jobID string, steps []githubStep) error {
+func (actions githubActionRefs) validateHelperPreparedFirst(jobID string, steps []githubStep, plans ...*Plan) error {
+	wantRun := prepareHelperRun
+	if len(plans) != 0 {
+		wantRun = prepareHelperRunFor(plans[0])
+	}
 	prepared := -1
 	for index, step := range steps {
-		if step.Name == prepareHelperStepName && strings.TrimSpace(step.Run) == prepareHelperRun {
+		if step.Name == prepareHelperStepName && strings.TrimSpace(step.Run) == wantRun {
 			prepared = index
 			break
 		}

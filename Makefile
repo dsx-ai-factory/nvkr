@@ -223,11 +223,11 @@ workflows-check: workflow-generator pipeline-dev-check ## Check committed produc
 	bin/nvkr-exec run generate --engine github \
 		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
 		--environment inputs/environments/github-nightly-nvidia.json \
-		--root . --check
+		--root . --runtime --check
 	bin/nvkr-exec run generate --engine github \
 		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
 		--environment inputs/environments/github-nightly-upstream.json \
-		--root . --check
+		--root . --runtime --check
 
 .PHONY: workflows-generate
 workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate producer, qualification and development bundles with their canonical generator stamp.

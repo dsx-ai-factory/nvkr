@@ -22,6 +22,11 @@ runs:
     - name: Build runner from this checkout
       run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o nvkr-exec ./cmd/nvkr
       shell: bash -e {0}
+    - name: 'Download NVKR runtime inputs'
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      with:
+        name: 'nvkr-runtime-inputs'
+        path: '.github/nvkr-run-nvke-nightly-upstream-ovn-arm64'
     - name: Verify committed Run generation is current
       id: validate-catalog
       env:
@@ -47,6 +52,11 @@ runs:
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: ${{ inputs.runner-artifact }}
-        path: 'nvkr-exec'
+        path: |
+          nvkr-exec
+          .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json
+          .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/action-data.json
+          .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/manifest.json
+        include-hidden-files: 'true'
         if-no-files-found: error
         retention-days: 7

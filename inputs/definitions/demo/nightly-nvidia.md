@@ -32,7 +32,7 @@ The exact private OVN fork and NVKE source-access bindings pass the existing
 `NKE_SOURCE_TOKEN` only to their selected fetch steps. Public upstream OVN does
 not receive that binding.
 
-Validate and regenerate through the existing owner:
+Generate the initial reviewed workflow contract through the existing owner:
 
 ```sh
 bin/nvkr definition validate --definition inputs/definitions/demo/arm64-nvidia-kvm.json
@@ -40,6 +40,11 @@ bin/nvkr run generate \
   --definition inputs/definitions/demo/arm64-nvidia-kvm.json \
   --environment inputs/environments/github-nightly-nvidia.json
 ```
+
+The Environment selects `githubRuntimePlan: true`. Routine catalog-pin updates are compiled on each
+producer dispatch and do not require another regeneration commit. The producer freezes one Plan for
+all jobs; `run generate --runtime --check` validates its unchanged workflow/action and Environment
+contract without writing files. Changes to that contract require normal regeneration and review.
 
 The downstream nightly workflow owns executing the NVKE runtime suite. Definition validation and
 workflow generation establish neither runtime E2E success nor hardware acceptance. Runner capacity,

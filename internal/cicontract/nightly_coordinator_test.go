@@ -100,7 +100,7 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 	executed, checkedSource, publicUpload := false, false, false
 	for _, step := range runtime.Steps {
 		if step.With["repository"] == "dsx-ai-factory/nvke" {
-			checkedSource = step.With["ref"] == "${{ matrix.harness_commit }}" &&
+			checkedSource = step.With["ref"] == "${{ steps.suite.outputs.commit }}" &&
 				step.With["persist-credentials"] == false && step.With["path"] == ".nightly-private/nvke"
 		}
 		if strings.Contains(step.Run, "go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$'") {

@@ -14,6 +14,14 @@ ordinary generated M2 workflow retains its default paths; named bundles use the
 existing generator and manifest owner. The coordinator is authored separately.
 The daily trigger is retained as explicitly requested by the user.
 
+Both nightly Environments opt into runtime Plan preparation. Each producer's first bootstrap reads the
+current catalog pins from that dispatch's exact repository commit and freezes fresh Plan data. Other
+helper bootstraps restore the same data and verify it against those inputs; every producer job and the
+finalizer then receives it with its native helper. Source-version updates within the reviewed execution
+contract need no regeneration commit. Changes to workflow/action bytes, member paths or Environment
+policy still fail admission and require reviewed regeneration. This retains pinned inputs throughout
+the cycle and does not follow newer versions after the build starts.
+
 This is downstream repository CI test infrastructure outside NVKR's public
 product lifecycle and v1 acceptance. It leaves M3 build/evidence qualification
 and ADR-16's passive conformance boundary unchanged. Its schedule is authored
@@ -31,14 +39,16 @@ native-host preflight and owned-resource cleanup remain required.
 
 Both Definitions select the profile-owned site catalog at exact NVKE candidate commit
 `a8391755d12d99f859783c6cf390338debd1e085` for the CLI, controller image,
-controller chart and NKTP chart. The suite checkout selects that same revision,
+controller chart and NKTP chart. The baseline suite selection uses that same revision,
 including the runtime `^TestE2E$` selection and candidate-input fixes. Relative to
 the previous product source, only eight adapter, test and documentation files
 changed; CLI, controller and chart producer code is unchanged. The source and
 suite selections now share one exact commit, consistent with ADR-23's proposed
 matching-revision rule. This alignment does not establish overall interface adoption
 or broader acceptance; ADR-23 remains proposed and excludes CI trigger, runner
-and credential policy.
+and credential policy. At runtime the suite checkout follows the single exact NVKE revision shared by
+the frozen Plan's CLI, controller and two chart producers. Ambiguous or mixed source revisions fail.
+The Go consumer independently checks this join before executing the suite.
 This is a candidate revision from open NVKE PR #1580, not a claim of merged-main
 membership or human approval. Its exact source bytes remain required; a pin
 does not guarantee future provider reachability or authorize the privileged suite.
@@ -119,13 +129,15 @@ establish a completed hosted producer or E2E cycle.
    returned by dispatch; never use a latest-run search or retry an ambiguous
    POST. Join that run while checking repository, commit, workflow and attempt.
 3. Download only that completed run's named lifecycle and publication locator
-   artifacts. Run records and locators remain descriptive until verification.
+   artifacts and, for runtime Plan profiles, its frozen `nvkr-runtime-inputs`.
+   Run records, locators and the frozen Plan remain descriptive until verification.
 4. Authenticate the complete publication, signing identity, production
    provenance, outputs and exact Definition, Environment and Plan. Export held
    bytes only for the originating invocation. Extract native tools, images,
    charts and disk through existing lifecycle and delivery owners.
-5. Use a private checkout at the exact pinned NVKE suite revision. Generate profile
-   resources through NVKE's existing Go owner. Produce the suite's
+5. Use a private checkout at the frozen Plan's shared NVKE producer commit, or
+   the profile's pinned suite revision when runtime Plans are not selected.
+   Generate profile resources through NVKE's existing Go owner. Produce the suite's
    `release-description/v1` input through NVKR's existing export renderer over
    the held publication; the description adds no verification authority.
    Execute its existing

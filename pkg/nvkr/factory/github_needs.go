@@ -58,6 +58,14 @@ func githubNeedsForPlan(ctx context.Context, plan *Plan) (*githubNeedsProjection
 		bootstrap[resolved.RunsOn] = id
 		full[id] = nil
 	}
+	if plan.Environment.GitHubRuntimePlan {
+		first := bootstrap[sortedKeys(bootstrap)[0]]
+		for _, id := range bootstrap {
+			if id != first {
+				full[id] = []string{first}
+			}
+		}
+	}
 	_, artifacts := planIndex(plan)
 	for _, stage := range stages {
 		if err := githubNeedsContext(ctx); err != nil {
