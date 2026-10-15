@@ -84,7 +84,13 @@ and a quote. Docker inspection records acquisition without an artifact mount and
 execution with no network, read-only source/artifact/root filesystem, dropped
 capabilities and no new privileges. Local raw records, candidate inputs, Plan,
 fresh artifact and retained results are under `.nvkr/go-adapter-verification/`.
-Native Linux reruns and the final repository gate are tracked separately in #138.
+The separate [native Go runtime record](https://github.com/dsx-ai-factory/nvkr/actions/runs/38787255116)
+uses the same Go implementation (`a553c56`) on native Linux AMD64 and ARM64.
+Its diagnostic workflow and candidate inputs stay outside #138. The earlier
+[native Go run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38785478450)
+passed full uncached repository tests, race checks and fresh recipe builds on
+both architectures, then failed during unprivileged checksum collection from
+root-owned attempt storage. The runtime rerun corrects that workflow-only read.
 
 Bounded real Go-command negatives rejected a freshly recipe-built
 `v9.9.9-negative` executable and an `exit 7` executable with suite exit 2.
@@ -99,6 +105,12 @@ Go regressions cover complete Plan admission before workspace creation, exact
 shallow imports, wrong commit/tree refusal, poisoned ambient Git routing without
 changing the caller checkout, both suite commands, private staging, byte changes,
 result rejection and cleanup. Targeted process-lifetime race tests passed.
+The [PR Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/38785476658)
+passed on `5df8a63`. Local formatting, vet, lint, shellcheck, CI-report tests,
+build, other package tests and vulnerability scan passed. Local `make check`
+exhausted its default ten-minute lifecycle package budget; an uncached lifecycle
+rerun with `-timeout=20m -count=1` passed in 596.7 seconds. This records successful
+constituent checks without relabeling the timed-out aggregate invocation.
 Compiler/loader fixtures cover both architectures, scalar/map precedence and
 fallback, permitted relocation, unsupported producers and complete Plan admission.
 The current main base admits renamed `NVKECTL_VERSION` stamps; loader contracts
