@@ -39,7 +39,7 @@ jobs:
         with:
           persist-credentials: 'false'
       - name: Prepare NVKR runner (arc-arm64-kvm)
-        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/bootstrap-linux-arm64
+        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/bootstrap-linux-arm64-runtime-plan
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
@@ -47,6 +47,7 @@ jobs:
     name: 'Prepare NVKR runner (ubuntu-24.04)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 15
+    needs: [build-runner-arc-arm64-kvm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - &check-native-linux-amd64
@@ -64,6 +65,7 @@ jobs:
     name: 'Prepare NVKR runner (ubuntu-24.04-arm)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 15
+    needs: [build-runner-arc-arm64-kvm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -405,7 +407,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1045
-    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvke-node-image-arm64-fetch-nvke-cni-3798aad9f7bb, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu]
+    needs: [nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvke-node-image-arm64-fetch-nvke-cni-3798aad9f7bb, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nkd-arc'
     permissions:

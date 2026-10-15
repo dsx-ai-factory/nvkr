@@ -89,6 +89,15 @@ resolution or generated-output work. See the [feature-branch development loop](h
 and inputs for both commands; the generator version contributes to generated content. Change authored
 inputs and regenerate instead of editing generated files.
 
+Named production Environments can opt into `githubRuntimePlan: true`. Generate their initial complete
+bundle normally. On each dispatch the first bootstrap compiles the repository's current catalog pins
+with `run generate --runtime`, freezes the resulting Plan, and carries that exact data to every job.
+Routine source-version updates therefore do not require a regenerated bundle commit. CI uses the same
+inputs with `--runtime --check`: it checks baseline integrity and unchanged workflow/action bytes,
+membership and Environment policy without writing files. Changes outside that contract require normal
+regeneration and review. This mode neither follows floating upstream versions nor changes the default
+or development bundle contract; ordinary `--check` remains a complete byte comparison.
+
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can
 schedule dispatches; that scheduling and runtime-test ownership are separate

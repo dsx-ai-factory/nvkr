@@ -107,13 +107,19 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
 			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},
+			&cli.BoolFlag{Name: "runtime", Usage: "refresh named production Plan data within its reviewed workflow contract"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
 			}
 			var digest string
-			if c.IsSet("qualification-policy") {
+			if c.Bool("runtime") && c.IsSet("qualification-policy") {
+				return e.New(e.CodeUsage, "runtime Plan preparation does not generate qualification workflows")
+			}
+			if c.Bool("runtime") {
+				digest, err = lifecycle.GenerateRuntimeFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			} else if c.IsSet("qualification-policy") {
 				digest, err = qualification.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), c.String("qualification-policy"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
 			} else {
 				digest, err = lifecycle.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))

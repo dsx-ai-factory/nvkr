@@ -65,7 +65,9 @@ type NightlyBuild struct {
 }
 
 type NightlyInputs struct {
-	Reference string
+	Reference     string
+	Plan          *factory.Plan
+	HarnessCommit string
 	// LocatorRoot contains an unsigned, restored reference carrier. It is never
 	// the layout exported by Consumer.Verify under its exact-input receipt.
 	LocatorRoot        string
@@ -265,6 +267,11 @@ func selectNightlyArtifact(list nightlyArtifactList, name string, build NightlyB
 // the lifecycle Run or publication described by its member. The existing command
 // owner caps captured archive bytes at diagnosticLimit before this decoder runs.
 func nightlyArchiveMember(ctx context.Context, archive []byte, artifact nightlyGitHubArtifact, memberName string) ([]byte, error) {
+	members, err := nightlyArchiveMembers(ctx, archive, artifact, map[string]int64{memberName: 32 << 20})
+	return members[memberName], err
+}
+
+func nightlyArchiveMembers(ctx context.Context, archive []byte, artifact nightlyGitHubArtifact, expected map[string]int64) (map[string][]byte, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "nightly archive context")
 	}
@@ -279,29 +286,36 @@ func nightlyArchiveMember(ctx context.Context, archive []byte, artifact nightlyG
 	if err != nil {
 		return nil, nightlyArchiveError(ctx, err, "decoding nightly artifact ZIP")
 	}
-	if len(reader.File) != 1 {
-		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP requires exactly one selected member")
+	if len(reader.File) != len(expected) {
+		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP differs from its exact selected member set")
 	}
-	member := reader.File[0]
-	if member.Name != memberName || !member.Mode().IsRegular() || member.UncompressedSize64 > 32<<20 {
-		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP member has an unexpected path, type or size")
-	}
+	members := make(map[string][]byte, len(expected))
 	input.metadata = false
-	held, err := member.Open()
-	if err != nil {
-		return nil, nightlyArchiveError(ctx, err, "opening nightly artifact ZIP member")
-	}
-	raw, readErr := io.ReadAll(io.LimitReader(held, (32<<20)+1))
-	if err = errors.Join(readErr, held.Close()); err != nil {
-		return nil, nightlyArchiveError(ctx, err, "reading nightly artifact ZIP member")
-	}
-	if len(raw) > 32<<20 || uint64(len(raw)) != member.UncompressedSize64 {
-		return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP member exceeds its bound or declared size")
+	remaining := int64(32 << 20)
+	for _, member := range reader.File {
+		limit, ok := expected[member.Name]
+		_, repeated := members[member.Name]
+		if !ok || repeated || !member.Mode().IsRegular() || member.UncompressedSize64 > uint64(limit) || member.UncompressedSize64 > uint64(remaining) {
+			return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP member has an unexpected path, type, duplicate or size")
+		}
+		held, err := member.Open()
+		if err != nil {
+			return nil, nightlyArchiveError(ctx, err, "opening nightly artifact ZIP member")
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(held, limit+1))
+		if err = errors.Join(readErr, held.Close()); err != nil {
+			return nil, nightlyArchiveError(ctx, err, "reading nightly artifact ZIP member")
+		}
+		if int64(len(raw)) > limit || uint64(len(raw)) != member.UncompressedSize64 {
+			return nil, e.New(e.CodeVerifyFailed, "nightly artifact ZIP member exceeds its bound or declared size")
+		}
+		remaining -= int64(len(raw))
+		members[member.Name] = raw
 	}
 	if err = ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "nightly artifact ZIP canceled")
 	}
-	return raw, nil
+	return members, nil
 }
 
 func nightlyArchiveError(ctx context.Context, err error, operation string) error {
@@ -337,15 +351,15 @@ func (reader *nightlyZIPReaderAt) ReadAt(p []byte, offset int64) (int, error) {
 
 type nightlyCapture func(context.Context, []string, string, time.Duration) ([]byte, error)
 
-func newNightlyInputs(ctx context.Context, profile NightlyProfile, build NightlyBuild, plan *factory.Plan, workspace string) (*NightlyInputs, error) {
+func newNightlyInputs(ctx context.Context, profile NightlyProfile, build NightlyBuild, plan *factory.Plan, definition lifecycle.Definition, environment lifecycle.Environment, workspace string) (*NightlyInputs, error) {
 	if os.Getenv("GITHUB_SERVER_URL") != "https://github.com" || os.Getenv("GITHUB_REF") != "refs/heads/main" || os.Getenv("GH_TOKEN") == "" {
 		return nil, e.New(e.CodeEngineCapability, "nightly artifact retrieval requires explicit main-branch GitHub identity and API token")
 	}
 	runner := Runner{Work: workspace, Env: os.Environ()}
-	return newNightlyInputsWithCapture(ctx, profile, build, plan, workspace, os.Getenv("GITHUB_REPOSITORY"), os.Getenv("GITHUB_REPOSITORY_ID"), os.Getenv("GITHUB_SHA"), os.Getenv("GITHUB_RUN_ID"), os.Getenv("GITHUB_RUN_ATTEMPT"), runner.Capture)
+	return newNightlyInputsWithCapture(ctx, profile, build, plan, definition, environment, workspace, os.Getenv("GITHUB_REPOSITORY"), os.Getenv("GITHUB_REPOSITORY_ID"), os.Getenv("GITHUB_SHA"), os.Getenv("GITHUB_RUN_ID"), os.Getenv("GITHUB_RUN_ATTEMPT"), runner.Capture)
 }
 
-func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, build NightlyBuild, plan *factory.Plan, workspace, repository, repositoryID, sha, parentID, parentAttempt string, capture nightlyCapture) (*NightlyInputs, error) {
+func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, build NightlyBuild, plan *factory.Plan, definition lifecycle.Definition, environment lifecycle.Environment, workspace, repository, repositoryID, sha, parentID, parentAttempt string, capture nightlyCapture) (*NightlyInputs, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "nightly input context")
 	}
@@ -362,14 +376,10 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 	if plan.Environment.GitHubBundle != profile.Bundle || plan.DefinitionPath != profile.Definition || plan.EnvironmentPath != profile.Environment || plan.Qualification.String() != lifecycle.LanePipeline {
 		return nil, e.New(e.CodePipelineDrift, "nightly Plan selection differs from maintained profile")
 	}
-	var publication factory.Artifact
-	for _, artifact := range plan.Graph.Artifacts {
-		if artifact.ID == "publication/release" {
-			publication = artifact
+	if !environment.GitHubRuntimePlan {
+		if _, err := lifecycle.PrepareExactInputs(definition, environment, plan); err != nil {
+			return nil, err
 		}
-	}
-	if publication.Kind != "published-reference" || publication.Producer != "publish/release" || publication.Target != "release" || !securepath.WorkspaceRelative(publication.Path) {
-		return nil, e.New(e.CodePipelineDrift, "nightly Plan lacks exact aggregate publication reference")
 	}
 	directory, info, err := securepath.OpenDirectory(workspace)
 	if err != nil {
@@ -404,6 +414,9 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 		return nil, err
 	}
 	names := []string{"nvkr-lifecycle-run", "nvkr-publication-release"}
+	if environment.GitHubRuntimePlan {
+		names = append(names, "nvkr-runtime-inputs")
+	}
 	selected := make([]nightlyGitHubArtifact, len(names))
 	for i, name := range names {
 		var list nightlyArtifactList
@@ -442,17 +455,41 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 		}
 	}
 	memberNames := []string{"run.json", "publication-release.tar"}
-	members := make([][]byte, len(names))
-	for i := range names {
+	members := make([][]byte, len(memberNames))
+	for i := range memberNames {
 		members[i], err = nightlyArchiveMember(ctx, archives[i], selected[i], memberNames[i])
 		if err != nil {
 			return nil, err
 		}
 	}
+	harnessCommit := profile.HarnessCommit
+	if environment.GitHubRuntimePlan {
+		plan, err = nightlyRuntimePlan(ctx, archives[2], selected[2], profile, definition, environment)
+		if err != nil {
+			return nil, err
+		}
+		digest, err = plan.Digest()
+		if err != nil {
+			return nil, err
+		}
+		harnessCommit, err = nightlyPlanHarnessCommit(plan, profile)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var publication factory.Artifact
+	for _, artifact := range plan.Graph.Artifacts {
+		if artifact.ID == "publication/release" {
+			publication = artifact
+		}
+	}
+	if publication.Kind != "published-reference" || publication.Producer != "publish/release" || publication.Target != "release" || !securepath.WorkspaceRelative(publication.Path) {
+		return nil, e.New(e.CodePipelineDrift, "nightly Plan lacks exact aggregate publication reference")
+	}
 	// No artifact destination is created until both provider-pinned blobs and
 	// their exact members have been admitted, including the before/after joins.
-	downloads := make([]string, len(names))
-	for i := range names {
+	downloads := make([]string, len(memberNames))
+	for i := range memberNames {
 		downloads[i], err = os.MkdirTemp(workspace, "nightly-download-")
 		if err != nil {
 			return nil, e.Wrap(e.CodeImmutableViolation, err, "creating fresh artifact destination")
@@ -495,7 +532,60 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 	if plan.Environment.Publication == nil || reference[:at] != plan.Environment.Publication.RepositoryPrefix+"/releases" {
 		return nil, e.New(e.CodeUnpinnedInput, "aggregate reference differs from Plan publication namespace")
 	}
-	return &NightlyInputs{Reference: reference, LocatorRoot: locatorRoot, RunPath: filepath.Join(downloads[0], "run.json"), Run: run, ExpectedInvocation: fmt.Sprintf("https://github.com/%s/actions/runs/%d/attempts/%d", repository, build.ProducerRun, build.ProducerAttempt)}, nil
+	return &NightlyInputs{Reference: reference, Plan: plan, HarnessCommit: harnessCommit, LocatorRoot: locatorRoot, RunPath: filepath.Join(downloads[0], "run.json"), Run: run, ExpectedInvocation: fmt.Sprintf("https://github.com/%s/actions/runs/%d/attempts/%d", repository, build.ProducerRun, build.ProducerAttempt)}, nil
+}
+
+func nightlyRuntimePlan(ctx context.Context, archive []byte, artifact nightlyGitHubArtifact, profile NightlyProfile, definition lifecycle.Definition, environment lifecycle.Environment) (*factory.Plan, error) {
+	members, err := nightlyArchiveMembers(ctx, archive, artifact, map[string]int64{"plan.json": factory.MaxPlanBytes, "action-data.json": 32 << 20, "manifest.json": 32 << 20})
+	if err != nil {
+		return nil, err
+	}
+	var plan factory.Plan
+	if err := canonical.UnmarshalExact(members["plan.json"], &plan); err != nil {
+		return nil, e.Wrap(e.CodePipelineDrift, err, "decoding same-Run runtime Plan")
+	}
+	if err := plan.Validate(); err != nil {
+		return nil, err
+	}
+	if !environment.GitHubRuntimePlan || plan.Environment.GitHubBundle != profile.Bundle || plan.DefinitionPath != profile.Definition || plan.EnvironmentPath != profile.Environment || plan.Qualification.String() != lifecycle.LanePipeline {
+		return nil, e.New(e.CodePipelineDrift, "runtime Plan selection differs from trusted nightly inputs")
+	}
+	if _, err := lifecycle.PrepareExactInputs(definition, environment, &plan); err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+// The current-source suite follows the one exact NVKE revision that produced all
+// four public NVKE roles. Mixed product revisions cannot choose a suite by order.
+func nightlyPlanHarnessCommit(plan *factory.Plan, profile NightlyProfile) (string, error) {
+	if plan == nil {
+		return "", e.New(e.CodeUsage, "nightly harness selection requires a Plan")
+	}
+	roles := map[string]string{"nvkectl": "nvkectl", nightlyControllerOutput(profile): "nvke-controller", "controller-chart": "nvke-controller-chart", "nktp": "nktp-chart"}
+	if len(roles) != 4 {
+		return "", e.New(e.CodePipelineDrift, "nightly NVKE roles must be disjoint")
+	}
+	selected := map[string]bool{}
+	commit := ""
+	for _, build := range plan.Builds {
+		component, ok := roles[build.Name]
+		if !ok {
+			continue
+		}
+		if selected[build.Name] || len(build.ResolvedComponents) != 1 {
+			return "", e.New(e.CodePipelineDrift, "nightly NVKE role has ambiguous producers")
+		}
+		producer := build.ResolvedComponents[0]
+		if producer.Name != component || !producer.FromSource || strings.TrimSuffix(producer.Repo, ".git") != "https://github.com/dsx-ai-factory/nvke" || !nightlyGitCommit(producer.Commit) || (commit != "" && producer.Commit != commit) {
+			return "", e.New(e.CodeUnpinnedInput, "nightly NVKE roles do not share one exact source revision")
+		}
+		selected[build.Name], commit = true, producer.Commit
+	}
+	if len(selected) != len(roles) {
+		return "", e.New(e.CodeProvenanceMissing, "nightly Plan omits a required NVKE source role")
+	}
+	return commit, nil
 }
 
 func validateNightlyRun(plan *factory.Plan, digest string, build NightlyBuild, run *lifecycle.Run) error {

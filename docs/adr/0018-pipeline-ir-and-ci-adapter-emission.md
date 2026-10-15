@@ -972,8 +972,24 @@ exact parameters, commands or pins change. Template selection does not depend on
 or transport-action commits. Topology changes, including source-cohort splits/merges, and changes to the
 checkout pin, runtime job containers/services, runner/capability routes, permissions, secret references,
 timeouts, qualification or
-inline operator setup may require a workflow diff. The full bundle must still regenerate and pass its
-byte-exact check after every input update; workflow stability grants no exemption from admission or drift.
+inline operator setup may require a workflow diff. Ordinary bundles still regenerate and pass their
+byte-exact check after every input update.
+
+A named production Environment may explicitly select `githubRuntimePlan: true`. Its first bootstrap
+compiles the current repository's pinned inputs, validates the complete committed baseline against its
+embedded Plan, and compares every workflow/action byte and member path. The Environment digest and
+authored input paths remain fixed. Only Plan data, descriptive invocation data and their derived manifest
+may refresh. Changed scheduling, action templates or Environment policy fails before output and requires
+reviewed regeneration. This does not resolve latest versions or silently alter pins.
+
+That bootstrap publishes the frozen data once as `nvkr-runtime-inputs`. Other native helper bootstraps
+depend on it, restore it and run the ordinary complete generation check against the same repository
+inputs. Every helper artifact carries the same Plan, invocation data and manifest alongside the native
+helper; ordinary jobs, ARC jobs, recovery and finalization therefore restore the dispatch's exact inputs
+before execution. This retains the existing trusted bootstrap and same-Run artifact boundary and issues
+no new execution receipt. CI uses `run generate --runtime --check` to admit unchanged scheduling and
+policy without requiring current source pins in the committed baseline. Ordinary `--check` remains
+byte-exact, including after bootstrap restoration. Default and development generation remain unchanged.
 
 Native preflight and pinned checkout remain explicit steps in their entry-workflow execution job.
 Operator-authored environment setup, timed producer execution and steps whose outcomes or outputs are

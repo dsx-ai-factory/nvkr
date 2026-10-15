@@ -39,7 +39,7 @@ jobs:
         with:
           persist-credentials: 'false'
       - name: Prepare NVKR runner (arc-arm64-kvm)
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/bootstrap-linux-arm64
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/bootstrap-linux-arm64-runtime-plan
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
@@ -47,6 +47,7 @@ jobs:
     name: 'Prepare NVKR runner (ubuntu-24.04)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 15
+    needs: [build-runner-arc-arm64-kvm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - &check-native-linux-amd64
@@ -64,6 +65,7 @@ jobs:
     name: 'Prepare NVKR runner (ubuntu-24.04-arm)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 15
+    needs: [build-runner-arc-arm64-kvm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -405,7 +407,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-image-upstream-ovn-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1045
-    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-image-upstream-ovn-arm64-f-09f9a2b3de02, nvkr-nvke-node-image-upstream-ovn-arm64-f-0b49c5f11821, nvkr-nvke-node-image-upstream-ovn-arm64-f-1aec0b309b7c, nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-nvke-node-image-upstream-ovn-arm64-f-78d2fff1af52, nvkr-nvke-node-image-upstream-ovn-arm64-f-8eddb001351f]
+    needs: [nvkr-nvke-node-image-upstream-ovn-arm64-f-09f9a2b3de02, nvkr-nvke-node-image-upstream-ovn-arm64-f-0b49c5f11821, nvkr-nvke-node-image-upstream-ovn-arm64-f-1aec0b309b7c, nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-nvke-node-image-upstream-ovn-arm64-f-78d2fff1af52, nvkr-nvke-node-image-upstream-ovn-arm64-f-8eddb001351f]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nkd-arc'
     permissions:

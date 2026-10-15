@@ -482,12 +482,12 @@ func TestNightlyExactDownloadsAndOwnerCarrierRestore(t *testing.T) {
 				}
 				return archives[index], nil
 			}
-			inputs, err := newNightlyInputsWithCapture(t.Context(), profile, build, plan, workspace, "example/nvkr", "123", build.SourceCommit, "100", "2", capture)
+			inputs, err := newNightlyInputsWithCapture(t.Context(), profile, build, plan, plan.Definition, plan.Environment, workspace, "example/nvkr", "123", build.SourceCommit, "100", "2", capture)
 			if scenario == "success" {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if inputs.ExpectedInvocation != "https://github.com/example/nvkr/actions/runs/200/attempts/1" || inputs.Run.PlanDigest != baseRun.PlanDigest || !strings.HasPrefix(inputs.Reference, plan.Environment.Publication.RepositoryPrefix+"/releases@") {
+				if inputs.Plan != plan || inputs.HarnessCommit != profile.HarnessCommit || inputs.ExpectedInvocation != "https://github.com/example/nvkr/actions/runs/200/attempts/1" || inputs.Run.PlanDigest != baseRun.PlanDigest || !strings.HasPrefix(inputs.Reference, plan.Environment.Publication.RepositoryPrefix+"/releases@") {
 					t.Fatal("handoff binding differs", inputs)
 				}
 				if _, err := os.Stat(filepath.Join(inputs.LocatorRoot, ".nvkr/factory/publications/release.txt")); err != nil {
@@ -550,7 +550,7 @@ func TestNightlyCancellationSourceBindingAndCapabilitiesPrecedeArtifactWork(t *t
 			}
 			calls := 0
 			capture := func(context.Context, []string, string, time.Duration) ([]byte, error) { calls++; return nil, nil }
-			inputs, err := newNightlyInputsWithCapture(ctx, selected, locator, plan, workspace, "example/nvkr", "123", build.SourceCommit, "100", "2", capture)
+			inputs, err := newNightlyInputsWithCapture(ctx, selected, locator, plan, plan.Definition, plan.Environment, workspace, "example/nvkr", "123", build.SourceCommit, "100", "2", capture)
 			assertNightlyCode(t, err, code)
 			entries, readErr := os.ReadDir(workspace)
 			if inputs != nil || calls != 0 || readErr != nil || len(entries) != 0 {

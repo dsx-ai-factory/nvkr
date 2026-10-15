@@ -942,7 +942,7 @@ recorded in reconciliation; the table states the acceptance strategy, including 
 | Boundary | Contract checks | External acceptance |
 |---|---|---|
 | Definition → identity | Canonical corpus, direct-selection, retired-topology and exact output-membership negatives, differential identity tests | Independent-language canonical corpus |
-| Plan → generated execution | Graph validation, unsupported-lane errors, byte-exact drift checks | Exact committed bundle executed by the target provider |
+| Plan → generated execution | Graph validation, unsupported-lane errors, byte-exact drift checks; opt-in named production runtime Plans preserve the complete reviewed workflow/action and Environment contract | Exact frozen invocation bundle executed by the target provider |
 | Producer → artifact | Observed subject binding, substitution and malformed-record negatives | Pinned source build on the intended runtime |
 | Artifact → SBOM | Subject/index binding and deterministic documents | Inspect generated evidence for the scoped real artifacts |
 | Publication → verification | Subject mismatch, mode/policy mismatch, missing evidence | Live keyless round trip and independent cosign-only verification |

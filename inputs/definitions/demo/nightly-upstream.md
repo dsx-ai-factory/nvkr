@@ -37,6 +37,11 @@ bin/nvkr run generate \
   --environment inputs/environments/github-nightly-upstream.json
 ```
 
+The Environment selects `githubRuntimePlan: true`. Each dispatch freezes current catalog pins within
+the reviewed workflow/action and Environment contract, so routine source-version updates need no
+regeneration commit. CI checks that contract with `run generate --runtime --check`; changes to the
+execution contract still require normal regeneration and review.
+
 The downstream nightly workflow owns the real NVKE suite and its cleanup. Generating this producer
 workflow does not execute that suite or establish operational acceptance.
 

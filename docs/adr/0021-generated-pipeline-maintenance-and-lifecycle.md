@@ -133,8 +133,15 @@ and ownership manifest change. This stability is conditional on unchanged topolo
 interfaces and visible execution policy; checkout pins, pins of required inline transports and inline
 operator-setup changes remain workflow changes. The closing summary's references keep finalization and
 the final Run upload inline, so an upload-action pin change affects the maintained workflow. ADR-18 §8
-defines the full boundary. Every input update still requires complete regeneration and
-the same all-member drift check; an unchanged workflow file does not establish an up-to-date bundle.
+defines the full boundary. Ordinary bundles require complete regeneration and the same all-member drift
+check after every input update. Named production Environments may explicitly select
+`githubRuntimePlan: true`: the first bootstrap admits the committed baseline, freezes a fresh Plan from
+current pinned inputs and distributes its exact data through same-Run helper artifacts. Only Plan and
+invocation data plus the derived manifest may change; every workflow/action byte, member path,
+Environment digest and authored input path stays fixed. Source-version updates within that contract need
+no regeneration commit. `--runtime --check` validates that contract without writes; ordinary `--check`
+still compares the complete current bundle. ADR-18 owns bootstrap ordering and transport. Neither an
+unchanged workflow nor runtime compilation establishes execution or publication acceptance.
 
 Same-input determinism and edit locality are separate contracts. Adding an independent named output must
 preserve existing outputs' provider job membership, IDs, dependencies, policy and shared action templates

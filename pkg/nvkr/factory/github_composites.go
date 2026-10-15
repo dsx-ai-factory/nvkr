@@ -111,7 +111,7 @@ func lowerGitHubActions(plan *Plan, raw []byte, actions githubActionRefs) ([]byt
 			}
 			// Consolidate the repeated, ordered helper delivery in one action.
 			if githubYAMLValue(step, "uses") == actions.Download && githubYAMLValue(step, "name") == "Download NVKR runner" && position+1 < len(steps.Content) &&
-				githubYAMLValue(steps.Content[position+1], "name") == prepareHelperStepName && githubYAMLValue(steps.Content[position+1], "run") == prepareHelperRun {
+				githubYAMLValue(steps.Content[position+1], "name") == prepareHelperStepName && strings.TrimSpace(githubYAMLValue(steps.Content[position+1], "run")) == prepareHelperRunFor(plan) {
 				artifact := githubYAMLField(githubYAMLField(step, "with"), "name")
 				value := *artifact
 				artifact.Value = "${{ inputs.runner-artifact }}"
