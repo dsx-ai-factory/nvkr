@@ -86,6 +86,15 @@ capabilities and no new privileges. Local raw records, candidate inputs, Plan,
 fresh artifact and retained results are under `.nvkr/go-adapter-verification/`.
 Native Linux reruns and the final repository gate are tracked separately in #138.
 
+Bounded real Go-command negatives rejected a freshly recipe-built
+`v9.9.9-negative` executable and an `exit 7` executable with suite exit 2.
+Maintained source `ed9fb09b` failed on its missing entrypoint with capability
+exit 29. A two-second container timeout and SIGINT/SIGTERM delivered while a
+container was running returned timeout exit 31. All six cases removed the default
+workspace and owned container and published no success result; raw logs and
+`negative-results.json` are in the same local record directory. The cancellation
+exit contract deliberately differs from the historical Python 130/143 mapping.
+
 Go regressions cover complete Plan admission before workspace creation, exact
 shallow imports, wrong commit/tree refusal, poisoned ambient Git routing without
 changing the caller checkout, both suite commands, private staging, byte changes,
