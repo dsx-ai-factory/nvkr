@@ -143,6 +143,12 @@ _Avoid_: Release, arbitrary archive
 
 ## Evidence and authority
 
+**External test producer**:
+An implementation external to NVKR supplying original reports and descriptive metadata, distinct from a
+Component producer that builds delivery artifacts. Lane: none (descriptive); [ADR-16 §6](docs/adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns its execution and authority boundary.
+_Avoid_: Component producer, qualified verifier, conformance receipt
+
 **Release authenticity**:
 Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.
 _Avoid_: Payload verification, deployment readiness, full release acceptance
@@ -241,13 +247,6 @@ _Avoid_: Inventory, registry destination
 A catalog declaration describing how to build or acquire a named component from pinned inputs and which target
 platforms it supports. It carries build or acquisition instructions, never a deployment placement taxonomy.
 _Avoid_: Named output, artifact, authored build group
-
-**External test producer**:
-An external implementation of the test-output interface that owns its test execution and supplies
-original report references plus descriptive metadata. Distinct from a component catalog producer,
-which builds or acquires delivery artifacts. The output-description package supplies no executor,
-suite-selection dispatcher or authenticated evidence; its lane is none (descriptive).
-_Avoid_: Component producer, qualified verifier, conformance receipt
 
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact

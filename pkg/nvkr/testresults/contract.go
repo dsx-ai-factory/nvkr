@@ -40,7 +40,7 @@ const FormatCTRF = "ctrf-json"
 // does not validate JSON against the upstream schema or interpret test results.
 const CTRFProfile = "ctrf-0.2.0"
 
-// Producer implementations outside the qualified verifier own configuration and
+// Producer implementations external to NVKR own configuration and
 // execution. On error, any retained output must use CapturePartial. Neither
 // output, CaptureComplete nor Validate implies that tests passed.
 type Producer interface {
@@ -133,6 +133,8 @@ type SubjectDescription struct {
 
 // Validate checks only the handoff description. It performs no I/O, hashing,
 // format parsing, count reconciliation, coverage evaluation or passing verdict.
+// Success establishes field and collection shape; Encode separately enforces
+// the aggregate serialized byte limit.
 func (o Output) Validate() error {
 	if o.SchemaVersion == "" {
 		return invalid("schema is required")
@@ -355,7 +357,7 @@ func Encode(output Output) ([]byte, error) {
 // Unknown fields, duplicate keys and alternative encodings fail before handoff.
 func Decode(raw []byte) (Output, error) {
 	if len(raw) == 0 || len(raw) > MaxDocumentBytes {
-		return Output{}, invalid("document byte length exceeds bounds")
+		return Output{}, invalid("document byte length must be between 1 and 16 MiB")
 	}
 	var output Output
 	if err := canonical.UnmarshalExact(raw, &output); err != nil {

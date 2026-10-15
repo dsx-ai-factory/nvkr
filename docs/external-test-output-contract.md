@@ -7,13 +7,10 @@ producer implementation, execution, report parser, file collector, signing or qu
 
 ## Producer boundary
 
-`Producer.Produce(context.Context) (Output, error)` permits external implementations to execute
-outside the qualified verifier. Implementations own suite/harness configuration, arguments, permitted
-environment, access requirements and child-process lifecycle. No implementation ships at this boundary.
-A future user-invoked diagnostic adapter must remain separate from qualification verification; see
-[ADR-16's passive handoff](adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
-and [ADR-05's trust-object separation](adr/0005-trust-object-model-and-digest-authentication.md#4-publisher-evidence-and-later-observations-are-different-trust-objects).
-No suite-selection dispatcher, cluster provisioning or test-execution workflow is implemented.
+`Producer.Produce(context.Context) (Output, error)` is the external implementation interface.
+[ADR-16 §6](adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns its execution and authority boundary. The fields below describe its output, never an executable
+workflow or permission to run a suite.
 
 `Output` uses schema `nvkr.dev/test-results-output/v1`. It describes `ProducerIdentity`,
 `SuiteSelection`, optional `HarnessIdentity`, `Reports []ReportReference`,
@@ -65,7 +62,8 @@ identities and subject digests are validated by their existing owners without au
 
 ## Validation and serialization
 
-`Output.Validate()` checks wrapper shape and declarations. `Encode(Output)` validates, defensively
+`Output.Validate()` checks wrapper shape and declarations; success does not guarantee the aggregate
+document fits the serialized byte limit. `Encode(Output)` validates, defensively
 copies and sorts descriptions through the existing canonical codec. `Decode([]byte)` admits at most
 16 MiB, validates exact canonical bytes and rejects non-normalized collection order. Selection,
 report and subject collections are bounded to 1,024 entries each; environment facts to 10,000.

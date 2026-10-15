@@ -318,15 +318,10 @@ future qualified publication needs an authenticated commit protocol before expos
   own a competing schema, verifier, receipt constructor, or policy decision. Remaining multi-step command
   orchestration is migration debt tracked independently rather than declared absent.
 
-`testresults` owns external producer output descriptions, wrapper validation and deterministic
-serialization. Its lane is **none (descriptive)**. `Producer` permits external implementations outside
-the qualified verifier; the package supplies no execution implementation, file capture, result parser,
-signer or qualification receipt. Outputs are producer-supplied data, not public lifecycle objects.
-Optional post-publication inputs reuse `lifecycle.ExactInputDescription`; local subject descriptions
-carry immutable reference/digest declarations. Policy references do not activate enforcement.
-Validation-vector v3 and qualification-evidence v2 remain unchanged. The
-[external test output reference](../external-test-output-contract.md) owns format pins and limits;
-ADR-05/16 keep later descriptive outputs separate from publisher evidence and verifier authority.
+`testresults` owns output descriptions, wrapper validation and deterministic serialization in lane
+**none (descriptive)**. [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns the external-producer boundary; the [output reference](../external-test-output-contract.md)
+owns descriptive fields, format pins and limits. This adds no public lifecycle object or receipt.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 

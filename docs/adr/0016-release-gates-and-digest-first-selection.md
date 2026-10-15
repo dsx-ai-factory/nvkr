@@ -74,9 +74,8 @@ private state; it cannot be serialized or reconstructed from public fields. A fi
 reference, untyped `verified` or `complete` flag, decoded report, or receipt or capability for a different
 artifact, evidence document, or policy is rejected.
 
-- The qualified verifier **emits the reproduction verdict** (ADR-04) and **consumes a handed-off
-  conformance result**. It never runs the suite to create its own promotion evidence; external
-  producer implementations remain outside that verifier.
+- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**. It **never
+  runs the conformance suite**; running it would break verifier isolation and cross into fleet operation.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
   distinct from the build/publish identity**. `vectorDigests` is sorted and exhaustive for the promoted set.
@@ -321,21 +320,21 @@ the approved scope and these contracts do not establish milestone completion or 
 
 ### 6. Passive external qualification handoff — deferred producer protocol
 
-The external suite owns execution, provisioning, process context and lifecycle. The qualified
-verifier never initiates or supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
+The external suite owns execution, provisioning, process context and lifecycle. NVKR never initiates or
+supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
 suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
 `resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
 unpinned identities, caller-provided pass booleans, wrong roles, expired evidence or mismatched subjects fail
 closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
 are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
 
-The ADR-17 external `Producer` interface is usable by implementations outside the qualified verifier.
-Its output-description lane is **none (descriptive)**; wrapper validation and serialization issue no
-receipt. No producer execution is implemented at this boundary. A future separately user-invoked
-diagnostic adapter must remain isolated from qualification verification and cannot use its own
-unsigned outputs to authorize promotion. Cluster operation, generic test selection and qualification
-integration require their owning decisions; this contract activates none of them. ADR-05 keeps
-producer-supplied descriptions separate from publisher evidence and authenticated later observations.
+`testresults.Producer` describes implementations external to NVKR. Those implementations own suite
+configuration, access, execution and process lifecycle; NVKR supplies only output descriptions,
+wrapper validation and deterministic serialization in lane **none (descriptive)**. No producer
+execution, cluster operation, dispatcher or qualification integration is supplied. Unsigned output
+descriptions cannot authorize qualification or promotion, or replace ADR-05's publisher evidence and
+authenticated later observations. The [output reference](../external-test-output-contract.md) owns
+the descriptive fields, format declarations and wire limits.
 
 ## Consequences
 
@@ -359,7 +358,7 @@ producer-supplied descriptions separate from publisher evidence and authenticate
 ## Alternatives considered
 
 - **Infer conformance from reproduction (single gate).** Rejected — SEC-08 requires two independent gates.
-- **Run the conformance suite inside the qualified verifier.** Rejected — it breaks verifier isolation and the produce-vs-operate
+- **Run the conformance suite inside NVKR.** Rejected — it breaks verifier isolation and the produce-vs-operate
   boundary.
 - **Select releases by tag.** Rejected — a mutable tag must never bypass digest and signature verification.
 - **Rollback that mutates running infrastructure.** Rejected — NVKR re-selects a verified set; the engine makes
