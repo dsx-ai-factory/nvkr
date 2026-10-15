@@ -14,7 +14,7 @@ import (
 
 func TestHelmImageDependency(t *testing.T) {
 	t.Chdir(filepath.Join("..", "..", ".."))
-	definitionPath := filepath.Join("definitions", "nvke-v1", "definition.yaml")
+	definitionPath := filepath.Join("docs", "examples", "nvke-tutorial", "definition.yaml")
 	definition, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +52,7 @@ func TestSourceHelmSelection(t *testing.T) {
 		{"ambiguous source archives", []string{"first", "second"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			definitionPath := filepath.Join("definitions", "nvke-v1", "definition.yaml")
+			definitionPath := filepath.Join("docs", "examples", "nvke-tutorial", "definition.yaml")
 			definition, err := LoadDefinition(t.Context(), definitionPath)
 			if err != nil {
 				t.Fatal(err)

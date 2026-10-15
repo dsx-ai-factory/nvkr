@@ -81,13 +81,13 @@ command -v jq >/dev/null 2>&1 || {
   echo "jq is required to validate and freeze the toolchain identity" >&2
   exit 1
 }
-definition_source="definitions/nvke-os/definition-${arch}-kvm.yaml"
-environment_source="definitions/nvke-os/environment-local-linux-${arch}-docker.yaml"
+definition_source="inputs/definitions/diagnostics/os-${arch}.yaml"
+environment_source="inputs/environments/local-linux-${arch}-kvm.yaml"
 overlay_source=""
 # Only maintained Definitions that declare an architecture overlay need one.
 # A missing declared overlay still fails when NVKR loads the frozen Definition.
-if [[ -f "definitions/nvke-os/${arch}-kvm.yaml" ]]; then
-  overlay_source="definitions/nvke-os/${arch}-kvm.yaml"
+if [[ -f "inputs/catalogs/node-images/variants/diagnostic-${arch}-kvm.yaml" ]]; then
+  overlay_source="inputs/catalogs/node-images/variants/diagnostic-${arch}-kvm.yaml"
 fi
 required_inputs=("${definition_source}" "${environment_source}")
 if [[ -n "${overlay_source}" ]]; then
@@ -121,12 +121,11 @@ if [[ ! "${toolchain_image}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
 fi
 
 mkdir -p "${input_root}/catalog"
-cp "${definition_source}" "${input_root}/definition.yaml"
 cp "${environment_source}" "${input_root}/environment-local.yaml"
-cp definitions/nvke-os/catalog/pins.lock.yaml "${input_root}/catalog/pins.lock.yaml"
-cp definitions/nvke-os/catalog/registry.yaml "${input_root}/catalog/registry.yaml"
+cp inputs/catalogs/node-images/diagnostic/pins.lock.yaml "${input_root}/catalog/pins.lock.yaml"
+cp inputs/catalogs/node-images/diagnostic/registry.yaml "${input_root}/catalog/registry.yaml"
 if [[ -n "${overlay_source}" ]]; then
-  cp "${overlay_source}" "${input_root}/${arch}-kvm.yaml"
+  cp "${overlay_source}" "${input_root}/diagnostic-${arch}-kvm.yaml"
 fi
 
 # Build the bootstrap runner from this checkout in the exact pinned native
@@ -152,6 +151,18 @@ if [[ ! -x "${runner}" ]]; then
 fi
 
 frozen_definition="${input_root}/definition.yaml"
+# Keep the frozen catalog and overlays local to this immutable attempt even
+# though authored Definitions and catalogs live in separate input directories.
+"${runner}" definition inspect --definition "${definition_source}" |
+  jq --arg catalog '../../catalogs/node-images/diagnostic' \
+    --arg overlay "../../catalogs/node-images/variants/diagnostic-${arch}-kvm.yaml" '
+    if .catalog.base != $catalog or any(.outputs[]; .catalog != null) or
+      any((.catalog.overlays // [])[]; . != $overlay) then
+      error("OS bootstrap requires the maintained diagnostic catalog and architecture overlay")
+    else . end |
+    .catalog.base = "catalog" |
+    if .catalog.overlays then .catalog.overlays |= map(split("/") | last) else . end' \
+  >"${frozen_definition}"
 # The native Docker build is an attempt input, not a maintained release pin.
 # Freeze its observed exact ID through the existing catalog overlay contract
 # before compiling the executable Plan. The Packer runtime rechecks the ID.

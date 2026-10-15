@@ -18,12 +18,12 @@ import (
 // Supplier URLs and digests below are deliberate contract fixtures. No download
 // or operational compatibility with NVKE's composition script is claimed.
 func TestMaintainedM2CustomerMaterialReplacement(t *testing.T) {
-	const root = "../../../definitions/nvke-m2"
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir(root+"/os-catalog"))
+	const root = "../../../inputs/definitions/nvke"
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(root+"/../../catalogs/node-images/release"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	native, err := catalog.LoadOverlayContext(t.Context(), root+"/native-toolchains.yaml")
+	native, err := catalog.LoadOverlayContext(t.Context(), root+"/../../catalogs/node-images/variants/native-toolchains.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

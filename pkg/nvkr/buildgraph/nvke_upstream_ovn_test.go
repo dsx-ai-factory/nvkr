@@ -30,7 +30,7 @@ import (
 const upstreamOVNCommit = "d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d"
 const upstreamOVNTree = "ce0cb49cd14f2fc260457e61a5a222c027a07f79"
 const upstreamOVNEpoch = 1788540677
-const upstreamOVNDir = "../../../definitions/nvke-local-dev-arm64/upstream-ovn-catalog"
+const upstreamOVNDir = "../../../inputs/catalogs/ovn-upstream"
 
 func loadUpstreamOVN(t *testing.T) *catalog.Catalog {
 	t.Helper()
@@ -109,15 +109,15 @@ func TestNVKEUpstreamOVNGraphs(t *testing.T) {
 }
 
 func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-m2/os-catalog"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images/release"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	prior, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nvke-local-dev-arm64/os-tcg.json")
+	prior, err := catalog.LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	upstream, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nvke-local-dev-arm64/os-upstream-ovn.json")
+	upstream, err := catalog.LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/upstream-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,12 +143,12 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 		t.Fatalf("out-of-order overlay: %v", err)
 	}
 
-	const path = "../../../definitions/nvke-local-dev-arm64/definition-upstream-ovn.json"
+	const path = "../../../inputs/definitions/demo/arm64-upstream-tcg.json"
 	d, err := definition.LoadDefinition(t.Context(), path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	baseline, err := definition.LoadDefinition(t.Context(), "../../../definitions/nvke-local-dev-arm64/definition.json")
+	baseline, err := definition.LoadDefinition(t.Context(), "../../../inputs/definitions/demo/arm64-nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,19 +162,19 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	for _, output := range d.Outputs {
 		switch output.Name {
 		case "nvke-node-image-upstream-ovn-arm64":
-			if len(output.Catalog.Overlays) != 2 || output.Catalog.Overlays[1] != "./os-upstream-ovn.json" {
+			if len(output.Catalog.Overlays) != 2 || output.Catalog.Overlays[1] != "../../catalogs/node-images/variants/upstream-tcg.json" {
 				t.Fatal("disk lost explicit ordered override")
 			}
 		case "upstream-ovn-chart-arm64":
-			if output.Catalog.Base != "./upstream-ovn-catalog" || len(output.Helm.Images) != 1 || output.Helm.Images["ovn"] != "upstream-ovn-image-arm64" {
+			if output.Catalog.Base != "../../catalogs/ovn-upstream" || len(output.Helm.Images) != 1 || output.Helm.Images["ovn"] != "upstream-ovn-image-arm64" {
 				t.Fatal("upstream chart binds wrong image slot")
 			}
 		case "upstream-ovn-image-arm64":
-			if output.Catalog.Base != "./upstream-ovn-catalog" {
+			if output.Catalog.Base != "../../catalogs/ovn-upstream" {
 				t.Fatal("upstream image selects the NVIDIA producer")
 			}
 		case "controller-profiles-upstream-ovn":
-			if output.Catalog.Base != "./upstream-ovn-profiles-catalog" {
+			if output.Catalog.Base != "../../catalogs/controller-profiles/upstream-arm64" {
 				t.Fatal("upstream profile selects NVIDIA install inputs")
 			}
 		default:
@@ -187,11 +187,11 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if len(old) != 4 {
 		t.Fatalf("alternative replaces %d baseline slots, want four", len(old))
 	}
-	profile, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-local-dev-arm64/upstream-ovn-profiles-catalog"))
+	profile, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/controller-profiles/upstream-arm64"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile("../../../definitions/nvke-local-dev-arm64/upstream-ovn-profiles-catalog/patches/local-profile.patch")
+	raw, err := os.ReadFile("../../../inputs/catalogs/controller-profiles/upstream-arm64/patches/local-profile.patch")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if strings.Contains(string(raw), "http://172.30.0.1:18080/nvke-node-image-arm64.qcow2") {
 		t.Fatal("upstream profile retains the NVIDIA disk route")
 	}
-	baselinePatch, err := os.ReadFile("../../../definitions/nvke-local-dev-arm64/profiles-catalog/patches/local-profile.patch")
+	baselinePatch, err := os.ReadFile("../../../inputs/catalogs/controller-profiles/nvidia-arm64/patches/local-profile.patch")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if string(raw) != expected {
 		t.Fatal("upstream profile alters unrelated bootstrap behavior")
 	}
-	baselineProfiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-local-dev-arm64/profiles-catalog"))
+	baselineProfiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/controller-profiles/nvidia-arm64"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,15 +242,15 @@ func TestNVKEUpstreamOVNFullPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	d, err := definition.LoadDefinition(t.Context(), "definitions/nvke-local-dev-arm64/definition-upstream-ovn.json")
+	d, err := definition.LoadDefinition(t.Context(), "inputs/definitions/demo/arm64-upstream-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := definition.LoadEnvironment(t.Context(), "definitions/nvke-local-dev-arm64/environment-local-docker.json")
+	env, err := definition.LoadEnvironment(t.Context(), "inputs/environments/local-arm64-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := factory.CompileDocuments(t.Context(), "definitions/nvke-local-dev-arm64/definition-upstream-ovn.json", d, "definitions/nvke-local-dev-arm64/environment-local-docker.json", env, "upstream-ovn-test")
+	plan, err := factory.CompileDocuments(t.Context(), "inputs/definitions/demo/arm64-upstream-tcg.json", d, "inputs/environments/local-arm64-tcg.json", env, "upstream-ovn-test")
 	if err != nil {
 		t.Fatal(err)
 	}

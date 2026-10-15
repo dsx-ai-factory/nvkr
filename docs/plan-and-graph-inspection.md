@@ -27,8 +27,8 @@ The same views can compile authored inputs directly:
 
 ```sh
 nvkr run plan \
-  --definition definitions/nvke-deploy/definition.yaml \
-  --environment definitions/nvke-deploy/environment-github.yaml --pretty
+  --definition docs/examples/nvke-deploy/definition.yaml \
+  --environment docs/examples/nvke-deploy/environment-github.yaml --pretty
 ```
 
 Use either `--plan` or the pair `--definition` and `--environment`. Compilation can need access to pinned
@@ -104,15 +104,15 @@ Save the previous exact Plan before regeneration, then compare it to the regener
 ```sh
 git show HEAD:.github/nvkr-run/plan.json > /tmp/nvkr-plan-before.json
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
-  --definition definitions/nvke-m2/definition.yaml \
-  --environment definitions/nvke-m2/environment-github.yaml --engine github --root .
+  --definition inputs/definitions/nvke/definition.yaml \
+  --environment inputs/environments/github-release.yaml --engine github --root .
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json --details
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json --format json
 ```
 
 The root regeneration uses the committed M2 inputs and the generator identity described in the
-[M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md). Generate alternative Definitions into scratch roots
+[M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md). Generate alternative Definitions into scratch roots
 as shown in the [pipeline guide](generate-pipeline.md).
 
 The default text report identifies changed, added or removed per-output Build Digests, counts every changed

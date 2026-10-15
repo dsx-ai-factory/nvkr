@@ -258,7 +258,7 @@ func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.DefinitionPath != "definitions/nvke-m2/definition.yaml" || plan.EnvironmentPath != "definitions/nvke-m2/environment-github.yaml" {
+	if plan.DefinitionPath != "inputs/definitions/nvke/definition.yaml" || plan.EnvironmentPath != "inputs/environments/github-release.yaml" {
 		t.Fatal("committed workflow must select the maintained combined M2 inputs")
 	}
 	raw, err := os.ReadFile("../../../" + GitHubWorkflowPath)

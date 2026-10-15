@@ -206,12 +206,14 @@ jobs:
           set -euo pipefail
           mapfile -t required_arches < <(jq -r '.[].arch' <<<"${VALIDATED_LEGS}")
           for target_arch in "${required_arches[@]}"; do
-            input_dir=.candidate-inputs/definitions/nvke-os
-            test -f "${input_dir}/definition-${target_arch}-kvm.yaml" || {
+            input_dir=.candidate-inputs/inputs
+            test -f \
+              "${input_dir}/definitions/diagnostics/os-${target_arch}.yaml" || {
               echo "missing maintained ${target_arch} KVM Definition" >&2
               exit 1
             }
-            test -f "${input_dir}/environment-local-linux-${target_arch}-docker.yaml" || {
+            test -f \
+              "$input_dir/environments/local-linux-${target_arch}-kvm.yaml" || {
               echo "missing maintained ${target_arch} Docker Environment" >&2
               exit 1
             }
@@ -278,14 +280,15 @@ jobs:
             exit 1
           }
           pin="$(bin/nvkr catalog source-pin \
-            --data .candidate-inputs/definitions/nvke-os/catalog nvke-os)"
+            --data .candidate-inputs/inputs/catalogs/node-images/diagnostic \
+            nvke-os)"
           # One lock entry cannot establish the full component/overlay closure.
           # New input schemas must land in main before this trusted reader.
           for target_arch in "${required_arches[@]}"; do
-            input_dir=.candidate-inputs/definitions/nvke-os
+            input_dir=.candidate-inputs/inputs
             plan="$(bin/nvkr run plan \
-              --definition "${input_dir}/definition-${target_arch}-kvm.yaml" \
-              --environment "${input_dir}/environment-local-linux-${target_arch}-docker.yaml" --json)"
+              --definition "${input_dir}/definitions/diagnostics/os-${target_arch}.yaml" \
+              --environment "${input_dir}/environments/local-linux-${target_arch}-kvm.yaml" --json)"
             jq -L scripts -e --argjson pin "${pin}" \
               'include "nvke-os-plan"; nvke_source_closure($pin)' <<<"${plan}" >/dev/null || {
               echo "selected ${target_arch} NVKE source closure disagrees with the approved pin" >&2

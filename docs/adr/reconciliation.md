@@ -66,23 +66,34 @@ Run below establishes only its exact bake and raw transport.
 
 The separate FDE diagnostic route admits direct Packer only with explicit public `luks_passphrase=changeit`.
 It retains raw QCOW2 bytes locally or through a generated native ARC build-only workflow, without release
-publication, signing, inspection or confidentiality claims. Its separate `definitions/nvke-fde` selection
+publication, signing, inspection or confidentiality claims. Its separate `inputs/definitions/diagnostics/fde-amd64.yaml` selection
 contains one AMD64 output and the complete material closure. Runtime admission and generated transport
 contracts are complemented by [Run 38443178035](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035),
 which completed the pinned FDE target and finalized a `static-unqualified` Run at code commit `68c219845398b8ef5890e5c76a13d4901a22630d`.
 The [native ARC record below](#native-arc-disk-route) binds the exact output and retained evidence.
-The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retained bootstrap
+The [pinned-source audit](../../inputs/definitions/diagnostics/fde-audit.md) records retained bootstrap
 files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
 requires no GitHub secret; private passphrases remain unsupported.
 
-## Preparatory external test output boundary
+## External test output and local diagnostic boundary
 
-`pkg/nvkr/testresults` implements JUnit/CTRF output descriptions, wrapper validation and deterministic
-Encode/Decode in lane **none (descriptive)**. Producer execution, file collection, format parsing,
-authenticated coverage, signing and publication remain unimplemented. Contract tests establish no
-external execution or service acceptance. Validation-vector v3 and qualification-evidence v2 are unchanged.
+`testresults` implements bounded JUnit/CTRF descriptions and deterministic serialization in lane
+**none (descriptive)**. `validation` dispatches explicit named checks; `conformance` implements the
+`kube-conformance` / `hydrophone` diagnostic adapter. Lifecycle authenticates selected product/tools
+publications and exports held executable bytes; catalog, buildgraph, acquisition and delivery retain
+production ownership. Original reports, product/tool source provenance and before/after observations
+are retained. Normal harness exit status is a fact with an unknown cause, never a passing verdict.
+Local/disposable acknowledgements are operator declarations, not proof of locality or exclusive ownership.
+
+Contract and process-fixture tests cover guards, capture, cleanup and dispatch. They do not establish
+successful external execution of the corrected published-source route. Report parsing, original JUnit
+validity, continuous installed-byte proof, AI/user adapters, Definition applicability detection,
+qualification signing and promotion from these outputs remain unimplemented. Local unsigned sources
+remain unsupported. Existing validation-vector v3 and qualification-evidence v2 are unchanged.
 [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
-owns the boundary; the [output reference](../external-test-output-contract.md) owns fields and limits.
+owns diagnostic execution and passive external qualification; [ADR-18 §3](0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks)
+owns the host isolation posture. The [operator reference](../external-test-output-contract.md)
+owns prerequisites, selection and capture limits. These proposed contracts establish no organizational ratification.
 
 ## M3 MVP scope and acceptance boundary
 
@@ -227,7 +238,7 @@ Scheduling does not relax provider job success, worker signature or complete-set
 workflow contracts and actionlint cover the condition; actual hosted failure scheduling remains part of
 external acceptance. The runtime checks the pair against the independent loaded policy before candidate work.
 The maintained candidate records concrete verifier/native-image selections and exact smoke scope in
-`definitions/nvke-m2/qualification.yaml`. Its generated pair is `.github/workflows/nvkr-qualify.yml` and
+`inputs/policies/nvke-qualification.yaml`. Its generated pair is `.github/workflows/nvkr-qualify.yml` and
 `.github/workflows/nvkr-smoke.yml`, with the separately owned qualification manifest. These inputs and workflows
 are configuration for post-merge acceptance, not evidence of production readiness or organizational approval.
 The user has accepted merging the reviewed implementation/configuration before the fresh complete producer
@@ -422,7 +433,7 @@ hosted finalization or independent consumer acceptance.
 
 ## Local ARM64 development inputs
 
-The `definitions/nvke-local-dev-arm64` combined example selects 29 outputs in one
+The `inputs/definitions/demo/arm64-nvidia-tcg.json` combined example selects 29 outputs in one
 Run without publication/signing: OS, components, installer-aligned site, tools,
 profiles and simulator. Focused selections remain available; the historical
 22-output component subset is not the complete demo. This is not a complete
@@ -877,7 +888,7 @@ drop-in replacement for the Docker/Kind and NICoSim adapter.
 
 ## Experimental OS source producers and OVN outputs
 
-The separate `definitions/nvke-os-source` catalog builds public OS binaries from
+The separate `inputs/experiments/public-os-sources/catalog` catalog builds public OS binaries from
 pinned Git sources. Its read-only `nvke-os-source-build.yaml` workflow exercises
 `pipeline.Local` diagnostics on generic native AMD64/ARM64 hosted runners without
 internal-source credentials. This is not full package-folder migration, OS-image
@@ -891,7 +902,7 @@ passed all public-source producer builds on native AMD64 and ARM64 at
 `pipeline.Local` execution, not OVN, full QCOW2 builds, production publication
 or the held `ExecNode` preparation route.
 
-The separate `definitions/nvke-ovn-source` Definition selects native image and
+The separate `inputs/definitions/diagnostics/ovn.yaml` Definition selects native image and
 digest-bound Helm OCI outputs for both architectures. Contracts compile the
 four-output Plan, enforce six same-platform image bindings, reject missing
 slots/outputs and cross-platform joins, exclude publication destinations from Build
@@ -1037,7 +1048,7 @@ Generation uses only the current Plan, without scheduling state from previous ge
 has its own provider success condition, removing accidental unrelated-output barriers; complete finalization
 still requires every job and exact carrier. The projected provider graph is checked for cycles.
 The current production workflow is 393,699 bytes (106,301 bytes of provider headroom); development is
-372,362 bytes. Both have 596 jobs. The named ARM64 nightly workflows are 175,989 and 177,603 bytes,
+372,362 bytes. Both have 596 jobs. The named ARM64 nightly workflows are 175,980 and 177,572 bytes,
 each with 266 jobs. Moving from global packing to fixed output-local groups adds 34 jobs to each M2
 workflow and 12 to each nightly workflow; production YAML grows by 3,362 bytes. Logical Plans and shared
 action implementations remain byte-identical. This is a one-time scheduling migration, not an assertion
@@ -1241,7 +1252,7 @@ cutover, hosted publication, independent consumer acceptance or qualification.
 
 ## Maintained input and schema boundaries
 
-The [M2 Definition instructions](../../definitions/nvke-m2/README.md) own example-specific selection and input
+The [M2 Definition instructions](../../inputs/definitions/nvke/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
 CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NKTP,
 and fourteen acquired runtime-image components delivered separately for both native architectures.

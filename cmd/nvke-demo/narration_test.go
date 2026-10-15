@@ -19,16 +19,19 @@ import (
 func narrationRepository(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
-	relative := filepath.Join("definitions", "nvke-local-dev-arm64")
-	if err := os.MkdirAll(filepath.Join(repo, relative), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"definition.json", "definition-upstream-ovn.json", "environment-local-docker.json"} {
-		raw, err := os.ReadFile(filepath.Join("..", "..", relative, name))
+	for _, relative := range []string{
+		"inputs/definitions/demo/arm64-nvidia-tcg.json",
+		"inputs/definitions/demo/arm64-upstream-tcg.json",
+		"inputs/environments/local-arm64-tcg.json",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, relative)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := os.ReadFile(filepath.Join("..", "..", relative))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(repo, relative, name), raw, 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(repo, relative), raw, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -38,10 +41,10 @@ func narrationRepository(t *testing.T) string {
 func TestDemoNarrationSelectedInputsAndPrivacy(t *testing.T) {
 	repo := narrationRepository(t)
 	for _, row := range []struct{ network, selected, label string }{
-		{"", "definition.json", "NVIDIA OVN (default)"},
-		{"ovn", "definition.json", "NVIDIA OVN (default)"},
-		{"upstream-ovn", "definition-upstream-ovn.json", "upstream OVN diagnostic"},
-		{"kind-calico", "definition.json", "Kind/Calico diagnostic"},
+		{"", "arm64-nvidia-tcg.json", "NVIDIA OVN (default)"},
+		{"ovn", "arm64-nvidia-tcg.json", "NVIDIA OVN (default)"},
+		{"upstream-ovn", "arm64-upstream-tcg.json", "upstream OVN diagnostic"},
+		{"kind-calico", "arm64-nvidia-tcg.json", "Kind/Calico diagnostic"},
 	} {
 		t.Run(row.network, func(t *testing.T) {
 			var out bytes.Buffer
@@ -49,12 +52,12 @@ func TestDemoNarrationSelectedInputsAndPrivacy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range []string{row.label, "29 named outputs", "definitions/nvke-local-dev-arm64/" + row.selected, "cli-catalog/registry.yaml", "cli-catalog/pins.lock.yaml", "os-tcg.json", "environment-local-docker.json", ".nvkr/laptop-bootstrap/fresh-01/selected-plan.json", ".nvkr/runs/fresh-01/lifecycle.json", demoDocsURL + "user-concepts.md", demoDocsURL + "catalogs-and-components.md", demoDocsURL + "README.md", demoDocsURL + "local-nvke-demo.md"} {
+			for _, want := range []string{row.label, "29 named outputs", "inputs/definitions/demo/" + row.selected, "inputs/catalogs/nvke/module-cli-arm64/registry.yaml", "inputs/catalogs/nvke/module-cli-arm64/pins.lock.yaml", "inputs/catalogs/node-images/variants/nvidia-tcg.json", "inputs/environments/local-arm64-tcg.json", ".nvkr/laptop-bootstrap/fresh-01/selected-plan.json", ".nvkr/runs/fresh-01/lifecycle.json", demoDocsURL + "user-concepts.md", demoDocsURL + "catalogs-and-components.md", demoDocsURL + "README.md", demoDocsURL + "local-nvke-demo.md"} {
 				if !strings.Contains(out.String(), want) {
 					t.Fatalf("missing %q", want)
 				}
 			}
-			for _, forbidden := range []string{repo, "nvke-v1", "os-tcg.json/registry.yaml", "os-tcg.json/pins.lock.yaml"} {
+			for _, forbidden := range []string{repo, "nvke-v1", "nvidia-tcg.json/registry.yaml", "nvidia-tcg.json/pins.lock.yaml"} {
 				if strings.Contains(out.String(), forbidden) {
 					t.Fatalf("unexpected %q", forbidden)
 				}
@@ -98,10 +101,10 @@ func TestDemoNarrationFailuresBeforeExecution(t *testing.T) {
 }
 
 func TestDemoNarrationInvalidAuthoredInputsEmitNothing(t *testing.T) {
-	for _, name := range []string{"definition.json", "environment-local-docker.json"} {
+	for _, name := range []string{"inputs/definitions/demo/arm64-nvidia-tcg.json", "inputs/environments/local-arm64-tcg.json"} {
 		t.Run(name, func(t *testing.T) {
 			repo := narrationRepository(t)
-			if err := os.WriteFile(filepath.Join(repo, "definitions", "nvke-local-dev-arm64", name), []byte(`{"unknown":"rejected"}`), 0o600); err != nil {
+			if err := os.WriteFile(filepath.Join(repo, name), []byte(`{"unknown":"rejected"}`), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			var out bytes.Buffer

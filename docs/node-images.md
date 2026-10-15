@@ -8,7 +8,7 @@ unpack them.
 
 ## Select the root and every material
 
-This is the complete [ARM64 KVM Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-os/definition-arm64-kvm.yaml):
+This is the complete [ARM64 KVM Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/diagnostics/os-arm64.yaml):
 
 ```yaml
 apiVersion: nvkr.dev/definition/v5
@@ -17,9 +17,9 @@ metadata:
   name: nvke-os-arm64-kvm
   description: Build the ARM64 non-FDE NVKE node QCOW2 on a native KVM host.
 catalog:
-  base: ./catalog
+  base: ../../catalogs/node-images/diagnostic
   overlays:
-    - arm64-kvm.yaml
+    - ../../catalogs/node-images/variants/diagnostic-arm64-kvm.yaml
 outputs:
   - name: nvke-node-image-arm64
     platform: linux/arm64
@@ -45,7 +45,7 @@ are errors. **Selecting only the root does not expand its dependencies.**
 
 ## Connect producers by exact names
 
-The [catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-os/catalog/registry.yaml) declares these `materials` mappings:
+The [catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/node-images/diagnostic/registry.yaml) declares these `materials` mappings:
 
 | Consuming component | Binding name → supplying component |
 |---|---|
@@ -77,14 +77,14 @@ KVM or Packer execution:
 ```sh
 NVKR_OS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-os.XXXXXX")
 bin/nvkr run plan \
-  --definition definitions/nvke-os/definition-arm64-kvm.yaml \
-  --environment definitions/nvke-os/environment-local-linux-arm64-docker.yaml \
+  --definition inputs/definitions/diagnostics/os-arm64.yaml \
+  --environment inputs/environments/local-linux-arm64-kvm.yaml \
   --json > "$NVKR_OS_DIR/plan.json"
 bin/nvkr run graph --plan "$NVKR_OS_DIR/plan.json" \
   --view producers --format mermaid > "$NVKR_OS_DIR/materials.mmd"
 bin/nvkr run local \
-  --definition definitions/nvke-os/definition-arm64-kvm.yaml \
-  --environment definitions/nvke-os/environment-local-linux-arm64-docker.yaml \
+  --definition inputs/definitions/diagnostics/os-arm64.yaml \
+  --environment inputs/environments/local-linux-arm64-kvm.yaml \
   --attempt os-preview --dry-run
 ```
 
@@ -96,7 +96,7 @@ The Mermaid file describes dependencies; see [user concepts](user-concepts.md) f
 Native Docker/KVM execution requires matching Linux architecture, a running Docker daemon and CLI, Git,
 `jq`, KVM access, 8 CPUs, 10 GiB memory,
 64 GiB free workspace storage, and access to pinned source/toolchain inputs. Follow the
-[maintained wrapper instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-os/README.md) for source-locked toolchain bootstrap
+[maintained wrapper instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/diagnostics/README.md) for source-locked toolchain bootstrap
 and a fresh immutable attempt. There is no maintained macOS/Podman disk-build route.
 For the ARM64 local demo's Docker/Colima Linux execution setup, see the
 [local demo guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md); a macOS CLI build does not admit native macOS deployment.

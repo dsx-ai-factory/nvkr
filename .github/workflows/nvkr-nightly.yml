@@ -47,7 +47,7 @@ jobs:
           jq --arg profile "$PROFILE" '
             [.[] | select($profile == "all" or .name == $profile) |
               {name, harness_commit, runtime_target, network}]
-          ' definitions/nightly-profiles.json > "$RUNNER_TEMP/nightly-selection.json"
+          ' inputs/testing/nightly-profiles.json > "$RUNNER_TEMP/nightly-selection.json"
           matrix=$(jq -ce --arg profile "$PROFILE" '
             [.[] | select($profile == "all" or .name == $profile)] |
             if length > 0 and all(.[];
@@ -59,7 +59,7 @@ jobs:
               (map(.name) | length == (unique | length)) then
               {include: map({name, harness_commit})}
             else error("invalid maintained nightly profile") end
-          ' definitions/nightly-profiles.json)
+          ' inputs/testing/nightly-profiles.json)
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
       - name: Preserve public nightly selection report
         if: always()
@@ -94,7 +94,7 @@ jobs:
           PROFILE: ${{ matrix.name }}
         run: |
           set -euo pipefail
-          bash scripts/nightly-build.sh definitions/nightly-profiles.json "$PROFILE" \
+          bash scripts/nightly-build.sh inputs/testing/nightly-profiles.json "$PROFILE" \
             "$RUNNER_TEMP/nightly-build-$PROFILE"
       - name: Preserve exact producing Run facts
         if: always()
@@ -245,7 +245,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NVKR_NIGHTLY_ENABLE: '1'
           NVKR_NIGHTLY_PROFILE: ${{ matrix.name }}
-          NVKR_NIGHTLY_PROFILES: ${{ github.workspace }}/definitions/nightly-profiles.json
+          NVKR_NIGHTLY_PROFILES: ${{ github.workspace }}/inputs/testing/nightly-profiles.json
           NVKR_NIGHTLY_BUILD: ${{ github.workspace }}/.nightly-private/build/build.json
           NVKR_NIGHTLY_SOURCE: ${{ github.workspace }}/.nightly-private/nvke
           NVKR_NIGHTLY_NETWORK_HELPER: ${{ github.workspace }}/bin/nvke-demo

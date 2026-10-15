@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
 )
 
 func TestBuildIdentityFieldRulesCoverEveryGraphField(t *testing.T) {
@@ -159,6 +160,75 @@ func TestDigestStableAndSensitive(t *testing.T) {
 	d3, _ := g2.Digest()
 	if d3 == d1 {
 		t.Fatal("digest did not change when a pinned commit changed")
+	}
+}
+
+func TestDigestViewOwnsMutableInputs(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		graph  func() Graph
+		mutate func(*LogicalGraph)
+	}{
+		{
+			name: "source build",
+			graph: func() Graph {
+				graph := sample()
+				graph.Nodes[0].Patches = []PatchRef{testPatch("fix.patch", "patch content")}
+				graph.Nodes[1].VendorCmd = []string{"go", "mod", "vendor"}
+				vendorSpec, err := VendorSpecIdentity(graph.Nodes[1].VendorCmd, graph.Nodes[1].VendorImage)
+				if err != nil {
+					t.Fatal(err)
+				}
+				graph.Nodes[0].VendorSpecDigest = vendorSpec
+				graph.Nodes[1].VendorSpecDigest = vendorSpec
+				return graph
+			},
+			mutate: func(view *LogicalGraph) {
+				view.Nodes[0].Needs[0] = "changed"
+				view.Nodes[0].Env[0].Value = "changed"
+				view.Nodes[0].Patches[0].Content = "changed"
+				view.Nodes[0].Command[0] = "changed"
+				view.Nodes[1].VendorCmd[0] = "changed"
+			},
+		},
+		{
+			name: "VM build",
+			graph: func() Graph {
+				graph := vmGraph(t)
+				graph.Nodes[0].Packer.MaterialManifest = &material.Projection{
+					SchemaVersion: "nke.dev/os-image-materials/v1",
+					Kinds:         map[string]string{"agent-package": "raw"},
+				}
+				return graph
+			},
+			mutate: func(view *LogicalGraph) {
+				view.Nodes[0].Disk.Format = "changed"
+				view.Nodes[0].Packer.ProjectPath = "changed"
+				view.Nodes[0].Packer.Variables[0].Value = "changed"
+				view.Nodes[0].Packer.MaterialManifest.Kinds["agent-package"] = "changed"
+				view.Nodes[0].Materials[0].Component = "changed"
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			graph := test.graph()
+			before, err := graph.CanonicalJSON()
+			if err != nil {
+				t.Fatal(err)
+			}
+			view, err := graph.DigestView()
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.mutate(&view)
+			after, err := graph.CanonicalJSON()
+			if err != nil {
+				t.Fatalf("mutating the logical view invalidated the executable graph: %v", err)
+			}
+			if string(before) != string(after) {
+				t.Fatal("mutating the logical view changed the executable graph")
+			}
+		})
 	}
 }
 

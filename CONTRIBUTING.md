@@ -78,7 +78,7 @@ current implementation boundary:
 
 ## Contributing a catalog / component
 
-Adding a component is a **declarative** change in the selected Definition’s catalog under `definitions/`.
+Adding a component is a **declarative** change in the selected Definition’s catalog under `inputs/catalogs/`.
 Select it directly in an output with a concrete platform, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
 waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. A source bake-off is useful contract evidence, but

@@ -49,7 +49,7 @@ func TestGenerationCommitSurvivesReadOnlyViewerCtrlC(t *testing.T) {
 			return runpresenter.Run(ctx, options, source, nil)
 		},
 	}}
-	args := []string{"nvkr", "run", "generate", "--definition", "definitions/nvke-v1/definition.yaml", "--environment", "definitions/nvke-v1/environment-github.yaml", "--root", root, "--ui=tui"}
+	args := []string{"nvkr", "run", "generate", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "docs/examples/nvke-tutorial/environment-github.yaml", "--root", root, "--ui=tui"}
 	if err := app.RunContext(t.Context(), args); err != nil || !shown {
 		t.Fatal("Ctrl-C changed the committed command outcome", err)
 	}

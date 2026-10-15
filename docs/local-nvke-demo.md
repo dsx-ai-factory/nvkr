@@ -46,7 +46,7 @@ minimum. Capacity is not reserved and execution rechecks it at each stage:
 | Two-VM deployment | Space for a served QCOW2 copy **plus 30 GiB free**, checked after artifact building |
 
 The [launcher](../scripts/nvke-full-arm64-local.sh),
-[Docker Environment](../definitions/nvke-local-dev-arm64/environment-local-docker.json)
+[Docker Environment](../inputs/environments/local-arm64-tcg.json)
 and [deployment checks](../internal/nvkedemo/run.go) own these gates. Passing the
 10-GiB/64-GiB artifact check alone does **not** prove the full demo fits. Keep
 24 GiB assigned to the dedicated host and check `df -h .` before deployment;
@@ -451,7 +451,7 @@ not NVIDIA-fork validation or proof of a supported NVKE release combination.
   --network upstream-ovn
 ```
 
-This chooses the authored [upstream Definition](../definitions/nvke-local-dev-arm64/definition-upstream-ovn.json),
+This chooses the authored [upstream Definition](../inputs/definitions/demo/arm64-upstream-tcg.json),
 not a replacement of the NVIDIA catalog's pins. Image, chart, disk and profiles
 have distinct upstream output names. The complete selection still contains 29
 outputs in one fresh Run. The disk embeds the matching upstream image/chart
@@ -777,7 +777,7 @@ alone does not show a stall. The limits apply to different scopes:
 | --- | --- |
 | Eight hours | Entire `e2e` work context, including installer preparation, artifact building and deployment; [demo command](../cmd/nvke-demo/main.go) |
 | Six hours | **Entire artifact-build invocation**, including toolchain preparation, materials, Packer and packaging; [build adapter](../internal/nvkedemo/build.go) |
-| Six hours | OS VM execution request, admitted by the Environment's `maxTimeoutSeconds: 21600`; [OS overlay](../definitions/nvke-local-dev-arm64/os-tcg.json) and [Docker Environment](../definitions/nvke-local-dev-arm64/environment-local-docker.json) |
+| Six hours | OS VM execution request, admitted by the Environment's `maxTimeoutSeconds: 21600`; [OS overlay](../inputs/catalogs/node-images/variants/nvidia-tcg.json) and [Docker Environment](../inputs/environments/local-arm64-tcg.json) |
 | 180 minutes | Packer's wait for SSH, not the whole OS build; `ssh_timeout` in the OS overlay ([Packer SSH documentation](https://developer.hashicorp.com/packer/docs/communicators/ssh)) |
 | 60 minutes by default; configurable from 5 to 120 minutes | Tenant kubeconfig / two-node readiness wait after tenant creation; `run.timeoutSeconds: 3600` or `--timeout`, owned by [tenant deployment](../internal/nvkedemo/tenant.go) |
 | 45 minutes inside a separate one-hour tenant-cleanup ceiling | Wait for NVKE to delete the exact owned tenant after the two-minute delete request; this is independent of tenant readiness and is not an upstream teardown maximum |
@@ -821,14 +821,14 @@ existing session. Do not run the whole demo as root.
 If a TCG run is already active, press Ctrl+C, confirm with `y` in the dashboard,
 and wait for its command to return. If deployment was retained, use its printed
 explicit cleanup command and wait for cleanup before changing inputs. Before a new build, run this from the
-NVKR repository root on Linux. It updates [the OS overlay](../definitions/nvke-local-dev-arm64/os-tcg.json)
-and [the Docker Environment](../definitions/nvke-local-dev-arm64/environment-local-docker.json):
+NVKR repository root on Linux. It updates [the OS overlay](../inputs/catalogs/node-images/variants/nvidia-tcg.json)
+and [the Docker Environment](../inputs/environments/local-arm64-tcg.json):
 
 ```sh
 (
   set -eu
-  kvm_os=definitions/nvke-local-dev-arm64/os-tcg.json
-  kvm_env=definitions/nvke-local-dev-arm64/environment-local-docker.json
+  kvm_os=inputs/catalogs/node-images/variants/nvidia-tcg.json
+  kvm_env=inputs/environments/local-arm64-tcg.json
   kvm_tmp=$(mktemp)
   jq '
     (.components["nvke-node-image"].component.buildRequirements.capabilities[]
@@ -1027,11 +1027,11 @@ one tagged NVKE release.
 
 | Part | Selected NVKE commit | Owning input |
 | --- | --- | --- |
-| Installer, site CLI/controller/charts and diagnostic profiles | [`8fb2d533`](https://github.com/dsx-ai-factory/nvke/commit/8fb2d53368823bd386b4fbd55b4ab6d3c0931345) | [Site lock](../definitions/nvke-local-dev-arm64/site-catalog/pins.lock.yaml), [profiles lock](../definitions/nvke-local-dev-arm64/profiles-catalog/pins.lock.yaml) and the demo's [installer pin](../internal/nvkedemo/model.go) |
-| OS assembly, agent and most NVKE-owned OS material producers | [`ff21ba8c`](https://github.com/dsx-ai-factory/nvke/commit/ff21ba8c07cafff74b68e238a8876af11e5beded) | [OS lock](../definitions/nvke-m2/os-catalog/pins.lock.yaml) and [local OS overlay](../definitions/nvke-local-dev-arm64/os-tcg.json) |
+| Installer, site CLI/controller/charts and diagnostic profiles | [`8fb2d533`](https://github.com/dsx-ai-factory/nvke/commit/8fb2d53368823bd386b4fbd55b4ab6d3c0931345) | [Site lock](../inputs/catalogs/nvke/local-site-arm64/pins.lock.yaml), [profiles lock](../inputs/catalogs/controller-profiles/nvidia-arm64/pins.lock.yaml) and the demo's [installer pin](../internal/nvkedemo/model.go) |
+| OS assembly, agent and most NVKE-owned OS material producers | [`ff21ba8c`](https://github.com/dsx-ai-factory/nvke/commit/ff21ba8c07cafff74b68e238a8876af11e5beded) | [OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) and [local OS overlay](../inputs/catalogs/node-images/variants/nvidia-tcg.json) |
 | Temporary SPIRE package selection | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Same OS lock; the prior plugin-free producer is retained temporarily. DSX remains a required missing product input, tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641), not full source/content parity. |
-| NICoSim | [`6ffc2e5c`](https://github.com/dsx-ai-factory/nvke/commit/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4) | [Simulator lock](../definitions/nvke-local-dev-arm64/simulator-catalog/pins.lock.yaml) |
-| Provisioned provider (built, not used by this NICoSim tenant) | [`33fb71b2`](https://github.com/dsx-ai-factory/nvke/commit/33fb71b2f4224b470ebc628a9165fc4b92870406) | [Provider lock](../definitions/nvke-controller/catalog/pins.lock.yaml), selecting `v0.21.0` |
+| NICoSim | [`6ffc2e5c`](https://github.com/dsx-ai-factory/nvke/commit/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4) | [Simulator lock](../inputs/catalogs/nicosim/pins.lock.yaml) |
+| Provisioned provider (built, not used by this NICoSim tenant) | [`33fb71b2`](https://github.com/dsx-ai-factory/nvke/commit/33fb71b2f4224b470ebc628a9165fc4b92870406) | [Provider lock](../inputs/catalogs/nvke/release/pins.lock.yaml), selecting `v0.21.0` |
 
 The OS commit added APT archive capture; the installer commit includes the staged
 deployment interface this adapter checks. The NVIDIA OVN fork, CAPNICo, NICoSim

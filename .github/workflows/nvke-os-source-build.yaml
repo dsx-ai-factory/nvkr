@@ -7,7 +7,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/nvke-os-source-build.yaml
-      - definitions/nvke-os-source/**
+      - inputs/experiments/public-os-sources/**
       - pkg/nvkr/buildgraph/nvke_os_source_test.go
   schedule:
     - cron: '19 3 * * 1'

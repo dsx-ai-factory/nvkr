@@ -7,7 +7,7 @@ KVM guests as tenant nodes on a dedicated Linux runner. Local describes the test
 environment; GitHub Actions schedules and executes the entire cycle.
 
 The coordinator is `.github/workflows/nvkr-nightly.yml`, with a daily 03:17 UTC
-schedule and manual dispatch. `definitions/nightly-profiles.json` selects the
+schedule and manual dispatch. `inputs/testing/nightly-profiles.json` selects the
 project Definitions, named generated producer workflows, exact suite revisions
 and runtime profiles. Each project selects its own complete output set. The
 ordinary generated M2 workflow retains its default paths; named bundles use the

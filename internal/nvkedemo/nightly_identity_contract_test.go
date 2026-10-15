@@ -176,12 +176,12 @@ func TestNightlyInputReadersRejectAmbiguousUnsafeAndUnboundedRecords(t *testing.
 
 func nightlyCompiledFixture(t *testing.T, profile NightlyProfile, build NightlyBuild) (*factory.Plan, lifecycle.Run) {
 	t.Helper()
-	catalog, err := filepath.Abs("../../definitions/nvke-v1/catalog")
+	catalog, err := filepath.Abs("../../inputs/catalogs/nvke/module-tags")
 	if err != nil {
 		t.Fatal(err)
 	}
 	declared := definition.Definition{APIVersion: definition.DefinitionAPIVersion, Kind: definition.DefinitionKind, Metadata: definition.Metadata{Name: profile.Name}, Catalog: definition.Catalog{Base: catalog}, SBOMTool: "syft", CosignTool: "cosign", Outputs: []definition.DefinitionOutput{{Name: "nvkectl", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{"nvkectl"}}}}
-	environment, err := definition.LoadEnvironment(t.Context(), "../../definitions/nvke-v1/environment-github.yaml")
+	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-tutorial/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -29,25 +29,25 @@ For NVIDIA OVN, open these in this order:
 
 | File | What to explain |
 |---|---|
-| `definitions/nvke-local-dev-arm64/definition.json` | The complete named output selection, including per-output catalog stacks. |
+| `inputs/definitions/demo/arm64-nvidia-tcg.json` | The complete named output selection, including per-output catalog stacks. |
 | Each selected stack's `registry.yaml` | Reusable build/acquisition producers, dependencies and instructions. |
 | Each selected stack's `pins.lock.yaml` | CLI-managed exact source, artifact and tool identities. |
-| `definitions/nvke-local-dev-arm64/os-tcg.json` | The explicitly selected OS producer overlay; it is an authored file. |
-| `definitions/nvke-local-dev-arm64/environment-local-docker.json` | Native Linux ARM64 Docker execution; publication and signing are absent. |
+| `inputs/catalogs/node-images/variants/nvidia-tcg.json` | The explicitly selected OS producer overlay; it is an authored file. |
+| `inputs/environments/local-arm64-tcg.json` | Native Linux ARM64 Docker execution; publication and signing are absent. |
 
-The default catalog is `cli-catalog`; other outputs select their own complete stacks. The Go
+The default catalog is `inputs/catalogs/nvke/module-cli-arm64`; other outputs select their own complete stacks. The Go
 `e2e --walkthrough` introduction enumerates the selected catalog and overlay paths from the actual
 Definition and prints the actual output count. For explicit `upstream-ovn`, it instead reads
-`definition-upstream-ovn.json`. It never changes the NVIDIA default to make a demo pass.
+`inputs/definitions/demo/arm64-upstream-tcg.json`. It never changes the NVIDIA default to make a demo pass.
 
 These read-only commands inspect the NVIDIA selection:
 
 ```sh
-bin/nvkr catalog validate --data definitions/nvke-local-dev-arm64/cli-catalog
-bin/nvkr catalog list --data definitions/nvke-local-dev-arm64/cli-catalog
-bin/nvkr catalog source-pin --data definitions/nvke-local-dev-arm64/cli-catalog nvke
-bin/nvkr definition validate --definition definitions/nvke-local-dev-arm64/definition.json
-bin/nvkr definition inspect --definition definitions/nvke-local-dev-arm64/definition.json
+bin/nvkr catalog validate --data inputs/catalogs/nvke/module-cli-arm64
+bin/nvkr catalog list --data inputs/catalogs/nvke/module-cli-arm64
+bin/nvkr catalog source-pin --data inputs/catalogs/nvke/module-cli-arm64 nvke
+bin/nvkr definition validate --definition inputs/definitions/demo/arm64-nvidia-tcg.json
+bin/nvkr definition inspect --definition inputs/definitions/demo/arm64-nvidia-tcg.json
 ```
 
 A customer saying “recipe” usually means a reusable catalog producer. The current schema selects

@@ -45,7 +45,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
-	cat, err := catalog.LoadContext(ctx, catalog.Dir("../../../definitions/nvke-ovn-source/catalog"))
+	cat, err := catalog.LoadContext(ctx, catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
 	if err != nil {
 		t.Fatal(err)
 	}

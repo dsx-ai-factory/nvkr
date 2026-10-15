@@ -41,7 +41,7 @@ func TestCLIClosedStdoutPreservesCheckedStatus(t *testing.T) {
 		case "plain inspection":
 			os.Args = []string{"nvkr", "run", "inspect", "--record", os.Getenv("NVKR_TEST_RECORD_PATH")}
 		case "unchecked definition":
-			os.Args = []string{"nvkr", "definition", "validate", "--definition", "definitions/nvke-v1/definition.yaml"}
+			os.Args = []string{"nvkr", "definition", "validate", "--definition", "docs/examples/nvke-tutorial/definition.yaml"}
 		default:
 			t.Fatal("unknown process fixture")
 		}

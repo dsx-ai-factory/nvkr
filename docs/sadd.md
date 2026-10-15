@@ -50,8 +50,9 @@ provide reusable component producers and pins, including tool releases and GitHu
 Generated Runs bind action commits from the catalog; compatible action updates need a lock bump and workflow
 regeneration without rebuilding the generator. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
-access, registry retention, runtime conformance, and deployment policy. Downstream systems consume accepted
-artifact references and own their deployment descriptions (ADR-19/20).
+access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
+diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
+references and own deployment descriptions and acceptance decisions (ADR-19/20).
 A separately authored repository CI adapter schedules producer Runs and invokes
 NVKE's suite in a separate downstream job outside this product lifecycle and v1
 qualification acceptance (ADR-16/18). NVKE owns guest/cluster provisioning,
@@ -353,6 +354,7 @@ hosted execution, registry services, signing or operational release acceptance (
 | Artifact | Producer/packager → consumer | Exact blob or OCI bytes, separate from logical build identity |
 | Release content and evidence | Release/transport owners → verifier | Noncircular exact content subject and typed proof closure |
 | External test outputs | External producer → descriptive consumer | `testresults` owns bounded descriptions/serialization only; no execution, authentication or qualification authority |
+| Diagnostic validation profile | User → `validation` → supported producer | Separate check-instance/suite/harness selection; `lifecycle` authenticates product and tool publications and exports exact executable members; diagnostic execution cannot issue qualification authority |
 | Authenticated receipts | Owning verifier → authorized operation | Bound to exact subjects, roles, and policy; cannot be recreated by parsing |
 
 All structured identities use ADR-01's canonical codec and named digest families. The codec uses its specified
@@ -376,6 +378,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
+| Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
 | Plan inspection | `planview` | Validate through factory, retain immutable descriptive snapshots, render linked graphs and compare named Plan fields without granting execution or evidence authority |
 | Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
@@ -713,8 +716,8 @@ pipeline-attested lane unless a recorded bake-off proves the canonical RAW compa
 not prove deterministic output.
 
 Accepted artifact references can be consumed by a downstream deployer. NVKR does not generate a cluster
-realization or define a cluster qualification protocol. Deployment descriptions and runtime validation belong
-to that consumer. Proposed registration transport is separate from the v1 manifest and build/evidence gate.
+realization or define a cluster qualification protocol. Deployment descriptions and runtime acceptance belong
+to that consumer; the explicit local diagnostic route records descriptive observations without owning acceptance. Proposed registration transport is separate from the v1 manifest and build/evidence gate.
 
 ### Data Flow {#data-flow}
 

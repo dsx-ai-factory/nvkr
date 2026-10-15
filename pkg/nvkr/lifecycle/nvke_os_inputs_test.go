@@ -32,19 +32,18 @@ func TestNVKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.
 		wantKVM     bool
 		wantCPU     string
 	}{
-		{name: "native KVM", definition: "definition-arm64-kvm.yaml",
-			environment: "environment-local-linux-arm64-docker.yaml", arch: "arm64",
+		{name: "native KVM", definition: "inputs/definitions/diagnostics/os-arm64.yaml",
+			environment: "inputs/environments/local-linux-arm64-kvm.yaml", arch: "arm64",
 			root: "nvke-node-image", installer: "ubuntu-installer-iso",
 			patched: "nvke-patched-installer-iso", wantKVM: true},
-		{name: "amd64 native KVM", definition: "definition-amd64-kvm.yaml",
-			environment: "environment-local-linux-amd64-docker.yaml", arch: "amd64",
+		{name: "amd64 native KVM", definition: "inputs/definitions/diagnostics/os-amd64.yaml",
+			environment: "inputs/environments/local-linux-amd64-kvm.yaml", arch: "amd64",
 			root: "nvke-node-image-amd64", installer: "ubuntu-installer-iso-amd64",
 			patched: "nvke-patched-installer-iso-amd64", wantKVM: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			root := filepath.Join("definitions", "nvke-os")
-			plan, err := CompileFiles(t.Context(), filepath.Join(root, test.definition),
-				filepath.Join(root, test.environment), "test")
+			plan, err := CompileFiles(t.Context(), test.definition,
+				test.environment, "test")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -132,15 +131,14 @@ func TestNVKEOSExecutionModesRejectCrossedEnvironments(t *testing.T) {
 	for _, test := range []struct {
 		name, definition, environment string
 	}{
-		{name: "ARM64 cannot select AMD64 host", definition: "definition-arm64-kvm.yaml",
-			environment: "environment-local-linux-amd64-docker.yaml"},
-		{name: "AMD64 cannot select ARM64 host", definition: "definition-amd64-kvm.yaml",
-			environment: "environment-local-linux-arm64-docker.yaml"},
+		{name: "ARM64 cannot select AMD64 host", definition: "inputs/definitions/diagnostics/os-arm64.yaml",
+			environment: "inputs/environments/local-linux-amd64-kvm.yaml"},
+		{name: "AMD64 cannot select ARM64 host", definition: "inputs/definitions/diagnostics/os-amd64.yaml",
+			environment: "inputs/environments/local-linux-arm64-kvm.yaml"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			root := filepath.Join("definitions", "nvke-os")
-			plan, err := CompileFiles(t.Context(), filepath.Join(root, test.definition),
-				filepath.Join(root, test.environment), "test")
+			plan, err := CompileFiles(t.Context(), test.definition,
+				test.environment, "test")
 			assertCode(t, err, e.CodeEngineCapability)
 			if plan != nil {
 				t.Fatal("crossed execution mode returned a Plan")

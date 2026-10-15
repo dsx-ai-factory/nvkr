@@ -240,7 +240,7 @@ compiled Plan. Impossible policy scope fails before any workflow write. The work
 selected executable platform set, while the final signer remains AMD64 with its independent executable pin.
 `run generate --qualification-policy` admits and renders this pair before writes, then composes it with
 the normal producer generation. The worker is a generated reusable GitHub Actions workflow, not an additional
-handwritten integration. The maintained candidate uses `definitions/nvke-m2/qualification.yaml` to emit
+handwritten integration. The maintained candidate uses `inputs/policies/nvke-qualification.yaml` to emit
 `.github/workflows/nvkr-qualify.yml` and `.github/workflows/nvkr-smoke.yml` alongside its producer bundle.
 Its separate manifest owns exactly the two workflows. A persistent kernel lock serializes writes; bounded
 stages are synced and the manifest is committed last. Replacement or

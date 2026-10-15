@@ -61,18 +61,18 @@ resume capabilities. The [demo index](demos/README.md) provides bounded generati
 journeys with their prerequisites.
 
 The bundle records its selected Definition and Environment in `.github/nvkr-run/plan.json`.
-The maintained release selection is the 69-output [M2 candidate](definitions/nvke-m2/README.md), including
+The maintained release selection is the 69-output [M2 candidate](inputs/definitions/nvke/README.md), including
 plain and public-bootstrap FDE disks for both native architectures. The separate
-[FDE diagnostic workflow](definitions/nvke-fde/README.md) selects one build-only disk for branch iteration.
+[FDE diagnostic workflow](inputs/definitions/diagnostics/fde.md) selects one build-only disk for branch iteration.
 Regenerate with the intended selection after changing its inputs or generator code:
 
 ```sh
 go run ./cmd/nvkr run generate \
-  --definition definitions/nvke-m2/definition.yaml \
-  --environment definitions/nvke-m2/environment-github.yaml --engine github --root .
+  --definition inputs/definitions/nvke/definition.yaml \
+  --environment inputs/environments/github-release.yaml --engine github --root .
 go run ./cmd/nvkr run generate \
-  --definition definitions/nvke-m2/definition.yaml \
-  --environment definitions/nvke-m2/environment-github.yaml --engine github --root . --check
+  --definition inputs/definitions/nvke/definition.yaml \
+  --environment inputs/environments/github-release.yaml --engine github --root . --check
 ```
 
 Use the same generator version and input selection for generation and checking. Generated files are owned by
@@ -89,7 +89,7 @@ Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other exa
 The committed `nvkr-dev.yml` runs the **same 69-output M2 Definition** as the maintained production
 workflow, including native AMD64/ARM64 plain and public-bootstrap FDE disks, SBOM attestation, per-output publication, cosign signing,
 verification and finalization. Its generator and helper come from the dispatched branch. The separate
-`definitions/nvke-m2/environment-github-dev.yaml` selects development credentials, protected environments,
+`inputs/environments/github-development.yaml` selects development credentials, protected environments,
 signer policy and disposable registry destinations. Its Plan and manifest live beneath `.github/nvkr-dev/`.
 The production bundle remains independently owned and checked.
 
@@ -193,7 +193,7 @@ The cleanup report records candidates and API-confirmed deletions, including par
 failure. Its CI artifact retains seven days. A timed-out deletion has an unknown outcome and is not retried
 within the command. Inspect the next preview before retrying.
 
-The three-output unsigned Environment in `definitions/nvke-v1/environment-github-dev.yaml` remains a
+The three-output unsigned Environment in `docs/examples/nvke-tutorial/environment-github-dev.yaml` remains a
 smaller scratch-generation example. It uses one-day transfers, automatic cancellation and no publication.
 It does not supply the committed full-development bundle. Hosted execution, credential/pool setup and
 actual registry deletion still need a recorded external Run; local contract tests establish none of those.
@@ -301,7 +301,8 @@ Syft pin in `toolchains/nvkr-disk-inspect`; record which selected native executa
 
 ## Repository layout
 
-- `definitions/`: tutorial, deploy, combined candidate, and OS-image Definitions, Environments, and catalogs.
+- `inputs/`: distribution, demo and diagnostic Definitions, shared catalogs, Environments, policies and nightly configuration; start with the [input index](inputs/README.md).
+- `docs/examples/`: retained tutorial and deploy inputs, alongside the authoring lab.
 - `testdata/examples/`: multi-output, worker, and catalog contract fixtures.
 - `pkg/nvkr/definition/`: authored inputs, admission and identity.
 - `pkg/nvkr/factory/`: complete compilation, Run operations and provider generation.
@@ -324,6 +325,7 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
 | Producer execution, observations and qualified receipts | `pipeline`, `profile` |
 | External test output descriptions, wrapper validation and deterministic serialization (no execution or authority) | `pkg/nvkr/testresults` |
+| Configured diagnostic check selection and local upstream conformance execution | `validation`, `conformance` — delegate product/tool publication authentication and exact executable-member export to `lifecycle` |
 | Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
 | Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `trust`, `sign` |
 | Release authority and delivery | `release`, `status`, `delivery` |

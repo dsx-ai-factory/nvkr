@@ -1,0 +1,420 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+diff --git a/pkg/conformance/client/download.go b/pkg/conformance/client/download.go
+--- a/pkg/conformance/client/download.go
++++ b/pkg/conformance/client/download.go
+@@ -19,18 +19,20 @@
+ import (
+-	"bytes"
+-	"context"
+-	"fmt"
+-	"io"
+-	"net/http"
+-	"os"
+-	"path/filepath"
+-	"strings"
+-
+-	"sigs.k8s.io/hydrophone/pkg/conformance"
+-	"sigs.k8s.io/hydrophone/pkg/log"
+-
+-	corev1 "k8s.io/api/core/v1"
+-	"k8s.io/apimachinery/pkg/runtime"
+-	"k8s.io/client-go/tools/remotecommand"
+-	"k8s.io/streaming/pkg/httpstream"
++	"bytes"
++	"context"
++	"errors"
++	"fmt"
++	"io"
++	"net/http"
++	"os"
++	"path/filepath"
++	"strings"
++	"sync"
++
++	"sigs.k8s.io/hydrophone/pkg/conformance"
++	"sigs.k8s.io/hydrophone/pkg/log"
++
++	corev1 "k8s.io/api/core/v1"
++	"k8s.io/apimachinery/pkg/runtime"
++	"k8s.io/client-go/tools/remotecommand"
++	"k8s.io/streaming/pkg/httpstream"
+ )
+@@ -53,14 +55,9 @@
+ func (c *Client) fetchFile(ctx context.Context, outputDir, filename string) error {
+-	dest := filepath.Join(outputDir, filename)
+-	log.Printf("Downloading %s to %s...", filename, dest)
+-
+-	localFile, err := os.Create(dest)
+-	if err != nil {
+-		return err
+-	}
+-	defer localFile.Close()
+-
+-	containerFile := "/tmp/results/" + filename
+-
+-	return c.downloadFile(ctx, conformance.PodName, conformance.OutputContainer, containerFile, localFile)
++	dest := filepath.Join(outputDir, filename)
++	log.Printf("Downloading %s to %s...", filename, dest)
++
++	containerFile := "/tmp/results/" + filename
++	return writeDownloadedFile(ctx, dest, func(ctx context.Context, writer io.Writer) error {
++		return c.downloadFile(ctx, conformance.PodName, conformance.OutputContainer, containerFile, writer)
++	})
+ }
+@@ -109,15 +106,93 @@
+-	// Stream the file content from the container to the writer
+-	var stderr bytes.Buffer
+-
+-	err = executor.StreamWithContext(
+-		ctx,
+-		remotecommand.StreamOptions{
+-			Stdout: writer,
+-			Stderr: &stderr,
+-		})
+-	if err != nil {
+-		return fmt.Errorf("download failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+-	}
+-
+-	return nil
++	return streamFile(ctx, executor, writer)
+ }
++
++const (
++	maxDownloadBytes = 64 << 20
++	maxStderrBytes   = 1 << 20
++)
++
++var errDownloadLimit = errors.New("download byte limit exceeded")
++
++// writeDownloadedFile exposes only a successfully transferred and closed file.
++func writeDownloadedFile(ctx context.Context, dest string, download func(context.Context, io.Writer) error) error {
++	file, err := os.CreateTemp(filepath.Dir(dest), "."+filepath.Base(dest)+"-*")
++	if err != nil {
++		return err
++	}
++	defer os.Remove(file.Name())
++	defer file.Close()
++	if err := download(ctx, file); err != nil {
++		return err
++	}
++	if err := file.Close(); err != nil {
++		return err
++	}
++	if err := context.Cause(ctx); err != nil {
++		return err
++	}
++	return os.Rename(file.Name(), dest)
++}
++
++func streamFile(ctx context.Context, executor remotecommand.Executor, writer io.Writer) error {
++	ctx, cancel := context.WithCancelCause(ctx)
++	defer cancel(nil)
++	var stderr bytes.Buffer
++	stdoutBudget := &downloadWriter{ctx: ctx, cancel: cancel, writer: writer, remaining: maxDownloadBytes}
++	stderrBudget := &downloadWriter{ctx: ctx, cancel: cancel, writer: &stderr, remaining: maxStderrBytes}
++	err := executor.StreamWithContext(ctx, remotecommand.StreamOptions{Stdout: stdoutBudget, Stderr: stderrBudget})
++	// client-go may return on cancellation while copy goroutines still hold the
++	// writers. Stop both before the file is closed or stderr is inspected.
++	stdoutBudget.stop()
++	stderrBudget.stop()
++	if cause := context.Cause(ctx); cause != nil {
++		return fmt.Errorf("download failed: %w", cause)
++	}
++	if err != nil {
++		return fmt.Errorf("download failed: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
++	}
++	return nil
++}
++
++// StreamOptions requires writers; LimitReader cannot bound these streams.
++// Cancel on write failures because client-go can discard io.Copy errors.
++type downloadWriter struct {
++	mu        sync.Mutex
++	ctx       context.Context
++	cancel    context.CancelCauseFunc
++	writer    io.Writer
++	remaining int64
++	stopped   bool
++}
++
++func (w *downloadWriter) Write(p []byte) (int, error) {
++	w.mu.Lock()
++	defer w.mu.Unlock()
++	if w.stopped {
++		return 0, io.ErrClosedPipe
++	}
++	if err := context.Cause(w.ctx); err != nil {
++		return 0, err
++	}
++	overflow := int64(len(p)) > w.remaining
++	if overflow {
++		p = p[:int(w.remaining)]
++	}
++	n, err := w.writer.Write(p)
++	w.remaining -= int64(n)
++	if err == nil && n != len(p) {
++		err = io.ErrShortWrite
++	}
++	if err == nil && overflow {
++		err = errDownloadLimit
++	}
++	if err != nil {
++		w.cancel(err)
++	}
++	return n, err
++}
++
++func (w *downloadWriter) stop() {
++	w.mu.Lock()
++	defer w.mu.Unlock()
++	w.stopped = true
++}
+diff --git a/pkg/conformance/client/download_test.go b/pkg/conformance/client/download_test.go
+new file mode 100644
+--- /dev/null
++++ b/pkg/conformance/client/download_test.go
+@@ -0,0 +1,242 @@
++// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++// SPDX-License-Identifier: Apache-2.0
++
++package client
++
++import (
++	"bytes"
++	"context"
++	"errors"
++	"io"
++	"os"
++	"path/filepath"
++	"testing"
++	"time"
++
++	"k8s.io/client-go/tools/remotecommand"
++)
++
++func TestDownloadWriter(t *testing.T) {
++	for _, tc := range []struct {
++		name     string
++		writes   []string
++		want     string
++		overflow bool
++	}{
++		{"empty", []string{""}, "", false},
++		{"below", []string{"abc"}, "abc", false},
++		{"exact", []string{"ab", "cd"}, "abcd", false},
++		{"one over", []string{"abcd", "e"}, "abcd", true},
++		{"one large write", []string{"abcdef"}, "abcd", true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			ctx, cancel := context.WithCancelCause(context.Background())
++			defer cancel(nil)
++			var buf bytes.Buffer
++			w := &downloadWriter{ctx: ctx, cancel: cancel, writer: &buf, remaining: 4}
++			var err error
++			for _, p := range tc.writes {
++				_, err = w.Write([]byte(p))
++			}
++			if buf.String() != tc.want || errors.Is(err, errDownloadLimit) != tc.overflow || errors.Is(context.Cause(ctx), errDownloadLimit) != tc.overflow {
++				t.Fatalf("bytes=%q err=%v cause=%v", buf.String(), err, context.Cause(ctx))
++			}
++			if tc.overflow {
++				if n, err := w.Write([]byte("more")); n != 0 || !errors.Is(err, errDownloadLimit) {
++					t.Fatalf("late overflow write: %d %v", n, err)
++				}
++			}
++		})
++	}
++	for _, tc := range []struct {
++		name   string
++		writer io.Writer
++		want   error
++	}{
++		{"short write", writerFunc(func(p []byte) (int, error) { return len(p) - 1, nil }), io.ErrShortWrite},
++		{"write failure", writerFunc(func([]byte) (int, error) { return 0, io.ErrClosedPipe }), io.ErrClosedPipe},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			ctx, cancel := context.WithCancelCause(context.Background())
++			defer cancel(nil)
++			w := &downloadWriter{ctx: ctx, cancel: cancel, writer: tc.writer, remaining: 4}
++			_, err := w.Write([]byte("abc"))
++			if !errors.Is(err, tc.want) || !errors.Is(context.Cause(ctx), tc.want) {
++				t.Fatalf("error=%v cause=%v", err, context.Cause(ctx))
++			}
++		})
++	}
++}
++
++func TestStreamFileLimits(t *testing.T) {
++	for _, tc := range []struct {
++		name     string
++		stderr   bool
++		size     int64
++		overflow bool
++	}{
++		{"stdout exact", false, maxDownloadBytes, false},
++		{"stdout overflow", false, maxDownloadBytes + 1, true},
++		{"stderr exact", true, maxStderrBytes, false},
++		{"stderr overflow", true, maxStderrBytes + 1, true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
++			defer cancel()
++			written := int64(0)
++			out := writerFunc(func(p []byte) (int, error) { written += int64(len(p)); return len(p), nil })
++			executor := streamExecutor(func(ctx context.Context, o remotecommand.StreamOptions) error {
++				w := o.Stdout
++				if tc.stderr {
++					w = o.Stderr
++				}
++				chunk := bytes.Repeat([]byte{'x'}, 1<<20)
++				for remaining := tc.size; remaining > 0; {
++					p := chunk
++					if remaining < int64(len(p)) {
++						p = p[:remaining]
++					}
++					_, _ = w.Write(p) // Match client-go's discarded io.Copy errors.
++					remaining -= int64(len(p))
++				}
++				if tc.overflow {
++					<-ctx.Done()
++					return ctx.Err()
++				}
++				return nil
++			})
++			err := streamFile(ctx, executor, out)
++			if errors.Is(err, errDownloadLimit) != tc.overflow {
++				t.Fatalf("error=%v", err)
++			}
++			want := int64(0)
++			if !tc.stderr {
++				want = maxDownloadBytes
++			}
++			if written != want {
++				t.Fatalf("wrote %d, want %d", written, want)
++			}
++		})
++	}
++}
++
++func TestStreamFileCancellationAndLateWrites(t *testing.T) {
++	t.Run("caller cancellation", func(t *testing.T) {
++		ctx, cancel := context.WithCancelCause(context.Background())
++		cause := errors.New("caller interrupted")
++		cancel(cause)
++		err := streamFile(ctx, streamExecutor(func(ctx context.Context, o remotecommand.StreamOptions) error {
++			if n, err := o.Stdout.Write([]byte("x")); n != 0 || !errors.Is(err, cause) {
++				t.Fatalf("write=%d %v", n, err)
++			}
++			return ctx.Err()
++		}), io.Discard)
++		if !errors.Is(err, cause) {
++			t.Fatalf("lost cause: %v", err)
++		}
++	})
++	t.Run("copy goroutine returns late", func(t *testing.T) {
++		release, done := make(chan struct{}), make(chan struct{})
++		var n int
++		var writeErr error
++		failure := errors.New("stream interrupted")
++		err := streamFile(context.Background(), streamExecutor(func(_ context.Context, o remotecommand.StreamOptions) error {
++			go func() {
++				defer close(done)
++				<-release
++				n, writeErr = o.Stdout.Write([]byte("late"))
++				_, _ = o.Stderr.Write([]byte("late"))
++			}()
++			return failure
++		}), io.Discard)
++		close(release)
++		<-done
++		if !errors.Is(err, failure) || n != 0 || !errors.Is(writeErr, io.ErrClosedPipe) {
++			t.Fatalf("stream=%v late write=%d %v", err, n, writeErr)
++		}
++	})
++}
++
++func TestWriteDownloadedFile(t *testing.T) {
++	failure := errors.New("transfer interrupted")
++	for _, tc := range []struct {
++		name     string
++		transfer func(context.CancelCauseFunc, io.Writer) error
++		want     error
++	}{
++		{"success", func(_ context.CancelCauseFunc, w io.Writer) error {
++			_, err := io.WriteString(w, "original")
++			return err
++		}, nil},
++		{"failed transfer", func(_ context.CancelCauseFunc, w io.Writer) error {
++			_, _ = io.WriteString(w, "partial")
++			return failure
++		}, failure},
++		{"overflow", func(_ context.CancelCauseFunc, w io.Writer) error {
++			_, _ = io.WriteString(w, "partial")
++			return errDownloadLimit
++		}, errDownloadLimit},
++		{"write failure", func(_ context.CancelCauseFunc, w io.Writer) error {
++			_ = w.(io.Closer).Close()
++			_, err := io.WriteString(w, "partial")
++			return err
++		}, os.ErrClosed},
++		{"close failure", func(_ context.CancelCauseFunc, w io.Writer) error {
++			_, _ = io.WriteString(w, "partial")
++			return w.(io.Closer).Close()
++		}, os.ErrClosed},
++		{"canceled transfer", func(cancel context.CancelCauseFunc, w io.Writer) error {
++			_, _ = io.WriteString(w, "partial")
++			cancel(failure)
++			return nil
++		}, failure},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			dir := t.TempDir()
++			dest := filepath.Join(dir, "junit_01.xml")
++			ctx, cancel := context.WithCancelCause(context.Background())
++			defer cancel(nil)
++			err := writeDownloadedFile(ctx, dest, func(_ context.Context, w io.Writer) error { return tc.transfer(cancel, w) })
++			if !errors.Is(err, tc.want) {
++				t.Fatalf("error=%v want=%v", err, tc.want)
++			}
++			entries, err := os.ReadDir(dir)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if tc.want != nil {
++				if len(entries) != 0 {
++					t.Fatalf("failed transfer left files: %v", entries)
++				}
++				return
++			}
++			if len(entries) != 1 || entries[0].Name() != "junit_01.xml" {
++				t.Fatalf("unexpected files: %v", entries)
++			}
++			data, err := os.ReadFile(dest)
++			if err != nil {
++				t.Fatal(err)
++			}
++			info, err := os.Stat(dest)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(data) != "original" || info.Mode().Perm() != 0600 {
++				t.Fatalf("data=%q mode=%v", data, info.Mode())
++			}
++		})
++	}
++}
++
++type writerFunc func([]byte) (int, error)
++
++func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
++
++type streamExecutor func(context.Context, remotecommand.StreamOptions) error
++
++func (f streamExecutor) Stream(o remotecommand.StreamOptions) error {
++	return f(context.Background(), o)
++}
++func (f streamExecutor) StreamWithContext(ctx context.Context, o remotecommand.StreamOptions) error {
++	return f(ctx, o)
++}

@@ -43,9 +43,9 @@ const ovnGoBuilder = "quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4
 
 func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 	for _, path := range []string{
-		"../../../definitions/nvke-ovn-source/catalog",
-		"../../../definitions/nvke-m2/os-catalog",
-		"../../../definitions/nvke-os/catalog",
+		"../../../inputs/catalogs/ovn-nvidia",
+		"../../../inputs/catalogs/node-images/release",
+		"../../../inputs/catalogs/node-images/diagnostic",
 	} {
 		t.Run(path, func(t *testing.T) {
 			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(path))
@@ -62,7 +62,7 @@ func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 
 func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-ovn-source/catalog"))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,11 +72,11 @@ func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 // The local disk selects the same pinned fork producers as the standalone image
 // and chart outputs, while retaining the source-owned image-inputs handoff.
 func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-m2/os-catalog"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images/release"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nvke-local-dev-arm64/os-tcg.json")
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
 	if got := stack.Catalog.Components["nvke-image-inputs"].Materials["ovn"]; got != "nvke-cni-ovn" {
 		t.Fatalf("OS material binding = %q, want fork Debian bundle", got)
 	}
-	d, err := definition.LoadDefinition(t.Context(), "../../../definitions/nvke-local-dev-arm64/definition-os.json")
+	d, err := definition.LoadDefinition(t.Context(), "../../../inputs/definitions/diagnostics/demo-arm64/os.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,12 +108,12 @@ func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-local-dev-arm64/profiles-catalog"))
+	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/controller-profiles/nvidia-arm64"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	profile := profiles.Components["nvke-local-profiles"]
-	raw, err := os.ReadFile("../../../definitions/nvke-local-dev-arm64/profiles-catalog/patches/local-profile.patch")
+	raw, err := os.ReadFile("../../../inputs/catalogs/controller-profiles/nvidia-arm64/patches/local-profile.patch")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestNVKEOVNForkGraphs(t *testing.T) {
 // TestNVKEOVNForkPinBindings guards the supplied catalog's repeated literals.
 // Re-pinning this candidate requires reviewing its stream and packaging together.
 func TestNVKEOVNForkPinBindings(t *testing.T) {
-	lock, err := catalog.LoadLockContext(t.Context(), "../../../definitions/nvke-ovn-source/catalog")
+	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn-nvidia")
 	if err != nil {
 		t.Fatal(err)
 	}

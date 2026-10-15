@@ -130,11 +130,11 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			if err := os.WriteFile(launcher, data, 0600); err != nil {
 				t.Fatal(err)
 			}
-			inputs := filepath.Join(dir, "definitions", "nvke-local-dev-arm64")
+			inputs := filepath.Join(dir, "inputs/environments")
 			if err := os.MkdirAll(inputs, 0700); err != nil {
 				t.Fatal(err)
 			}
-			env, err := os.ReadFile(filepath.Join("..", "definitions", "nvke-local-dev-arm64", "environment-local-docker.json"))
+			env, err := os.ReadFile(filepath.Join("..", "inputs/environments/local-arm64-tcg.json"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +144,7 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			case "foreign bootstrap platform rejected":
 				env = []byte(strings.ReplaceAll(string(env), "linux/arm64", "linux/amd64"))
 			}
-			if err := os.WriteFile(filepath.Join(inputs, "environment-local-docker.json"), env, 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(inputs, "local-arm64-tcg.json"), env, 0600); err != nil {
 				t.Fatal(err)
 			}
 			linkLauncherTestTimeout(t, tools)
@@ -423,7 +423,7 @@ func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 			}
 			for _, path := range []string{
 				"scripts/nvke-full-arm64-local.sh", "scripts/nvke-os-plan.jq",
-				"definitions/nvke-local-dev-arm64/environment-local-docker.json",
+				"inputs/environments/local-arm64-tcg.json",
 			} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
@@ -520,14 +520,14 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 				}
 			}
 			for _, path := range []string{"scripts/nvke-full-arm64-local.sh", "scripts/nvke-os-plan.jq",
-				"definitions/nvke-local-dev-arm64/environment-local-docker.json"} {
+				"inputs/environments/local-arm64-tcg.json"} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
 					t.Fatal(err)
 				}
 				write(path, data, 0600)
 			}
-			write("definitions/nvke-local-dev-arm64/definition-simulator.json", []byte(`{"catalog":{"base":"simulator-catalog"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
+			write("inputs/definitions/diagnostics/demo-arm64/simulator.json", []byte(`{"catalog":{"base":"../../../catalogs/nicosim"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
 			write("toolchains/nvkr-packer/build.sh", []byte(`#!/bin/sh
 printf 'toolchain-build %s\n' "$*" >>"$TEST_CALLS"
 case " $* " in *' --print-validated-image-id '*) ;; *) exit 99;; esac
@@ -728,6 +728,27 @@ esac
 				t.Fatalf("local execution reached=%t; want %t: %s", reached, !tc.wantError, calls)
 			}
 			if !tc.wantError {
+				frozen, err := os.ReadFile(filepath.Join(dir, ".nvkr/laptop-bootstrap/id-probe/definition.json"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				type catalogLocation struct{ Base string }
+				var authored struct {
+					Catalog catalogLocation
+					Outputs []struct{ Catalog catalogLocation }
+				}
+				if err := json.Unmarshal(frozen, &authored); err != nil {
+					t.Fatal(err)
+				}
+				physicalDir, err := filepath.EvalSymlinks(dir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/nicosim")
+				if filepath.Clean(authored.Catalog.Base) != wantCatalog || len(authored.Outputs) != 1 ||
+					filepath.Clean(authored.Outputs[0].Catalog.Base) != wantCatalog {
+					t.Fatal("frozen catalogs did not resolve relative to the selected Definition")
+				}
 				graph, err := os.ReadFile(filepath.Join(dir, ".nvkr/laptop-bootstrap/id-probe/graph.json"))
 				if err != nil || string(graph) != displayGraph+"\n" {
 					t.Fatalf("selected owner graph was not preserved: %v %s", err, graph)

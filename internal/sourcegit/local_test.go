@@ -413,7 +413,7 @@ func TestLocalGitMaintainedOVNForkPin(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	overlay, err := catalog.LoadOverlayContext(ctx, "../../definitions/nvke-local-dev-arm64/os-tcg.json")
+	overlay, err := catalog.LoadOverlayContext(ctx, "../../inputs/catalogs/node-images/variants/nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}

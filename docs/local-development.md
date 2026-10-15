@@ -96,7 +96,7 @@ TCG, not KVM. The launcher builds/probes pinned local toolchain sources when
 necessary and freezes the measured image ID in the attempt's catalog overlay.
 It does not update maintained locks, publish images or confer qualification.
 
-The older [OS-only wrapper](../definitions/nvke-os/README.md) has different
+The older [OS-only wrapper](../inputs/definitions/diagnostics/README.md) has different
 runtime/acceleration admission; its commands are not interchangeable with
 the laptop route. See [toolchain inputs](../toolchains/nvkr-packer/README.md).
 
@@ -115,7 +115,7 @@ bash scripts/nvke-full-arm64-local.sh first-tools 1 tools
 The bundle contains Linux ARM64 Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3,
 ORAS 1.3.3 and Kind 0.32.0, matching
 [NVKE's pinned installer declarations](https://github.com/dsx-ai-factory/nvke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/make/tool-versions.mk).
-See [catalog producers](../definitions/nvke-local-dev-arm64/tools-catalog/registry.yaml)
+See [catalog producers](../inputs/catalogs/tools/installer-local-arm64/registry.yaml)
 and generated pins for exact commits, compiler and preparation instructions.
 
 Source preparation verifies module checksums before offline compilation.
@@ -182,9 +182,9 @@ GIT_CONFIG_COUNT=1 \
 GIT_CONFIG_KEY_0="url.$NVKE_DEV_CLONE.insteadOf" \
 GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nvke \
   bin/nvkr catalog pin \
-  --dir definitions/nvke-local-dev-arm64/cli-catalog \
+  --dir inputs/catalogs/nvke/module-cli-arm64 \
   --commit "$NVKE_DEV_COMMIT" nvke
-git diff -- definitions/nvke-local-dev-arm64/cli-catalog
+git diff -- inputs/catalogs/nvke/module-cli-arm64
 NVKE_LOCAL_CLONE="$NVKE_DEV_CLONE" \
   bash scripts/nvke-full-arm64-local.sh cli-change-01 1 components
 ```

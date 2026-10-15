@@ -20,7 +20,7 @@ import (
 )
 
 func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
-	environment, err := definition.LoadEnvironment(t.Context(), "../../../definitions/nvke-m2/environment-github.yaml")
+	environment, err := definition.LoadEnvironment(t.Context(), "../../../inputs/environments/github-release.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 // inputs: TestMaintainedM2DeploymentImageMembership still requires the entire
 // actual catalog to retain all 69 outputs and compile all 24 original image subjects.
 func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
-	provider := catalog.Dir("../../../definitions/nvke-m2/image-catalog").(catalog.ContextDataProvider)
+	provider := catalog.Dir("../../../inputs/catalogs/runtime-dependencies").(catalog.ContextDataProvider)
 	registryBytes, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
 	if err != nil {
 		t.Fatal(err)
@@ -166,7 +166,7 @@ func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
 }
 
 func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
-	const root = "../../../definitions/nvke-m2"
+	const root = "../../../inputs/definitions/nvke"
 	const commit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
 	expected := map[string]string{
 		"csi-node-driver-registrar-image": "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0",
@@ -205,7 +205,7 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	if len(authored.Outputs) != 69 {
 		t.Fatalf("got %d outputs, want 37 original outputs plus 32 additional release members", len(authored.Outputs))
 	}
-	provider := catalog.Dir(filepath.Join(root, "image-catalog")).(catalog.ContextDataProvider)
+	provider := catalog.Dir(filepath.Join(root, "../../catalogs/runtime-dependencies")).(catalog.ContextDataProvider)
 	cat, err := catalog.LoadContext(t.Context(), provider)
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +242,7 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	seen := map[string]map[string]bool{}
 	selections := 0
 	for _, output := range authored.Outputs {
-		if output.Catalog == nil || output.Catalog.Base != "./image-catalog" {
+		if output.Catalog == nil || output.Catalog.Base != "../../catalogs/runtime-dependencies" {
 			continue
 		}
 		if output.Format != definition.OutputOCI || len(output.Components) != 1 {

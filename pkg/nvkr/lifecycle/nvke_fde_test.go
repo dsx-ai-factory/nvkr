@@ -27,8 +27,8 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	const definition = "definitions/nvke-fde/definition.yaml"
-	const environment = "definitions/nvke-fde/environment-github.yaml"
+	const definition = "inputs/definitions/diagnostics/fde-amd64.yaml"
+	const environment = "inputs/environments/github-diagnostics.yaml"
 	plan, err := CompileFiles(t.Context(), definition, environment, "test (deadbeef)")
 	if err != nil {
 		t.Fatal(err)
@@ -81,8 +81,8 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	const definitionPath = "definitions/nvke-m2/definition.yaml"
-	const environmentPath = "definitions/nvke-m2/environment-github.yaml"
+	const definitionPath = "inputs/definitions/nvke/definition.yaml"
+	const environmentPath = "inputs/environments/github-release.yaml"
 	definition, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +94,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 	controllerCatalog := nvkeM2ControllerCatalogFixture(t)
 	for i := range definition.Outputs {
 		output := &definition.Outputs[i]
-		if output.Catalog != nil && output.Catalog.Base == "../nvke-controller/catalog" {
+		if output.Catalog != nil && output.Catalog.Base == "../../catalogs/nvke/release" {
 			output.Catalog.Base = controllerCatalog
 		}
 	}
@@ -247,7 +247,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 func nvkeM2ControllerCatalogFixture(t *testing.T) string {
 	t.Helper()
 	directory := t.TempDir()
-	if err := os.CopyFS(directory, os.DirFS("definitions/nvke-controller/catalog")); err != nil {
+	if err := os.CopyFS(directory, os.DirFS("inputs/catalogs/nvke/release")); err != nil {
 		t.Fatal(err)
 	}
 	lock, err := catalog.LoadLockContext(t.Context(), directory)

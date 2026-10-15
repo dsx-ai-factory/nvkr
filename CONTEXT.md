@@ -152,10 +152,19 @@ _Avoid_: Release, arbitrary archive
 ## Evidence and authority
 
 **External test producer**:
-An implementation external to NVKR supplying original reports and descriptive metadata, distinct from a
-Component producer that builds delivery artifacts. Lane: none (descriptive); [ADR-16 §6](docs/adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+An external implementation or NVKR-supplied diagnostic adapter providing original reports and descriptive
+metadata, distinct from a Component producer that builds delivery artifacts. Lane: none (descriptive); [ADR-16 §6](docs/adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
 owns its execution and authority boundary.
 _Avoid_: Component producer, qualified verifier, conformance receipt
+
+**Validation profile**:
+Explicit diagnostic configuration selecting a product publication and named check instances with
+separate suite/harness protocols and configuration. Tools are independently selected exact members
+of authenticated catalog-produced executable outputs. Its source and tools policy paths reference the existing
+qualification-policy format for artifact authentication; the profile does not replace those policies.
+Top-level `validate` runs diagnostics, whereas `definition validate` checks static authored-input shape.
+Outputs remain descriptive and cannot authorize qualification or promotion.
+_Avoid_: Recipe, test dispatcher framework, verification policy
 
 **Release authenticity**:
 Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.

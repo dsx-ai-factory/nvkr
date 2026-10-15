@@ -42,7 +42,7 @@ Path-level ownership is authoritative in
 [`.github/CODEOWNERS`](.github/CODEOWNERS). At a high level the project is
 organized into:
 
-- **Definitions, catalog, and evidence** — `definitions/**` (Definition, Environment,
+- **Definitions, catalog, and evidence** — `inputs/**` (Definition, Environment,
   `registry.yaml`, and the `pins.lock.yaml` trust roots under ADR-22).
 - **Core engine** — producer resolution, build graph compilation, bundling, collection, and validation
   (`pkg/nvkr/**`).

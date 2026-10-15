@@ -1,8 +1,8 @@
 # NVKE M2 inputs and customer choices
 
-The [M2 Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/definition.yaml) selects 69 named outputs, including independent
+The [M2 Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/definition.yaml) selects 69 named outputs, including independent
 `linux/amd64` and `linux/arm64` plain and public-bootstrap FDE disks. FDE publication carries build provenance
-without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md#native-execution-and-publication).
+without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#native-execution-and-publication).
 The catalog owns producer commands, material edges and
 component-exposed Packer variables. The Environment owns runner, runtime, registry and signing choices.
 There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriting.
@@ -11,15 +11,15 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 
 | Field or choice | Owning source | Required check |
 |---|---|---|
-| Each disk's exact root and complete material set | M2 Definition and `os-catalog/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
-| OS, Calico and kubeadm source | `os-catalog/pins.lock.yaml`, NVKE `ff21ba8c07cafff74b68e238a8876af11e5beded` | Exact commit/tree/epoch; retain this separately from controller/CLI release selection. |
+| Each disk's exact root and complete material set | M2 Definition and `inputs/catalogs/node-images/release/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
+| OS, Calico and kubeadm source | `inputs/catalogs/node-images/release/pins.lock.yaml`, NVKE `ff21ba8c07cafff74b68e238a8876af11e5beded` | Exact commit/tree/epoch; retain this separately from controller/CLI release selection. |
 | Temporary SPIRE packaging selection | Same lock selects `nvke-spire-agent-source` at `726f76944404e1106626b8333d3576bdf67b575b` | The older package omits DSX IMDS. Do not claim full current-NVKE parity; [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks restoration. OS assembly, agent and other sources are unchanged. |
-| Runtime image selection | `image-catalog` plus NVKE deploy values at `33fb71b2f4224b470ebc628a9165fc4b92870406` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
+| Runtime image selection | `inputs/catalogs/runtime-dependencies` plus NVKE deploy values at `33fb71b2f4224b470ebc628a9165fc4b92870406` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
 | Release-component pins | CLI/controller/operator catalogs and their own locks | Validate each source independently; one shared repository URL does not imply one release. |
-| Reference-profile fixture | `release-catalog`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only; not the demo's runnable `controller-profiles` or approved fleet configuration. |
+| Reference-profile fixture | `inputs/catalogs/nvke/release-components`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only; not the demo's runnable `controller-profiles` or approved fleet configuration. |
 | Customer replacement | Ordered catalog overlay, bound to its exact predecessor snapshot | Preserve the logical component's output type and supported platforms; validate its new material closure. |
 
-The [M2 input guide](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md) records the detailed source paths and remaining
+The [M2 input guide](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) records the detailed source paths and remaining
 acceptance gaps. Catalog/graph validation authenticates selections, not installed containment, build
 compatibility or publication acceptance.
 
@@ -69,6 +69,6 @@ go test ./pkg/nvkr/buildgraph -run '^TestMaintainedM2CustomerMaterialReplacement
 The complete test invokes public `factory.CompileDocuments`, including production's ordered overlay
 loader, Environment admission and cross-output packaging relationships. A local Git `insteadOf` mapping
 may supply identical pinned source bytes without changing any catalog identity; the
-[deploy guide](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-deploy/README.md#execute-locally) shows invocation-scoped configuration.
+[deploy guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-deploy/README.md#execute-locally) shows invocation-scoped configuration.
 Regenerate the bundle from the same Definition and Environment and check drift.
 Neither graph compilation nor regeneration proves a successful hosted delivery.

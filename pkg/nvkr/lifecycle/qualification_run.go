@@ -53,22 +53,45 @@ func CheckQualificationRun(ctx context.Context, runURL, policyPath string, optio
 	if err != nil {
 		return nil, nil, err
 	}
+	return checkQualificationRunWithPolicyAndReference(ctx, locator, policy, options, "")
+}
+
+func checkQualificationRunWithPolicyAndReference(ctx context.Context, locator qualificationorigin.RunLocator, policy QualificationPolicy, options QualificationRuntimeOptions, reference string) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
 	provider := qualificationorigin.NewGitHub(options.GitHubToken)
 	source, err := provider.AuthenticateRun(ctx, locator, policy.Source)
 	if err != nil {
 		return nil, nil, err
 	}
-	raw, err := provider.DownloadQualificationHandoff(ctx, source)
+	return completeQualificationRunReference(ctx, reference, source.Close,
+		func(ctx context.Context) ([]byte, error) { return provider.DownloadQualificationHandoff(ctx, source) },
+		func(ctx context.Context, raw []byte) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
+			return CheckQualificationHandoff(ctx, raw, source, policy, options)
+		})
+}
+
+// Keep ownership and exact-reference checks in one production path, independently
+// of the provider transport. These private callbacks cannot issue public authority.
+func completeQualificationRunReference(ctx context.Context, reference string, closeSource func() error, download func(context.Context) ([]byte, error), check func(context.Context, []byte) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error)) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
+	raw, err := download(ctx)
 	if err != nil {
-		_ = source.Close()
+		_ = closeSource()
 		return nil, nil, err
 	}
-	receipt, report, err := CheckQualificationHandoff(ctx, raw, source, policy, options)
+	if reference != "" {
+		if err := requireQualificationHandoffReference(raw, reference); err != nil {
+			_ = closeSource()
+			return nil, nil, err
+		}
+	}
+	receipt, report, err := check(ctx, raw)
 	if err != nil {
-		_ = source.Close()
+		if receipt != nil {
+			_ = receipt.Close()
+		}
+		_ = closeSource()
 		return nil, report, err
 	}
-	receipt.lifetime.closeSource = source.Close
+	receipt.lifetime.closeSource = closeSource
 	return receipt, report, nil
 }
 

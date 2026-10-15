@@ -1,0 +1,17 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-local-profiles-arm64",
+    "description": "Native Linux ARM64 profiles image with diagnostic Ubuntu 26.04 plain NICoSim profile data at /profiles. No fleet or qualification claim."
+  },
+  "catalog": {"base": "../../../catalogs/controller-profiles/nvidia-arm64"},
+  "outputs": [
+    {
+      "name": "controller-profiles",
+      "components": ["nvke-local-profiles"],
+      "format": "oci",
+      "platform": "linux/arm64"
+    }
+  ]
+}

@@ -324,7 +324,7 @@ remain closed; publication authenticates production and exact delivery bytes, no
 
 The public bootstrap disk makes no confidentiality claim, including after TPM enrollment: cloning its
 LUKS payload preserves the volume key, and changing unlock slots does not rotate that key. The source audit
-beside `definitions/nvke-fde` records retained bootstrap files, SSH key distinctions and firstboot limitations.
+at `inputs/definitions/diagnostics/fde-audit.md` records retained bootstrap files, SSH key distinctions and firstboot limitations.
 Secret-valued FDE still requires an authenticated file-path handoff and source-owned lifetime/retention
 contract; injecting a GitHub secret cannot protect a value that upstream writes into GRUB and guest files.
 
