@@ -303,7 +303,7 @@ def main(args):
                             process.wait(timeout=10)
             registry_path = root / "inputs/catalog/registry.yaml"
             registry_input = json.loads(registry_path.read_text())
-            registry_input["components"]["nvkectl"]["versionStamp"]["NKECTL_VERSION"] = "v0.0.0-negative"
+            registry_input["components"]["nvkectl"]["versionStamp"]["NKECTL_VERSION"] = "v9.9.9-negative"
             write(registry_path, registry_input)
             wrong_plan = root / "wrong-version-plan.json"
             run([nvkr, "run", "plan", *authored, "--json"], wrong_plan)
