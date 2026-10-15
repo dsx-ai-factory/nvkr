@@ -84,13 +84,14 @@ and a quote. Docker inspection records acquisition without an artifact mount and
 execution with no network, read-only source/artifact/root filesystem, dropped
 capabilities and no new privileges. Local raw records, candidate inputs, Plan,
 fresh artifact and retained results are under `.nvkr/go-adapter-verification/`.
-The separate [native Go runtime record](https://github.com/dsx-ai-factory/nvkr/actions/runs/38787255116)
+The separate [native Go runtime record](https://github.com/dsx-ai-factory/nvkr/actions/runs/38788495912)
 uses the same Go implementation (`a553c56`) on native Linux AMD64 and ARM64.
 Its diagnostic workflow and candidate inputs stay outside #138. The earlier
 [native Go run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38785478450)
 passed full uncached repository tests, race checks and fresh recipe builds on
 both architectures, then failed during unprivileged checksum collection from
-root-owned attempt storage. The runtime rerun corrects that workflow-only read.
+root-owned attempt storage. The final runtime workflow corrects checksum reads
+and transfers completed private workspaces before collecting their results.
 
 Bounded real Go-command negatives rejected a freshly recipe-built
 `v9.9.9-negative` executable and an `exit 7` executable with suite exit 2.
