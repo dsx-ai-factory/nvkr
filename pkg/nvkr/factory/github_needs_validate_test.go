@@ -20,7 +20,7 @@ func TestGitHubDependencyProjectionAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expanded, err := expandGitHubActions(t.Context(), plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
+	expanded, err := expandGitHubActions(plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
 	if err != nil {
 		t.Fatal(err)
 	}

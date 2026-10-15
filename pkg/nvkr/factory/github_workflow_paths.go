@@ -11,21 +11,21 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 )
 
-var githubWorkflowTemplateName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$`)
+var legacyGitHubWorkflowTemplateName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$`)
 
-// IsGeneratedGitHubChildWorkflowPath identifies the reserved producer-owned
-// workflow namespace. It grants no execution authority or ownership of bytes.
-func IsGeneratedGitHubChildWorkflowPath(relative string) bool {
-	_, ok := githubChildWorkflowOwner(relative)
+// IsLegacyGeneratedGitHubChildWorkflowPath identifies names reserved for retiring
+// prior producer-owned workflows. New generated bundles cannot contain them.
+func IsLegacyGeneratedGitHubChildWorkflowPath(relative string) bool {
+	_, ok := legacyGitHubChildWorkflowOwner(relative)
 	return ok
 }
 
-func githubChildWorkflowOwner(relative string) (string, bool) {
+func legacyGitHubChildWorkflowOwner(relative string) (string, bool) {
 	if !safeGeneratedPath(relative) || path.Dir(relative) != ".github/workflows" || !strings.HasSuffix(relative, ".yml") {
 		return "", false
 	}
 	stem, template, ok := strings.Cut(strings.TrimSuffix(relative, ".yml"), "__")
-	if !ok || !githubWorkflowTemplateName.MatchString(template) {
+	if !ok || !legacyGitHubWorkflowTemplateName.MatchString(template) {
 		return "", false
 	}
 	entry := stem + ".yml"
@@ -51,20 +51,18 @@ func githubWorkflowNamespace(entry string) (generationLayout, bool) {
 	return githubBundleLayout(name), true
 }
 
-func githubWorkflowPathInNamespace(entry, member string) bool {
-	if _, ok := githubWorkflowNamespace(entry); !ok {
-		return false
-	}
-	if member == entry {
-		return true
-	}
-	owner, ok := githubChildWorkflowOwner(member)
-	return ok && owner == entry
-}
-
 func generatedMemberInNamespace(bundle *GeneratedBundle, member string) bool {
 	if !safeGeneratedPath(member) || member == bundle.ManifestPath || member == bundle.ManifestPath+".lease" {
 		return false
 	}
-	return githubWorkflowPathInNamespace(bundle.WorkflowPath, member) || strings.HasPrefix(member, path.Dir(bundle.ManifestPath)+"/")
+	return member == bundle.WorkflowPath || strings.HasPrefix(member, path.Dir(bundle.ManifestPath)+"/")
+}
+
+// Legacy child paths are admitted only from a prior manifest for retirement.
+func priorGeneratedMemberInNamespace(bundle *GeneratedBundle, member string) bool {
+	if generatedMemberInNamespace(bundle, member) {
+		return true
+	}
+	owner, ok := legacyGitHubChildWorkflowOwner(member)
+	return ok && owner == bundle.WorkflowPath
 }

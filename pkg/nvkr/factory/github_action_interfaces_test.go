@@ -85,7 +85,7 @@ func TestGitHubSemanticCallAliasesKeepIndependentJobParameters(t *testing.T) {
 		t.Fatal("identical complete operation calls must share their semantic alias")
 	}
 	for range 2 {
-		expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
+		expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,7 +180,7 @@ func TestGitHubSemanticCallAliasesUseSelectedLayout(t *testing.T) {
 					seen[step.Name] = true
 				}
 			}
-			expanded, err := expandGitHubActions(t.Context(), plan, workflow, files)
+			expanded, err := expandGitHubActions(plan, workflow, files)
 			if err != nil || !reflect.DeepEqual(decodeGitHubWorkflow(t, expanded), decodeGitHubWorkflow(t, raw)) {
 				t.Fatalf("layout expansion changed producer labels or semantics: %v", err)
 			}
@@ -254,7 +254,7 @@ func TestGitHubSemanticInterfacesReuseAcrossNodeAndCarrierCounts(t *testing.T) {
 			t.Fatalf("fixture did not exercise %s", family)
 		}
 	}
-	expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
+	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestGitHubInputAndImagePreparationWithoutFollowingNode(t *testing.T) {
 	if want := []string{"prepare-inputs", "prepare-images"}; !reflect.DeepEqual(order, want) {
 		t.Fatalf("preparation order=%v, want %v", order, want)
 	}
-	expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
+	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,7 +18,8 @@ import (
 )
 
 // A prior manifest is a bounded ownership description, not execution authority.
-// Paths must belong to this exact namespace, including reserved child workflows.
+// Paths must belong to this exact namespace. Legacy sibling workflows are
+// recognized here only so unchanged prior members can be retired safely.
 func priorGeneratedMembers(ctx context.Context, root string, bundle *GeneratedBundle) ([]GeneratedMember, error) {
 	manifestPath, err := generatedDestination(root, bundle.ManifestPath)
 	if err != nil {
@@ -45,7 +46,7 @@ func priorGeneratedMembers(ctx context.Context, root string, bundle *GeneratedBu
 		}
 		previous := ""
 		for _, member := range prior.Members {
-			if !generatedMemberInNamespace(bundle, member.Path) || member.Path <= previous || member.Mode != 0o644 || !canonical.IsDigest(member.SHA256) {
+			if !priorGeneratedMemberInNamespace(bundle, member.Path) || member.Path <= previous || member.Mode != 0o644 || !canonical.IsDigest(member.SHA256) {
 				return nil, e.New(e.CodePipelineDrift, "prior generated Run manifest has an invalid member %q", member.Path)
 			}
 			previous = member.Path

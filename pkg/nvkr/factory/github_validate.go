@@ -70,7 +70,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err != nil {
 		return err
 	}
-	expanded, err := expandGitHubActions(ctx, plan, workflow, bundle.Files)
+	expanded, err := expandGitHubActions(plan, workflow, bundle.Files)
 	if err != nil {
 		return err
 	}

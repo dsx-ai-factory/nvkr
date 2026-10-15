@@ -130,7 +130,7 @@ func TestGitHubUnreferencedFinalizerInterfacePreservesCommandsAndEnvironment(t *
 					t.Fatalf("finalizer descriptor contains executable or provider context %q", forbidden)
 				}
 			}
-			expanded, err := expandGitHubActions(t.Context(), plan, workflow, files)
+			expanded, err := expandGitHubActions(plan, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -16,7 +16,7 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
-func TestQualificationRejectsProducerChildNamespaceBeforeInputIO(t *testing.T) {
+func TestQualificationRejectsLegacyProducerNamespaceBeforeInputIO(t *testing.T) {
 	for _, workflow := range []string{
 		".github/workflows/nvkr-run__host-amd64-node.yml",
 		".github/workflows/nvkr-dev__host-amd64-node.yml",
@@ -58,7 +58,7 @@ func TestQualificationRejectsProducerChildNamespaceBeforeInputIO(t *testing.T) {
 	}
 }
 
-func TestQualificationManifestCannotOwnProducerChildren(t *testing.T) {
+func TestQualificationManifestCannotOwnLegacyProducerWorkflows(t *testing.T) {
 	for _, role := range []string{"qualifier", "worker"} {
 		t.Run(role, func(t *testing.T) {
 			bundle, policy := generationBundle(t)

@@ -18,6 +18,25 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func TestGitHubActionsRejectMalformedOrCallableJobs(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  string
+	}{
+		{name: "empty"},
+		{name: "comment only", raw: "# missing workflow\n"},
+		{name: "invalid YAML", raw: "jobs: [\n"},
+		{name: "no jobs", raw: "name: Missing jobs\n"},
+		{name: "local workflow call", raw: "jobs:\n  operation:\n    uses: ./.github/workflows/nvkr-worker.yml\n"},
+		{name: "remote workflow call", raw: "jobs:\n  operation:\n    uses: example/repo/.github/workflows/worker.yml@main\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := expandGitHubActions(&Plan{}, []byte(test.raw), nil)
+			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+		})
+	}
+}
+
 // The fixture deliberately combines caller-only contexts, an output-referenced
 // execution step and all provider controls that cannot move across action scope.
 func githubCompositeContractFixture(actions githubActionRefs, container bool) []byte {
@@ -154,7 +173,7 @@ func TestGitHubCompositesPreserveExpandedSemanticsAndProviderControls(t *testing
 			if err != nil {
 				t.Fatal(err)
 			}
-			expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
+			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -423,7 +442,7 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 				}
 				changedFiles := maps.Clone(files)
 				changedFiles[strings.TrimPrefix(call.Uses, "./")+"/action.yml"] = changedRaw
-				_, err = expandGitHubActions(t.Context(), &Plan{}, workflow, changedFiles)
+				_, err = expandGitHubActions(&Plan{}, workflow, changedFiles)
 				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 			}
 		}
@@ -501,7 +520,7 @@ func TestGitHubCompositesKeepReferencedTransferOutputsInCaller(t *testing.T) {
 			if after[1].Uses != test.uses || after[1].ID != "transfer" {
 				t.Fatal("transfer output producer was hidden behind a composite without declared outputs")
 			}
-			expanded, err := expandGitHubActions(t.Context(), &Plan{}, workflow, files)
+			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}

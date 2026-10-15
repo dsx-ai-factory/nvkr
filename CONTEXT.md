@@ -111,16 +111,16 @@ _Avoid_: Authored definition, execution observation
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
-Its entry workflow, closed reusable execution workflows, shared composite templates and generated invocation data share one ownership manifest and
+Its entry workflow, shared composite templates and generated invocation data share one ownership manifest and
 byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
 from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
-expansion preserves independent job parameters, policies and exact result membership. Eligible uncredentialed
-native stages call one fixed execution job each, passing their original stage selector and timeout explicitly.
-The caller retains its job ID, prerequisite closure and condition; redundant scheduling edges may be removed.
+expansion preserves independent job parameters, policies and exact result membership. Every job retains its
+ID, runner, timeout, permissions and condition in the entry workflow. Redundant scheduling edges may be
+removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
-collector success never substitutes for producer success. Signing and protected execution remain inline. Each child is owned in the entry workflow's reserved filename namespace. Neither scripts
-supplied as data nor separately authored lifecycle inputs are admitted.
+collector success never substitutes for producer success. Neither scripts supplied as data nor separately
+authored lifecycle inputs are admitted.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.

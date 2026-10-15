@@ -70,7 +70,7 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 		if !safeGeneratedPath(name) || int64(len(bundle.Files[name])) > maxGeneratedFileBytes {
 			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run member %q is unsafe or oversized", name)
 		}
-		if githubWorkflowPathInNamespace(bundle.WorkflowPath, name) {
+		if name == bundle.WorkflowPath {
 			if err := validateGitHubWorkflowSize(bundle.Files[name]); err != nil {
 				return GeneratedManifest{}, nil, err
 			}
@@ -87,8 +87,8 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	return manifest, append(raw, '\n'), nil
 }
 
-// Ownership descriptions may include retired records in this namespace, but
-// cannot grant write or retirement ownership over another generated bundle.
+// New bundles contain one entry workflow and records in its private directory.
+// Legacy sibling workflows are admitted only when retiring a prior manifest.
 func validateBundleNamespace(bundle *GeneratedBundle) error {
 	layout, ok := githubWorkflowNamespace(bundle.WorkflowPath)
 	if !ok {
@@ -119,11 +119,6 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	if err != nil {
 		return err
 	}
-	// Shared workflow directories may contain operator files. Refuse a new
-	// ownership claim before creating even the private directory or lease.
-	if err := preflightNewGeneratedWorkflowOwner(ctx, root, bundle); err != nil {
-		return err
-	}
 	if err := ensureGeneratedDirectory(root, filepath.ToSlash(filepath.Dir(bundle.ManifestPath))); err != nil {
 		return err
 	}
@@ -134,9 +129,6 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	defer release()
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
-	}
-	if err := preflightGeneratedWorkflowClaims(ctx, root, bundle); err != nil {
-		return err
 	}
 	retired, err := retiredGeneratedMembers(ctx, root, bundle)
 	if err != nil {

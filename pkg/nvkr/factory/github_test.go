@@ -248,21 +248,7 @@ func expandedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
 	if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := expandGitHubActions(t.Context(), &plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return logicalGitHubWorkflow(t, &plan, raw)
-}
-
-// Retain shared action calls while materializing admitted workflow calls.
-func sharedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
-	t.Helper()
-	var plan Plan
-	if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := expandGitHubReusableWorkflows(t.Context(), &plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
+	raw, err := expandGitHubActions(&plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,10 +263,15 @@ func logicalGitHubWorkflow(t *testing.T, plan *Plan, raw []byte) []byte {
 	if err := admitGitHubNeeds(t.Context(), plan, &logical); err != nil {
 		t.Fatal(err)
 	}
-	document, jobs, err := githubReusableDocument(raw)
+	var parsed yamlv3.Node
+	if err := yamlv3.Unmarshal(raw, &parsed); err != nil || len(parsed.Content) != 1 {
+		t.Fatalf("decode logical workflow: %v", err)
+	}
+	document, err := githubResolveAliases(&parsed, map[*yamlv3.Node]bool{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	jobs := githubTestYAMLField(t, document.Content[0], "jobs")
 	for _, id := range githubSerializedJobOrder(t, raw) {
 		job, retained := logical.Jobs[id]
 		if !retained {
@@ -312,6 +303,15 @@ func logicalGitHubWorkflow(t *testing.T, plan *Plan, raw []byte) []byte {
 		t.Fatal(err)
 	}
 	return result
+}
+
+func githubTestYAMLBytes(t *testing.T, node *yamlv3.Node) []byte {
+	t.Helper()
+	raw, err := encodeGitHubYAML(node)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }
 
 // Mutation fixtures name the exact member instead of searching unrelated jobs,
@@ -403,7 +403,7 @@ func githubTestYAMLStep(t *testing.T, steps *yamlv3.Node, field, value string) *
 
 func githubTestBootstrap(t *testing.T, bundle *GeneratedBundle) (jobID, member string) {
 	t.Helper()
-	document := decodeGitHubWorkflow(t, sharedGitHubWorkflow(t, bundle))
+	document := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
 	for _, id := range sortedKeys(document.Jobs) {
 		if !strings.HasPrefix(id, "build-runner-") {
 			continue
@@ -431,7 +431,7 @@ func githubTestSharedInvocation(t *testing.T, bundle *GeneratedBundle, jobID, ro
 	if err := canonical.UnmarshalExact(bundle.Files[path.Join(path.Dir(bundle.PlanPath), "action-data.json")], &data); err != nil {
 		t.Fatal(err)
 	}
-	job, exists := decodeGitHubWorkflow(t, sharedGitHubWorkflow(t, bundle)).Jobs[jobID]
+	job, exists := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs[jobID]
 	if !exists {
 		t.Fatalf("fixture omits job %q", jobID)
 	}
@@ -568,9 +568,6 @@ func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
 	actions := 0
 	for name := range bundle.Files {
 		if name == bundle.PlanPath || name == GitHubWorkflowPath || name == GitHubActionDataPath {
-			continue
-		}
-		if owner, ok := githubChildWorkflowOwner(name); ok && owner == bundle.WorkflowPath {
 			continue
 		}
 		if !strings.HasPrefix(name, ".github/nvkr-run/actions/") || !strings.HasSuffix(name, "/action.yml") {

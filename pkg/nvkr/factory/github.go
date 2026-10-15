@@ -76,12 +76,6 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 
 // validate=false is private to the validator's exact regeneration comparison.
 func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBundle, error) {
-	return renderGitHubVariant(ctx, plan, validate, true)
-}
-
-// The unsplit form is an internal semantic projection, never a writable bundle.
-// It lets validation and result accounting derive membership from the Plan.
-func renderGitHubVariant(ctx context.Context, plan *Plan, validate, split bool) (*GeneratedBundle, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "GitHub factory rendering requires a context")
 	}
@@ -117,12 +111,9 @@ func renderGitHubVariant(ctx context.Context, plan *Plan, validate, split bool) 
 		return nil, err
 	}
 	layout := githubLayoutFor(plan)
-	var needsProjection *githubNeedsProjection
-	if split {
-		needsProjection, err = githubNeedsForPlan(ctx, plan)
-		if err != nil {
-			return nil, err
-		}
+	needsProjection, err := githubNeedsForPlan(ctx, plan)
+	if err != nil {
+		return nil, err
 	}
 	files, planDigest, err := renderStaticInputs(ctx, plan, layout)
 	if err != nil {
@@ -401,7 +392,7 @@ func renderGitHubVariant(ctx context.Context, plan *Plan, validate, split bool) 
 			writeGitHubQualificationHandoffStep(&body, actions)
 		}
 		summary := githubRunEndSummary(len(allNeeds))
-		if needsProjection != nil && len(needsProjection.Collectors) != 0 {
+		if len(needsProjection.Collectors) != 0 {
 			summary = githubCollectedRunEndSummary(len(allNeeds))
 		}
 		writeGitHubRunSummary(&body, summary)
@@ -414,23 +405,15 @@ func renderGitHubVariant(ctx context.Context, plan *Plan, validate, split bool) 
 	if err != nil {
 		return nil, err
 	}
-	if split {
-		workflow, err = lowerGitHubReusableWorkflows(plan, workflow, actionFiles, actions)
-		if err != nil {
-			return nil, err
-		}
-		workflow, err = lowerGitHubNeeds(ctx, plan, workflow)
-		if err != nil {
-			return nil, err
-		}
+	workflow, err = lowerGitHubNeeds(ctx, plan, workflow)
+	if err != nil {
+		return nil, err
 	}
 	for name, raw := range actionFiles {
 		files[name] = raw
 	}
-	if split {
-		if err := validateGitHubWorkflowSize(workflow); err != nil {
-			return nil, err
-		}
+	if err := validateGitHubWorkflowSize(workflow); err != nil {
+		return nil, err
 	}
 	files[layout.workflowPath] = append([]byte(nil), workflow...)
 	bundle := newGeneratedBundle(EngineGitHub, layout, files, planDigest)

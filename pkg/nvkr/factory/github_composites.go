@@ -5,7 +5,6 @@ package factory
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strings"
 
@@ -358,12 +357,8 @@ func githubActionInput(description string) *yamlv3.Node {
 // expandGitHubActions restores the concrete step graph for semantic admission.
 // This is a deliberately closed macro format, not a general Actions interpreter.
 // Exact regeneration additionally authenticates every action and its call sites.
-func expandGitHubActions(ctx context.Context, plan *Plan, raw []byte, files map[string][]byte) ([]byte, error) {
+func expandGitHubActions(plan *Plan, raw []byte, files map[string][]byte) ([]byte, error) {
 	var err error
-	raw, err = expandGitHubReusableWorkflows(ctx, plan, raw, files)
-	if err != nil {
-		return nil, err
-	}
 	raw, files, err = materializeGitHubSharedActions(plan, raw, files)
 	if err != nil {
 		return nil, err
@@ -496,6 +491,28 @@ func githubYAMLField(node *yamlv3.Node, name string) *yamlv3.Node {
 		}
 	}
 	return nil
+}
+
+func githubYAMLOnlyFields(node *yamlv3.Node, allowed ...string) bool {
+	if node == nil || node.Kind != yamlv3.MappingNode || len(node.Content)%2 != 0 {
+		return false
+	}
+	seen := map[string]bool{}
+	for index := 0; index < len(node.Content); index += 2 {
+		key := node.Content[index]
+		if key.Kind != yamlv3.ScalarNode || key.Tag != "!!str" || seen[key.Value] {
+			return false
+		}
+		seen[key.Value] = true
+		found := false
+		for _, name := range allowed {
+			found = found || key.Value == name
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func githubYAMLValue(node *yamlv3.Node, name string) string {

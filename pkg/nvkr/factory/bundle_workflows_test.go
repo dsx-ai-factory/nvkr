@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -32,66 +31,82 @@ func generatedWorkflowFixture(t *testing.T, namespace string) (*GeneratedBundle,
 		t.Fatal(err)
 	}
 	child := strings.TrimSuffix(bundle.WorkflowPath, ".yml") + "__ownership-fixture.yml"
-	bundle.Files[child] = []byte("name: fixture\n'on':\n  workflow_call: {}\n")
 	return bundle, child
 }
 
-func TestGeneratedWorkflowMembersUseExistingManifest(t *testing.T) {
+// Construct the old ownership description directly: the current writer must
+// never be able to create a bundle containing sibling workflows.
+func legacyWorkflowManifest(t *testing.T, bundle *GeneratedBundle, child string, raw []byte) []byte {
+	t.Helper()
+	manifest, _, err := ManifestFor(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest.Members = append(manifest.Members, GeneratedMember{Path: child, SHA256: pipeline.FileDigest(raw), Mode: 0o644})
+	slices.SortFunc(manifest.Members, func(a, b GeneratedMember) int { return strings.Compare(a.Path, b.Path) })
+	encoded, err := canonical.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(encoded, '\n')
+}
+
+func seedLegacyWorkflow(t *testing.T, root string, bundle *GeneratedBundle, child string) {
+	t.Helper()
+	if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte("name: retired fixture\n'on':\n  workflow_call: {}\n")
+	writeGeneratedFixture(t, filepath.Join(root, child), raw)
+	writeGeneratedFixture(t, filepath.Join(root, bundle.ManifestPath), legacyWorkflowManifest(t, bundle, child, raw))
+}
+
+func TestGeneratedBundleRejectsNewChildWorkflowsBeforeOutput(t *testing.T) {
+	for _, namespace := range []string{"", "development", "nightly"} {
+		t.Run(namespace, func(t *testing.T) {
+			bundle, child := generatedWorkflowFixture(t, namespace)
+			bundle.Files[child] = []byte("name: unsupported child\n")
+			_, _, err := ManifestFor(bundle)
+			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+			output := filepath.Join(t.TempDir(), "uncreated")
+			assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), output, bundle), e.CodeInvalidCatalog)
+			if _, err := os.Lstat(output); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("unsupported child created output")
+			}
+		})
+	}
+}
+
+func TestGeneratedWorkflowLegacyManifestRetirement(t *testing.T) {
 	root := t.TempDir()
 	var bundles []*GeneratedBundle
+	var children []string
 	for _, namespace := range []string{"", "development", "nightly", "nightly-other"} {
 		bundle, child := generatedWorkflowFixture(t, namespace)
-		manifest, _, err := ManifestFor(bundle)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if manifest.SchemaVersion != "nvkr.dev/generated-run/v1" || manifest.WorkflowPath != bundle.WorkflowPath || manifest.WorkflowDigest != pipeline.FileDigest(bundle.Files[bundle.WorkflowPath]) {
-			t.Fatal("child workflow changed manifest schema or entry identity")
-		}
-		index := slices.IndexFunc(manifest.Members, func(member GeneratedMember) bool { return member.Path == child })
-		if index < 0 || manifest.Members[index].Mode != 0o644 || manifest.Members[index].SHA256 != pipeline.FileDigest(bundle.Files[child]) {
-			t.Fatal("child workflow omitted exact bytes or mode from manifest")
-		}
+		seedLegacyWorkflow(t, root, bundle, child)
+		bundles = append(bundles, bundle)
+		children = append(children, child)
+	}
+	for index, bundle := range bundles {
+		assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
 		if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
 			t.Fatal(err)
 		}
-		bundles = append(bundles, bundle)
-	}
-	for _, bundle := range bundles {
+		if _, err := os.Lstat(filepath.Join(root, children[index])); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("retired workflow remains: %v", err)
+		}
+		for _, other := range children[index+1:] {
+			if _, err := os.Lstat(filepath.Join(root, other)); err != nil {
+				t.Fatalf("another owner's workflow changed: %v", err)
+			}
+		}
 		if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
 			t.Fatal(err)
 		}
 	}
 }
 
-func TestGeneratedWorkflowLegacyManifestMigration(t *testing.T) {
-	bundle, _ := generatedWorkflowFixture(t, "")
-	legacy := *bundle
-	legacy.Files = maps.Clone(bundle.Files)
-	for name := range legacy.Files {
-		if IsGeneratedGitHubChildWorkflowPath(name) {
-			delete(legacy.Files, name)
-		}
-	}
-	root := t.TempDir()
-	for _, generation := range []*GeneratedBundle{&legacy, bundle, &legacy} {
-		if err := WriteGeneratedBundle(t.Context(), root, generation); err != nil {
-			t.Fatal(err)
-		}
-		if err := CheckGeneratedBundle(t.Context(), root, generation); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for name := range bundle.Files {
-		if IsGeneratedGitHubChildWorkflowPath(name) {
-			if _, err := os.Lstat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
-				t.Fatalf("v1 retirement retained child %s: %v", name, err)
-			}
-		}
-	}
-}
-
-func TestGeneratedWorkflowClaimsWaitForEarlierOwner(t *testing.T) {
+func TestLegacyWorkflowRetirementWaitsForEarlierOwner(t *testing.T) {
 	bundle, _ := generatedWorkflowFixture(t, "")
 	root := t.TempDir()
 	if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
@@ -105,15 +120,10 @@ func TestGeneratedWorkflowClaimsWaitForEarlierOwner(t *testing.T) {
 	}
 	unlock := sync.OnceFunc(release)
 	defer unlock()
-	future := *bundle
-	future.Files = maps.Clone(bundle.Files)
 	child := strings.TrimSuffix(bundle.WorkflowPath, ".yml") + "__earlier-owner.yml"
-	future.Files[child] = []byte("earlier owner payload\n")
-	writeGeneratedFixture(t, filepath.Join(root, child), future.Files[child])
-	_, manifest, err := ManifestFor(&future)
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := []byte("earlier owner payload\n")
+	writeGeneratedFixture(t, filepath.Join(root, child), raw)
+	manifest := legacyWorkflowManifest(t, bundle, child, raw)
 	finished := make(chan struct{})
 	var writeErr error
 	go func() {
@@ -140,7 +150,7 @@ func TestGeneratedWorkflowClaimsWaitForEarlierOwner(t *testing.T) {
 	}
 }
 
-func TestGeneratedWorkflowDriftAndRetirement(t *testing.T) {
+func TestLegacyWorkflowDriftAndRetirement(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		edit func(*testing.T, string)
@@ -169,21 +179,16 @@ func TestGeneratedWorkflowDriftAndRetirement(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			bundle, child := generatedWorkflowFixture(t, "")
 			root := t.TempDir()
-			if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
-				t.Fatal(err)
-			}
+			seedLegacyWorkflow(t, root, bundle, child)
 			test.edit(t, filepath.Join(root, child))
 			if test.name != "unchanged" {
 				assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
 			}
-			next := *bundle
-			next.Files = maps.Clone(bundle.Files)
-			delete(next.Files, child)
 			before, err := os.ReadFile(filepath.Join(root, bundle.ManifestPath))
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = WriteGeneratedBundle(t.Context(), root, &next)
+			err = WriteGeneratedBundle(t.Context(), root, bundle)
 			if test.name != "unchanged" && test.name != "missing" {
 				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 				after, readErr := os.ReadFile(filepath.Join(root, bundle.ManifestPath))
@@ -198,103 +203,77 @@ func TestGeneratedWorkflowDriftAndRetirement(t *testing.T) {
 			if _, err := os.Lstat(filepath.Join(root, child)); !errors.Is(err, os.ErrNotExist) {
 				t.Fatalf("retired child remains: %v", err)
 			}
-			if err := CheckGeneratedBundle(t.Context(), root, &next); err != nil {
+			if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
 				t.Fatal(err)
 			}
 		})
 	}
 }
 
-func TestGeneratedWorkflowUnownedClaimsAndInventory(t *testing.T) {
+func TestLegacyWorkflowUnownedInventory(t *testing.T) {
 	for _, test := range []struct {
-		name     string
-		expected e.Code
+		name string
+		path string
+		code e.Code
 	}{
-		{"conflicting destination", e.CodeWriteConflict},
-		{"unexpected reserved child", e.CodePipelineDrift},
-		{"exact interrupted payload", ""},
-		{"operator and other namespace", ""},
+		{"unowned child", ".github/workflows/nvkr-run-nightly__host-node.yml", e.CodePipelineDrift},
+		{"other namespace", ".github/workflows/nvkr-run-other__host-node.yml", ""},
+		{"operator workflow", ".github/workflows/operator.yml", ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			bundle, child := generatedWorkflowFixture(t, "nightly")
 			root := t.TempDir()
-			name := child
 			raw := []byte("operator bytes\n")
-			switch test.name {
-			case "unexpected reserved child":
-				name = strings.TrimSuffix(bundle.WorkflowPath, ".yml") + "__unlisted.yml"
-			case "exact interrupted payload":
-				raw = bundle.Files[child]
-			case "operator and other namespace":
-				name = ".github/workflows/operator.yml"
-				writeGeneratedFixture(t, filepath.Join(root, ".github/workflows/nvkr-run-other__host-node.yml"), raw)
-			}
-			writeGeneratedFixture(t, filepath.Join(root, name), raw)
+			name := filepath.Join(root, test.path)
+			writeGeneratedFixture(t, name, raw)
 			err := WriteGeneratedBundle(t.Context(), root, bundle)
-			if test.expected != "" {
-				assertFactoryErrorCode(t, err, test.expected)
-				if _, err := os.Lstat(filepath.Join(root, filepath.Dir(bundle.ManifestPath))); !errors.Is(err, os.ErrNotExist) {
-					t.Fatal("refused ownership claim created its private directory or lease")
+			if test.code != "" {
+				assertFactoryErrorCode(t, err, test.code)
+				if _, err := os.Lstat(filepath.Join(root, bundle.ManifestPath)); !errors.Is(err, os.ErrNotExist) {
+					t.Fatal("unowned workflow wrote a manifest")
 				}
-				retained, err := os.ReadFile(filepath.Join(root, name))
-				if err != nil || !bytes.Equal(retained, raw) {
-					t.Fatal("refused ownership claim changed operator bytes")
-				}
-				return
-			}
-			if err != nil {
+			} else if err != nil {
 				t.Fatal(err)
 			}
-			if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
-				t.Fatal(err)
+			retained, err := os.ReadFile(name)
+			if err != nil || !bytes.Equal(retained, raw) {
+				t.Fatal("inventory changed unowned bytes")
 			}
-			writeGeneratedFixture(t, filepath.Join(root, strings.TrimSuffix(bundle.WorkflowPath, ".yml")+"__unlisted.yml"), raw)
-			assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
+			if test.code == "" {
+				if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+					t.Fatal(err)
+				}
+				writeGeneratedFixture(t, filepath.Join(root, child), raw)
+				assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
+			}
 		})
 	}
 }
 
-func TestGeneratedWorkflowCrossNamespaceRetirementFailsClosed(t *testing.T) {
-	bundle, _ := generatedWorkflowFixture(t, "nightly")
-	other, child := generatedWorkflowFixture(t, "nightly-other")
-	root := t.TempDir()
-	for _, selected := range []*GeneratedBundle{bundle, other} {
-		if err := WriteGeneratedBundle(t.Context(), root, selected); err != nil {
-			t.Fatal(err)
-		}
-	}
-	manifest, _, err := ManifestFor(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest.Members = append(manifest.Members, GeneratedMember{Path: child, Mode: 0o644, SHA256: pipeline.FileDigest(other.Files[child])})
-	slices.SortFunc(manifest.Members, func(a, b GeneratedMember) int { return strings.Compare(a.Path, b.Path) })
-	raw, err := canonical.Marshal(manifest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeGeneratedFixture(t, filepath.Join(root, bundle.ManifestPath), append(raw, '\n'))
-	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
-	if err := CheckGeneratedBundle(t.Context(), root, other); err != nil {
-		t.Fatalf("foreign child changed: %v", err)
-	}
-	changed := *bundle
-	changed.Files = maps.Clone(bundle.Files)
-	changed.Files[child] = other.Files[child]
-	output := filepath.Join(t.TempDir(), "uncreated")
-	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), output, &changed), e.CodeInvalidCatalog)
-	if _, err := os.Lstat(output); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("invalid namespace created output")
-	}
-}
-
-func TestOversizedChildWorkflowCannotWriteGeneratedBundle(t *testing.T) {
-	bundle, child := generatedWorkflowFixture(t, "")
-	bundle.Files[child] = bytes.Repeat([]byte("x"), maxGitHubWorkflowBytes+1)
-	output := filepath.Join(t.TempDir(), "uncreated")
-	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), output, bundle), e.CodeEngineCapability)
-	if _, err := os.Lstat(output); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("oversized child created output")
+func TestLegacyWorkflowMalformedOwnershipFailsClosed(t *testing.T) {
+	for _, child := range []string{
+		".github/workflows/nvkr-run-other__host-node.yml",
+		".github/workflows/nvkr-run-nightly__host.yaml",
+		".github/workflows/nvkr-run-nightly__host__node.yml",
+		".github/workflows/nvkr-run-nightly__" + strings.Repeat("a", 65) + ".yml",
+	} {
+		t.Run(child, func(t *testing.T) {
+			bundle, _ := generatedWorkflowFixture(t, "nightly")
+			root := t.TempDir()
+			seedLegacyWorkflow(t, root, bundle, child)
+			before, err := os.ReadFile(filepath.Join(root, bundle.ManifestPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
+			after, err := os.ReadFile(filepath.Join(root, bundle.ManifestPath))
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatal("malformed ownership changed manifest")
+			}
+			if _, err := os.Lstat(filepath.Join(root, child)); err != nil {
+				t.Fatalf("malformed ownership removed a workflow: %v", err)
+			}
+		})
 	}
 }
 

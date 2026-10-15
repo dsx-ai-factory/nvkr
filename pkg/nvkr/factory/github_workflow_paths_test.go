@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestGeneratedGitHubChildWorkflowNamespace(t *testing.T) {
+func TestLegacyGeneratedGitHubChildWorkflowNamespace(t *testing.T) {
 	for _, test := range []struct {
 		path  string
 		owner string
@@ -32,12 +32,20 @@ func TestGeneratedGitHubChildWorkflowNamespace(t *testing.T) {
 		{"/.github/workflows/nvkr-run__host.yml", ""},
 	} {
 		t.Run(test.path, func(t *testing.T) {
-			owner, ok := githubChildWorkflowOwner(test.path)
-			if ok != (test.owner != "") || (ok && owner != test.owner) || IsGeneratedGitHubChildWorkflowPath(test.path) != ok {
+			owner, ok := legacyGitHubChildWorkflowOwner(test.path)
+			if ok != (test.owner != "") || (ok && owner != test.owner) || IsLegacyGeneratedGitHubChildWorkflowPath(test.path) != ok {
 				t.Fatalf("owner = %q, %t; want %q", owner, ok, test.owner)
 			}
-			if ok && (!githubWorkflowPathInNamespace(owner, test.path) || githubWorkflowPathInNamespace(".github/workflows/nvkr-run-other.yml", test.path)) {
-				t.Fatal("child ownership escaped its exact entry namespace")
+			if ok {
+				layout, _ := githubWorkflowNamespace(owner)
+				bundle := &GeneratedBundle{WorkflowPath: owner, ManifestPath: layout.manifestPath}
+				if generatedMemberInNamespace(bundle, test.path) || !priorGeneratedMemberInNamespace(bundle, test.path) {
+					t.Fatal("legacy child must be admitted only for prior-manifest retirement")
+				}
+				bundle.WorkflowPath = ".github/workflows/nvkr-run-other.yml"
+				if priorGeneratedMemberInNamespace(bundle, test.path) {
+					t.Fatal("child retirement escaped its exact entry namespace")
+				}
 			}
 		})
 	}

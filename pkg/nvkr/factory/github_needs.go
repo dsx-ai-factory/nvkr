@@ -249,7 +249,7 @@ func lowerGitHubNeeds(ctx context.Context, plan *Plan, raw []byte) ([]byte, erro
 		return nil, e.New(e.CodePipelineDrift, "GitHub dependency lowering requires one valid workflow")
 	}
 	jobs := githubYAMLField(document.Content[0], "jobs")
-	if !githubReusableFields(jobs, sortedKeys(projection.Full)...) || githubYAMLLength(jobs) != 2*len(projection.Full) {
+	if !githubYAMLOnlyFields(jobs, sortedKeys(projection.Full)...) || githubYAMLLength(jobs) != 2*len(projection.Full) {
 		return nil, e.New(e.CodePipelineDrift, "GitHub dependency lowering requires the exact original jobs")
 	}
 	for index := 0; index < len(jobs.Content); index += 2 {

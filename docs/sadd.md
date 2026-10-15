@@ -557,10 +557,9 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
-GitHub keeps named jobs, prerequisite closure and conditions visible in the entry workflow. Credentialed
-jobs retain their runner, permissions and time bounds inline; closed native templates below carry eligible
-uncredentialed execution. Manifest-owned composite actions expose fixed interfaces for node/source execution,
-preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
+GitHub keeps named jobs, prerequisite closure and conditions visible in the entry workflow. All jobs retain
+their runner, permissions and time bounds inline. Manifest-owned composite actions expose fixed interfaces
+for node/source execution, preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
 individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
 invocation-data member holds parameters with named operation roles. The runtime descriptor operation
 recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
@@ -587,17 +586,12 @@ Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
-Eligible uncredentialed native sequences execute through fixed reusable workflows, one unconditional child
-job per original caller. Caller IDs, labels, prerequisite closure and conditions remain visible; the fixed runner
-lives in the child and the caller passes its original stage selector and bounded timeout explicitly.
-Signing, protected environments, source/private credentials, disk jobs and finalization stay inline. No
-producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
+No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
 prerequisite closure preserved; authored setup, runtime variables, images or services that mention the
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
 succeed and report its complete Plan-derived membership before recovery; its aggregate status never replaces
-individual producer outcomes. The reusable execution workflows share the bundle manifest and occupy an owner-specific filename namespace, with the same drift,
-size and exact retirement checks. Producer matrix and general callable scheduling remain deferred
+individual producer outcomes. Producer matrix and reusable callable scheduling remain deferred
 (ADR-18 §8); ADR-21 separately admits the fixed native qualification worker and its selected-platform matrix.
 
 An explicit GitHub development Environment selects a separate fixed bundle. It shares the

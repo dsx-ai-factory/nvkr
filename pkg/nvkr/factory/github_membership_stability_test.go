@@ -178,7 +178,7 @@ func assertGitHubExistingOutputJobs(t *testing.T, beforePlan, afterPlan *Plan, b
 	}{
 		// Decoding resolves aliases, whose definition site may move when a
 		// newly inserted job is the first user of an existing shared sequence.
-		{name: "shared", before: expandGitHubStabilityCalls(t, beforePlan, before), after: expandGitHubStabilityCalls(t, afterPlan, after)},
+		{name: "shared", before: logicalGitHubWorkflow(t, beforePlan, before.Files[before.WorkflowPath]), after: logicalGitHubWorkflow(t, afterPlan, after.Files[after.WorkflowPath])},
 		{name: "expanded", before: expandedGitHubWorkflow(t, before), after: expandedGitHubWorkflow(t, after)},
 	} {
 		beforeWorkflow := decodeGitHubWorkflow(t, projection.before)
@@ -207,19 +207,10 @@ func assertGitHubExistingOutputJobs(t *testing.T, beforePlan, afterPlan *Plan, b
 		}
 	}
 	for name, raw := range before.Files {
-		if (strings.HasPrefix(name, githubActionsDirectory) || IsGeneratedGitHubChildWorkflowPath(name)) && !bytes.Equal(raw, after.Files[name]) {
+		if strings.HasPrefix(name, githubActionsDirectory) && !bytes.Equal(raw, after.Files[name]) {
 			t.Errorf("unrelated output changed existing execution template %s", name)
 		}
 	}
-}
-
-func expandGitHubStabilityCalls(t *testing.T, plan *Plan, bundle *GeneratedBundle) []byte {
-	t.Helper()
-	raw, err := expandGitHubReusableWorkflows(t.Context(), plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return logicalGitHubWorkflow(t, plan, raw)
 }
 
 func githubSerializedJobOrder(t *testing.T, raw []byte) []string {

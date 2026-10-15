@@ -289,7 +289,7 @@ func githubNeedsWorkflowFixture(t *testing.T, projection *githubNeedsProjection)
 	}
 	root := githubYAMLMap("name", githubYAMLString("Dependency fixture"), "jobs", jobs)
 	root.HeadComment = "Keep generated header"
-	return githubReusableBytes(t, root)
+	return githubTestYAMLBytes(t, root)
 }
 
 func TestGitHubNeedsLoweringPreservesBodiesAliasesAndExactCollectors(t *testing.T) {
@@ -379,7 +379,7 @@ func TestGitHubNeedsLoweringRejectsChangedOriginalGraph(t *testing.T) {
 				t.Fatal(err)
 			}
 			test.edit(githubYAMLField(document.Content[0], "jobs"))
-			got, err := lowerGitHubNeeds(t.Context(), plan, githubReusableBytes(t, &document))
+			got, err := lowerGitHubNeeds(t.Context(), plan, githubTestYAMLBytes(t, &document))
 			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 			if got != nil {
 				t.Fatal("changed graph returned partial workflow bytes")

@@ -112,7 +112,7 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				}
 			}
 			assertGitHubCompositeReadableYAML(t, "workflow", workflow, plan)
-			expanded, err := expandGitHubActions(t.Context(), plan, workflow, files)
+			expanded, err := expandGitHubActions(plan, workflow, files)
 			if err != nil {
 				t.Fatal(err)
 			}
