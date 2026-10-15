@@ -126,7 +126,7 @@ func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 	}
 	checksum := hex.EncodeToString(hash.Sum(nil))
 	if err := importSource(ctx, os.Environ(), filepath.Join(workspace, "nvke"), inputs.Repo, inputs.Commit, inputs.TreeHash, options.Stderr); err != nil {
-		return diagnosticError(ctx, err)
+		return diagnosticSourceError(ctx, err)
 	}
 	makefile, err := os.ReadFile(filepath.Join(workspace, "nvke", "cli", "Makefile"))
 	if err != nil {
@@ -179,6 +179,18 @@ func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 	return nil
 }
 
+func diagnosticSourceError(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "artifact diagnostic source import canceled")
+	}
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		return err
+	}
+	return e.Wrap(e.CodeFetchFailed, err, "importing artifact diagnostic source")
+}
+
+// Only container execution preserves a positive child process exit status.
 func diagnosticError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return e.Wrap(e.CodeTimeout, ctx.Err(), "artifact diagnostic canceled")

@@ -98,7 +98,9 @@ func TestArtifactDiagnosticStagingResultsAndCleanup(t *testing.T) {
 					}
 					return os.WriteFile(filepath.Join(directory, "cli", "Makefile"), []byte(body), 0o600)
 				}
+				ran := false
 				run := func(_ context.Context, input pipeline.ArtifactDiagnostic, _ io.Writer, _ io.Writer) error {
+					ran = true
 					if phase == "run" {
 						return errors.New("runtime failure")
 					}
@@ -129,6 +131,9 @@ func TestArtifactDiagnosticStagingResultsAndCleanup(t *testing.T) {
 					return os.WriteFile(filepath.Join(input.Workspace, "tests.jsonl"), []byte(log), 0o600)
 				}
 				err := testCLIArtifact(ctx, options, importSource, run)
+				if phase == "import" && ran {
+					t.Fatal("source import refusal reached container execution")
+				}
 				passes := phase == "success" || phase == "caller-swap"
 				if (err == nil) != passes {
 					t.Fatalf("%s: %v", phase, err)
@@ -185,4 +190,29 @@ func TestArtifactDiagnosticAdmissionAndExit(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	assertFactoryErrorCode(t, diagnosticError(ctx, err), e.CodeTimeout)
+}
+
+func TestArtifactDiagnosticSourcePhaseCodes(t *testing.T) {
+	cmd := exec.CommandContext(t.Context(), "sh", "-c", "exit 128")
+	childErr := cmd.Run()
+	for _, test := range []struct {
+		name string
+		err  error
+		code e.Code
+	}{
+		{"capability", e.New(e.CodeEngineCapability, "unsupported source"), e.CodeEngineCapability},
+		{"fetch-exit", e.Wrap(e.CodeFetchFailed, childErr, "fetch failed"), e.CodeFetchFailed},
+		{"uncoded-import", errors.New("import failed"), e.CodeFetchFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := diagnosticSourceError(t.Context(), test.err)
+			assertFactoryErrorCode(t, err, test.code)
+			if got := GitHubStepExitCode(err); got != e.ExitCode(err) {
+				t.Fatalf("source error turned into raw process status: %d", got)
+			}
+		})
+	}
+	if got := GitHubStepExitCode(diagnosticError(t.Context(), e.Wrap(e.CodeBuildFailed, childErr, "suite failed"))); got != 128 {
+		t.Fatalf("suite exit not preserved: %d", got)
+	}
 }

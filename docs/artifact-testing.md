@@ -46,16 +46,20 @@ must provide Go and Make; Plan validation does not prove those tools are present
 `--keep` retains the printed `.nvkr/artifact-tests/cli-*/` workspace. Source and
 cache exist only after their phases run; `tests.jsonl` is created for test execution
 and `result.json` only on success. Otherwise the workspace is removed on exit.
-Each acquisition/execution command has a 30-minute timeout (`--timeout` overrides
-it). Cancellation stops
+Each dependency/test container has a 30-minute timeout (`--timeout` overrides
+that per-container bound). Each source Git command has its own fixed 30-minute
+bound; `--timeout` does not shorten fetch. Cancellation stops
 and joins the client and requests container removal; removal is best effort.
 
 Source import uses the existing Go local-source policy: global credential helpers
 are projected only into fetch; ambient Git routing, hooks, filters and configuration
 are excluded. Private access uses a developer credential helper or the supported
 explicit local redirect, rather than `GIT_ASKPASS`. Test containers receive no Git
-credentials. The verified scratch checkout must share a filesystem with the
-workspace so it can be moved without exposing a partial import.
+credentials. Scratch uses the workspace parent, or its closest ancestor without
+a Git search-path separator for colon-containing paths. This keeps ordinary
+cross-filesystem workspaces independent of the system temporary filesystem.
+The verified checkout must still share a filesystem with that ancestor for
+atomic publication; an intervening mount boundary fails without partial output.
 
 Errors use NVKR's coded exit contract; timeouts and cancellation use the timeout
 code, while a failed suite preserves its positive process exit status. A failed
