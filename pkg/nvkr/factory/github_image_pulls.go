@@ -39,11 +39,24 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	if strings.HasPrefix(image, prefix+"/toolchains/") {
 		return true
 	}
-	// Rebranding publication does not relocate the already-published, pinned
-	// candidate toolchains. Preserve their separate credential preparation only
-	// for the matching maintained namespace, not for arbitrary third-party images.
-	return prefix == "ghcr.io/dsx-ai-factory/nvkr/m2-candidate" &&
-		strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+	// Development publication does not move already-pinned native toolchains.
+	// Only the maintained NVKR development namespace may prepare these two
+	// retained toolchain roots, using the separate read-only workflow token.
+	if plan.Environment.GitHubDevelopment && prefix == "ghcr.io/dsx-ai-factory/nvkr/development" {
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
+			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+	}
+	// Maintained nightly outputs reuse the same published, pinned M2 tooling.
+	// Output publication does not relocate those subjects or authorize other owners.
+	switch prefix {
+	case "ghcr.io/dsx-ai-factory/nvkr/m2-candidate",
+		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64",
+		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64":
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
+			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+	default:
+		return false
+	}
 }
 
 func githubStagePrivateImages(plan *Plan, stage githubStage) []string {

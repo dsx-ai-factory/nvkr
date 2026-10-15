@@ -15,7 +15,7 @@ import (
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -111,22 +111,88 @@ func TestPrivateToolchainRebrandingBoundary(t *testing.T) {
 	plan := arcTestPlan(t, "linux/amd64")
 	for _, test := range []struct {
 		name, publication, image string
+		development              bool
 		want                     bool
 	}{
-		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true},
-		{"published legacy subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true},
-		{"different publication owner", "ghcr.io/example/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false},
-		{"sibling repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes-mirror/m2-candidate/toolchains/packer", false},
-		{"non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/other/packer", false},
+		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"published legacy subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, true},
+		{"nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"nightly legacy subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, true},
+		{"upstream nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"upstream nightly legacy subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, true},
+		{"nightly prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64-mirror", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
+		{"nightly child prefix", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64/other", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
+		{"foreign nightly owner", "ghcr.io/other/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
+		{"foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/other/nke-recipes/m2-candidate/toolchains/packer", false, false},
+		{"different publication owner", "ghcr.io/example/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
+		{"sibling repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes-mirror/m2-candidate/toolchains/packer", false, false},
+		{"non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/other/packer", false, false},
+		{"development current toolchain", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true, true},
+		{"development legacy toolchain", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true, true},
+		{"development different owner", "ghcr.io/example/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true, false},
+		{"development sibling repository", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr-mirror/m2-candidate/toolchains/packer", true, false},
+		{"development non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", true, false},
+		{"development prefix without policy", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan.Environment.Publication.RepositoryPrefix = test.publication
+			plan.Environment.GitHubDevelopment = test.development
 			image := test.image + "@sha256:" + strings.Repeat("a", 64)
 			if got := githubPrivateToolchain(plan, image); got != test.want {
 				t.Fatalf("private preparation = %t, want %t", got, test.want)
 			}
 			if githubPrivateToolchain(plan, test.image+":latest") {
 				t.Fatal("unpinned image admitted")
+			}
+		})
+	}
+	plan.Environment.GitHubARC = "unsupported"
+	if githubPrivateToolchain(plan, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:"+strings.Repeat("a", 64)) {
+		t.Fatal("unsupported ARC policy received private image preparation")
+	}
+}
+
+func TestMaintainedNightlyPrivateImageCredentialBoundary(t *testing.T) {
+	for _, profile := range []string{"nvke-nightly-arm64", "nvke-nightly-upstream-ovn-arm64"} {
+		t.Run(profile, func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-"+profile+"/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			disks, fetches := 0, 0
+			for _, job := range document.Jobs {
+				prepared := false
+				prepareIndex, executionIndex := -1, -1
+				for index, step := range job.Steps {
+					if step.Env[githubImageToken] != "" {
+						if prepared || job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
+							step.Env[githubImageToken] != "${{ github.token }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
+							t.Fatal("toolchain credential escaped its separate read-only preparation step")
+						}
+						prepared = true
+						prepareIndex = index
+						if job.Environment == githubARCEnvironment {
+							disks++
+						} else {
+							fetches++
+						}
+						continue
+					}
+					if executionIndex < 0 && (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) {
+						executionIndex = index
+					}
+				}
+				if prepared && executionIndex <= prepareIndex {
+					t.Fatal("toolchain preparation did not precede source or producer execution")
+				}
+			}
+			if disks != 1 || fetches == 0 {
+				t.Fatalf("missing private preparation for native disk or its source vendors: %d/%d", disks, fetches)
 			}
 		})
 	}
@@ -141,7 +207,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	disks, fetches := 0, 0
 	for _, job := range document.Jobs {
 		for _, step := range job.Steps {
@@ -162,23 +228,48 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if disks != 4 || fetches == 0 {
 		t.Fatalf("missing preparation for native disks or their source vendors: %d/%d", disks, fetches)
 	}
-	for _, test := range []struct{ name, before, after string }{
-		{"write scope", "packages: read", "packages: write"},
-		{"wrong credential", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ github.token }}'", "NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}'"},
-		{"wrong helper", "factory github prepare-images --plan", "factory github run-node --plan"},
+	stages, _, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobID := ""
+	for _, stage := range stages {
+		if stage.DiskOutput != "" && len(githubStagePrivateImages(plan, stage)) > 0 {
+			jobID = stage.ID
+			break
+		}
+	}
+	if jobID == "" {
+		t.Fatal("fixture lacks a native private-image preparation job")
+	}
+	member, _ := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
+	for _, test := range []struct {
+		name, member string
+		mutate       func(*testing.T, *yamlv3.Node)
+	}{
+		{"write scope", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "jobs", jobID, "permissions", "packages").Value = "write"
+		}},
+		{"wrong credential", member, func(t *testing.T, root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")
+			token := githubTestYAMLField(t, step, "env", githubImageToken)
+			if token.Value != "${{ github.token }}" {
+				t.Fatalf("fixture image token differs: %q", token.Value)
+			}
+			token.Value = "${{ secrets.NKE_SOURCE_TOKEN }}"
+		}},
+		{"wrong helper", member, func(t *testing.T, root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")
+			run := githubTestYAMLField(t, step, "run")
+			if strings.Count(run.Value, "factory github prepare-images --plan") != 1 {
+				t.Fatal("fixture image preparation omits its exact helper")
+			}
+			run.Value = strings.Replace(run.Value, "factory github prepare-images --plan", "factory github run-node --plan", 1)
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			changed := *bundle
-			changed.Files = make(map[string][]byte, len(bundle.Files))
-			for name, value := range bundle.Files {
-				changed.Files[name] = value
-			}
-			changed.Files[GitHubWorkflowPath] = bytes.Replace(bundle.Files[GitHubWorkflowPath], []byte(test.before), []byte(test.after), 1)
-			if bytes.Equal(changed.Files[GitHubWorkflowPath], bundle.Files[GitHubWorkflowPath]) {
-				t.Fatal("mutation did not change workflow")
-			}
-			changed.WorkflowDigest = pipeline.FileDigest(changed.Files[GitHubWorkflowPath])
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+			changed := mutateGitHubBundleYAML(t, bundle, test.member, func(root *yamlv3.Node) { test.mutate(t, root) })
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
 }
@@ -222,8 +313,8 @@ func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 	plan.Environment.DiskEvidence = "build-provenance-v1"
 	stage := githubStage{ID: "disk-stage", DiskOutput: "image", Nodes: []Node{{Container: plan.Environment.Publication.RepositoryPrefix + "/toolchains/packer@sha256:" + strings.Repeat("a", 64)}}}
 	stage.diskExecutionBudget = time.Minute
-	prepare := githubStep{Run: githubRunnerCommand("prepare-images", "stage", stage.ID), Env: githubImageEnvironment()}
-	run := githubStep{ID: "run-disk", Run: githubRunnerCommand("run-disk", "output", stage.DiskOutput), TimeoutMinutes: 1 + githubDiskCleanupHeadroomMinutes}
+	prepare := githubStep{Run: githubRunnerCommand(plan, "prepare-images", "stage", stage.ID), Env: githubImageEnvironment()}
+	run := githubStep{ID: "run-disk", Run: githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput), TimeoutMinutes: 1 + githubDiskCleanupHeadroomMinutes}
 	actions, err := resolveGitHubActions(plan.Actions)
 	if err != nil {
 		t.Fatal(err)

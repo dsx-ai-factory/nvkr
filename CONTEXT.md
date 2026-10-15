@@ -19,6 +19,10 @@ Separately selected execution settings, publication namespace, credential refere
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies; the workflow adapter consumes their locked commits.
+An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
+native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
+registry namespaces. Unsigned development remains static-unqualified. Neither setting grants production
+acceptance, provider access or qualified evidence.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -36,6 +40,8 @@ _Avoid_: Producer, expected output, release
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
 Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
 signature or policy acceptance.
+Diagnostic output pulling additionally checks one selected output's complete payload closure and byte integrity
+without establishing signature or policy acceptance.
 A release description is a versioned, detached metadata view derived solely from a pinned publication;
 it is not another lifecycle object or a verified Release. It retains every named artifact, platform and
 bound source/evidence record, including aggregate image-index children. Source repository/commit belongs
@@ -105,7 +111,18 @@ _Avoid_: Authored definition, execution observation
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
+Its workflow, shared composite templates and generated invocation data share one ownership manifest and
+byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
+interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
+from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
+expansion preserves independent job parameters, policies and exact result membership. Neither scripts
+supplied as data nor separately authored lifecycle inputs are admitted.
+The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
+visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
+the complete bundle still requires regeneration and checking.
 Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
+Development and production use separate fixed bundle layouts selected by their Environment, with the same
+compiler and independent ownership manifests. A development bundle is not a release authorization.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
 **Catalog maintenance candidate**:
@@ -127,6 +144,21 @@ An Artifact format containing exact executable files and their installation meta
 _Avoid_: Release, arbitrary archive
 
 ## Evidence and authority
+
+**External test producer**:
+An external implementation or NVKR-supplied diagnostic adapter providing original reports and descriptive
+metadata, distinct from a Component producer that builds delivery artifacts. Lane: none (descriptive); [ADR-16 §6](docs/adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns its execution and authority boundary.
+_Avoid_: Component producer, qualified verifier, conformance receipt
+
+**Validation profile**:
+Explicit diagnostic configuration selecting a product publication and named check instances with
+separate suite/harness protocols and configuration. Tools are independently selected exact members
+of authenticated catalog-produced executable outputs. Its source and tools policy paths reference the existing
+qualification-policy format for artifact authentication; the profile does not replace those policies.
+Top-level `validate` runs diagnostics, whereas `definition validate` checks static authored-input shape.
+Outputs remain descriptive and cannot authorize qualification or promotion.
+_Avoid_: Recipe, test dispatcher framework, verification policy
 
 **Release authenticity**:
 Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.
@@ -178,6 +210,10 @@ attempt and an independent consumer policy. The generated handoff carries origin
 recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
 The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
 joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+Native workers exercise every selected delivered tool with fixed version checks in isolated containers and
+sign exact member observations. The final qualifier authenticates complete native coverage under the same
+independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
+they are not caller-authored pass records or release authorization.
 External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
@@ -194,6 +230,15 @@ _Avoid_: Public Release synonym, output list, binary bundle
 Distinct independently authenticated release claims covering exact reproduction, compatibility requirements, and runtime behavior for their bound subjects.
 Qualified release-gate acceptance is deferred; no retained clearance implementation consumes these claims.
 _Avoid_: Generic pass result, cluster qualification
+
+**Downstream test coordinator**:
+A separately authored repository CI adapter outside the NVKR product lifecycle
+that joins exact project producer Runs, consumes authenticated publication bytes
+and invokes NVKE's suite in a separate job. NVKE owns guest/cluster provisioning,
+assertions and teardown; the parent harness owns host admission, outer leases,
+disk service and network-control restoration. Its unsigned reports are diagnostics,
+not qualified conformance receipts or a seventh public lifecycle object (ADR-16/18).
+_Avoid_: Nightly qualification, qualified runtime, product fleet operator
 
 **Clearance**:
 Authenticated authorization for one exact qualified ReleaseSet after its required evidence, policy, and lifecycle checks pass.

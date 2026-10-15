@@ -28,10 +28,15 @@ type SavedQualificationPredicate struct {
 // original qualification evidence. Legacy aggregate publication remains usable
 // for builds and publication, but has neither per-output predicates nor invocation-bound
 // release metadata and therefore cannot support a qualification handoff.
+// Development publication has a separate disposable namespace and trust policy;
+// it cannot supply the default-branch production handoff for qualification.
 // Callers must still validate the Plan and authenticate the source and evidence.
 func AdmitQualificationHandoff(plan *Plan) error {
 	if plan == nil {
 		return e.New(e.CodeUsage, "qualification handoff requires an original Plan")
+	}
+	if plan.Environment.GitHubDevelopment {
+		return e.New(e.CodeEngineCapability, "qualification handoff requires production publication; development publication has a separate trust policy")
 	}
 	if plan.Environment.Signing == nil || plan.Environment.Signing.Mode != SigningModeCosign {
 		return e.New(e.CodeEngineCapability, "qualification handoff requires live signed publication")

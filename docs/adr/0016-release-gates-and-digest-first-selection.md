@@ -74,8 +74,9 @@ private state; it cannot be serialized or reconstructed from public fields. A fi
 reference, untyped `verified` or `complete` flag, decoded report, or receipt or capability for a different
 artifact, evidence document, or policy is rejected.
 
-- NVKR **emits the reproduction verdict** (ADR-04) and **consumes a handed-off conformance result**. It **never
-  runs the conformance suite**; running it would break verifier isolation and cross into fleet operation.
+- For qualification and promotion, NVKR **emits the reproduction verdict** (ADR-04) and **consumes a
+  handed-off independently signed external conformance result**. It never runs that suite to create its
+  own conformance evidence. Explicit local diagnostics in §6 have no qualification or promotion authority.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
   distinct from the build/publish identity**. `vectorDigests` is sorted and exhaustive for the promoted set.
@@ -185,13 +186,22 @@ Source, patch, configuration and material identity/provenance checks remain mand
 no new upstream component manifest. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
 establishes producer-only disk evidence and defers disk inspection and material reconciliation.
 
-The manual diagnostic entrypoint takes an exact GitHub Run attempt URL and independently authored
+The manual artifact-check entrypoint takes an exact GitHub Run attempt URL and independently authored
 qualification policy. The policy approves the producer repository, workflow and default branch and pins the
 consumer verifier; neither the source Environment nor downloaded records can supply those decisions. The
 provider discovers the commit from the selected attempt and authenticates its successful default-branch
 execution. A Run URL without an attempt is ambiguous and is rejected.
 
-The real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+`lifecycle.CheckQualificationReference` additionally accepts an explicitly selected immutable publication
+root and independently selected qualification policy. It authenticates the root against that policy,
+reads the signed source `InvocationID`, discovers the producing Run internally, authenticates its exact
+handoff and recompiles the original inputs through the existing Run owner. The resulting receipt must
+bind the originally selected root; source records cannot select trust policy or substitute a publication.
+An error closes any returned receipt. This adds publication-based discovery, not a new trust lane.
+
+The production real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+The development Environment cannot supply this qualification handoff; admission rejects it before
+qualification evidence collection while its separate signed build/publication workflow remains available.
 It carries original Plan bytes, the compiler-read authored file closure and original root/output predicates.
 Predicates are keyed by the aggregate root and each delivered payload reference. The collector validates
 the bounded aggregate metadata against the Plan and joins its exact output origins to the saved output-route
@@ -216,6 +226,44 @@ Smoke startup failure, unsuccessful execution or a conflicting version fails the
 use an explicit not-applicable rule. The publisher must reject missing required smoke results. No placeholder
 or absent implementation may mint passing smoke evidence.
 
+The native MVP uses one fixed same-repository reusable GitHub Actions smoke workflow invoked at the
+qualifier's exact commit. The existing `run generate --qualification-policy` operation emits this worker
+and the qualifier alongside the producer workflow; the worker is generated infrastructure, not a separately
+authored operator workflow. The independent policy selects native Linux AMD64/ARM64 image pins and fixed
+nvkectl, Helm or kubectl version profiles by exact component name. Every delivered executable member must be exercised;
+expected versions and nvkectl source stamps come from A's frozen Plan. OCI/APT non-tool scope requires an
+exact named output, kind, component set and deployment-image/package-repository role. It does not assert
+that those artifacts contain no tools. Disk and Helm use the explicit non-tool format rule. One pure
+lifecycle admission operation joins the frozen Plan and smoke policy before generation and runtime bundle
+reads. It rejects missing or extra tool profiles, non-tool membership and native execution images, and
+validates expected versions/source stamps. Generated workers cover exactly the selected executable
+platforms; the final AMD64 signer additionally requires its independently pinned cosign executable.
+
+Pipeline owns native ELF and image admission, bounded execution in a nonroot network-disabled container,
+clean payload environment, no host mounts or credentials, bounded output and stop/join cleanup. Lifecycle
+streams exact held members and evaluates fixed version responses; it issues a native receipt only after
+cleanup. The worker signs only that live receipt's canonical report under its separate worker identity.
+No worker has final qualification publication credentials. Failed native reports retain actual observations
+and enumerate known member results as completed pass, attempted failure or not evaluated. A late cleanup,
+cancellation or revocation error fails the report without rewriting completed checks. Failure-only result
+rows cannot enter successful canonical worker evidence. When final aggregation cannot authenticate the
+smoke set, it emits a failed `delivered-tool-smoke-authentication` verdict for every authenticated A output,
+preserves A's results and returns the original coded error; no qualification evidence is issued. The generated
+final owner therefore runs after completed worker failure as well as success, subject to the same trusted
+source condition and cancellation refusal. Failed or missing worker evidence cannot issue a B receipt.
+
+Hosted aggregation independently rechecks A and the current invocation, admits every required successful
+worker job from that exact attempt and authenticates each worker document. The same verified certificate
+must match the independently selected worker SAN and GitHub issuer and bind the top-level workflow URI,
+workflow commit and exact Run attempt. Provider artifact metadata and job status alone are insufficient.
+The owner recomputes complete disjoint native member coverage, exact payload sizes/digests, expected and
+observed versions, image selections and the full policy identity before issuing a B receipt. B borrows
+A and the invocation; closure revokes copies. Caller-authored reports and booleans cannot restore it.
+
+Hosted qualification takes one independently selected policy; its source is derived only from the trusted
+`workflow_run` event and provider API. Native cosign byte pins are independent of producer tool selection.
+The pinned release version is a bootstrap download locator, never authority in place of those byte pins.
+
 The MVP requires each root/output production predicate's invocation to equal the authenticated source Run
 attempt exactly. Where an output carries a publication-origin record, both its preparation and signing
 invocations must equal that source attempt. ADR-20's existing publication retry/reuse behavior is unchanged,
@@ -235,14 +283,34 @@ policy. The source build's successful default-branch invocation is authenticated
 qualification invocation (ADR-18); a green build or the publisher's own identity alone is insufficient.
 Smoke execution receives no qualification signing authority.
 
+The current scope directed by the user permits merging the reviewed implementation and concrete candidate
+policy/workflows before real acceptance runs. After merge, a fresh complete producer attempt with its original
+handoff and hosted positive/negative qualification and independent-consumer checks must establish acceptance.
+Until those results are recorded, production readiness remains unproved; merge is not operational acceptance.
+All runtime gates remain mandatory for those runs. External acceptance must retain immutable Run/artifact
+references for a real `workflow_run` exercise: the certificate SAN and OIDC issuer from the verified bundle,
+the exact source and qualification invocations, subject-bound attachment/read-back results, and rejection
+under a wrong expected signer identity. The observed certificate identity must match the independently
+authenticated qualification workflow identity. [Fulcio's GitHub identity mapping](https://github.com/sigstore/fulcio/blob/main/docs/oidc.md#github)
+uses `job_workflow_ref` for the SAN; a reusable signing workflow can therefore differ from its caller.
+The admitted same-commit smoke worker must establish its distinct SAN, caller workflow/commit and exact
+Run claims, and the exact generated native job names, in hosted acceptance. Any future reusable final signer
+must establish its own exact identity binding before admission. A mismatch remains
+a rejection; broadening the identity expression does not satisfy acceptance. Local fixtures do not establish
+the hosted certificate identity or complete this external acceptance requirement.
+
 Qualification evidence binds its schema and gate version, exact subject membership, producing Run/attempt/commit,
 Definition and relevant input identities, source build identity, qualification invocation and per-check results.
-Its canonical schema and family are registered in ADR-01 before use. Signing and attachment use the admitted
+Version 2 additionally requires the full independent policy and authenticated per-member native worker
+observations; the v1 placeholder shape cannot satisfy this gate. Its canonical schema and family are registered
+in ADR-01 before use. Signing and attachment use the admitted
 signing machinery. All-verdicts-before-signing is a preflight guarantee, not a transaction across registry
 attachments: an operational failure marks the invocation unsuccessful and blocks release even when earlier
 attachments remain. The release consumer must authenticate complete successful qualification publication;
 presence of one attachment cannot prove success for the set. M4's release manifest remains a separate deferred
-consumer and grants no qualified-lane clearance.
+consumer and grants no qualified-lane clearance. Its acceptance tests must reject an earlier output's surviving
+attachment when a later attachment fails or the qualification invocation is canceled, even if the surviving
+predicate records a complete passing preflight set.
 
 Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated
 verify-only dispatch and incremental reuse are deferred hardening. External qualification suites such as
@@ -260,13 +328,52 @@ the approved scope and these contracts do not establish milestone completion or 
 
 ### 6. Passive external qualification handoff — deferred producer protocol
 
-The external suite owns execution, provisioning, process context and lifecycle. NVKR never initiates or
-supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
+External conformance evidence used for qualification remains a passive handoff: the independent suite
+owns execution, provisioning, process context and lifecycle. NVKR never runs that suite to manufacture
+its own conformance evidence. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
 suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
 `resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
 unpinned identities, caller-provided pass booleans, wrong roles, expired evidence or mismatched subjects fail
 closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
 are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
+
+The repository's separately authored NVKE E2E adapter is downstream CI test infrastructure,
+outside the NVKR product lifecycle and v1 qualification acceptance. ADR-18 §3 records its
+runner and trust constraints. It uses artifact-consumer APIs and issues no conformance receipt;
+it does not change this passive product boundary or establish named-decider ratification.
+
+The separate user-invoked `validate` command runs explicit named diagnostic checks in lane **none
+(descriptive)**. `validation` owns profile admission and dispatch; `conformance` implements the
+`kube-conformance` / `hydrophone` adapter. `testresults` owns descriptions and serialization, not
+execution or interpretation. The [operator reference](../external-test-output-contract.md) owns
+configuration, prerequisites and field limits. This is an implemented diagnostic path under this
+proposed contract, not organizational ratification or production cluster qualification.
+
+The profile independently selects product and tools publication roots and qualification-policy documents.
+Lifecycle authenticates each root and its exact producing Run, retains live receipts, and exports selected
+executable members through the delivery owner. The adapter runs those held Linux executables with an
+embedded kubeconfig and bounded child-process lifetimes. Tools and suite images are ordinary catalog
+outputs; caller-authored binary paths, payload digests or raw image references cannot restore authority.
+The operator must explicitly declare an existing disposable local cluster. That declaration proves
+neither locality nor exclusive ownership. This host execution is not a sandbox (ADR-18 §3).
+
+`targets` is a caller-owned output-to-workload mapping under ADR-19 §3. Before/after API assertions
+compare selected named OCI artifacts, workload identities and observed image identities; they do not
+own deployment roles, provision a cluster, prove continuously installed bytes or cover unmapped outputs.
+The adapter creates test resources and joins cleanup; lifecycle owns receipt closure outside registered
+callbacks. Cancellation, receipt revocation, unknown resource ownership or failed cleanup cannot become
+a complete capture. Fleet lifecycle, site/tenant operation and automatic applicability remain unsupported.
+
+Normal process exit status is retained as a harness fact with an unknown cause. Complete capture means
+original report retention, terminal wrapper cleanup, matching subject observations and live bindings;
+it means neither valid reports, suite completeness nor test/harness success. A normal nonzero exit may
+therefore accompany complete capture and permit the next configured check. Signals, launch failures,
+timeouts/cancellation, capture I/O errors, missing results, identity drift and failed wrapper cleanup
+remain partial/error. No JUnit verdict parser or exit-code-to-test-verdict protocol is introduced.
+
+Unsigned diagnostic descriptions cannot authorize qualification, signing or promotion, or replace ADR-05's
+publisher evidence and authenticated later observations. This does not change §5's separately isolated
+delivered-tool smoke workers. Passive external conformance admission remains deferred as described above.
 
 ## Consequences
 
@@ -284,12 +391,14 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
 
 **Neutral**
 - The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
-  It runs no suite, performs no infra rollback, and authorizes no mutation.
+  Qualification consumes independently produced external conformance evidence; §6's explicit diagnostic
+  execution grants no qualification authority. NVKR performs no infrastructure rollback or fleet lifecycle management.
+  The unqualified artifact diagnostics proposed in ADR-23 do not cross this qualification boundary.
 
 ## Alternatives considered
 
 - **Infer conformance from reproduction (single gate).** Rejected — SEC-08 requires two independent gates.
-- **Run the conformance suite inside NVKR.** Rejected — it breaks verifier isolation and the produce-vs-operate
+- **Run the conformance suite as its own qualification evidence.** Rejected — it breaks verifier isolation and the produce-vs-operate
   boundary.
 - **Select releases by tag.** Rejected — a mutable tag must never bypass digest and signature verification.
 - **Rollback that mutates running infrastructure.** Rejected — NVKR re-selects a verified set; the engine makes

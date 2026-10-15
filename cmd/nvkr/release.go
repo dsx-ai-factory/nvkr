@@ -29,7 +29,12 @@ type releaseVerificationResult struct {
 }
 
 type releaseVerifyOperation func(context.Context, string, lifecycle.VerificationPolicy,
-	lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error)
+	lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error)
+
+type releaseExportOptions struct {
+	Invocation string
+	Directory  string
+}
 
 type releaseAuthenticateOperation func(context.Context, string, lifecycle.VerificationPolicy,
 	lifecycle.ConsumerOptions) (lifecycle.AuthenticityDescription, error)
@@ -51,6 +56,7 @@ func executeReleaseAuthentication(ctx context.Context, reference string, policy 
 
 func executeReleaseVerification(ctx context.Context, reference string, policy lifecycle.VerificationPolicy,
 	options lifecycle.ConsumerOptions, expectation *lifecycle.ExactInputExpectation,
+	export releaseExportOptions,
 ) (releaseVerificationResult, error) {
 	consumer, err := lifecycle.NewConsumer(options)
 	if err != nil {
@@ -78,6 +84,11 @@ func executeReleaseVerification(ctx context.Context, reference string, policy li
 			return releaseVerificationResult{}, exactErr
 		}
 		result.ExactInputs = &exact
+	}
+	if export.Directory != "" {
+		if err := verified.ExportForInvocation(ctx, receipt, export.Invocation, export.Directory); err != nil {
+			return releaseVerificationResult{}, err
+		}
 	}
 	return result, nil
 }
@@ -133,11 +144,12 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 	}
 	return &cli.Command{
 		Name:            "release",
-		Usage:           "inspect or verify an immutable release closure",
+		Usage:           "inspect, pull outputs from, or verify an immutable release closure",
 		HideHelpCommand: true,
 		Subcommands: append([]*cli.Command{
 			releaseBrowseCmd(),
 			releaseExportCmd(),
+			releasePullCmd(),
 			{
 				Name: "inspect", Usage: "inspect an exact local OCI release layout without granting authority",
 				Flags: append([]cli.Flag{&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "layout", Required: true}}, commandPresentationFlags()...),
@@ -178,6 +190,8 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require with --environment and --plan"},
 					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require with --definition and --plan"},
 					&cli.StringFlag{Name: "plan", Usage: "exact generated compiled Plan to require with --definition and --environment; unreadable or undecodable Plan bytes report pipeline drift, while validation errors keep their code"},
+					&cli.StringFlag{Name: "export-layout", Usage: "export held verified bytes to a new layout; requires exact inputs and --expected-invocation"},
+					&cli.StringFlag{Name: "expected-invocation", Usage: "exact originating invocation required for --export-layout"},
 					&cli.StringFlag{Name: "workspace", Value: ".nvkr/verified-releases"}, &cli.BoolFlag{Name: "anonymous"}, &cli.BoolFlag{Name: "plain-http"},
 				}, commandPresentationFlags()...),
 				Action: func(c *cli.Context) (returnedErr error) {
@@ -207,6 +221,15 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 					}
 					if exactInputCount != 0 && exactInputCount != 3 {
 						return e.New(e.CodeUsage, "release verification requires --definition, --environment, and --plan together")
+					}
+					export := releaseExportOptions{Invocation: c.String("expected-invocation"), Directory: c.String("export-layout")}
+					if c.IsSet("export-layout") || c.IsSet("expected-invocation") {
+						if c.String("scope") == lifecycle.ScopeAuthenticity {
+							return e.New(e.CodeEngineCapability, "authenticity verification cannot export payloads; publication export requires artifact-publication scope")
+						}
+						if strings.TrimSpace(export.Invocation) == "" || strings.TrimSpace(export.Directory) == "" || exactInputCount != 3 {
+							return e.New(e.CodeUsage, "publication export requires exact inputs, --export-layout and --expected-invocation")
+						}
 					}
 					policy := lifecycle.VerificationPolicy{Lane: c.String("lane"), Scope: c.String("scope"), IdentityRegexp: c.String("identity"), Issuer: c.String("issuer"),
 						MinimumDiskEvidence: lifecycle.DiskEvidenceRequirement(c.String("minimum-disk-evidence"))}
@@ -268,7 +291,7 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 							return err
 						}
 					}
-					result, err := verify(c.Context, c.String("reference"), policy, options, expectation)
+					result, err := verify(c.Context, c.String("reference"), policy, options, expectation, export)
 					if err != nil {
 						return err
 					}

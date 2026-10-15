@@ -24,12 +24,13 @@ func githubQualificationHandoffStep(actions githubActionRefs) githubStep {
 		With: map[string]string{
 			"name": githubQualificationHandoffName, "path": githubQualificationHandoffPath,
 			"include-hidden-files": "true", "if-no-files-found": "error",
+			"retention-days": "7",
 		},
 	}
 }
 
 func writeGitHubQualificationHandoffStep(out *bytes.Buffer, actions githubActionRefs) {
 	step := githubQualificationHandoffStep(actions)
-	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        if: %s\n        timeout-minutes: %d\n        with:\n          name: %s\n          path: %s\n          include-hidden-files: 'true'\n          if-no-files-found: error\n",
+	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        if: %s\n        timeout-minutes: %d\n        with:\n          name: %s\n          path: %s\n          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: 7\n",
 		step.Name, step.Uses, step.If, step.TimeoutMinutes, yamlSingle(step.With["name"]), step.With["path"])
 }

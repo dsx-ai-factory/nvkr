@@ -441,6 +441,12 @@ func ReadObject(ctx context.Context, layoutRoot, name string) (PublishedObject, 
 	if err != nil {
 		return PublishedObject{}, nil, err
 	}
+	return readObject(inspection, name, func(descriptor Descriptor, max int64) ([]byte, error) {
+		return readBlob(ctx, layoutRoot, descriptor, max)
+	})
+}
+
+func readObject(inspection Inspection, name string, read func(Descriptor, int64) ([]byte, error)) (PublishedObject, []byte, error) {
 	var object PublishedObject
 	for _, candidate := range inspection.Root.Objects {
 		if candidate.Name == name {
@@ -453,7 +459,7 @@ func ReadObject(ctx context.Context, layoutRoot, name string) (PublishedObject, 
 	if object.Name == "" {
 		return PublishedObject{}, nil, e.New(e.CodeUnverifiedRef, "publication root has no object named %q", name)
 	}
-	manifestRaw, err := readBlob(ctx, layoutRoot, Descriptor{MediaType: MediaOCIManifest,
+	manifestRaw, err := read(Descriptor{MediaType: MediaOCIManifest,
 		Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
 	if err != nil {
 		return PublishedObject{}, nil, err
@@ -462,7 +468,7 @@ func ReadObject(ctx context.Context, layoutRoot, name string) (PublishedObject, 
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || manifest.ArtifactType != object.ArtifactType || len(manifest.Layers) != 1 {
 		return PublishedObject{}, nil, e.New(e.CodeVerifyFailed, "publication object %q is not a single-payload delivery object", name)
 	}
-	payload, err := readBlob(ctx, layoutRoot, manifest.Layers[0], maxDeliveryFileBytes)
+	payload, err := read(manifest.Layers[0], maxDeliveryFileBytes)
 	if err != nil {
 		return PublishedObject{}, nil, err
 	}
@@ -493,16 +499,16 @@ func writeExtractedObject(ctx context.Context, destination string, payload []byt
 		}
 	}()
 	if err := tmp.Chmod(0o644); err != nil {
-		return err
+		return e.Wrap(e.CodeInternal, err, "setting extracted-object mode")
 	}
 	if _, err := io.Copy(tmp, contextReader{ctx: ctx, reader: bytes.NewReader(payload)}); err != nil {
-		return classifyContext(ctx, err)
+		return classifyContext(ctx, e.Wrap(e.CodeInternal, err, "writing extracted object"))
 	}
 	if err := tmp.Sync(); err != nil {
-		return err
+		return e.Wrap(e.CodeInternal, err, "persisting extracted object")
 	}
 	if err := tmp.Close(); err != nil {
-		return err
+		return e.Wrap(e.CodeInternal, err, "closing extracted-object stage")
 	}
 	if err := deliveryContext(ctx); err != nil {
 		return err
@@ -519,14 +525,17 @@ func writeExtractedObject(ctx context.Context, destination string, payload []byt
 	}
 	directory, err := os.Open(parent)
 	if err != nil {
-		return err
+		return e.Wrap(e.CodeInternal, err, "opening extracted-object parent for persistence")
 	}
 	syncErr := directory.Sync()
 	closeErr := directory.Close()
 	if syncErr != nil {
-		return syncErr
+		return e.Wrap(e.CodeInternal, syncErr, "persisting extracted-object parent")
 	}
-	return closeErr
+	if closeErr != nil {
+		return e.Wrap(e.CodeInternal, closeErr, "closing extracted-object parent")
+	}
+	return nil
 }
 
 type contextReader struct {

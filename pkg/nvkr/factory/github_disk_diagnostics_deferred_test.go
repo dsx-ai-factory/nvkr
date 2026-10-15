@@ -4,13 +4,11 @@
 package factory
 
 import (
-	"maps"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"sigs.k8s.io/yaml"
 )
@@ -38,7 +36,7 @@ func TestDeferredDiskEvidenceRejectsInspectionDiagnosticUpload(t *testing.T) {
 			if err := ValidateGitHubBundle(t.Context(), plan, bundle); err != nil {
 				t.Fatalf("deferred mode without an inspector was rejected: %v", err)
 			}
-			document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			for _, job := range document.Jobs {
 				for _, step := range job.Steps {
 					if step.Name == "Retain inspection diagnostics" || strings.HasPrefix(step.With["path"], ".nvkr/diagnostics/inspection/") {
@@ -72,12 +70,8 @@ func TestDeferredDiskEvidenceRejectsInspectionDiagnosticUpload(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			workflow = append([]byte("# qualification: "+plan.Qualification.String()+"\n# planDigest: "+bundle.PlanDigest+"\n"), workflow...)
-			changed := *bundle
-			changed.Files = maps.Clone(bundle.Files)
-			changed.Files[GitHubWorkflowPath] = workflow
-			changed.WorkflowDigest = pipeline.FileDigest(workflow)
-			err = ValidateGitHubBundle(t.Context(), plan, &changed)
+			changed := relowerGitHubTestBundle(t, plan, bundle, workflow)
+			err = ValidateGitHubBundle(t.Context(), plan, changed)
 			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 			// Reject the missing-file warning at semantic admission before
 			// exact regeneration notices the serializer's formatting changes.

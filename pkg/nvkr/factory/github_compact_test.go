@@ -17,25 +17,30 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestWorkflowCompactionPreservesExpandedGraph(t *testing.T) {
-	raw := []byte("'on': {workflow_dispatch: {}}\njobs:\n  first:\n    steps:\n      - uses: actions/checkout@" + testCosignArchiveDigest[7:] + "\n        with: {persist-credentials: 'false'}\n  second:\n    steps:\n      - uses: actions/checkout@" + testCosignArchiveDigest[7:] + "\n        with: {persist-credentials: 'false'}\n")
-	compact, err := compactGitHubWorkflow(raw)
+func TestWorkflowLoweringPreservesExpandedGraph(t *testing.T) {
+	actions := testActionRefs(t, githubTestPlan(t))
+	raw := []byte("'on': {workflow_dispatch: {}}\njobs:\n  first:\n    steps:\n      - uses: " + actions.Checkout + "\n        with: {persist-credentials: 'false'}\n  second:\n    steps:\n      - uses: " + actions.Checkout + "\n        with: {persist-credentials: 'false'}\n")
+	workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(compact, []byte("*n")) || len(compact) >= len(raw) {
-		t.Fatal("repeated steps not compacted")
+	if !bytes.Contains(workflow, []byte("*checkout-workflow-source")) {
+		t.Fatal("repeated checkout does not use its descriptive preflight alias")
 	}
 	expected, err := yaml.YAMLToJSONStrict(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, err := yaml.YAMLToJSONStrict(compact)
+	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, err := yaml.YAMLToJSONStrict(expanded)
 	if err != nil || !bytes.Equal(expected, actual) {
 		t.Fatalf("graph changed: %v", err)
 	}
 	var tree yamlv3.Node
-	if err := yamlv3.Unmarshal(compact, &tree); err != nil {
+	if err := yamlv3.Unmarshal(workflow, &tree); err != nil {
 		t.Fatal(err)
 	}
 	definitions, uses := map[string]bool{}, map[string]bool{}
@@ -52,18 +57,22 @@ func TestWorkflowCompactionPreservesExpandedGraph(t *testing.T) {
 		}
 	}
 	visit(&tree)
+	if len(uses) == 0 {
+		t.Fatal("repeated steps not aliased")
+	}
 	for name := range definitions {
 		if !uses[name] {
 			t.Fatalf("unused anchor %s", name)
 		}
 	}
-	second, err := compactGitHubWorkflow(raw)
-	if err != nil || !bytes.Equal(compact, second) {
-		t.Fatalf("nondeterministic compaction: %v", err)
+	second, _, err := lowerGitHubActions(&Plan{}, raw, actions)
+	if err != nil || !bytes.Equal(workflow, second) {
+		t.Fatalf("nondeterministic action lowering: %v", err)
 	}
 }
 
-func TestWorkflowCompactionPreservesScalarTypesAndAuthority(t *testing.T) {
+func TestWorkflowLoweringPreservesScalarTypesAndAuthority(t *testing.T) {
+	actions := testActionRefs(t, githubTestPlan(t))
 	for _, value := range []string{"yes", "No", "ON", "off", "y", "N", "true", "null", "01", "1e2", "2026-10-13", "# literal", "colon: value", "first\nsecond", "${{ secrets.NKE_SOURCE_TOKEN }}"} {
 		t.Run(value, func(t *testing.T) {
 			raw := []byte(fmt.Sprintf(`'on': {workflow_dispatch: {}}
@@ -76,6 +85,7 @@ jobs:
     permissions: {contents: read, packages: read}
     if: ${{ github.ref == 'refs/heads/main' }}
     steps:
+      - uses: %s
       - name: 'Fetch exact source'
         env: {NVKR_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}', LITERAL: %s}
         run: |
@@ -89,60 +99,117 @@ jobs:
     permissions: {contents: read, packages: write, id-token: write}
     if: ${{ github.ref == 'refs/heads/main' }}
     steps:
+      - uses: %s
       - name: 'Sign exact publication'
         run: ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node sign/output
-`, yamlSingle(value)))
-			compact, err := compactGitHubWorkflow(raw)
+`, actions.Checkout, yamlSingle(value), actions.Checkout))
+			workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
 			if err != nil {
 				t.Fatal(err)
 			}
+			assertGitHubActionExtraction(t, workflow, files)
 			before, err := yaml.YAMLToJSONStrict(raw)
 			if err != nil {
 				t.Fatal(err)
 			}
-			after, err := yaml.YAMLToJSONStrict(compact)
+			expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			after, err := yaml.YAMLToJSONStrict(expanded)
 			if err != nil || !bytes.Equal(before, after) {
-				t.Fatalf("compaction changed credentials, dependency, branch policy, permissions or script bytes: %v", err)
+				t.Fatalf("action lowering changed credentials, dependency, branch policy, permissions or script bytes: %v", err)
 			}
 		})
 	}
 }
 
-func TestWorkflowCompactionPreservesExistingAliases(t *testing.T) {
-	raw := []byte(`'on': {workflow_dispatch: {}}
+func TestGitHubYAMLEncodingPreservesConstructedStringTypes(t *testing.T) {
+	for _, value := range []string{"y", "Y", "yes", "Yes", "YES", "n", "N", "no", "No", "NO", "on", "On", "ON", "off", "Off", "OFF", "true", "null", "01", "1e2"} {
+		t.Run(value, func(t *testing.T) {
+			raw, err := encodeGitHubYAML(githubYAMLMap("literal", githubYAMLString(value)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var decoded map[string]any
+			if err := yaml.UnmarshalStrict(raw, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if decoded["literal"] != value {
+				t.Fatalf("constructed string %q changed YAML scalar type: %#v", value, decoded["literal"])
+			}
+		})
+	}
+}
+
+func TestWorkflowLoweringPreservesExistingAliases(t *testing.T) {
+	actions := testActionRefs(t, githubTestPlan(t))
+	raw := []byte(strings.ReplaceAll(`'on': {workflow_dispatch: {}}
 env: {EXACT_SOURCE: &n1 '${{ secrets.EXACT_SOURCE }}'}
 jobs:
   first:
     name: 'Repeated source fetch'
     runs-on: ubuntu-24.04
     steps:
+      - uses: CHECKOUT
       - env: {EXACT_SOURCE: *n1}
         run: 'fetch exact source bytes'
   second:
     name: 'Repeated source fetch'
     runs-on: ubuntu-24.04
     steps:
+      - uses: CHECKOUT
       - env: {EXACT_SOURCE: *n1}
         run: 'fetch exact source bytes'
-`)
+`, "CHECKOUT", actions.Checkout))
 	expected, err := yaml.YAMLToJSONStrict(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {
-		raw, err = compactGitHubWorkflow(raw)
+		workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertGitHubActionExtraction(t, workflow, files)
+		raw, err = expandGitHubActions(&Plan{}, workflow, files)
 		if err != nil {
 			t.Fatal(err)
 		}
 		actual, err := yaml.YAMLToJSONStrict(raw)
 		if err != nil || !bytes.Equal(expected, actual) {
-			t.Fatalf("recompaction changed an existing alias binding: %v", err)
+			t.Fatalf("repeated action lowering changed an existing alias binding: %v", err)
 		}
 	}
 }
 
-func TestWorkflowCompactionRejectsRecursiveAliases(t *testing.T) {
-	_, err := compactGitHubWorkflow([]byte("jobs: &recursive {first: *recursive}\n"))
+func assertGitHubActionExtraction(t *testing.T, workflow []byte, files map[string][]byte) {
+	t.Helper()
+	actions, calls := 0, 0
+	for name := range files {
+		if strings.HasPrefix(name, githubActionsDirectory+"jobs/") {
+			actions++
+		}
+	}
+	var document yamlv3.Node
+	if err := yamlv3.Unmarshal(workflow, &document); err != nil {
+		t.Fatal(err)
+	}
+	jobs := githubYAMLField(document.Content[0], "jobs")
+	for index := 1; index < len(jobs.Content); index += 2 {
+		for _, step := range githubYAMLField(jobs.Content[index], "steps").Content {
+			if strings.HasPrefix(githubYAMLValue(step, "uses"), "./"+githubActionsDirectory+"jobs/") {
+				calls++
+			}
+		}
+	}
+	if actions == 0 || calls == 0 {
+		t.Fatalf("fixture bypassed action extraction: %d actions, %d local calls", actions, calls)
+	}
+}
+
+func TestWorkflowLoweringRejectsRecursiveAliases(t *testing.T) {
+	_, _, err := lowerGitHubActions(&Plan{}, []byte("jobs: &recursive {first: *recursive}\n"), testActionRefs(t, githubTestPlan(t)))
 	assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 }
 
@@ -210,4 +277,26 @@ func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
 	}
 	document := decodeGitHubWorkflow(t, raw)
 	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(document.Jobs))
+}
+
+// Render the maintained complete Plan as well as checking its committed bytes:
+// a newly required field on hundreds of steps can overflow provider admission
+// even when the previous generated workflow still fits.
+func TestMaintainedM2RenderingFitsGitHubFileLimit(t *testing.T) {
+	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := bundle.Files[bundle.WorkflowPath]
+	if err := validateGitHubWorkflowSize(raw); err != nil {
+		t.Fatal(err)
+	}
+	if len(raw) > maxGitHubWorkflowBytes*95/100 {
+		t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
+	}
+	t.Logf("maintained M2 rendering: %d bytes (%d bytes below GitHub limit)", len(raw), maxGitHubWorkflowBytes-len(raw))
 }

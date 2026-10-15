@@ -77,7 +77,7 @@ func TestReleasePresentationAdmissionPrecedesOwner(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			called, shown := false, false
-			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error) {
 				called = true
 				return releaseVerificationResult{}, nil
 			}
@@ -99,7 +99,7 @@ func TestReleaseVerificationTUIProjectsOwningResultOnce(t *testing.T) {
 	for _, exact := range []bool{false, true} {
 		t.Run(map[bool]string{false: "normal", true: "exact inputs"}[exact], func(t *testing.T) {
 			calls, shows := 0, 0
-			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy, _ lifecycle.ConsumerOptions, _ *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy, _ lifecycle.ConsumerOptions, _ *lifecycle.ExactInputExpectation, _ releaseExportOptions) (releaseVerificationResult, error) {
 				calls++
 				if policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication {
 					t.Fatal("policy changed")
@@ -148,7 +148,7 @@ func TestReleaseVerificationTUIKeepsOwnerFailureCode(t *testing.T) {
 		t.Run(string(code), func(t *testing.T) {
 			owner := e.New(code, "private-owner-error-sentinel")
 			reporting := e.New(e.CodeInternal, "renderer failure")
-			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error) {
 				return releaseVerificationResult{}, owner
 			}
 			shows := 0
@@ -176,7 +176,7 @@ func TestReleaseVerificationPlainRetainsExactJSONBytes(t *testing.T) {
 		result := releasePresentationFixtureResult(exact)
 		for _, explicit := range []bool{false, true} {
 			t.Run(map[bool]string{false: "normal", true: "exact"}[exact]+"/"+map[bool]string{false: "default", true: "plain"}[explicit], func(t *testing.T) {
-				verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+				verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error) {
 					return result, nil
 				}
 				app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}

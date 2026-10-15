@@ -620,6 +620,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if len(plan.Environment.GitHubRunners) > 0 {
 		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubRunners")
 	}
+	if plan.Environment.GitHubDevelopment {
+		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubDevelopment")
+	}
 	if len(plan.Environment.GitHubDispatchBranches) > 0 {
 		return e.New(e.CodeEngineCapability, "local execution does not support Environment.githubDispatchBranches")
 	}
@@ -1087,51 +1090,6 @@ func localRunnerPlatforms(nodes []Node) []string {
 		}
 	}
 	return sortedKeys(set)
-}
-
-func topologicalFactoryNodes(graph ArtifactGraph) []Node {
-	byID := make(map[string]Node, len(graph.Nodes))
-	producer := make(map[string]string, len(graph.Artifacts))
-	for _, node := range graph.Nodes {
-		byID[node.ID] = node
-	}
-	for _, artifact := range graph.Artifacts {
-		producer[artifact.ID] = artifact.Producer
-	}
-	indegree := make(map[string]int, len(graph.Nodes))
-	children := make(map[string][]string, len(graph.Nodes))
-	for _, node := range graph.Nodes {
-		parents := map[string]bool{}
-		for _, input := range node.Inputs {
-			parent := producer[input]
-			if !parents[parent] {
-				parents[parent] = true
-				indegree[node.ID]++
-				children[parent] = append(children[parent], node.ID)
-			}
-		}
-	}
-	var ready []string
-	for id := range byID {
-		if indegree[id] == 0 {
-			ready = append(ready, id)
-		}
-	}
-	sort.Strings(ready)
-	ordered := make([]Node, 0, len(byID))
-	for len(ready) > 0 {
-		id := ready[0]
-		ready = ready[1:]
-		ordered = append(ordered, byID[id])
-		for _, child := range children[id] {
-			indegree[child]--
-			if indegree[child] == 0 {
-				ready = append(ready, child)
-				sort.Strings(ready)
-			}
-		}
-	}
-	return ordered
 }
 
 func failedLocalDependency(graph ArtifactGraph, node Node, status map[string]string) string {

@@ -112,6 +112,9 @@ evidence and is never included in, or hashed back into, the reference vector it 
 compatibility, and vulnerability results are likewise release-gate receipts under ADR-13/16, not mutable fields
 added to an already published vector. Every claim therefore has exactly one owner and no vector self-compares.
 
+External test output descriptions have lane **none (descriptive)**; [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns their separation from publisher evidence and authenticated release-gate receipts.
+
 Every retained trust object — resolved build graph, ValidationVector, ReleaseSet, Inventory,
 publisher-evidence index, and ReproductionObservation — is independently digest-addressable via the ADR-01 codec,
 satisfying SEC-01.

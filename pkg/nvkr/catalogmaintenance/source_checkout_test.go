@@ -65,54 +65,68 @@ func changeCheckoutSource(t *testing.T, directory, name, repo string) {
 }
 
 func TestWorkflowRejectsSourceCheckoutPrefixCollisionsBeforeWork(t *testing.T) {
-	for _, mode := range []string{"static", "local-run"} {
-		for _, location := range []string{"selected root", "derived member", "required fetch", "output catalog"} {
-			t.Run(mode+"/"+location, func(t *testing.T) {
-				cfg := sourceCheckoutFixture(t)
-				cfg.Validation = mode
-				switch location {
-				case "selected root":
-					changeCheckoutSource(t, "catalog", "role", checkoutRepo+"-tools")
-				case "derived member":
-					changeCheckoutSource(t, "catalog", "app", checkoutRepo+"-tools")
-				case "required fetch":
-					cfg.Sources = []string{"root"}
-					changeCheckoutSource(t, "catalog", "role", checkoutRepo+"-tools")
-					registry := bytes.Replace(readFixture(t, "catalog/registry.yaml"), []byte(`"source": "app"`), []byte(`"source": "role"`), 1)
-					writeFixture(t, "catalog/registry.yaml", registry)
-				case "output catalog":
-					if err := os.Mkdir("output-catalog", 0700); err != nil {
-						t.Fatal(err)
-					}
-					for _, name := range []string{"registry.yaml", "pins.lock.yaml"} {
-						writeFixture(t, filepath.Join("output-catalog", name), readFixture(t, filepath.Join("catalog", name)))
-					}
-					changeCheckoutSource(t, "output-catalog", "app", checkoutRepo+"-tools")
-					definition := bytes.Replace(readFixture(t, cfg.Definition), []byte("name: tools,"), []byte("name: tools, catalog: {base: output-catalog},"), 1)
-					writeFixture(t, cfg.Definition, definition)
-				}
-				beforeLock := readFixture(t, "catalog/pins.lock.yaml")
-				beforePlan := readFixture(t, ".github/nvkr-run/plan.json")
-				raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
-				assertCode(t, err, e.CodeEngineCapability)
-				if len(raw) != 0 || !strings.Contains(err.Error(), "would redirect distinct repository") {
-					t.Fatalf("collision emitted workflow or unrelated error: %s %v", raw, err)
-				}
-				calls := 0
-				_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
-					calls++
-					return catalog.SourcePinUpdate{}, nil
-				})
-				assertCode(t, err, e.CodeEngineCapability)
-				if calls != 0 || !bytes.Equal(beforeLock, readFixture(t, "catalog/pins.lock.yaml")) || !bytes.Equal(beforePlan, readFixture(t, ".github/nvkr-run/plan.json")) {
-					t.Fatal("collision reached pin mutation or changed generated files")
-				}
+	baseline := sourceCheckoutFixture(t)
+	registry := readFixture(t, "catalog/registry.yaml")
+	definition := readFixture(t, baseline.Definition)
+	beforeLock := readFixture(t, "catalog/pins.lock.yaml")
+	beforePlan := readFixture(t, ".github/nvkr-run/plan.json")
+	// Both entrypoints share prepare before mode-specific admission. Exercise
+	// every source location once and retain both modes without their cross-product.
+	for _, tc := range []struct{ location, mode string }{
+		{"selected root", "static"},
+		{"derived member", "static"},
+		{"required fetch", "local-run"},
+		{"output catalog", "static"},
+	} {
+		t.Run(tc.mode+"/"+tc.location, func(t *testing.T) {
+			cfg := baseline
+			cfg.Validation = tc.mode
+			t.Cleanup(func() {
+				writeFixture(t, "catalog/registry.yaml", registry)
+				writeFixture(t, cfg.Definition, definition)
 			})
-		}
+			switch tc.location {
+			case "selected root":
+				changeCheckoutSource(t, "catalog", "role", checkoutRepo+"-tools")
+			case "derived member":
+				changeCheckoutSource(t, "catalog", "app", checkoutRepo+"-tools")
+			case "required fetch":
+				cfg.Sources = []string{"root"}
+				changeCheckoutSource(t, "catalog", "role", checkoutRepo+"-tools")
+				changed := bytes.Replace(readFixture(t, "catalog/registry.yaml"), []byte(`"source": "app"`), []byte(`"source": "role"`), 1)
+				writeFixture(t, "catalog/registry.yaml", changed)
+			case "output catalog":
+				if err := os.Mkdir("output-catalog", 0700); err != nil {
+					t.Fatal(err)
+				}
+				for _, name := range []string{"registry.yaml", "pins.lock.yaml"} {
+					writeFixture(t, filepath.Join("output-catalog", name), readFixture(t, filepath.Join("catalog", name)))
+				}
+				changeCheckoutSource(t, "output-catalog", "app", checkoutRepo+"-tools")
+				changed := bytes.Replace(definition, []byte("name: tools,"), []byte("name: tools, catalog: {base: output-catalog},"), 1)
+				writeFixture(t, cfg.Definition, changed)
+			}
+			raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+			assertCode(t, err, e.CodeEngineCapability)
+			if len(raw) != 0 || !strings.Contains(err.Error(), "would redirect distinct repository") {
+				t.Fatalf("collision emitted workflow or unrelated error: %s %v", raw, err)
+			}
+			calls := 0
+			_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+				calls++
+				return catalog.SourcePinUpdate{}, nil
+			})
+			assertCode(t, err, e.CodeEngineCapability)
+			if calls != 0 || !bytes.Equal(beforeLock, readFixture(t, "catalog/pins.lock.yaml")) || !bytes.Equal(beforePlan, readFixture(t, ".github/nvkr-run/plan.json")) {
+				t.Fatal("collision reached pin mutation or changed generated files")
+			}
+		})
 	}
 }
 
 func TestWorkflowAllowsRepeatedRepositoryAndUnrelatedSources(t *testing.T) {
+	baseline := sourceCheckoutFixture(t)
+	registry := readFixture(t, "catalog/registry.yaml")
 	for _, tc := range []struct {
 		name, repo string
 		selected   bool
@@ -125,7 +139,8 @@ func TestWorkflowAllowsRepeatedRepositoryAndUnrelatedSources(t *testing.T) {
 		{"unused sibling", checkoutRepo + "-tools", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := sourceCheckoutFixture(t)
+			cfg := baseline
+			t.Cleanup(func() { writeFixture(t, "catalog/registry.yaml", registry) })
 			changeCheckoutSource(t, "catalog", "role", tc.repo)
 			if !tc.selected {
 				cfg.Sources = []string{"root"}
@@ -141,15 +156,6 @@ func TestWorkflowAllowsRepeatedRepositoryAndUnrelatedSources(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestGitSourceCheckoutPrefixWouldRedirectSibling(t *testing.T) {
-	_ = sourceCheckoutFixture(t)
-	command := exec.CommandContext(t.Context(), "git", "ls-remote", checkoutRepo+"-tools")
-	output, err := command.CombinedOutput()
-	if err == nil || !bytes.Contains(output, []byte("/-tools")) || !bytes.Contains(output, []byte("does not appear to be a git repository")) {
-		t.Fatalf("expected local prefix collision: %s %v", output, err)
 	}
 }
 

@@ -36,6 +36,13 @@ recorded inputs. NVKE owns embedded-software correctness and runtime validation;
 own deployment topology and placement. The acceptance specification retains the full dependencies,
 artifact matrix obligations and exclusions.
 
+The separately authored [NVKE nightly E2E adapter](nvke-nightly.md) is downstream
+repository CI infrastructure outside these product milestones. Its first target
+uses kind and native ARM64 KVM guests under ADR-18's separate test-adapter contract;
+it does not widen the generated ARC disk engine or complete M3 qualification.
+NVKE owns guest/cluster provisioning and teardown; the parent harness owns outer
+host and network restoration. A successful combined cycle remains unrecorded.
+
 M2’s product floor remains AMD64 producer provenance. The October 12 approved M3 scope defers strict
 inspection and material reconciliation without organizational ADR ratification. ARM64 is an implementation extension; every additional
 output explicitly selected by a Definition remains mandatory for that Run and Release.

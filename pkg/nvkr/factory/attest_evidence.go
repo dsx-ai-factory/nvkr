@@ -73,6 +73,22 @@ func bindEvidenceAttestation(plan *Plan) error {
 }
 
 func executeAttestEvidence(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, newSigner signerFor, stdout io.Writer) error {
+	if plan.Environment.GitHubDevelopment {
+		if _, err := runtimeTarget(plan, node.Target); err != nil {
+			return err
+		}
+		input, err := signNodeInput(node, artifacts, PackageOCI)
+		if err != nil {
+			return err
+		}
+		inspection, err := delivery.Inspect(ctx, input.Path)
+		if err != nil {
+			return err
+		}
+		if err := admitDevelopmentMetadata(plan, inspection); err != nil {
+			return err
+		}
+	}
 	if plan.Environment.Signing == nil || plan.Environment.Signing.Mode != SigningModeCosign {
 		return e.New(e.CodeEngineCapability, "SBOM attestations require production signing")
 	}
@@ -92,7 +108,7 @@ func executeAttestEvidence(ctx context.Context, plan *Plan, node Node, artifacts
 	if err != nil {
 		return err
 	}
-	result, err := delivery.AttestEvidence(ctx, input.Path, output.Path, attester.AttestSBOM)
+	result, err := delivery.AttestPreparedEvidence(ctx, input.Path, output.Path, attester.AttestSBOM)
 	if err != nil {
 		return err
 	}

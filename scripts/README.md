@@ -22,6 +22,15 @@ explicit maintained-input refresh remain follow-ups. The guide distinguishes pri
 
 ## Definition → Run
 
+For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
+development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
+remote commit and an active registered `nvkr-dev.yml`, then dispatches that branch explicitly. It performs
+no commit, push, environment-policy update or registry cleanup. `--check` runs only its provider preflight.
+See [pipeline development](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for full M2 branch
+execution, separate development signing/publication credentials, and attempt-scoped registry cleanup.
+Controlled dispatch-adapter tests run with `make test-ci-tools`; registry cleanup is owned by the Go
+development module and the separate default-branch cleanup workflow.
+
 Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nvke-demo.md) for
 `nvke-demo e2e`: build selected artifacts through `nvkr`, then deploy those
 completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
@@ -128,6 +137,13 @@ process-local; its description grants no stronger evidence lane or Release scope
 Signer-policy rejection is covered by the owning consumer contract tests.
 
 ## Focused supporting contracts
+
+`nightly-build.sh` dispatches one maintained generated producer and joins its
+exact GitHub run. The separately authored nightly coordinator invokes the Go
+integration test and NVKE's existing runtime suite after authenticated publication.
+See the [nightly workflow and runtime bindings](../docs/nvke-nightly.md).
+The initial profiles select kind plus native ARM64 KVM guests with explicit OVN
+variants. The special TestGrid integration is deferred.
 
 - `demo-catalog-change.sh` exercises previewed and machine-managed source pin
   changes against an isolated catalog copy.

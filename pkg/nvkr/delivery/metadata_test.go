@@ -29,7 +29,7 @@ func TestMetadataTransportExcludesPayloadAndPreservesConsumerRelease(t *testing.
 				t.Fatal(err)
 			}
 			full := filepath.Join(t.TempDir(), "full")
-			result, err := AttestEvidence(t.Context(), prepared, full, func(_ context.Context, subject string, document []byte) ([]byte, error) {
+			result, err := AttestPreparedEvidence(t.Context(), prepared, full, func(_ context.Context, subject string, document []byte) ([]byte, error) {
 				return diskFixtureBundle(t, subject, document), nil
 			})
 			if err != nil {

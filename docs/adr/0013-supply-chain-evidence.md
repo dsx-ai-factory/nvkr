@@ -18,7 +18,9 @@
 
 The evidence contract includes per-artifact SBOMs, external references for acquired artifacts, and deferred
 vulnerability results. The set is deterministic, bound to artifact identity, and folds into the evidence bundle
-(ADR-05). One boundary governs all of it: NVKR **produces** evidence and does not operate the fleet.
+(ADR-05). NVKR **produces** this evidence and owns no fleet lifecycle. Explicit local diagnostics have
+lane **none (descriptive)** under [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol);
+their reports cannot become publisher evidence or qualified receipts by being retained.
 
 ## Decision
 

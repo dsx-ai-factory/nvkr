@@ -4,5 +4,84 @@
 # Configuration for NVIDIA's copy-pr-bot GitHub App.
 # https://docs.gha-runners.nvidia.com/platform/apps/copy-pr-bot/
 enabled: true
-auto_sync_draft: false
-auto_sync_ready: false
+auto_sync_draft: true
+auto_sync_ready: true
+
+# Contributors whose pull requests the bot mirrors without a vetter's
+# `/ok to test`. Shared with NVKE's copy-pr-bot configuration at:
+# https://github.com/dsx-ai-factory/nvke/blob/80e34a26bc1d09a427f054f072ff2f53b0c720ad/.github/copy-pr-bot.yaml
+additional_trustees:
+  - abhay-krishna
+  - abhinavmpandey08
+  - adityavenneti
+  - aks02hay
+  - anisha-nv
+  - avasilevskii
+  - awgreene
+  - bmcadams1
+  - carldanley
+  - chaochn47
+  - coffeepac
+  - cullenmcdermott
+  - danbudris
+  - depohmel
+  - dims
+  - dry923
+  - echapman13
+  - erstaples
+  - g-gaston
+  - Ganiredi
+  - glaguteta
+  - harish-sampath
+  - hulquest
+  - iamkhaledh
+  - j-griffith
+  - jaxesn
+  - Jay-Madden
+  - jdubs
+  - jedimt
+  - jmmclean
+  - johnshults
+  - jonathanmeier5
+  - junshun
+  - justinhopper
+  - jyotimahapatra
+  - Lazzer64
+  - lia-campbell
+  - mark-larter
+  - marklee77
+  - maxcelant
+  - mchmarny
+  - mdaverde
+  - meet101
+  - miancheng7
+  - mjlshen
+  - mmeha
+  - mmoore71
+  - natherz97
+  - naut-brian
+  - nbhoomakkanavar
+  - newtonkishore-nv
+  - nhammernik
+  - njhensley
+  - nvidiajeff
+  - odacremolbap
+  - pbikki
+  - pdmack
+  - rbever-nvidia
+  - rcompos
+  - rorajani
+  - sithape2025
+  - smalleni
+  - srao-nv
+  - srekhi93
+  - stephliu-nv
+  - suket22
+  - TerryHowe
+  - tjrasche
+  - vignesh-goutham
+  - vineeth-bandi
+  - vwilson-nvidia
+  - wongma7
+  - xdu31
+  - zmadell523

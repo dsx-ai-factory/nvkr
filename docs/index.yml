@@ -9,6 +9,8 @@ navigation:
     contents:
       - page: Quickstart
         path: quickstart.md
+      - page: Use NVKR with Your AI Agent
+        path: use-with-agents.md
       - page: Concepts
         path: user-concepts.md
       - page: Definition, Run, and Release
@@ -42,7 +44,7 @@ navigation:
     contents:
       - page: Plan and Graph Inspection
         path: plan-and-graph-inspection.md
-      - page: Browse and Verify a Release
+      - page: Browse, Export, Pull, and Verify a Release
         path: release-quickstart.md
       - page: Release Navigation
         path: release-navigation.md

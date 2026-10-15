@@ -16,7 +16,6 @@ import (
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
 
@@ -30,6 +29,8 @@ func TestGitHubRunSummariesHaveTwoOwners(t *testing.T) {
 			return nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
 		}},
 		{"metadata publication", referenceTestPlan},
+		{"unsigned development", githubDevelopmentTestPlan},
+		{"signed development", githubDevelopmentPublicationTestPlan},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := tc.plan(t)
@@ -37,7 +38,7 @@ func TestGitHubRunSummariesHaveTwoOwners(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			workflow := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+			workflow := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			starts, ends := 0, 0
 			finalizations := 0
 			for id, job := range workflow.Jobs {
@@ -145,6 +146,8 @@ func TestGitHubRunRenderedSummaryResults(t *testing.T) {
 			return nativeGitHubTestPlan(t, map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"})
 		}},
 		{"metadata publication", referenceTestPlan},
+		{"unsigned development", githubDevelopmentTestPlan},
+		{"signed development", githubDevelopmentPublicationTestPlan},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := tc.plan(t)
@@ -152,7 +155,7 @@ func TestGitHubRunRenderedSummaryResults(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			raw := bundle.Files[GitHubWorkflowPath]
+			raw := bundle.Files[bundle.WorkflowPath]
 			if PerOutputPublication(plan) {
 				var tree yamlv3.Node
 				if err := yamlv3.Unmarshal(raw, &tree); err != nil {
@@ -174,7 +177,7 @@ func TestGitHubRunRenderedSummaryResults(t *testing.T) {
 					t.Fatal("publication fixture does not exercise compact workflow decoding")
 				}
 			}
-			workflow := decodeGitHubWorkflow(t, raw)
+			workflow := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			finalizer := workflow.Jobs["nvkr-lifecycle-run"]
 			if len(finalizer.Needs) == 0 || len(finalizer.Steps) == 0 {
 				t.Fatal("rendered finalizer has no dependencies or steps")
@@ -296,27 +299,23 @@ func TestGitHubRunSummaryContractRejectsTampering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tc := range []struct{ name, before, after string }{
-		{"opening guard", "if: ${{ success() && " + githubDispatchCondition(plan) + " }}", "if: ${{ always() }}"},
-		{"closing guard", "id: summarize-run-end\n        if: ${{ always() }}", "id: summarize-run-end\n        if: ${{ success() }}"},
-		{"blocking diagnostics", "continue-on-error: true\n        run: |", "continue-on-error: false\n        run: |"},
-		{"status input", "join(needs.*.result, '' '')", "join(needs.*.result, ''failure'')"},
-		{"missing upload identity", "id: upload-run-record", "id: another-upload"},
+	bootstrap, _ := githubTestBootstrap(t, bundle)
+	for _, tc := range []struct {
+		name, job, step, value string
+		field                  []string
+	}{
+		{"opening guard", bootstrap, githubRunStartSummaryID, "${{ always() }}", []string{"if"}},
+		{"closing guard", "nvkr-lifecycle-run", githubRunEndSummaryID, "${{ success() }}", []string{"if"}},
+		{"blocking diagnostics", bootstrap, githubRunStartSummaryID, "false", []string{"continue-on-error"}},
+		{"status input", "nvkr-lifecycle-run", githubRunEndSummaryID, "${{ join(needs.*.result, 'failure') }}", []string{"env", "NVKR_JOB_RESULTS"}},
+		{"missing upload identity", "nvkr-lifecycle-run", githubRunUploadID, "another-upload", []string{"id"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mutated := *bundle
-			mutated.Files = make(map[string][]byte, len(bundle.Files))
-			for path, raw := range bundle.Files {
-				mutated.Files[path] = raw
-			}
-			original := bundle.Files[GitHubWorkflowPath]
-			changed := bytes.Replace(original, []byte(tc.before), []byte(tc.after), 1)
-			if bytes.Equal(changed, original) {
-				t.Fatal("mutation did not reach the workflow")
-			}
-			mutated.Files[GitHubWorkflowPath] = changed
-			mutated.WorkflowDigest = pipeline.FileDigest(changed)
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &mutated), e.CodeEngineCapability)
+			mutated := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+				step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "jobs", tc.job, "steps"), "id", tc.step)
+				githubTestYAMLField(t, step, tc.field...).Value = tc.value
+			})
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, mutated), e.CodeEngineCapability)
 		})
 	}
 }

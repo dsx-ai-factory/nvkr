@@ -4,13 +4,10 @@
 package factory
 
 import (
-	"bytes"
-	"maps"
 	"strings"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
 
@@ -24,6 +21,8 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 		{"dry run", func(t *testing.T) *Plan { return signedTestPlan(t, dryRunSigningProfile(), ghcrTarget()) }, false},
 		{"signed aggregate", func(t *testing.T) *Plan { return signedTestPlan(t, cosignSigningProfile(), ghcrTarget()) }, false},
 		{"signed outputs", referenceTestPlan, true},
+		{"unsigned development", githubDevelopmentTestPlan, false},
+		{"signed development", githubDevelopmentPublicationTestPlan, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan := test.plan(t)
@@ -31,7 +30,7 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 			if err != nil {
 				t.Fatal(err)
 			}
-			job := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs["nvkr-lifecycle-run"]
+			job := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs["nvkr-lifecycle-run"]
 			if strings.Contains(joinRuns(job.Steps), " --handoff .nvkr/qualification/handoff.json") != test.want {
 				t.Fatalf("handoff capture admission differs for %s", test.name)
 			}
@@ -41,8 +40,8 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 					continue
 				}
 				uploads++
-				if step.Uses != plan.Actions["upload-artifact"].Uses() || step.If != "${{ success() }}" || step.TimeoutMinutes != 5 || step.ContinueOnError || len(step.Env) != 0 || len(step.With) != 4 ||
-					step.With["path"] != ".nvkr/qualification/handoff.json" || step.With["include-hidden-files"] != "true" || step.With["if-no-files-found"] != "error" {
+				if step.Uses != plan.Actions["upload-artifact"].Uses() || step.If != "${{ success() }}" || step.TimeoutMinutes != 5 || step.ContinueOnError || len(step.Env) != 0 || len(step.With) != 5 ||
+					step.With["path"] != ".nvkr/qualification/handoff.json" || step.With["include-hidden-files"] != "true" || step.With["if-no-files-found"] != "error" || step.With["retention-days"] != "7" {
 					t.Fatalf("handoff upload is not exact and bounded: %+v", step)
 				}
 			}
@@ -63,99 +62,68 @@ func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, test := range []struct{ name, field, old, replacement string }{
-		{"unchanged", "", "", ""},
-		{"wrong attempt", "with.name", githubQualificationHandoffName, "nvkr-qualification-latest"},
-		{"whole workspace", "with.path", githubQualificationHandoffPath, ".nvkr"},
-		{"failure upload", "if", "${{ success() }}", "${{ always() }}"},
-		{"no deadline", "timeout-minutes", "5", ""},
-		{"missing capture", "run", " --handoff .nvkr/qualification/handoff.json", ""},
-		{"hidden omission", "with.include-hidden-files", "true", "false"},
-		{"missing handoff ignored", "with.if-no-files-found", "error", "ignore"},
+	const jobID = "nvkr-lifecycle-run"
+	_, part, role := githubTestSharedUpload(t, bundle, jobID, "Upload complete qualification handoff")
+	if role != "upload" {
+		t.Fatal("handoff must use the standalone upload role")
+	}
+	for _, test := range []struct{ name, field, old, replacement, reason string }{
+		{"unchanged", "", "", "", ""},
+		{"wrong attempt", "with.name", githubQualificationHandoffName, "nvkr-qualification-latest", "complete handoff for this successful exact attempt"},
+		{"whole workspace", "with.path", githubQualificationHandoffPath, ".nvkr", "unsupported provider-attempt name"},
+		{"failure upload", "if", "${{ success() }}", "${{ always() }}", "must preserve its transport cancellation condition"},
+		{"no deadline", "timeout-minutes", "5", "", "complete handoff for this successful exact attempt"},
+		{"missing capture", "run", " --handoff .nvkr/qualification/handoff.json", "", "exact admitted rendering"},
+		{"hidden omission", "with.include-hidden-files", "true", "false", "complete handoff for this successful exact attempt"},
+		{"missing handoff ignored", "with.if-no-files-found", "error", "ignore", "missing declared output"},
+		{"extended retention", "with.retention-days", "7", "90", "complete handoff for this successful exact attempt"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			original := bundle.Files[GitHubWorkflowPath]
-			workflow := bytes.Clone(original)
-			if test.field != "" {
-				var tree yamlv3.Node
-				if err := yamlv3.Unmarshal(original, &tree); err != nil {
-					t.Fatal(err)
-				}
-				mutated := false
-				var mutate func(*yamlv3.Node)
-				mutate = func(node *yamlv3.Node) {
-					if mutated {
-						return
-					}
-					if test.name == "missing capture" && node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, test.old) {
-						node.Value = strings.Replace(node.Value, test.old, test.replacement, 1)
-						mutated = true
-						return
-					}
-					if node.Kind == yamlv3.MappingNode && test.name != "missing capture" {
-						for i := 0; i < len(node.Content); i += 2 {
-							if node.Content[i].Value != "name" || node.Content[i+1].Value != "Upload complete qualification handoff" {
-								continue
-							}
-							// Locate the exact upload field independently of whole-job
-							// compaction, scalar quoting and unrelated step fields.
-							parent := node
-							fields := strings.Split(test.field, ".")
-							for depth, field := range fields {
-								found := false
-								for j := 0; j < len(parent.Content); j += 2 {
-									if parent.Content[j].Value != field {
-										continue
-									}
-									found = true
-									if depth < len(fields)-1 {
-										parent = parent.Content[j+1]
-										break
-									}
-									if parent.Content[j+1].Value != test.old {
-										t.Fatalf("upload field %s = %q, want %q", test.field, parent.Content[j+1].Value, test.old)
-									}
-									if test.replacement == "" {
-										parent.Content = append(parent.Content[:j], parent.Content[j+2:]...)
-									} else {
-										parent.Content[j+1].Value = test.replacement
-									}
-									mutated = true
-									return
-								}
-								if !found {
-									t.Fatalf("upload field %s is missing", test.field)
-								}
-							}
+			changed := bundle
+			switch {
+			case strings.HasPrefix(test.field, "with."):
+				changed = mutateGitHubActionParameters(t, bundle, jobID, part, func(values map[string]string) {
+					field := "upload_with_" + strings.ReplaceAll(strings.TrimPrefix(test.field, "with."), "-", "_")
+					old := values[field]
+					if test.field == "with.name" {
+						if values["upload_name_attempt"] != "true" {
+							t.Fatal("fixture handoff name is not attempt-scoped")
 						}
+						old += githubAttemptUploadNameSuffix
+						values["upload_name_attempt"] = "false"
 					}
-					for _, child := range node.Content {
-						mutate(child)
+					if old != test.old || values[field+"_present"] != "true" {
+						t.Fatalf("handoff parameter %s = %q, want %q", field, old, test.old)
 					}
-				}
-				mutate(&tree)
-				if !mutated {
-					t.Fatal("mutation did not apply")
-				}
-				raw, err := yamlv3.Marshal(&tree)
-				if err != nil {
-					t.Fatal(err)
-				}
-				workflow, err = compactGitHubWorkflow(raw)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := validateGitHubWorkflowSize(workflow); err != nil {
-					t.Fatal(err)
-				}
-				if bytes.Equal(workflow, original) {
-					t.Fatal("mutation did not change workflow")
-				}
+					// An altered path with the original attempt name is rejected by
+					// the shared interface before downstream handoff validation.
+					values[field] = test.replacement
+				})
+			case test.field != "":
+				changed = mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+					steps := githubTestYAMLField(t, root, "jobs", jobID, "steps")
+					if test.field == "run" {
+						finalizer := githubTestYAMLStep(t, steps, "id", "finalize-catalog")
+						run := githubTestYAMLField(t, finalizer, "run")
+						if strings.Count(run.Value, test.old) != 1 {
+							t.Fatal("finalizer does not capture the handoff exactly once")
+						}
+						run.Value = strings.Replace(run.Value, test.old, test.replacement, 1)
+						return
+					}
+					step := githubTestYAMLStep(t, steps, "name", "Upload complete qualification handoff")
+					field := githubTestYAMLField(t, step, test.field)
+					if field.Value != test.old {
+						t.Fatalf("handoff caller field %s = %q, want %q", test.field, field.Value, test.old)
+					}
+					if test.replacement == "" {
+						githubYAMLRemove(step, test.field)
+					} else {
+						field.Value = test.replacement
+					}
+				})
 			}
-			changed := *bundle
-			changed.Files = maps.Clone(bundle.Files)
-			changed.Files[GitHubWorkflowPath], changed.WorkflowDigest = workflow, pipeline.FileDigest(workflow)
-			err := ValidateGitHubBundle(t.Context(), plan, &changed)
+			err := ValidateGitHubBundle(t.Context(), plan, changed)
 			if test.name == "unchanged" {
 				if err != nil {
 					t.Fatal(err)
@@ -163,6 +131,9 @@ func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
 				return
 			}
 			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if !strings.Contains(err.Error(), test.reason) {
+				t.Fatalf("handoff mutation reached the wrong guard: %v", err)
+			}
 		})
 	}
 }

@@ -37,7 +37,7 @@ func TestImageIndexAttestationBindsNativeSubjectAndAggregateAttachment(t *testin
 			source, _, index := registryImageIndexFixture(t)
 			destination := filepath.Join(t.TempDir(), "attested")
 			seen := map[string]bool{}
-			result, err := AttestEvidence(t.Context(), source, destination, func(_ context.Context, subject string, document []byte) ([]byte, error) {
+			result, err := AttestPreparedEvidence(t.Context(), source, destination, func(_ context.Context, subject string, document []byte) ([]byte, error) {
 				seen[subject] = true
 				if bad {
 					subject = index.Digest

@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
@@ -32,14 +31,17 @@ type QualificationPolicy struct {
 	Cosign                QualificationCosignPolicy        `json:"cosign"`
 	OutsideMVPSuites      []string                         `json:"outsideMVPSuites,omitempty"`
 	RequiredSuites        []string                         `json:"requiredSuites,omitempty"`
+	Smoke                 *QualificationSmokePolicy        `json:"smoke,omitempty"`
 }
 
 // QualificationCosignPolicy pins the verifier and qualifier executable separately
 // from the build's tool selection. An omitted Path selects cosign from PATH;
 // execution must still authenticate its exact bytes against Digest.
 type QualificationCosignPolicy struct {
-	Path   string `json:"path,omitempty"`
-	Digest string `json:"digest"`
+	Path            string            `json:"path,omitempty"`
+	Version         string            `json:"version,omitempty"`
+	Digest          string            `json:"digest,omitempty"`
+	PlatformDigests map[string]string `json:"platformDigests,omitempty"`
 }
 
 func (policy QualificationPolicy) Validate() error {
@@ -59,11 +61,16 @@ func (policy QualificationPolicy) Validate() error {
 			return e.New(e.CodeTrustPolicyMissing, "qualification policy requires a workflow distinct from the builder")
 		}
 	}
-	if !canonical.IsDigest(policy.Cosign.Digest) {
-		return e.New(e.CodeUnpinnedInput, "qualification policy requires an independent exact cosign executable digest")
+	if err := policy.Cosign.validatePins(); err != nil {
+		return err
 	}
 	if strings.TrimSpace(policy.Cosign.Path) != policy.Cosign.Path || strings.ContainsAny(policy.Cosign.Path, "\x00\r\n") {
 		return e.New(e.CodeTrustPolicyMissing, "qualification cosign path contains invalid whitespace or control characters")
+	}
+	if policy.Smoke != nil {
+		if err := policy.Smoke.validate(policy); err != nil {
+			return err
+		}
 	}
 	seen := make(map[string]bool, len(policy.OutsideMVPSuites)+len(policy.RequiredSuites))
 	for _, names := range [][]string{policy.OutsideMVPSuites, policy.RequiredSuites} {

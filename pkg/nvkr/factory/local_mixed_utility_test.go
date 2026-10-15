@@ -70,6 +70,8 @@ func TestExecuteMixedLocalUtilitiesPreservesImageSubject(t *testing.T) {
 }
 
 func TestMixedLocalUtilityCannotExecuteProducerOrObserveDisk(t *testing.T) {
+	t.Chdir(t.TempDir())
+	plan := mixedLocalUtilityPlan(t)
 	for _, tc := range []struct {
 		name string
 		node string
@@ -81,8 +83,6 @@ func TestMixedLocalUtilityCannotExecuteProducerOrObserveDisk(t *testing.T) {
 		{"unknown node", "missing", e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			plan := mixedLocalUtilityPlan(t)
 			assertFactoryErrorCode(t, ExecuteNode(t.Context(), plan, tc.node, nil, nil), tc.code)
 			if _, err := os.Stat(".nvkr/factory/node-image"); !os.IsNotExist(err) {
 				t.Fatalf("denied operation touched disk workspace: %v", err)
@@ -145,6 +145,16 @@ func TestMixedLocalUtilityRejectsOrdinaryBuildRequirements(t *testing.T) {
 // deliberately tested at the owning gate, before full-Plan validation can mask
 // a missing term with an unrelated digest or projection mismatch.
 func TestMixedLocalUtilityAdmissionRejectsEachUnsupportedRoute(t *testing.T) {
+	t.Chdir(t.TempDir())
+	base := mixedLocalUtilityPlan(t)
+	const id = "worker/terminal-observe"
+	if err := admitExecuteNodeRequirements(base, id); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := canonical.Marshal(base)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name  string
 		edit  func(*Plan, *Node)
@@ -164,12 +174,13 @@ func TestMixedLocalUtilityAdmissionRejectsEachUnsupportedRoute(t *testing.T) {
 			p.Environment.SourceAccess = map[string]authored.SourceAccess{"https://example.test/source": {CredentialRef: "secret"}}
 		}, "cannot admit hosted credentials or dispatch policy"},
 		{"dispatch policy", func(p *Plan, _ *Node) { p.Environment.GitHubDispatchBranches = []string{"candidate"} }, "cannot admit hosted credentials or dispatch policy"},
+		{"development policy", func(p *Plan, _ *Node) { p.Environment.GitHubDevelopment = true }, "cannot admit hosted credentials or dispatch policy"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Chdir(t.TempDir())
-			plan := mixedLocalUtilityPlan(t)
-			const id = "worker/terminal-observe"
-			if err := admitExecuteNodeRequirements(plan, id); err != nil {
+			// Admission reads no payload bytes. Clone only the descriptions each
+			// mutation changes, keeping the shared image fixture immutable.
+			var plan Plan
+			if err := canonical.UnmarshalExact(raw, &plan); err != nil {
 				t.Fatal(err)
 			}
 			var node *Node
@@ -182,8 +193,8 @@ func TestMixedLocalUtilityAdmissionRejectsEachUnsupportedRoute(t *testing.T) {
 			if node == nil || node.IRNode != "" {
 				t.Fatal("fixture must select a non-IR offline utility")
 			}
-			tc.edit(plan, node)
-			err := admitExecuteNodeRequirements(plan, id)
+			tc.edit(&plan, node)
+			err := admitExecuteNodeRequirements(&plan, id)
 			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 			if !strings.Contains(err.Error(), tc.guard) {
 				t.Fatalf("wrong admission branch: %v; want %q", err, tc.guard)

@@ -61,7 +61,7 @@ resume capabilities. The [demo index](demos/README.md) provides bounded generati
 journeys with their prerequisites.
 
 The bundle records its selected Definition and Environment in `.github/nvkr-run/plan.json`.
-The maintained release selection is the 37-output [M2 candidate](definitions/nvke-m2/README.md), including
+The maintained release selection is the 69-output [M2 candidate](definitions/nvke-m2/README.md), including
 plain and public-bootstrap FDE disks for both native architectures. The separate
 [FDE diagnostic workflow](definitions/nvke-fde/README.md) selects one build-only disk for branch iteration.
 Regenerate with the intended selection after changing its inputs or generator code:
@@ -84,14 +84,131 @@ Definition/Environment paths recorded in the committed Plan. A `make build` CLI 
 Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other examples; generating them with
 `--root .` would replace the M2 workflow.
 
+## Test pipeline changes on a feature branch
+
+The committed `nvkr-dev.yml` runs the **same 69-output M2 Definition** as the maintained production
+workflow, including native AMD64/ARM64 plain and public-bootstrap FDE disks, SBOM attestation, per-output publication, cosign signing,
+verification and finalization. Its generator and helper come from the dispatched branch. The separate
+`definitions/nvke-m2/environment-github-dev.yaml` selects development credentials, protected environments,
+signer policy and disposable registry destinations. Its Plan and manifest live beneath `.github/nvkr-dev/`.
+The production bundle remains independently owned and checked.
+
+```sh
+# After editing generator code or authored inputs, regenerate and inspect both bundles.
+make workflows-generate
+make workflows-check
+git diff --stat
+
+# Commit and push the reviewed changes to your feature branch, then dispatch it.
+make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr
+```
+
+The dispatch helper requires a clean named branch matching the selected repository's remote commit and
+an active registered workflow. It never commits, pushes or changes provider settings. For a preflight without
+dispatch, use `python3 scripts/pipeline-dev.py --repo dsx-ai-factory/nvkr --check` after
+`make pipeline-dev-check`. `make pipeline-dev-generate` regenerates just the development bundle.
+
+### One-time operator setup
+
+Merge the development and cleanup workflows onto the default branch before dispatching them. GitHub's
+[manual-dispatch registration](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+requires that default-branch presence. Keep the generated development bundle on each tested branch.
+
+Configure these **separate development environments**, retaining the existing production environments:
+
+| Environment | Configuration |
+|---|---|
+| `nvkr-dev-release` | Admit reviewed feature branches. Store `NVKR_DEV_REGISTRY_WRITE` and `NVKR_DEV_REGISTRY_READ` secrets, plus `NVKR_DEV_REGISTRY_WRITE_USER` and `NVKR_DEV_REGISTRY_READ_USER` variables. |
+| `nvkr-dev-arc` | Admit the reviewed development workflow and selected branch refs to the existing ephemeral `arc-amd64-kvm` and `arc-arm64-kvm` pools. Preserve the existing capacity, Docker/KVM and isolation requirements. |
+| `nvkr-dev-cleanup` | Admit **only the default branch**. Store `NVKR_DEV_REGISTRY_CLEANUP`; allow its daily scheduled job to run without a per-run approval if automatic cleanup is desired. |
+
+Use a dedicated development publishing account with no production-package write/admin access. Its write
+credential needs `write:packages`; its read credential is a separate token restricted to `read:packages`.
+The cleanup credential needs package admin access with `read:packages` and `delete:packages`, plus read
+access to this repository's Actions metadata. Using the same dedicated account with separate token scopes
+lets it access newly created private packages without assigning another account to every attempt.
+Check the actual account/package ACLs: names and a registry prefix do not restrict a token's authority.
+See [GitHub package permissions](https://docs.github.com/en/packages/learn-github-packages/about-permissions-for-github-packages)
+and [package deletion requirements](https://docs.github.com/en/packages/learn-github-packages/deleting-and-restoring-a-package).
+Do not use a production administrator's token for these secrets. The generated development jobs grant
+no package-write permission to their repository `GITHUB_TOKEN`; verification, assembly and finalization
+receive only the dedicated read credential. Only artifact signing and SBOM attestation receive OIDC.
+
+Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Grant the workflow
+repository read access to the retained private native toolchain packages. Their temporary read credential
+is removed before producer execution. Branch code participates in these operations, so run reviewed branches;
+the workflow is not an untrusted-code sandbox. The generator does not provision or attest provider access policy.
+
+The development signing policy accepts this repository's `nvkr-dev.yml` branch identities only, using the
+GitHub OIDC issuer. Production consumer policies pinned to `nvkr-run.yml` do not accept those identities.
+A real signed development result is `pipeline-attested` under that development policy, with the same explicit
+producer-only disk-evidence scope as M2; it is neither production acceptance nor qualified reproduction.
+Keyless signatures use the existing transparency services, whose records are not erased by registry cleanup.
+
+### Inspect results and repeat
+
+The helper prints a commit-filtered command for finding the Run. Inspect its head SHA, completion and final
+record before using any outputs:
+
+```sh
+gh run watch RUN_ID --repo dsx-ai-factory/nvkr --exit-status
+gh run view RUN_ID --repo dsx-ai-factory/nvkr --log-failed
+gh run download RUN_ID --repo dsx-ai-factory/nvkr \
+  --name nvkr-lifecycle-run --dir /tmp/nvkr-dev-record-RUN_ID
+```
+
+Each attempt publishes into
+`ghcr.io/dsx-ai-factory/nvkr/development/runs/RUN_ID/attempts/ATTEMPT/`.
+The aggregate root is `releases@sha256:…`; named outputs and output-local roots are siblings.
+Use the digest-pinned references recorded by the Run with the [release navigation tools](docs/release-navigation.md).
+Different branches and attempts cannot advance one another's Helm aliases or share disposable package storage.
+The Plan records the namespace policy; the execution owner binds actual destinations to the current
+repository, workflow, run and attempt without changing logical Build identity or rewriting the committed Plan.
+
+Signed development Runs are non-canceling. To retry, dispatch a complete new Run (or rerun **all** jobs).
+Failed-job-only reruns cannot reuse publications from an earlier attempt's disposable namespace. A cancelled
+Run can leave partial publications and may have no final record; cleanup discovers packages independently
+of successful finalization. CI helpers/carriers and final Run records retain seven days; disk diagnostics
+retain one day. After CI transfers expire, start a complete new Run.
+
+### Disposable registry cleanup
+
+The default-branch `nvkr-dev-cleanup.yml` runs daily and supports a manual preview (`apply: false`, the
+default). It uses its own compiled cleanup owner and credential; it never executes a feature branch's code
+or downloaded artifacts. Preview from the default branch before enabling deletion:
+
+```sh
+gh workflow run nvkr-dev-cleanup.yml --repo dsx-ai-factory/nvkr --ref main -f apply=false
+```
+
+Cleanup requires private packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
+attempt at least 24 hours old, and package/version timestamps at least 24 hours old. It rechecks candidates
+before deletion. Active, young or ambiguous state is retained; API/admission failures fail the job rather
+than claim cleanup succeeded. Whole-package deletion includes that package's versions, signatures and
+referrers, avoiding guesses based on tags. The next daily sweep removes eligible packages; this is not an
+exact 24-hour expiry or proof of physical storage reclamation. Existing production and older unscoped
+publications are outside the cleanup namespace. GitHub retains its own restoration policy.
+
+The cleanup report records candidates and API-confirmed deletions, including partial progress before a
+failure. Its CI artifact retains seven days. A timed-out deletion has an unknown outcome and is not retried
+within the command. Inspect the next preview before retrying.
+
+The three-output unsigned Environment in `definitions/nvke-v1/environment-github-dev.yaml` remains a
+smaller scratch-generation example. It uses one-day transfers, automatic cancellation and no publication.
+It does not supply the committed full-development bundle. Hosted execution, credential/pool setup and
+actual registry deletion still need a recorded external Run; local contract tests establish none of those.
+
 ## Generated and handwritten GitHub files
 
-The generator owns `.github/workflows/nvkr-run.yml` and every manifest member beneath `.github/nvkr-run/`.
+The generator owns `.github/workflows/nvkr-run.yml` and every manifest member beneath `.github/nvkr-run/`,
+plus the development workflow and its separate `.github/nvkr-dev/` members.
+Qualification generation separately owns the production `nvkr-qualify.yml`/`nvkr-smoke.yml` pair
+through `.github/nvkr-qualification/manifest.json`; development emits no qualification handoff or workflow pair.
 Its checker rejects unexpected managed-directory entries, including symlinks. Human-maintained repository
 workflows, Dependabot configuration, and issue templates have separate ownership. Action pins for generated
 CI come from its selected catalog and lock, rather than edits to rendered YAML.
 
-Pull requests check generation. The maintained publication route admits default-branch manual dispatch;
+Pull requests check both producer bundles and the qualification pair. The maintained publication route admits default-branch manual dispatch;
 only its isolated artifact-signing and SBOM-attestation jobs receive OIDC minting permission. Generic hosted
 runners are the default, with ADR-18's explicitly admitted native ARC disk routes. Dated validation-branch
 exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconciliation.md).
@@ -206,6 +323,8 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Complete compilation, output joins, scheduling, packaging and provider generation | `pkg/nvkr/factory` |
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
 | Producer execution, observations and qualified receipts | `pipeline`, `profile` |
+| External test output descriptions, wrapper validation and deterministic serialization (no execution or authority) | `pkg/nvkr/testresults` |
+| Configured diagnostic check selection and local upstream conformance execution | `validation`, `conformance` — delegate product/tool publication authentication and exact executable-member export to `lifecycle` |
 | Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
 | Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `trust`, `sign` |
 | Release authority and delivery | `release`, `status`, `delivery` |

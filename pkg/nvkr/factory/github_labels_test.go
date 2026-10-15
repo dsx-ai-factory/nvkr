@@ -47,7 +47,7 @@ func TestMaintainedWorkflowMakesImageBindingVisible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	found := false
 	for _, job := range document.Jobs {
 		if strings.Contains(job.Name, "terminal-observe") || strings.Contains(job.Name, "fetch-source-") {

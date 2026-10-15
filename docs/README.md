@@ -9,8 +9,9 @@ each concept to a worked example.
 
 | I want to… | Read |
 |---|---|
-| Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Customer operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
+| Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md), [presenter narration](nvkr-presenter.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
@@ -19,12 +20,14 @@ each concept to a worked example.
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
-| Find published outputs and verify a consumer claim | [Release quickstart](release-quickstart.md) |
+| Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
+| Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
+| Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../definitions/nvke-m2/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
-[nine-output deploy example](../definitions/nvke-deploy/README.md), [37-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
+[nine-output deploy example](../definitions/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
 and [OS-image routes](../definitions/nvke-os/README.md). The separate
 [FDE-only diagnostic workflow](../definitions/nvke-fde/README.md) selects one native disk for branch iteration.
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
@@ -40,12 +43,13 @@ records source availability and remaining gaps.
 |---|---|
 | Immutable attempts, completeness, consumer policy, and SDK | [Lifecycle](lifecycle.md) |
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
-| Registry/layout browsing, generic JSON export, credentials, and metadata limits | [Release navigation](release-navigation.md) |
+| Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
+| External test output descriptions and configured diagnostic checks | [External test output contract](external-test-output-contract.md) |
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nvke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nvke-os-live-inspection.md) |
 
@@ -70,6 +74,8 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 [acceptance specification](epics-v1-spec.md).
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
+Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
+dispatch, separate generated development bundles, artifact downloads and short retention.
 Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
 [CI test performance](ci-test-performance.md) for the current profiling follow-up.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and

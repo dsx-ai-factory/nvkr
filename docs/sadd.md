@@ -50,8 +50,15 @@ provide reusable component producers and pins, including tool releases and GitHu
 Generated Runs bind action commits from the catalog; compatible action updates need a lock bump and workflow
 regeneration without rebuilding the generator. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
-access, registry retention, runtime conformance, and deployment policy. Downstream systems consume accepted
-artifact references and own their deployment descriptions (ADR-19/20).
+access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
+diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
+references and own deployment descriptions and acceptance decisions (ADR-19/20).
+A separately authored repository CI adapter schedules producer Runs and invokes
+NVKE's suite in a separate downstream job outside this product lifecycle and v1
+qualification acceptance (ADR-16/18). NVKE owns guest/cluster provisioning,
+assertions and teardown; the parent harness owns host admission, outer leases,
+disk service and journaled network-control restoration. These trusted-code CI
+diagnostics do not add runtime authority to the artifact-verification core.
 
 ## Assumptions {#assumptions}
 
@@ -317,6 +324,17 @@ workspace, new identity or serialized verification capability is introduced. Con
 source compatibility, installation formats and offline completeness. Unpublished packages remain Run
 artifacts; this interface describes publications and does not assemble a release from a local workspace.
 
+Diagnostic output pulling reuses that complete metadata/evidence validation, then retrieves and checks only
+one exact named output's complete payload closure into a new caller-selected directory. Executables retain
+their recorded filenames and modes, disks and charts retain their exact payload bytes (including declared
+LUKS2 disk ciphertext without decryption), OCI layouts retain native OCI/Docker image bytes and every declared
+aggregate platform, and APT outputs retain repository trees.
+Delivery owns admission, metadata and payload checks, safe file membership, preserved permission modes,
+destination publication and temporary cleanup; lifecycle supplies the overall deadline. Existing destinations
+are rejected, and malformed or unsupported format metadata fails with a coded error before payload or
+destination work. Pulling executes or installs nothing and grants no signature or policy acceptance. The
+explicit Release verifier remains the authenticated consumer boundary.
+
 Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
 unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
 one image output with a sorted finite platform set; the compiler freezes a native Build, result and SBOM use
@@ -335,6 +353,8 @@ hosted execution, registry services, signing or operational release acceptance (
 | Run observations | Executor → completeness/evidence owners | Exact observed bytes and attempt state; serialized records remain descriptions |
 | Artifact | Producer/packager → consumer | Exact blob or OCI bytes, separate from logical build identity |
 | Release content and evidence | Release/transport owners → verifier | Noncircular exact content subject and typed proof closure |
+| External test outputs | External producer → descriptive consumer | `testresults` owns bounded descriptions/serialization only; no execution, authentication or qualification authority |
+| Diagnostic validation profile | User → `validation` → supported producer | Separate check-instance/suite/harness selection; `lifecycle` authenticates product and tool publications and exports exact executable members; diagnostic execution cannot issue qualification authority |
 | Authenticated receipts | Owning verifier → authorized operation | Bound to exact subjects, roles, and policy; cannot be recreated by parsing |
 
 All structured identities use ADR-01's canonical codec and named digest families. The codec uses its specified
@@ -358,6 +378,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
+| Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
 | Plan inspection | `planview` | Validate through factory, retain immutable descriptive snapshots, render linked graphs and compare named Plan fields without granting execution or evidence authority |
 | Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
 | Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
@@ -536,6 +557,33 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+GitHub keeps named jobs, dependencies, runners, permissions and failure/time boundaries visible in the
+top-level workflow. Manifest-owned composite actions expose fixed interfaces for node/source execution,
+preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
+individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
+invocation-data member holds parameters with named operation roles. The runtime descriptor operation
+recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
+with no executable script inputs. Controlled transport
+wrappers contain one upload/download and retain their
+provider controls on the caller; native preflight, checkout, operator setup, timed producers and steps with
+referenced outcomes/outputs stay inline. This includes finalization and the final Run upload used by the
+closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
+reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
+while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
+complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
+bytes, preserving credential scope and per-job finalizer results. Identical complete host step sequences
+can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
+and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
+job's parameters; job policy and dependencies remain inline. Producer matrix and general callable
+scheduling remain deferred (ADR-18 §8); ADR-21 admits only the separate fixed native qualification worker
+and its selected-platform matrix.
+
+An explicit GitHub development Environment selects a separate fixed bundle. It shares the
+compiler, helper and complete output checks with production, while keeping its Plan, workflow and
+ownership manifest separate. Branch testing therefore does not replace the maintained publication bundle.
+Signed development retains the full publication and admitted disk graph, using separate credentials,
+signer policy and run-attempt registry destinations. Its runtime transport projection preserves Plan and
+Build identity; a default-branch cleanup owner expires only eligible disposable packages (ADR-20).
 `catalogmaintenance` composes atomic source/pin-set updates with that generator for disposable review
 candidates. Explicit schedules and optional complete local diagnostic execution do not change the public
 lifecycle or grant release acceptance. Lock and bundle writes retain separate failure/recovery boundaries;
@@ -596,11 +644,15 @@ Downloaded records cannot select consumer policy or replace missing evidence.
 
 The lifecycle owner issues an opaque check receipt retaining the verified publication and frozen Plan.
 Closing it revokes copies, cancels and joins registered operations, then releases held bytes and any owned
-source receipt. The receipt grants neither smoke-execution nor signing authority. This A implementation does
-not establish M3-B smoke, M3-C signing or hosted qualification acceptance; reconciliation owns those gaps.
-The independent qualification publisher requires every applicable result before signing; missing smoke results
-fail closed. It authenticates
-the successful default-branch build separately from its own invocation and signs for every selected subject.
+source receipt. The receipt grants neither smoke-execution nor signing authority. Fixed native smoke workers
+consume its held executable members in nonroot network-disabled containers and compare versions with the
+frozen producer inputs. Their distinct signatures bind exact member observations, full policy and the current
+qualifier invocation. The final owner requires successful exact-attempt jobs, authenticates those signatures
+and certificate invocation claims, and recomputes complete native coverage before issuing a B receipt.
+The independently configured `run qualify --policy <path>` derives its source from the authenticated hosted
+event, consumes live A/B/invocation receipts and signs for every selected subject. The generator owns the
+same-commit worker pair and its secret/permission routing. These implementation contracts and local native
+execution do not establish hosted acceptance; reconciliation owns the remaining candidate and external gaps.
 Any failed verdict prevents all attestations; later signing/attachment failure marks qualification unsuccessful
 even if earlier attachments remain. Smoke execution has no qualification credentials.
 
@@ -653,8 +705,8 @@ pipeline-attested lane unless a recorded bake-off proves the canonical RAW compa
 not prove deterministic output.
 
 Accepted artifact references can be consumed by a downstream deployer. NVKR does not generate a cluster
-realization or define a cluster qualification protocol. Deployment descriptions and runtime validation belong
-to that consumer. Proposed registration transport is separate from the v1 manifest and build/evidence gate.
+realization or define a cluster qualification protocol. Deployment descriptions and runtime acceptance belong
+to that consumer; the explicit local diagnostic route records descriptive observations without owning acceptance. Proposed registration transport is separate from the v1 manifest and build/evidence gate.
 
 ### Data Flow {#data-flow}
 
@@ -839,12 +891,23 @@ ADR-18 §8's event policy is the admission contract for production rendering:
 | In-repository pull request | Build and package | Read-only credential on fetch steps; no publish or OIDC access |
 | Default-branch push / manual dispatch on default ref | Publish, sign, attest and verify in a protected environment | Phase-scoped registry and OIDC access |
 | Explicitly allowed branch manual dispatch | Full publication after branch-policy admission | Same scoped credentials; exact workflow identity |
+| Development Environment branch manual dispatch | Unsigned build-only, or full signed development including admitted native disks | Separate development environments, phase-scoped dev registry credentials and development workflow identity; OIDC only for signing/attestation |
 | Git tag | No v1 signing trigger | No signing authorization from the tag |
 
-The current generated Run workflow is manual-only. It admits the default branch and optional exact branch
+Generated Run workflows are manual-only. Production admits the default branch and optional exact branch
 exceptions in `Environment.githubDispatchBranches`; publication also requires deployment-environment and
-signing-identity policies that admit the selected workflow ref. Other branches and tag/PR refs remain closed.
-Repository Merge Gate performs PR regeneration checks when generator inputs or outputs change.
+signing-identity policies that admit the selected workflow ref. Other production branches and tag/PR refs remain closed.
+Development admits branch dispatch and supports the same native ARC route only with its explicit signed
+publication contract. Generic hosted runners retain bootstrap, source retrieval, publication, signing and
+finalization. The development account must lack production-package write/admin access; namespace names
+cannot enforce provider ACLs. Unsigned development cancels superseded Runs and retains transfers for one day.
+Signed development and production remain non-canceling with seven-day transfers; final Run records retain
+seven days and disk diagnostics one day. Development registry packages are isolated per run attempt and
+become cleanup candidates after completion and 24 hours of inactivity. A default-branch-only owner
+rechecks authenticated provider metadata before whole-package deletion; it never executes branch artifacts.
+Expired transfers or a development retry require a complete attempt; cancellation can prevent finalization.
+These are contract-tested behaviors pending external execution, access-policy and deletion evidence.
+Repository Merge Gate checks both producer bundles and the qualification pair for PR drift.
 
 A renderer unable to express the required guards must reject the affected lane. This table states the contract;
 it is not proof that an unexercised workflow or the proposed fused job already enforces it in production.
@@ -885,8 +948,14 @@ does not establish that a large-image workflow fits a hosted runner.
 For the live disk group, capacity planning must include materialized sources, toolchains, build scratch, produced
 image, package representation and, in strict mode, inspection temporaries that coexist. Keeping packaging with
 the producer preserves live ownership; it does not remove these storage requirements. Separate hosted jobs must
-also budget retained carriers, authenticated restoration snapshots, extracted inputs and publication or
-verification temporaries. No numeric capacity or duration target is invented here.
+also budget retained carriers, extracted inputs and publication or verification temporaries. Restoration
+hashes extraction and rechecks the same held carrier before publishing, avoiding a full tar snapshot.
+Evidence attestation consumes the private preparation and moves unchanged payload blobs into the final layout
+after preparing the signed evidence. Thus restoration retains a carrier plus extracted payload, and outgoing
+packing retains the final payload plus its carrier; attestation introduces no extra unchanged payload copy.
+Failure after attestation claims the preparation requires restore/build retry (ADR-20 §6). These local
+lifetimes do not bound provider ZIP handling, other coexisting files or later registry-fetched verification
+snapshots, and no measured hosted capacity or duration target is claimed.
 
 Runner requirements are modeled with a generic per-step request, not as builder-specific metadata. Minimum CPU,
 memory and ephemeral storage, eligible host platforms, typed host capabilities, and an executor wall-time budget

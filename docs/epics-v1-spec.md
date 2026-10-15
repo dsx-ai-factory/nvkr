@@ -266,7 +266,11 @@ metadata. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-1595
 establishes producer-only disk evidence and the deferred capabilities described below. The
 [implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930) separates artifact
 authentication, delivered-tool smoke, independent evidence publication and acceptance demonstrations.
-Scope approval does not establish completed implementation or organizational ADR ratification.
+Scope approval does not establish completed implementation or organizational ADR ratification. The reviewed
+implementation and candidate configuration may merge before real operational acceptance. A fresh complete
+producer execution, hosted positive and negative qualification, and independent consumer verification follow
+merge. Their evidence remains required before production-readiness claims or completion of this milestone;
+merge and repository tests do not satisfy those criteria.
 
 **Delivers**
 - **Authenticated candidate.** Strict input and evidence schemas; complete exact output membership; applicable
@@ -434,3 +438,7 @@ Outside v1: non-OCI delivery, upstream from-source replacement builds, acquired 
 verification, vulnerability scanning, deployment topology, cluster E2E qualification, air gap,
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
+
+A downstream nightly end-to-end test is customer CI infrastructure, outside v1
+product acceptance. It can exercise delivered artifacts without expanding the
+build/evidence qualification milestone or supplying independently signed conformance.

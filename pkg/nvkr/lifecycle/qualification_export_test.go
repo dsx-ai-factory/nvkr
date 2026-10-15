@@ -259,7 +259,7 @@ func qualificationExportFixture(t *testing.T) (*factory.Plan, factory.InputSnaps
 		}
 	}
 	if prepared, ok := artifacts["prepared/release"]; ok {
-		if _, err := delivery.AttestEvidence(t.Context(), prepared.Path, artifacts["package/release"].Path, fixtureSBOMAttestation(t)); err != nil {
+		if _, err := delivery.AttestPreparedEvidence(t.Context(), prepared.Path, artifacts["package/release"].Path, fixtureSBOMAttestation(t)); err != nil {
 			t.Fatal(err)
 		}
 	}

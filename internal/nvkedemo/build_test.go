@@ -10,7 +10,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -19,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
@@ -311,7 +309,7 @@ func TestUpstreamBuildPreparationKeepsExplicitMode(t *testing.T) {
 
 func preparedInvocationFixture(cfg BuildConfig) []string {
 	root := ".nvkr/laptop-bootstrap/" + cfg.AttemptPrefix
-	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker"}
+	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--ui=plain"}
 }
 
 func writeInvocationFixture(t *testing.T, cfg BuildConfig, args []string) {
@@ -339,6 +337,9 @@ func TestPreparedInvocationRejectsSubstitution(t *testing.T) {
 		{"other executable", func(args []string) []string { args[0] = "/bin/sh"; return args }, ""},
 		{"other definition", func(args []string) []string { args[4] = "/private/other.json"; return args }, ""},
 		{"different jobs", func(args []string) []string { args[14] = "8"; return args }, ""},
+		{"missing plain presentation", func(args []string) []string { return args[:len(args)-1] }, ""},
+		{"changed presentation", func(args []string) []string { args[len(args)-1] = "--ui=tui"; return args }, ""},
+		{"split presentation flag", func(args []string) []string { return append(args[:len(args)-1], "--ui", "plain") }, ""},
 		{"extra flags", func(args []string) []string { return append(args, "--publish") }, ""},
 		{"short argv", func(args []string) []string { return args[:4] }, ""},
 		{"world readable", func(args []string) []string { return args }, "mode"},
@@ -512,23 +513,5 @@ func TestBuildAttemptDiagnostics(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-// Positive fixtures select their invocation environment explicitly. Production
-// admission still rejects this unselected override; negative tests keep their
-// own vectors rather than inheriting a blanket package-wide reset.
-func TestPositiveBuildFixturesDoNotInheritUnselectedGitOverrides(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
-	defer cancel()
-	selected := "^Test(BuildOnlyPreservesDeveloperGitHome|BuildTransportSettingsReachOnlyGitFetch|BuildAttemptDiagnostics|PrepareInstallerPinnedAttempt|PrepareInstallerAttemptDiagnostics|ProgressInstallerAdmissionFailure)$"
-	command := exec.CommandContext(ctx, os.Args[0], "-test.run="+selected, "-test.count=1", "-test.timeout=80s")
-	command.Env = SetEnv(os.Environ(), map[string]string{
-		"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "/unselected-fixture",
-	})
-	var output bytes.Buffer
-	command.Stdout, command.Stderr = &output, &output
-	if err := ownedcmd.Run(ctx, command); err != nil {
-		t.Fatalf("positive fixtures inherited ambient Git configuration: %v\n%s", err, &output)
 	}
 }

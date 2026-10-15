@@ -31,6 +31,17 @@ func (e *runtimeReadinessError) Error() string {
 // node. These bounded private diagnostics never reach the public output writer,
 // do not retry deployment, and cannot turn the original failure into success.
 func retainRuntimeFailure(ctx context.Context, session ManagementSession, cause error) error {
+	result := retainFailedRuntimeLogs(ctx, session, cause)
+	var failed *runtimeReadinessError
+	if !errors.As(cause, &failed) || failed.dependency != "runtime-temporal-server" ||
+		failed.pod.Name == "" || failed.pod.Namespace != "temporal" || failed.pod.UID == "" ||
+		errors.Is(result, ErrUnjoined) {
+		return result
+	}
+	return retainTemporalFailure(ctx, session, result, failed)
+}
+
+func retainFailedRuntimeLogs(ctx context.Context, session ManagementSession, cause error) error {
 	var failed *runtimeReadinessError
 	if !errors.As(cause, &failed) {
 		return cause

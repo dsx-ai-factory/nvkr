@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,8 +25,9 @@ import (
 // This adapter tests authority handoffs only; it makes no cryptographic claim.
 type referenceSigner struct {
 	fakeOCISigner
-	sbomErr error
-	dry     bool
+	sbomErr          error
+	dry              bool
+	observedIdentity string
 }
 
 func (s *referenceSigner) Verify(ctx context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
@@ -38,6 +40,9 @@ func (s *referenceSigner) Verify(ctx context.Context, subject sign.Subject, poli
 		SignatureVerified: true, AttestationVerified: true, PredicateType: sign.ProvenancePredicateType, Ran: [][]string{{"fixture-verify"}}}
 	if s.dry {
 		return s.fakeOCISigner.Verify(ctx, subject, policy)
+	}
+	if s.observedIdentity != "" {
+		record.ObservedIdentity = s.observedIdentity
 	}
 	return record, nil
 }
@@ -56,9 +61,17 @@ func referenceSignerFactory(s *referenceSigner) signerFor {
 func referenceMetadataFixture(t *testing.T, attempts ...string) (*Plan, map[string]Artifact, *referenceSigner) {
 	t.Helper()
 	plan := referenceTestPlan(t)
+	return referenceMetadataFixtureForPlan(t, plan, attempts...)
+}
+
+func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...string) (*Plan, map[string]Artifact, *referenceSigner) {
+	t.Helper()
 	t.Chdir(t.TempDir())
 	for key, value := range map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "example/nvkr", "GITHUB_WORKFLOW_REF": "example/nvkr/.github/workflows/nvkr-factory.yml@refs/heads/main", "GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "1"} {
 		t.Setenv(key, value)
+	}
+	if plan.Environment.GitHubDevelopment {
+		setDevelopmentRun(t)
 	}
 	nodes, artifacts := planIndex(plan)
 	for _, a := range artifacts {
@@ -75,6 +88,9 @@ func referenceMetadataFixture(t *testing.T, attempts ...string) (*Plan, map[stri
 		}
 	}
 	signer := &referenceSigner{}
+	if plan.Environment.GitHubDevelopment {
+		signer.observedIdentity = "https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/feature/pipeline"
+	}
 	for i, output := range plan.LifecycleOutputs {
 		if i < len(attempts) {
 			t.Setenv("GITHUB_RUN_ATTEMPT", attempts[i])
@@ -103,6 +119,7 @@ func referenceMetadataFixture(t *testing.T, attempts ...string) (*Plan, map[stri
 }
 
 func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
+	plan, original, _ := referenceMetadataFixture(t)
 	for _, tc := range []struct {
 		name   string
 		change func(*testing.T, *Plan, map[string]Artifact, *referenceSigner)
@@ -124,17 +141,19 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			path := artifacts["predicate/"+route].Path
-			raw, err := os.ReadFile(path)
+			predicate := artifacts["predicate/"+route]
+			raw, err := os.ReadFile(predicate.Path)
 			if err != nil {
 				t.Fatal(err)
 			}
 			raw = []byte(strings.ReplaceAll(string(raw), strings.TrimPrefix(digest, "sha256:"), strings.Repeat("f", 64)))
-			if err := writeFactoryFile(t.Context(), path, raw, 0644); err != nil {
+			predicate.Path = filepath.Join(t.TempDir(), "predicate.json")
+			artifacts[predicate.ID] = predicate
+			if err := os.WriteFile(predicate.Path, raw, 0644); err != nil {
 				t.Fatal(err)
 			}
-			recordPath := artifacts["signature/"+route].Path
-			record, err := readSigningRecord(t.Context(), recordPath)
+			signature := artifacts["signature/"+route]
+			record, err := readSigningRecord(t.Context(), signature.Path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -143,7 +162,9 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := writeFactoryFile(t.Context(), recordPath, encoded, 0644); err != nil {
+			signature.Path = filepath.Join(t.TempDir(), "signature.json")
+			artifacts[signature.ID] = signature
+			if err := os.WriteFile(signature.Path, encoded, 0644); err != nil {
 				t.Fatal(err)
 			}
 		}, code: e.CodeVerifyFailed},
@@ -156,11 +177,17 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 		{name: "dry run", change: func(_ *testing.T, _ *Plan, _ map[string]Artifact, s *referenceSigner) { s.dry = true }, code: e.CodeSignatureInvalid},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, artifacts, signer := referenceMetadataFixture(t)
+			// Authentication reads the same immutable output roots. Isolate the
+			// signer, handoff descriptions and assembly destination for each row.
+			artifacts := maps.Clone(original)
+			signer := &referenceSigner{}
+			node := planNode(plan, "package/release")
+			output := artifacts[node.Outputs[0]]
+			output.Path = filepath.Join(t.TempDir(), "release")
+			artifacts[output.ID] = output
 			if tc.change != nil {
 				tc.change(t, plan, artifacts, signer)
 			}
-			node := planNode(plan, "package/release")
 			err := executeReferenceRelease(t.Context(), plan, node, artifacts, referenceSignerFactory(signer))
 			if tc.code != "" {
 				assertFactoryErrorCode(t, err, tc.code)
@@ -209,7 +236,11 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 
 func writeReferenceSigningFixture(t *testing.T, plan *Plan, artifacts map[string]Artifact, route, digest string) {
 	t.Helper()
-	ref := plan.Targets[route].Ref + "@" + digest
+	target, err := runtimeTarget(plan, route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := target.Ref + "@" + digest
 	writeReferenceFile(t, artifacts["publication/"+route].Path, ref)
 	predicate, err := productionPredicateFor(plan, plan.Environment.Signing, time.Now().UTC(), time.Now().UTC())
 	if err != nil {

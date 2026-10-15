@@ -75,9 +75,15 @@ acquired `operator-tools` selection remains in the combined artifact membership.
 
 The local OS replaces the upstream OVN producers with PR #113's
 [NVKE/NVIDIA fork producers](../nvke-ovn-source/README.md). Its chart/image Debian
-packages and demo tenant select stream `1.5.18`. Packer still consumes staged
+packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.
+
+The shared OS catalog temporarily retains SPIRE packaging at NVKE commit `726f7694`, without the
+DSX IMDS plugin. These local selections do not schedule the blocked DSX source build or require its
+credentials. This restores the prior producer contract, not a fresh runtime acceptance result or full
+NVKE content parity. DSX restoration is tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641).
+No local NVKE checkout or runner profile is repinned by this catalog update.
 
 The combined selection also produces standalone OVN OCI image and image-bound
 Helm OCI outputs. They have their own build identities; do not assume their bytes

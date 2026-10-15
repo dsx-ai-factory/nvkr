@@ -156,6 +156,13 @@ jobs:
               - 'definitions/**'
               - '.github/workflows/nvkr-run.yml'
               - '.github/nvkr-run/**'
+              - '.github/workflows/nvkr-run-*.yml'
+              - '.github/nvkr-run-*/**'
+              - '.github/workflows/nvkr-qualify.yml'
+              - '.github/workflows/nvkr-smoke.yml'
+              - '.github/nvkr-qualification/**'
+              - '.github/workflows/nvkr-dev.yml'
+              - '.github/nvkr-dev/**'
               - 'cmd/**'
               - 'client/**'
               - 'internal/**'
@@ -415,7 +422,7 @@ jobs:
           token: ${{ secrets.NKE_SOURCE_TOKEN }}
           persist-credentials: false
 
-      - name: Verify committed Run generation is current
+      - name: Verify committed producer and qualification generation is current
         env:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nvkr-inputs/nvke/.insteadOf

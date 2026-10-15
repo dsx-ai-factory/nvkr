@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"path"
 	"text/template"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -36,7 +37,8 @@ func Workflow(ctx context.Context, config Config, configPath, generatorVersion s
 	}
 	// The candidate must also be producible by the actual generation owner; a
 	// maintenance wrapper cannot enable an unsupported product Run.
-	if _, err := factory.Render(ctx, plan, factory.EngineGitHub); err != nil {
+	bundle, err := factory.Render(ctx, plan, factory.EngineGitHub)
+	if err != nil {
 		return nil, err
 	}
 	actions, err := pipeline.ResolveGitHubActions(plan.Actions)
@@ -53,12 +55,14 @@ func Workflow(ctx context.Context, config Config, configPath, generatorVersion s
 		versions[name] = pin.Version
 	}
 	data := struct {
-		Config      Config
-		ConfigPath  string
-		Actions     pipeline.GitHubActionRefs
-		Versions    map[string]string
-		LinkerFlags string
-	}{config, configPath, actions, versions, linkerFlags}
+		Config          Config
+		ConfigPath      string
+		Actions         pipeline.GitHubActionRefs
+		Versions        map[string]string
+		LinkerFlags     string
+		RunDirectory    string
+		RunWorkflowPath string
+	}{config, configPath, actions, versions, linkerFlags, path.Dir(bundle.ManifestPath), bundle.WorkflowPath}
 	if err := tmpl.Execute(&out, data); err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "rendering maintenance workflow")
 	}

@@ -157,7 +157,7 @@ func TestARCInspectionDiagnosticUploadIsSeparateFromEvidence(t *testing.T) {
 				t.Fatal(err)
 			}
 			var document githubWorkflowDocument
-			if err := yaml.UnmarshalStrict(bundle.Files[GitHubWorkflowPath], &document); err != nil {
+			if err := yaml.UnmarshalStrict(expandedGitHubWorkflow(t, bundle), &document); err != nil {
 				t.Fatal(err)
 			}
 			count := 0
@@ -374,24 +374,24 @@ func TestInspectionDiagnosticTailWiring(t *testing.T) {
 
 func TestGitHubDiskDiagnosticsAndDeadlineSemantics(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		plan := arcTestPlan(t, platform)
+		bundle, err := RenderGitHub(t.Context(), plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stages, _, err := githubStages(plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var stage githubStage
+		for _, candidate := range stages {
+			if candidate.DiskOutput != "" {
+				stage = candidate
+			}
+		}
 		for _, mutation := range []string{"valid", "missing", "duplicate", "always upload", "substituted readiness output", "workspace path", "substituted route output", "long retention", "ambient credentials", "unbounded upload", "changed upload duration", "late upload", "outer equals inner"} {
 			t.Run(platform+"/"+mutation, func(t *testing.T) {
-				plan := arcTestPlan(t, platform)
-				bundle, err := RenderGitHub(t.Context(), plan)
-				if err != nil {
-					t.Fatal(err)
-				}
-				stages, _, err := githubStages(plan)
-				if err != nil {
-					t.Fatal(err)
-				}
-				var stage githubStage
-				for _, candidate := range stages {
-					if candidate.DiskOutput != "" {
-						stage = candidate
-					}
-				}
-				steps := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath]).Jobs[stage.ID].Steps
+				steps := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs[stage.ID].Steps
 				index := slices.IndexFunc(steps, func(s githubStep) bool { return s.Name == "Upload failed Packer diagnostics" })
 				if index < 0 {
 					t.Fatal("no diagnostic upload")
@@ -422,7 +422,7 @@ func TestGitHubDiskDiagnosticsAndDeadlineSemantics(t *testing.T) {
 				case "outer equals inner":
 					steps[index-1].TimeoutMinutes = int(stage.diskExecutionBudget / time.Minute)
 				}
-				err = validateGitHubStageExecution(plan, stage, steps)
+				err := validateGitHubStageExecution(plan, stage, steps)
 				if mutation == "valid" {
 					if err != nil {
 						t.Fatal(err)

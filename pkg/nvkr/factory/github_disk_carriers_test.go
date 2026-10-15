@@ -87,7 +87,7 @@ func TestGitHubRestoredCarriersHaveOneProducerUpload(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				document := decodeGitHubWorkflow(t, bundle.Files[GitHubWorkflowPath])
+				document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 				stages, jobs, artifacts, err := admitGitHubCarriers(t.Context(), plan)
 				if err != nil {
 					t.Fatal(err)

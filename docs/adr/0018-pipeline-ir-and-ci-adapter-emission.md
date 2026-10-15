@@ -127,6 +127,16 @@ The maintained pipeline-attested workflow trusts the bootstrap job and same-Run 
 it does not independently checksum the downloaded helper before restoring its execute bit. This delivery
 contract is not the qualified exact-helper-byte verification required below.
 
+The explicit diagnostic `validate` route is separate from generated producer execution. It is Linux-only
+and executes authenticated, held tool bytes on the host with the selected embedded kubeconfig. Private
+workspaces, pinned descriptors, bounded output, restricted environment and process cancellation/join
+protect capture and lifecycle; they provide no filesystem, network, privilege or container sandbox.
+The cluster endpoint can be remote: local/disposable acknowledgement is an operator declaration, not
+proof of locality or exclusive ownership. Admission requires that explicit acknowledgement and exact
+selected subjects; the operator owns endpoint access and execution trust. This route grants no qualified
+execution, fleet-management or promotion authority. ADR-16 §6 owns its scope; it does not weaken the
+producer isolation or native ARC requirements below.
+
 Landlock/seccomp application and process replacement run on one dedicated locked OS thread. Restrictions are
 thread-local before exec; a Go scheduler handoff must not change the thread that enters the build command.
 If the transition fails, its goroutine exits without unlocking so the runtime retires the possibly restricted
@@ -145,10 +155,12 @@ publication; secret-valued FDE, encrypted inspection and qualified execution fai
 Their execution classes select exactly
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
-The operator must provision ephemeral single-job runners and restrict pool access to the reviewed workflow on the default branch and any exact
-branches explicitly admitted by `githubDispatchBranches`. The generated disk jobs use the `nkd-arc` protected Environment. Provider configuration and fresh
-native interoperability are external acceptance requirements; emitting a label or naming an Environment does
-not establish those facts.
+Production and standalone diagnostic disk jobs use the `nkd-arc` protected Environment, with pool access
+restricted to reviewed producer workflows on the default branch and any exact branches explicitly admitted by
+`githubDispatchBranches`. The separate signed-development policy is described below. The separately authored
+downstream E2E adapter has its own trust and provider-admission requirements in this section's
+[repository NVKE E2E adapter](#repository-nvke-e2e-adapter-outside-generated-execution) subsection;
+producer admission does not establish admission of that downstream workflow.
 
 With publication and signing omitted, the same native policy also admits a **build-only diagnostic**
 workflow at `static-unqualified`. It accepts plain disks and ADR-10's explicit public-bootstrap LUKS2
@@ -168,8 +180,15 @@ the maintained `ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchain
 read-only credential remains outside producer execution. This mode does not use publication configuration
 as a surrogate for build credentials. Real native FDE execution is acceptance evidence recorded separately.
 
-The publication route reuses the exact `githubDispatchBranches` manual-dispatch policy described below. Both
-`nkd-arc` and `nkd-release` deployment policies and the signing identity must admit each selected ref.
+The operator must provision ephemeral single-job runners and restrict pool access to reviewed workflows and
+admitted refs. Production uses the default branch plus exact `githubDispatchBranches` entries and the
+`nkd-arc` protected Environment. Signed development uses the separate `nvkr-dev-arc` Environment and its
+reviewed branch policy described below, with the same two fixed runner labels and execution contracts.
+Provider configuration and fresh native interoperability are external acceptance requirements; emitting a
+label or naming an Environment does not establish those facts.
+
+Production `nkd-arc`/`nkd-release` and development `nvkr-dev-arc`/`nvkr-dev-release` deployment policies
+and the corresponding signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
 Docker is the initial admitted runtime. For publication workflows, bootstrap, source fetch, registry publication,
 signing and finalization remain on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
@@ -185,6 +204,10 @@ disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and `packages: read`.
+The maintained M2 and two NVKE nightly publication prefixes also reuse the already-published
+`ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` pins. Reusing these
+toolchain subjects does not relocate them into the nightly output namespace or admit unrelated
+publication owners or toolchain repositories.
 Only that step receives the ephemeral workflow token. The helper admits the complete Plan,
 native platform and disk host requirements before pulling; it uses a private temporary Docker
 configuration and deletes it on success or failure before source or producer execution.
@@ -309,6 +332,32 @@ Helper delivery can use pinned source bootstrap or a pinned helper image. Delive
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.
 Prebuilt helper-image qualification stays disabled until that admission contract exists. Runtime/helper changes
 belong to Environment/profile configuration; component toolchains remain producer inputs.
+
+#### Repository NVKE E2E adapter outside generated execution
+
+The separately authored repository CI adapter uses `arc-arm64-kvm` and `nkd-arc`
+for kind management plus native KVM tenant guests. This engineering contract is
+outside generated Run execution and v1 product qualification acceptance; it adds
+no Environment runtime engine, public runtime API or qualified runner claim.
+The generated adapter's native disk policy above remains unchanged. Other labels
+and downstream runtime targets are unsupported by this E2E adapter.
+
+NVKE owns guest and cluster provisioning, assertions and guest/cluster teardown.
+The parent repository harness owns host admission, serialization, the disk service,
+outer leases, network-control mutation and journaled restoration. It requires
+native architecture, KVM, host packages, exact source and private workspace before
+host mutation and joins both owners before reporting a successful cycle. Missing
+cleanup evidence retains recovery controls and fails the cycle.
+
+The pinned NVKE suite is fully trusted code. Its sudo and Docker access are
+root-equivalent on the runner; running under the parent's UID means it can access
+the parent's read-only job token despite environment scrubbing. Private paths
+and separate workflow jobs do not establish an independent sandbox or signer.
+The suite's unsigned outcomes therefore remain diagnostics, including its own
+pass verdict. A label, configured schedule or local contract test proves neither
+pool access nor combined runtime acceptance. Provider admission and the first
+combined cycle remain external evidence in reconciliation; no organizational
+tool approval or named-decider ratification is inferred.
 
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
@@ -683,9 +732,10 @@ Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selec
 | In-repository pull request | Build/package; read-only mirror credential on fetch steps only; no OIDC, push or environment access |
 | Default-branch push or manual dispatch on that ref | Publish/sign/attest/verify inside a protected environment; phase-scoped registry and OIDC credentials |
 | Explicitly allowed branch manual dispatch | Same publication lane; exact Environment allowlist, deployment policy and signing identity must admit the branch |
+| Development Environment branch manual dispatch | Unsigned hosted builds, or full signed publication using development environments/credentials, the admitted native ARC route, and disposable attempt namespaces |
 | Git tag | No signing trigger |
 
-The current generated Run workflow is manual-only. Execution admits the default branch plus exact branch
+Generated Run workflows are manual-only. Production execution admits the default branch plus exact branch
 names explicitly listed in `Environment.githubDispatchBranches`. The optional list is sorted and unique;
 wildcards, tag/PR refs and expression syntax are rejected. It is bound into Environment and Plan identity,
 cloned with its owner, and enforced in source access, execution and finalization guards. Local execution
@@ -702,7 +752,46 @@ bounded, and workflow concurrency does not cancel an in-progress publication. Te
 finalization still run after failures within an admitted execution. The generated Run workflow does not
 start on pull requests.
 
-Identity is one committed workflow path and explicitly admitted branch refs; verification rejects PR refs. Protect workflow,
+`Environment.githubDevelopment: true` selects the separate `nvkr-dev.yml` workflow and admits manual
+branch refs only. Tags and pull requests remain closed. It shares the compiler, complete graph, helper,
+output requirements and finalizer with production; no selected outputs are filtered out. Local execution
+rejects this GitHub-only setting. Arbitrary runtime setup/variables and a second dispatch-branch allowlist
+are rejected. Legacy runner overrides must name an admitted generic hosted label; disks use only the
+explicit native ARC policy and fixed execution-class labels above.
+Combining this fixed development workflow with a nonempty `githubBundle` is
+unsupported and returns `CodeEngineCapability` before catalog resolution or
+generated-output work; optional named bundles select production workflows only.
+
+Unsigned development omits both publication and signing, remains `static-unqualified`, and cannot use
+ARC or disk evidence. Signed development requires real cosign, the GitHub issuer, `per-output-v1`, the
+reserved development namespace and exact development workflow identity in ADR-20. It retains the
+`pipeline-attested` lane and all output-local signing, evidence, verification and completeness gates.
+The Environment cannot select a production signer, anonymous/plain-HTTP registry, or arbitrary publication
+credential. Development verification is a separate consumer trust decision, not production acceptance or
+qualified reproduction. The current hosted repository/workflow identity is admitted before execution.
+Development finalization emits its Run record without a production qualification handoff; explicit handoff
+admission rejects development before qualification evidence collection.
+
+Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
+They never inherit the production deployment environments. Dedicated write and read registry credentials
+are delivered only to their corresponding phases. Development jobs receive no repository-token package-write
+permission; only signing and SBOM attestation receive OIDC. Read-only toolchain preparation can still use
+the repository token for exact retained private M2 toolchain roots; credentials are removed before producer
+execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
+remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
+reviewed before dispatch. Provider ACLs must independently exclude production write access from development
+principals; selecting a namespace or protected environment alone cannot enforce token scope.
+
+Development and production have separate generated layouts and concurrency groups (ADR-21). Unsigned
+development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
+like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
+Final Run records and production qualification handoffs retain seven days and disk diagnostics one day. Provider cancellation or runner loss can
+prevent finalization. Expired carriers require a complete new Run. Signed development uses per-attempt
+registry namespaces and full-attempt retries; production's authenticated earlier-attempt reuse is unchanged.
+ADR-20 owns the separate default-branch registry cleanup protocol. Actual dispatch, credential/pool
+isolation, provider expiry and remote deletion require external evidence.
+
+Production identity is one committed workflow path and explicitly admitted branch refs; verification rejects PR refs. Protect workflow,
 generator, helper and signing code with branch protection and code ownership. Hosted source access uses a mirror
 with vendored inputs. The renderer must reject guards it cannot express, including OIDC outside the signing job
 family or credentials in build phases. These are testable contracts; current rendering is not proof that a
@@ -769,7 +858,9 @@ an already-entered regular-file syscall cannot be interrupted, so this is not a 
 
 The compiler creates a private release preparation, a production SBOM-attestation stage producing the
 final release package, and one publish/sign/verify route. The attestation stage binds and verifies each
-CycloneDX document before final release identity is derived. It adds one internal handoff. GitHub handoff artifacts remain
+CycloneDX document before final release identity is derived. The private preparation is disposable: delivery
+consumes its unchanged payload files into the final layout after preparing the signed evidence, with the
+ownership and retry contract in ADR-20 §6. It adds one internal handoff. GitHub handoff artifacts remain
 internal job transfers, not additional deliverables. Product names do not cause duplicate copies of the full
 closure to be uploaded or published.
 
@@ -785,7 +876,13 @@ command argument is added.
 
 Each stage downloads one exact set of external input carriers, then restores each required carrier in one
 helper step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
-part of the requested set. After a successful restore, the helper deletes that exact regular carrier file to
+part of the requested set. Restoration holds the opened carrier inode and streams extraction into a private
+staging tree while hashing every carrier byte. It then rehashes that same held inode and checks unchanged
+metadata before publishing any extracted root. This uses no additional full-archive snapshot; the retained
+carrier and extracted tree coexist until validation completes. Archive traversal, entry and byte limits,
+no-follow access and atomic no-replace publication remain mandatory. Carrier consistency is transport
+validation, not artifact or release authority; consumers still authenticate their own exact closures.
+After a successful restore, the helper deletes that exact regular carrier file to
 avoid retaining both the archive and its unpacked contents. Failed and unrequested carriers remain untouched.
 Each operation prepares its outputs in one step and retains an independent upload
 for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
@@ -811,15 +908,125 @@ admission still covers every stage and bootstrap job; any failed, skipped or mis
 completion. Assembly and finalization have registry-read permission and no OIDC minting or package-write
 permission. All credentials and signing remain outside ARC producer jobs.
 
-Every generated run script remains checked against GitHub's 21,000-character ceiling, conservatively measured
-as UTF-8 bytes, including explicit operator setup and bootstrap commands. The generator also rejects a
-workflow file over 500,000 UTF-8 bytes before returning a bundle or writing generated files; validation and
-bundle persistence enforce the same bound. Per-output workflows compact repeated values with short YAML anchors
-and inline job maps, preserving string types when removing optional quotes, then compare the fully expanded JSON
-to the uncompressed workflow before acceptance.
-Compaction changes presentation only, not jobs, scripts or permissions. The limit follows GitHub's
+The top-level workflow keeps each named job, exact dependency set, runner, timeout, permission, protected
+Environment and execution condition visible. Native-platform preflight remains before checkout. After
+checkout, shared local composite actions expose fixed semantic interfaces for node execution, source
+execution, input preparation, image preparation, output collection and individual carrier transfer.
+`execute-node`, `execute-source`, `prepare-inputs`, `prepare-images` and `collect-node-outputs` describe
+operations owned by the factory. The generator selects these interfaces directly; it does not create a new
+template for each observed step shape, group size or output count. A shared preparation action downloads the
+selected same-Run helper and immediately restores its execute bit. The production templates live under
+`.github/nvkr-run/actions/`; one canonical
+`.github/nvkr-run/action-data.json` stores invocation values keyed by stable job/segment selectors.
+The development layout uses the corresponding paths under `.github/nvkr-dev/`. Both are
+exact manifest-owned bundle members. Templates retain fixed helper commands and literal catalog-pinned
+provider actions; invocation data contains selected node IDs, carrier names, paths and other parameters,
+never executable scripts or credentials. Parameters use named operation roles such as `execute_selector`
+and `upload_with_name` rather than numbered step positions. They add no authored operation, new scheduling
+authority or independently selectable execution input.
+
+The internal `factory github describe-action` operation admits the complete Plan and recomputes the selected
+invocation from the renderer before emitting bounded canonical JSON to the provider's step-output channel.
+Each job's output is limited to 200,000 UTF-8 bytes, including `data=` and the terminating newline; this is
+not a limit on the complete `action-data.json` file. Generation and runtime reject oversized output before
+opening the provider output file.
+Shared preparation selects the stable provider job through the exact `github.job` context binding.
+The checked-in data file is an inspectable generated projection, not runtime execution authority. Templates
+map its recomputed parameters through explicit environment values or action inputs; fixed shell commands
+quote their parameter variables instead of evaluating generated command text. Caller-only expressions and
+credentials retain explicit bindings outside this data. Bootstrap uses a shared family that does not depend
+on the helper it is building. Host and job-container shells and distinct credential roles have explicit
+interfaces. Grouped jobs invoke the same node interface repeatedly in execution order. Contiguous input
+download/restore and image preparation occupy declared optional node slots; preparation separated from
+execution retains its own interface. Folding cannot cross inline setup or provider-control boundaries.
+Execution and output collection provide two optional carrier slots;
+additional carriers use the same individual upload interface before the next node executes. Every planned
+output retains its own ordered upload. Neither group size nor output cardinality produces another action
+file. Absent optional work does not execute; supported transport defaults preserve the pinned provider
+interface, while static materialization restores original field presence. Missing required work,
+unsupported bindings or reordered operations fail closed through expanded-graph admission.
+
+The workflow header points to fixed Plan and manifest paths instead of embedding a changing Plan digest.
+Source-fetch scheduling keys and ordering derive from the build target and its actual consuming component
+cohort. The exact Plan, producer IR, source identities and execution selectors retain their pin-bound IDs;
+the node-to-job mapping connects them to the provider projection. Missing consumers, collisions and
+incomplete projected graphs fail closed. Updating a source pin cannot reorder otherwise unchanged jobs or
+regroup utilities merely because its content-derived fetch ID sorts differently.
+
+Routine source, artifact, toolchain and generator-version updates preserve top-level
+workflow bytes when the scheduling projection, labels, action interface and visible policy are unchanged.
+Transport-action pin changes preserve workflow bytes only when every affected transport is extracted.
+The closing summary reads the finalization outcome and final Run upload's outcome/artifact URL, so those
+steps remain inline; changing that upload action's pin changes the maintained workflow.
+Plan and manifest identities still change, with invocation data or shared action bodies changing when their
+exact parameters, commands or pins change. Template selection does not depend on changing node/carrier IDs
+or transport-action commits. Topology changes, including source-cohort splits/merges, and changes to the
+checkout pin, runtime job containers/services, runner/capability routes, permissions, secret references,
+timeouts, qualification or
+inline operator setup may require a workflow diff. The full bundle must still regenerate and pass its
+byte-exact check after every input update; workflow stability grants no exemption from admission or drift.
+
+Native preflight, pinned checkout, operator-authored environment setup, timed producer execution and steps
+whose outcomes or outputs are referenced by the caller remain inline. Keeping setup inline preserves its caller contexts and action-path environment; arbitrary setup
+expressions do not become composite inputs. A controlled upload/download may use a local wrapper containing
+exactly one pinned transport step. Its ID, condition, timeout and continue-on-error policy remain on the
+caller, while carrier selections come from generated invocation values and transport pins live in the
+shared action. Transfer parameters are resolved before the caller's controlled boundary; descriptor
+preparation cannot disappear after a producer failure and silently suppress its diagnostic transfer.
+A caller step-output expression, such as the sealed disk diagnostic path, is passed explicitly into that
+transport's original input.
+An always-run transport also retains `always()` on its inner step because GitHub re-evaluates embedded
+conditions during cancellation; other wrappers keep the default inner success condition and remain
+cancellable. Transfers whose own outcomes or outputs are referenced remain inline. Recovery uses the
+standalone `recover-inputs` interface before referenced inline finalization; unreferenced adjacent recovery
+and finalization can use `finalize-run`. This retains the provider boundary
+for bounded disk execution and failure/always-run diagnostic transport; controls cannot hide a multi-step producer
+sequence behind a different outcome. Remaining sequences preserve logical operation order and fail on the
+same mandatory execution or transfer errors. Composite shell steps explicitly preserve the original Linux
+default (`bash -e {0}` on the host, `sh -e {0}` in a job container), without
+introducing `pipefail`. Job policies and the source checkout are not hidden inside generated actions.
+
+The caller passes secrets and provider-result expressions as explicit action inputs. Each input is mapped
+only to the original inner step field that consumes it: source credentials remain on source execution,
+private-image credentials remain on preparation, and catalog credentials remain on catalog validation or
+finalization. Packing and uploads gain no credential environment through extraction. Recovery receives the
+caller's exact `toJSON(needs)` value; no matrix result or action output replaces the required provider-job set.
+Actions are statically selected from the generated bundle, with no arbitrary command or action-path input.
+
+Validation checks the closed shared-template and invocation-data set and expands its admitted references
+and input bindings before applying the existing graph, transport, permission, credential and execution-order
+checks. Exact regeneration additionally compares every generated member's bytes, including templates and
+invocation data. An unknown, missing or changed template or data member cannot be accepted merely because
+the top-level workflow is unchanged. This lowering replaces numbered YAML anchors and inline-map compaction;
+top-level policy and dependencies remain
+ordinary readable YAML. Complete, identical native-platform preflight, pinned checkout and shared job
+preparation steps may use descriptive aliases: `check-native-linux-amd64`, `check-native-linux-arm64`,
+`checkout-workflow-source` and `prepare-stage-<runner-artifact>`. Complete uncontrolled semantic operation
+calls may also share an alias after structural equality, including their parameter and credential bindings.
+Preparation retains the same caller step ID and binds its job selector through `github.job` in each job.
+An entire identical host step sequence may share a descriptive `steps-<runner>-node` or
+`steps-<runner>-two-nodes` anchor when it contains only the exact native preflight, credential-free pinned
+checkout, current-job helper preparation and one or two uncontrolled `execute-node` calls. Source calls,
+additional credential inputs, authored setup and controlled transfers are outside this sequence form.
+Aliases resolve into independent nodes before per-job parameter substitution. Scalar values, job permissions,
+conditions and dependency sets remain inline. This presentation change retains the exact provider-job set.
+
+Producer matrix scheduling and general reusable `workflow_call` pipelines remain deferred. The separately
+owned fixed native qualification worker and its exact selected-platform matrix are admitted by ADR-21 §4;
+that exception does not alter producer scheduling. A producer matrix changes dependency
+barriers and the provider-result shape used by finalization; a callable workflow adds execution-context,
+credential and identity contracts. Neither is a presentation-only substitution for the current exact named
+jobs. Future admission must preserve each named output's execution/evidence slots, failure behavior and
+complete result accounting before either form is emitted.
+
+Every generated run script, including scripts inside composite actions, remains checked against GitHub's
+21,000-character ceiling, conservatively measured as UTF-8 bytes, including explicit operator setup and
+bootstrap commands. The generator also rejects a workflow file over 500,000 UTF-8 bytes before returning a
+bundle or writing generated files; validation and bundle persistence enforce the same bound. The limit follows GitHub's
 [500 KB workflow-file ceiling](https://docs.github.com/en/actions/reference/limits#workflow-file-size);
 files that remain oversized fail closed instead of generating an unstartable workflow.
+Local rendering and expanded-graph validation do not establish provider execution of the composite layout;
+reconciliation records which regression checks have actually run.
 Provider outage or failed local outcome storage can
 still prevent finalization.
 

@@ -1,0 +1,20 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  busybox-image:
+    digests:
+      arm64: sha256:55c89c6d9404d6668eb237dda92f28a99eb14e640f1c177a55cc9d738c53c303
+    imageParentDigest: sha256:55c89c6d9404d6668eb237dda92f28a99eb14e640f1c177a55cc9d738c53c303
+    tag: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+  conformance-image:
+    digests:
+      arm64: sha256:a308614b20795ed57586bbe929721909ba4524d7babfe44b70b18b56f5edb375
+    imageParentDigest: sha256:a308614b20795ed57586bbe929721909ba4524d7babfe44b70b18b56f5edb375
+    tag: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+kind: PinLock
+pins:
+  hydrophone-suite-selection:
+    commit: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+    sourceDateEpoch: 1790615809
+    tag: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+    treeHash: dd63e54638cdc37ab2d5480bce02fb098efa2691
