@@ -102,8 +102,9 @@ the Helm metadata reader. Its disk job also failed its KVM admission check on
 that attempt. A later runner repair was reported by the operator; no rerun of
 this combined cycle is recorded here to verify that repair.
 
-Generic tarball assets in executable bundles now select a bounded archive-content
-inventory of member paths and hashes. NICoSim's seed/UI archive uses that path;
+Selected source tarball assets in executable bundles use a bounded archive-content
+inventory only when their component and producer/output bindings match the Plan.
+The inventory records member paths and hashes. NICoSim's seed/UI archive uses that path;
 Helm archives retain their strict metadata reader. The archive method records
 file composition without claiming package discovery. The pinned Syft 1.51.1
 scanner returned no packages for the source-selected simulator seed/UI archive

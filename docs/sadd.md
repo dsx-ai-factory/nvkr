@@ -752,7 +752,7 @@ The acquired component retains its acquisition-only claim. SBOM generation asser
 verifies upstream signatures nor upgrades evidence. The release metadata references each required document once in its owning artifact repository
 as a subject-bound CycloneDX attestation bundle. Attestations are created and verified before deriving
 the final release index, so its signature covers each exact bundle and document digest. Helm source-archive and final bound-package
-inventories are separate claims. Generic tarball assets in executable outputs use the separate
+inventories are separate claims. Selected source tarball assets in executable outputs use the separate
 `archive-content/v1` method to record exact member hashes; this is file composition, not discovered
 package dependencies. Run completion is not signed. See the [registry graph](publication-architecture.md). Build-only and dry-run outputs gain no signature.
 
