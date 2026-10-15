@@ -199,9 +199,9 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 ## Key files
 
 Use `docs/README.md` for documentation, `demos/README.md` for presentations and guided demos, and
-`scripts/README.md` for operational scripts. Generate alternate examples into scratch roots. `definitions/nvke-v1/`
-contains the retained three-output NVKE inputs; `definitions/nvke-m2/` supplies the maintained release candidate,
-and `definitions/nvke-fde/` supplies the build-only FDE selection. `make workflows-check` repeats the exact input
+`scripts/README.md` for operational scripts and `inputs/README.md` for authored input ownership. Generate alternate examples into scratch roots. `docs/examples/nvke-tutorial/`
+contains the retained three-output NVKE inputs; `inputs/definitions/nvke/` supplies the maintained release candidate,
+and `inputs/definitions/diagnostics/fde-amd64.yaml` supplies the build-only FDE selection. `make workflows-check` repeats the exact input
 paths in the committed Plan. A branch's selection is not a ratified canonical-product decision.
 `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json` are generated. `toolchains/` owns toolchain
 sources and helper pins. `CONTRIBUTING.md` owns contribution rules.

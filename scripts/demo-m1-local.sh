@@ -23,7 +23,7 @@ ATTEMPTS_ROOT=${ATTEMPTS_ROOT:-.nvkr/m1-local}
 ATTEMPT=${ATTEMPT:-$(demo_default_attempt m1)}
 WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
 CONSUME=${CONSUME:-.nvkr/m1-local-consume}
-DEFINITIONS=${DEFINITIONS:-definitions/nvke-v1}
+DEFINITIONS=${DEFINITIONS:-docs/examples/nvke-tutorial}
 ROUTE=${ROUTE:-release}
 BUNDLE=${BUNDLE:-nvkectl}
 BUILD_TARGET=${BUILD_TARGET:-nvkectl}
@@ -65,6 +65,8 @@ Options:
   -h, --help        show this help
 
 Environment:
+  DEFINITIONS       directory containing the tutorial Definition and Environments
+                    (default: docs/examples/nvke-tutorial).
   NVKE_LOCAL_CLONE   path to a local NVKE clone containing the exact pinned commits. When set, git is
                     redirected to it for this process only, via GIT_CONFIG_COUNT.
                     The catalog keeps its https://github.com/dsx-ai-factory/nvke identity and
@@ -170,13 +172,12 @@ done
 [ "$registry_ready" -eq 1 ] || demo_die "registry $REGISTRY_HOSTPORT did not become ready"
 printf 'registry ready: http://%s/v2/\n' "$REGISTRY_HOSTPORT"
 
-demo_section "2/8  Validate the pinned component catalog"
-"$NVKR" catalog validate --data "$DEFINITIONS/catalog"
+demo_section "2/8  Validate the pinned producers and plan the Run"
+"$NVKR" run plan --definition "$DEFINITIONS/definition.yaml" \
+  --environment "$DEFINITIONS/environment-local.yaml"
 
 demo_section "3/8  Validate the Definition and generate its hosted Run in scratch space"
 "$NVKR" definition validate --definition "$DEFINITIONS/definition.yaml"
-"$NVKR" run plan --definition "$DEFINITIONS/definition.yaml" \
-  --environment "$DEFINITIONS/environment-local.yaml"
 # The committed workflow selects M2, while this demo selects the three-output v1
 # Definition. Generate and check that example with the same binary in a fresh root.
 HOSTED_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-m1-hosted.XXXXXX")

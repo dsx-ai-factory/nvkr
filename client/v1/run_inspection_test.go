@@ -52,7 +52,7 @@ func TestSDKRunInspectionValidAndRejectedRecords(t *testing.T) {
 	}
 	t.Chdir(repo)
 	sdk := client.New()
-	prepared, err := sdk.PrepareLifecycleRun(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "sdk-inspection")
+	prepared, err := sdk.PrepareLifecycleRun(t.Context(), "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", "sdk-inspection")
 	if err != nil {
 		t.Fatal(err)
 	}

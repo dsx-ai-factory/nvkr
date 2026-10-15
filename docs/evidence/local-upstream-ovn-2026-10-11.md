@@ -13,7 +13,7 @@ This establishes one unqualified local diagnostic at that exact revision. It
 does not validate NVIDIA OVN, later source revisions, a supported NKE release
 combination, a complete source-built distribution, M2 or qualification. NVIDIA
 OVN remains the default; there was no implicit Calico fallback. See the
-[execution guide](../local-nke-demo.md#explicit-upstream-ovn-alternative).
+[execution guide](../local-nvke-demo.md#explicit-upstream-ovn-alternative).
 
 ## Observed acceptance
 

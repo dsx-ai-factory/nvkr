@@ -194,15 +194,15 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 		return nil, errors.New("invalid private build invocation")
 	}
 	definition := args[4]
-	authored := "definitions/nvke-local-dev-arm64/definition.json"
+	authored := "inputs/definitions/demo/arm64-nvidia-tcg.json"
 	if cfg.Network == "upstream-ovn" {
-		authored = "definitions/nvke-local-dev-arm64/definition-upstream-ovn.json"
+		authored = "inputs/definitions/demo/arm64-upstream-tcg.json"
 	}
 	if definition != authored && definition != bootstrap+"/definition.json" {
 		return nil, errors.New("private build invocation selected an unsupported definition path")
 	}
 	want := []string{bootstrap + "/nvkr", "run", "local", "--definition", definition,
-		"--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix,
+		"--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix,
 		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker", "--ui=plain"}
 	if !slices.Equal(args, want) {
 		return nil, errors.New("private build invocation differs from the supported local command")

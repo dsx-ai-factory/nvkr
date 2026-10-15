@@ -169,7 +169,7 @@ if [[ -n "${NVKE_LOCAL_CLONE:-}" ]]; then
   # source identity. The bare NVKE form also prefix-matches sibling repository
   # names, so use this override only for this maintained NVKE selection.
 fi
-environment="definitions/nvke-local-dev-arm64/environment-local-docker.json"
+environment="inputs/environments/local-arm64-tcg.json"
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
@@ -231,9 +231,9 @@ if [[ -z "${shared_bootstrap}" ]]; then
 fi
 runner="${tools}/nvkr"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }
-definition="definitions/nvke-local-dev-arm64/definition.json"
-if [[ "${network}" == upstream-ovn ]]; then definition="definitions/nvke-local-dev-arm64/definition-upstream-ovn.json"; fi
-if [[ "${lane}" != all ]]; then definition="definitions/nvke-local-dev-arm64/definition-${lane}.json"; fi
+definition="inputs/definitions/demo/arm64-nvidia-tcg.json"
+if [[ "${network}" == upstream-ovn ]]; then definition="inputs/definitions/demo/arm64-upstream-tcg.json"; fi
+if [[ "${lane}" != all ]]; then definition="inputs/definitions/diagnostics/demo-arm64/${lane}.json"; fi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.
@@ -280,9 +280,10 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
       toolchain_overlay("arm64"; .pin; $to; .catalogDigest; .components)' \
       "${bootstrap}/substitutions.json" >"${bootstrap}/${file}"
   done < <(jq -r 'keys[]' "${bootstrap}/substitutions.json")
-  jq -e --arg root "${repo_root}" --arg out "${repo_root}/${bootstrap}" \
+  definition_dir="$(cd "$(dirname "${definition}")" && pwd -P)"
+  jq -e --arg definition_dir "${definition_dir}" --arg out "${repo_root}/${bootstrap}" \
     --slurpfile scopes "${bootstrap}/substitutions.json" '
-    def absolute: if startswith("/") then . else $root + "/definitions/nvke-local-dev-arm64/" + . end;
+    def absolute: if startswith("/") then . else $definition_dir + "/" + . end;
     def locate: .base |= absolute | if .overlays then .overlays |= map(absolute) else . end;
     .catalog |= locate |
     .catalog as $default |

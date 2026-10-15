@@ -12,7 +12,7 @@ each concept to a worked example.
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md), [presenter narration](nvkr-presenter.md) |
-| Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
+| Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
@@ -22,18 +22,18 @@ each concept to a worked example.
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
 | Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
-| Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../definitions/nvke-m2/README.md#qualification-readiness) |
+| Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
-Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
-[nine-output deploy example](../definitions/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
-and [OS-image routes](../definitions/nvke-os/README.md). The separate
-[FDE-only diagnostic workflow](../definitions/nvke-fde/README.md) selects one native disk for branch iteration.
+Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
+[nine-output deploy example](examples/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
+and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
+[FDE-only diagnostic workflow](../inputs/definitions/diagnostics/fde.md) selects one native disk for branch iteration.
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
-Experimental [public OS source producers](../definitions/nvke-os-source/README.md) and the
-[OVN source-build option](../definitions/nvke-ovn-source/README.md) are separate candidates, not full OS
+Experimental [public OS source producers](../inputs/experiments/public-os-sources/README.md) and the
+[OVN source-build option](../inputs/catalogs/ovn-nvidia/README.md) are separate candidates, not full OS
 migration or maintained M2 membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
 records source availability and remaining gaps.
 
@@ -64,6 +64,10 @@ records source availability and remaining gaps.
 | Determine what remains for a full source-built local NVKE distribution | [Full-source gap map](full-nvke-source-build.md) |
 
 ## Engineering and maintenance
+
+[Input layout and consolidation](input-layout-migration.md) maps every relocated Definition and Environment,
+separates the completed ownership move from conditional consolidation, and records the remaining parity gaps.
+The [input index](../inputs/README.md) and [catalog ownership map](../inputs/catalogs/README.md) own current locations.
 
 [NVKR/NVKE naming cutover](nvkr-rebranding.md) lists renamed public surfaces,
 preserved external contracts and the remaining provider migration steps.

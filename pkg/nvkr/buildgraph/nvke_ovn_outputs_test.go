@@ -26,8 +26,8 @@ func TestNVKEOVNForkReleaseOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	const definitionPath = "definitions/nvke-ovn-source/definition.yaml"
-	const environmentPath = "definitions/nvke-ovn-source/environment-github.yaml"
+	const definitionPath = "inputs/definitions/diagnostics/ovn.yaml"
+	const environmentPath = "inputs/environments/github-ovn-diagnostics.yaml"
 	authored, err := definition.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)

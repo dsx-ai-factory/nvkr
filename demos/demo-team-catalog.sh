@@ -76,13 +76,13 @@ if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive w
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-catalog.XXXXXX"); fi
 cd "$ROOT"
 printf 'cd %q\n' "$ROOT" >"$OUT/commands.txt"
-DEFINITION=definitions/nvke-v1/definition.yaml
-ENVIRONMENT=definitions/nvke-v1/environment-github.yaml
-CATALOG=definitions/nvke-v1/catalog
+DEFINITION=docs/examples/nvke-tutorial/definition.yaml
+ENVIRONMENT=docs/examples/nvke-tutorial/environment-github.yaml
+CATALOG=inputs/catalogs/nvke/module-tags
 if [ "$DEPLOY" -eq 1 ]; then
-  DEFINITION=definitions/nvke-deploy/definition.yaml
-  ENVIRONMENT=definitions/nvke-deploy/environment-github.yaml
-  CATALOG=definitions/nvke-controller/catalog
+  DEFINITION=docs/examples/nvke-deploy/definition.yaml
+  ENVIRONMENT=docs/examples/nvke-deploy/environment-github.yaml
+  CATALOG=inputs/catalogs/nvke/release
 fi
 
 heading 'NVKR / From catalog to pipeline'

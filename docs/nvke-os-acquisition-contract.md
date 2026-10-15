@@ -6,8 +6,8 @@ acquisition-origin authority, installed inventory, a live-Run receipt or a full 
 [ADR-10](adr/0010-pluggable-builder-types.md) owns the producer/carrier handoff;
 [ADR-13](adr/0013-supply-chain-evidence.md) owns evidence authority.
 
-The standalone [OS development inputs](../definitions/nvke-os/README.md) and the newer
-[M2 candidate](../definitions/nvke-m2/README.md) have different source selections. M2 pins the
+The standalone [OS development inputs](../inputs/definitions/diagnostics/README.md) and the newer
+[M2 candidate](../inputs/definitions/nvke/README.md) have different source selections. M2 pins the
 merged capture-capable NVKE source and explicitly enables capture. Its generic disk collector can retain
 the declared carrier under the original Run/QCOW2 owner; that integration does not strengthen this
 standalone verifier's claim.

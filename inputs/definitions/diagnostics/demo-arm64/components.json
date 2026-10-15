@@ -1,0 +1,250 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/nvke/module-cli-arm64"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-local-dev-arm64-components",
+    "description": "Local ARM64 CLI, controller, source-built providers, tools, five charts and twelve acquired dependency images; not a full source-built NVKE distribution; no publication or signing."
+  },
+  "outputs": [
+    {
+      "catalog": {"base": "../../../catalogs/capnico/local-arm64"},
+      "components": ["capnico-controller"],
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../../../catalogs/nvke/release"},
+      "components": ["cluster-api-provider-provisioned"],
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/release"
+      },
+      "components": [
+        "nvke-controller-chart"
+      ],
+      "format": "helm-oci",
+      "helm": {
+        "images": {
+          "controller": "cwe"
+        }
+      },
+      "name": "controller-chart",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "csi-node-driver-registrar-image"
+      ],
+      "format": "oci",
+      "name": "csi-node-driver-registrar-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/release"
+      },
+      "components": [
+        "nvke-controller"
+      ],
+      "format": "oci",
+      "name": "cwe",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "nvkectl-arm64"
+      ],
+      "format": "executable",
+      "name": "nvkectl",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/tools/operator-arm64"
+      },
+      "components": [
+        "helm",
+        "kubectl"
+      ],
+      "format": "executable",
+      "name": "operator-tools",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/release"
+      },
+      "components": [
+        "postgresql-chart"
+      ],
+      "format": "helm-oci",
+      "name": "postgresql",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "postgresql-image"
+      ],
+      "format": "oci",
+      "name": "postgresql-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spiffe-csi-image"
+      ],
+      "format": "oci",
+      "name": "spiffe-csi-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/release"
+      },
+      "components": [
+        "spire-chart"
+      ],
+      "format": "helm-oci",
+      "name": "spire",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-agent-image"
+      ],
+      "format": "oci",
+      "name": "spire-agent-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-bash-image"
+      ],
+      "format": "oci",
+      "name": "spire-bash-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-controller-manager-image"
+      ],
+      "format": "oci",
+      "name": "spire-controller-manager-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/release"
+      },
+      "components": [
+        "spire-crds-chart"
+      ],
+      "format": "helm-oci",
+      "name": "spire-crds",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-oidc-image"
+      ],
+      "format": "oci",
+      "name": "spire-oidc-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-server-image"
+      ],
+      "format": "oci",
+      "name": "spire-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-tpm-server-image"
+      ],
+      "format": "oci",
+      "name": "spire-tpm-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/release"
+      },
+      "components": [
+        "temporal-chart"
+      ],
+      "format": "helm-oci",
+      "name": "temporal",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "temporal-admin-tools-image"
+      ],
+      "format": "oci",
+      "name": "temporal-admin-tools-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "temporal-server-image"
+      ],
+      "format": "oci",
+      "name": "temporal-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "temporal-ui-image"
+      ],
+      "format": "oci",
+      "name": "temporal-ui-image-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

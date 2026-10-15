@@ -46,16 +46,21 @@
 
 # The lock contract (ADR-22). A lock entry is the exact content identity of
 # something that will be built and published; changing one changes what ships.
-/definitions/**/catalog/pins.lock.yaml  @dsx-ai-factory/nvke-write
+/inputs/**/pins.lock.yaml               @dsx-ai-factory/nvke-write
 
 # The registry: which components exist and their constraints. Paired with the
 # lock above under ADR-22's registry/lockfile split.
-/definitions/**/catalog/registry.yaml   @dsx-ai-factory/nvke-write
+/inputs/**/registry.yaml                @dsx-ai-factory/nvke-write
 
-# Definition and Environment are Tier-1 inputs bound into `recipeDigest`
-# (ADR-11, ADR-12). A change here changes recipe identity.
-/definitions/**/definition.yaml         @dsx-ai-factory/nvke-write
-/definitions/**/environment-*.yaml      @dsx-ai-factory/nvke-write
+# Authored selections, environments, overlays, patches and consumer policies
+# determine build content, execution requirements and trust (ADR-11, ADR-12).
+/inputs/definitions/                    @dsx-ai-factory/nvke-write
+/inputs/environments/                   @dsx-ai-factory/nvke-write
+/inputs/catalogs/                       @dsx-ai-factory/nvke-write
+/inputs/policies/                       @dsx-ai-factory/nvke-write
+/inputs/testing/                        @dsx-ai-factory/nvke-write
+/inputs/experiments/                    @dsx-ai-factory/nvke-write
+/docs/examples/                         @dsx-ai-factory/nvke-write
 
 # Toolchain pins. A toolchain digest is a build-semantic input (ADR-10 §5) and
 # contaminates every artifact built with it.

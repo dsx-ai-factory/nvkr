@@ -247,7 +247,7 @@ After separately authorized publication supplies an exact reference, read back t
 descriptor using `crane digest --platform linux/amd64 '<repository>@sha256:<digest>'`, or ARM64 on its
 native host. Local image inspection and executable measurements above do not publish, approve or
 authenticate that reference. The inspector and Packer source locks retain their general approval gates;
-the [M2 candidate](../../definitions/nvke-m2/README.md) uses a separately recorded exception.
+the [M2 candidate](../../inputs/definitions/nvke/README.md) uses a separately recorded exception.
 
 The selected root's native host binding chooses the profile; guest package architecture remains a
 different field. The authenticated runtime accessor contract can be checked independently:

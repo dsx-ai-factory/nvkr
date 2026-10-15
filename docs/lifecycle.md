@@ -16,7 +16,7 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
+The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
 for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
@@ -25,8 +25,8 @@ Definitions and Releases contain no cluster views, deployment roles or categorie
 
 ## Select an Environment
 
-The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-local.yaml) supplies execution settings and a local
-registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-github.yaml) supplies the
+The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-local.yaml) supplies execution settings and a local
+registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-github.yaml) supplies the
 corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
 host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
 binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
@@ -47,11 +47,11 @@ With `bin/nvkr` built as described in the quickstart, inspect the three-output N
 
 ```sh
 bin/nvkr definition validate \
-  --definition definitions/nvke-v1/definition.yaml
+  --definition docs/examples/nvke-tutorial/definition.yaml
 
 bin/nvkr run plan \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml
 ```
 
 For saved generated Plans, `run plan --plan <path>` prints the required outputs and instructions;
@@ -65,17 +65,17 @@ The matching `--check` invocation regenerates in memory and fails if generated f
 ```sh
 NVKR_LIFECYCLE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-lifecycle.XXXXXX")
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT"
 
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT" --check
 ```
 
-Use the [M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md) to regenerate the committed bundle.
+Use the [M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) to regenerate the committed bundle.
 Generated CI defaults to generic hosted runners; ADR-18 separately admits the explicit native ARC disk
 route. Publication and signing belong to the GitHub v1 lane. Generation does not prove provider execution.
 
@@ -85,8 +85,8 @@ Inspect a local attempt without creating its workspace or executing nodes:
 
 ```sh
 bin/nvkr run local \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt review-001 --dry-run
 ```
 
@@ -107,8 +107,8 @@ observation, finalization, release verification or runtime health.
 
 ```sh
 bin/nvkr run local \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt build-001 --ui=plain
 ```
 
@@ -168,9 +168,9 @@ and `--ui=tui` are incompatible and fail before input, network or write work.
 presentation flags.
 
 ```sh
-bin/nvkr definition inspect --definition definitions/nvke-v1/definition.yaml --ui=tui
+bin/nvkr definition inspect --definition docs/examples/nvke-tutorial/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
-bin/nvkr catalog list --data definitions/nvke-v1/catalog --ui=tui
+bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied
@@ -536,7 +536,7 @@ A manually dispatched qualifier or the source build's own identity is rejected.
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `definitions/nvke-m2/qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
+candidate supplies `inputs/policies/nvke-qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
 and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
@@ -556,7 +556,7 @@ The independent policy extends the artifact-check policy with these decisions:
 | `smoke.nonToolOutputs` | Exact OCI/APT output names, kinds and components explicitly outside loose-tool smoke |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing
@@ -692,7 +692,7 @@ Typed evidence explains reproduction, compatibility, conformance, or qualificati
 Clearance and publication roots explain authorization and transport. These records are useful diagnostic views;
 normal product authors do not construct and join them manually.
 
-Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
+Maintained inputs under `inputs/` use Definition and Environment; teaching selections live in `docs/examples/`. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
 The direct-output model uses Definition v5, catalog v3 and producer IR v4. Generated Run Plans use v5; Run and Release use v4. Older recipe layouts and cluster/placement fields
 are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;

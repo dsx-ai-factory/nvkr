@@ -15,8 +15,8 @@ Create a canonical Plan, then read its output list and build instructions:
 ```sh
 NVKR_PIPELINE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-pipeline.XXXXXX")
 bin/nvkr run plan \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --json > "$NVKR_PIPELINE_DIR/plan.json"
 bin/nvkr run plan --plan "$NVKR_PIPELINE_DIR/plan.json"
 ```
@@ -40,12 +40,12 @@ intended work; it does not establish that the step succeeded.
 ```sh
 mkdir "$NVKR_PIPELINE_DIR/generated"
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_PIPELINE_DIR/generated"
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_PIPELINE_DIR/generated" --check
 ```
 

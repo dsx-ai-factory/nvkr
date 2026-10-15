@@ -62,7 +62,7 @@ you finish reviewing it; the script does not remove it automatically.
 The script prints the actual reference, digests, paths and timings. Use those values during a presentation;
 historical node counts, workspace names and digests are not stable expectations for the current model.
 
-Inspect [the NVKE inputs](../definitions/nvke-v1/README.md) to show the authorship split: Definition owns the
+Inspect [the NVKE inputs](../docs/examples/nvke-tutorial/README.md) to show the authorship split: Definition owns the
 output selection and packaging; Environment owns runtime, publication namespace, credentials and signing identity. The catalog owns source,
 tool and action pins; the Definition selects tools by purpose. Compiler output
 contains the package graph and publication envelope, so users do not wire those records manually. There are no

@@ -17,7 +17,7 @@ import (
 // ff21ba8c07cafff74b68e238a8876af11e5beded, kubeadm-distro's AMD64 v1.36.3 lock.
 // This freezes membership and logical pins, not publication or measured runtime.
 func TestMaintainedOperatorInputMembership(t *testing.T) {
-	const inputRoot = "../../../definitions/nvke-m2"
+	const inputRoot = "../../../inputs/definitions/nvke"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -29,14 +29,14 @@ func TestMaintainedOperatorInputMembership(t *testing.T) {
 		}
 		found++
 		if output.Platform != "linux/amd64" || output.Format != definition.OutputExecutable ||
-			output.Catalog == nil || output.Catalog.Base != "./catalog" || !slices.Equal(output.Components, []string{"helm", "kubectl"}) {
+			output.Catalog == nil || output.Catalog.Base != "../../catalogs/tools/operator-amd64" || !slices.Equal(output.Components, []string{"helm", "kubectl"}) {
 			t.Fatalf("operator output differs from its explicit formal-v1 selection: %+v", output)
 		}
 	}
 	if found != 1 {
 		t.Fatalf("got %d operator outputs, want one explicit native selection", found)
 	}
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(inputRoot, "catalog")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(inputRoot, "../../catalogs/tools/operator-amd64")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestMaintainedOperatorInputMembership(t *testing.T) {
 }
 
 func TestMaintainedOperatorExecutableGraph(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-m2/catalog"))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/tools/operator-amd64"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,12 +23,12 @@ func TestSDKLifecyclePreparationIsOpaqueAndDryRunHasNoOutput(t *testing.T) {
 	t.Chdir(repo)
 	sdk := client.New()
 	ctx := context.Background()
-	prepared, err := sdk.PrepareLifecycleRun(ctx, "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "sdk-attempt")
+	prepared, err := sdk.PrepareLifecycleRun(ctx, "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", "sdk-attempt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	original := prepared.Description()
-	definition, err := sdk.LoadDefinition(ctx, "definitions/nvke-v1/definition.yaml")
+	definition, err := sdk.LoadDefinition(ctx, "docs/examples/nvke-tutorial/definition.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

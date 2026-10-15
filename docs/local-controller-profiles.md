@@ -19,9 +19,9 @@ replace those checks.
 
 ## Content and delivery
 
-The [catalog](../definitions/nvke-local-dev-arm64/profiles-catalog/registry.yaml)
+The [catalog](../inputs/catalogs/controller-profiles/nvidia-arm64/registry.yaml)
 selects pinned NVKE config profiles and runbooks. Its authenticated
-[local data overlay](../definitions/nvke-local-dev-arm64/profiles-catalog/patches/local-profile.patch)
+[local data overlay](../inputs/catalogs/controller-profiles/nvidia-arm64/patches/local-profile.patch)
 **only adds** a plain Ubuntu 26.04 ARM64 profile: cloud-init, metadata and iPXE
 configuration. It changes no upstream NVKE file and adds no build script.
 
@@ -65,10 +65,10 @@ deployment remain unverified; the older data-bundle recording does not prove the
 
 ## Dual-platform fixture image
 
-The [controller profiles Definition](../definitions/nvke-controller/definition-profiles.yaml)
+The [controller profiles Definition](../inputs/definitions/diagnostics/controller-profiles.yaml)
 packages the pinned NVKE test fixtures for both Linux AMD64 and ARM64,
 with native image members collected into one OCI index. The
-[deploy Definition](../definitions/nvke-deploy/definition.yaml) selects this image
+[deploy Definition](examples/nvke-deploy/definition.yaml) selects this image
 alongside the controller and charts. It preserves the upstream fixture profiles,
 including placeholder deployment URLs; it is not a fleet profile configuration.
 The local Ubuntu 26.04 diagnostic profile remains ARM64-only.

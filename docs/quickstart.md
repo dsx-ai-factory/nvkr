@@ -140,13 +140,13 @@ This small NVKE Definition requests `nvkectl`, `cwe`, and `nvke-helm`; the chart
 These preview commands need only the CLI you built above, with no Docker, registry, or NVKE source checkout:
 
 ```sh
-bin/nvkr definition validate --definition definitions/nvke-v1/definition.yaml
+bin/nvkr definition validate --definition docs/examples/nvke-tutorial/definition.yaml
 bin/nvkr run plan \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml
 bin/nvkr run local \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt quickstart-preview --dry-run
 ```
 

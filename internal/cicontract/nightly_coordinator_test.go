@@ -64,7 +64,7 @@ func nightlyCoordinatorFixture(t *testing.T) (nightlyCoordinatorDocument, []map[
 	if err := yaml.UnmarshalStrict(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
-	raw, err = os.ReadFile("../../definitions/nightly-profiles.json")
+	raw, err = os.ReadFile("../../inputs/testing/nightly-profiles.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,10 +207,10 @@ func TestNightlyCoordinatorSelectionFailsClosedBeforeDispatch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Mkdir(filepath.Join(root, "definitions"), 0o700); err != nil {
+			if err := os.MkdirAll(filepath.Join(root, "inputs/testing"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(root, "definitions/nightly-profiles.json"), raw, 0o600); err != nil {
+			if err := os.WriteFile(filepath.Join(root, "inputs/testing/nightly-profiles.json"), raw, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			output := filepath.Join(root, "outputs")

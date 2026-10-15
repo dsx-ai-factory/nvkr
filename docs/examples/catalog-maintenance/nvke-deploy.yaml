@@ -1,11 +1,11 @@
 apiVersion: nvkr.dev/catalog-maintenance/v1
 name: nvke-deploy
-catalog: definitions/nvke-controller/catalog
+catalog: inputs/catalogs/nvke/release
 sources: [nvke, nvke-helm]
 sameRelease:
   - [nvke, nvke-helm]
-definition: definitions/nvke-deploy/definition.yaml
-environment: definitions/nvke-deploy/environment-github.yaml
+definition: docs/examples/nvke-deploy/definition.yaml
+environment: docs/examples/nvke-deploy/environment-github.yaml
 # The hosted Environment declares sourceAccess; local execution rejects it.
 # This example produces a review patch without a producer-execution claim.
 validation: static

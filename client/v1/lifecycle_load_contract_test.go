@@ -16,7 +16,7 @@ import (
 )
 
 func TestSDKEnvironmentLoadPreservesDocumentIdentity(t *testing.T) {
-	path := filepath.Join("..", "..", "definitions", "nvke-v1", "environment-local.yaml")
+	path := filepath.Join("..", "..", "docs/examples/nvke-tutorial/environment-local.yaml")
 	want, err := lifecycle.LoadEnvironment(t.Context(), path)
 	if err != nil {
 		t.Fatal(err)

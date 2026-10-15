@@ -13,7 +13,7 @@ registries and renamed hosted configuration are already provisioned.
 | Framework configuration, environment and schema namespace | `.nvkr`, `NVKR_*`, `nvkr.dev` |
 | Structured digest families | `nvkr.*` |
 | Generated workflow and ownership records | `nvkr-run.yml`, `.github/nvkr-run` |
-| Downstream product and maintained inputs | NVKE, `definitions/nvke-*` |
+| Downstream product and maintained inputs | NVKE, `inputs/` (see the [input layout](input-layout-migration.md)) |
 | Local downstream demo | `nvke-demo`, `internal/nvkedemo` |
 
 ## Identities and generated files

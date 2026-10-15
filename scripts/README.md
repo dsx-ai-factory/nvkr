@@ -21,7 +21,7 @@ completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
 host through Colima; this is not a native Darwin build.
 
 `nvke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
-[focused selections](../definitions/nvke-local-dev-arm64/README.md);
+[focused selections](../inputs/definitions/demo/README.md);
 `--check LANE` performs diagnostics only. The full demo compiles binaries once and shares
 one measured Packer toolchain, including Helm 4.2.4 and ORAS 1.3.3. Profiles are
 data bundles, not a separate container image. No publication/signing is enabled.
@@ -34,7 +34,7 @@ a [full source-built distribution](../docs/full-nvke-source-build.md).
 
 ```sh
 # Plan only: validates and creates no attempt storage.
-nvkr run plan --definition definitions/nvke-v1/definition.yaml --environment definitions/nvke-v1/environment-local.yaml
+nvkr run plan --definition docs/examples/nvke-tutorial/definition.yaml --environment docs/examples/nvke-tutorial/environment-local.yaml
 
 # Local execution; Docker, Go and acquisition/build network access are required.
 # Despite its historical name, the M1 script executes CLI + CWE + Helm.
@@ -69,7 +69,7 @@ Use a different immutable attempt name for each run. The historical Podman
 does not validate a current maintained route.
 The [ARC evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
 Docker/KVM builds and boot smoke at an earlier exact commit, not validation of the latest changes.
-See the [Definition guide](../definitions/nvke-os/README.md) for route requirements and limitations.
+See the [Definition guide](../inputs/definitions/diagnostics/README.md) for route requirements and limitations.
 Set `NVKE_LOCAL_CLONE` to reuse an exact local NVKE checkout, accessible at the
 same absolute path to the native Linux runner and Docker daemon.
 

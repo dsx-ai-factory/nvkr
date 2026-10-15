@@ -11,11 +11,11 @@ import (
 )
 
 func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
-	candidate, err := definition.LoadEnvironment(t.Context(), "../../../definitions/nvke-m2/environment-github.yaml")
+	candidate, err := definition.LoadEnvironment(t.Context(), "../../../inputs/environments/github-release.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	production, err := definition.LoadEnvironment(t.Context(), "../../../definitions/nvke-v1/environment-github.yaml")
+	production, err := definition.LoadEnvironment(t.Context(), "../../../docs/examples/nvke-tutorial/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -21,8 +21,8 @@ import (
 // They are not framework requirements for customer catalogs or component names.
 func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 	for _, tc := range []struct{ catalog, component, artifact string }{
-		{"../../../definitions/nvke-controller/catalog", "nvke-controller-chart", "charts/nke-controller-0.1.1.tgz"},
-		{"../../../definitions/nvke-local-dev-arm64/site-catalog", "nvke-controller-chart", "charts/nke-controller-0.0.0.tgz"},
+		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nke-controller-0.1.1.tgz"},
+		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nke-controller-0.0.0.tgz"},
 	} {
 		t.Run(tc.catalog, func(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(tc.catalog, "registry.yaml"))
@@ -46,7 +46,7 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 }
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
-	const inputRoot = "../../../definitions/nvke-m2"
+	const inputRoot = "../../../inputs/definitions/nvke"
 	const approvedSource = "ff21ba8c07cafff74b68e238a8876af11e5beded"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {

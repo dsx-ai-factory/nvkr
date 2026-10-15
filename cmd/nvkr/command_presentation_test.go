@@ -216,8 +216,8 @@ func TestGraphAndComparisonProjectionExcludeTransportAndRawValues(t *testing.T) 
 func TestRootCommandTypedResultsAndDefaultBytes(t *testing.T) {
 	lifecycleCommandRepo(t)
 	for _, args := range [][]string{
-		{"definition", "validate", "--definition", "definitions/nvke-v1/definition.yaml"},
-		{"definition", "inspect", "--definition", "definitions/nvke-v1/definition.yaml"},
+		{"definition", "validate", "--definition", "docs/examples/nvke-tutorial/definition.yaml"},
+		{"definition", "inspect", "--definition", "docs/examples/nvke-tutorial/definition.yaml"},
 		{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--view", "producers"},
 		{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", ".github/nvkr-run/plan.json", "--exit-code"},
 		{"resolve", "--data", "testdata/catalogs/kubernetes-layered", "--component", "kubectl", "--platform", "linux/amd64"},

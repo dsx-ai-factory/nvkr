@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-os-amd64-kvm
+  description: Build the AMD64 non-FDE NVKE node QCOW2 on a native KVM host.
+catalog:
+  base: ../../catalogs/node-images/diagnostic
+outputs:
+  - name: nvke-node-image-amd64
+    platform: linux/amd64
+    format: disk-image
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-image-amd64
+      - nvke-patched-installer-iso-amd64
+      - nvke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso-amd64

@@ -41,14 +41,14 @@ artifact and tool inputs. The Environment supplies where and how the work execut
 
 ```sh
 bin/nvkr --version
-bin/nvkr catalog list --data definitions/nvke-local-dev-arm64/cli-catalog
-bin/nvkr catalog source-pin --data definitions/nvke-local-dev-arm64/cli-catalog nvke
-bin/nvkr definition inspect --definition definitions/nvke-local-dev-arm64/definition.json
+bin/nvkr catalog list --data inputs/catalogs/nvke/module-cli-arm64
+bin/nvkr catalog source-pin --data inputs/catalogs/nvke/module-cli-arm64 nvke
+bin/nvkr definition inspect --definition inputs/definitions/demo/arm64-nvidia-tcg.json
 ```
 
-Open `definitions/nvke-local-dev-arm64/definition.json` first, then the selected catalog stacks'
-`registry.yaml` and `pins.lock.yaml`, the authored `os-tcg.json` overlay, and
-`environment-local-docker.json`. The Go `e2e --walkthrough` opening lists these paths relative to `--repo`. Say: “A customer can choose components, update pins or replace a producer,
+Open `inputs/definitions/demo/arm64-nvidia-tcg.json` first, then the selected catalog stacks'
+`registry.yaml` and `pins.lock.yaml`, the authored `inputs/catalogs/node-images/variants/nvidia-tcg.json` overlay, and
+`inputs/environments/local-arm64-tcg.json`. The Go `e2e --walkthrough` opening lists these paths relative to `--repo`. Say: “A customer can choose components, update pins or replace a producer,
 then review the effect before execution. Here the full Definition requests 29 named outputs: OS, CLI, services, providers, charts, tools, profiles and simulator.”
 
 If asked about recipes: “The reusable recipe is a catalog producer. The current schema selects it

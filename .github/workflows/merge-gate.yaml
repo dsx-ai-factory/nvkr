@@ -124,7 +124,8 @@ jobs:
               - 'cmd/**'
               - 'internal/**'
               - 'pkg/**'
-              - 'definitions/**'
+              - 'inputs/**'
+              - 'docs/examples/**'
               - 'scripts/**'
               - 'demos/**'
               - 'testdata/**'
@@ -153,7 +154,7 @@ jobs:
               # Everything `run generate` consumes or emits, plus the files that
               # define the check itself, so a change to the gate cannot skip the
               # gate it changes.
-              - 'definitions/**'
+              - 'inputs/**'
               - '.github/workflows/nvkr-run.yml'
               - '.github/nvkr-run/**'
               - '.github/workflows/nvkr-run-*.yml'

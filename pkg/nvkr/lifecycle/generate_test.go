@@ -21,9 +21,9 @@ func TestGenerateFilesUsesLifecycleInputsForSupportedHostedEngines(t *testing.T)
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	definition := "definitions/nvke-v1/definition.yaml"
+	definition := "docs/examples/nvke-tutorial/definition.yaml"
 	environments := map[string]string{
-		factory.EngineGitHub: "definitions/nvke-v1/environment-github.yaml",
+		factory.EngineGitHub: "docs/examples/nvke-tutorial/environment-github.yaml",
 	}
 	for engine, environment := range environments {
 		t.Run(engine, func(t *testing.T) {

@@ -113,7 +113,7 @@ NVKR validates that selection against the catalog graph; the list is not positio
 NVKR checks and stages the input bytes. NVKE's source-owned commands understand the packages and
 archives, and Packer assembles the disk. Use the [Materials concept](demo-team-concepts.html#materials)
 for the full explanation. The separate OS script compiles and dry-runs the Plan; it does not bake a disk.
-Actual disk execution requires the matching host capabilities in the [OS-image guide](../definitions/nvke-os/README.md).
+Actual disk execution requires the matching host capabilities in the [OS-image guide](../inputs/definitions/diagnostics/README.md).
 
 ## Browse the hosted release
 

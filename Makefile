@@ -219,14 +219,14 @@ workflows-check: workflow-generator pipeline-dev-check ## Check committed produc
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy definitions/nvke-m2/qualification.yaml --root . --check
+		--qualification-policy inputs/policies/nvke-qualification.yaml --root . --check
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-arm64/definition.json \
-		--environment definitions/nvke-nightly-arm64/environment-github.json \
+		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
+		--environment inputs/environments/github-nightly-nvidia.json \
 		--root . --check
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
-		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json \
+		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
+		--environment inputs/environments/github-nightly-upstream.json \
 		--root . --check
 
 .PHONY: workflows-generate
@@ -235,26 +235,26 @@ workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate produ
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy definitions/nvke-m2/qualification.yaml \
+		--qualification-policy inputs/policies/nvke-qualification.yaml \
 		--root .
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-arm64/definition.json \
-		--environment definitions/nvke-nightly-arm64/environment-github.json --root .
+		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
+		--environment inputs/environments/github-nightly-nvidia.json --root .
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
-		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json --root .
+		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
+		--environment inputs/environments/github-nightly-upstream.json --root .
 
 .PHONY: pipeline-dev-generate
 pipeline-dev-generate: workflow-generator ## Regenerate the full feature-branch development pipeline.
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-m2/definition.yaml \
-		--environment definitions/nvke-m2/environment-github-dev.yaml --root .
+		--definition inputs/definitions/nvke/definition.yaml \
+		--environment inputs/environments/github-development.yaml --root .
 
 .PHONY: pipeline-dev-check
 pipeline-dev-check: workflow-generator ## Check development workflow generation without changing files.
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-m2/definition.yaml \
-		--environment definitions/nvke-m2/environment-github-dev.yaml --root . --check
+		--definition inputs/definitions/nvke/definition.yaml \
+		--environment inputs/environments/github-development.yaml --root . --check
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).

@@ -69,9 +69,10 @@ The [documentation map](docs/README.md) connects the next steps:
 | Find outputs and verify a published claim | [Release quickstart](docs/release-quickstart.md) |
 | Look up terminology and features | [Concept reference](docs/user-concepts.md) |
 
-The [tutorial Definition](definitions/nvke-v1/README.md) selects the CLI, CWE image, and Helm bundle.
-The [combined NVKE candidate](definitions/nvke-m2/README.md) selects 34 outputs, including AMD64 and ARM64
+The [tutorial Definition](docs/examples/nvke-tutorial/README.md) selects the CLI, CWE image, and Helm bundle.
+The [combined NVKE candidate](inputs/definitions/nvke/README.md) selects 69 outputs, including AMD64 and ARM64
 container and node images, and supplies the repository's generated GitHub workflow.
+The [input index](inputs/README.md) separates distribution, demo, diagnostic, catalog and execution-policy inputs.
 
 ## Use NVKR with your AI agent
 

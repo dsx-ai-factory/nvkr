@@ -2,7 +2,7 @@
 
 Translate the requested outcome into named outputs and supported capabilities before choosing files. Read the
 selected revision's [catalog guide](../../../../docs/catalogs-and-components.md), [concept
-reference](../../../../docs/user-concepts.md), and the nearest maintained example. Consult
+reference](../../../../docs/user-concepts.md), [input index](../../../../inputs/README.md), and the nearest maintained example. Consult
 [reconciliation](../../../../docs/adr/reconciliation.md) for execution/evidence limits. Customer requests for
 "recipes" usually mean catalog producers; do not introduce a retired authored Recipe schema.
 
