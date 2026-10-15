@@ -75,19 +75,10 @@ container and node images, and supplies the repository's generated GitHub workfl
 
 ## Use NVKR with your AI agent
 
-See [Use NVKR with your AI agent](docs/use-with-agents.md) for copyable prompts and supported setup.
-Give a terminal-capable agent this repository URL and a concrete task, for example:
+See [Use NVKR with Your AI Agent](docs/use-with-agents.md) for copyable prompts and supported setup.
 
-> Use https://github.com/dsx-ai-factory/nvkr to create inputs for a Linux ARM64 NVKE CLI
-> executable. Show the Plan and changes before running anything.
-
-The [NVKR operator skill](.agents/skills/nvkr-operator/SKILL.md) guides the agent through
-safe repository acquisition, the pinned CLI build, customer input authoring, and supported
-operations. It can create or update Definitions, Environments, catalog producers, pins and
-overlays, then validate and explain their effects through the CLI. Codex supports discovery
-at this repository skill location after checkout. Claude Code uses a different project-skill
-location; it and other agents can read this linked file directly.
-No global installation is necessary. A URL alone does not request an artifact build or publication.
+The [NVKR operator skill](.agents/skills/nvkr-operator/SKILL.md) supplies the agent instructions.
+Point your agent at it directly if it does not discover the skill.
 
 ## Current scope
 
