@@ -192,15 +192,21 @@ func diagnosticSourceError(ctx context.Context, err error) error {
 
 // Only container execution preserves a positive child process exit status.
 func diagnosticError(ctx context.Context, err error) error {
-	if ctx.Err() != nil {
+	var coded *e.Error
+	classified := errors.As(err, &coded)
+	// Pipeline classifies cancellation when execution ends. A later caller
+	// cancellation during cleanup must not replace that completed outcome.
+	if classified && coded.Code == e.CodeTimeout {
+		return err
+	}
+	if !classified && ctx.Err() != nil {
 		return e.Wrap(e.CodeTimeout, ctx.Err(), "artifact diagnostic canceled")
 	}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) && exit.ExitCode() > 0 {
 		return &githubStepExitError{status: exit.ExitCode(), cause: e.Wrap(e.CodeBuildFailed, err, "artifact diagnostic process failed")}
 	}
-	var coded *e.Error
-	if errors.As(err, &coded) {
+	if classified {
 		return err
 	}
 	return e.Wrap(e.CodeBuildFailed, err, "artifact diagnostic failed")

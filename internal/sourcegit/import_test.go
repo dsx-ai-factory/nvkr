@@ -145,3 +145,40 @@ func TestImportLocalWorkspaceOnSeparateFilesystem(t *testing.T) {
 		})
 	}
 }
+
+func TestImportLocalRepositoryIsRemoteAddPositional(t *testing.T) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
+	for _, repository := range []string{"https://example.invalid/source", "-review@host:repository"} {
+		t.Run(repository, func(t *testing.T) {
+			root := t.TempDir()
+			marker := filepath.Join(root, "origin.txt")
+			// Run real Git through init/remote-add, then record the stored URL
+			// and refuse fetch locally. No network or SSH client is invoked.
+			script := "#!/bin/sh\nprevious= directory=\nfor argument do\n" +
+				"  if [ \"$previous\" = -C ]; then directory=$argument; fi\n" +
+				"  if [ \"$argument\" = fetch ]; then\n" +
+				"    " + quote(git) + " -C \"$directory\" config --get remote.origin.url > " + quote(marker) + " || exit 98\n" +
+				"    exit 42\n  fi\n  previous=$argument\ndone\nexec " + quote(git) + " \"$@\"\n"
+			if err := os.WriteFile(filepath.Join(root, "git"), []byte(script), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			destination := filepath.Join(root, "nvke")
+			err := ImportLocal(t.Context(), []string{"PATH=" + root + string(os.PathListSeparator) + os.Getenv("PATH")}, destination, repository, strings.Repeat("a", 40), strings.Repeat("b", 40), io.Discard)
+			var exit *exec.ExitError
+			if errorCode(err) != e.CodeFetchFailed || !errors.As(err, &exit) || exit.ExitCode() != 42 {
+				t.Fatalf("repository became an option or passed the fetch guard: %v", err)
+			}
+			stored, readErr := os.ReadFile(marker)
+			if readErr != nil || strings.TrimSpace(string(stored)) != repository {
+				t.Fatalf("remote URL changed: %q %v", stored, readErr)
+			}
+			if _, err := os.Stat(destination); !os.IsNotExist(err) {
+				t.Fatal("refused fetch published source", err)
+			}
+		})
+	}
+}

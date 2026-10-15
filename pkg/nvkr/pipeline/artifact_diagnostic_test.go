@@ -4,6 +4,7 @@
 package pipeline
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"io"
@@ -17,6 +18,14 @@ import (
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func unexpectedArtifactCleanup(t *testing.T) reaperCleanupCommand {
+	t.Helper()
+	return func(context.Context, time.Duration, string, *heldRuntimeExecutable, []string) error {
+		t.Error("successful invocation requested cleanup")
+		return nil
+	}
+}
 
 func TestArtifactDiagnosticIsolationAndCommands(t *testing.T) {
 	for _, suite := range []string{"contract", "cli"} {
@@ -37,7 +46,7 @@ func TestArtifactDiagnosticIsolationAndCommands(t *testing.T) {
 				}
 				return nil
 			}
-			if err := runArtifactDiagnostic(t.Context(), input, io.Discard, io.Discard, run); err != nil {
+			if err := runArtifactDiagnostic(t.Context(), input, io.Discard, io.Discard, run, unexpectedArtifactCleanup(t)); err != nil {
 				t.Fatal(err)
 			}
 			if len(commands) != 2 {
@@ -49,6 +58,26 @@ func TestArtifactDiagnosticIsolationAndCommands(t *testing.T) {
 			}
 			if !reflect.DeepEqual(acquire[len(acquire)-4:], []string{input.Image, "go", "mod", "download"}) {
 				t.Fatal(acquire)
+			}
+			for _, command := range [][]string{acquire, offline} {
+				for flag, value := range map[string]string{"--cap-drop": "ALL", "--security-opt": "no-new-privileges", "--platform": input.Platform} {
+					index := slices.Index(command, flag)
+					if index < 0 || index+1 >= len(command) || command[index+1] != value {
+						t.Fatalf("missing exact %s %s pair", flag, value)
+					}
+				}
+				for _, value := range []string{"GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=-mod=readonly -modcacherw", "CGO_ENABLED=0", "GOCACHE=/cache/go-build", "GOPATH=/cache/go", "HOME=/tmp"} {
+					index := slices.Index(command, value)
+					if index <= 0 || command[index-1] != "--env" {
+						t.Fatalf("missing exact --env %s pair", value)
+					}
+				}
+			}
+			if index := slices.Index(offline, "--network"); index < 0 || index+1 >= len(offline) || offline[index+1] != "none" {
+				t.Fatal("offline execution lost --network none")
+			}
+			if !slices.Contains(offline, "GO_TEST_FLAGS=-count=1 -timeout=15m -json") {
+				t.Fatal("upstream test flags changed")
 			}
 			for _, expected := range []string{"--read-only", "ALL", "no-new-privileges", "none", "GOPROXY=off", "GO=go", "NVKECTL=/artifact/nvkectl", "NVKECTL_EXPECTED_VERSION=v1", "linux/arm64"} {
 				if !slices.Contains(offline, expected) {
@@ -77,6 +106,9 @@ func TestArtifactDiagnosticIsolationAndCommands(t *testing.T) {
 					t.Fatal(mounts)
 				}
 			}
+			if !reflect.DeepEqual(mounts["dst=/cache"], []string{"type=bind", "src=" + filepath.Join(workspace, "cache"), "dst=/cache"}) {
+				t.Fatal("writable cache mount changed", mounts)
+			}
 			entries, err := os.ReadDir(filepath.Join(workspace, "cache"))
 			if err != nil || len(entries) != 0 {
 				t.Fatal("cache not initially empty", err)
@@ -95,19 +127,18 @@ func TestArtifactDiagnosticCleanupAndPrimaryFailure(t *testing.T) {
 			primary := errors.New("primary process failure")
 			calls, cleaned := 0, 0
 			err := runArtifactDiagnostic(t.Context(), ArtifactDiagnostic{Workspace: t.TempDir(), Image: "image", Version: "v1", Platform: "linux/amd64", Suite: "contract"}, io.Discard, io.Discard,
-				func(opts RunOptions, args ...string) error {
-					if args[0] == "rm" {
-						cleaned++
-						if opts.ctx().Err() != nil {
-							t.Fatal("cleanup canceled")
-						}
-						return errors.New("cleanup failure")
-					}
+				func(_ RunOptions, _ ...string) error {
 					calls++
 					if calls == phase {
 						return primary
 					}
 					return nil
+				}, func(ctx context.Context, grace time.Duration, runtime string, _ *heldRuntimeExecutable, names []string) error {
+					cleaned++
+					if ctx.Err() != nil || grace <= 0 || grace > reaperTerminationGrace || runtime != "docker" || len(names) != 1 {
+						t.Error("cleanup lost its independent context, reserved grace or owned name")
+					}
+					return errors.New("cleanup failure")
 				})
 			if !errors.Is(err, primary) || cleaned != 1 {
 				t.Fatalf("error=%v cleaned=%d", err, cleaned)
@@ -119,13 +150,12 @@ func TestArtifactDiagnosticCleanupAndPrimaryFailure(t *testing.T) {
 func TestArtifactDiagnosticTimeoutCleanup(t *testing.T) {
 	cleaned := false
 	err := runArtifactDiagnostic(t.Context(), ArtifactDiagnostic{Workspace: t.TempDir(), Image: "image", Version: "v1", Platform: "linux/amd64", Suite: "contract", Timeout: time.Millisecond}, io.Discard, io.Discard,
-		func(opts RunOptions, args ...string) error {
-			if args[0] == "rm" {
-				cleaned = true
-				return opts.ctx().Err()
-			}
+		func(opts RunOptions, _ ...string) error {
 			<-opts.ctx().Done()
 			return opts.ctx().Err()
+		}, func(ctx context.Context, _ time.Duration, _ string, _ *heldRuntimeExecutable, _ []string) error {
+			cleaned = true
+			return ctx.Err()
 		})
 	var coded *e.Error
 	if !errors.As(err, &coded) || coded.Code != e.CodeTimeout || !cleaned {
@@ -154,7 +184,7 @@ func TestArtifactDiagnosticIndependentWorkspaceNames(t *testing.T) {
 					}
 				}
 				return nil
-			})
+			}, unexpectedArtifactCleanup(t))
 		if err != nil || name == "" || names[name] {
 			t.Fatalf("invocations share container ownership: %q %v", name, err)
 		}

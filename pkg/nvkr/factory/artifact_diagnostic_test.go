@@ -216,3 +216,24 @@ func TestArtifactDiagnosticSourcePhaseCodes(t *testing.T) {
 		t.Fatalf("suite exit not preserved: %d", got)
 	}
 }
+
+func TestArtifactDiagnosticCompletedExecutionSurvivesCleanupCancellation(t *testing.T) {
+	childErr := exec.CommandContext(t.Context(), "sh", "-c", "exit 7").Run()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, test := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"completed-exit", e.Wrap(e.CodeBuildFailed, childErr, "completed before cleanup"), 7},
+		{"execution-timed-out", e.Wrap(e.CodeTimeout, childErr, "execution canceled"), e.ExitCode(e.New(e.CodeTimeout, ""))},
+		{"unclassified-cancellation", childErr, e.ExitCode(e.New(e.CodeTimeout, ""))},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := GitHubStepExitCode(diagnosticError(ctx, test.err)); got != test.want {
+				t.Fatalf("completed execution reclassified during cleanup: got %d want %d", got, test.want)
+			}
+		})
+	}
+}

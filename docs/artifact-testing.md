@@ -50,6 +50,9 @@ Each dependency/test container has a 30-minute timeout (`--timeout` overrides
 that per-container bound). Each source Git command has its own fixed 30-minute
 bound; `--timeout` does not shorten fetch. Cancellation stops
 and joins the client and requests container removal; removal is best effort.
+Removal uses the existing reaper's separate two-second budget with reserved
+termination grace. The execution outcome is captured before cleanup, so a later
+deadline during cleanup cannot replace an already-completed process failure.
 
 Source import uses the existing Go local-source policy: global credential helpers
 are projected only into fetch; ambient Git routing, hooks, filters and configuration

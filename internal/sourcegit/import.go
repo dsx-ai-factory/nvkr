@@ -61,7 +61,7 @@ func ImportLocal(ctx context.Context, environment []string, directory, repositor
 		}
 		return strings.TrimSpace(output.String()), nil
 	}
-	for _, args := range [][]string{{"init", "--quiet"}, {"remote", "add", "origin", repository},
+	for _, args := range [][]string{{"init", "--quiet"}, {"remote", "add", "--", "origin", repository},
 		{"fetch", "--depth=1", "--no-tags", "origin", commit}, {"checkout", "--detach", commit}} {
 		if _, err := query(args...); err != nil {
 			return err
