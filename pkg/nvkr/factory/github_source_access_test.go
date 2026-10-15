@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,82 @@ import (
 	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
+
+func TestNightlyOVNFetchReceivesSelectedSourceCredential(t *testing.T) {
+	for _, test := range []struct {
+		profile, source string
+		private         bool
+	}{
+		{"nvke-nightly-arm64", "https://github.com/dsx-ai-factory/ovn-kubernetes", true},
+		{"nvke-nightly-upstream-ovn-arm64", "https://github.com/ovn-kubernetes/ovn-kubernetes", false},
+	} {
+		t.Run(test.profile, func(t *testing.T) {
+			root := "../../.."
+			plan, err := LoadPlanContext(t.Context(), filepath.Join(root, ".github/nvkr-run-"+test.profile, "plan.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.Environment, err = authored.LoadEnvironment(t.Context(), filepath.Join(root, plan.EnvironmentPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan.EnvironmentDigest, err = plan.Environment.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			_, nodeJobs, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := 0
+			for _, node := range plan.Graph.Nodes {
+				if node.Kind != NodeFetch {
+					continue
+				}
+				selected := false
+				for _, build := range plan.Builds {
+					for _, source := range build.Graph.Nodes {
+						selected = selected || build.Name == node.BuildTarget && source.ID == node.IRNode && source.Repo == test.source
+					}
+				}
+				if !selected {
+					continue
+				}
+				found++
+				job := document.Jobs[nodeJobs[node.ID]]
+				if job.Env[sourceTokenEnv] != "" {
+					t.Fatal("source token escaped into the whole job")
+				}
+				tokenSteps := 0
+				for _, step := range job.Steps {
+					if step.Env[sourceTokenEnv] == "" {
+						continue
+					}
+					tokenSteps++
+					if step.Env[sourceTokenEnv] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
+						step.Env["GIT_CONFIG_KEY_2"] != "credential."+test.source+".helper" {
+						t.Fatal("OVN fetch does not receive the selected repository-scoped token")
+					}
+				}
+				want := 0
+				if test.private {
+					want = 1
+				}
+				if tokenSteps != want {
+					t.Fatalf("OVN source %s has %d credential-bearing steps, want %d", test.source, tokenSteps, want)
+				}
+			}
+			if found == 0 {
+				t.Fatal("maintained nightly Plan has no selected OVN source fetch")
+			}
+		})
+	}
+}
 
 func authenticatedSourcePlan(t *testing.T) (*Plan, Node, string) {
 	t.Helper()

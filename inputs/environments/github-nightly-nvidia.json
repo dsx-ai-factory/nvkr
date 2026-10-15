@@ -42,6 +42,10 @@
     "mode": "cosign"
   },
   "sourceAccess": {
+    "https://github.com/dsx-ai-factory/ovn-kubernetes": {
+      "credentialRef": "github:NKE_SOURCE_TOKEN",
+      "mirror": "https://github.com/dsx-ai-factory/ovn-kubernetes"
+    },
     "https://github.com/dsx-ai-factory/nvke": {
       "credentialRef": "github:NKE_SOURCE_TOKEN",
       "mirror": "https://github.com/dsx-ai-factory/nvke"

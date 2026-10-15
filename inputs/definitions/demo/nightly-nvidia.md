@@ -28,6 +28,9 @@ The workflow namespace is `nvke-nightly-arm64`; its exact main-branch signing id
 the Environment. Publication uses `ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64`.
 These are authored candidate settings, not evidence of available runners, protected-environment
 admission, completed publication, runtime compatibility, FIPS/STIG compliance or qualification.
+The exact private OVN fork and NVKE source-access bindings pass the existing
+`NKE_SOURCE_TOKEN` only to their selected fetch steps. Public upstream OVN does
+not receive that binding.
 
 Validate and regenerate through the existing owner:
 
@@ -50,4 +53,6 @@ vulnerability-clearance claim. The suite and all four site-product sources selec
 selection and candidate-input fixes. This candidate comes from open NVKE PR #1580;
 it is not a merged-main or human-approval claim. The shared revision follows ADR-23's
 proposed matching-revision rule without establishing overall interface adoption.
-The first combined nightly cycle remains unrecorded.
+The [first scheduled attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/38676875690)
+failed during producer execution and skipped runtime tests. A successful combined
+cycle remains unrecorded; see the [nightly guide](../../../docs/nvke-nightly.md).

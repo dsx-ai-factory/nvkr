@@ -216,7 +216,8 @@ an exact observed version: equal names with unknown versions do not prove identi
 Per-material mixed scanner/package-reader/file-walk documents use the descriptive `disk-content/v1`
 inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operation uses
 `disk-reconciled/v1` with an `operating-system` subject. File dependency inventories are admitted only
-for these per-artifact disk methods, not ordinary Helm/Syft dependency documents. Source declarations
+for these per-artifact disk methods and the separately scoped `archive-content/v1` method below,
+not ordinary Helm/Syft dependency documents. Source declarations
 cannot relabel the inspected disk subject. This is descriptive vocabulary validation: neither a subject
 type nor a method string restores a runtime receipt or grants publication authority.
 
@@ -417,11 +418,34 @@ documents describe the observed archive before image-binding/package transformat
 are admitted to this reader only when the compiled output, acquisition producer, and resolved component
 all identify the same acquired Helm chart; other raw formats remain unsupported.
 
+Generic source tarballs selected as assets in an executable output use the explicit
+`archive-content/v1` method. The exact resolved component must declare `tarball`,
+belong to that output and have no Helm packaging declaration. This selection is
+compiled from declarations, never guessed from a filename or used as a fallback
+after a Helm failure. Other output formats retain their existing inspection paths.
+The archive reader uses the standard library's tar/gzip decoders over held bytes
+checked against the producer digest. It hashes every regular member without
+extracting files or executing a scanner. A document has an exact file subject,
+the original tarball output-type binding, nonempty file components with canonical
+relative member names and SHA-256 hashes, and no scanner identity, package URLs
+or inferred versions. This describes archive contents, not package discovery,
+installed contents or transitive dependency coverage.
+
+The reader bounds expansion to 256 MiB, individual members to 64 MiB and returned
+member entries to 65,536. The expansion budget includes metadata headers and padding. It checks
+the entire compressed stream and rejects malformed data, unsafe or duplicate
+paths, conflicting file/directory paths, links, sparse and special files, nonzero
+trailing content and archives with no regular members. Reads remain cancelable.
+The serialized document validator and the shared packaging/finalization join
+preserve this method's scope; an archive inventory cannot satisfy Helm metadata,
+Syft package discovery or reconciled disk requirements.
+
 Per-artifact documents keep the subject in `metadata.component` and use `components` for discovered packages
-or declared chart dependencies. Stable `bom-ref` values distinguish versions with the same name. Root dependency
+or declared chart dependencies; the explicit archive method instead records member files.
+Stable `bom-ref` values distinguish versions with the same name. Root dependency
 edges cover the inventory; they assert artifact inclusion/reference, not invented package-to-package call graphs.
 The index binds the populated document digest. Hosted finalization rejects missing dependency inventories and
-wrong subject/scanner bindings when inspection was requested. This is package discovery, not vulnerability scanning
+wrong subject/scanner bindings when inspection was requested. Package discovery and descriptive archive inventory are not vulnerability scanning
 or qualified reproduction. It does not claim dependencies absent from artifact metadata can be discovered.
 
 SBOMs assert composition. Packaging requires each exact output's SBOM set and producer record

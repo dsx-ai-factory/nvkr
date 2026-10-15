@@ -18,8 +18,8 @@ This is downstream repository CI test infrastructure outside NVKR's public
 product lifecycle and v1 acceptance. It leaves M3 build/evidence qualification
 and ADR-16's passive conformance boundary unchanged. Its schedule is authored
 configuration, not evidence of a successful cycle or organizational approval.
-Merging the configured daily trigger enables unattended execution; the first combined
-manual cycle and its cleanup verdict have not yet been recorded.
+The daily trigger is enabled. The first scheduled attempt is recorded below;
+a successful combined cycle and its runtime cleanup verdict remain unrecorded.
 
 ## Runtime and tool bindings
 
@@ -74,12 +74,42 @@ disk jobs completed on their ARC KVM pools, and that historical Run completed
 NVKE's existing
 [kind plus ARM64 VM job](https://github.com/dsx-ai-factory/nvke/actions/runs/38459969744/job/115512893269)
 also completed on `arc-arm64-kvm`. These results establish those capabilities.
-The new combined publication-to-runtime nightly cycle has not yet been recorded;
+The new combined publication-to-runtime nightly cycle has not yet passed;
 historical NVKR records do not establish current-schema Release acceptance.
 
 Forge YTL, AZ61, DSX and Redstone profiles remain subsequent work. Each needs its
 own component closure, runtime configuration, access, usable capacity and cleanup
 ownership. The special TestGrid integration remains deferred.
+
+## First scheduled attempt
+
+The [2026-10-15 coordinator](https://github.com/dsx-ai-factory/nvkr/actions/runs/38676875690)
+started at 03:33:24 UTC on commit
+`b77229c2cc7bedfc422af506c1cdfbbb655aba48`. Both producer workflows failed,
+so runtime tests were skipped. This attempt provides no VM E2E or runtime
+cleanup result.
+
+The [NVIDIA-fork producer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38676906834)
+failed fetching the private OVN fork. The Environment omitted that repository's
+source-access binding; the existing organization token was not passed to those
+fetch steps. The binding now selects the same `NKE_SOURCE_TOKEN` for that exact
+repository, with regression coverage for private and public OVN fetches. This
+fix changes credential delivery, not the token's permissions.
+
+The [upstream producer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38677610324)
+independently failed because the generic NICoSim seed/UI archive was sent to
+the Helm metadata reader. Its disk job also failed its KVM admission check on
+that attempt. A later runner repair was reported by the operator; no rerun of
+this combined cycle is recorded here to verify that repair.
+
+Generic tarball assets in executable bundles now select a bounded archive-content
+inventory of member paths and hashes. NICoSim's seed/UI archive uses that path;
+Helm archives retain their strict metadata reader. The archive method records
+file composition without claiming package discovery. The pinned Syft 1.51.1
+scanner returned no packages for the source-selected simulator seed/UI archive
+in a separate diagnostic, so treating it as a generic Syft scan would not supply
+the required nonempty inventory. Neither that diagnostic nor local contracts
+establish a completed hosted producer or E2E cycle.
 
 ## One cycle
 

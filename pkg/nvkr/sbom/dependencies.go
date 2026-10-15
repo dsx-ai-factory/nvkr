@@ -4,6 +4,7 @@
 package sbom
 
 import (
+	"archive/tar"
 	"net/url"
 	"slices"
 	"sort"
@@ -24,16 +25,19 @@ func WithDependencies(bom *BOM, components []Component, method, scannerDigest st
 	if err != nil || artifact == "" || len(bom.Metadata.Component.Hashes) != 1 {
 		return nil, e.New(e.CodeProvenanceMissing, "dependency inventory requires a per-artifact subject")
 	}
-	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" {
+	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" && method != archiveContentMethod {
 		return nil, e.New(e.CodeUnsupported, "unsupported dependency inspection method %q", method)
 	}
-	if method != "helm-manifests/v1" && !canonical.IsDigest(scannerDigest) {
+	if method != "helm-manifests/v1" && method != archiveContentMethod && !canonical.IsDigest(scannerDigest) {
 		return nil, e.New(e.CodeUnverifiedRef, "dependency inventory requires the scanner executable digest")
 	}
 	if len(components) == 0 {
 		return nil, e.New(e.CodeProvenanceMissing, "dependency inspection returned no components for %q", bom.Metadata.Component.Name)
 	}
 	result := cloneBOM(bom)
+	if method == archiveContentMethod {
+		result.Metadata.Component.Type = "file"
+	}
 	result.Components = nil
 	byRef := map[string]Component{}
 	for _, component := range components {
@@ -105,16 +109,43 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 		}
 	}
 	diskInventory := method == "disk-content/v1" || method == "disk-reconciled/v1"
+	archiveInventory := method == archiveContentMethod
+	if archiveInventory {
+		outputType := ""
+		for _, property := range bom.Metadata.Component.Properties {
+			if property.Name == "nvkr:outputType" {
+				outputType = property.Value
+			}
+		}
+		if artifact == "" || bom.Metadata.Component.Type != "file" || outputType != "tarball" {
+			return e.New(e.CodeVerifyFailed, "archive content inventory requires an exact per-artifact tarball file subject")
+		}
+		for _, property := range bom.Metadata.Props {
+			if property.Name == "nvkr:dependencyScannerDigest" {
+				return e.New(e.CodeVerifyFailed, "archive content inventory cannot claim an external package scanner")
+			}
+		}
+	}
 	if diskInventory && artifact == "" {
 		return e.New(e.CodeVerifyFailed, "disk inventory requires an exact per-artifact subject")
 	}
 	if method == "disk-reconciled/v1" && bom.Metadata.Component.Type != "operating-system" {
 		return e.New(e.CodeVerifyFailed, "reconciled disk inventory requires an operating-system subject")
 	}
+	archivePaths := map[string]byte{}
 	for _, component := range bom.Components {
-		if component.Type == "file" && !diskInventory {
+		if archiveInventory && (component.Type != "file" || !archiveMemberPath(component.Name) || component.Version != "" || component.PURL != "" || len(component.Properties) != 0) {
+			return e.New(e.CodeVerifyFailed, "archive content inventory admits only member paths and exact file hashes")
+		}
+		if component.Type == "file" && !diskInventory && !archiveInventory {
 			return e.New(e.CodeVerifyFailed, "file inventory requires its descriptive disk-content or reconciled disk method")
 		}
+		if archiveInventory {
+			archivePaths[component.Name] = tar.TypeReg
+		}
+	}
+	if archiveInventory && archivePathConflict(archivePaths) {
+		return e.New(e.CodeVerifyFailed, "archive content inventory has conflicting file and directory paths")
 	}
 	return nil
 }
@@ -138,10 +169,10 @@ func validateDependencies(bom *BOM) error {
 	if method == "" {
 		return e.New(e.CodeProvenanceMissing, "dependency inventory omits its inspection method")
 	}
-	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" {
+	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" && method != archiveContentMethod {
 		return e.New(e.CodeUnsupported, "unsupported dependency inspection method %q", method)
 	}
-	if method != "helm-manifests/v1" && !canonical.IsDigest(scanner) {
+	if method != "helm-manifests/v1" && method != archiveContentMethod && !canonical.IsDigest(scanner) {
 		return e.New(e.CodeUnverifiedRef, "dependency inventory has no scanner pin")
 	}
 	if len(bom.Metadata.Component.Hashes) != 1 || bom.Metadata.Component.BOMRef != "artifact:"+bom.Metadata.Component.Hashes[0].Content {
