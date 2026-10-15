@@ -84,6 +84,8 @@ Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures 
 [CI test performance](ci-test-performance.md) for the current profiling follow-up.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and
 [contribution guidance](../CONTRIBUTING.md) own ongoing maintainer procedures.
+The [source-release procedure](../RELEASE.md) covers releasing NVKR itself,
+building a released tag, validated SBOM evidence, approval and recovery.
 
 Reconciliation cites scoped external Runs and historical observations. Unit tests, a Plan, metadata
 browsing, and authenticated consumer verification establish different facts. Historical captures,

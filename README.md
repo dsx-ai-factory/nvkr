@@ -101,6 +101,8 @@ full disk inventory, or deployment readiness; full release qualification remains
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for setup and `make check`, and
 [CONTRIBUTING.md](CONTRIBUTING.md) for contribution rules.
+See [RELEASE.md](RELEASE.md) for NVKR source releases, building a released tag,
+validated SBOM evidence, approval and recovery.
 
 The [documentation map](docs/README.md) connects architecture, engineering decisions, and evidence.
 The [demo index](demos/README.md) provides presentations and runnable walkthroughs.
