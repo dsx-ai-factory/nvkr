@@ -825,6 +825,7 @@ type observedRuntime struct {
 
 func validateRuntimePods(rows podList, refs map[string]string) (map[string]observedRuntime, error) {
 	result := make(map[string]observedRuntime)
+	var pending *runtimeReadinessError
 	bindings := runtimeBindings()
 	for _, name := range runtimeImages {
 		key := "runtime-" + name
@@ -882,8 +883,8 @@ func validateRuntimePods(rows podList, refs map[string]string) (map[string]obser
 					if field.kind == "containers" {
 						ready = (state.Ready && state.State.Running != nil) || (completed && pod.Status.Phase == "Succeeded")
 					}
-					if !ready {
-						return nil, &runtimeReadinessError{dependency: key, pod: pod.Metadata, container: container.Name, state: state}
+					if !ready && pending == nil {
+						pending = &runtimeReadinessError{dependency: key, pod: pod.Metadata, container: container.Name, state: state}
 					}
 					if pod.Metadata.UID == "" {
 						return nil, errors.New("missing deployed pod UID")
@@ -904,6 +905,9 @@ func validateRuntimePods(rows podList, refs map[string]string) (map[string]obser
 			return strings.Compare(a.Namespace+"\x00"+a.PodUID+"\x00"+a.Kind+"\x00"+a.Container, b.Namespace+"\x00"+b.PodUID+"\x00"+b.Kind+"\x00"+b.Container)
 		})
 		result[key] = observedRuntime{Status: "observed", Containers: members}
+	}
+	if pending != nil {
+		return nil, pending
 	}
 	return result, nil
 }
@@ -943,11 +947,11 @@ func deployedSiteImages(ctx context.Context, session ManagementSession, refs map
 			ImageID string `json:"imageID"`
 		}{rows.Items[0].Metadata.UID, selected[0].ImageID}
 	}
-	rows, err := captureJSON[podList](ctx, session.Runner, []string{kubectl, "--kubeconfig", kube, "get", "pods", "-A", "-o", "json"}, "deployed-runtime-images")
-	if err != nil {
-		return nil, err
-	}
-	runtime, err := validateRuntimePods(rows, refs)
+	attempt := 0
+	runtime, err := waitRuntimePods(ctx, refs, 5*time.Minute, 5*time.Second, func(probe context.Context) (podList, error) {
+		attempt++
+		return captureJSON[podList](probe, session.Runner, []string{kubectl, "--kubeconfig", kube, "--request-timeout=10s", "get", "pods", "-A", "-o", "json"}, fmt.Sprintf("deployed-runtime-images-%03d", attempt))
+	})
 	if err != nil {
 		return nil, retainRuntimeFailure(ctx, session, err)
 	}

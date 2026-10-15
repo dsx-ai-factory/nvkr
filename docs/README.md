@@ -11,6 +11,7 @@ each concept to a worked example.
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Customer operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md), [presenter narration](nvkr-presenter.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../definitions/nvke-local-dev-arm64/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |

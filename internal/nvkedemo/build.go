@@ -190,7 +190,7 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 	}
 	var args []string
 	decoder := json.NewDecoder(bytes.NewReader(raw))
-	if err := decoder.Decode(&args); err != nil || len(args) != 17 {
+	if err := decoder.Decode(&args); err != nil || len(args) != 18 {
 		return nil, errors.New("invalid private build invocation")
 	}
 	definition := args[4]
@@ -203,7 +203,7 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 	}
 	want := []string{bootstrap + "/nvkr", "run", "local", "--definition", definition,
 		"--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix,
-		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker"}
+		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker", "--ui=plain"}
 	if !slices.Equal(args, want) {
 		return nil, errors.New("private build invocation differs from the supported local command")
 	}

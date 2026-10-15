@@ -838,6 +838,11 @@ func consumeTenant(ctx context.Context, cfg Config, guard *NetworkGuard, session
 	if err = t.run(ctx, cfg.Timeout); err != nil {
 		return err
 	}
+	if cfg.Walkthrough {
+		if err := t.recordedWalkthrough(ctx, cfg.Progress); err != nil {
+			return err
+		}
+	}
 	return presentTenantResult(ctx, cfg, session)
 }
 

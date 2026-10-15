@@ -311,7 +311,7 @@ func TestUpstreamBuildPreparationKeepsExplicitMode(t *testing.T) {
 
 func preparedInvocationFixture(cfg BuildConfig) []string {
 	root := ".nvkr/laptop-bootstrap/" + cfg.AttemptPrefix
-	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker"}
+	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--ui=plain"}
 }
 
 func writeInvocationFixture(t *testing.T, cfg BuildConfig, args []string) {
@@ -339,6 +339,9 @@ func TestPreparedInvocationRejectsSubstitution(t *testing.T) {
 		{"other executable", func(args []string) []string { args[0] = "/bin/sh"; return args }, ""},
 		{"other definition", func(args []string) []string { args[4] = "/private/other.json"; return args }, ""},
 		{"different jobs", func(args []string) []string { args[14] = "8"; return args }, ""},
+		{"missing plain presentation", func(args []string) []string { return args[:len(args)-1] }, ""},
+		{"changed presentation", func(args []string) []string { args[len(args)-1] = "--ui=tui"; return args }, ""},
+		{"split presentation flag", func(args []string) []string { return append(args[:len(args)-1], "--ui", "plain") }, ""},
 		{"extra flags", func(args []string) []string { return append(args, "--publish") }, ""},
 		{"short argv", func(args []string) []string { return args[:4] }, ""},
 		{"world readable", func(args []string) []string { return args }, "mode"},
