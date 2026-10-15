@@ -1,0 +1,12 @@
+{
+  "apiVersion": "nvkr.dev/environment/v1",
+  "kind": "Environment",
+  "metadata": {
+    "name": "cli-candidate-diagnostic"
+  },
+  "utilityContainer": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+  "utilityPlatform": "linux/amd64",
+  "runtime": {
+    "runtime": "docker"
+  }
+}

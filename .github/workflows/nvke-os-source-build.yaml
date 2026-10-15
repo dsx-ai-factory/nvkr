@@ -1,42 +1,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 ---
-name: NVKE direct OS source builds
-
+name: Go CLI artifact native verification
 on:
-  pull_request:
-    paths:
-      - .github/workflows/nvke-os-source-build.yaml
-      - definitions/nvke-os-source/**
-      - pkg/nvkr/buildgraph/nvke_os_source_test.go
-  schedule:
-    - cron: '19 3 * * 1'
   workflow_dispatch:
-    inputs:
-      architecture:
-        description: Native architecture to diagnose
-        type: choice
-        default: both
-        options: [both, amd64, arm64]
-      components:
-        description: Exact comma-separated public-source producer IDs (empty builds all)
-        type: string
-        required: false
-
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-# Diagnostic source builds only. This is not the generated Release pipeline,
-# does not use private NVKE sources, and cannot publish or sign artifacts.
+# Disposable verification branch only; maintained workflows and pins are unchanged.
 jobs:
-  source-build:
-    name: Native ${{ matrix.arch }} public-source builds
+  verify:
+    name: Native ${{ matrix.arch }} Go adapter
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -47,56 +22,118 @@ jobs:
             runner: ubuntu-24.04-arm
     env:
       GOTOOLCHAIN: local
-      NVKR_OS_SOURCE_RUNTIME: docker
-      NVKR_OS_SOURCE_COMPONENTS: ${{ inputs.components }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: .go-version
           cache: false
-      - name: Check native runner and Docker
+      - name: Build Go adapter and verify native platform
         env:
           EXPECTED_ARCH: ${{ matrix.arch }}
-          REQUESTED_ARCH: ${{ inputs.architecture }}
         run: |
           set -euo pipefail
-          case "$REQUESTED_ARCH" in
-            ''|both|amd64|arm64) ;;
-            *) echo 'Invalid architecture selection' >&2; exit 1 ;;
-          esac
+          make build
           test "$(go env GOOS)" = linux
           test "$(go env GOARCH)" = "$EXPECTED_ARCH"
           docker_platform="$(docker info --format '{{.OSType}}/{{.Architecture}}')"
           case "$EXPECTED_ARCH/$docker_platform" in
             amd64/linux/x86_64|amd64/linux/amd64|arm64/linux/aarch64|arm64/linux/arm64) ;;
-            *) echo "Docker platform mismatch: $docker_platform" >&2; exit 1 ;;
+            *) exit 1 ;;
           esac
-          sudo --non-interactive true
-      - name: Build pinned public sources offline and rehash outputs
-        if: >-
-          github.event_name != 'workflow_dispatch' ||
-          inputs.architecture == 'both' || inputs.architecture == matrix.arch
+          mkdir -p .nvkr/cli-go-proof/inputs
+          cp -R ".github/cli-proof-inputs/$EXPECTED_ARCH/inputs/." .nvkr/cli-go-proof/inputs/
+          git rev-parse HEAD > .nvkr/cli-go-proof/nvkr-commit.txt
+          uname -m > .nvkr/cli-go-proof/native-host.txt
+          printf '%s\n' "$docker_platform" > .nvkr/cli-go-proof/docker-platform.txt
+      - name: Native Go process-lifetime race checks
         run: |
           set -euo pipefail
-          go test -c -o "$RUNNER_TEMP/nvke-os-source.test" ./pkg/nvkr/buildgraph
-          cd pkg/nvkr/buildgraph
-          # This credential-free hosted diagnostic uses the rootful Docker
-          # daemon. Keep the test's disposable checkout/output owner aligned
-          # with that daemon, without weakening Git or source integrity checks.
-          sudo --non-interactive --preserve-env=NVKR_OS_SOURCE_RUNTIME,NVKR_OS_SOURCE_COMPONENTS \
-            "$RUNNER_TEMP/nvke-os-source.test" \
-            -test.run '^TestNVKEOSPublicSourcesLive$' -test.v -test.timeout 75m \
-            2>&1 | tee "$RUNNER_TEMP/direct-source-build.log"
-      - name: Retain diagnostic build log
-        if: >-
-          always() && (github.event_name != 'workflow_dispatch' ||
-          inputs.architecture == 'both' || inputs.architecture == matrix.arch)
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+          go test -race -p=2 ./internal/sourcegit ./internal/ownedcmd \
+            ./pkg/nvkr/pipeline ./pkg/nvkr/factory ./cmd/nvkr \
+            -run 'Test(ImportLocal|ArtifactDiagnostic|Reaper|Command.*Cancel)' -count=1 \
+            > .nvkr/cli-go-proof/race.log 2>&1
+      - name: Fresh recipe build and both cold-cache Go adapter suites
+        env:
+          NVKR_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$NVKR_SOURCE_TOKEN"
+          helper="$RUNNER_TEMP/nvke-go-helper"
+          cat > "$helper" <<'HELPER'
+          #!/bin/sh
+          [ "$1" = get ] || exit 0
+          credential_host= credential_path=
+          while IFS='=' read -r credential_key credential_value; do
+            [ -n "$credential_key" ] || break
+            case "$credential_key" in
+              host) credential_host=$credential_value ;;
+              path) credential_path=$credential_value ;;
+            esac
+          done
+          [ "$credential_host" = github.com ] || exit 1
+          case "$credential_path" in dsx-ai-factory/nvke|dsx-ai-factory/nvke.git) ;; *) exit 1 ;; esac
+          printf '%s\n' username=x-access-token
+          printf 'password='
+          cat "$0.token"
+          printf '\n'
+          HELPER
+          sudo install -m 700 "$helper" "$helper.root"
+          printf '%s' "$NVKR_SOURCE_TOKEN" | sudo sh -c 'umask 077; cat > "$1"' sh "$helper.root.token"
+          sudo git config --global credential.https://github.com/dsx-ai-factory/nvke.helper "!$helper.root"
+          sudo git config --global credential.https://github.com/dsx-ai-factory/nvke.useHttpPath true
+          binary="$PWD/bin/nvkr"
+          definition=.nvkr/cli-go-proof/inputs/definition.json
+          environment=.nvkr/cli-go-proof/inputs/environment.json
+          "$binary" run plan --definition "$definition" --environment "$environment" --json > .nvkr/cli-go-proof/plan.json
+          # Logs belong to the runner; only the recipe process needs root.
+          # shellcheck disable=SC2024
+          sudo --non-interactive "$binary" run local --definition "$definition" --environment "$environment" \
+            --attempt fresh --attempts-root .nvkr/cli-go-proof/attempts --ui plain > .nvkr/cli-go-proof/build.log 2>&1
+          artifact="$PWD/.nvkr/cli-go-proof/attempts/fresh/nvkectl/out/nvkectl/nvkectl"
+          plan="$PWD/.nvkr/cli-go-proof/plan.json"
+          sha256sum "$artifact" > .nvkr/cli-go-proof/artifact-before.sha256
+          "$binary" run artifact-test-inputs --plan "$plan" > .nvkr/cli-go-proof/selected.json
+          mkdir -p '.nvkr/cli-go-proof/repo space:comma,quote"'
+          proof="$PWD/.nvkr/cli-go-proof"
+          cd '.nvkr/cli-go-proof/repo space:comma,quote"'
+          for suite in contract cli; do
+            # shellcheck disable=SC2024
+            sudo --non-interactive "$binary" run artifact-test --artifact "$artifact" --plan "$plan" \
+              --suite "$suite" --keep > "$proof/$suite.log" 2>&1
+          done
+          for workspace in .nvkr/artifact-tests/cli-*; do
+            suite="$(sudo jq -r .suite "$workspace/result.json")"
+            sudo cp "$workspace/result.json" "$proof/$suite-result.json"
+            sudo cp "$workspace/tests.jsonl" "$proof/$suite-tests.jsonl"
+            sudo tar -czf "$proof/$suite-import.tgz" -C "$workspace" nvke
+          done
+          sha256sum "$artifact" > "$proof/artifact-after.sha256"
+          cmp "$proof/artifact-before.sha256" "$proof/artifact-after.sha256"
+      - name: Remove host credentials and make private records readable
+        if: always()
+        run: |
+          set -euo pipefail
+          sudo git config --global --unset-all credential.https://github.com/dsx-ai-factory/nvke.helper || true
+          sudo git config --global --unset-all credential.https://github.com/dsx-ai-factory/nvke.useHttpPath || true
+          sudo unlink "$RUNNER_TEMP/nvke-go-helper.root.token" || true
+          sudo unlink "$RUNNER_TEMP/nvke-go-helper.root" || true
+          sudo chown -R "$(id -u):$(id -g)" .nvkr/cli-go-proof
+      - name: Retain raw candidate records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: direct-source-build-${{ matrix.arch }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/direct-source-build.log
-          if-no-files-found: warn
+          name: go-cli-proof-${{ matrix.arch }}-${{ github.run_attempt }}
+          path: |
+            .nvkr/cli-go-proof/*.json
+            .nvkr/cli-go-proof/*.jsonl
+            .nvkr/cli-go-proof/*.txt
+            .nvkr/cli-go-proof/*.sha256
+            .nvkr/cli-go-proof/*.log
+            .nvkr/cli-go-proof/*.tgz
+            .nvkr/cli-go-proof/inputs/
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 7

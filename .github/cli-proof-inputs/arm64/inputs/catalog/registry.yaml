@@ -1,0 +1,41 @@
+{
+  "apiVersion": "nvkr.dev/catalog/v3",
+  "kind": "SourceBuildRegistry",
+  "metadata": {
+    "name": "cli-candidate-diagnostic"
+  },
+  "sources": {
+    "nvke-cli": {
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=; cd cli; timeout --kill-after=10s 540s go mod download; GOPROXY=off timeout --kill-after=10s 60s go mod verify; GOPROXY=off timeout --kill-after=10s 180s go mod vendor"
+      ]
+    }
+  },
+  "components": {
+    "nvkectl": {
+      "fromSource": true,
+      "source": "nvke-cli",
+      "cgo": false,
+      "platforms": [
+        "linux/arm64"
+      ],
+      "outputType": "host-package",
+      "artifactPath": "cli/bin/nvkectl",
+      "writeDir": "cli/bin",
+      "versionStamp": {
+        "NKECTL_VERSION": "{{.Commit}}",
+        "NKECTL_COMMIT": "{{.Commit}}",
+        "NKECTL_DATE": "{{.Date}}"
+      },
+      "buildCommand": [
+        "bash",
+        "-euc",
+        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor; export NVKECTL_VERSION=$NKECTL_VERSION NVKECTL_COMMIT=$NKECTL_COMMIT NVKECTL_DATE=$NKECTL_DATE; make -C cli build NVKECTL_TREE=clean"
+      ]
+    }
+  }
+}

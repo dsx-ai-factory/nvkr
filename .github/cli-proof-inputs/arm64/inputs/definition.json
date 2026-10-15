@@ -1,0 +1,20 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "kind": "Definition",
+  "metadata": {
+    "name": "cli-candidate-diagnostic"
+  },
+  "catalog": {
+    "base": "./catalog"
+  },
+  "outputs": [
+    {
+      "name": "nvkectl",
+      "components": [
+        "nvkectl"
+      ],
+      "format": "executable",
+      "platform": "linux/arm64"
+    }
+  ]
+}
