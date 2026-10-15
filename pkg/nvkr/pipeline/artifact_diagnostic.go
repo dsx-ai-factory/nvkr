@@ -28,7 +28,7 @@ type ArtifactDiagnostic struct {
 // RunArtifactDiagnostic acquires dependencies without the artifact and runs the
 // selected upstream suite offline against read-only source and staged bytes.
 func RunArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout, stderr io.Writer) error {
-	err := runArtifactDiagnostic(ctx, input, stdout, stderr, runContainerRuntime)
+	err := runArtifactDiagnostic(ctx, input, stdout, stderr, runContainerRuntime, runReaperCleanupCommand)
 	var coded *e.Error
 	if err == nil || errors.As(err, &coded) {
 		return err
@@ -36,7 +36,8 @@ func RunArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout
 	return e.Wrap(e.CodeBuildFailed, err, "running artifact diagnostic")
 }
 
-func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout, stderr io.Writer, run func(RunOptions, ...string) error) error {
+func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout, stderr io.Writer,
+	run func(RunOptions, ...string) error, cleanup reaperCleanupCommand) error {
 	if stdout == nil {
 		stdout = io.Discard
 	}
@@ -74,21 +75,23 @@ func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout
 		// Use the existing runtime boundary and cleanup registry. Registration
 		// precedes process start; cleanup has an independent bounded context and
 		// is joined before the diagnostic can remove its workspace.
-		reap := newReaperWithCleanup(bounded, "docker", func(cleanup context.Context, _ time.Duration, runtime string, _ *heldRuntimeExecutable, names []string) error {
-			return run(RunOptions{Ctx: cleanup, Runtime: runtime, Stdout: io.Discard, Stderr: io.Discard}, append([]string{"rm", "-f"}, names...)...)
-		})
+		reap := newReaperWithCleanup(bounded, "docker", cleanup)
 		defer reap.close()
 		opts := RunOptions{Ctx: bounded, Runtime: "docker", Stdout: output, Stderr: stderr, reap: reap}
 		if err := registerContainer(opts, name); err != nil {
 			return err
 		}
 		err := run(opts, arguments...)
+		// Classify execution before independently bounded cleanup. Its deadline
+		// must not turn an already-completed failure into a timeout.
+		executionErr := bounded.Err()
 		if err == nil {
 			reap.forget(name)
 		}
+		cancel()
 		reap.close()
-		if bounded.Err() != nil {
-			return e.Wrap(e.CodeTimeout, bounded.Err(), "artifact diagnostic execution canceled")
+		if executionErr != nil {
+			return e.Wrap(e.CodeTimeout, executionErr, "artifact diagnostic execution canceled")
 		}
 		return err
 	}
