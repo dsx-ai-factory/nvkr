@@ -40,6 +40,9 @@ func TestPlanRejectsChangedBuildTransport(t *testing.T) {
 		{"unauthorized toolchain relocation", "relocated", ir.KindBuild, func(n *ir.Node) {
 			n.Toolchain = "other.invalid/toolchain@" + strings.SplitN(n.Toolchain, "@", 2)[1]
 		}},
+		{"unauthorized vendor relocation", "relocated", ir.KindFetch, func(n *ir.Node) {
+			n.VendorImage = "other.invalid/vendor@" + strings.SplitN(n.VendorImage, "@", 2)[1]
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan := buildTransportPlan(t, tc.lane)
@@ -103,6 +106,30 @@ func TestPlanAcceptsEnvironmentToolchainRelocation(t *testing.T) {
 	if !strings.HasPrefix(toolchain, "mirror.example/nvkr/nvkr-toolchain-test@sha256:") {
 		t.Fatalf("fixture did not relocate its toolchain: %q", toolchain)
 	}
+	unrouted := buildTransportPlan(t, "unrouted")
+	if plan.Builds[0].BuildDigest != unrouted.Builds[0].BuildDigest {
+		t.Fatal("registry relocation changed logical build identity")
+	}
+	for _, node := range plan.Builds[0].Graph.Nodes {
+		if node.Kind != ir.KindFetch {
+			continue
+		}
+		if node.VendorImage != toolchain {
+			t.Fatalf("vendoring uses %q while compilation uses %q", node.VendorImage, toolchain)
+		}
+		found := false
+		for _, original := range unrouted.Builds[0].Graph.Nodes {
+			if original.ID == node.ID {
+				found = true
+				if original.VendorSpecDigest != node.VendorSpecDigest || original.Dest != node.Dest {
+					t.Fatal("registry relocation changed the dependency closure or source destination")
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("registry relocation changed source node identity %s", node.ID)
+		}
+	}
 	raw, err := canonical.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)
@@ -147,9 +174,11 @@ func buildTransportPlan(t *testing.T, lane string) *Plan {
 	component := base.Components["containerd"]
 	switch lane {
 	case "source":
-	case "relocated":
+	case "relocated", "unrouted":
 		component.ToolchainImage = "nvkr-toolchain-test@" + strings.SplitN(component.ToolchainImage, "@", 2)[1]
-		environment.Runtime.ToolchainRegistry = "mirror.example/nvkr"
+		if lane == "relocated" {
+			environment.Runtime.ToolchainRegistry = "mirror.example/nvkr"
+		}
 	case "nix":
 		component.BuilderType = ir.BuilderNix
 		component.Flake = &catalog.FlakePin{Ref: "github:example/tool?rev=" + component.Commit,
