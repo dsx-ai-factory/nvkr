@@ -42,9 +42,9 @@ func TestArtifactDiagnosticAdmission(t *testing.T) {
 			}
 			return r
 		}, t.Context(), false, e.CodeGateUnmet},
-		{"nil callback", diagnosticReceiptFixture, t.Context(), true, e.CodeUsage},
-		{"nil context", diagnosticReceiptFixture, nil, false, e.CodeUsage},
-		{"canceled context", diagnosticReceiptFixture, canceled, false, e.CodeTimeout},
+		{"nil callback", func(*testing.T) *ArtifactCheckReceipt { return &ArtifactCheckReceipt{} }, t.Context(), true, e.CodeUsage},
+		{"nil context", func(*testing.T) *ArtifactCheckReceipt { return &ArtifactCheckReceipt{} }, nil, false, e.CodeUsage},
+		{"canceled context", func(*testing.T) *ArtifactCheckReceipt { return &ArtifactCheckReceipt{} }, canceled, false, e.CodeTimeout},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
@@ -171,22 +171,24 @@ func TestArtifactDiagnosticRequestCancellationCannotReturnSuccess(t *testing.T) 
 }
 
 func TestArtifactDiagnosticSourceRevocationIsRecheckedWithoutAsyncCancellation(t *testing.T) {
+	request, consumer, _ := newQualificationFixture(t)
 	for _, during := range []bool{false, true} {
 		name := "before registration"
 		if during {
 			name = "during callback"
 		}
 		t.Run(name, func(t *testing.T) {
-			receipt := diagnosticReceiptFixture(t)
-			source, ok := receipt.origin.(*qualificationFixtureSource)
-			if !ok {
-				t.Fatal("unexpected existing fixture source")
+			source := qualificationSourceFixture()
+			receipt, _, err := consumer.checkQualification(t.Context(), request, source)
+			if err != nil {
+				t.Fatal(err)
 			}
+			defer receipt.Close()
 			if !during {
 				source.closed = true
 			}
 			calls := 0
-			err := receipt.WithDiagnosticOperation(t.Context(), func(ctx context.Context, _ ArtifactCheckDescription) error {
+			err = receipt.WithDiagnosticOperation(t.Context(), func(ctx context.Context, _ ArtifactCheckDescription) error {
 				calls++
 				source.closed = true
 				if ctx.Err() != nil {

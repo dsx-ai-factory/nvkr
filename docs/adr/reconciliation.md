@@ -75,35 +75,25 @@ The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retai
 files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
 requires no GitHub secret; private passphrases remain unsupported.
 
-## Preparatory external test output boundary
+## External test output and local diagnostic boundary
 
-`pkg/nvkr/testresults` owns producer-supplied JUnit/CTRF report references and metadata in lane
-**none (descriptive)**. Bounded wrapper validation and deterministic Encode/Decode are implemented;
-complete/partial capture declarations do not mean suite success. Optional post-publication input
-bindings require the existing complete exact-input shape, including policy identity. Local subject
-descriptions and policy references grant no authentication or enforcement. Validation-vector v3 and
-qualification-evidence v2 remain unchanged.
+`testresults` implements bounded JUnit/CTRF descriptions and deterministic serialization in lane
+**none (descriptive)**. `validation` dispatches explicit named checks; `conformance` implements the
+`kube-conformance` / `hydrophone` diagnostic adapter. Lifecycle authenticates selected product/tools
+publications and exports held executable bytes; catalog, buildgraph, acquisition and delivery retain
+production ownership. Original reports, product/tool source provenance and before/after observations
+are retained. Normal harness exit status is a fact with an unknown cause, never a passing verdict.
+Local/disposable acknowledgements are operator declarations, not proof of locality or exclusive ownership.
 
-The description owner supplies no execution, file collector, JUnit parser or CTRF JSON Schema
-validator. Separately, top-level `validate` / SDK `Client.Validate` delegate to `validation.RunFiles`
-for explicitly configured check instances against an authenticated immutable published root. Lifecycle
-discovers and authenticates the producing Run internally; customer CLI flags require no GitHub URL.
-Instance names are distinct from the supported suite/harness pair, `kube-conformance` / `hydrophone`.
-The producer selects Hydrophone/kubectl executable members and conformance/busybox native OCI images
-from independently authenticated catalog-produced outputs. Existing compilation, acquisition, delivery
-and held-file owners supply those bytes; customer binary paths, executable hashes and raw image references
-are not accepted as tool proof. Tool and product publications may be the same explicitly selected root.
-Both receipt lifetimes cover capture, execution and cleanup. Explicit selected native OCI workload mappings
-are checked through before/after API assertions before test resources are created. The kube-system namespace
-UID is a cluster-identity surrogate; unmapped subjects have no coverage claim. Local disposable-cluster
-execution and original JUnit retention are implemented. Local unsigned subject sources return
-`CodeEngineCapability`; unsupported suites/harnesses fail before provider or harness work. Generic Definition
-applicability and user/AI producer adapters are not implemented. Report validity, passing results,
-continuous/installed-byte proof, qualification, signing and publication remain outside this diagnostic route.
-Contract tests establish no successful external execution of the rewritten route. ADR-16/17 are unchanged;
-implementation does not establish organizational ratification or activate the qualified verifier.
-[ADR-05](0005-trust-object-model-and-digest-authentication.md#4-publisher-evidence-and-later-observations-are-different-trust-objects)
-retains evidence separation; the [contract reference](../external-test-output-contract.md) records limits.
+Contract and process-fixture tests cover guards, capture, cleanup and dispatch. They do not establish
+successful external execution of the corrected published-source route. Report parsing, original JUnit
+validity, continuous installed-byte proof, AI/user adapters, Definition applicability detection,
+qualification signing and promotion from these outputs remain unimplemented. Local unsigned sources
+remain unsupported. Existing validation-vector v3 and qualification-evidence v2 are unchanged.
+[ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns diagnostic execution and passive external qualification; [ADR-18 §3](0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks)
+owns the host isolation posture. The [operator reference](../external-test-output-contract.md)
+owns prerequisites, selection and capture limits. These proposed contracts establish no organizational ratification.
 
 ## M3 MVP scope and acceptance boundary
 

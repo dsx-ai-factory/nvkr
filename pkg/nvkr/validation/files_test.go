@@ -197,3 +197,51 @@ func TestConfiguredCheckInstancesSelectTheirExplicitSuite(t *testing.T) {
 		}
 	}
 }
+
+func TestProfileCheckCountBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		count   int
+		allowed bool
+	}{
+		{"at limit", 64, true}, {"over limit", 65, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			profile := profileFixture()
+			for len(profile.Checks) < tc.count {
+				check := profile.Checks[0]
+				check.Name = strings.Repeat("x", len(profile.Checks)+1)
+				profile.Checks = append(profile.Checks, check)
+			}
+			err := profile.validate()
+			if tc.allowed {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			requireError(t, err, e.CodeUsage, "1..64 configured checks")
+		})
+	}
+}
+
+func TestCompleteCaptureContinuesAfterNonzeroHarnessExit(t *testing.T) {
+	profile := profileFixture()
+	next := profile.Checks[0]
+	next.Name, next.Config = "next", "next.json"
+	profile.Checks = append(profile.Checks, next)
+	calls := 0
+	outputs, err := runSelected(t.Context(), profile.Source, profile.Checks, lifecycle.QualificationRuntimeOptions{}, func(context.Context, string, string, string, lifecycle.QualificationRuntimeOptions) (testresults.Output, error) {
+		calls++
+		return testresults.Output{SchemaVersion: testresults.SchemaVersion, CaptureStatus: testresults.CaptureComplete,
+			Environment: []testresults.EnvironmentFact{{Scope: "harness", Name: "process.exitCode", Phase: "after", Metadata: testresults.Metadata{Status: "observed", Value: "1"}}}}, nil
+	})
+	if err != nil || calls != 2 || len(outputs) != 2 {
+		t.Fatalf("complete capture stopped later check: calls=%d outputs=%d err=%v", calls, len(outputs), err)
+	}
+	for _, output := range outputs {
+		if output.CaptureStatus != testresults.CaptureComplete || output.Environment[0].Metadata.Value != "1" {
+			t.Fatal("dispatch changed capture status or harness fact")
+		}
+	}
+}

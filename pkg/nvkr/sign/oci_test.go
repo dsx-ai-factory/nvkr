@@ -567,3 +567,33 @@ func TestVerificationRecordValidateRefusesDryRunClaims(t *testing.T) {
 		t.Fatalf("valid dry-run verification record rejected: %v", err)
 	}
 }
+
+func TestOCICosignEnvironmentHomeRequiresReplacement(t *testing.T) {
+	for _, tc := range []struct {
+		name, directory, home string
+		keepCache             bool
+	}{
+		{"blob adapter", "", "/ambient/home", true},
+		{"OCI private workspace", "/private/work/docker", "/private/work", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := []string{"HOME=/ambient/home", "USERPROFILE=/ambient/profile", "XDG_CONFIG_HOME=/ambient/cache", "XDG_RUNTIME_DIR=/ambient/runtime", "DOCKER_CONFIG=/ambient/docker", "REGISTRY_AUTH_FILE=/ambient/auth", "ACTIONS_ID_TOKEN_REQUEST_URL=https://oidc.example/token", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=identity-token", "COSIGN_PASSWORD=ambient"}
+			got := ociCosignEnvironment(base, tc.directory)
+			values := map[string]string{}
+			for _, entry := range got {
+				if key, value, ok := strings.Cut(entry, "="); ok {
+					values[key] = value
+				}
+			}
+			if values["HOME"] != tc.home || values["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] != "identity-token" {
+				t.Fatalf("home or signing identity environment changed: %v", got)
+			}
+			if (values["XDG_CONFIG_HOME"] != "") != tc.keepCache || (values["USERPROFILE"] != "") != tc.keepCache || (values["XDG_RUNTIME_DIR"] != "") != tc.keepCache {
+				t.Fatalf("cache scope differs from replacement scope: %v", got)
+			}
+			if values["DOCKER_CONFIG"] != tc.directory || values["REGISTRY_AUTH_FILE"] != "" || values["COSIGN_PASSWORD"] != "" {
+				t.Fatalf("registry or cosign configuration not scrubbed: %v", got)
+			}
+		})
+	}
+}

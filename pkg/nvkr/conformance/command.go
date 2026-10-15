@@ -23,6 +23,7 @@ type boundedBuffer struct {
 	limit    int
 	overflow bool
 	sink     io.Writer
+	err      error
 }
 
 // Keep the backing buffer private: every copy must pass through bounded Write.
@@ -33,13 +34,21 @@ func (b *boundedBuffer) ReadFrom(r io.Reader) (int64, error) {
 }
 
 func (b *boundedBuffer) Write(raw []byte) (int, error) {
+	if b.err != nil {
+		return 0, b.err
+	}
 	n := min(len(raw), b.limit-b.Len())
 	if n < len(raw) {
 		b.overflow = true
 	}
 	if n > 0 {
 		if b.sink != nil {
-			if _, err := b.sink.Write(raw[:n]); err != nil {
+			written, err := b.sink.Write(raw[:n])
+			if err == nil && written != n {
+				err = io.ErrShortWrite
+			}
+			if err != nil {
+				b.err = err
 				return 0, err
 			}
 		}
@@ -52,7 +61,7 @@ func (a *admitted) command(ctx context.Context, tool *heldfile.File, args []stri
 }
 func (a *admitted) commandLimit(ctx context.Context, tool *heldfile.File, args []string, workspace string, stdin io.Reader, timeout time.Duration, limit int) ([]byte, int, error) {
 	if workspace == "" {
-		return nil, 1, e.New(e.CodeUsage, "private command workspace required")
+		return nil, -1, e.New(e.CodeUsage, "private command workspace required")
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -60,16 +69,17 @@ func (a *admitted) commandLimit(ctx context.Context, tool *heldfile.File, args [
 	// serializes shared descriptors, which otherwise prevents concurrent polling.
 	kube, err := heldfile.FromBytesContext(ctx, a.kubeBytes, heldfile.Options{Label: "private kubeconfig", MaxBytes: 1 << 20, ExpectedDigest: a.options.Kubeconfig.Digest})
 	if err != nil {
-		return nil, 1, captureFailure(ctx, err, e.CodeUnpinnedInput, "holding command kubeconfig")
+		return nil, -1, captureFailure(ctx, err, e.CodeUnpinnedInput, "holding command kubeconfig")
 	}
 	defer func() { _ = kube.Close() }()
 	path, err := heldfile.ChildPath(1)
 	if err != nil {
-		return nil, 1, capability(err)
+		return nil, -1, capability(err)
 	}
 	args = append([]string{"--kubeconfig=" + path}, args...)
 	stdout := &boundedBuffer{limit: limit}
 	stderr := &boundedBuffer{limit: maxDiagnosticBytes}
+	var diagnostics []*os.File
 	if tool == a.hydrophone {
 		for _, target := range []struct {
 			name string
@@ -77,25 +87,38 @@ func (a *admitted) commandLimit(ctx context.Context, tool *heldfile.File, args [
 		}{{"hydrophone.stdout.log", stdout}, {"hydrophone.stderr.log", stderr}} {
 			f, err := os.OpenFile(filepath.Join(workspace, target.name), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 			if err != nil {
-				return nil, 1, e.Wrap(e.CodeFetchFailed, err, "creating private Hydrophone diagnostics")
+				return nil, -1, e.Wrap(e.CodeFetchFailed, err, "creating private Hydrophone diagnostics")
 			}
 			defer f.Close()
+			diagnostics = append(diagnostics, f)
 			target.b.sink = f
 		}
 	}
 	err = heldfile.RunContext(ctx, tool, args, heldfile.RunOptions{Stdin: stdin, Stdout: stdout, Stderr: stderr, Dir: workspace, Env: []string{"HOME=" + workspace, "TMPDIR=" + workspace, "PATH=", "KUBECONFIG=" + path, "KUBECACHEDIR=" + filepath.Join(workspace, "kube-cache")}, TerminationGrace: 250 * time.Millisecond}, kube)
+	sinkErr := errors.Join(stdout.err, stderr.err)
+	for _, file := range diagnostics {
+		sinkErr = errors.Join(sinkErr, file.Close())
+	}
+	if ctx.Err() != nil {
+		return bytes.Clone(stdout.Bytes()), -1, e.Wrap(e.CodeTimeout, ctx.Err(), "conformance command canceled or timed out")
+	}
+	if sinkErr != nil {
+		return bytes.Clone(stdout.Bytes()), -1, e.Wrap(e.CodeFetchFailed, sinkErr, "retaining private command diagnostics")
+	}
 	if tool != a.hydrophone && stdout.overflow && ctx.Err() == nil {
 		return bytes.Clone(stdout.Bytes()), 1, failure("command output byte budget exhausted")
 	}
 	code := 0
 	if err != nil {
-		code = 1
+		code = -1
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && exit.ExitCode() > 0 && exit.ExitCode() <= 255 {
 			code = exit.ExitCode()
 		}
-		if ctx.Err() != nil {
-			return bytes.Clone(stdout.Bytes()), code, e.Wrap(e.CodeTimeout, ctx.Err(), "conformance command canceled or timed out")
+		// Normal Hydrophone exits, including nonzero statuses, do not decide
+		// capture completeness. Retention, cleanup and observations do that.
+		if tool == a.hydrophone && exit != nil && exit.ProcessState != nil && exit.Exited() && code > 0 {
+			return bytes.Clone(stdout.Bytes()), code, nil
 		}
 		diagnostics := "private diagnostic text excluded from public errors"
 		if tool == a.hydrophone {

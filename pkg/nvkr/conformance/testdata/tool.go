@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -57,6 +58,9 @@ func main() {
 	}
 	_ = os.MkdirAll(os.Getenv("KUBECACHEDIR"), 0700)
 	_ = os.WriteFile(filepath.Join(os.Getenv("KUBECACHEDIR"), "fixture-private-cache"), []byte("private"), 0600)
+	if mode == "diagnostic-create-failure" && !has("--conformance") {
+		_ = os.WriteFile(filepath.Join(wd, "hydrophone.stdout.log"), []byte("preexisting"), 0600)
+	}
 	config := value("--kubeconfig=")
 	if config == "" {
 		os.Exit(3)
@@ -65,6 +69,8 @@ func main() {
 		os.Exit(4)
 	}
 	if has("--conformance") {
+		argv, _ := json.Marshal(os.Args[1:])
+		_ = os.WriteFile(state+".argv", argv, 0600)
 		_ = os.WriteFile(state+".startup", []byte(value("--startup-timeout=")), 0600)
 		if !has("--disable-progress-status") {
 			os.Exit(22)
@@ -98,7 +104,7 @@ func main() {
 		if mode == "success" || mode == "zero" || mode == "failed" {
 			save(map[string]string{})
 		}
-		if mode == "after-failure" || mode == "deployment-drift" || mode == "cluster-drift" || mode == "terminal-budget" {
+		if mode == "after-failure" || mode == "deployment-drift" || mode == "cluster-drift" || mode == "terminal-budget" || mode == "slow-after" {
 			m := readState()
 			m["_finished"] = "yes"
 			save(m)
@@ -106,7 +112,13 @@ func main() {
 		if mode == "failed" {
 			os.Exit(1)
 		}
+		if mode == "signal" {
+			_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
+		}
 		return
+	}
+	if mode == "slow-after" && readState()["_finished"] != "" {
+		time.Sleep(40 * time.Millisecond)
 	}
 	var args []string
 	for _, a := range os.Args[1:] {
@@ -177,6 +189,14 @@ func main() {
 		key := args[1] + "/" + args[2]
 		m := readState()
 		uid := m[key]
+		if mode == "delayed-cleanup" && strings.HasPrefix(key, "namespaces/") && m["_terminating"] != "" {
+			m["_polls"] += "x"
+			if len(m["_polls"]) >= 5 {
+				delete(m, key)
+				uid = ""
+			}
+			save(m)
+		}
 		if key == "namespaces/kube-system" {
 			uid = "cluster-system-uid"
 			if mode == "cluster-drift" && m["_finished"] != "" {
@@ -189,7 +209,11 @@ func main() {
 		if uid == "" {
 			return
 		}
-		record := map[string]any{"metadata": map[string]string{"uid": uid}}
+		metadata := map[string]string{"uid": uid}
+		if mode == "delayed-cleanup" && strings.HasPrefix(key, "namespaces/") && m["_terminating"] != "" {
+			metadata["deletionTimestamp"] = "2026-10-14T00:00:00Z"
+		}
+		record := map[string]any{"metadata": metadata}
 		if args[1] == "clusterrolebindings" {
 			ns := strings.SplitN(args[2], ":", 2)[1]
 			record["subjects"] = []any{map[string]string{"namespace": ns, "name": "conformance-serviceaccount", "kind": "ServiceAccount"}}
@@ -245,14 +269,20 @@ func main() {
 			os.Exit(7)
 		}
 		if mode == "delayed-cleanup" && strings.HasPrefix(key, "namespaces/") {
-			n := len(m["_polls"])
-			if n < 5 {
-				m["_polls"] += "x"
-				save(m)
-				output(map[string]string{"status": "Success"})
-				return
+			if m["_terminating"] != "" {
+				os.Exit(23)
 			}
+			m["_terminating"] = "yes"
+			save(m)
+			output(map[string]string{"status": "Success"})
+			return
 		}
+		if mode == "delete-not-found" {
+			delete(m, key)
+			save(m)
+			os.Exit(1)
+		}
+
 		delete(m, key)
 		save(m)
 		output(map[string]string{"status": "Success"})

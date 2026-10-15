@@ -74,9 +74,9 @@ private state; it cannot be serialized or reconstructed from public fields. A fi
 reference, untyped `verified` or `complete` flag, decoded report, or receipt or capability for a different
 artifact, evidence document, or policy is rejected.
 
-- The qualified verifier **emits the reproduction verdict** (ADR-04) and **consumes a handed-off
-  conformance result**. It never runs the suite to create its own promotion evidence; external
-  producer implementations remain outside that verifier.
+- For qualification and promotion, NVKR **emits the reproduction verdict** (ADR-04) and **consumes a
+  handed-off independently signed external conformance result**. It never runs that suite to create its
+  own conformance evidence. Explicit local diagnostics in §6 have no qualification or promotion authority.
 - `ConformanceReceipt { releaseSetDigest, inventoryDigest, vectorDigests[], suite, suitePolicyDigest, verdict,
   resultsDigest, effectiveEpoch, expiresEpoch }` is **independently signed** by a **conformance-signer identity
   distinct from the build/publish identity**. `vectorDigests` is sorted and exhaustive for the promoted set.
@@ -186,13 +186,22 @@ Source, patch, configuration and material identity/provenance checks remain mand
 no new upstream component manifest. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
 establishes producer-only disk evidence and defers disk inspection and material reconciliation.
 
-The manual diagnostic entrypoint takes an exact GitHub Run attempt URL and independently authored
+The manual artifact-check entrypoint takes an exact GitHub Run attempt URL and independently authored
 qualification policy. The policy approves the producer repository, workflow and default branch and pins the
 consumer verifier; neither the source Environment nor downloaded records can supply those decisions. The
 provider discovers the commit from the selected attempt and authenticates its successful default-branch
 execution. A Run URL without an attempt is ambiguous and is rejected.
 
-The real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+`lifecycle.CheckQualificationReference` additionally accepts an explicitly selected immutable publication
+root and independently selected qualification policy. It authenticates the root against that policy,
+reads the signed source `InvocationID`, discovers the producing Run internally, authenticates its exact
+handoff and recompiles the original inputs through the existing Run owner. The resulting receipt must
+bind the originally selected root; source records cannot select trust policy or substitute a publication.
+An error closes any returned receipt. This adds publication-based discovery, not a new trust lane.
+
+The production real-signing `per-output-v1` producer saves one bounded generated handoff under an exact Run/attempt artifact name.
+The development Environment cannot supply this qualification handoff; admission rejects it before
+qualification evidence collection while its separate signed build/publication workflow remains available.
 It carries original Plan bytes, the compiler-read authored file closure and original root/output predicates.
 Predicates are keyed by the aggregate root and each delivered payload reference. The collector validates
 the bounded aggregate metadata against the Plan and joins its exact output origins to the saved output-route
@@ -319,21 +328,47 @@ the approved scope and these contracts do not establish milestone completion or 
 
 ### 6. Passive external qualification handoff — deferred producer protocol
 
-The external suite owns execution, provisioning, process context and lifecycle. The qualified
-verifier never initiates or supervises it. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
+External conformance evidence used for qualification remains a passive handoff: the independent suite
+owns execution, provisioning, process context and lifecycle. NVKR never runs that suite to manufacture
+its own conformance evidence. A future qualification adapter must authenticate an already-produced independently signed observation containing pinned suite,
 suite policy, harness and environment identities, exact raw result bytes, subject and signature. It recomputes
 `resultsDigest`, checks role and subject, and applies coverage policy before issuing a receipt. Unsigned input,
 unpinned identities, caller-provided pass booleans, wrong roles, expired evidence or mismatched subjects fail
 closed with coded errors and no partial output. Release-set conformance remains exhaustive. Cluster topology and post-clearance deployment qualification
 are deferred outside the current artifact model (ADR-19); they cannot authorize promotion.
 
-The ADR-17 external `Producer` interface is usable by implementations outside the qualified verifier.
-Its output-description lane is **none (descriptive)**; wrapper validation and serialization issue no
-receipt. No producer execution is implemented at this boundary. A future separately user-invoked
-diagnostic adapter must remain isolated from qualification verification and cannot use its own
-unsigned outputs to authorize promotion. Cluster operation, generic test selection and qualification
-integration require their owning decisions; this contract activates none of them. ADR-05 keeps
-producer-supplied descriptions separate from publisher evidence and authenticated later observations.
+The separate user-invoked `validate` command runs explicit named diagnostic checks in lane **none
+(descriptive)**. `validation` owns profile admission and dispatch; `conformance` implements the
+`kube-conformance` / `hydrophone` adapter. `testresults` owns descriptions and serialization, not
+execution or interpretation. The [operator reference](../external-test-output-contract.md) owns
+configuration, prerequisites and field limits. This is an implemented diagnostic path under this
+proposed contract, not organizational ratification or production cluster qualification.
+
+The profile independently selects product and tools publication roots and qualification-policy documents.
+Lifecycle authenticates each root and its exact producing Run, retains live receipts, and exports selected
+executable members through the delivery owner. The adapter runs those held Linux executables with an
+embedded kubeconfig and bounded child-process lifetimes. Tools and suite images are ordinary catalog
+outputs; caller-authored binary paths, payload digests or raw image references cannot restore authority.
+The operator must explicitly declare an existing disposable local cluster. That declaration proves
+neither locality nor exclusive ownership. This host execution is not a sandbox (ADR-18 §3).
+
+`targets` is a caller-owned output-to-workload mapping under ADR-19 §3. Before/after API assertions
+compare selected named OCI artifacts, workload identities and observed image identities; they do not
+own deployment roles, provision a cluster, prove continuously installed bytes or cover unmapped outputs.
+The adapter creates test resources and joins cleanup; lifecycle owns receipt closure outside registered
+callbacks. Cancellation, receipt revocation, unknown resource ownership or failed cleanup cannot become
+a complete capture. Fleet lifecycle, site/tenant operation and automatic applicability remain unsupported.
+
+Normal process exit status is retained as a harness fact with an unknown cause. Complete capture means
+original report retention, terminal wrapper cleanup, matching subject observations and live bindings;
+it means neither valid reports, suite completeness nor test/harness success. A normal nonzero exit may
+therefore accompany complete capture and permit the next configured check. Signals, launch failures,
+timeouts/cancellation, capture I/O errors, missing results, identity drift and failed wrapper cleanup
+remain partial/error. No JUnit verdict parser or exit-code-to-test-verdict protocol is introduced.
+
+Unsigned diagnostic descriptions cannot authorize qualification, signing or promotion, or replace ADR-05's
+publisher evidence and authenticated later observations. This does not change §5's separately isolated
+delivered-tool smoke workers. Passive external conformance admission remains deferred as described above.
 
 ## Consequences
 
@@ -351,12 +386,14 @@ producer-supplied descriptions separate from publisher evidence and authenticate
 
 **Neutral**
 - The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
-  It runs no suite, performs no infra rollback, and authorizes no mutation.
+  Qualification consumes independently produced external conformance evidence; §6's explicit diagnostic
+  execution grants no qualification authority. NVKR performs no infrastructure rollback or fleet lifecycle management.
+  The unqualified artifact diagnostics proposed in ADR-23 do not cross this qualification boundary.
 
 ## Alternatives considered
 
 - **Infer conformance from reproduction (single gate).** Rejected — SEC-08 requires two independent gates.
-- **Run the conformance suite inside the qualified verifier.** Rejected — it breaks verifier isolation and the produce-vs-operate
+- **Run the conformance suite as its own qualification evidence.** Rejected — it breaks verifier isolation and the produce-vs-operate
   boundary.
 - **Select releases by tag.** Rejected — a mutable tag must never bypass digest and signature verification.
 - **Rollback that mutates running infrastructure.** Rejected — NVKR re-selects a verified set; the engine makes

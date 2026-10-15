@@ -43,6 +43,9 @@ func validateExecutableSelector(selector ExecutableSelector) error {
 	return nil
 }
 func validateToolSelections(description lifecycle.ArtifactCheckDescription, options Options) error {
+	if options.Hydrophone == options.Kubectl {
+		return e.New(e.CodeUsage, "conformance harness and kubectl require distinct executable selectors")
+	}
 	for _, selector := range []ExecutableSelector{options.Hydrophone, options.Kubectl} {
 		matches := 0
 		for _, output := range description.Outputs {

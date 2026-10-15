@@ -27,13 +27,13 @@ func appendProjection(output *testresults.Output, facts []testresults.Environmen
 	return nil
 }
 
-func admitProjectionCount(beforeFacts int, targets []DeploymentTarget) error {
+func admitProjectionCount(beforeFacts, provenanceFacts int, targets []DeploymentTarget) error {
 	replicas := 0
 	for _, target := range targets {
 		replicas += target.RequiredReplicas
 	}
-	// Source Run contributes four facts and the disposable acknowledgment one.
-	if 2*(beforeFacts+replicas)+5 > testresults.MaxEnvironmentFacts {
+	// Reserve provenance, disposable acknowledgment and terminal process status.
+	if 2*(beforeFacts+replicas)+provenanceFacts+2 > testresults.MaxEnvironmentFacts {
 		return projectionFailure(nil)
 	}
 	return nil
@@ -48,6 +48,7 @@ func admitTerminalProjection(output testresults.Output, before []testresults.Env
 		after[i].Phase = "after"
 	}
 	output.Environment = append(append(append([]testresults.EnvironmentFact(nil), output.Environment...), after...), deploymentFacts(baseline, "after")...)
+	output.Environment = append(output.Environment, testresults.EnvironmentFact{Scope: "harness", Name: "process.exitCode", Phase: "after", Metadata: testresults.Metadata{Status: "observed", Value: "255"}})
 	// This private capacity reservation is never returned as a captured report.
 	output.Reports = []testresults.ReportReference{{Format: testresults.FormatJUnit, Profile: JUnitProfile, Reference: reportPath, Digest: blobDigest(nil), ByteLength: maxReportBytes}}
 	if _, err := testresults.Encode(output); err != nil {

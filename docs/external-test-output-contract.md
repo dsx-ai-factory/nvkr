@@ -3,20 +3,13 @@
 `pkg/nvkr/testresults` describes outputs supplied by external test producers. Its lane is **none
 (descriptive)**. It supplies an interface, wrapper validation and deterministic serialization, with no
 producer implementation, execution, report parser, file collector, signing or qualification integration.
-The separate generic diagnostic workflow below supplies one concrete producer without changing that
-descriptive contract or activating qualified-verifier execution.
 [Reconciliation](adr/reconciliation.md) owns implementation and disabled-path status.
 
 ## Producer boundary
 
-`Producer.Produce(context.Context) (Output, error)` permits external implementations to execute
-outside the qualified verifier. Implementations own suite/harness configuration, arguments, permitted
-environment, access requirements and child-process lifecycle. No implementation ships at this boundary.
-User-invoked diagnostic adapters remain separate from qualification verification; see
-[ADR-16's passive handoff](adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
-and [ADR-05's trust-object separation](adr/0005-trust-object-model-and-digest-authentication.md#4-publisher-evidence-and-later-observations-are-different-trust-objects).
-The output-description package supplies no dispatcher or cluster provisioning. Diagnostic check
-selection is explicit in a separate profile, not inferred from these descriptions.
+`Producer.Produce(context.Context) (Output, error)` is the output implementation interface.
+[ADR-16 §6](adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns its execution and authority boundary. The fields below describe its output; execution requires the separate explicit diagnostic profile below.
 
 `Output` uses schema `nvkr.dev/test-results-output/v1`. It describes `ProducerIdentity`,
 `SuiteSelection`, optional `HarnessIdentity`, `Reports []ReportReference`,
@@ -25,7 +18,12 @@ name/selection/revision and harness name/version stay separate. Raw credentials 
 
 `CaptureStatus` is `complete` or `partial`. Complete requires at least one report reference; partial
 may contain none. This declares capture availability, not suite success, format validity or passing tests.
-An error may accompany partial diagnostic output. Metadata status is `declared`, `observed`, `unknown`
+A normal nonzero harness exit can accompany complete capture: original bytes, terminal wrapper cleanup,
+matching observations and live subject bindings must all be retained. The observed `harness/process.exitCode`
+fact has an unknown cause and cannot distinguish failed tests from a late harness failure. CLI success means
+capture completed, not that reports are valid, a suite completed or tests passed. Signals, launch failure,
+timeout/cancellation, capture I/O errors, missing results, identity drift and failed wrapper cleanup remain
+partial/error. An error may accompany partial diagnostic output. Metadata status is `declared`, `observed`, `unknown`
 or `unavailable`; unknown/unavailable carries no value. Environment facts have explicit scope and
 `before`, `during`, `after` or `unknown` phase. Observed metadata is descriptive, not independently
 authenticated. Missing data stays absent or unknown; never fabricate a Run/attempt, timestamp,
@@ -35,7 +33,7 @@ installed artifact, successful cleanup or passing result.
 
 A producer may reference original JUnit XML, CTRF JSON, or both. `ReportReference` declares format,
 profile, opaque location, exact SHA-256 and byte length. Validation never opens that location or
-recomputes its digest. A collector must independently check the original bytes. Independent
+recomputes its digest. A future collector must independently check the original bytes. Independent
 JUnit/CTRF files need no conversion link. Optional `DerivedFrom` names another included original
 reference, with one derivation step only; it proves no conversion. No report bytes are rewritten.
 
@@ -63,6 +61,16 @@ nvkr validate --config validation.json --workspace .nvkr/validation
 nvkr validate --config validation.json --workspace .nvkr/validation cluster-conformance
 ```
 
+This route requires Linux execution support, a complete embedded HTTPS kubeconfig, and an explicitly
+acknowledged existing disposable local cluster. That acknowledgement proves neither locality nor exclusive
+ownership; selected tools execute on the host with cluster credentials, without a sandbox. See
+[ADR-18 §3](adr/0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks).
+Product and tools roots must be signed `per-output-v1` hosted publications carrying a qualification handoff;
+unsigned local/dry-run and legacy aggregate outputs cannot supply this capability. Both policy paths name
+independently selected qualification-policy documents in the [M3 policy format](lifecycle.md#authenticate-an-m3-candidate).
+Set `NVKR_GITHUB_TOKEN` for producing-Run and handoff reads. Trust policy and verifier pins remain independent
+of downloaded records.
+
 The profile explicitly selects a published source and independently selected policy. Replace the
 reference placeholder with the immutable publication root; there is no automatic latest lookup:
 
@@ -81,8 +89,11 @@ Registry authentication is explicit. The CLI selects anonymous access only when 
 `NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD` are all absent. Otherwise supply the complete
 host-scoped tuple; partial credentials fail owning admission. SDK callers must set
 `ValidationOptions.Registry.Anonymous = true` or supply complete matching scoped credentials.
-Ambient Docker configuration and credential helpers are not used by this published-source adapter.
-Provider read credentials remain independently explicit; no registry/provider secret reaches cluster tools.
+Registry reads use the selected anonymous or host-scoped transport, and OCI cosign children receive private
+Docker/Podman configuration rather than ambient configuration. This does not disable every cosign provider
+keychain: ambient cloud/provider variables and helper lookup may still affect cosign verification. Anonymous
+transport selection is not proof of anonymous cosign provider access. Provider read credentials remain
+independently explicit; registry/provider secrets are not forwarded in the cluster tools' restricted environment.
 
 Relative policy and check-configuration paths resolve beside the profile. Lifecycle owns publication,
 source-Run lookup and artifact authentication; customers need no GitHub Run URL. An unsigned local
@@ -172,7 +183,8 @@ identities and subject digests are validated by their existing owners without au
 
 ## Validation and serialization
 
-`Output.Validate()` checks wrapper shape and declarations. `Encode(Output)` validates, defensively
+`Output.Validate()` checks wrapper shape and declarations; success does not guarantee the aggregate
+document fits the serialized byte limit. `Encode(Output)` validates, defensively
 copies and sorts descriptions through the existing canonical codec. `Decode([]byte)` admits at most
 16 MiB, validates exact canonical bytes and rejects non-normalized collection order. Selection,
 report and subject collections are bounded to 1,024 entries each; environment facts to 10,000.
@@ -186,6 +198,6 @@ Deterministic serialization supplies no new digest family or structured identity
 publisher evidence. Existing validation-vector v3 (including `ConformanceClaim` and
 `ValidationVectorRef`) and qualification-evidence v2 remain unchanged. This output cannot authorize
 artifact verification, qualification signing, promotion or release, nor establish current cluster health.
-The explicit diagnostic route supplies scoped producer execution and raw file retention. Other
-producer integration, format adapters, coverage policy and authenticated external handoff remain
-unimplemented. No qualified-verifier execution or external runtime acceptance is claimed.
+The configured diagnostic route supplies capture and selected-subject observations. Format adapters,
+coverage policy and independently authenticated external qualification handoff remain unimplemented;
+contract tests establish no external runtime acceptance.

@@ -127,6 +127,16 @@ The maintained pipeline-attested workflow trusts the bootstrap job and same-Run 
 it does not independently checksum the downloaded helper before restoring its execute bit. This delivery
 contract is not the qualified exact-helper-byte verification required below.
 
+The explicit diagnostic `validate` route is separate from generated producer execution. It is Linux-only
+and executes authenticated, held tool bytes on the host with the selected embedded kubeconfig. Private
+workspaces, pinned descriptors, bounded output, restricted environment and process cancellation/join
+protect capture and lifecycle; they provide no filesystem, network, privilege or container sandbox.
+The cluster endpoint can be remote: local/disposable acknowledgement is an operator declaration, not
+proof of locality or exclusive ownership. Admission requires that explicit acknowledgement and exact
+selected subjects; the operator owns endpoint access and execution trust. This route grants no qualified
+execution, fleet-management or promotion authority. ADR-16 §6 owns its scope; it does not weaken the
+producer isolation or native ARC requirements below.
+
 Landlock/seccomp application and process replacement run on one dedicated locked OS thread. Restrictions are
 thread-local before exec; a Go scheduler handoff must not change the thread that enters the build command.
 If the transition fails, its goroutine exits without unlocking so the runtime retires the possibly restricted

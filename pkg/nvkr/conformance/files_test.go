@@ -143,3 +143,48 @@ func TestRunReferenceFilesRefusesWrongLocatorBeforeConfiguration(t *testing.T) {
 func toolsSourceFixture() PublishedSource {
 	return PublishedSource{Reference: "registry.example.test/tools@sha256:" + strings.Repeat("a", 64), Policy: "/must-not-open-policy"}
 }
+
+func TestToolsSourceAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		edit  func(*PublishedSource)
+		valid bool
+	}{
+		{"exact publication", func(*PublishedSource) {}, true},
+		{"missing reference", func(s *PublishedSource) { s.Reference = "" }, false},
+		{"tagged reference", func(s *PublishedSource) { s.Reference = "registry.example.test/tools:latest" }, false},
+		{"URI reference", func(s *PublishedSource) { s.Reference = "oci://" + s.Reference }, false},
+		{"missing policy", func(s *PublishedSource) { s.Policy = "" }, false},
+		{"policy leading whitespace", func(s *PublishedSource) { s.Policy = " policy.json" }, false},
+		{"policy control", func(s *PublishedSource) { s.Policy = "policy\n.json" }, false},
+		{"policy maximum", func(s *PublishedSource) { s.Policy = "/" + strings.Repeat("p", 4095) }, true},
+		{"policy over maximum", func(s *PublishedSource) { s.Policy = "/" + strings.Repeat("p", 4096) }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var config Configuration
+			if err := json.Unmarshal(configurationBytes(t), &config); err != nil {
+				t.Fatal(err)
+			}
+			tc.edit(&config.ToolsSource)
+			raw, err := json.Marshal(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err = os.WriteFile(path, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, _, err = loadConfiguration(t.Context(), path, "/must-not-create")
+			if tc.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				requireCode(t, err, e.CodeUsage)
+				if !strings.Contains(err.Error(), "published tools source and policy") {
+					t.Fatalf("wrong admission branch: %v", err)
+				}
+			}
+		})
+	}
+}

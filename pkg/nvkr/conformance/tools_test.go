@@ -129,3 +129,75 @@ func TestExecutableWriterBudgetAndCancellation(t *testing.T) {
 		t.Fatalf("canceled write admitted: %d %v", n, err)
 	}
 }
+
+func TestToolSelectionAdmission(t *testing.T) {
+	for _, tool := range []string{"hydrophone", "kubectl"} {
+		for _, tc := range []struct {
+			name string
+			edit func(*lifecycle.ArtifactCheckDescription, *Options)
+			code e.Code
+		}{
+			{"exact", func(*lifecycle.ArtifactCheckDescription, *Options) {}, ""},
+			{"missing output", func(d *lifecycle.ArtifactCheckDescription, _ *Options) { d.Outputs = d.Outputs[1:] }, e.CodeVerifyFailed},
+			{"duplicate output", func(d *lifecycle.ArtifactCheckDescription, _ *Options) { d.Outputs = append(d.Outputs, d.Outputs[0]) }, e.CodeVerifyFailed},
+			{"image output", func(d *lifecycle.ArtifactCheckDescription, _ *Options) { d.Outputs[0].Kind = lifecycle.OutputOCI }, e.CodeEngineCapability},
+			{"wrong platform", func(d *lifecycle.ArtifactCheckDescription, _ *Options) { d.Outputs[0].Platform = "linux/other" }, e.CodeEngineCapability},
+			{"missing member", func(d *lifecycle.ArtifactCheckDescription, o *Options) {
+				member := o.Hydrophone.Member
+				if tool == "kubectl" {
+					member = o.Kubectl.Member
+				}
+				for i := range d.Outputs[0].BuildSubjects {
+					if d.Outputs[0].BuildSubjects[i].Component == member {
+						d.Outputs[0].BuildSubjects[i].Component = "sibling"
+					}
+				}
+			}, e.CodeVerifyFailed},
+			{"duplicate member", func(d *lifecycle.ArtifactCheckDescription, o *Options) {
+				subject := d.Outputs[0].BuildSubjects[0]
+				if tool == "kubectl" {
+					subject = d.Outputs[0].BuildSubjects[1]
+				}
+				d.Outputs[0].BuildSubjects = append(d.Outputs[0].BuildSubjects, subject)
+			}, e.CodeVerifyFailed},
+			{"identical selectors", func(_ *lifecycle.ArtifactCheckDescription, o *Options) { o.Kubectl = o.Hydrophone }, e.CodeUsage},
+		} {
+			t.Run(tool+"/"+tc.name, func(t *testing.T) {
+				d, o := toolsDescriptionFixture(), optionsFixture()
+				tc.edit(&d, &o)
+				err := validateToolSelections(d, o)
+				if tc.code == "" {
+					if err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					requireCode(t, err, tc.code)
+				}
+			})
+		}
+	}
+}
+
+func TestDiagnosticWriterFailuresRemainSticky(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		sink io.Writer
+		want error
+	}{
+		{"short write", diagnosticSink(func(p []byte) (int, error) { return len(p) - 1, nil }), io.ErrShortWrite},
+		{"write error", diagnosticSink(func([]byte) (int, error) { return 0, io.ErrClosedPipe }), io.ErrClosedPipe},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &boundedBuffer{limit: 8, sink: tc.sink}
+			for range 2 {
+				if _, err := b.Write([]byte("data")); !errors.Is(err, tc.want) || !errors.Is(b.err, tc.want) {
+					t.Fatalf("lost diagnostic I/O failure: %v %v", err, b.err)
+				}
+			}
+		})
+	}
+}
+
+type diagnosticSink func([]byte) (int, error)
+
+func (f diagnosticSink) Write(p []byte) (int, error) { return f(p) }

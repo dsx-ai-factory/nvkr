@@ -802,11 +802,13 @@ func (s *CosignOCISigner) writeDockerConfig(ctx context.Context, workspace strin
 }
 
 // ociCosignEnvironment is the qualified cosign environment plus exclusive
-// control of registry authentication. HOME is private because the upstream
-// Docker keychain checks HOME before DOCKER_CONFIG. It keeps the ambient scrub of the
+// control of Docker registry configuration. When a private workspace is supplied,
+// HOME is replaced because the upstream Docker keychain checks HOME before
+// DOCKER_CONFIG. Blob adapters without a registry workspace keep their ambient
+// home and cache locations. It keeps the ambient scrub of the
 // sign-blob/verify-blob adapters (loader injection, COSIGN_*, SIGSTORE_*, TUF_*,
-// SOURCE_DATE_EPOCH) and additionally removes every ambient registry-credential
-// control, so the only credential in scope is the one this adapter wrote.
+// SOURCE_DATE_EPOCH) and additionally removes ambient Docker/Podman registry
+// configuration controls.
 // ACTIONS_ID_TOKEN_REQUEST_URL/TOKEN are deliberately preserved: they are how
 // keyless signing obtains its workload identity in GitHub Actions.
 func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
@@ -818,7 +820,11 @@ func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 			name = entry[:i]
 		}
 		switch strings.ToUpper(name) {
-		case "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR", "DOCKER_CONFIG", "DOCKER_AUTH_CONFIG", "REGISTRY_AUTH_FILE", "REGISTRY_AUTH_TOKEN":
+		case "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR":
+			if dockerConfigDir != "" {
+				continue
+			}
+		case "DOCKER_CONFIG", "DOCKER_AUTH_CONFIG", "REGISTRY_AUTH_FILE", "REGISTRY_AUTH_TOKEN":
 			continue
 		}
 		out = append(out, entry)

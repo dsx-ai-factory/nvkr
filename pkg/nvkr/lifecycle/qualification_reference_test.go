@@ -5,6 +5,7 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -94,9 +95,10 @@ func TestQualificationReferenceOwnedSourceAdmission(t *testing.T) {
 }
 
 func TestQualificationReferenceBindsExactCandidateAndLifetime(t *testing.T) {
-	for _, mode := range []string{"matching", "different reference", "closed source", "late cancellation"} {
+	request, consumer, verifier := newQualificationFixture(t)
+	for _, mode := range []string{"matching", "different reference", "closed source", "late cancellation", "receipt and error"} {
 		t.Run(mode, func(t *testing.T) {
-			request, consumer, verifier := newQualificationFixture(t)
+			verifier.source = qualificationSourceFixture()
 			checked, _, err := consumer.checkQualification(t.Context(), request, verifier.source)
 			if err != nil {
 				t.Fatal(err)
@@ -126,6 +128,9 @@ func TestQualificationReferenceBindsExactCandidateAndLifetime(t *testing.T) {
 				if mode == "late cancellation" {
 					cancel()
 				}
+				if mode == "receipt and error" {
+					return checked, nil, e.New(e.CodeUnavailable, "source check failed after issuing receipt")
+				}
 				return checked, nil, nil
 			}
 			got, report, err := checkQualificationReferenceWithPolicy(ctx, reference, policy, QualificationRuntimeOptions{}, authenticate, run)
@@ -140,6 +145,9 @@ func TestQualificationReferenceBindsExactCandidateAndLifetime(t *testing.T) {
 				}
 				if mode == "late cancellation" {
 					code = e.CodeTimeout
+				}
+				if mode == "receipt and error" {
+					code = e.CodeUnavailable
 				}
 				assertCode(t, err, code)
 				if got != nil || report != nil {
@@ -217,5 +225,108 @@ func TestQualificationReferenceTransportAdmission(t *testing.T) {
 		if !strings.Contains(err.Error(), "ambient credential helpers") {
 			t.Fatalf("did not refuse auth before policy/tool/provider work: %v", err)
 		}
+	}
+}
+
+func TestQualificationSelectedRunAdmissionBeforeProviderIO(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, tc := range []struct {
+		name    string
+		ctx     context.Context
+		locator qualificationorigin.RunLocator
+		policy  QualificationPolicy
+		code    e.Code
+	}{
+		{"nil context", nil, qualificationorigin.RunLocator{}, qualificationPolicyFixture(), e.CodeUsage},
+		{"canceled", canceled, qualificationorigin.RunLocator{}, qualificationPolicyFixture(), e.CodeVerifyFailed},
+		{"bad policy", t.Context(), qualificationorigin.RunLocator{}, QualificationPolicy{}, e.CodeTrustPolicyMissing},
+		{"bad locator", t.Context(), qualificationorigin.RunLocator{}, qualificationPolicyFixture(), e.CodeUsage},
+		{"foreign repository", t.Context(), qualificationorigin.RunLocator{Repository: "other/repo", RunID: "42", Attempt: "2"}, qualificationPolicyFixture(), e.CodeUntrustedSigner},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			receipt, report, err := checkQualificationRunWithPolicyAndReference(tc.ctx, tc.locator, tc.policy, QualificationRuntimeOptions{}, "registry.example.test/product@sha256:"+strings.Repeat("a", 64))
+			assertCode(t, err, tc.code)
+			if receipt != nil || report != nil {
+				t.Fatal("provider admission returned authority")
+			}
+			if tc.ctx == canceled && !errors.Is(err, context.Canceled) {
+				t.Fatal("provider cancellation cause lost")
+			}
+		})
+	}
+}
+
+func TestQualificationRunReferenceOwnsCompletionAndFailureCleanup(t *testing.T) {
+	request, consumer, verifier := newQualificationFixture(t)
+	for _, mode := range []string{"download error", "reference mismatch", "check error", "receipt and error", "successful ownership"} {
+		t.Run(mode, func(t *testing.T) {
+			closed, checks := 0, 0
+			closeSource := func() error { closed++; return nil }
+			cause := e.New(e.CodeUnavailable, "bounded provider failure")
+			reference := request.Reference
+			raw := qualificationHandoffJSON(t, QualificationHandoff{Candidate: QualificationCandidate{Reference: reference}})
+			if mode == "reference mismatch" {
+				reference = "registry.example.test/other@sha256:" + strings.Repeat("b", 64)
+			}
+			var issued *ArtifactCheckReceipt
+			download := func(context.Context) ([]byte, error) {
+				if mode == "download error" {
+					return nil, cause
+				}
+				return raw, nil
+			}
+			check := func(ctx context.Context, got []byte) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
+				checks++
+				if string(got) != string(raw) {
+					t.Fatal("downloaded handoff bytes changed")
+				}
+				if mode == "check error" {
+					return nil, nil, cause
+				}
+				var report *ArtifactCheckDescription
+				var err error
+				issued, report, err = consumer.checkQualification(ctx, request, verifier.source)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = issued.Close() })
+				if mode == "receipt and error" {
+					return issued, report, cause
+				}
+				return issued, report, nil
+			}
+			got, report, err := completeQualificationRunReference(t.Context(), reference, closeSource, download, check)
+			if mode == "successful ownership" {
+				if err != nil || got != issued || report == nil || closed != 0 {
+					t.Fatalf("ownership transfer failed: %v closes%d", err, closed)
+				}
+				if err := got.Close(); err != nil {
+					t.Fatal(err)
+				}
+				if closed != 1 {
+					t.Fatal("receipt did not own source closure")
+				}
+				return
+			}
+			code := e.CodeUnavailable
+			if mode == "reference mismatch" {
+				code = e.CodeVerifyFailed
+			}
+			assertCode(t, err, code)
+			if mode != "reference mismatch" && !errors.Is(err, cause) {
+				t.Fatal("failure cause changed")
+			}
+			if closed != 1 || got != nil {
+				t.Fatalf("failed run leaked ownership: closes%d receipt%v", closed, got)
+			}
+			if (mode == "download error" || mode == "reference mismatch") && checks != 0 {
+				t.Fatal("failed transport or selection reached artifact work")
+			}
+			if issued != nil {
+				_, err := issued.Description()
+				assertCode(t, err, e.CodeGateUnmet)
+			}
+		})
 	}
 }

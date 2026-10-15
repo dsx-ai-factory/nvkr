@@ -17,12 +17,10 @@ version `v1.36.3-dirty` and tree state `dirty` in both upstream version packages
 
 Each source command checks exact original and resulting module/workspace hashes,
 downloads the complete dependency closure, and vendors before the build runs
-with network disabled. The selected native Go images were exercised with
-`go version` and report Go 1.27.2. Dependency resolution upgrades eight existing
-modules for Hydrophone and twelve for kubectl, with no new module families. The
-changed Go modules retain BSD-3-Clause licenses; the three OpenTelemetry modules
-retain Apache-2.0. Generated locks are maintained by `catalog pin` and
-`catalog pin-artifacts`, not edited by hand.
+with network disabled. Run `go version` in the selected native toolchain image
+and review the resulting dependency closure before admitting its outputs.
+Generated locks are maintained by `catalog pin` and `catalog pin-artifacts`,
+not edited by hand.
 
 The Hydrophone component applies the hash-bound `patches/bounded-download.patch`
 after source vendoring. It limits each downloaded log/report to 64 MiB and exec
@@ -35,12 +33,13 @@ maintained catalog producer, not arbitrary authenticated tools.
 The adapter disables upstream progress-status collection, whose separate exec
 buffer path is therefore unused by this invocation.
 
-The source candidates and their actual catalog-produced ARM64 binaries passed
-`govulncheck` 1.8.0 source/binary scans against database revision `2026-10-08T22:31:09Z`.
-Hydrophone upstream unit tests and focused kubectl version/get/apply tests passed.
-Normal local catalog runs built, observed and packaged the ARM64 tools; AMD64
-catalog execution and hosted publication were not exercised. Raw diagnostic logs
-and scan JSON remain outside the repository.
+Before using newly produced tools, run the upstream Hydrophone tests, the
+kubectl version/get/apply tests, and source and binary vulnerability scans against
+the current database. Record the exact source, dependency closure, produced bytes,
+scanner version and database revision with the Run artifacts. Repeat these checks
+when a source, patch, dependency or toolchain pin changes. The commands below are
+reproduction procedures, not a recorded acceptance result for either architecture
+or for hosted publication.
 
 The image references preserve the original local diagnostic suite selection.
 They are acquired without upstream evidence (`evidence: none`) and retain their

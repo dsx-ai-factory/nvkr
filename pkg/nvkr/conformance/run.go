@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -86,7 +87,7 @@ func (p *Producer) Produce(ctx context.Context) (output testresults.Output, resu
 		}
 		return p.options.Artifacts.WithDiagnosticOperation(toolsContext, func(operation context.Context, description lifecycle.ArtifactCheckDescription) error {
 			var err error
-			output, err = p.produce(operation, description)
+			output, err = p.produce(operation, description, tools)
 			return err
 		})
 	})
@@ -94,13 +95,20 @@ func (p *Producer) Produce(ctx context.Context) (output testresults.Output, resu
 }
 
 // produce is private: only the public receipt-owned operation admits production use.
-func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCheckDescription) (output testresults.Output, resultErr error) {
+func (p *Producer) produce(ctx context.Context, description, tools lifecycle.ArtifactCheckDescription) (output testresults.Output, resultErr error) {
 	defer func() {
 		if resultErr != nil && output.SchemaVersion != "" {
 			output.CaptureStatus = testresults.CapturePartial
 		}
 	}()
 	outputs, err := selectOutputs(description, p.options.Targets)
+	if err != nil {
+		return testresults.Output{}, err
+	}
+	if err = validateToolSelections(tools, p.options); err != nil {
+		return testresults.Output{}, err
+	}
+	image, busybox, err := resolveImages(tools, p.options)
 	if err != nil {
 		return testresults.Output{}, err
 	}
@@ -123,16 +131,7 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 	if err != nil {
 		return testresults.Output{}, err
 	}
-	if p.captureTool == nil {
-		toolsDescription, descriptionErr := p.options.ToolArtifacts.Description()
-		if descriptionErr != nil {
-			return testresults.Output{}, descriptionErr
-		}
-		a.options.Image, a.options.BusyboxImage, err = resolveImages(toolsDescription, p.options)
-		if err != nil {
-			return testresults.Output{}, err
-		}
-	}
+	a.options.Image, a.options.BusyboxImage = image, busybox
 	o := a.options
 	root, err := filepath.Abs(o.WorkspaceRoot)
 	if err != nil {
@@ -147,14 +146,17 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 		Suite:    testresults.SuiteSelection{Name: o.SuiteName, Selection: []string{`\[Conformance\]`}, Revision: testresults.Metadata{Status: "declared", Value: o.Image}},
 		Harness:  &testresults.HarnessIdentity{Name: "hydrophone", Version: testresults.Metadata{Status: "unknown"}},
 	}
-	for _, fact := range []struct{ name, value string }{{"invocationID", description.Origin.InvocationID}, {"commit", description.Origin.Commit}, {"repository", description.Origin.Repository}, {"workflow", description.Origin.Workflow}} {
-		metadata := testresults.Metadata{Status: "unavailable"}
-		if fact.value != "" {
-			metadata = testresults.Metadata{Status: "observed", Value: fact.value}
+	facts := append(publicationFacts("sourceRun", description), publicationFacts("toolsSource", tools)...)
+	for _, tool := range []struct {
+		name     string
+		selector ExecutableSelector
+	}{{"hydrophone", o.Hydrophone}, {"kubectl", o.Kubectl}} {
+		for _, field := range []struct{ name, value string }{{"output", tool.selector.Output}, {"member", tool.selector.Member}, {"platform", tool.selector.Platform}} {
+			facts = append(facts, testresults.EnvironmentFact{Scope: "toolsSource", Name: tool.name + "." + field.name, Phase: "before", Metadata: testresults.Metadata{Status: "observed", Value: field.value}})
 		}
-		if projectionErr := appendProjection(&output, []testresults.EnvironmentFact{{Scope: "sourceRun", Name: fact.name, Phase: "before", Metadata: metadata}}); projectionErr != nil {
-			return output, errors.Join(err, projectionErr)
-		}
+	}
+	if err = appendProjection(&output, facts); err != nil {
+		return output, err
 	}
 	before, err := a.observe(ctx, workspace, "before")
 	projectionErr := appendProjection(&output, before)
@@ -165,7 +167,7 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 	if err != nil {
 		return output, err
 	}
-	if err = admitProjectionCount(len(before), o.Targets); err != nil {
+	if err = admitProjectionCount(len(before), len(facts), o.Targets); err != nil {
 		return output, err
 	}
 	baseline, subjects, err := a.observeDeployments(ctx, workspace, outputs)
@@ -208,7 +210,12 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 	}
 	owned := map[string]string{refs[0].path: ns.Metadata.UID}
 	args := []string{"--conformance", "--disable-progress-status", "--namespace=" + namespace, "--skip-preflight=" + namespace, "--conformance-image=" + o.Image, "--busybox-image=" + o.BusyboxImage, "--output-dir=" + workspace, "--parallel=1", "--verbosity=1", "--startup-timeout=" + o.StartupTimeout.String()}
-	_, _, runErr := a.command(ctx, a.hydrophone, args, workspace, nil, o.RunTimeout)
+	_, exitCode, runErr := a.command(ctx, a.hydrophone, args, workspace, nil, o.RunTimeout)
+	exitStatus := testresults.Metadata{Status: "unavailable"}
+	if exitCode >= 0 {
+		exitStatus = testresults.Metadata{Status: "observed", Value: strconv.Itoa(exitCode)}
+	}
+	exitProjectionErr := appendProjection(&output, []testresults.EnvironmentFact{{Scope: "harness", Name: "process.exitCode", Phase: "after", Metadata: exitStatus}})
 	// Recovery and cleanup own bounded contexts after a canceled runner is joined.
 	recoveryCtx, recoveryCancel := context.WithTimeout(context.Background(), o.CommandTimeout)
 	defer recoveryCancel()
@@ -238,7 +245,7 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), o.CleanupTimeout)
 	defer cancel()
 	cleanupErr := a.cleanup(cleanupCtx, workspace, refs, owned, namespace)
-	afterCtx, afterCancel := context.WithTimeout(context.Background(), o.CommandTimeout)
+	afterCtx, afterCancel := context.WithTimeout(context.Background(), afterObservationTimeout(o))
 	defer afterCancel()
 	after, afterErr := a.observe(afterCtx, workspace, "after")
 	afterProjectionErr := appendProjection(&output, after)
@@ -257,13 +264,32 @@ func (p *Producer) produce(ctx context.Context, description lifecycle.ArtifactCh
 		}
 		return a.Name < b.Name
 	})
-	if err := errors.Join(runErr, cleanupErr, afterErr, afterProjectionErr, deploymentErr, deploymentProjectionErr, readErr); err != nil {
+	if err := errors.Join(runErr, exitProjectionErr, cleanupErr, afterErr, afterProjectionErr, deploymentErr, deploymentProjectionErr, readErr); err != nil {
 		return output, err
 	}
 	output.CaptureStatus = testresults.CaptureComplete
 	_, err = testresults.Encode(output)
 	return output, err
 }
+
+func publicationFacts(scope string, description lifecycle.ArtifactCheckDescription) []testresults.EnvironmentFact {
+	facts := make([]testresults.EnvironmentFact, 0, 5)
+	for _, fact := range []struct{ name, value string }{{"publication", description.Inputs.ReleaseSubject}, {"invocationID", description.Origin.InvocationID}, {"commit", description.Origin.Commit}, {"repository", description.Origin.Repository}, {"workflow", description.Origin.Workflow}} {
+		metadata := testresults.Metadata{Status: "unavailable"}
+		if fact.value != "" {
+			metadata = testresults.Metadata{Status: "observed", Value: fact.value}
+		}
+		facts = append(facts, testresults.EnvironmentFact{Scope: scope, Name: fact.name, Phase: "before", Metadata: metadata})
+	}
+	return facts
+}
+
+func afterObservationTimeout(options Options) time.Duration {
+	// observe uses version/nodes/CNI calls; deployment observation uses nodes,
+	// cluster UID, and one call per target. Each retains its own command timeout.
+	return min(time.Duration(len(options.Targets)+5)*options.CommandTimeout, 6*time.Hour)
+}
+
 func saveOriginal(ctx context.Context, path string, raw []byte) error {
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "result capture canceled")
@@ -301,7 +327,8 @@ func blobDigest(raw []byte) string {
 type resourceRef struct{ path string }
 type object struct {
 	Metadata struct {
-		UID string `json:"uid"`
+		UID               string  `json:"uid"`
+		DeletionTimestamp *string `json:"deletionTimestamp"`
 	} `json:"metadata"`
 	Subjects []struct {
 		Namespace string `json:"namespace"`
@@ -368,15 +395,16 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 }
 
 // Keep the first deletion cause before subsequent GET or deadline errors. The
-// kubectl owner deliberately does not parse localized stderr: an unclassified
-// command refusal is permanent. Only an explicitly coded unavailable service or
-// bounded command timeout can be retried while the cleanup context remains live.
+// kubectl owner does not parse localized stderr. A fresh GET can prove absence
+// after a DELETE race; otherwise an unclassified refusal is permanent. Explicitly
+// coded unavailability/timeouts can be retried within the cleanup deadline.
 func cleanupDeleteLoop(ctx context.Context, refs []resourceRef, owned map[string]string,
 	get func(context.Context, resourceRef) (object, error),
 	deleteObject func(context.Context, resourceRef, []byte) error, interval time.Duration) error {
 	// RBAC precedes namespace deletion; every DELETE retains the exact UID precondition.
 	order := []resourceRef{refs[1], refs[2], refs[0]}
 	var firstDeleteErr error
+	deleting := map[string]bool{}
 	for {
 		if err := ctx.Err(); err != nil {
 			return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, err, "waiting for terminal cleanup"))
@@ -396,6 +424,10 @@ func cleanupDeleteLoop(ctx context.Context, refs []resourceRef, owned map[string
 			if found.Metadata.UID != uid {
 				return errors.Join(firstDeleteErr, failure("attempt resource replaced; cleanup rejected"))
 			}
+			if deleting[ref.path] || found.Metadata.DeletionTimestamp != nil {
+				deleting[ref.path] = true
+				continue
+			}
 			body, err := canonical.Marshal(struct {
 				APIVersion    string `json:"apiVersion"`
 				Kind          string `json:"kind"`
@@ -409,12 +441,28 @@ func cleanupDeleteLoop(ctx context.Context, refs []resourceRef, owned map[string
 				return errors.Join(firstDeleteErr, failure("encoding UID cleanup precondition"))
 			}
 			if err = deleteObject(ctx, ref, body); err != nil {
+				// Finalization may win the GET/DELETE race. Only a fresh successful
+				// GET proving absence can turn an unclassified DELETE refusal into success.
+				current, getErr := get(ctx, ref)
+				if getErr == nil && current.Metadata.UID == "" {
+					continue
+				}
+				if getErr != nil {
+					return errors.Join(firstDeleteErr, err, getErr)
+				}
+				if current.Metadata.UID != uid {
+					return errors.Join(firstDeleteErr, err, failure("attempt resource replaced; cleanup rejected"))
+				}
 				first := firstDeleteErr == nil
 				if first {
 					firstDeleteErr = err
 				}
 				if ctx.Err() != nil {
 					return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"))
+				}
+				if current.Metadata.DeletionTimestamp != nil {
+					deleting[ref.path] = true
+					continue
 				}
 				var coded *e.Error
 				if !errors.As(err, &coded) || (coded.Code != e.CodeUnavailable && coded.Code != e.CodeTimeout) {
@@ -423,6 +471,8 @@ func cleanupDeleteLoop(ctx context.Context, refs []resourceRef, owned map[string
 					}
 					return errors.Join(firstDeleteErr, err)
 				}
+			} else {
+				deleting[ref.path] = true
 			}
 		}
 		allAbsent := true

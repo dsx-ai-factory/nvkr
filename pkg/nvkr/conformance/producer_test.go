@@ -5,6 +5,7 @@ package conformance
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -96,29 +98,34 @@ func TestConfigurationAdmissionBeforeIO(t *testing.T) {
 	}
 }
 func TestKubeconfigAdmission(t *testing.T) {
-	tests := []struct {
-		name, raw, context string
-		valid              bool
-	}{
-		{"embedded token", kubeFixture, "exact", true},
-		{"wrong context", kubeFixture, "other", false},
-		{"external CA", strings.Replace(kubeFixture, "certificate-authority-data: Y2E=", "certificate-authority: /private/ca.pem", 1), "exact", false},
-		{"exec plugin", strings.Replace(kubeFixture, "token: private-token", "exec: {command: unpinned}", 1), "exact", false},
-		{"auth provider", strings.Replace(kubeFixture, "token: private-token", "auth-provider: {name: gcp}", 1), "exact", false},
-		{"duplicate target", strings.Replace(kubeFixture, "current-context: exact", "current-context: exact\ncurrent-context: other", 1), "exact", false},
-		{"TLS bypass", strings.Replace(kubeFixture, "certificate-authority-data: Y2E=", "insecure-skip-tls-verify: true", 1), "exact", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := checkKubeconfig([]byte(tt.raw), tt.context)
-			if (err == nil) != tt.valid {
-				t.Fatalf("valid=%v error=%v", tt.valid, err)
-			}
-			if err != nil {
-				var coded *e.Error
-				if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
+	for _, tc := range []struct{ name, raw, context, message string }{
+		{"embedded token", kubeFixture, "exact", ""},
+		{"embedded client certificate", strings.Replace(kubeFixture, "token: private-token", "client-certificate-data: Y2VydA==\n    client-key-data: a2V5", 1), "exact", ""},
+		{"wrong context", kubeFixture, "other", "single exact kubeconfig context"},
+		{"external CA", strings.Replace(kubeFixture, "certificate-authority-data: Y2E=", "certificate-authority: /private/ca.pem", 1), "exact", "without external files or plugins"},
+		{"exec plugin", strings.Replace(kubeFixture, "token: private-token", "exec: {command: unpinned}", 1), "exact", "without external files or plugins"},
+		{"auth provider", strings.Replace(kubeFixture, "token: private-token", "auth-provider: {name: gcp}", 1), "exact", "without external files or plugins"},
+		{"duplicate target", strings.Replace(kubeFixture, "current-context: exact", "current-context: exact\ncurrent-context: other", 1), "exact", "invalid private kubeconfig YAML"},
+		{"TLS bypass", strings.Replace(kubeFixture, "certificate-authority-data: Y2E=", "insecure-skip-tls-verify: true", 1), "exact", "without external files or plugins"},
+		{"plaintext server", strings.Replace(kubeFixture, "https://private.invalid", "http://private.invalid", 1), "exact", "exact TLS target and one embedded authentication method"},
+		{"missing CA", strings.Replace(kubeFixture, "certificate-authority-data: Y2E=", "certificate-authority-data: \"\"", 1), "exact", "exact TLS target and one embedded authentication method"},
+		{"token and certificate", strings.Replace(kubeFixture, "token: private-token", "token: private-token\n    client-certificate-data: Y2VydA==\n    client-key-data: a2V5", 1), "exact", "exact TLS target and one embedded authentication method"},
+		{"token and partial certificate", strings.Replace(kubeFixture, "token: private-token", "token: private-token\n    client-certificate-data: Y2VydA==", 1), "exact", "multiple authentication methods"},
+		{"no authentication", strings.Replace(kubeFixture, "token: private-token", "token: \"\"", 1), "exact", "exact TLS target and one embedded authentication method"},
+		{"missing client key", strings.Replace(kubeFixture, "token: private-token", "client-certificate-data: Y2VydA==", 1), "exact", "exact TLS target and one embedded authentication method"},
+		{"nonempty preferences", strings.Replace(kubeFixture, "preferences: {}", "preferences: {colors: true}", 1), "exact", "preferences unsupported"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkKubeconfig([]byte(tc.raw), tc.context)
+			if tc.message == "" {
+				if err != nil {
 					t.Fatal(err)
 				}
+				return
+			}
+			requireCode(t, err, e.CodeVerifyFailed)
+			if !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("wrong branch: %v, want %q", err, tc.message)
 			}
 		})
 	}
@@ -153,7 +160,7 @@ func produce(t *testing.T, o Options) (testresults.Output, error) {
 		t.Fatal(err)
 	}
 	p := &Producer{options: o, captureTool: fixtureCapture(o)}
-	return p.produce(t.Context(), artifactDescriptionFixture())
+	return p.produce(t.Context(), artifactDescriptionFixture(), toolsDescriptionFixture())
 }
 func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) {
 	for _, tc := range []struct {
@@ -167,7 +174,10 @@ func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) 
 		{"empty-retrievable", "", true},
 		{"large-retrievable", "", true},
 		{"delayed-cleanup", "", true},
-		{"failed", "exit 1", true},
+		{"failed", "", true},
+		{"signal", "exit -1", true},
+		{"slow-after", "", true},
+		{"delete-not-found", "", true},
 		{"after-failure", "pinned command failed", true},
 		{"missing", "original suite results unavailable", false},
 		{"cleanup-failure", "exit 8", true},
@@ -175,6 +185,9 @@ func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) 
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
 			o := buildFixture(t, tc.mode)
+			if tc.mode == "slow-after" {
+				o.CommandTimeout = 150 * time.Millisecond
+			}
 			if tc.mode == "delayed-cleanup" {
 				o.CleanupTimeout = 12 * time.Second
 			}
@@ -196,6 +209,17 @@ func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) 
 			}
 			if out.CaptureStatus != expectedCapture {
 				t.Fatalf("capture status %q want %q error %v", out.CaptureStatus, expectedCapture, err)
+			}
+			if tc.mode == "failed" || tc.mode == "signal" {
+				var status testresults.Metadata
+				for _, fact := range out.Environment {
+					if fact.Scope == "harness" && fact.Name == "process.exitCode" {
+						status = fact.Metadata
+					}
+				}
+				if tc.mode == "failed" && (status.Status != "observed" || status.Value != "1") || tc.mode == "signal" && status.Status != "unavailable" {
+					t.Fatalf("process status misclassified: %+v", status)
+				}
 			}
 			if (len(out.Reports) > 0) != tc.report {
 				t.Fatalf("report capture=%v error=%v", out.Reports, err)
@@ -370,5 +394,89 @@ func fixtureCapture(o Options) executableCapture {
 			_, err = destination.Write(raw)
 			return lifecycle.ExecutableMemberDescription{Output: output, Member: member, Platform: platform, PayloadDigest: blobDigest(raw), Size: int64(len(raw))}, err
 		})
+	}
+}
+
+func toolsDescriptionFixture() lifecycle.ArtifactCheckDescription {
+	d := artifactDescriptionFixture()
+	d.Inputs.ReleaseSubject = "registry.example.test/tools@" + d.Inputs.ContentSubject
+	d.Origin.InvocationID = "https://github.com/example/tools/actions/runs/2/attempts/1"
+	image := d.Outputs[0]
+	image.Name = "conformance"
+	image.Reference = "mirror.example.test/conformance@" + image.Subject
+	busybox := image
+	busybox.Name = "busybox"
+	busybox.Reference = "mirror.example.test/busybox@" + image.Subject
+	d.Outputs = []lifecycle.ArtifactCheckOutput{{Name: "tools", Kind: lifecycle.OutputExecutable, Platform: "linux/" + runtime.GOARCH, BuildSubjects: []delivery.BuildSubject{{Component: "hydrophone"}, {Component: "kubectl"}}}, image, busybox}
+	return d
+}
+
+func TestProducerUsesAuthenticatedImagesAndRetainsToolOrigins(t *testing.T) {
+	o := buildFixture(t, "success")
+	output, err := produce(t, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.argv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var argv []string
+	if err = json.Unmarshal(raw, &argv); err != nil {
+		t.Fatal(err)
+	}
+	tools := toolsDescriptionFixture()
+	for _, want := range []string{"--conformance-image=" + tools.Outputs[1].Reference, "--busybox-image=" + tools.Outputs[2].Reference} {
+		found := false
+		for _, arg := range argv {
+			found = found || arg == want
+		}
+		if !found {
+			t.Fatalf("authenticated argument %q missing: %v", want, argv)
+		}
+	}
+	facts := map[string]testresults.Metadata{}
+	for _, fact := range output.Environment {
+		facts[fact.Scope+"/"+fact.Name] = fact.Metadata
+	}
+	for key, want := range map[string]string{"sourceRun/invocationID": artifactDescriptionFixture().Origin.InvocationID, "toolsSource/publication": tools.Inputs.ReleaseSubject, "toolsSource/invocationID": tools.Origin.InvocationID, "toolsSource/hydrophone.output": o.Hydrophone.Output, "toolsSource/hydrophone.member": o.Hydrophone.Member, "toolsSource/hydrophone.platform": o.Hydrophone.Platform, "toolsSource/kubectl.output": o.Kubectl.Output, "toolsSource/kubectl.member": o.Kubectl.Member, "toolsSource/kubectl.platform": o.Kubectl.Platform, "harness/process.exitCode": "0"} {
+		if got := facts[key]; got.Status != "observed" || got.Value != want {
+			t.Fatalf("fact %s: %+v, want %q", key, got, want)
+		}
+	}
+}
+
+func TestAfterObservationTimeoutBudget(t *testing.T) {
+	for _, count := range []int{1, 64} {
+		o := optionsFixture()
+		o.Targets = make([]DeploymentTarget, count)
+		o.CommandTimeout = 5 * time.Minute
+		if got, want := afterObservationTimeout(o), time.Duration(count+5)*o.CommandTimeout; got != want {
+			t.Fatalf("%d targets: %s want %s", count, got, want)
+		}
+	}
+}
+
+func TestPrestartDiagnosticFailureDoesNotInventProcessExit(t *testing.T) {
+	o := buildFixture(t, "diagnostic-create-failure")
+	output, err := produce(t, o)
+	requireCode(t, err, e.CodeFetchFailed)
+	if !strings.Contains(err.Error(), "creating private Hydrophone diagnostics") || output.CaptureStatus != testresults.CapturePartial {
+		t.Fatalf("prestart failure lost: %+v %v", output, err)
+	}
+	found := false
+	for _, fact := range output.Environment {
+		if fact.Scope == "harness" && fact.Name == "process.exitCode" {
+			found = true
+			if fact.Metadata.Status != "unavailable" || fact.Metadata.Value != "" {
+				t.Fatalf("invented child exit: %+v", fact)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("missing unavailable process status")
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.argv")); !os.IsNotExist(err) {
+		t.Fatalf("prestart refusal ran child: %v", err)
 	}
 }

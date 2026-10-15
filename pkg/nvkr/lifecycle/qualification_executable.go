@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 )
@@ -104,6 +105,25 @@ func (receipt *ArtifactCheckReceipt) WriteExecutableMember(ctx context.Context, 
 	if publicationMatches != 1 || publicationDescription.Metadata.InvocationID != description.Origin.InvocationID {
 		return ExecutableMemberDescription{}, e.New(e.CodeVerifyFailed, "executable publication does not match its authenticated source binding")
 	}
+	member, err := streamExecutableMember(operation, publication, selected, memberName, platform, maxBytes, destination)
+	if err != nil {
+		return ExecutableMemberDescription{}, err
+	}
+	if _, err := receipt.Description(); err != nil {
+		return ExecutableMemberDescription{}, err
+	}
+	return member, nil
+}
+
+// executableMemberSource is the existing retained delivery boundary. The private
+// seam tests stream guards; only WriteExecutableMember admits receipt authority.
+type executableMemberSource interface {
+	ExecutableBundle(string) (delivery.BinaryBundle, error)
+	WriteExecutableMember(context.Context, string, string, io.Writer) (int64, error)
+}
+
+func streamExecutableMember(ctx context.Context, publication executableMemberSource, selected ArtifactCheckOutput, memberName, platform string, maxBytes int64, destination io.Writer) (ExecutableMemberDescription, error) {
+	outputName := selected.Name
 	bundle, err := publication.ExecutableBundle(outputName)
 	if err != nil {
 		return ExecutableMemberDescription{}, err
@@ -140,11 +160,11 @@ func (receipt *ArtifactCheckReceipt) WriteExecutableMember(ctx context.Context, 
 	if sourceMatches != 1 {
 		return ExecutableMemberDescription{}, e.New(e.CodeVerifyFailed, "executable member has no unique authenticated build subject")
 	}
-	if err := operation.Err(); err != nil {
+	if err := ctx.Err(); err != nil {
 		return ExecutableMemberDescription{}, e.Wrap(e.CodeTimeout, err, "executable member streaming canceled before write")
 	}
-	written, err := publication.WriteExecutableMember(operation, outputName, memberName, destination)
-	if canceled := operation.Err(); canceled != nil {
+	written, err := publication.WriteExecutableMember(ctx, outputName, memberName, destination)
+	if canceled := ctx.Err(); canceled != nil {
 		return ExecutableMemberDescription{}, e.Wrap(e.CodeTimeout, errors.Join(err, canceled), "executable member streaming canceled")
 	}
 	if err != nil {
@@ -156,9 +176,6 @@ func (receipt *ArtifactCheckReceipt) WriteExecutableMember(ctx context.Context, 
 	}
 	if written != member.Size {
 		return ExecutableMemberDescription{}, e.New(e.CodeVerifyFailed, "streamed executable member has a different size")
-	}
-	if _, err := receipt.Description(); err != nil {
-		return ExecutableMemberDescription{}, err
 	}
 	return member, nil
 }

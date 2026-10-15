@@ -164,7 +164,7 @@ local Run default described above, commands default to `--ui=plain` and keep the
 existing text, canonical JSON or diagram output. On commands with a result
 browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
 and `--ui=tui` are incompatible and fail before input, network or write work.
-`run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
+`validate`, `run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
 presentation flags.
 
 ```sh

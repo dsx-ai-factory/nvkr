@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
@@ -231,6 +232,62 @@ func TestArtifactExecutableMemberRequiresLiveBorrowedSource(t *testing.T) {
 			assertCode(t, err, e.CodeProvenanceMissing)
 			if got != (ExecutableMemberDescription{}) || phase == "before" && writes != 0 {
 				t.Fatal("revoked source produced successful member metadata or wrote before admission")
+			}
+		})
+	}
+}
+
+// Descriptive delivery fixture only; it cannot issue an ArtifactCheckReceipt.
+type executableStreamFixture struct {
+	bundle      delivery.BinaryBundle
+	onBundle    func()
+	streamCalls int
+	sizeDelta   int64
+}
+
+func (f *executableStreamFixture) ExecutableBundle(string) (delivery.BinaryBundle, error) {
+	if f.onBundle != nil {
+		f.onBundle()
+	}
+	return f.bundle, nil
+}
+func (f *executableStreamFixture) WriteExecutableMember(_ context.Context, _, _ string, destination io.Writer) (int64, error) {
+	f.streamCalls++
+	n, err := destination.Write([]byte("abc"))
+	return int64(n) + f.sizeDelta, err
+}
+func TestExecutableMemberDeliveryGuardsBeforeAndAfterWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mode   uint32
+		arch   string
+		delta  int64
+		cancel bool
+		code   e.Code
+		writes int
+	}{
+		{"non executable 0644", 0o644, "amd64", 0, false, e.CodeEngineCapability, 0},
+		{"bundle platform mismatch", 0o755, "arm64", 0, false, e.CodeVerifyFailed, 0},
+		{"stream size mismatch", 0o755, "amd64", 1, false, e.CodeVerifyFailed, 1},
+		{"canceled before stream", 0o755, "amd64", 0, true, e.CodeTimeout, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			digest := pipeline.FileDigest([]byte("abc"))
+			source := &executableStreamFixture{bundle: delivery.BinaryBundle{OS: "linux", Arch: tc.arch, Entries: []delivery.BinaryEntry{{Name: "tool", Mode: tc.mode, Size: 3, SHA256: digest}}}, sizeDelta: tc.delta}
+			if tc.cancel {
+				source.onBundle = cancel
+			}
+			selected := ArtifactCheckOutput{Name: "tools", BuildSubjects: []delivery.BuildSubject{{Component: "tool", Digest: digest}}}
+			var destination bytes.Buffer
+			got, err := streamExecutableMember(ctx, source, selected, "tool", "linux/amd64", 3, &destination)
+			assertCode(t, err, tc.code)
+			if got != (ExecutableMemberDescription{}) || source.streamCalls != tc.writes || tc.writes == 0 && destination.Len() != 0 {
+				t.Fatal("refused stream returned metadata or crossed its write boundary")
+			}
+			if tc.cancel && !errors.Is(err, context.Canceled) {
+				t.Fatal("cancellation cause lost")
 			}
 		})
 	}

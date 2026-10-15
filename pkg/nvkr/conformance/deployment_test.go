@@ -13,11 +13,12 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 )
 
 func artifactDescriptionFixture() lifecycle.ArtifactCheckDescription {
 	digest := "sha256:" + strings.Repeat("a", 64)
-	return lifecycle.ArtifactCheckDescription{Inputs: lifecycle.ExactInputDescription{ReleaseSubject: "registry.example.test/release@" + digest, PolicyDigest: digest, DefinitionDigest: digest, EnvironmentDigest: digest, PlanDigest: digest, ContentSubject: digest}, Outputs: []lifecycle.ArtifactCheckOutput{{Name: "image", Kind: lifecycle.OutputOCI, Reference: "registry.example.test/nvke@" + digest, Subject: digest, Platform: "linux/amd64"}}}
+	return lifecycle.ArtifactCheckDescription{Origin: qualificationorigin.Description{InvocationID: "https://github.com/example/nvkr/actions/runs/1/attempts/1", Repository: "example/nvkr", Commit: strings.Repeat("a", 40), Workflow: ".github/workflows/run.yml"}, Inputs: lifecycle.ExactInputDescription{ReleaseSubject: "registry.example.test/release@" + digest, PolicyDigest: digest, DefinitionDigest: digest, EnvironmentDigest: digest, PlanDigest: digest, ContentSubject: digest}, Outputs: []lifecycle.ArtifactCheckOutput{{Name: "image", Kind: lifecycle.OutputOCI, Reference: "registry.example.test/nvke@" + digest, Subject: digest, Platform: "linux/amd64"}}}
 }
 func deploymentFixture(t *testing.T) ([]deploymentNode, [][]deploymentPod) {
 	t.Helper()

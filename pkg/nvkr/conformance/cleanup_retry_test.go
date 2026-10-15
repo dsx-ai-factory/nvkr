@@ -112,3 +112,43 @@ func TestCleanupTransientDeleteCanReachTerminalAbsence(t *testing.T) {
 		t.Fatalf("terminal cleanup err%v calls%d", err, calls)
 	}
 }
+
+func TestCleanupPollsAcceptedOrTerminatingDeletionAndVerifiesDeleteRaces(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		terminating, race bool
+		wantDeletes       int
+	}{
+		{"accepted deletion is polled", false, false, 1},
+		{"already terminating is polled", true, false, 0},
+		{"DELETE NotFound race is verified", false, true, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			refs, owned, found := cleanupLoopFixture()
+			if tc.terminating {
+				stamp := "2026-10-14T00:00:00Z"
+				found.Metadata.DeletionTimestamp = &stamp
+			}
+			deletes, gets := 0, 0
+			err := cleanupDeleteLoop(t.Context(), refs, owned, func(_ context.Context, ref resourceRef) (object, error) {
+				if ref.path != refs[0].path {
+					return object{}, nil
+				}
+				gets++
+				if gets >= 4 || tc.race && deletes > 0 {
+					return object{}, nil
+				}
+				return found, nil
+			}, func(context.Context, resourceRef, []byte) error {
+				deletes++
+				if tc.race {
+					return failure("kubectl exit1 (404)")
+				}
+				return nil
+			}, time.Millisecond)
+			if err != nil || deletes != tc.wantDeletes {
+				t.Fatalf("cleanup err=%v deletes=%d want=%d", err, deletes, tc.wantDeletes)
+			}
+		})
+	}
+}
