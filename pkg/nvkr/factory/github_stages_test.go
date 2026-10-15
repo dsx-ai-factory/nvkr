@@ -87,14 +87,15 @@ func TestGitHubContractedStagesRejectIntroducedCycle(t *testing.T) {
 	}
 }
 
-func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
+func TestGitHubStagesGroupOnlyTargetObservationAndSBOM(t *testing.T) {
 	base := Node{
-		ID:        "observe",
-		Kind:      NodeVerify,
-		RunsOn:    "ubuntu-latest",
-		Network:   ir.NetworkNone,
-		Container: "utility@sha256:" + strings.Repeat("1", 64),
-		Platform:  "linux/amd64",
+		ID:          "observe",
+		Kind:        NodeVerify,
+		BuildTarget: "worker",
+		RunsOn:      "ubuntu-latest",
+		Network:     ir.NetworkNone,
+		Container:   "utility@sha256:" + strings.Repeat("1", 64),
+		Platform:    "linux/amd64",
 	}
 	tests := []struct {
 		name   string
@@ -108,17 +109,24 @@ func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
 		{name: "runner boundary", mutate: func(_, second *Node) { second.RunsOn = "ubuntu-24.04-arm" }, want: 2},
 		{name: "build boundary", mutate: func(first, _ *Node) { first.Kind = NodeBuild }, want: 2},
 		{name: "fetch boundary", mutate: func(_, second *Node) { second.Kind = NodeFetch }, want: 2},
+		{name: "package boundary", mutate: func(_, second *Node) { second.Kind = NodePackage }, want: 2},
+		{name: "different target", mutate: func(_, second *Node) { second.BuildTarget = "other" }, want: 2},
+		{name: "no target", mutate: func(first, second *Node) { first.BuildTarget, second.BuildTarget = "", "" }, want: 2},
+		{name: "no observation dependency", mutate: func(_, second *Node) { second.Inputs = nil }, want: 2},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			first := base
+			first.Outputs = []string{"observation"}
 			second := base
-			second.ID = "package"
-			second.Kind = NodePackage
+			second.ID = "sbom"
+			second.Kind = NodeSBOM
+			second.Inputs = []string{"observation"}
 			if test.mutate != nil {
 				test.mutate(&first, &second)
 			}
-			stages, jobs, err := githubStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second}}})
+			stages, jobs, err := githubStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second},
+				Artifacts: []Artifact{{ID: "observation", Producer: first.ID}}}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -127,6 +135,43 @@ func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
 			}
 			if (jobs[first.ID] == jobs[second.ID]) != (test.want == 1) {
 				t.Fatalf("node-to-stage mapping does not match grouping: %v", jobs)
+			}
+		})
+	}
+}
+
+func TestGitHubObservationPairIgnoresUnrelatedInterleaving(t *testing.T) {
+	for _, extraInput := range []bool{false, true} {
+		name := "independent insertion"
+		if extraInput {
+			name = "new readiness dependency"
+		}
+		t.Run(name, func(t *testing.T) {
+			observe := Node{ID: "a-observe", Kind: NodeVerify, BuildTarget: "worker", Network: ir.NetworkNone,
+				Container: "utility@sha256:" + strings.Repeat("1", 64), RunsOn: "ubuntu-24.04", Platform: "linux/amd64",
+				Outputs: []string{"observation"}}
+			sbom := observe
+			sbom.ID, sbom.Kind, sbom.Outputs = "z-sbom", NodeSBOM, nil
+			sbom.Inputs = []string{"observation"}
+			if extraInput {
+				sbom.Inputs = append(sbom.Inputs, "unrelated")
+			}
+			plan := &Plan{Graph: ArtifactGraph{
+				Nodes:     []Node{observe, {ID: "middle", Kind: NodeAcquire, Outputs: []string{"unrelated"}}, sbom},
+				Artifacts: []Artifact{{ID: "observation", Producer: observe.ID}, {ID: "unrelated", Producer: "middle"}},
+			}}
+			stages, jobs, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (jobs[observe.ID] == jobs[sbom.ID]) == extraInput {
+				t.Fatalf("grouping must ignore unrelated work but retain new readiness boundaries: %v", jobs)
+			}
+			if jobs["middle"] == jobs[observe.ID] || jobs["middle"] == jobs[sbom.ID] {
+				t.Fatal("unrelated work entered observation stage")
+			}
+			if !extraInput && (len(stages) != 2 || stages[0].Nodes[0].ID != observe.ID || stages[0].Nodes[1].ID != sbom.ID) {
+				t.Fatal("pair lost exact observation-before-SBOM execution order")
 			}
 		})
 	}

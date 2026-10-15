@@ -12,10 +12,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-// A stage is a scheduling choice, not a new graph or authority record. Compatible
-// offline utilities group consecutively; a disk's operations share its live owner
-// even when interleaved with another output. Validate the contracted job graph
-// because grouping nonconsecutive nodes can otherwise introduce a cycle.
+// A stage is a scheduling choice, not a new graph or authority record. Ordinary
+// grouping follows one target's observation-to-SBOM edge, never global adjacency.
+// A disk's operations share its live owner even when interleaved with another
+// output. Validate the contracted graph because grouping can introduce a cycle.
 type githubStage struct {
 	DiskOutput            string
 	ID                    string
@@ -178,6 +178,8 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 	}
 	var stages []githubStage
 	diskStages := make(map[string]int)
+	observationStages := make(map[string]int)
+	nodes, artifacts := planIndex(plan)
 	for _, node := range ordered {
 		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
@@ -193,15 +195,15 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 			stages[index].Nodes = append(stages[index].Nodes, node)
 			continue
 		}
-		if len(stages) > 0 {
-			last := &stages[len(stages)-1]
-			first := last.Nodes[0]
-			if !(PerOutputPublication(plan) && (first.PackageKind == PackageOCI || node.PackageKind == PackageOCI)) &&
-				last.DiskOutput == "" && len(last.Nodes) < 16 && githubUtilityNode(first) && githubUtilityNode(node) &&
-				first.RunsOn == node.RunsOn && first.Container == node.Container && first.Platform == node.Platform {
-				last.Nodes = append(last.Nodes, node)
+		if index, exists := observationStages[node.BuildTarget]; exists {
+			stage := &stages[index]
+			if githubObservationPair(*stage, node, nodes, artifacts) {
+				stage.Nodes = append(stage.Nodes, node)
 				continue
 			}
+		}
+		if node.Kind == NodeVerify && node.BuildTarget != "" {
+			observationStages[node.BuildTarget] = len(stages)
 		}
 		stages = append(stages, githubStage{Nodes: []Node{node}})
 	}
@@ -265,16 +267,34 @@ func validateGitHubStageDAG(plan *Plan, stages []githubStage, jobs map[string]st
 	return nil
 }
 
-func githubUtilityNode(node Node) bool {
-	if node.Network != ir.NetworkNone || node.Container == "" {
+// Only pair the exact target's observation and SBOM. Additional SBOM inputs may
+// come from independent root tool acquisition, never another output's work.
+// This cannot create a dependency that leaves and reenters the pair. Packaging
+// stays separate, and the complete contracted DAG is still checked.
+func githubObservationPair(stage githubStage, node Node, nodes map[string]Node, artifacts map[string]Artifact) bool {
+	if stage.DiskOutput != "" || len(stage.Nodes) != 1 {
 		return false
 	}
-	switch node.Kind {
-	case NodeVerify, NodeSBOM, NodePackage:
-		return true
-	default:
+	first := stage.Nodes[0]
+	if first.Kind != NodeVerify || node.Kind != NodeSBOM || first.BuildTarget == "" || first.BuildTarget != node.BuildTarget ||
+		first.Network != ir.NetworkNone || node.Network != ir.NetworkNone || first.Container == "" ||
+		first.RunsOn != node.RunsOn || first.Container != node.Container || first.Platform != node.Platform {
 		return false
 	}
+	observed := false
+	for _, input := range node.Inputs {
+		if slices.Contains(first.Outputs, input) {
+			observed = true
+		} else if !slices.Contains(first.Inputs, input) {
+			artifact := artifacts[input]
+			producer := nodes[artifact.Producer]
+			if artifact.Kind != "pipeline-tool" || producer.Kind != NodeAcquire || producer.BuildTarget != "" ||
+				producer.IRNode != "" || len(producer.Inputs) != 0 {
+				return false
+			}
+		}
+	}
+	return observed
 }
 
 func (stage githubStage) inputs(artifacts map[string]Artifact, nodeJobs map[string]string) []string {

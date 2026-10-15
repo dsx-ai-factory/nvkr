@@ -128,6 +128,19 @@ the final Run upload inline, so an upload-action pin change affects the maintain
 defines the full boundary. Every input update still requires complete regeneration and
 the same all-member drift check; an unchanged workflow file does not establish an up-to-date bundle.
 
+Same-input determinism and edit locality are separate contracts. Adding an independent named output must
+preserve existing outputs' provider job membership, IDs, dependencies, policy and shared action templates
+when their own producer closures and execution policy are unchanged. Ordinary grouping is fixed by the
+same BuildTarget's observation-to-SBOM dependency (ADR-18 §8), never global adjacency or chunk boundaries.
+The pair may additionally wait for a shared pinned root tool acquisition; no extra source or output
+dependency is admitted. Failed tool acquisition prevents pair completion.
+Packaging owns a separate job and success condition. Aggregate assembly/publication, finalizer accounting
+and the opening Run summary necessarily change with required membership. Source-cohort changes and real
+new dependencies remain topology changes. YAML anchor definitions may move to an earlier new owner of an
+identical sequence; this bounded presentation change does not change the expanded existing jobs. Generation
+derives the projection from the current complete Plan without using the previous workflow as an input.
+Producer matrices and callable workflows are not required for this contract and remain deferred.
+
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 
 `run generate --check` re-emits in memory using the recorded Definition/Environment selection and compares

@@ -568,10 +568,21 @@ closing summary; shared recovery precedes inline finalization. Static Plan/manif
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
-bytes, preserving credential scope and per-job finalizer results. Identical complete host step sequences
+bytes, preserving credential scope and per-job finalizer results. Edit locality separately preserves existing
+jobs when an independent output is added. Ordinary grouping pairs only a terminal observation and its
+dependent SBOM for the same BuildTarget and compatible offline runtime. A shared pinned tool acquired by
+an independent root operation may be an additional prerequisite; the pair waits for acquisition and
+restores the tool before observation. Failed acquisition prevents pair completion. No additional source
+or output dependency is admitted.
+Other ordinary nodes, including packaging, retain their own jobs and success conditions; the explicit ARC
+disk group preserves its live owner. Membership does not follow global adjacency or fixed-size chunks.
+Aggregate accounting and summaries change with the complete required set, and finalization still requires
+every job. The current Plan determines scheduling without previous-generated-state input.
+Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
-job's parameters; job policy and dependencies remain inline. Producer matrix and general callable
+job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
+Job policy and dependencies remain inline. Producer matrix and general callable
 scheduling remain deferred (ADR-18 §8); ADR-21 admits only the separate fixed native qualification worker
 and its selected-platform matrix.
 

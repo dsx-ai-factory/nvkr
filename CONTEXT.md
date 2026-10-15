@@ -120,6 +120,12 @@ supplied as data nor separately authored lifecycle inputs are admitted.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
+Edit locality additionally preserves existing output jobs when an independent output is added. Ordinary
+grouping pairs only one BuildTarget's terminal observation and dependent SBOM; packaging and other ordinary
+nodes keep separate jobs. A shared pinned root tool may be an additional prerequisite for the pair,
+which waits for its acquisition and restoration before observation. Required aggregate accounting changes,
+and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
+generated files do not supply scheduling state.
 Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
 Development and production use separate fixed bundle layouts selected by their Environment, with the same
 compiler and independent ownership manifests. A development bundle is not a release authorization.

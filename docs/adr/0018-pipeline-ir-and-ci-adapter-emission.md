@@ -802,15 +802,23 @@ reported as not evaluated. Source/build authentication and all verdict collectio
 or attachment failure can leave earlier attachments but never produces successful qualification. ADR-16 owns
 the evidence and publication contract; reconciliation separately records implementation and hosted acceptance.
 
-The v1 scheduler may group consecutive offline observation, SBOM and packaging nodes with identical runner,
-container and platform into one bounded job. Every logical node retains its exact execution command and
-container isolation; fetch, build, publication and signing remain separate jobs. Internal dependencies use the
-same workspace bytes and consumer checks. Each logical output retains its carrier for finalization. A failed
-shared job makes its outputs unsuccessful for finalization, even if an earlier step uploaded a carrier.
-This provider scheduling choice does not change the logical graph or logical build identity.
+The v1 scheduler pairs only a terminal observation and its directly dependent SBOM for the same exact
+BuildTarget, with identical runner, container and platform and offline execution. Every external SBOM input
+must already be an observation input or a pinned pipeline tool from an independent root acquisition:
+`pipeline-tool` produced by `NodeAcquire` with no BuildTarget, IR instruction or inputs. The pair waits for
+and restores that tool before observation; failed tool acquisition prevents pair completion. No additional
+source or output dependency is admitted, so a new dependency cannot leave and reenter the pair. Other
+ordinary nodes, including packaging, each own a provider job. The explicit native ARC disk group remains
+the separate live-owner exception above. Membership never depends on adjacency in the global topological
+order or on a fixed-size chunk of unrelated nodes; the projected provider graph must remain acyclic.
+Every logical node retains its exact command, isolation and carrier. The paired nodes use the same
+workspace bytes and consumer checks; pair failure makes both unsuccessful for finalization, even if the
+observation already uploaded a carrier. Independent packaging retains its own provider success condition,
+so an unrelated output's failure does not become an accidental shared barrier. Complete finalization still
+requires every required provider job to succeed. Scheduling does not change the logical graph or Build identity.
 
-GitHub job and step labels describe the operation and selected component or output. Grouped jobs name their
-packaged outputs and disclose Helm image binding when present; stable execution step IDs and exact commands
+GitHub job and step labels describe the operation and selected component or output. Packaging jobs name their
+outputs and disclose Helm image binding when present; stable execution step IDs and exact commands
 retain the graph binding independently of display names. Each execution step logs its operation, node and
 producer instruction, component and selected output where applicable, platform/network, declared inputs and
 expected outputs. The host helper reports successful outputs, elapsed seconds, primary exit
