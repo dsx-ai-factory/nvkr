@@ -1400,8 +1400,16 @@ original publication reference, signing record and predicate for the qualificati
 restoring output payload packages. Development finalization
 retains only the six aggregate/tool controls because it emits no qualification handoff. Assembly/finalization need
 registry read access, not OIDC or package-write
-permission. Production rejects arbitrary static credentials; the explicit development mode uses its admitted
-scoped read/write credentials. Local execution and dry-run signing reject this mode.
+permission. Production admits a fixed independent reader/writer credential policy; arbitrary static
+credentials remain rejected. Development retains its separate fixed credential policy. Local execution
+and dry-run signing reject this mode.
+
+Maintained production/nightly generation selects fixed independent
+registry reader/writer credentials, including native toolchain preparation, qualification/smoke and nightly
+runtime consumers. Hosted publication now rejects repository-linked packages even while their repository is
+private. Code and regression coverage are prepared; local unit execution is intentionally deferred and no
+hosted execution of this change is claimed. Provider package ACL migration, explicit Actions-grant removal,
+credential provisioning and denial tests remain operator work before public visibility.
 
 The root reader rejects extra blobs and bounds control/evidence to 512 MiB per root. Full and metadata-only
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,

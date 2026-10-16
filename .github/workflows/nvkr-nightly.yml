@@ -165,7 +165,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: read
     env:
       COSIGN_DIGEST: c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a
     concurrency:
@@ -306,6 +305,8 @@ jobs:
         env:
           GOTOOLCHAIN: local
           GH_TOKEN: ${{ github.token }}
+          NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
+          NVKR_REGISTRY_READ_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
           NVKR_NIGHTLY_ENABLE: '1'
           NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}

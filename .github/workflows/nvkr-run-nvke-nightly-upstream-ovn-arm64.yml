@@ -92,7 +92,7 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-arm-node
+    steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - &prepare-stage-nvkr-exec-ubuntu-24-04-arm
@@ -106,6 +106,7 @@ jobs:
         name: execute node part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
+          nvkr-toolchain-read-token: ""
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -118,7 +119,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -128,7 +133,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-two-nodes
+    steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - &prepare-stage-nvkr-exec-ubuntu-24-04
@@ -139,9 +144,11 @@ jobs:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - *operation-execute-node-part-1
-      - name: execute node part-2
+      - &operation-execute-node-part-2
+        name: execute node part-2
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
+          nvkr-toolchain-read-token: ""
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -162,6 +169,7 @@ jobs:
         name: execute source part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ""
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
@@ -175,7 +183,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-cluster-api-provider-provisioned-arm-d53e503b7714]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -185,7 +197,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -209,7 +226,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-controller-chart-fetch-nvke-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -219,7 +240,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-controller-chart-build-nvke-controller-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -243,7 +269,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-controller-profiles-fetch-nvke-local-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -253,7 +283,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-controller-profiles-build-nvke-local-profiles, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -263,7 +298,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -273,7 +312,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -297,7 +341,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-cwe-fetch-nvke-controller]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -307,7 +355,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-cwe-build-nvke-controller, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -317,7 +370,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -327,7 +384,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-installer-tools-arm64-fetch-clusterctl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -337,7 +398,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -347,7 +412,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-installer-tools-arm64-fetch-kind]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -357,7 +426,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -367,7 +440,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-installer-tools-arm64-fetch-kubectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -377,7 +454,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -387,7 +468,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-installer-tools-arm64-fetch-oras]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -397,7 +482,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -407,7 +496,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-pull-helm, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -420,12 +514,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nicosim-tools-arm64-build-nico-sim:
     name: 'Build nico-sim (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -435,8 +535,17 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52:
     name: 'Build nico-sim-runtime-assets (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -446,8 +555,17 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nicosim-tools-arm64-build-nico-simctl:
     name: 'Build nico-simctl (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -457,15 +575,29 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-process-nicosim-tools-arm64-terminal-db7be8c7b6bb:
     name: 'Verify artifacts and generate SBOMs: nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nicosim-tools-arm64-build-nico-simctl, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -489,7 +621,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-nktp-fetch-nktp-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -499,7 +635,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-nktp-build-nktp-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -512,12 +653,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-image-upstream-ovn-arm64:
     name: 'Build and package producer evidence for nvke-node-image-upstream-ovn-arm64'
     runs-on: 'arc-arm64-kvm'
@@ -528,7 +675,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - name: Prepare KVM access before transfer
@@ -568,6 +714,7 @@ jobs:
       - name: prepare images part-2
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-images
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
       - name: 'Build and package producer evidence for nvke-node-image-upstream-ovn-arm64'
         id: run-disk
@@ -659,19 +806,29 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-upstream-ovn-arm64-f-78d2fff1af52:
     name: 'Fetch pinned source for nvke-cni-ovn, ovn-kubernetes-chart (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -684,12 +841,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-upstream-ovn-arm64-f-8eddb001351f:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -699,19 +862,29 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -735,7 +908,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-nvkectl-fetch-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -745,7 +922,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-nvkectl-build-nvkectl, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -755,7 +937,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -765,7 +951,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -775,7 +965,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -785,7 +980,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-capnico-controller-arm64-ter-bb955af0200c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-node
+    steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
@@ -799,7 +994,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-cluster-api-provider-provisi-9a13d6f6b1eb]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -809,7 +1008,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-controller-profiles-terminal-18270f0744b4]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -819,7 +1022,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-csi-node-driver-registrar-im-11c07063ce1a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -829,7 +1036,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-cwe-terminal-observe-cwe-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -839,7 +1050,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-cwe, nvkr-process-controller-chart-terminal-ob-1c72a2221014]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -849,7 +1064,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-installer-tools-arm64-termin-de371e0bc9ee]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -859,7 +1078,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-nicosim-tools-arm64-terminal-db7be8c7b6bb]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -869,7 +1092,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-nktp-terminal-observe-nktp-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -879,7 +1106,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-nvkectl-terminal-observe-nvkectl-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -889,7 +1120,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-operator-tools-terminal-obse-ad40acf7eeda]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -899,7 +1134,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -909,7 +1148,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -919,7 +1163,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -929,7 +1177,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -939,7 +1191,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-postgresql-pull-postgresql-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -949,7 +1206,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-postgresql-terminal-observe-5a421f61f894]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -959,7 +1220,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -969,7 +1234,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -979,7 +1249,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -989,7 +1263,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -999,7 +1277,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1009,7 +1292,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1019,7 +1306,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1029,7 +1320,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1039,7 +1335,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1049,7 +1349,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1059,7 +1363,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1069,7 +1378,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-controller-manager-ima-3e5db62fee30]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1079,7 +1392,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1089,7 +1406,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-crds-pull-spire-crds-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1099,7 +1421,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-crds-terminal-observe-f6ed6995bc52]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1109,7 +1435,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1119,7 +1449,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1129,7 +1464,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1139,7 +1478,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1149,7 +1492,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1159,7 +1507,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-server-image-arm64-ter-78345db78e5c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1169,7 +1521,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1179,7 +1535,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1189,7 +1550,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1199,7 +1564,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1209,7 +1578,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-spire-pull-spire-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1219,7 +1593,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-spire-terminal-observe-spire-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1229,7 +1607,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1239,7 +1621,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1249,7 +1636,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-temporal-admin-tools-image-a-2e37748f989e]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1259,7 +1650,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1269,7 +1664,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1279,7 +1679,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-temporal-server-image-arm64-a7b9faf98be2]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1289,7 +1693,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1299,7 +1707,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1309,7 +1722,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1319,7 +1736,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1329,7 +1750,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-temporal-pull-temporal-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -1339,7 +1765,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-temporal-terminal-observe-temporal-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1349,7 +1779,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1364,7 +1798,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-nvke-node-image-upstr-b4a1b43e5991:
     name: 'Publish output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1375,12 +1813,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-nvke-node-image-upstream-ovn-arm64:
     name: 'Sign and attest release and deliverables: output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1392,18 +1833,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-tool-syft:
     name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1413,7 +1861,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-capnico-controller-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1428,14 +1880,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-cluster-api-prov-7d1ac851fb60:
     name: 'Package publication bundle: publication-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-cluster-api-provider-provisioned-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1450,14 +1910,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-controller-chart:
     name: 'Package publication bundle: publication-controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1472,14 +1940,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-controller-profiles:
     name: 'Package publication bundle: publication-controller-profiles'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-controller-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1494,14 +1970,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-csi-node-driver-02a78ae16d16:
     name: 'Package publication bundle: publication-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-csi-node-driver-registrar-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1516,14 +2000,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-cwe:
     name: 'Package publication bundle: publication-cwe'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1538,14 +2030,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-installer-tools-arm64:
     name: 'Package publication bundle: publication-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-installer-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1560,14 +2060,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-nicosim-tools-arm64:
     name: 'Package publication bundle: publication-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-nicosim-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1582,14 +2090,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-nktp:
     name: 'Package publication bundle: publication-nktp'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1604,14 +2120,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-nvkectl:
     name: 'Package publication bundle: publication-nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1626,14 +2150,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-operator-tools:
     name: 'Package publication bundle: publication-operator-tools'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1648,14 +2180,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-postgresql-image-arm64:
     name: 'Package publication bundle: publication-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1670,14 +2210,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-postgresql:
     name: 'Package publication bundle: publication-postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -1692,7 +2240,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-capnico-controller-arm64:
     name: 'Publish output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1703,12 +2255,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-cluster-api-provider-4b7d31608734:
     name: 'Publish output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1719,12 +2274,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-controller-chart:
     name: 'Publish output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1735,12 +2293,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-controller-profiles:
     name: 'Publish output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1751,12 +2312,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb:
     name: 'Publish output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1767,12 +2331,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-cwe:
     name: 'Publish output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1783,12 +2350,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-installer-tools-arm64:
     name: 'Publish output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1799,12 +2369,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-nicosim-tools-arm64:
     name: 'Publish output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1815,12 +2388,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-nktp:
     name: 'Publish output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1831,12 +2407,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-nvkectl:
     name: 'Publish output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -1847,12 +2426,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-operator-tools:
     name: 'Publish output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1863,12 +2445,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-postgresql:
     name: 'Publish output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1879,12 +2464,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-postgresql-image-arm64:
     name: 'Publish output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1895,12 +2483,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-capnico-controller-arm64:
     name: 'Sign and attest release and deliverables: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1912,11 +2503,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-cluster-api-provider-pro-9543d5c3a952:
     name: 'Sign and attest release and deliverables: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1928,11 +2522,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-controller-chart:
     name: 'Sign and attest release and deliverables: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1944,11 +2541,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-controller-profiles:
     name: 'Sign and attest release and deliverables: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1960,11 +2560,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9:
     name: 'Sign and attest release and deliverables: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1976,11 +2579,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-cwe:
     name: 'Sign and attest release and deliverables: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1992,11 +2598,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-installer-tools-arm64:
     name: 'Sign and attest release and deliverables: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2008,11 +2617,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-nicosim-tools-arm64:
     name: 'Sign and attest release and deliverables: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2024,11 +2636,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-nktp:
     name: 'Sign and attest release and deliverables: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -2040,11 +2655,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-nvkectl:
     name: 'Sign and attest release and deliverables: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -2056,11 +2674,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-operator-tools:
     name: 'Sign and attest release and deliverables: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -2072,11 +2693,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-postgresql:
     name: 'Sign and attest release and deliverables: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -2088,11 +2712,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-postgresql-image-arm64:
     name: 'Sign and attest release and deliverables: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2104,18 +2731,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spiffe-csi-image-arm64:
     name: 'Package publication bundle: publication-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2130,7 +2764,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spiffe-csi-image-arm64:
     name: 'Publish output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2141,12 +2779,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spiffe-csi-image-arm64:
     name: 'Sign and attest release and deliverables: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2158,18 +2799,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-agent-image-arm64:
     name: 'Package publication bundle: publication-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2184,7 +2832,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-agent-image-arm64:
     name: 'Publish output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2195,12 +2847,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-agent-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2212,18 +2867,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-bash-image-arm64:
     name: 'Package publication bundle: publication-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2238,7 +2900,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-bash-image-arm64:
     name: 'Publish output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2249,12 +2915,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-bash-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2266,18 +2935,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-controller-14366a611047:
     name: 'Package publication bundle: publication-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire-controller-manager-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2292,7 +2968,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-controller-mana-4c760c0ddb13:
     name: 'Publish output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2303,12 +2983,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-controller-manager-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2320,18 +3003,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-crds:
     name: 'Package publication bundle: publication-spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2346,7 +3036,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-crds:
     name: 'Publish output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2357,12 +3051,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-crds:
     name: 'Sign and attest release and deliverables: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2374,18 +3071,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-oidc-image-arm64:
     name: 'Package publication bundle: publication-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2400,7 +3104,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-oidc-image-arm64:
     name: 'Publish output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2411,12 +3119,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-oidc-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2428,18 +3139,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-server-image-arm64:
     name: 'Package publication bundle: publication-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2454,7 +3172,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-server-image-arm64:
     name: 'Publish output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2465,12 +3187,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2482,18 +3207,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire-tpm-server-image-arm64:
     name: 'Package publication bundle: publication-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2508,7 +3240,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire-tpm-server-image-arm64:
     name: 'Publish output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2519,12 +3255,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire-tpm-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2536,18 +3275,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-spire:
     name: 'Package publication bundle: publication-spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2562,7 +3308,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-spire:
     name: 'Publish output-spire'
     runs-on: 'ubuntu-24.04'
@@ -2573,12 +3323,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-spire:
     name: 'Sign and attest release and deliverables: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -2590,18 +3343,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal-admin-t-619203c9c277:
     name: 'Package publication bundle: publication-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-temporal-admin-tools-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2616,7 +3376,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal-admin-tools-image-arm64:
     name: 'Publish output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2627,12 +3391,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal-admin-tools-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2644,18 +3411,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal-server-image-arm64:
     name: 'Package publication bundle: publication-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2670,7 +3444,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal-server-image-arm64:
     name: 'Publish output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2681,12 +3459,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2698,18 +3479,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal-ui-image-arm64:
     name: 'Package publication bundle: publication-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2724,7 +3512,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal-ui-image-arm64:
     name: 'Publish output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2735,12 +3527,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal-ui-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2752,18 +3547,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-temporal:
     name: 'Package publication bundle: publication-temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2778,7 +3580,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-temporal:
     name: 'Publish output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -2789,12 +3595,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-temporal:
     name: 'Sign and attest release and deliverables: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -2806,18 +3615,25 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-upstream-ovn-chart-arm64-fetch-ovn-k-15e776834961:
     name: 'Fetch pinned source for ovn-kubernetes-chart (upstream-ovn-chart-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2827,7 +3643,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-upstream-ovn-chart-arm64-fetch-ovn-k-15e776834961]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2837,7 +3657,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-tool-syft, nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -2847,7 +3672,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2857,7 +3686,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-upstream-ovn-image-arm64-fetch-ovn-kube-ubuntu]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2867,7 +3700,12 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-tool-syft, nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-two-nodes
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
     permissions:
       actions: read
       contents: read
@@ -2877,7 +3715,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-upstream-ovn-image-arm64-ter-52e0c2ccb6dd]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2887,7 +3729,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-upstream-ovn-image-arm64, nvkr-process-upstream-ovn-chart-arm64-ter-d2d87c39005a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2897,7 +3743,11 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-upstream-ovn-chart-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2912,14 +3762,22 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-publication-upstream-ovn-image-arm64:
     name: 'Package publication bundle: publication-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-upstream-ovn-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -2934,7 +3792,11 @@ jobs:
       actions: read
       contents: read
       id-token: write
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-upstream-ovn-chart-arm64:
     name: 'Publish output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2945,12 +3807,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-output-upstream-ovn-image-arm64:
     name: 'Publish output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2961,12 +3826,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-upstream-ovn-chart-arm64:
     name: 'Sign and attest release and deliverables: output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2978,11 +3846,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-output-upstream-ovn-image-arm64:
     name: 'Sign and attest release and deliverables: output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2994,11 +3865,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-capnico-co-a41756165d77:
     name: 'Verify release and deliverable signatures: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3009,11 +3883,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-cluster-ap-f52c14e947ce:
     name: 'Verify release and deliverable signatures: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3024,11 +3901,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-controller-chart:
     name: 'Verify release and deliverable signatures: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -3039,11 +3919,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-controller-profiles:
     name: 'Verify release and deliverable signatures: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -3054,11 +3937,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-csi-node-d-ed501e7759bf:
     name: 'Verify release and deliverable signatures: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3069,11 +3955,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-cwe:
     name: 'Verify release and deliverable signatures: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -3084,11 +3973,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-installer-tools-arm64:
     name: 'Verify release and deliverable signatures: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3099,11 +3991,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nicosim-tools-arm64:
     name: 'Verify release and deliverable signatures: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3114,11 +4009,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nktp:
     name: 'Verify release and deliverable signatures: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -3129,11 +4027,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nvke-node-4ccfed0d3edb:
     name: 'Verify release and deliverable signatures: output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3144,11 +4045,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-nvkectl:
     name: 'Verify release and deliverable signatures: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -3159,11 +4063,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-operator-tools:
     name: 'Verify release and deliverable signatures: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -3174,11 +4081,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-postgresql:
     name: 'Verify release and deliverable signatures: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -3189,11 +4099,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-postgresql-image-arm64:
     name: 'Verify release and deliverable signatures: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3204,11 +4117,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spiffe-csi-image-arm64:
     name: 'Verify release and deliverable signatures: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3219,11 +4135,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire:
     name: 'Verify release and deliverable signatures: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -3234,11 +4153,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-agen-690d58615fef:
     name: 'Verify release and deliverable signatures: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3249,11 +4171,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-bash-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3264,11 +4189,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91:
     name: 'Verify release and deliverable signatures: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3279,11 +4207,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-crds:
     name: 'Verify release and deliverable signatures: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -3294,11 +4225,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-oidc-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3309,11 +4243,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-serv-2ffabff52266:
     name: 'Verify release and deliverable signatures: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3324,11 +4261,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-spire-tpm-fdd5a5adf925:
     name: 'Verify release and deliverable signatures: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3339,11 +4279,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal:
     name: 'Verify release and deliverable signatures: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -3354,11 +4297,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal-a-325229721989:
     name: 'Verify release and deliverable signatures: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3369,11 +4315,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal-s-030929bd4981:
     name: 'Verify release and deliverable signatures: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3384,11 +4333,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac:
     name: 'Verify release and deliverable signatures: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3399,11 +4351,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-upstream-o-6a771d3e2e52:
     name: 'Verify release and deliverable signatures: output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3414,11 +4369,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-output-upstream-o-49a3c983341d:
     name: 'Verify release and deliverable signatures: output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -3429,11 +4387,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-package-release:
     name: 'Assemble release from verified output references'
     runs-on: 'ubuntu-24.04'
@@ -3444,11 +4405,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-publish-release:
     name: 'Publish release'
     runs-on: 'ubuntu-24.04'
@@ -3459,12 +4423,15 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-sign-release:
     name: 'Sign and attest release and deliverables: release'
     runs-on: 'ubuntu-24.04'
@@ -3476,11 +4443,14 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-verify-publication-release:
     name: 'Verify release and deliverable signatures: release'
     runs-on: 'ubuntu-24.04'
@@ -3491,11 +4461,14 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-    steps: *steps-ubuntu-24-04-node
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
   nvkr-results-00:
     name: 'Collect provider results: nvkr-results-00'
     runs-on: ubuntu-24.04
@@ -3712,12 +4685,11 @@ jobs:
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source

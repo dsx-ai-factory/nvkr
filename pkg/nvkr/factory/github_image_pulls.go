@@ -40,7 +40,7 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	}
 	// Development publication does not move already-pinned native toolchains.
 	// Only the maintained NVKR development namespace may prepare the
-	// toolchain roots, using the separate read-only workflow token.
+	// toolchain roots, using the separate read-only registry credential.
 	if plan.Environment.GitHubDevelopment && prefix == "ghcr.io/dsx-ai-factory/nvkr/development" {
 		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	}
@@ -73,7 +73,7 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 }
 
 func githubImageEnvironment() map[string]string {
-	return map[string]string{githubImageToken: "${{ github.token }}", "NVKR_TOOLCHAIN_READ_USER": "${{ github.actor }}"}
+	return map[string]string{githubImageToken: "${{ secrets.NVKR_REGISTRY_READ }}", "NVKR_TOOLCHAIN_READ_USER": "${{ vars.NVKR_REGISTRY_READ_USER }}"}
 }
 
 // PrepareGitHubImages is a separate credential-bearing step. Its temporary Docker

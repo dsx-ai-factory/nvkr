@@ -170,8 +170,8 @@ func TestMaintainedNightlyPrivateImageCredentialBoundary(t *testing.T) {
 				prepareIndex, executionIndex := -1, -1
 				for index, step := range job.Steps {
 					if step.Env[githubImageToken] != "" {
-						if prepared || job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
-							step.Env[githubImageToken] != "${{ github.token }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
+						if prepared || job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
+							step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
 							t.Fatal("toolchain credential escaped its separate read-only preparation step")
 						}
 						prepared = true
@@ -214,7 +214,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 			if step.Env[githubImageToken] == "" {
 				continue
 			}
-			if job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" || step.Env[sourceTokenEnv] != "" ||
+			if job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" || step.Env[sourceTokenEnv] != "" ||
 				!strings.Contains(step.Run, "factory github prepare-images ") {
 				t.Fatal("toolchain credential escaped its read-only preparation step")
 			}
@@ -253,7 +253,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 		{"wrong credential", member, func(t *testing.T, root *yamlv3.Node) {
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")
 			token := githubTestYAMLField(t, step, "env", githubImageToken)
-			if token.Value != "${{ github.token }}" {
+			if token.Value != "${{ inputs.nvkr-toolchain-read-token }}" {
 				t.Fatalf("fixture image token differs: %q", token.Value)
 			}
 			token.Value = "${{ secrets.NKE_SOURCE_TOKEN }}"

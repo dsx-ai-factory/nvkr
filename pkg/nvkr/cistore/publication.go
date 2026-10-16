@@ -51,7 +51,7 @@ func (b *backend) admitPrivatePublication(ctx context.Context, sourceRepository 
 	// package prevents all writes even when an earlier package is missing.
 	for _, ref := range parsed {
 		packageName := strings.TrimPrefix(ref.RepositoryStr(), owner+"/")
-		exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts, false)
+		exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts, true)
 		if err != nil {
 			return err
 		}
@@ -60,14 +60,14 @@ func (b *backend) admitPrivatePublication(ctx context.Context, sourceRepository 
 		}
 	}
 	for _, ref := range missing {
-		if err := b.ensurePrivatePackage(ctx, ref, source, opts, false); err != nil {
+		if err := b.ensurePrivatePackage(ctx, ref, source, opts, true); err != nil {
 			return err
 		}
 	}
 	// Seeding may take time; every exact package must still pass before return.
 	for _, ref := range parsed {
 		packageName := strings.TrimPrefix(ref.RepositoryStr(), owner+"/")
-		if exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts, false); err != nil {
+		if exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts, true); err != nil {
 			return err
 		} else if !exists {
 			return e.New(e.CodeTrustPolicyMissing, "private publication package disappeared before payload admission")

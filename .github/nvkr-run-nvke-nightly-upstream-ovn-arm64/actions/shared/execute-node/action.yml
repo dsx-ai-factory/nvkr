@@ -8,6 +8,9 @@ inputs:
   parameters:
     description: Plan-derived parameters for this operation; never shell source
     required: true
+  nvkr-toolchain-read-token:
+    description: Independent private toolchain reader
+    required: true
   nvkr-ci-storage-read-token:
     description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true
@@ -33,8 +36,8 @@ runs:
       run: ./nvkr-exec factory github prepare-images --plan .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json --stage "$NVKR_ACTION_SELECTOR"
       shell: bash -e {0}
       env:
-        NVKR_TOOLCHAIN_READ_TOKEN: ${{ github.token }}
-        NVKR_TOOLCHAIN_READ_USER: ${{ github.actor }}
+        NVKR_TOOLCHAIN_READ_TOKEN: ${{ inputs.nvkr-toolchain-read-token }}
+        NVKR_TOOLCHAIN_READ_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
         NVKR_ACTION_SELECTOR: ${{ fromJSON(inputs.parameters).images_selector }}
     - name: ${{ fromJSON(inputs.parameters).execute_name }}
       id: operation_execute

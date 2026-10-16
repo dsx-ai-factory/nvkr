@@ -111,13 +111,13 @@ func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, e
 	if node.Kind == NodePublish {
 		permissions := map[string]string{"contents": "read"}
 		target := plan.Targets[node.Target]
-		if target.CredentialRef != "" && strings.HasPrefix(target.Ref, "ghcr.io/") && !plan.Environment.GitHubDevelopment {
+		if target.CredentialRef != "" && strings.HasPrefix(target.Ref, "ghcr.io/") && !githubScopedPublication(plan) {
 			permissions["packages"] = "write"
 		}
 		return permissions, nil
 	}
 	if len(githubStagePrivateImages(plan, stage)) > 0 {
-		return map[string]string{"contents": "read", "packages": "read"}, nil
+		return map[string]string{"contents": "read"}, nil
 	}
 	return nil, nil
 }
@@ -125,7 +125,7 @@ func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, e
 func githubFinalizerPermissions(plan *Plan) map[string]string {
 	if PerOutputPublication(plan) {
 		permissions := map[string]string{"contents": "read"}
-		if !plan.Environment.GitHubDevelopment {
+		if !githubScopedPublication(plan) {
 			permissions["packages"] = "read"
 		}
 		return permissions

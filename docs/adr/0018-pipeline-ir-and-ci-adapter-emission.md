@@ -318,18 +318,18 @@ publication operations remain on hosted runners. Those runners restore the prepa
 disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
-repositories use a separate preparation step with `contents: read` and `packages: read`.
+repositories use a separate preparation step with `contents: read` and no workflow package scope.
 The maintained M2 and two NVKE nightly publication prefixes also reuse the already-published
 `ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` pins. Reusing these
 toolchain subjects does not relocate them into the nightly output namespace or admit unrelated
 publication owners or toolchain repositories.
-Only that step receives the ephemeral workflow token. The helper admits the complete Plan,
+Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account. The helper admits the complete Plan,
 native platform and disk host requirements before pulling; it uses a private temporary Docker
 configuration and deletes it on success or failure before source or producer execution.
 Held runtime observation accepts an already-local exact repository digest, rejects a present
 but mismatched record, and pulls only after a failed local lookup. Image/platform/tool-byte
 admission remains required. No registry credential is forwarded into producer containers.
-The package owner must grant the workflow repository Actions read access separately.
+The package owner grants the reader account access without granting the source repository Actions access.
 
 Each generated native disk producer first prepares access to the fixed `/dev/kvm` path, before checkout,
 helper downloads or input restoration. The credential-free, one-minute step rejects a missing device,

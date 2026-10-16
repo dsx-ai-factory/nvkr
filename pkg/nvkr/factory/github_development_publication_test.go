@@ -308,8 +308,8 @@ func TestMaintainedM2DevelopmentPreservesCompleteGraphAndPrivateToolchainReads(t
 			if step.Env[githubImageToken] == "" {
 				continue
 			}
-			if job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" ||
-				step.Env[githubImageToken] != "${{ github.token }}" || job.Env["NVKR_CREDENTIAL"] != "" {
+			if job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" ||
+				step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || job.Env["NVKR_CREDENTIAL"] != "" {
 				t.Fatal("native toolchain preparation lost its independent read-only scope")
 			}
 			if job.Environment == githubDevelopmentARCEnvironment {

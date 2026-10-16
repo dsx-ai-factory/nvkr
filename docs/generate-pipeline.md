@@ -128,6 +128,35 @@ Invalid bytes, unsafe archive entries, filesystem or cleanup failures stop immed
 destination replacement are outside the retry boundary. Error reports include only a fixed category,
 chunk number and byte counts, keeping provider URLs and response bodies out of logs.
 
+Production registry access uses separate credentials from CI storage. Configure repository secret
+`NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for a package reader covering release,
+toolchain and smoke-image packages. Configure secret `NVKR_REGISTRY_WRITE` and variable
+`NVKR_REGISTRY_WRITE_USER` in the protected `nvkr-release` environment for publication, signing and
+qualification. Use separate accounts and tokens with read-only versus write package scopes; copying a
+write-capable PAT into the reader secret does not narrow its authority. The existing CI storage secrets
+remain unchanged. Native image preparation consumes its reader only in the preparation step.
+
+For each existing storage, release, toolchain and smoke-image package, an administrator must:
+1. Keep visibility private (or internal only when enterprise-wide access is intended).
+2. Disable repository permission inheritance and remove the source-repository connection.
+3. Remove the source repository under **Manage Actions access**, including explicit grants.
+4. Grant the dedicated reader/writer accounts only their required package roles.
+
+The package API verifies visibility and repository linkage, but does not prove absence of separate Actions
+grants. Record that settings audit and verify denial for anonymous users, unrelated users, and fork workflows
+before changing repository visibility. Replacing a token does not revoke existing package grants.
+Do not revoke grants needed by an active old workflow: migrate credentials, merge and validate the new
+workflow, then retire the old access. Existing dispatched runs retain their original workflow code.
+
+To enter credentials securely from a local terminal (the commands prompt without printing the secret):
+
+```sh
+gh secret set NVKR_REGISTRY_READ --repo dsx-ai-factory/nvkr
+gh variable set NVKR_REGISTRY_READ_USER --repo dsx-ai-factory/nvkr --body READER_ACCOUNT
+gh secret set NVKR_REGISTRY_WRITE --repo dsx-ai-factory/nvkr --env nvkr-release
+gh variable set NVKR_REGISTRY_WRITE_USER --repo dsx-ai-factory/nvkr --env nvkr-release --body WRITER_ACCOUNT
+```
+
 Before making the source public, verify hidden package grants and anonymous, unrelated-user and fork access
 for storage, toolchain and release packages. Previously retained Actions artifacts, caches, active runs and
 old workflow refs also require separate handling; this change does not migrate or delete historical payloads.

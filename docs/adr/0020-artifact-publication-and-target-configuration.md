@@ -319,9 +319,9 @@ one release index from named outputs; normal authors do not wire payload → roo
 
 GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
 package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
-null or nonpublic repository linkage, using the publication credential independently of CI carrier storage.
+no repository linkage, using the publication credential independently of CI carrier storage.
 The source repository metadata lookup uses the job's automatic repository token, passed separately only to
-GHCR publication jobs. Package-scoped development credentials therefore need no source-repository scope
+GHCR publication jobs. Package-scoped publication credentials therefore need no source-repository scope
 for this admission check. The repository token does not replace the publication credential for package
 metadata or registry operations and is not added to producer execution.
 Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
@@ -417,9 +417,12 @@ exact Plan/invocation-bound production predicate, output signatures/provenance a
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
 read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
-Production GitHub per-output publication admits only anonymous access or the job-scoped
-`github:GITHUB_TOKEN`; arbitrary static credentials are rejected because job permissions cannot narrow their
-authority. The explicit signed-development contract below instead requires separately scoped read/write
+Production GitHub per-output publication additionally admits the fixed `github:NVKR_REGISTRY_WRITE`
+policy. Publishers and signers receive that secret and its explicit account; verification, assembly and
+finalization receive `NVKR_REGISTRY_READ` and its explicit account. These jobs request no workflow-token
+package permissions. Maintained production and nightly inputs use this policy. Legacy anonymous and
+job-scoped `github:GITHUB_TOKEN` configurations remain supported but are unsuitable for private binaries
+in a future-public source repository; arbitrary static credentials remain rejected. The explicit signed-development contract below instead requires separately scoped read/write
 credentials. Legacy publication without this mode retains its full-closure assembly/finalization path. Local
 execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
 published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository

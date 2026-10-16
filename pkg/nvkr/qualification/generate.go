@@ -227,11 +227,11 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	// Run the existing authenticated owner after a failed worker so it can report
 	// complete per-output refusal diagnostics. No failed worker becomes evidence.
 	finalCondition := "!cancelled() && (needs.native-smoke.result == 'success' || needs.native-smoke.result == 'failure') && " + condition //nolint:misspell // GitHub status function uses this exact spelling.
-	fmt.Fprintf(&top, "  qualify:\n    name: Qualify complete artifact set\n    needs: [native-smoke]\n    if: ${{ %s }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n", finalCondition)
+	fmt.Fprintf(&top, "  qualify:\n    name: Qualify complete artifact set\n    environment: nvkr-release\n    needs: [native-smoke]\n    if: ${{ %s }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n", finalCondition)
 	qualificationPermissions(&top, "    ", true)
 	fmt.Fprint(&top, "    steps:\n")
 	qualificationBootstrap(&top, plan, actions, linker, policy, "amd64")
-	fmt.Fprint(&top, "      - name: Authenticate all evidence and publish qualification\n        timeout-minutes: 20\n        env:\n          NVKR_GITHUB_TOKEN: ${{ github.token }}\n          NVKR_REGISTRY: ghcr.io\n          NVKR_REGISTRY_USER: ${{ github.actor }}\n          NVKR_REGISTRY_PASSWORD: ${{ github.token }}\n")
+	fmt.Fprint(&top, "      - name: Authenticate all evidence and publish qualification\n        timeout-minutes: 20\n        env:\n          NVKR_GITHUB_TOKEN: ${{ github.token }}\n          NVKR_REGISTRY: ghcr.io\n          NVKR_REGISTRY_USER: ${{ vars.NVKR_REGISTRY_WRITE_USER }}\n          NVKR_REGISTRY_PASSWORD: ${{ secrets.NVKR_REGISTRY_WRITE }}\n")
 	fmt.Fprintln(&top, "          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}")
 	fmt.Fprintln(&top, "          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}")
 	sourceAuth.writeEnvironment(&top)
@@ -255,8 +255,8 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	qualificationPermissions(&worker, "    ", false)
 	fmt.Fprint(&worker, "    steps:\n")
 	qualificationBootstrap(&worker, plan, actions, linker, policy, "")
-	worker.WriteString("      - name: Acquire pinned native smoke image\n        timeout-minutes: 5\n        env:\n          SMOKE_IMAGE: ${{ matrix.image }}\n          SMOKE_ARCH: ${{ matrix.arch }}\n          GHCR_USER: ${{ github.actor }}\n          GHCR_TOKEN: ${{ github.token }}\n        run: |\n          set -euo pipefail\n          export DOCKER_CONFIG=\"$RUNNER_TEMP/nvkr-smoke-pull\"\n          mkdir -m 0700 \"$DOCKER_CONFIG\"\n          printf '%s' \"$GHCR_TOKEN\" | docker login ghcr.io --username \"$GHCR_USER\" --password-stdin\n          docker pull --platform \"linux/$SMOKE_ARCH\" \"$SMOKE_IMAGE\"\n")
-	fmt.Fprint(&worker, "      - name: Authenticate and smoke exact delivered tool bytes\n        timeout-minutes: 20\n        env:\n          NVKR_GITHUB_TOKEN: ${{ github.token }}\n          NVKR_PULL_REGISTRY: ghcr.io\n          NVKR_PULL_REGISTRY_USER: ${{ github.actor }}\n          NVKR_PULL_REGISTRY_PASSWORD: ${{ github.token }}\n")
+	worker.WriteString("      - name: Acquire pinned native smoke image\n        timeout-minutes: 5\n        env:\n          SMOKE_IMAGE: ${{ matrix.image }}\n          SMOKE_ARCH: ${{ matrix.arch }}\n          GHCR_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}\n          GHCR_TOKEN: ${{ secrets.NVKR_REGISTRY_READ }}\n        run: |\n          set -euo pipefail\n          export DOCKER_CONFIG=\"$RUNNER_TEMP/nvkr-smoke-pull\"\n          mkdir -m 0700 \"$DOCKER_CONFIG\"\n          printf '%s' \"$GHCR_TOKEN\" | docker login ghcr.io --username \"$GHCR_USER\" --password-stdin\n          docker pull --platform \"linux/$SMOKE_ARCH\" \"$SMOKE_IMAGE\"\n")
+	fmt.Fprint(&worker, "      - name: Authenticate and smoke exact delivered tool bytes\n        timeout-minutes: 20\n        env:\n          NVKR_GITHUB_TOKEN: ${{ github.token }}\n          NVKR_PULL_REGISTRY: ghcr.io\n          NVKR_PULL_REGISTRY_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}\n          NVKR_PULL_REGISTRY_PASSWORD: ${{ secrets.NVKR_REGISTRY_READ }}\n")
 	fmt.Fprintln(&worker, "          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}")
 	fmt.Fprintln(&worker, "          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}")
 	sourceAuth.writeEnvironment(&worker)
@@ -274,12 +274,8 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	return &GeneratedWorkflows{files: files, manifest: qualificationManifest{SchemaVersion: qualificationGeneratedSchema, PlanDigest: planDigest, PolicyDigest: policyDigest, ProducerWorkflow: policy.Source.Workflow, QualificationWorkflow: policy.QualificationWorkflow, SmokeWorkflow: policy.Smoke.Workflow, Members: members}}, nil
 }
 
-func qualificationPermissions(out *bytes.Buffer, indent string, signing bool) {
-	packages := "read"
-	if signing {
-		packages = "write"
-	}
-	fmt.Fprintf(out, "%spermissions:\n%s  contents: read\n%s  actions: read\n%s  packages: %s\n%s  id-token: write\n", indent, indent, indent, indent, packages, indent)
+func qualificationPermissions(out *bytes.Buffer, indent string, _ bool) {
+	fmt.Fprintf(out, "%spermissions:\n%s  contents: read\n%s  actions: read\n%s  id-token: write\n", indent, indent, indent, indent)
 }
 func qualificationYAML(value string) string       { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
 func qualificationExpression(value string) string { return qualificationYAML(value) }
@@ -290,11 +286,11 @@ func qualificationShell(value string) string {
 func admitQualificationRegistry(plan *factory.Plan, policy lifecycle.QualificationPolicy) error {
 	namespace := "ghcr.io/" + strings.ToLower(strings.Split(policy.Source.Repository, "/")[0]) + "/"
 	publication := plan.Environment.Publication
-	if publication == nil || !strings.HasPrefix(publication.RepositoryPrefix, namespace) || publication.Anonymous || publication.CredentialRef != "github:GITHUB_TOKEN" {
-		return e.New(e.CodeEngineCapability, "qualification generation requires GHCR publication in the trusted source owner namespace using github:GITHUB_TOKEN")
+	if publication == nil || !strings.HasPrefix(publication.RepositoryPrefix, namespace) || publication.Anonymous || (publication.CredentialRef != "github:GITHUB_TOKEN" && publication.CredentialRef != factory.ProductionRegistryWriteCredential) {
+		return e.New(e.CodeEngineCapability, "qualification generation requires GHCR publication in the trusted source owner namespace using an admitted production credential policy")
 	}
 	for _, target := range plan.Targets {
-		if !strings.HasPrefix(target.Ref, namespace) || target.PlainHTTP || target.Anonymous || target.CredentialRef != "github:GITHUB_TOKEN" {
+		if !strings.HasPrefix(target.Ref, namespace) || target.PlainHTTP || target.Anonymous || (target.CredentialRef != "github:GITHUB_TOKEN" && target.CredentialRef != factory.ProductionRegistryWriteCredential) {
 			return e.New(e.CodeEngineCapability, "qualification generation requires every publication target in the admitted GHCR namespace")
 		}
 	}

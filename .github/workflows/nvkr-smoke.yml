@@ -8,6 +8,8 @@ name: 'nvkr-smoke-nvke-m2'
         required: true
       NKE_SOURCE_TOKEN:
         required: true
+      NVKR_REGISTRY_READ:
+        required: true
 permissions:
   contents: read
 concurrency:
@@ -33,7 +35,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: read
       id-token: write
     steps:
       - name: Admit trusted same-commit workflow
@@ -77,8 +78,8 @@ jobs:
         env:
           SMOKE_IMAGE: ${{ matrix.image }}
           SMOKE_ARCH: ${{ matrix.arch }}
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          GHCR_TOKEN: ${{ secrets.NVKR_REGISTRY_READ }}
         run: |
           set -euo pipefail
           export DOCKER_CONFIG="$RUNNER_TEMP/nvkr-smoke-pull"
@@ -90,8 +91,8 @@ jobs:
         env:
           NVKR_GITHUB_TOKEN: ${{ github.token }}
           NVKR_PULL_REGISTRY: ghcr.io
-          NVKR_PULL_REGISTRY_USER: ${{ github.actor }}
-          NVKR_PULL_REGISTRY_PASSWORD: ${{ github.token }}
+          NVKR_PULL_REGISTRY_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          NVKR_PULL_REGISTRY_PASSWORD: ${{ secrets.NVKR_REGISTRY_READ }}
           NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
           GIT_CONFIG_COUNT: '4'

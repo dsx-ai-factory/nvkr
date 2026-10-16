@@ -299,11 +299,22 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 		return nil, e.New(e.CodeEngineCapability, "semantic GitHub recovery omits its provider-result input")
 	}
 	if role.kind == "prepare-images" {
-		if present && !githubInterfaceEnvironmentEqual(originalEnv, githubImageEnvironment()) {
+		expected := githubImageEnvironment()
+		expected[githubImageToken] = "${{ inputs.nvkr-toolchain-read-token }}"
+		if present && !githubInterfaceEnvironmentEqual(originalEnv, expected) {
 			return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its read credential")
 		}
-		for _, key := range sortedKeys(githubImageEnvironment()) {
-			githubYAMLSet(env, key, githubYAMLString(githubImageEnvironment()[key]))
+		githubYAMLSet(inputs, "nvkr-toolchain-read-token", githubActionInput("Independent private toolchain reader"))
+		token := ""
+		if present {
+			token = githubYAMLValue(githubYAMLField(call, "with"), "nvkr-toolchain-read-token")
+			if token != githubImageEnvironment()[githubImageToken] {
+				return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its caller credential")
+			}
+		}
+		githubYAMLSet(invocation.Arguments, "nvkr-toolchain-read-token", githubYAMLString(token))
+		for _, key := range sortedKeys(expected) {
+			githubYAMLSet(env, key, githubYAMLString(expected[key]))
 		}
 	} else if originalEnv != nil {
 		if originalEnv.Kind != yamlv3.MappingNode || (role.kind != "execute-source" && role.kind != "recover" && role.kind != "finalize") {

@@ -66,7 +66,6 @@ func TestPrivatePublicationAdmitsExactOutputAndReleasePackages(t *testing.T) {
 		p := publicationPackage(packageName)
 		if packageName == "source/releases" {
 			p["visibility"] = "internal"
-			p["repository"] = map[string]any{"id": 2, "full_name": "Example/Private", "private": true}
 		}
 		return http.StatusOK, p
 	})
@@ -112,6 +111,9 @@ func TestPrivatePublicationRefusesPublicUnknownAndLinkedPackagesBeforeSeed(t *te
 		{"unknown visibility", func(p map[string]any) { delete(p, "visibility") }},
 		{"public linked", func(p map[string]any) {
 			p["repository"] = map[string]any{"id": 3, "full_name": "Example/Source", "private": false, "visibility": "public"}
+		}},
+		{"private linked", func(p map[string]any) {
+			p["repository"] = map[string]any{"id": 3, "full_name": "Example/Private", "private": true}
 		}},
 		{"unknown linkage", func(p map[string]any) { p["repository"] = map[string]any{} }},
 		{"substituted package", func(p map[string]any) { p["name"] = "other/releases" }},

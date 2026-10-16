@@ -115,11 +115,11 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	if call.Name != "native-smoke" || call.Uses != "./"+policy.Smoke.Workflow || native.Name != "native-${{ matrix.arch }}" || native.RunsOn != "${{ matrix.runner }}" {
 		t.Fatal("exact authenticated job or same-commit reusable identity changed")
 	}
-	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "write" || call.Permissions["packages"] != "read" || native.Permissions["packages"] != "read" {
+	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "" || call.Permissions["packages"] != "" || native.Permissions["packages"] != "" {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
 	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
-		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || len(call.Secrets) != 2 {
+		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || len(call.Secrets) != 3 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
 	}
 	contract, ok := worker.On["workflow_call"].(map[string]any)
