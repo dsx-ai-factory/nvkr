@@ -6,6 +6,7 @@ package catalogmaintenance
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -26,25 +27,39 @@ func TestMaintenanceConfigAdmission(t *testing.T) {
 		code   e.Code
 	}{
 		{"valid", func(*Config) {}, ""},
-		{"weekly", func(c *Config) { c.Schedule = "0 6 * * 1" }, ""},
 		{"schema", func(c *Config) { c.APIVersion = "future" }, e.CodeInvalidCatalog},
 		{"escape", func(c *Config) { c.Catalog = "../catalog" }, e.CodeUsage},
 		{"shell path", func(c *Config) { c.Definition = "$(touch pwn)" }, e.CodeUsage},
 		{"absolute", func(c *Config) { c.Environment = "/env.yaml" }, e.CodeUsage},
 		{"duplicate", func(c *Config) { c.Sources = []string{"first", "first"} }, e.CodeUsage},
 		{"unknown cohort", func(c *Config) { c.SameRelease = [][]string{{"first", "absent"}} }, e.CodeUsage},
-		{"cron injection", func(c *Config) { c.Schedule = "0 6 * * 1\nrun: evil" }, e.CodeUsage},
-		{"cron out of range", func(c *Config) { c.Schedule = "60 6 * * 1" }, e.CodeUsage},
-		{"cron too frequent", func(c *Config) { c.Schedule = "* * * * *" }, e.CodeUsage},
 		{"validation", func(c *Config) { c.Validation = "qualified" }, e.CodeUsage},
-		{"PR without execution", func(c *Config) {
-			c.PullRequest = &PullRequest{ClientIDVariable: "BOT_CLIENT_ID", PrivateKeySecret: "BOT_PRIVATE_KEY"}
+		{"dependent bundles", func(c *Config) {
+			c.DevelopmentEnvironment, c.QualificationPolicy = "environment-dev.yaml", "qualification.yaml"
+		}, ""},
+		{"development escape", func(c *Config) { c.DevelopmentEnvironment = "../dev.yaml" }, e.CodeUsage},
+		{"development shell path", func(c *Config) { c.DevelopmentEnvironment = "$(touch pwn)" }, e.CodeUsage},
+		{"development equals production", func(c *Config) { c.DevelopmentEnvironment = c.Environment }, e.CodeUsage},
+		{"qualification absolute", func(c *Config) { c.QualificationPolicy = "/qualification.yaml" }, e.CodeUsage},
+		{"additional runs", func(c *Config) {
+			c.DevelopmentEnvironment = "environment-dev.yaml"
+			c.AdditionalRuns = []RunInput{{"nightly.json", "environment-nightly.json"}, {c.Definition, "environment-other.yaml"}}
+		}, ""},
+		{"additional run escape", func(c *Config) { c.AdditionalRuns = []RunInput{{"../nightly.json", "environment-nightly.json"}} }, e.CodeUsage},
+		{"additional run shell path", func(c *Config) { c.AdditionalRuns = []RunInput{{"nightly.json", "$(touch pwn)"}} }, e.CodeUsage},
+		{"additional run empty", func(c *Config) { c.AdditionalRuns = []RunInput{{}} }, e.CodeUsage},
+		{"additional run repeats production", func(c *Config) { c.AdditionalRuns = []RunInput{{c.Definition, c.Environment}} }, e.CodeUsage},
+		{"additional run repeats development", func(c *Config) {
+			c.DevelopmentEnvironment = "environment-dev.yaml"
+			c.AdditionalRuns = []RunInput{{c.Definition, c.DevelopmentEnvironment}}
 		}, e.CodeUsage},
-		{"mutable checkout", func(c *Config) {
-			c.SourceCheckout = &SourceCheckout{Repository: "owner/repo", Ref: "main", Secret: "SOURCE_TOKEN"}
+		{"additional run repeated", func(c *Config) {
+			c.AdditionalRuns = []RunInput{{"nightly.json", "environment-nightly.json"}, {"nightly.json", "environment-nightly.json"}}
 		}, e.CodeUsage},
-		{"secret injection", func(c *Config) {
-			c.SourceCheckout = &SourceCheckout{Repository: "owner/repo", Ref: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Secret: "X }}"}
+		{"too many additional runs", func(c *Config) {
+			for i := 0; i <= maxAdditionalRuns; i++ {
+				c.AdditionalRuns = append(c.AdditionalRuns, RunInput{"nightly.json", fmt.Sprintf("environment-%d.json", i)})
+			}
 		}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -91,7 +106,7 @@ func TestMaintenanceLoadRejectsAmbiguousAndUnsafeFiles(t *testing.T) {
 	var missingContext context.Context
 	_, err = Load(missingContext, "missing")
 	assertCode(t, err, e.CodeUsage)
-	_, err = Refresh(ctx, Config{}, "test", false)
+	_, err = Refresh(ctx, Config{}, "test", false, "")
 	assertCode(t, err, e.CodeTimeout)
 }
 
@@ -118,13 +133,13 @@ validation: static
 		{"single JSON document", string(jsonConfig), true},
 		{"explicit document boundaries", "---\n" + valid + "...\n# trailing comment\n", true},
 		{"additional unknown policy", valid + "---\nunknownPolicy: true\n", false},
-		{"additional conflicting policy", valid + "---\n" + valid + "schedule: '0 6 * * 1'\n", false},
+		{"additional conflicting policy", valid + "---\n" + strings.Replace(valid, "name: test", "name: other", 1), false},
 		{"malformed trailing document", valid + "---\ninvalid: [\n", false},
 		{"empty second document", valid + "---\n", false},
 		{"unknown field", valid + "unknownPolicy: true\n", false},
 		{"duplicate field", valid + "validation: local-run\n", false},
-		{"nested unknown field", valid + "sourceCheckout: {unknown: true}\n", false},
-		{"nested duplicate field", valid + "sourceCheckout: {secret: FIRST, secret: SECOND}\n", false},
+		{"retired source checkout", valid + "sourceCheckout: {repository: owner/repo}\n", false},
+		{"unknown dependent bundle field", valid + "qualification: qualification.yaml\n", false},
 		{"anchor", strings.Replace(valid, "name: test", "name: &policy test", 1), false},
 		{"alias", strings.Replace(valid, "sources: [first, second]", "sources: [&source first, *source]", 1), false},
 	} {
@@ -142,6 +157,33 @@ validation: static
 			if err != nil || !reflect.DeepEqual(got, validConfig()) {
 				t.Fatalf("valid config = %+v, error = %v", got, err)
 			}
+		})
+	}
+}
+
+func TestValidateSchedule(t *testing.T) {
+	for _, tc := range []struct {
+		name, schedule string
+		code           e.Code
+	}{
+		{"manual only", "", ""},
+		{"nightly", DefaultSchedule, ""},
+		{"weekly", "0 6 * * 1", ""},
+		{"injection", "0 6 * * 1\nrun: evil", e.CodeUsage},
+		{"out of range", "60 6 * * 1", e.CodeUsage},
+		{"too frequent", "* * * * *", e.CodeUsage},
+		{"step", "0 */6 * * *", e.CodeUsage},
+		{"alias", "@daily", e.CodeUsage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateSchedule(tc.schedule)
+			if tc.code == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			assertCode(t, err, tc.code)
 		})
 	}
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package catalogmaintenance owns review-only catalog refreshes and their
-// scheduled GitHub adapter. It grants no build, publication or release authority.
+// GitHub workflow renderer. It grants no build, publication or release authority.
 package catalogmaintenance
 
 import (
@@ -23,42 +23,70 @@ const SchemaVersion = "nvkr.dev/catalog-maintenance/v1"
 // Config is operator-owned maintenance policy, not a public lifecycle object.
 // Constraints stay in the catalog. This config never authorizes widening them.
 type Config struct {
-	APIVersion     string          `json:"apiVersion"`
-	Name           string          `json:"name"`
-	Catalog        string          `json:"catalog"`
-	Sources        []string        `json:"sources"`
-	SameRelease    [][]string      `json:"sameRelease,omitempty"`
-	Definition     string          `json:"definition"`
-	Environment    string          `json:"environment"`
-	Schedule       string          `json:"schedule,omitempty"`
-	Validation     string          `json:"validation"`
-	PullRequest    *PullRequest    `json:"pullRequest,omitempty"`
-	SourceCheckout *SourceCheckout `json:"sourceCheckout,omitempty"`
+	APIVersion  string     `json:"apiVersion"`
+	Name        string     `json:"name"`
+	Catalog     string     `json:"catalog"`
+	Sources     []string   `json:"sources"`
+	SameRelease [][]string `json:"sameRelease,omitempty"`
+	Definition  string     `json:"definition"`
+	Environment string     `json:"environment"`
+	Validation  string     `json:"validation"`
+	// DevelopmentEnvironment and QualificationPolicy name the other committed
+	// generated bundles that share this catalog's pins. They are generation
+	// inputs for the existing owners, not authority: each is checked, regenerated
+	// and transported with the production Run, and a committed bundle the policy
+	// does not name is refused.
+	DevelopmentEnvironment string `json:"developmentEnvironment,omitempty"`
+	QualificationPolicy    string `json:"qualificationPolicy,omitempty"`
+	// AdditionalRuns names further committed Run bundles, each compiled from its
+	// own Definition and Environment, that also consume this catalog's pins, such
+	// as named nightly bundles. They join the same closure under the same rules.
+	AdditionalRuns []RunInput `json:"additionalRuns,omitempty"`
 }
 
-// PullRequest describes the reserved opt-in GitHub App publication policy.
-// Workflow rejects it with CodeEngineCapability until that stage is implemented.
-type PullRequest struct {
-	ClientIDVariable string `json:"clientIDVariable"`
-	PrivateKeySecret string `json:"privateKeySecret"`
+// RunInput selects one generated Run bundle by its authored inputs.
+type RunInput struct {
+	Definition  string `json:"definition"`
+	Environment string `json:"environment"`
 }
 
-// SourceCheckout transports a private Git repository without leaving credentials
-// available to catalog resolution, generation or validation subprocesses.
-type SourceCheckout struct {
-	Repository string `json:"repository"`
-	Ref        string `json:"ref"`
-	Secret     string `json:"secret"`
-}
+// maxAdditionalRuns bounds the closure a single refresh regenerates.
+const maxAdditionalRuns = 16
 
 var safeName = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
 var safePath = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 var repositoryName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$`)
-var commitSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var secretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 
 func safeRelative(value string) bool {
 	return value != "" && value != "." && value != ".." && !strings.HasPrefix(value, "../") && !path.IsAbs(value) && path.Clean(value) == value && safePath.MatchString(value)
+}
+
+// ValidateSchedule admits an empty schedule (manual dispatch only) or a reviewed
+// cron: each field is '*' or one in-range decimal integer, and the minute is fixed.
+func ValidateSchedule(schedule string) error {
+	if schedule == "" {
+		return nil
+	}
+	fields := strings.Fields(schedule)
+	if len(fields) != 5 || strings.Join(fields, " ") != schedule {
+		return e.New(e.CodeUsage, "schedule requires five cron fields")
+	}
+	// Deliberately narrow: no aliases, steps, lists or injection syntax.
+	bounds := [][2]int{{0, 59}, {0, 23}, {1, 31}, {1, 12}, {0, 6}}
+	for i, field := range fields {
+		if field == "*" {
+			continue
+		}
+		n, err := strconv.Atoi(field)
+		if err != nil || strconv.Itoa(n) != field || n < bounds[i][0] || n > bounds[i][1] {
+			return e.New(e.CodeUsage, "unsupported cron field %q; use '*' or an in-range decimal integer", field)
+		}
+	}
+	if fields[0] == "*" {
+		return e.New(e.CodeUsage, "maintenance schedule must select one minute of the hour")
+	}
+	return nil
 }
 
 func (config Config) Validate() error {
@@ -72,6 +100,30 @@ func (config Config) Validate() error {
 		if !safeRelative(value) {
 			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q", value)
 		}
+	}
+	for _, value := range []string{config.DevelopmentEnvironment, config.QualificationPolicy} {
+		if value != "" && !safeRelative(value) {
+			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q", value)
+		}
+	}
+	if config.DevelopmentEnvironment != "" && config.DevelopmentEnvironment == config.Environment {
+		return e.New(e.CodeUsage, "developmentEnvironment must differ from the production environment")
+	}
+	if len(config.AdditionalRuns) > maxAdditionalRuns {
+		return e.New(e.CodeUsage, "maintenance admits at most %d additional runs", maxAdditionalRuns)
+	}
+	runs := map[RunInput]bool{{config.Definition, config.Environment}: true}
+	if config.DevelopmentEnvironment != "" {
+		runs[RunInput{config.Definition, config.DevelopmentEnvironment}] = true
+	}
+	for _, run := range config.AdditionalRuns {
+		if !safeRelative(run.Definition) || !safeRelative(run.Environment) {
+			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q, %q", run.Definition, run.Environment)
+		}
+		if runs[run] {
+			return e.New(e.CodeUsage, "additional run %s with %s repeats another selected run", run.Definition, run.Environment)
+		}
+		runs[run] = true
 	}
 	if len(config.Sources) == 0 || len(config.Sources) > 128 {
 		return e.New(e.CodeUsage, "maintenance requires 1–128 explicit source roots")
@@ -95,39 +147,17 @@ func (config Config) Validate() error {
 			grouped[source] = true
 		}
 	}
-	if config.Schedule != "" {
-		fields := strings.Fields(config.Schedule)
-		if len(fields) != 5 || strings.Join(fields, " ") != config.Schedule {
-			return e.New(e.CodeUsage, "schedule requires five cron fields")
-		}
-		// Deliberately narrow: each field is '*' or one decimal integer. This covers
-		// daily/weekly schedules without aliases, steps, lists or injection syntax.
-		bounds := [][2]int{{0, 59}, {0, 23}, {1, 31}, {1, 12}, {0, 6}}
-		for i, field := range fields {
-			if field == "*" {
-				continue
-			}
-			n, err := strconv.Atoi(field)
-			if err != nil || strconv.Itoa(n) != field || n < bounds[i][0] || n > bounds[i][1] {
-				return e.New(e.CodeUsage, "unsupported cron field %q; use '*' or an in-range decimal integer", field)
-			}
-		}
-		if fields[0] == "*" {
-			return e.New(e.CodeUsage, "maintenance schedule must select one minute of the hour")
-		}
-	}
 	if config.Validation != "static" && config.Validation != "local-run" {
 		return e.New(e.CodeUsage, "maintenance validation must be static or local-run")
 	}
-	if pr := config.PullRequest; pr != nil {
-		if config.Validation != "local-run" || !secretName.MatchString(pr.ClientIDVariable) || !secretName.MatchString(pr.PrivateKeySecret) || strings.HasPrefix(pr.PrivateKeySecret, "GITHUB_") {
-			return e.New(e.CodeUsage, "automated PRs require local-run validation and dedicated GitHub App variable/secret names")
-		}
-	}
-	if access := config.SourceCheckout; access != nil {
-		if !repositoryName.MatchString(access.Repository) || strings.HasSuffix(access.Repository, ".git") || !commitSHA.MatchString(access.Ref) || !secretName.MatchString(access.Secret) || strings.HasPrefix(access.Secret, "GITHUB_") {
-			return e.New(e.CodeUsage, "source checkout requires owner/repository, a full commit and a dedicated secret name")
-		}
+	return nil
+}
+
+// ValidateSourceRepository admits the owner/repository of a private source that
+// the workflow transports through a local Git rewrite; empty means none.
+func ValidateSourceRepository(repository string) error {
+	if repository != "" && (!repositoryName.MatchString(repository) || strings.HasSuffix(repository, ".git")) {
+		return e.New(e.CodeUsage, "source repository requires owner/repository without a .git suffix")
 	}
 	return nil
 }

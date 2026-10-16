@@ -207,16 +207,39 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
   failure after pin commit leaves a disposable checkout for diagnosis, never a publishable candidate.
   Recovery context preserves the generating owner's coded cause, including retryable cancellation and
   non-retryable generated-file drift during either generation pass.
-- `catalog update-ci` renders a separate GitHub workflow with optional reviewed scheduling, default-branch
-  admission, exact base checkout, bounded non-canceling concurrency and read-only repository permissions.
-  Credentials are passed only to the fixed private-source checkout, not resolution or producer execution.
-  Its Git prefix override rejects distinct repository URL collisions before workflow output or pin mutation;
-  admission covers selected maintenance source closures, every revalidated catalog pin set and compiled
-  fetches. Repeated roles and ordinary `.git`/trailing-slash aliases for the same repository remain supported.
-  Changed candidates pass the repository gate and deterministic regeneration; `local-run` additionally
-  requires execution and independent observation of every required output. Unsupported capabilities fail
-  without reducing the Definition. Static mode emits only a review patch. Automatic review-branch/PR
-  publication remains capability-gated, and no scheduled external acceptance is claimed.
+- `catalog update-ci` takes no policy path and renders a separate GitHub workflow that discovers the one
+  `inputs/policies/*-catalog-maintenance.yaml` when it runs (several share the repository-root generated bundle
+  and are refused), with a reviewed schedule (nightly unless one is given, so pins stay current without an
+  operator remembering to run the command; an empty schedule is manual dispatch only), default-branch admission,
+  exact base checkout, per-ref canceling concurrency and read-only repository permissions. Credentials are
+  passed only to the fixed private-source checkout, not resolution or producer execution. Its Git prefix
+  override rejects distinct repository URL collisions before workflow output or pin mutation, and `catalog
+  refresh --source-repository` repeats the admission at run time; admission covers selected maintenance source
+  closures, every revalidated catalog pin set and compiled fetches. Repeated roles and ordinary
+  `.git`/trailing-slash aliases for the same repository remain supported. Changed candidates pass deterministic
+  regeneration and then the pull request's required checks, which the App's writes start; `local-run`
+  additionally requires execution and independent observation of every required output. Unsupported capabilities
+  fail without reducing the Definition. An isolated job that alone holds write permission on the workflow's
+  GitHub App installation token (minted in that job for this repository only, with contents, pull requests and
+  workflows write, and revoked when the leg ends; the workflow token stays read-only everywhere) opens or
+  updates the PR for a changed Definition, leaves a branch that already holds the candidate alone, and closes
+  the stale PR and branch of an unchanged one. Only a closed, unmerged PR whose head commit carries the current
+  candidate keeps a PR from being recreated, even after its branch is deleted, and every PR lookup ignores PRs
+  from fork branches with the same name. The policy names the dependent generated bundles (a development Run, a
+  qualification pair and additional named Runs). Each is checked before any pin update, regenerated through its
+  own owner (the runtime-Plan owner for a `githubRuntimePlan` Run, which admits only Plan and action-data
+  changes) with that owner's coded failure preserved, and transported on an exact path allowlist; a committed
+  generated bundle the policy does not name is refused with `CodeEngineCapability` before pin mutation or
+  workflow output. `catalog update-ci` also refuses a generator stamp that differs from the committed Plans
+  (`CodePipelineDrift`), before any catalog or source resolution, and a symlinked policy location. Regenerating
+  a member does not qualify or accept anything. The deployment-image selection is not part of that closure: a
+  release advance must coordinate it in a separate authored change, which maintenance neither performs nor
+  checks. The job creates the review commit through the GitHub API with a DCO trailer and no author or
+  committer, so GitHub is expected to sign it (not verified on GitHub). Because that token can write workflows,
+  a candidate that regenerates a generated workflow in the closure is published like any other generated file;
+  patch admission still refuses every other workflow path, and code-owner review gates the merge. The App token
+  exchange, revocation and DCO attribution are contract-tested only. The rendered workflow is installed, but no
+  scheduled run is claimed as exercised.
 - Local candidate verification is diagnostic, not qualified reproduction or hosted release acceptance.
   Qualified changes require reproduction; v1 production uses its explicit evidence contract. Merge to the
   default branch is the v1 release decision (ADR-16), without a reproduction claim. Release-manifest issuance
@@ -351,8 +374,10 @@ and worktrees retain Git's ordinary review and merge-conflict behavior.
 
 ### 7. Single-owner rule for "the CI files"
 
-`run generate` is the sole owner of the emitted build pipeline; the legacy `bundle` adapter is removed. `catalog bump` may regenerate only the *pin-bot*
-workflow — the scheduled bump job — never the build pipeline. Conflating two "CI" artifacts under one verb is
+`run generate` is the sole owner of the emitted build pipeline; the legacy `bundle` adapter is removed.
+`catalog update-ci` renders only the scheduled catalog-refresh workflow, never the build pipeline. Catalog
+maintenance regenerates a candidate by invoking the existing owners (`run generate` and the qualification
+generator); it renders none of their files itself. Conflating two "CI" artifacts under one verb is
 disallowed; that ambiguity is what makes forgotten-regen drift possible.
 
 ## Consequences

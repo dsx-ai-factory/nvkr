@@ -215,7 +215,7 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 .PHONY: workflows-check
-workflows-check: workflow-generator pipeline-dev-check ## Check committed producer, qualification and development bundles for drift.
+workflows-check: workflow-generator pipeline-dev-check catalog-refresh-check ## Check committed producer, qualification, development bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
 	@# Definitions. The generator still authenticates the complete bundle and inputs.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
@@ -231,6 +231,27 @@ workflows-check: workflow-generator pipeline-dev-check ## Check committed produc
 		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
 		--environment inputs/environments/github-nightly-upstream.json \
 		--root . --runtime --check
+
+# The private NVKE source the installed catalog refresh workflow was rendered with.
+CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN
+
+.PHONY: catalog-refresh-check
+catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
+	@# The installed file is generated, so it must equal the renderer's output for the
+	@# same source option and the canonical generator stamp. Regenerate it with
+	@# `make catalog-refresh-generate`; never edit the file by hand.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 { diff -u .github/workflows/catalog-refresh.yaml "$$rendered" || { \
+	   echo "catalog-refresh.yaml differs from catalog update-ci output; regenerate it from the generator" >&2; exit 1; }; }
+
+.PHONY: catalog-refresh-generate
+catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog refresh workflow with the canonical generator stamp.
+	@# Render to a temporary file and replace the installed workflow only after the renderer
+	@# succeeds: a refused render (source, stamp or closure admission) leaves it untouched.
+	@rendered="$$(mktemp .github/workflows/.catalog-refresh.XXXXXX)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate
 workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate producer, qualification and development bundles with their canonical generator stamp.
