@@ -20,6 +20,7 @@ type githubWorkflowDocument struct {
 	Name        string                     `json:"name"`
 	On          map[string]json.RawMessage `json:"on"`
 	Permissions map[string]string          `json:"permissions"`
+	Env         map[string]string          `json:"env,omitempty"`
 	Jobs        map[string]githubJob       `json:"jobs"`
 	Concurrency struct {
 		Group            string `json:"group"`

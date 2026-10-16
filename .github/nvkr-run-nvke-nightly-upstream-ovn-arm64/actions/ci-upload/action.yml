@@ -67,7 +67,7 @@ runs:
       env:
         NVKR_CI_STORAGE_TOKEN: ${{ inputs.nvkr-ci-storage-write-token }}
         NVKR_CI_REPOSITORY_TOKEN: ${{ github.token }}
-        NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
+        NVKR_CI_STORAGE_USER: ${{ env.NVKR_CI_STORAGE_WRITE_USER }}
         NVKR_CI_NAME: ${{ inputs.name }}
         NVKR_CI_PATH: ${{ inputs.path }}
         NVKR_CI_MISSING: ${{ inputs.if-no-files-found }}

@@ -442,6 +442,8 @@ jobs:
       - name: Upload toolchain evidence
         if: always() && needs.select.outputs.commit == github.workflow_sha && steps.ci-helper.outcome == 'success'
         uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
           nvkr-ci-always: 'true'
@@ -515,6 +517,8 @@ jobs:
 
       - name: Upload one-day NVKE source handoff
         uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
           name: nvke-os-source-${{ github.run_id }}
@@ -556,6 +560,8 @@ jobs:
 
       - name: Download exact NVKE source handoff
         uses: ./.github/nvkr-run/actions/ci-download
+        env:
+          NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         with:
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           name: nvke-os-source-${{ github.run_id }}
@@ -765,6 +771,8 @@ jobs:
       - name: Upload full validation evidence
         if: always() && needs.select.outputs.commit == github.workflow_sha
         uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
           nvkr-ci-always: 'true'
@@ -781,6 +789,8 @@ jobs:
       - name: Upload retained QCOW2
         if: success() && needs.select.outputs.retain_qcow2 == 'true' && needs.select.outputs.commit == github.workflow_sha
         uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
           name: nvke-os-${{ matrix.arch }}-qcow2-${{ needs.select.outputs.commit }}-${{ github.run_attempt }}

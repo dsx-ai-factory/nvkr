@@ -7724,3 +7724,6 @@ jobs:
             fi
             printf 'This summary is diagnostic; the Run record carries the completeness result.\n'
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

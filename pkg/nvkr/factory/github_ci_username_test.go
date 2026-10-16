@@ -16,9 +16,9 @@ func TestGitHubCITransferUsesConfiguredCredentialAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ mode, username, input string }{
-		{"upload", "${{ vars.NVKR_CI_STORAGE_WRITE_USER }}", githubCIStorageInput},
-		{"download", "${{ vars.NVKR_CI_STORAGE_READ_USER }}", githubCIReadInput},
-		{"bootstrap-download", "${{ vars.NVKR_CI_STORAGE_READ_USER }}", githubCIReadInput},
+		{"upload", "${{ env.NVKR_CI_STORAGE_WRITE_USER }}", githubCIStorageInput},
+		{"download", "${{ env.NVKR_CI_STORAGE_READ_USER }}", githubCIReadInput},
+		{"bootstrap-download", "${{ env.NVKR_CI_STORAGE_READ_USER }}", githubCIReadInput},
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
 			var document yamlv3.Node

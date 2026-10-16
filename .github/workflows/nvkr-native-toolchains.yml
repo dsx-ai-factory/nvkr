@@ -44,6 +44,8 @@ jobs:
       - name: Retain native measurements
         if: always() && steps.ci-helper.outcome == 'success'
         uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
           nvkr-ci-always: 'true'

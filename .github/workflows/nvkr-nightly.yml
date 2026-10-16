@@ -241,6 +241,8 @@ jobs:
       - name: Download the producer's frozen runtime inputs
         if: steps.candidate.outputs.runtime_plan == 'true'
         uses: ./.github/nvkr-run/actions/ci-download
+        env:
+          NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         with:
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           name: nvkr-runtime-inputs

@@ -23,6 +23,46 @@ const githubCIIndexCondition = "${{ always() && steps.store.outcome == 'success'
 
 type githubCITransfer struct{ upload, download bool }
 
+func githubCIUserEnvironment() map[string]string {
+	return map[string]string{
+		"NVKR_CI_STORAGE_READ_USER":  "${{ vars.NVKR_CI_STORAGE_READ_USER }}",
+		"NVKR_CI_STORAGE_WRITE_USER": "${{ vars.NVKR_CI_STORAGE_WRITE_USER }}",
+	}
+}
+
+// Composite action manifests cannot resolve the workflow-only vars context.
+// Bind the public account names once in the entry workflow; only the leaf
+// transfer command selects its account. Tokens remain explicit step inputs.
+func admitGitHubCIUserEnvironment(documents map[string]*yamlv3.Node, entry string) error {
+	root := documents[entry].Content[0]
+	expected := githubCIUserEnvironment()
+	if !githubInterfaceEnvironmentEqual(githubYAMLField(root, "env"), expected) {
+		return e.New(e.CodeEngineCapability, "private transport requires its exact workflow account bindings")
+	}
+	var visit func(*yamlv3.Node) error
+	visit = func(node *yamlv3.Node) error {
+		if node != root {
+			for key := range expected {
+				if githubYAMLField(githubYAMLField(node, "env"), key) != nil {
+					return e.New(e.CodeEngineCapability, "private transport account binding must not be overridden below workflow scope")
+				}
+			}
+		}
+		for _, child := range node.Content {
+			if err := visit(child); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for _, name := range sortedKeys(documents) {
+		if err := visit(documents[name]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Credentials are distinct explicit inputs and never add package authority to
 // the repository token. Complete sequence sharing compares both bindings.
 func githubCISequenceArgumentLength(node *yamlv3.Node) int {
@@ -141,9 +181,9 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				githubYAMLMap("name", githubYAMLString("Build private transport helper from this checkout"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString("set -eu\nmkdir -p .nvkr/ci-bootstrap\nCGO_ENABLED=0 go build -trimpath -ldflags "+shellQuote(linker)+" -o .nvkr/ci-bootstrap/nvkr-exec ./cmd/nvkr")))
 		}
 		steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Create a fresh locator directory"), "id", githubYAMLString("directory"), "shell", githubYAMLString("bash"), "run", githubYAMLString("set -eu\ndirectory=$(mktemp -d \"$RUNNER_TEMP/nvkr-ci-index.XXXXXX\")\nprintf 'path=%s\\n' \"$directory\" >> \"$GITHUB_OUTPUT\"")))
-		username := "${{ vars.NVKR_CI_STORAGE_READ_USER }}"
+		username := "${{ env.NVKR_CI_STORAGE_READ_USER }}"
 		if mode == "upload" {
-			username = "${{ vars.NVKR_CI_STORAGE_WRITE_USER }}"
+			username = "${{ env.NVKR_CI_STORAGE_WRITE_USER }}"
 		}
 		env := githubYAMLMap("NVKR_CI_STORAGE_TOKEN", githubYAMLString("${{ inputs."+credentialInput+" }}"), "NVKR_CI_REPOSITORY_TOKEN", githubYAMLString("${{ github.token }}"), "NVKR_CI_STORAGE_USER", githubYAMLString(username))
 		outputs := githubYAMLMap()
@@ -292,6 +332,19 @@ func privatizeGitHubTransfers(plan *Plan, workflow []byte, files map[string][]by
 		return nil, nil, err
 	}
 	entry := githubLayoutFor(plan).workflowPath
+	root := documents[entry].Content[0]
+	if githubYAMLField(root, "env") != nil {
+		return nil, nil, e.New(e.CodeEngineCapability, "private transport workflow account bindings conflict with an existing environment")
+	}
+	userEnvironment := githubYAMLMap()
+	accounts := githubCIUserEnvironment()
+	for _, key := range sortedKeys(accounts) {
+		githubYAMLSet(userEnvironment, key, githubYAMLString(accounts[key]))
+	}
+	githubYAMLSet(root, "env", userEnvironment)
+	if err := admitGitHubCIUserEnvironment(documents, entry); err != nil {
+		return nil, nil, err
+	}
 	for _, document := range documents {
 		if err := githubCIWalkSteps(document, func(step *yamlv3.Node) error {
 			mode := ""
@@ -419,6 +472,10 @@ func materializeGitHubPrivateTransfers(plan *Plan, workflow []byte, files map[st
 		return nil, nil, err
 	}
 	entry := githubLayoutFor(plan).workflowPath
+	if err := admitGitHubCIUserEnvironment(documents, entry); err != nil {
+		return nil, nil, err
+	}
+	githubYAMLRemove(documents[entry].Content[0], "env")
 	basePermissions, err := githubCIBasePermissions(plan)
 	if err != nil {
 		return nil, nil, err

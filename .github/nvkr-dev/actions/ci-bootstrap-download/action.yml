@@ -76,7 +76,7 @@ runs:
       env:
         NVKR_CI_STORAGE_TOKEN: ${{ inputs.nvkr-ci-storage-read-token }}
         NVKR_CI_REPOSITORY_TOKEN: ${{ github.token }}
-        NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+        NVKR_CI_STORAGE_USER: ${{ env.NVKR_CI_STORAGE_READ_USER }}
         NVKR_CI_INDEX: ${{ steps.directory.outputs.path }}
         NVKR_CI_DESTINATION: ${{ inputs.path }}
         NVKR_CI_RUN: ${{ inputs.run-id }}

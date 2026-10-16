@@ -1012,6 +1012,15 @@ acceptance. Raw chunks trade compression for predictable layer bounds. Registry 
 package grants and anonymous/unrelated-user/fork access remain operator responsibilities. Old workflow
 artifacts and caches are not migrated or purged. No complete hosted private-transfer Run is recorded.
 
+The first combined-branch development attempt,
+[Run 38841923994](https://github.com/dsx-ai-factory/nvkr/actions/runs/38841923994) at
+`b59e974860514aa1414eebee3bc033b0bed644d2`, compiled both native helpers and passed committed-generation
+validation. All four bootstrap jobs then failed before payload transfer because GitHub's composite-action
+schema rejects the `vars` context. The generated workflow now binds the two nonsecret storage usernames
+from repository variables into workflow environment values; nested transfer actions consume the supported
+`env` context. Authored nightly, native-toolchain and OS-validation callers supply the corresponding username explicitly.
+That failed attempt does not establish registry authentication, transfer, runner admission, or publication.
+
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage
 writer are admitted only for the exact trusted workflow commit. The nightly public runtime attachment
@@ -1078,9 +1087,9 @@ The combined production/development layout has 564 original jobs and 16 collecto
 The production dependency graph has 1,375 edges, down from 1,438. Logical Plan identity and original
 per-node result accounting remain unchanged by scheduling. Shared preparation selects the current
 `github.job` internally, removing a redundant caller input while retaining exact projection checks.
-Production is 379,971 bytes and 47,444 expanded YAML events; development is 359,208 bytes and 47,001 events.
-The named ARM64 nightly and upstream-OVN entries are respectively 182,173/183,090 bytes and
-22,118/22,110 events, each with 282 jobs and 644 dependency edges.
+Production is 380,112 bytes and 47,451 expanded YAML events; development is 359,349 bytes and 47,008 events.
+The named ARM64 nightly and upstream-OVN entries are respectively 182,314/183,231 bytes and
+22,125/22,117 events, each with 282 jobs and 644 dependency edges.
 All four producer bundles keep their jobs inline. The earlier output-local grouping migration removed
 accidental unrelated-output failure barriers; dependency reduction preserves the resulting ancestor closure.
 The addition/removal regression compiles binary, native binary, collected native binary, source and signed
