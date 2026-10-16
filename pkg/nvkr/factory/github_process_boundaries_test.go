@@ -29,6 +29,10 @@ func TestGitHubBootstrapStopsDescendantHoldingCapturedPipe(t *testing.T) {
 	if err != nil {
 		t.Skip("Bash required")
 	}
+	ps, err := exec.LookPath("ps")
+	if err != nil {
+		t.Skip("ps required")
+	}
 	for _, outcome := range []string{"valid module result", "invalid module result"} {
 		t.Run(outcome, func(t *testing.T) {
 			root, cache := t.TempDir(), t.TempDir()
@@ -54,7 +58,9 @@ if sys.argv[1:4] == ["mod", "download", "-json"]:
     print("not-json" if ` + strconv.Quote(outcome) + ` == "invalid module result" else json.dumps({"Path":"example.com/module","Version":"v1.0.0"}), flush=True)
     sys.exit(0)
 pid = pathlib.Path("descendant.pid").read_text()
-state = subprocess.run(["ps", "-o", "stat=", "-p", pid], capture_output=True, text=True).stdout.strip()
+probe = subprocess.run(["ps", "-o", "stat=", "-p", pid], capture_output=True, text=True)
+assert probe.returncode == 0 or (probe.returncode == 1 and not probe.stdout.strip() and not probe.stderr.strip()), "ps probe failed: " + probe.stderr
+state = probe.stdout.strip()
 assert not state or state.startswith("Z"), "descendant still executing when compilation began"
 assert pathlib.Path(os.environ["GOMODCACHE"]).parent.exists(), "cache removed before compiler"
 pathlib.Path("joined-before-build").write_text("yes")
@@ -90,7 +96,16 @@ PY
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			state, _ := exec.CommandContext(t.Context(), "ps", "-o", "stat=", "-p", strings.TrimSpace(string(pidBytes))).Output()
+			probe := exec.CommandContext(ctx, ps, "-o", "stat=", "-p", strings.TrimSpace(string(pidBytes)))
+			var probeStderr bytes.Buffer
+			probe.Stderr = &probeStderr
+			state, probeErr := probe.Output()
+			if probeErr != nil {
+				var exit *exec.ExitError
+				if !errors.As(probeErr, &exit) || exit.ExitCode() != 1 || len(bytes.TrimSpace(state)) != 0 || probeStderr.Len() != 0 {
+					t.Fatalf("ps probe failed: %v %s", probeErr, probeStderr.String())
+				}
+			}
 			if value := strings.TrimSpace(string(state)); value != "" && !strings.HasPrefix(value, "Z") {
 				t.Fatalf("descendant still executing: %s", state)
 			}

@@ -7,6 +7,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -158,13 +159,17 @@ func TestGitHubMetadataRejectsMalformedOCIArchiveWithoutReceipt(t *testing.T) {
 			}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			code := e.CodeVerifyFailed
 			if kind == "canceled" {
 				cancel()
-				code = e.CodeTimeout
 			}
 			receipt, err := admitGitHubMetadata(ctx, artifact, carrier)
-			assertFactoryErrorCode(t, err, code)
+			if kind == "canceled" {
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("private admission cancellation = %v, want context.Canceled", err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+			}
 			if receipt != nil {
 				t.Fatal("rejected archive issued publication receipt")
 			}
@@ -192,11 +197,8 @@ func TestGitHubMetadataRejectsChangedSBOMMembershipAndDigest(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
 			for name, raw := range metadataTreeBytes(t, artifact.Path) {
-				if strings.HasSuffix(name, ".cdx.json") {
-					if kind == "missing" {
-						continue
-					}
-
+				if kind == "missing" && strings.HasSuffix(name, ".cdx.json") {
+					continue
 				}
 				if kind == "changed digest" && name == "index.json" {
 					var index sbom.Index
