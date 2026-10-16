@@ -2,20 +2,20 @@
 # SPDX-License-Identifier: Apache-2.0
 
 instances:
-  - url: nvidia-nvkr.docs.buildwithfern.com/nvkr
-    custom-domain: docs.nvidia.com/nvkr
+  - url: nvidia-nvkr.docs.buildwithfern.com/nvke/nvkr
+    custom-domain: docs.nvidia.com/nvke/nvkr
     multi-source: true
 
 redirects:
-  - source: /nvkr/index.html
-    destination: /nvkr
+  - source: /nvke/nvkr/index.html
+    destination: /nvke/nvkr
 
 title: NVIDIA NVKR
 
 global-theme: nvidia
 
 logo:
-  href: /nvkr
+  href: /nvke/nvkr
   right-text: NVKR
 
 navbar-links:
