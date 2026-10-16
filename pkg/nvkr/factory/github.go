@@ -181,7 +181,8 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			if runner == sortedKeys(bootstrapJobs)[0] {
 				command = githubRuntimeGenerationCommand(plan)
 			} else {
-				actions.writeDownloadStep(&body, "NVKR runtime inputs", githubRuntimeInputsArtifact, filepath.ToSlash(filepath.Dir(layout.planPath)))
+				actions.writeDownloadStep(&body, "NVKR runtime inputs", githubRuntimeInputsArtifact, githubRuntimeInputDirectory)
+				writeGitHubShellStep(&body, "Install NVKR runtime inputs", []string{githubRuntimeInstallCommand(plan)})
 			}
 		}
 		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", command)
@@ -554,6 +555,10 @@ func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, plan *Plan, l
 }
 
 const githubRuntimeInputsArtifact = "nvkr-runtime-inputs"
+
+func githubRuntimeInstallCommand(plan *Plan) string {
+	return "./nvkr-exec factory github install-runtime-inputs --plan " + shellQuote(githubLayoutFor(plan).planPath)
+}
 
 func githubRuntimeInputPaths(plan *Plan) []string {
 	layout := githubLayoutFor(plan)

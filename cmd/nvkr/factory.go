@@ -109,6 +109,9 @@ func cmdFactoryGitHub() *cli.Command {
 		githubFactoryCommand("check-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
 			return factory.CheckGitHubRuntimeInputs(c.Context, plan, ".")
 		}),
+		githubFactoryCommand("install-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.InstallGitHubRuntimeInputs(c.Context, plan, ".")
+		}),
 		githubFactoryCommand("describe-action", "action", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
 			return factory.WriteGitHubActionData(c.Context, plan, c.String("action"), os.Getenv("GITHUB_OUTPUT"))
 		}),

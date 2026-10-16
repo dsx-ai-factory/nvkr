@@ -32,8 +32,12 @@ runs:
       uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-download
       with:
         name: 'nvkr-runtime-inputs'
-        path: '.github/nvkr-run-nvke-nightly-upstream-ovn-arm64'
+        path: '.nvkr/runtime-inputs'
         nvkr-ci-storage-read-token: ${{ inputs.nvkr-ci-storage-read-token }}
+    - name: 'Install NVKR runtime inputs'
+      run: |
+        ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json
+      shell: bash -e {0}
     - name: Verify committed Run generation is current
       id: validate-catalog
       env:

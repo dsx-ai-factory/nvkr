@@ -322,6 +322,11 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			wantSteps = 6
 			if runner == sortedKeys(bootstrap)[0] {
 				command = githubRuntimeGenerationCommand(plan)
+			} else {
+				wantSteps = 7
+				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
+					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
+				}
 			}
 		}
 		wantCondition := ""

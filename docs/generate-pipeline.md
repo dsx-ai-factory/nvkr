@@ -92,6 +92,8 @@ inputs and regenerate instead of editing generated files.
 Named production Environments can opt into `githubRuntimePlan: true`. Generate their initial complete
 bundle normally. On each dispatch the first bootstrap compiles the repository's current catalog pins
 with `run generate --runtime`, freezes the resulting Plan, and carries that exact data to every job.
+Secondary helper bootstraps restore the three JSON files into fresh staging, validate them against the
+committed bundle and current authored inputs, then install them through the generated-file writer.
 Routine source-version updates therefore do not require a regenerated bundle commit. CI uses the same
 inputs with `--runtime --check`: it checks baseline integrity and unchanged workflow/action bytes,
 membership and Environment policy without writing files. Changes outside that contract require normal

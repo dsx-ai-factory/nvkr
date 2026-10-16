@@ -1108,8 +1108,11 @@ may refresh. Changed scheduling, action templates or Environment policy fails be
 reviewed regeneration. This does not resolve latest versions or silently alter pins.
 
 That bootstrap publishes the frozen data once as `nvkr-runtime-inputs`. Other native helper bootstraps
-depend on it, restore it and run the ordinary complete generation check against the same repository
-inputs. Every helper artifact carries the same Plan, invocation data and manifest alongside the native
+depend on it and restore its three JSON files into a fresh staging directory. The generation owner admits
+the complete committed baseline, exact staged Plan/data/manifest and current authored inputs before
+installing freshly rendered bytes through the existing manifest-last writer. The generic private transport
+continues to reject existing destinations. The bootstrap then runs the ordinary complete generation check
+against the same repository inputs. Every helper artifact carries the same Plan, invocation data and manifest alongside the native
 helper; ordinary jobs, ARC jobs, recovery and finalization therefore restore the dispatch's exact inputs
 before execution. This retains the existing trusted bootstrap and same-Run artifact boundary and issues
 no new execution receipt. CI uses `run generate --runtime --check` to admit unchanged scheduling and

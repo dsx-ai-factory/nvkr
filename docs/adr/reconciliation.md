@@ -1304,6 +1304,17 @@ writer are admitted only for the exact trusted workflow commit. The nightly publ
 contains the constructed cycle summary, not raw suite-report files. These safeguards and job consolidation
 retain the existing `pipeline-attested` boundary; they do not establish SLSA Build L3 or qualified execution.
 
+Secondary named-runtime helper bootstraps previously restored the three runtime JSON files directly over
+checked-in generated members, conflicting with private transport's no-replace rule. They now restore into
+fresh staging and invoke the generation owner to admit the complete baseline, exact staged bytes, unchanged
+execution closure and current authored inputs before installation. The existing lock, per-file atomic
+replacement and manifest-last writer retain ownership; this is not an atomic three-file transaction.
+Development bundles and generic transport replacement policy are unchanged. Focused contract source covers
+the admission boundary; unit execution is skipped at the operator's request. Build, affected-package vet
+and lint, Linux AMD64/ARM64 compilation, four-bundle regeneration/drift, Actionlint, YAML, formatting,
+license, shell and diff checks passed; the vulnerability scan found no vulnerabilities. Hosted nightly
+acceptance of this repair remains unproved.
+
 The generator/validator/writer enforce a 500,000-byte limit and 50,000 expanded YAML parsing-event limit
 for each workflow file. The entry workflow retains
 the original named job slots, prerequisite closure, conditions and credential boundaries. Manifest-owned local
