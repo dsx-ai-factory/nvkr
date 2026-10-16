@@ -129,9 +129,24 @@ outputs are stored in a separately checked private or internal GHCR package. The
 locator to its repository, Run, attempt and artifact name, an exact image/config, and the archive digest and
 size before existing carrier restoration. It confers no release or qualification authority. The generated
 workflow admits at most 2,000 locator uploads per generated attempt, counting helper, diagnostic and finalization uploads even
-when conditional. Both locator-download templates set the pinned action's matching 2,000-artifact listing
-bound; its default 1,000-entry pagination limit is insufficient for the maintained selection. Missing
-required inputs still fail closed during restoration and completeness checking. A helper is
+when conditional. The Go transport owner acquires at most 2,000 selected locators serially, looking up each
+fixed artifact name through the authenticated same-Run API before downloading its ZIP. Exact-name queries
+avoid the former action's 1,000-entry listing cutoff and dependence on page positions while unrelated
+jobs add artifacts. The selected Run-attempt response binds repository IDs and head; each name lookup
+must return zero or one matching artifact. Each ZIP is bounded to 64 KiB and must match its provider
+SHA-256; it must contain one canonical locator of at most 32 KiB bound to the exact repository, Run,
+attempt and selected name.
+Provider digests and all selected locators are checked in memory before the locator index is written.
+API request starts are separated by at least 100 milliseconds. Each API request permits at most four
+attempts, only for HTTP 429 or an HTTP 403 JSON response identifying a secondary rate limit. Cancellable
+waits honor `Retry-After` up to 120 seconds, with a 60-second exponentially increasing fallback and an
+increasing minimum delay for repeated rate limits. A delay beyond the bound or an exhausted primary
+quota fails without an early retry. Acquisition has a twenty-minute bound and each HTTP request a thirty-second bound;
+earlier caller cancellation/deadlines still win. ZIP reads use one credential-free request after an admitted
+redirect and have no generic retry. Ambiguous selections, malformed metadata and integrity or binding
+failures fail closed. This replaces eager concurrent locator downloads without adding jobs or payload
+copies; private GHCR authentication and payload restoration are unchanged. Missing required inputs still
+fail closed during restoration and completeness checking. A helper is
 built from the exact checkout with the pinned Go toolchain before private downloads, so bootstrap needs no
 public binary delivery. The source bootstrap owns fresh Go build and module caches beneath the runner's
 temporary directory. A fixed Python 3 supervisor bounds compilation, stops and joins its child before

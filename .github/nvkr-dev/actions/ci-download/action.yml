@@ -53,16 +53,18 @@ runs:
         directory=$(mktemp -d "$RUNNER_TEMP/nvkr-ci-index.XXXXXX")
         printf 'path=%s\n' "$directory" >> "$GITHUB_OUTPUT"
     - name: Download only private locators
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      shell: bash
       env:
-        ACTIONS_ARTIFACT_MAX_ARTIFACT_COUNT: "2000"
-      with:
-        name: ${{ inputs.name }}
-        pattern: ${{ inputs.pattern }}
-        path: ${{ steps.directory.outputs.path }}
-        merge-multiple: ${{ inputs.merge-multiple || 'false' }}
-        run-id: ${{ inputs.run-id || github.run_id }}
-        github-token: ${{ github.token }}
+        NVKR_CI_REPOSITORY_TOKEN: ${{ github.token }}
+        NVKR_CI_INDEX: ${{ steps.directory.outputs.path }}
+        NVKR_CI_NAME: ${{ inputs.name }}
+        NVKR_CI_PATTERN: ${{ inputs.pattern }}
+        NVKR_CI_MERGE: ${{ inputs.merge-multiple || 'false' }}
+        NVKR_CI_RUN: ${{ inputs.run-id }}
+        NVKR_CI_ATTEMPT: ${{ inputs.attempt }}
+      run: |-
+        set -eu
+        exec ./nvkr-exec factory github ci-fetch-locators --index-dir "$NVKR_CI_INDEX" --name "$NVKR_CI_NAME" --pattern "$NVKR_CI_PATTERN" --merge-multiple="$NVKR_CI_MERGE" --run-id "$NVKR_CI_RUN" --attempt "$NVKR_CI_ATTEMPT"
     - name: Restore bytes from private GHCR
       shell: bash
       env:

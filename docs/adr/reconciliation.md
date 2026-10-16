@@ -1139,15 +1139,15 @@ The [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706/
 an incomplete locator selection, then correctly rejected the failed provider closure with
 `NVKR-E-PROVENANCE-MISSING`. These were locator-discovery failures, not storage or cryptographic verification failures. The pinned
 [download action](https://github.com/actions/download-artifact/blob/3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c/dist/index.js)
-supports a finite listing override. Generated download templates now set 2,000, and expanded workflow
-validation rejects more than 2,000 possible uploads per attempt, including helper, conditional diagnostic
-and finalization uploads. Missing or changed overrides fail exact-template validation. This bounds a fresh
+supported a finite listing override. Generated download templates at that revision set 2,000, and expanded workflow
+validation rejected more than 2,000 possible uploads per attempt, including helper, conditional diagnostic
+and finalization uploads. Missing or changed overrides failed exact-template validation. That bounded a fresh
 generated attempt, not accumulated artifacts across arbitrary reruns. A read-only probe using the exact
 pinned action library listed all 1,073 artifacts across 11 pages with the new bound and found the Cosign
-locator (`12026349075`) on page 11; an exact-name lookup matched it. This exercises the library's real API
+locator (`12026349075`) on page 11; an exact-name lookup matched it. This exercised the library's real API
 path, not hosted action execution. Four-bundle generation and drift checks, build, vet, lint, formatting,
-license checks, workflow/YAML lint and diff checks passed. The complete hosted path still requires a fresh
-successful Run; unit tests remain unexecuted at the operator's request.
+license checks, workflow/YAML lint and diff checks passed. At that revision the complete hosted path still
+required a fresh successful Run; unit tests remained unexecuted at the operator's request.
 
 The next [development Run 38859949586](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586),
 commit `9ef9c841ebbebef854c30be7beedd8983367234f`, encountered a separate private-chunk read failure in
@@ -1229,19 +1229,51 @@ OS-validation diagnostic workflow remains read-only.
 This is an operator-accepted native ARC permission bootstrap, not SLSA Build L3 isolation or a qualified
 execution claim. Mode 0666 can widen access to a host-backed/shared device beyond the runner job; it is
 not assumed to be confined to an ephemeral pod. Producer identity, held native capacity/KVM API admission,
-guarded Docker projection and the pipeline-attested evidence lane remain unchanged. The generated bootstrap
-and a complete 69-output Run with it have not yet been exercised; the NVKE result is not a substitute for
-that evidence. Unit contracts remain unexecuted at the operator's request.
+guarded Docker projection and the pipeline-attested evidence lane remain unchanged. Unit contracts remain
+unexecuted at the operator's request.
 
-For this bootstrap implementation, repository build/vet and lint, four-bundle regeneration/drift,
+For the bootstrap revision, repository build/vet and lint, four-bundle regeneration/drift,
 Actionlint, YAML syntax/style checks, formatting, license, shell and diff checks passed; the vulnerability
 scan found no vulnerabilities. Generated YAML retains its existing long-line and document-start style.
 Expanded YAML parsing counts remain 47,431/46,988/22,120/22,112 for production, development and the two
 nightlies, below the 47,500-event headroom bound. Unit, race and Python test suites were skipped at the
 operator's request; these static checks do not establish hosted execution.
 
-The plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP containing one 527-byte
-canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256
+The subsequent [development Run 38923861766](https://github.com/dsx-ai-factory/nvkr/actions/runs/38923861766),
+head `0c302566f259da8bd01a80f9b64ea4c196e40afa`, attempt 1, finished with 575 successful, two failed and
+three skipped jobs out of 580. All 69 named outputs, including all four native plain/public-bootstrap FDE
+disks, completed SBOM attestation, publication, real Cosign signing and independent remote verification.
+All four disk runners already exposed `/dev/kvm` with GID 108 and mode 0666. This exercised the generated
+access check without changing permissions and the complete disk build paths; it did not exercise the
+conditional chmod repair, establish SLSA Build L3 or qualified execution, or demonstrate TPM first-boot acceptance.
+
+The [aggregate assembly job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38923861766/job/117085717125)
+failed before assembly while the pinned download action eagerly started requests for 346 selected locator
+artifacts. GitHub returned HTTP 403 for a secondary rate limit with `Retry-After: 1`, despite a primary
+quota remaining of 14,441 out of 15,000. This was a provider locator-acquisition failure after every output
+verified, not a disk build or signature failure. Aggregate publication, signing and verification were skipped;
+the [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38923861766/job/117086390427)
+rejected the incomplete provider closure. No complete aggregate release acceptance follows from this Run.
+
+The follow-up acquisition path moves locator selection and ZIP reads into the Go transport owner. It
+looks up each exact selected name serially rather than paging a changing global index, then serially
+downloads bounded 64 KiB ZIPs, verifies provider SHA-256, and admits one canonical locator of at most
+32 KiB with exact repository, Run, attempt and name bindings before writing the index. Selected-Run metadata
+anchors repository IDs and head. API starts are spaced by at least 100 milliseconds, with at most four
+attempts only for recognized provider rate limits, cancellable waits and a twenty-minute acquisition bound.
+ZIP reads have no generic retry. The 2,000-selection/workflow budget remains; private GHCR payload
+authentication and restoration are unchanged, with no additional jobs or payload copies. A read-only local
+probe exercised this acquisition path against all 346 assembly locators from Run 38923861766, attempt 1,
+checking the source head before acquisition. It completed in 305 seconds and wrote 179,845 bytes of
+validated locator JSON without fetching private GHCR payloads. This establishes real API/ZIP acquisition
+for that selection; it does not exercise a rate-limit retry, hosted step credentials or complete aggregate
+release acceptance. Repository build, vet and lint, Linux AMD64/ARM64 compilation, four-bundle
+regeneration/drift, Actionlint, YAML, formatting, license, shell and diff checks passed; the vulnerability
+scan found no vulnerabilities. Generated entry workflows and job counts are unchanged. Hosted acceptance
+of this path is not yet recorded; unit, race and Python suites remain unexecuted at the operator's request.
+
+For Run 38867619968, the plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP
+containing one 527-byte canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256
 `8346896ddd5dba69678d6e0773478a0ecee60bb12bd4d9b32b26dadb90387557`, exact Run/head/attempt and
 carrier bindings were checked without downloading the payload. At `2026-10-16T08:11:54Z`, anonymous manifest
 requests and their exact anonymous pull-token exchanges both returned 401 for that carrier and the published
@@ -1249,7 +1281,7 @@ plain ARM64 release wrapper. Authenticated package metadata reported internal vi
 repository for CI storage and that output package. This establishes the sampled anonymous denial, not
 hidden authenticated, enterprise or fork grants, future visibility or aggregate release availability.
 
-After the Run finished, a complete attachment audit concluded at `2026-10-16T08:36:43Z`. All 1,051 Actions
+After Run 38867619968 finished, a complete attachment audit concluded at `2026-10-16T08:36:43Z`. All 1,051 Actions
 attachment ZIPs matched their provider SHA-256 digests and contained only one canonical, Run-bound v2
 locator each. Their combined size was 592,517 bytes; individual ZIPs ranged from 478 to 591 bytes.
 The audit rechecked the terminal failed conclusion, exact head and attempt, and unchanged final inventory

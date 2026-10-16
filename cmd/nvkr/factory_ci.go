@@ -61,6 +61,34 @@ func cmdFactoryCIUpload() *cli.Command {
 	}
 }
 
+func cmdFactoryCIFetchLocators() *cli.Command {
+	return &cli.Command{
+		Name: "ci-fetch-locators", Hidden: true, Usage: "fetch exact provider locator records with bounded serial requests",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "index-dir"}, &cli.StringFlag{Name: "name"}, &cli.StringFlag{Name: "pattern"},
+			&cli.BoolFlag{Name: "merge-multiple"}, &cli.StringFlag{Name: "run-id"}, &cli.StringFlag{Name: "attempt"},
+		},
+		Action: func(c *cli.Context) error {
+			if c.Args().Present() || c.String("index-dir") == "" {
+				return e.New(e.CodeUsage, "ci-fetch-locators requires --index-dir without positional arguments")
+			}
+			if os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("GITHUB_SERVER_URL") != "https://github.com" {
+				return e.New(e.CodeEngineCapability, "CI locator acquisition requires the GitHub runner context")
+			}
+			if (c.String("run-id") == "") != (c.String("attempt") == "") {
+				return e.New(e.CodeUsage, "cross-Run CI locator acquisition requires both --run-id and --attempt")
+			}
+			request := cistore.Request{Repository: os.Getenv("GITHUB_REPOSITORY"), RunID: os.Getenv("GITHUB_RUN_ID"), Attempt: os.Getenv("GITHUB_RUN_ATTEMPT")}
+			if c.String("run-id") != "" {
+				request.RunID, request.Attempt = c.String("run-id"), c.String("attempt")
+			}
+			return cistore.FetchGitHubLocators(c.Context, request, c.String("index-dir"), cistore.GitHubLocatorSelection{
+				Name: c.String("name"), Pattern: c.String("pattern"), MergeMultiple: c.Bool("merge-multiple"),
+			}, os.Getenv("NVKR_CI_REPOSITORY_TOKEN"))
+		},
+	}
+}
+
 func cmdFactoryCIDownload() *cli.Command {
 	return &cli.Command{
 		Name: "ci-download", Hidden: true, Usage: "restore exact private CI carriers from provider locator records",

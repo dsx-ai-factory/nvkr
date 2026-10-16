@@ -9,6 +9,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -17,10 +18,8 @@ const githubCIStorageInput = "nvkr-ci-storage-write-token"
 const githubCIReadInput = "nvkr-ci-storage-read-token"
 const githubCIAlwaysInput = "nvkr-ci-always"
 
-// The pinned artifact action defaults to listing only 1,000 artifacts before
-// filtering names. Bound its pagination above the admitted generated inventory;
-// validateGitHubLocatorBudget rejects workflows that would exceed this ceiling.
-const maxGitHubLocatorArtifacts = 2000
+// Keep the generated upload budget within the serial locator acquisition bound.
+const maxGitHubLocatorArtifacts = cistore.MaxGitHubLocatorArtifacts
 
 const githubCIUploadCondition = "${{ always() && (inputs.nvkr-ci-always == 'true' || success()) }}"
 const githubCIStoreCondition = "${{ always() && steps.directory.outcome == 'success' && (inputs.nvkr-ci-always == 'true' || success()) }}"
@@ -300,7 +299,6 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				githubYAMLSet(outputs, field, githubYAMLMap("description", githubYAMLString("Locator index "+field), "value", githubYAMLString("${{ steps.index.outputs."+field+" }}")))
 			}
 		} else {
-			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download only private locators"), "uses", githubYAMLString(actions.Download), "env", githubYAMLMap("ACTIONS_ARTIFACT_MAX_ARTIFACT_COUNT", githubYAMLString(fmt.Sprint(maxGitHubLocatorArtifacts))), "with", githubYAMLMap("name", githubYAMLString("${{ inputs.name }}"), "pattern", githubYAMLString("${{ inputs.pattern }}"), "path", githubYAMLString("${{ steps.directory.outputs.path }}"), "merge-multiple", githubYAMLString("${{ inputs.merge-multiple || 'false' }}"), "run-id", githubYAMLString("${{ inputs.run-id || github.run_id }}"), "github-token", githubYAMLString("${{ github.token }}"))))
 			githubYAMLSet(env, "NVKR_CI_INDEX", githubYAMLString("${{ steps.directory.outputs.path }}"))
 			githubYAMLSet(env, "NVKR_CI_DESTINATION", githubYAMLString("${{ inputs.path }}"))
 			githubYAMLSet(env, "NVKR_CI_RUN", githubYAMLString("${{ inputs.run-id }}"))
@@ -309,6 +307,13 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 			if mode == "bootstrap-download" {
 				helper = "./.nvkr/ci-bootstrap/nvkr-exec"
 			}
+			locatorEnv := githubYAMLMap("NVKR_CI_REPOSITORY_TOKEN", githubYAMLString("${{ github.token }}"),
+				"NVKR_CI_INDEX", githubYAMLString("${{ steps.directory.outputs.path }}"),
+				"NVKR_CI_NAME", githubYAMLString("${{ inputs.name }}"), "NVKR_CI_PATTERN", githubYAMLString("${{ inputs.pattern }}"),
+				"NVKR_CI_MERGE", githubYAMLString("${{ inputs.merge-multiple || 'false' }}"),
+				"NVKR_CI_RUN", githubYAMLString("${{ inputs.run-id }}"), "NVKR_CI_ATTEMPT", githubYAMLString("${{ inputs.attempt }}"))
+			locatorCommand := "set -eu\nexec " + helper + " factory github ci-fetch-locators --index-dir \"$NVKR_CI_INDEX\" --name \"$NVKR_CI_NAME\" --pattern \"$NVKR_CI_PATTERN\" --merge-multiple=\"$NVKR_CI_MERGE\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
+			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download only private locators"), "shell", githubYAMLString("bash"), "env", locatorEnv, "run", githubYAMLString(locatorCommand)))
 			download := helper + " factory github ci-download --index-dir \"$NVKR_CI_INDEX\" --destination \"${NVKR_CI_DESTINATION:-.}\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
 			command := "set -eu\n"
 			if mode == "download" {
