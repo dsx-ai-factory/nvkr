@@ -160,7 +160,7 @@ jobs:
     needs: [select-runtime]
     if: needs.select-runtime.result == 'success' && needs.select-runtime.outputs.available == 'true' && !cancelled()
     runs-on: arc-arm64-kvm
-    environment: nkd-arc
+    environment: nvkr-arc
     timeout-minutes: 360
     permissions:
       contents: read

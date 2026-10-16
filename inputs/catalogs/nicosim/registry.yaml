@@ -14,7 +14,7 @@ sources:
     # freshly validated bytes; this pin does not prove current-source reproduction
     # or completed organizational review.
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
       - bash
       - -euc
@@ -31,6 +31,13 @@ components:
   nico-sim:
     fromSource: true
     source: nvke-nicosim
+    patches:
+      - name: patches/version-interface.patch
+        sha256: sha256:b45c745b03f1661572f00ce658499a6b260940c36293e03dfff4300ba940e167
+    versionStamp:
+      NICO_SIM_VERSION: 'v{{.Version}}'
+      NICO_SIM_COMMIT: '{{.Commit}}'
+      NICO_SIM_TREE: patched
     cgo: true
     platforms: [linux/arm64]
     outputType: host-package
@@ -41,10 +48,18 @@ components:
       - -euc
       - |
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-        make -C controller/nico-sim build-static
+        make -C controller/nico-sim build-static \
+          BUILD_VERSION="${NICO_SIM_VERSION:?}" GIT_COMMIT="${NICO_SIM_COMMIT:?}" GIT_TREE_STATE="${NICO_SIM_TREE:?}"
   nico-simctl:
     fromSource: true
     source: nvke-nicosim
+    patches:
+      - name: patches/version-interface.patch
+        sha256: sha256:b45c745b03f1661572f00ce658499a6b260940c36293e03dfff4300ba940e167
+    versionStamp:
+      NICO_SIM_VERSION: 'v{{.Version}}'
+      NICO_SIM_COMMIT: '{{.Commit}}'
+      NICO_SIM_TREE: patched
     cgo: true
     platforms: [linux/arm64]
     outputType: host-package
@@ -57,7 +72,7 @@ components:
         cd controller/nico-sim
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
         CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
-          -ldflags '-linkmode external -extldflags -static' \
+          -ldflags "-X github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version.BuildVersion=${NICO_SIM_VERSION:?} -X github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version.GitCommit=${NICO_SIM_COMMIT:?} -X github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version.GitTreeState=${NICO_SIM_TREE:?} -linkmode external -extldflags -static" \
           -o bin/nico-simctl ./cmd/nico-simctl
   nico-sim-runtime-assets:
     fromSource: true

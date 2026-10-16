@@ -7,6 +7,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
 // ValidateQualificationSmokePlan checks whether the exact planned outputs can
@@ -27,6 +28,7 @@ type plannedSmokeOutput struct {
 }
 type plannedSmokeMember struct {
 	profile, version, commit string
+	nonToolReason            string
 }
 
 // qualificationSmokePlanScope is shared by generation admission and runtime
@@ -39,12 +41,25 @@ func qualificationSmokePlanScope(plan *factory.Plan, policy QualificationPolicy)
 	if policy.Smoke == nil {
 		return nil, e.New(e.CodeTrustPolicyMissing, "tool smoke policy is required")
 	}
+	return toolSmokePlanScope(plan, *policy.Smoke)
+}
+
+// toolSmokePlanScope owns exact membership independently of the execution
+// provider. The hosted caller separately admits its workflow and signer policy.
+func toolSmokePlanScope(plan *factory.Plan, smoke QualificationSmokePolicy) ([]plannedSmokeOutput, error) {
+	if err := smoke.validateExecution(); err != nil {
+		return nil, err
+	}
 	if plan == nil || len(plan.LifecycleOutputs) == 0 || len(plan.LifecycleOutputs) > 1024 {
 		return nil, e.New(e.CodeReleaseIncomplete, "smoke requires the complete planned output set")
 	}
-	exemptions := make(map[string]QualificationNonToolOutput, len(policy.Smoke.NonToolOutputs))
-	for _, rule := range policy.Smoke.NonToolOutputs {
+	exemptions := make(map[string]QualificationNonToolOutput, len(smoke.NonToolOutputs))
+	for _, rule := range smoke.NonToolOutputs {
 		exemptions[rule.Output] = rule
+	}
+	memberExemptions := make(map[string]QualificationNonToolMember, len(smoke.NonToolMembers))
+	for _, rule := range smoke.NonToolMembers {
+		memberExemptions[rule.key()] = rule
 	}
 	seenOutputs := map[string]bool{}
 	usedTools := map[string]bool{}
@@ -82,11 +97,25 @@ func qualificationSmokePlanScope(plan *factory.Plan, policy QualificationPolicy)
 			}
 			scope.platform = build.Platform
 			scope.members = make(map[string]plannedSmokeMember, len(output.Components))
+			toolCount := 0
 			for _, component := range output.Components {
 				if _, exists := scope.members[component]; exists || !qualificationSmokeName.MatchString(component) {
 					return nil, e.New(e.CodeReleaseIncomplete, "executable smoke component names must be exact and unique")
 				}
-				profile, exists := policy.Smoke.Tools[component]
+				key := output.Name + "\x00" + component
+				if rule, exists := memberExemptions[key]; exists {
+					node, err := smokeProducerNode(build, component)
+					if err != nil {
+						return nil, err
+					}
+					if node.Kind != ir.KindBuild || node.OutputType != "tarball" {
+						return nil, e.New(e.CodeGateUnmet, "non-tool member requires a source-built tarball producer")
+					}
+					scope.members[component] = plannedSmokeMember{nonToolReason: rule.Reason}
+					delete(memberExemptions, key)
+					continue
+				}
+				profile, exists := smoke.Tools[component]
 				if !exists {
 					return nil, e.New(e.CodeGateUnmet, "member %q has no fixed smoke profile", component)
 				}
@@ -104,6 +133,10 @@ func qualificationSmokePlanScope(plan *factory.Plan, policy QualificationPolicy)
 				}
 				scope.members[component] = plannedSmokeMember{profile: profile, version: version, commit: commit}
 				usedTools[component] = true
+				toolCount++
+			}
+			if toolCount == 0 {
+				return nil, e.New(e.CodeGateUnmet, "executable smoke output requires at least one delivered tool")
 			}
 			platforms[build.Platform] = true
 		default:
@@ -111,11 +144,11 @@ func qualificationSmokePlanScope(plan *factory.Plan, policy QualificationPolicy)
 		}
 		planned = append(planned, scope)
 	}
-	if len(exemptions) != 0 || len(usedTools) != len(policy.Smoke.Tools) || len(platforms) != len(policy.Smoke.Images) {
+	if len(exemptions) != 0 || len(memberExemptions) != 0 || len(usedTools) != len(smoke.Tools) || len(platforms) != len(smoke.Images) {
 		return nil, e.New(e.CodeReleaseIncomplete, "smoke policy has missing or extra tool, image or output scope")
 	}
 	for platform := range platforms {
-		if _, exists := policy.Smoke.Images[platform]; !exists {
+		if _, exists := smoke.Images[platform]; !exists {
 			return nil, e.New(e.CodeTrustPolicyMissing, "smoke policy omits a required native image")
 		}
 	}

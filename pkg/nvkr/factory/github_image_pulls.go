@@ -29,8 +29,7 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	if GitHubDiskBuildOnly(plan) {
 		// Build-only iteration consumes the same published native tooling, with
 		// read access independent of any output publication configuration.
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
-			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	}
 	if plan.Environment.Publication == nil || !strings.HasPrefix(plan.Environment.Publication.RepositoryPrefix, "ghcr.io/") {
 		return false
@@ -40,11 +39,10 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 		return true
 	}
 	// Development publication does not move already-pinned native toolchains.
-	// Only the maintained NVKR development namespace may prepare these two
-	// retained toolchain roots, using the separate read-only workflow token.
+	// Only the maintained NVKR development namespace may prepare the
+	// toolchain roots, using the separate read-only workflow token.
 	if plan.Environment.GitHubDevelopment && prefix == "ghcr.io/dsx-ai-factory/nvkr/development" {
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
-			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	}
 	// Maintained nightly outputs reuse the same published, pinned M2 tooling.
 	// Output publication does not relocate those subjects or authorize other owners.
@@ -52,8 +50,7 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	case "ghcr.io/dsx-ai-factory/nvkr/m2-candidate",
 		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64",
 		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64":
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
-			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	default:
 		return false
 	}

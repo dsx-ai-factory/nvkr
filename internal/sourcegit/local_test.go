@@ -820,7 +820,7 @@ func TestLocalCloneChecksLocalObjects(t *testing.T) {
 			if malformed {
 				tree := localFixtureGit(t, source, "rev-parse", "HEAD^{tree}")
 				cmd := exec.CommandContext(t.Context(), "git", "-C", source, "hash-object", "--literally", "-t", "commit", "-w", "--stdin")
-				cmd.Stdin = strings.NewReader("tree " + tree + "\nauthor Fixture <nkd@example.test> invalid +0000\ncommitter Fixture <nkd@example.test> 0 +0000\n\nfixture\n")
+				cmd.Stdin = strings.NewReader("tree " + tree + "\nauthor Fixture <nvkr@example.test> invalid +0000\ncommitter Fixture <nvkr@example.test> 0 +0000\n\nfixture\n")
 				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
 				out, err := cmd.CombinedOutput()
 				if err != nil {

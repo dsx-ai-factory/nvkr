@@ -85,6 +85,9 @@ func TestAcquiredImageReleaseEvidenceRetainsNativeSubject(t *testing.T) {
 				}
 			}
 			release := nodes["package/release"]
+			t.Run("retained workspace capture", func(t *testing.T) {
+				testRetainedImagePublication(t, plan, artifacts, subject)
+			})
 			evidence, err := releaseEvidenceObjects(t.Context(), plan, release, artifacts)
 			if err != nil || len(evidence) != 1 || evidence[0].Evidence.SubjectDigest != subject || evidence[0].Evidence.InspectionInputDigest != "" {
 				t.Fatalf("native acquired evidence must omit a distinct transport subject: %+v, %v", evidence, err)

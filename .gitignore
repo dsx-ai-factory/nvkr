@@ -8,13 +8,6 @@
 
 # local engine workspace: cloned sources + build artifacts (hundreds of MB)
 /.nvkr/
-# Pre-cutover local state and build outputs remain private during migration.
-# Preserve any needed Run/recovery data before removing these directories.
-/.nkd/
-/nkdctl
-/toolchains/nkd-exec/out/
-/.github/nkd-run/*.lease
-
 # persistent local coordination inodes for generated workflow bundle updates
 /.github/nvkr-run/*.lease
 /.github/nvkr-run-*/*.lease

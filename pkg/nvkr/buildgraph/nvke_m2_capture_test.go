@@ -145,6 +145,10 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {
 					t.Fatal("capture carrier did not reach compiled graph")
 				}
+				if len(node.Patches) != 1 || node.Patches[0].Name != "patches/capture-schema.patch" ||
+					!strings.Contains(node.Patches[0].Content, `+SCHEMA = "nvkr.dev/package-acquisitions/v1"`) {
+					t.Fatal("capture producer must use the same schema as its consumer through an authenticated source patch")
+				}
 				if node.ArtifactPath != want.variant+"/nke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
 					node.Packer.BuildName != "nke-node-"+want.variant+".qemu.nke-"+want.variant {
 					t.Fatal("selected disk variant did not reach the source target and output paths")

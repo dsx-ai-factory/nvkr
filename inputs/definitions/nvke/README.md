@@ -208,7 +208,7 @@ Only admitted source retrieval and pinned-source revalidation steps receive `NKE
 native build jobs receive source bytes without that
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
 before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
-package. Restrict `nkd-arc`, `nkd-release` and the signing identity to the selected refs. Maintained inputs
+package. Restrict `nvkr-arc`, `nvkr-release` and the signing identity to the selected refs. Maintained inputs
 admit `main` only and contain no validation-branch dispatch exception. Ephemeral runner isolation and
 provider access restrictions remain operator obligations.
 

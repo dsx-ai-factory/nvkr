@@ -305,7 +305,11 @@ the memory-backed route explicitly requests both. The non-root consumer drops al
 requests no-new-privileges, while the fixed ownership preparer has only CHOWN. These controls do not
 justify claiming equivalent mount-flag enforcement or a provider-owned storage quota.
 
-Inspection progress is a separate, non-authoritative channel. The inspection helper emits only closed phase/event
+Helper reports use `nvkr:diskContentClass`, `nvkr:packageFormat`,
+`nvkr:packageArchitecture` and `nvkr:containedIn`.
+
+Inspection progress is a separate, non-authoritative channel. The helper emits
+`NVKR_INSPECTION ` records containing only closed phase/event
 names, elapsed milliseconds and bounded numeric counters; stdout remains the complete report. The host rejects
 unknown diagnostics and, for full-content composition inspection, enriches accepted records with its original held subject's digest and content kind.
 Records are bounded to 512 bytes, the sanitized retained log to 32 KiB and forwarded records to 512 per helper
@@ -334,7 +338,7 @@ limits visible through the current cgroup mount, not a reservation, hidden ances
 allocation or a hosted identity boundary. The generic APIs do not by themselves connect a production disk
 compiler, packaging consumer or publisher.
 
-The diagnostic guest package capture schema `nkd.dev/package-acquisitions/v1` has scope
+The diagnostic guest package capture schema `nvkr.dev/package-acquisitions/v1` has scope
 `apt-pre-install-pkgs` and target `amd64` or `arm64`. Its canonical JSON manifest is the first USTAR member,
 followed by nonempty, unique package members in digest order with exact digest-derived paths and sizes.
 Limits are 16,384 packages, 1 GiB per package, 8 MiB manifest, 8 GiB archive, and 1–32 bounded raw repository

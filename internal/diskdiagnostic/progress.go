@@ -18,9 +18,8 @@ import (
 )
 
 const (
-	// Wire ABI emitted by the digest-pinned inspector image. Rename only with
-	// a versioned helper protocol and measured producer/consumer repin together.
-	Prefix              = "NKD_INSPECTION "
+	// Wire prefix emitted by the NVKR inspection helper.
+	Prefix              = "NVKR_INSPECTION "
 	MaxRecordBytes      = 512
 	MaxRetainedBytes    = 32 << 10
 	MaxForwardedRecords = 512

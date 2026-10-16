@@ -86,7 +86,7 @@ func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
 		"COPY --from=scanner /tmp/syft /usr/local/bin/syft",
 		"https://github.com/anchore/syft/releases/download/v" + lock.Scanner.Version + "/syft_" + lock.Scanner.Version + "_linux_${TARGETARCH}.tar.gz",
 		"sha256sum -c -;",
-		"COPY --chmod=0755 bin/nvkr-disk-inspect-${TARGETARCH} /usr/local/bin/nkd-disk-inspect",
+		"COPY --chmod=0755 bin/nvkr-disk-inspect-${TARGETARCH} /usr/local/bin/nvkr-disk-inspect",
 		"--max-time 300 --max-filesize 134217728",
 		"sha256sum /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish /usr/bin/dpkg-deb /usr/local/bin/syft",
 		"USER 65534:65534",
@@ -136,7 +136,7 @@ func TestNativeBuildAndMeasurementInstructions(t *testing.T) {
 	}
 	for _, required := range []string{"--pull=never", "--network none --read-only --cap-drop ALL",
 		"/usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish", "/usr/local/bin/syft /usr/bin/dpkg-deb",
-		"/usr/local/bin/nkd-disk-inspect", "/usr/share/nvkr-disk-inspect/packages.tsv"} {
+		"/usr/local/bin/nvkr-disk-inspect", "/usr/share/nvkr-disk-inspect/packages.tsv"} {
 		if !strings.Contains(readme, required) {
 			t.Fatalf("local measurement instructions omit %q", required)
 		}

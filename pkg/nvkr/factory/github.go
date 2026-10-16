@@ -24,9 +24,9 @@ const (
 	GitHubDevelopmentWorkflowPath = ".github/workflows/nvkr-dev.yml"
 	GitHubDevelopmentPlanPath     = ".github/nvkr-dev/plan.json"
 	GitHubDevelopmentManifestPath = ".github/nvkr-dev/manifest.json"
-	// Existing protected provider objects are not renamed by a repository change.
-	githubReleaseEnvironment            = "nkd-release"
-	githubARCEnvironment                = "nkd-arc"
+	// Protected provider objects must be provisioned under these exact names.
+	githubReleaseEnvironment            = "nvkr-release"
+	githubARCEnvironment                = "nvkr-arc"
 	githubDevelopmentReleaseEnvironment = "nvkr-dev-release"
 	githubDevelopmentARCEnvironment     = "nvkr-dev-arc"
 	githubExecutionCondition            = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
