@@ -330,7 +330,10 @@ helper use. Bootstrap builds a separate static Linux helper with explicit `GOOS`
 transport pairs each job with that route's helper. The execution entrypoint checks its own native helper
 platform against the exact Plan before work. Before build execution, the pipeline owner checks the
 actual Docker/Podman daemon platform, pulls the pinned toolchain for the selected platform, and verifies its
-reported image platform and manifest identity. Held source vendoring separately checks its daemon against
+reported image platform and manifest identity. Failed platform-admission pulls capture at most 1 MiB of
+stderr and report only a fixed diagnostic category; raw registry messages, URLs and credentials are not
+included. Overflow and unrecognized responses remain distinct diagnostic categories. Cancellation takes
+precedence, and classification does not retry a pull or relax admission. Held source vendoring separately checks its daemon against
 the native helper platform before image materialization or Git checkout, using the source owner's isolated
 runtime environment rather than its Git credentials. It retains the pinned native vendor-image checks.
 Plain Git fetching without a vendor command launches no container and requires no daemon check.

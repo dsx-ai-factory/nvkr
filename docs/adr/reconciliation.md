@@ -1058,12 +1058,25 @@ therefore failed closed; comparison now follows
 equality and every privacy check. This probe establishes endpoint revalidation behavior, not full-Run quota
 savings or completion; those remain to be demonstrated.
 
-Six sampled attachments in that Run (IDs `12022647313`, `12022133262`, `12023070943`, `12022991328`,
+Six sampled attachments in Run `38844396801` (IDs `12022647313`, `12022133262`, `12023070943`, `12022991328`,
 `12022558957`, and `12023125384`) covered helper, tool, artifact, result, source and package carriers. Each
 ZIP contained exactly one 440–542-byte v2 locator bound to the exact repository, Run, attempt and artifact
 name, with a digest reference to the CI package; no payload files were present. GHCR reported internal
 visibility and no linked repository. These samples do not establish the complete final attachment inventory
 or effective access grants.
+
+[Development Run 38847118548](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548), commit
+`8c3a8dbb6af538650d6751c86c1a5bb319541b6d`, passed all bootstrap jobs and, by
+`2026-10-16T04:00Z`, 59 SBOM attestations, 58 output publications and 36 signature-verification jobs.
+These successes exercise the new signing implementation but do not prove that a conflict retry occurred.
+All four native disk builds were still executing. One
+[packaging job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548/job/116801143181)
+failed while pulling its pinned AMD64 BusyBox utility image; its daemon admission and input restoration had
+succeeded. The discarded child-process diagnostic prevents attribution to registry, network or runner
+failure. Platform admission now retains bounded stderr solely for fixed diagnostic classification, with
+cancellation precedence and no raw-response logging or pull-behavior change. Regression cases were added
+but not run at the operator's request; compilation, vet and static review are separate from external
+exercise. This incomplete Run does not establish all-output completion or release acceptance.
 
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage
