@@ -415,6 +415,11 @@ Tmpfs allocates memory as content is written; this ceiling is neither reserved
 RAM nor proof of available memory. The deployment host must still meet the
 complete-demo capacity checks above.
 
+To include local M3 signing, delivered-tool smoke and independent publication read-back before
+deployment, add `--qualify-local` to `e2e`; see [automatic qualification setup](local-development.md#rehearse-local-m3-qualification).
+It prepares fresh local trust and a separate disk-backed loopback registry, then stops that registry
+after qualification read-back, retaining data and evidence. The deployment registry described above remains managed separately.
+
 Run the checked-in example directly from the repository root. The flags below
 replace its placeholder repository and output paths; no YAML copy or editing
 is required. For each rerun, change both `--attempt` and `--out` to unused names.

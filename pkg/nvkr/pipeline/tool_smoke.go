@@ -27,6 +27,10 @@ const (
 	ToolSmokeNVKECTL            ToolSmokeProfile = "nvkectl"
 	ToolSmokeHelm               ToolSmokeProfile = "helm"
 	ToolSmokeKubectl            ToolSmokeProfile = "kubectl"
+	ToolSmokeKind               ToolSmokeProfile = "kind"
+	ToolSmokeClusterctl         ToolSmokeProfile = "clusterctl"
+	ToolSmokeORAS               ToolSmokeProfile = "oras"
+	ToolSmokeNICoSim            ToolSmokeProfile = "nicosim"
 	MaxToolSmokeExecutableBytes int64            = 128 << 20
 	MaxToolSmokeOutputBytes                      = 64 << 10
 	toolSmokeTimeout                             = 30 * time.Second
@@ -193,6 +197,14 @@ func toolSmokeArguments(profile ToolSmokeProfile) ([]string, error) {
 		return []string{"version", "--template", "{{.Version}}"}, nil
 	case ToolSmokeKubectl:
 		return []string{"version", "--client", "--output", "json"}, nil
+	case ToolSmokeKind:
+		return []string{"version", "-q"}, nil
+	case ToolSmokeClusterctl:
+		return []string{"version", "--output=json"}, nil
+	case ToolSmokeNICoSim:
+		return []string{"version", "--output=json"}, nil
+	case ToolSmokeORAS:
+		return []string{"version"}, nil
 	default:
 		return nil, e.New(e.CodeEngineCapability, "unsupported tool smoke profile %q", profile)
 	}

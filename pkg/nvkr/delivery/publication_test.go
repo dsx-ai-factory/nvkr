@@ -21,6 +21,31 @@ func releasePublicationFixture(t *testing.T) (string, string) {
 	return releasePublicationPlatformFixture(t, "", "")
 }
 
+func TestPublicationOutputsRemainDetachedAndLocationFree(t *testing.T) {
+	root, digest := releasePublicationFixture(t)
+	publication, err := OpenPublication(t.Context(), root, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = publication.Close() })
+	outputs, err := publication.Outputs()
+	if err != nil || len(outputs) != 1 || outputs[0].Reference != "" {
+		t.Fatalf("unexpected local output descriptions: %+v, %v", outputs, err)
+	}
+	outputs[0].Name, outputs[0].Components[0] = "changed", "changed"
+	again, err := publication.Outputs()
+	if err != nil || again[0].Name != "tools" || again[0].Components[0] != "cli" {
+		t.Fatalf("mutated descriptions affected held state: %+v, %v", again, err)
+	}
+	if err := publication.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, closed := range []*Publication{nil, {}, publication} {
+		_, err := closed.Outputs()
+		assertRegistryCode(t, err, e.CodeGateUnmet)
+	}
+}
+
 func releasePublicationPlatformFixture(t *testing.T, osName, arch string) (string, string) {
 	t.Helper()
 	request := releasePublicationRequestFixture(t, osName, arch)

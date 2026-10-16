@@ -42,17 +42,20 @@ const (
 // owned by this module. Publication is opt-in because it is the sole consequential
 // remote mutation in the plan.
 type LocalRunOptions struct {
-	Workspace    string
-	RunnerSource string
-	Jobs         int
-	Runtime      string
-	Go           string
-	Publish      bool
-	DryRun       bool
-	Stdout       io.Writer
-	Stderr       io.Writer
-	Activity     *buildactivity.Sink // Optional descriptive log metadata only.
-	Progress     *progress.Monitor   // Optional descriptive latest state only.
+	// CompileInputs is canonical descriptive input transport. Factory replays it
+	// against the Plan and retains it only after workspace ownership is established.
+	CompileInputs string
+	Workspace     string
+	RunnerSource  string
+	Jobs          int
+	Runtime       string
+	Go            string
+	Publish       bool
+	DryRun        bool
+	Stdout        io.Writer
+	Stderr        io.Writer
+	Activity      *buildactivity.Sink // Optional descriptive log metadata only.
+	Progress      *progress.Monitor   // Optional descriptive latest state only.
 	// Diagnostics is an opaque lifecycle-issued attempt-directory capability.
 	// A path or serialized description cannot substitute for it.
 	Diagnostics   *pipeline.PackerDiagnosticSink
@@ -266,6 +269,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		completed = true
 		return result, nil
 	}
+	if err := validateLocalCompileInputs(ctx, plan, options.CompileInputs); err != nil {
+		return nil, err
+	}
 	if deps.prepareRunner == nil || deps.executeNode == nil {
 		return nil, e.New(e.CodeInternal, "factory local executor is incomplete")
 	}
@@ -303,6 +309,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}()
 	}
 	if err := ensureLocalWorkspace(ctx, options.Workspace, planDigest); err != nil {
+		return nil, err
+	}
+	if err := retainLocalCompileInputs(ctx, options.Workspace, options.CompileInputs); err != nil {
 		return nil, err
 	}
 	platforms := localRunnerPlatforms(ordered)

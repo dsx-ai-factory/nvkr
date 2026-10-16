@@ -93,8 +93,11 @@ func (report NativeToolSmokeReport) Validate() error {
 		if _, err := nativeSmokeProfile(member.Profile); err != nil {
 			return err
 		}
-		if member.Profile == "nvkectl-version-json" {
+		if member.Profile == "nvkectl-version-json" || member.Profile == "clusterctl-version-json" || member.Profile == "oras-version" || member.Profile == "nicosim-version-json" || member.Profile == "nicosim-patched-version-json" {
 			if !smokeHexCommit(member.ExpectedCommit) {
+				return invalid()
+			}
+			if member.Profile != "nvkectl-version-json" && len(member.ExpectedCommit) != 40 {
 				return invalid()
 			}
 		} else if member.ExpectedCommit != "" {

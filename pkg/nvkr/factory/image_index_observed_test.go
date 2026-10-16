@@ -160,6 +160,23 @@ func TestImageIndexPackagingObservesEveryExactChild(t *testing.T) {
 	if len(evidence) != 2 {
 		t.Fatalf("got %d child inventories", len(evidence))
 	}
+	retained, retainedDigest, err := captureRetainedOrdinaryPublication(t.Context(), p, artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = retained.Close() })
+	retainedPath := filepath.Join(t.TempDir(), "retained-index")
+	if err := retained.WriteLayout(t.Context(), retainedPath); err != nil {
+		t.Fatal(err)
+	}
+	retainedInspection, err := delivery.Inspect(t.Context(), retainedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retainedOutputs, _, err := retained.Artifacts("example.test/local/release@" + retainedDigest)
+	if err != nil || retainedInspection.RootDigest != retainedDigest || len(retainedOutputs) != 1 || !reflect.DeepEqual(retainedOutputs[0].ImageIndex, observed.ImageIndex) {
+		t.Fatalf("retained native child bindings differ: %+v, %v", retainedOutputs, err)
+	}
 	for _, object := range evidence {
 		binding := object.Evidence
 		found := false
