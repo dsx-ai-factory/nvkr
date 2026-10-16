@@ -13,9 +13,10 @@ import (
 )
 
 // A stage is a scheduling choice, not a new graph or authority record. Compatible
-// offline utilities group consecutively; a disk's operations share its live owner
-// even when interleaved with another output. Validate the contracted job graph
-// because grouping nonconsecutive nodes can otherwise introduce a cycle.
+// offline utilities group consecutively or remain with their sole producer;
+// a disk's operations share its live owner even when interleaved with another
+// output. Validate the contracted job graph because grouping nonconsecutive
+// nodes can otherwise introduce a cycle.
 type githubStage struct {
 	DiskOutput            string
 	ID                    string
@@ -45,9 +46,9 @@ func githubDiskStepTimeoutMinutes(stage githubStage) int {
 }
 
 // githubStageTimeoutMinutes projects the producer-owned per-node timeout into
-// GitHub's whole-minute job limit. A stage with no declared timeout keeps the
-// bounded 60-minute adapter default. Grouped nodes execute serially, so their
-// declared budgets are added rather than taking only the largest value.
+// GitHub's whole-minute job limit. Utility-only stages without declared timeouts
+// keep the bounded 60-minute adapter default. Producer stages reserve each serial
+// node's declared or default budget so co-location cannot shorten producer time.
 func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	if stage.DiskOutput != "" {
 		if stage.diskExecutionBudget <= 0 || stage.diskJobTimeoutMinutes <= 0 {
@@ -76,12 +77,12 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 		}
 		total += minutes
 	}
-	if !declared {
+	if !declared && !githubProducerStage(stage) {
 		return githubDefaultStageTimeoutMinutes, nil
 	}
-	// Once any node declares a timeout, the stage budget is the sum of its
-	// serial node budgets. Give each undeclared node the bounded adapter default
-	// rather than silently counting it as zero.
+	// Producer stages and stages with a declared timeout sum serial budgets.
+	// Give each undeclared node the bounded adapter default rather than silently
+	// counting it as zero.
 	for range undeclared {
 		if total > limit-githubDefaultStageTimeoutMinutes {
 			return 0, e.New(e.CodeEngineCapability,
@@ -178,6 +179,8 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 	}
 	var stages []githubStage
 	diskStages := make(map[string]int)
+	nodeStages := make(map[string]int, len(ordered))
+	_, artifacts := planIndex(plan)
 	for _, node := range ordered {
 		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
@@ -191,6 +194,12 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 				stages = append(stages, githubStage{DiskOutput: output})
 			}
 			stages[index].Nodes = append(stages[index].Nodes, node)
+			nodeStages[node.ID] = index
+			continue
+		}
+		if index, ok := githubProducerStageFor(node, stages, nodeStages, artifacts); ok {
+			stages[index].Nodes = append(stages[index].Nodes, node)
+			nodeStages[node.ID] = index
 			continue
 		}
 		if len(stages) > 0 {
@@ -200,10 +209,12 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 				last.DiskOutput == "" && len(last.Nodes) < 16 && githubUtilityNode(first) && githubUtilityNode(node) &&
 				first.RunsOn == node.RunsOn && first.Container == node.Container && first.Platform == node.Platform {
 				last.Nodes = append(last.Nodes, node)
+				nodeStages[node.ID] = len(stages) - 1
 				continue
 			}
 		}
 		stages = append(stages, githubStage{Nodes: []Node{node}})
+		nodeStages[node.ID] = len(stages) - 1
 	}
 	jobs := make(map[string]string, len(plan.Graph.Nodes))
 	jobOwners := map[string]string{"nvkr-lifecycle-run": "Run finalizer"}
@@ -217,6 +228,12 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 				ids = append(ids, schedulingKeys[node.ID])
 			}
 			stage.ID = githubJobID("process/" + strings.Join(ids, "+"))
+			if githubProducerStage(*stage) {
+				stage.Name = "Build and prepare " + stage.Nodes[0].BuildTarget
+				if stage.Nodes[0].Kind == NodeAcquire {
+					stage.Name = "Acquire and prepare " + stage.Nodes[0].BuildTarget
+				}
+			}
 		}
 		if stage.DiskOutput != "" {
 			stage.ID = githubJobID("disk/" + stage.DiskOutput)
@@ -246,6 +263,45 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 		return nil, nil, err
 	}
 	return stages, jobs, nil
+}
+
+func githubProducerStage(stage githubStage) bool {
+	if stage.DiskOutput != "" || len(stage.Nodes) == 0 {
+		return false
+	}
+	return stage.Nodes[0].Kind == NodeBuild || stage.Nodes[0].Kind == NodeAcquire
+}
+
+// Only append an offline consumer whose complete input set is already owned by
+// one producer job. This leaves cross-output joins and independent producers as
+// explicit job dependencies and cannot introduce a new contracted graph edge.
+// Containers need not match: each logical node still uses its own isolated,
+// pinned launcher. Credential-bearing source, publication and signing operations
+// are never candidates, and a full producer timeout never loses utility reserve.
+func githubProducerStageFor(node Node, stages []githubStage, owners map[string]int, artifacts map[string]Artifact) (int, bool) {
+	if !githubUtilityNode(node) || len(node.Inputs) == 0 {
+		return 0, false
+	}
+	index := -1
+	for _, input := range node.Inputs {
+		owner, ok := owners[artifacts[input].Producer]
+		if !ok || index >= 0 && owner != index {
+			return 0, false
+		}
+		index = owner
+	}
+	stage := stages[index]
+	first := stage.Nodes[0]
+	if !githubProducerStage(stage) || first.BuildTarget == "" || len(stage.Nodes) >= 16 ||
+		first.RunsOn != node.RunsOn || first.Platform != node.Platform ||
+		node.BuildTarget != "" && node.BuildTarget != first.BuildTarget {
+		return 0, false
+	}
+	stage.Nodes = append(slices.Clone(stage.Nodes), node)
+	if _, err := githubStageTimeoutMinutes(stage); err != nil {
+		return 0, false
+	}
+	return index, true
 }
 
 func validateGitHubStageDAG(plan *Plan, stages []githubStage, jobs map[string]string) error {
@@ -319,7 +375,7 @@ func (stage githubStage) needs(artifacts map[string]Artifact, nodeJobs map[strin
 }
 
 func (stage githubStage) condition(plan *Plan) string {
-	if stage.DiskOutput != "" {
+	if stage.DiskOutput != "" || githubProducerStage(stage) {
 		return "${{ " + githubDispatchCondition(plan) + " }}"
 	}
 	for _, node := range stage.Nodes {

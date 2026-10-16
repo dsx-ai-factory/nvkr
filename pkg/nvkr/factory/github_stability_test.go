@@ -122,10 +122,9 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 			},
 		},
 		{
-			name: "download action pin", fixture: githubTestPlan, wantActions: true, spliceCode: e.CodeInvalidCatalog,
-			spliceMatch: func(name string, raw []byte) bool {
-				return strings.HasPrefix(name, githubSharedDirectory+"execute-") && bytes.Contains(raw, []byte("actions/download-artifact@"))
-			},
+			// The retained catalog pin changes Plan identity but no longer
+			// participates in generated private GHCR transfer execution.
+			name: "download action pin", fixture: githubTestPlan,
 			mutate: func(t *testing.T, inputs *githubStabilityInputs) {
 				pin := inputs.catalog.Actions["download-artifact"]
 				pin.SHA = nextGitHubStabilityPin(t, pin.SHA)
@@ -133,7 +132,9 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 			},
 		},
 		{
-			name: "summary-referenced upload action pin", fixture: githubTestPlan, wantActions: true, wantWorkflow: true, spliceCode: e.CodeEngineCapability,
+			// Actions uploads remain only as direct, metadata-only exceptions;
+			// their pins do not change the private transfer implementation.
+			name: "summary-referenced upload action pin", fixture: githubTestPlan, wantWorkflow: true,
 			mutate: func(t *testing.T, inputs *githubStabilityInputs) {
 				pin := inputs.catalog.Actions["upload-artifact"]
 				pin.SHA = nextGitHubStabilityPin(t, pin.SHA)

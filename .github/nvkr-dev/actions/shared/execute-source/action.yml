@@ -11,17 +11,38 @@ inputs:
   nvkr-source-token:
     description: Caller value for step environment NVKR_SOURCE_TOKEN
     required: true
+  transfer-needs:
+    description: Private GHCR transport binding
+    required: true
+  transfer-read:
+    description: Private GHCR transport binding
+    required: true
+  transfer-registry:
+    description: Private GHCR transport binding
+    required: true
+  transfer-user:
+    description: Private GHCR transport binding
+    required: true
+  transfer-write:
+    description: Private GHCR transport binding
+    required: true
 runs:
   using: composite
   steps:
     - name: ${{ fromJSON(inputs.parameters).download_name }}
       id: operation_download
       if: ${{ fromJSON(inputs.parameters).download_present == 'true' }}
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      uses: ./.github/nvkr-dev/actions/private-transfer
       with:
         merge-multiple: ${{ fromJSON(inputs.parameters).download_with_merge_multiple }}
         path: ${{ fromJSON(inputs.parameters).download_with_path }}
         pattern: ${{ fromJSON(inputs.parameters).download_with_pattern }}
+        mode: download
+        recovery: ${{ github.job == 'nvkr-lifecycle-run' }}
+        expected-index-file: ${{ inputs.transfer-needs }}
+        registry: ${{ inputs.transfer-registry }}
+        token: ${{ inputs.transfer-read }}
+        username: ${{ inputs.transfer-user }}
     - name: ${{ fromJSON(inputs.parameters).restore_name }}
       id: operation_restore
       if: ${{ fromJSON(inputs.parameters).restore_present == 'true' }}
@@ -67,20 +88,28 @@ runs:
     - name: ${{ fromJSON(inputs.parameters).upload_name }}
       id: operation_upload
       if: ${{ fromJSON(inputs.parameters).upload_present == 'true' }}
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-dev/actions/private-transfer
       with:
         if-no-files-found: ${{ fromJSON(inputs.parameters).upload_with_if_no_files_found }}
         include-hidden-files: ${{ fromJSON(inputs.parameters).upload_with_include_hidden_files }}
         name: ${{ fromJSON(inputs.parameters).upload_with_name }}
         path: ${{ fromJSON(inputs.parameters).upload_with_path }}
         retention-days: ${{ fromJSON(inputs.parameters).upload_with_retention_days }}
+        mode: upload
+        registry: ${{ inputs.transfer-registry }}
+        token: ${{ inputs.transfer-write }}
+        username: ${{ inputs.transfer-user }}
     - name: ${{ fromJSON(inputs.parameters).extra_upload_name }}
       id: operation_extra_upload
       if: ${{ fromJSON(inputs.parameters).extra_upload_present == 'true' }}
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-dev/actions/private-transfer
       with:
         if-no-files-found: ${{ fromJSON(inputs.parameters).extra_upload_with_if_no_files_found }}
         include-hidden-files: ${{ fromJSON(inputs.parameters).extra_upload_with_include_hidden_files }}
         name: ${{ fromJSON(inputs.parameters).extra_upload_with_name }}
         path: ${{ fromJSON(inputs.parameters).extra_upload_with_path }}
         retention-days: ${{ fromJSON(inputs.parameters).extra_upload_with_retention_days }}
+        mode: upload
+        registry: ${{ inputs.transfer-registry }}
+        token: ${{ inputs.transfer-write }}
+        username: ${{ inputs.transfer-user }}

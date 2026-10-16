@@ -142,11 +142,13 @@ func TestOSWorkflowToolchainLockGate(t *testing.T) {
 type osWorkflowStep struct {
 	Name, Run, Uses, ID, If string
 	Env                     map[string]string
+	With                    map[string]string
 }
 
 type osWorkflowJob struct {
 	If          string
 	Permissions map[string]string
+	Outputs     map[string]string
 	Steps       []osWorkflowStep
 }
 
@@ -241,6 +243,7 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 		{name: "mirror probe", mode: "preflight", ref: "refs/heads/probe", commit: head, mirror: "59"},
 		{name: "image upload probe", mode: "preflight", ref: "refs/heads/probe", commit: head, retain: "true"},
 		{name: "main full dispatch", mode: "full", ref: "refs/heads/main", commit: main, want: true},
+		{name: "candidate private retention forbidden", mode: "full", ref: "refs/heads/main", commit: main, retain: "true"},
 		{name: "main merge push", ref: "refs/heads/main", commit: main, event: "push", want: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -362,6 +365,137 @@ func TestOSWorkflowRetainsPrimaryLifecycleFailure(t *testing.T) {
 				imageID, err := os.ReadFile(filepath.Join(root, ".nvkr/evidence/toolchain-arm64.image-id"))
 				if err != nil || string(imageID) != test.image+"\n" {
 					t.Fatalf("retained image ID=%q, error=%v, want %q", imageID, err, test.image)
+				}
+			}
+		})
+	}
+}
+
+func TestOSWorkflowPrivateTransferCredentialBoundary(t *testing.T) {
+	jobs := osValidationWorkflow(t)
+	const transfer = "./.github/nvkr-run/actions/private-transfer"
+	for _, test := range []struct {
+		job, mode, token string
+	}{
+		{"fetch-nvke-source", "upload", "${{ secrets.NVKR_TRANSFER_WRITE }}"},
+		{"validate-full", "download", "${{ secrets.NVKR_TRANSFER_READ }}"},
+	} {
+		t.Run(test.job, func(t *testing.T) {
+			trusted, transferred, candidate := -1, -1, -1
+			for index, step := range jobs[test.job].Steps {
+				if step.Name == "Check out trusted transport implementation" {
+					if !strings.HasPrefix(step.Uses, "actions/checkout@") || step.With["ref"] != "${{ github.sha }}" || step.With["persist-credentials"] != "false" {
+						t.Fatal("private source transport must execute the trusted workflow checkout")
+					}
+					trusted = index
+				}
+				if step.Name == "Check out the selected NVKR candidate" {
+					candidate = index
+				}
+				if step.Uses == transfer && step.With["mode"] == test.mode {
+					if step.With["token"] != test.token || step.With["registry"] != "${{ vars.NVKR_TRANSFER_PACKAGE }}" {
+						t.Fatal("private transfer lost exact registry and phase credential binding")
+					}
+					if test.mode == "download" && step.With["expected-index"] != "${{ toJSON(needs) }}" {
+						t.Fatal("source transfer does not bind the successful producing job's immutable digest")
+					}
+					transferred = index
+				}
+				if strings.HasPrefix(step.Uses, "actions/upload-artifact@") && (strings.Contains(step.With["path"], ".qcow2") || strings.Contains(step.With["path"], "source.tar")) {
+					t.Fatal("payload bytes returned to public workflow artifact storage")
+				}
+			}
+			if trusted < 0 || transferred <= trusted || candidate >= 0 && transferred >= candidate {
+				t.Fatal("source credential transfer must finish before candidate checkout and execution")
+			}
+		})
+	}
+	if jobs["fetch-nvke-source"].Outputs["nvkr-transfer-index"] != "${{ steps.nvkr-transfer-index.outputs.index }}" {
+		t.Fatal("source fetch does not expose its immutable transfer index")
+	}
+	var retained, diagnostics bool
+	for _, step := range jobs["validate-full"].Steps {
+		if strings.HasPrefix(step.Uses, "actions/upload-artifact@") &&
+			(strings.Contains(step.With["path"], "diagnostics/packer") || strings.Contains(step.With["path"], ".nvkr/evidence/**")) {
+			t.Fatal("raw producer directories must not reach public workflow artifacts")
+		}
+		if step.With["token"] != "${{ secrets.NVKR_TRANSFER_WRITE }}" {
+			continue
+		}
+		if step.Name == "Upload raw Packer diagnostics privately" {
+			diagnostics = true
+			if step.Uses != transfer || step.With["mode"] != "upload" ||
+				step.If != "always() && needs.select.outputs.commit == github.sha && steps.private-diagnostics.outputs.present == 'true'" ||
+				!strings.HasSuffix(step.With["path"], "/diagnostics/packer") {
+				t.Fatal("raw diagnostic write credentials can reach a selected candidate's runner")
+			}
+			continue
+		}
+		retained = true
+		if step.Uses != transfer || step.With["mode"] != "upload" ||
+			step.If != "success() && needs.select.outputs.retain_qcow2 == 'true' && needs.select.outputs.commit == github.sha" {
+			t.Fatal("QCOW2 write credential can reach a selected candidate's runner")
+		}
+	}
+	if !retained {
+		t.Fatal("trusted QCOW2 retention has no private transfer")
+	}
+	if !diagnostics {
+		t.Fatal("trusted raw Packer diagnostics have no private retention")
+	}
+}
+
+func TestWorkflowsDoNotRetainPublicCompiledCaches(t *testing.T) {
+	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
+	for _, filename := range []string{"merge-gate.yaml", "vulnerability-scan.yaml"} {
+		t.Run(filename, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", filename))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var workflow struct{ Jobs map[string]osWorkflowJob }
+			if err := yaml.Unmarshal(raw, &workflow); err != nil {
+				t.Fatal(err)
+			}
+			for jobID, job := range workflow.Jobs {
+				codeQLAdmitted := false
+				for _, step := range job.Steps {
+					if step.Name == "Admit CodeQL without database artifact uploads" {
+						if step.If != "" || !strings.Contains(step.Run, `"${RUNNER_DEBUG:-0}" = '1'`) ||
+							!strings.Contains(step.Run, "exit 1") {
+							t.Fatalf("%s does not reject automatic CodeQL debug database uploads", jobID)
+						}
+						for _, debug := range []string{"0", "1"} {
+							command := exec.CommandContext(t.Context(), "bash", "-eu", "-c", step.Run)
+							command.Env = append(os.Environ(), "RUNNER_DEBUG="+debug)
+							output, err := command.CombinedOutput()
+							if (err != nil) != (debug == "1") || debug == "1" && !strings.Contains(string(output), "NVKR-E-ENGINE-CAPABILITY") {
+								t.Fatalf("%s debug admission (%s): err=%v output=%s", jobID, debug, err, output)
+							}
+						}
+						codeQLAdmitted = true
+					}
+					switch {
+					case strings.HasPrefix(step.Uses, "actions/cache"):
+						t.Fatalf("%s retains an Actions cache that can contain compiled Go objects", jobID)
+					case strings.HasPrefix(step.Uses, "actions/setup-go@"):
+						if step.With["cache"] != "false" {
+							t.Fatalf("%s leaves setup-go compiled caches enabled", jobID)
+						}
+					case strings.HasPrefix(step.Uses, "golangci/golangci-lint-action@"):
+						if step.With["skip-cache"] != "true" {
+							t.Fatalf("%s leaves golangci compiled analysis caches enabled", jobID)
+						}
+					case strings.HasPrefix(step.Uses, "github/codeql-action/analyze@"):
+						if step.With["upload-database"] != "false" {
+							t.Fatalf("%s retains its compiled CodeQL database", jobID)
+						}
+					case strings.HasPrefix(step.Uses, "github/codeql-action/init@"):
+						if !codeQLAdmitted || step.With["debug"] != "false" || step.With["trap-caching"] != "false" ||
+							step.With["dependency-caching"] != "false" || step.Env["CODEQL_OVERLAY_DATABASE_MODE"] != "none" {
+							t.Fatalf("%s permits CodeQL database artifacts or compiled caches", jobID)
+						}
+					}
 				}
 			}
 		})

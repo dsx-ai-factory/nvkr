@@ -1,8 +1,12 @@
 # CI test performance diagnosis
 
-The race-and-coverage test step dominates the Merge Gate. Five successful upstream runs inspected on
+The historical race-and-coverage test step dominated the Merge Gate. Five successful upstream runs inspected on
 October 6, 2026 spent 8m24s–13m50s in tests, accounting for 85–87% of the `check` job. The latest fork
 run shows the same pattern. Optimizing workflow setup alone will not remove most of the wait.
+
+These measurements describe the October 6 snapshot. The current default gate uses ordinary tests;
+race and coverage remain opt-in. Hosted compiled-output caches are now disabled for public-repository
+confidentiality. See [the development guide](../DEVELOPMENT.md#test-timing-and-cache-use) for current behavior.
 
 ## Recorded GitHub timings
 
@@ -81,10 +85,9 @@ controls, quote, and backslash as before. Table-driven golden tests cover Unicod
 escaping, control bytes, long spans, and exact decoding. No identity schema, input admission, or digest
 family changes. The production-size inventory fixtures remain intact.
 
-The check job owns a separate Go module/build cache, keyed by platform, exact Go version, dependency
-hashes, and commit. It restores the most recent compatible check cache on a new commit and saves the
-updated cache only after successful checks. Notices and other jobs cannot populate its key. Actual hosted
-cache reuse and end-to-end workflow savings require a run after publication of this change.
+The October 6 change gave the check job a separate Go module/build cache, keyed by platform, exact Go
+version, dependency hashes, and commit. This hosted cache has since been removed to prevent compiled
+payload access through a public repository; its proposed reuse does not establish current savings.
 
 The workflow now requests the same `make test` flags with optional JSON output, seven-day event/coverage
 retention, and a summary of the slowest packages and tests, including on test failure. The explicit Bash
@@ -142,8 +145,8 @@ On October 6, 2026, the Linux ARM64 snapshot passed:
 The changed Go files, Makefile, workflow, and reporting scripts were byte-checked against the tested
 snapshot. Two package workers limited this local validation's memory use; no package was omitted and
 the workflow's default package concurrency was not changed. `actionlint`, YAML lint with existing-style
-rules, formatting, and `git diff --check` also passed. Hosted cache restore/save and artifact upload
-remain configured but unexercised until this change runs on GitHub.
+rules, formatting, and `git diff --check` also passed. At that snapshot, hosted cache restore/save and
+artifact upload were configured but unexercised; compiled-output caches are no longer configured.
 
 The macOS `make check` attempt failed with five staticcheck diagnostics in the unchanged
 `pkg/nvkr/pipeline/disk_inspection_runtime.go` and `pkg/nvkr/pipeline/source_vendor.go`: SA4023 reports

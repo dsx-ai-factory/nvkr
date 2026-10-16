@@ -43,6 +43,18 @@ jobs:
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
+      - &private-transfer-index
+        name: Record private transfer digests
+        id: nvkr-transfer-index
+        if: ${{ always() }}
+        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/private-transfer
+        with:
+          mode: index
+    outputs: &private-transfer-outputs
+      nvkr-transfer-index: ${{ steps.nvkr-transfer-index.outputs.index }}
   build-runner-ubuntu-24-04:
     name: 'Prepare NVKR runner (ubuntu-24.04)'
     runs-on: 'ubuntu-24.04'
@@ -60,6 +72,11 @@ jobs:
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   build-runner-ubuntu-24-04-arm:
     name: 'Prepare NVKR runner (ubuntu-24.04-arm)'
     runs-on: 'ubuntu-24.04-arm'
@@ -73,6 +90,11 @@ jobs:
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a:
     name: 'Fetch pinned source for capnico-controller (capnico-controller-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -82,6 +104,20 @@ jobs:
     steps: &steps-ubuntu-24-04-arm-node
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - &private-transfer-context
+        name: Stage private transfer dependency context
+        id: nvkr-transfer-context
+        if: ${{ always() }}
+        shell: bash
+        timeout-minutes: 1
+        run: |
+          set -eu
+          umask 077
+          nvkr_needs_file="$(mktemp "${RUNNER_TEMP:?}/nvkr-needs.XXXXXXXX")"
+          cat >"$nvkr_needs_file" <<'NVKR_PRIVATE_NEEDS_JSON_END'
+          ${{ toJSON(needs) }}
+          NVKR_PRIVATE_NEEDS_JSON_END
+          printf 'path=%s\n' "$nvkr_needs_file" >>"${GITHUB_OUTPUT:?}"
       - &prepare-stage-nvkr-exec-ubuntu-24-04-arm
         name: Prepare NVKR runner and job parameters
         id: nvkr-context
@@ -89,11 +125,22 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           action: ${{ github.job }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
       - &operation-execute-node-part-1
         name: execute node part-1
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-capnico-controller-arm64-build-capni-b3f328de28b1:
     name: 'Build capnico-controller (capnico-controller-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -101,6 +148,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-capnico-controller-arm64-terminal-observe:
     name: 'Verify built artifacts: capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -110,6 +158,7 @@ jobs:
     steps: &steps-ubuntu-24-04-node
       - *check-native-linux-amd64
       - *checkout-workflow-source
+      - *private-transfer-context
       - &prepare-stage-nvkr-exec-ubuntu-24-04
         name: Prepare NVKR runner and job parameters
         id: nvkr-context
@@ -117,7 +166,13 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           action: ${{ github.job }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
       - *operation-execute-node-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-cluster-api-provider-provisioned-arm-d53e503b7714:
     name: 'Fetch pinned source for cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -127,6 +182,7 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - &operation-execute-source-part-1
         name: execute source part-1
@@ -134,6 +190,13 @@ jobs:
         with:
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c:
     name: 'Build cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -141,6 +204,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-cluster-api-provider-provisioned-arm-d53e503b7714]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-cluster-api-provider-provisioned-arm-3b87ea206e23:
     name: 'Verify built artifacts: cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -148,6 +212,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-controller-chart-fetch-nvke-controller-chart:
     name: 'Fetch pinned source for nvke-controller-chart (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
@@ -157,8 +222,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-controller-chart-build-nvke-controller-chart:
     name: 'Build nvke-controller-chart (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
@@ -166,6 +234,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-controller-chart-fetch-nvke-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-controller-chart-terminal-observe:
     name: 'Verify built artifacts: controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -173,6 +242,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-controller-chart-build-nvke-controller-chart]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-controller-profiles-fetch-nvke-local-profiles:
     name: 'Fetch pinned source for nvke-local-profiles (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
@@ -182,8 +252,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-controller-profiles-build-nvke-local-profiles:
     name: 'Build nvke-local-profiles (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
@@ -191,6 +264,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-controller-profiles-fetch-nvke-local-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-controller-profiles-terminal-observe:
     name: 'Verify built artifacts: controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -198,6 +272,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-controller-profiles-build-nvke-local-profiles]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e:
     name: 'Acquire pinned csi-node-driver-registrar-image-arm64/pull-csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -205,6 +280,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-csi-node-driver-registrar-image-arm6-60cd5fc35fc9:
     name: 'Verify built artifacts: csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -212,6 +288,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-cwe-fetch-nvke-controller:
     name: 'Fetch pinned source for nvke-controller (cwe)'
     runs-on: 'ubuntu-24.04-arm'
@@ -221,8 +298,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-cwe-build-nvke-controller:
     name: 'Build nvke-controller (cwe)'
     runs-on: 'ubuntu-24.04-arm'
@@ -230,6 +310,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-cwe-fetch-nvke-controller]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-cwe-terminal-observe:
     name: 'Verify built artifacts: cwe'
     runs-on: 'ubuntu-24.04'
@@ -237,6 +318,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-cwe-build-nvke-controller]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-fetch-clusterctl:
     name: 'Fetch pinned source for clusterctl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -244,6 +326,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-build-clusterctl:
     name: 'Build clusterctl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -251,6 +334,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-installer-tools-arm64-fetch-clusterctl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-fetch-kind:
     name: 'Fetch pinned source for kind (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -258,6 +342,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-build-kind:
     name: 'Build kind (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -265,6 +350,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-installer-tools-arm64-fetch-kind]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-fetch-kubectl:
     name: 'Fetch pinned source for kubectl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -272,6 +358,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-build-kubectl:
     name: 'Build kubectl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -279,6 +366,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-installer-tools-arm64-fetch-kubectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-fetch-oras:
     name: 'Fetch pinned source for oras (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -286,6 +374,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-build-oras:
     name: 'Build oras (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -293,6 +382,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-installer-tools-arm64-fetch-oras]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-pull-helm:
     name: 'Acquire pinned installer-tools-arm64/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
@@ -300,6 +390,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-installer-tools-arm64-terminal-observe:
     name: 'Verify built artifacts: installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -307,6 +398,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-pull-helm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7:
     name: 'Fetch pinned source for nico-sim, nico-sim-runtime-assets, nico-simctl (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -319,8 +411,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-nicosim-tools-arm64-build-nico-sim:
     name: 'Build nico-sim (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -331,6 +426,7 @@ jobs:
       contents: read
       packages: read
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52:
     name: 'Build nico-sim-runtime-assets (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -341,6 +437,7 @@ jobs:
       contents: read
       packages: read
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-nicosim-tools-arm64-build-nico-simctl:
     name: 'Build nico-simctl (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -351,6 +448,7 @@ jobs:
       contents: read
       packages: read
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-nicosim-tools-arm64-terminal-observe:
     name: 'Verify built artifacts: nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -358,6 +456,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nicosim-tools-arm64-build-nico-simctl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-nktp-fetch-nktp-chart:
     name: 'Fetch pinned source for nktp-chart (nktp)'
     runs-on: 'ubuntu-24.04-arm'
@@ -367,8 +466,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-nktp-build-nktp-chart:
     name: 'Build nktp-chart (nktp)'
     runs-on: 'ubuntu-24.04-arm'
@@ -376,6 +478,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-nktp-fetch-nktp-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-nktp-terminal-observe:
     name: 'Verify built artifacts: nktp'
     runs-on: 'ubuntu-24.04'
@@ -383,6 +486,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-nktp-build-nktp-chart]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01:
     name: 'Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -395,8 +499,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-disk-nvke-node-image-arm64:
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
@@ -410,16 +517,25 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - name: Prepare NVKR runner and job parameters
         id: nvkr-context
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/prepare-stage
         with:
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
           action: ${{ github.job }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
       - name: prepare inputs part-1
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/prepare-inputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
       - name: prepare images part-2
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/prepare-images
         with:
@@ -432,68 +548,118 @@ jobs:
         with:
           with-path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
       - name: collect node outputs part-3
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-4
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-5
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-6
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-7
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-8
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-9
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-10
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-11
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-12
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-13
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-14
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-15
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-16
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: collect node outputs part-17
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -506,8 +672,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-nvke-node-image-arm64-fetch-nvke-cni-3798aad9f7bb:
     name: 'Fetch pinned source for nvke-cni-ovn, ovn-kubernetes-chart (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -515,6 +684,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -527,8 +697,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -541,8 +714,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -550,6 +726,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-nvkectl-fetch-nvkectl:
     name: 'Fetch pinned source for nvkectl (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
@@ -559,8 +736,11 @@ jobs:
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-nvkectl-build-nvkectl:
     name: 'Build nvkectl (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
@@ -568,6 +748,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-nvkectl-fetch-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-nvkectl-terminal-observe:
     name: 'Verify built artifacts: nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -575,6 +756,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-nvkectl-build-nvkectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-operator-tools-pull-helm:
     name: 'Acquire pinned operator-tools/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
@@ -582,6 +764,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-operator-tools-pull-kubectl:
     name: 'Acquire pinned operator-tools/pull-kubectl'
     runs-on: 'ubuntu-24.04-arm'
@@ -589,6 +772,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-operator-tools-terminal-observe:
     name: 'Verify built artifacts: operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -596,6 +780,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-ovn-chart-arm64-fetch-ovn-kubernetes-chart:
     name: 'Fetch pinned source for ovn-kubernetes-chart (ovn-chart-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -603,6 +788,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-ovn-chart-arm64-build-ovn-kubernetes-chart:
     name: 'Build ovn-kubernetes-chart (ovn-chart-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -610,6 +796,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-ovn-chart-arm64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-ovn-chart-arm64-terminal-observe:
     name: 'Verify built artifacts: ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -617,6 +804,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-ovn-chart-arm64-build-ovn-kubernetes-chart]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-ovn-image-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (ovn-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -624,6 +812,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-ovn-image-arm64-build-ovn-kube-ubuntu:
     name: 'Build ovn-kube-ubuntu (ovn-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -631,6 +820,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm, nvkr-ovn-image-arm64-fetch-ovn-kube-ubuntu]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5:
     name: 'Verify and package outputs with Helm image binding: capnico-controller-arm64, cluster-api-provider-provisioned-arm64, controller-chart, controller-profiles, csi-node-driver-registrar-image-arm64, cwe, installer-tools-arm64, nicosim-tools-arm64, nktp, nvkectl, operator-tools, ovn-chart-arm64, ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -640,6 +830,7 @@ jobs:
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-node-part-1
       - &operation-execute-node-part-2
@@ -647,65 +838,132 @@ jobs:
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-3
         name: execute node part-3
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-4
         name: execute node part-4
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-5
         name: execute node part-5
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-6
         name: execute node part-6
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-7
         name: execute node part-7
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-8
         name: execute node part-8
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-9
         name: execute node part-9
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-10
         name: execute node part-10
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-11
         name: execute node part-11
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-12
         name: execute node part-12
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - &operation-execute-node-part-13
         name: execute node part-13
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
       - name: execute node part-14
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
+          transfer-write: ${{ secrets.NVKR_TRANSFER_WRITE }}
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-postgresql-image-arm64-pull-postgresql-image:
     name: 'Acquire pinned postgresql-image-arm64/pull-postgresql-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -713,6 +971,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-postgresql-image-arm64-termi-767810e8a49e:
     name: 'Verify and package outputs: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -722,9 +981,12 @@ jobs:
     steps: &steps-ubuntu-24-04-two-nodes
       - *check-native-linux-amd64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-postgresql-pull-postgresql-chart:
     name: 'Acquire pinned postgresql/pull-postgresql-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -732,6 +994,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-postgresql-terminal-observe-555d0da8f385:
     name: 'Verify and package outputs: postgresql'
     runs-on: 'ubuntu-24.04'
@@ -739,6 +1002,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-postgresql-pull-postgresql-chart]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image:
     name: 'Acquire pinned spiffe-csi-image-arm64/pull-spiffe-csi-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -746,6 +1010,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spiffe-csi-image-arm64-termi-d00be006cc85:
     name: 'Verify and package outputs: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -753,6 +1018,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-agent-image-arm64-pull-spire-agent-image:
     name: 'Acquire pinned spire-agent-image-arm64/pull-spire-agent-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -760,6 +1026,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-agent-image-arm64-term-612d2fcd65a0:
     name: 'Verify and package outputs: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -767,6 +1034,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-agent-image-arm64-pull-spire-agent-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-bash-image-arm64-pull-spire-bash-image:
     name: 'Acquire pinned spire-bash-image-arm64/pull-spire-bash-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -774,6 +1042,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-bash-image-arm64-termi-ff2c63c9283e:
     name: 'Verify and package outputs: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -781,6 +1050,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-bash-image-arm64-pull-spire-bash-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-controller-manager-image-arm64-92b22b7f2333:
     name: 'Acquire pinned spire-controller-manager-image-arm64/pull-spire-controller-manager-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -788,6 +1058,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-controller-manager-ima-ea43a2dafd83:
     name: 'Verify and package outputs: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -795,6 +1066,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-controller-manager-image-arm64-92b22b7f2333]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-crds-pull-spire-crds-chart:
     name: 'Acquire pinned spire-crds/pull-spire-crds-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -802,6 +1074,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-crds-terminal-observe-82be9f86e106:
     name: 'Verify and package outputs: spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -809,6 +1082,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-crds-pull-spire-crds-chart]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-oidc-image-arm64-pull-spire-oidc-image:
     name: 'Acquire pinned spire-oidc-image-arm64/pull-spire-oidc-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -816,6 +1090,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-oidc-image-arm64-termi-efb32831475e:
     name: 'Verify and package outputs: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -823,6 +1098,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-server-image-arm64-pull-spire-server-image:
     name: 'Acquire pinned spire-server-image-arm64/pull-spire-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -830,6 +1106,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-server-image-arm64-ter-2de675367149:
     name: 'Verify and package outputs: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -837,6 +1114,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-server-image-arm64-pull-spire-server-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d:
     name: 'Acquire pinned spire-tpm-server-image-arm64/pull-spire-tpm-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -844,6 +1122,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-tpm-server-image-arm64-bf43cd0dcc3a:
     name: 'Verify and package outputs: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -851,6 +1130,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-spire-pull-spire-chart:
     name: 'Acquire pinned spire/pull-spire-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -858,6 +1138,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-spire-terminal-observe-package-spire:
     name: 'Verify and package outputs: spire'
     runs-on: 'ubuntu-24.04'
@@ -865,6 +1146,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-spire-pull-spire-chart]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3:
     name: 'Acquire pinned temporal-admin-tools-image-arm64/pull-temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -872,6 +1154,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-temporal-admin-tools-image-a-a7a48d5a7683:
     name: 'Verify and package outputs: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -879,6 +1162,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29:
     name: 'Acquire pinned temporal-server-image-arm64/pull-temporal-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -886,6 +1170,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-temporal-server-image-arm64-656a59441bb1:
     name: 'Verify and package outputs: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -893,6 +1178,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-temporal-ui-image-arm64-pull-temporal-ui-image:
     name: 'Acquire pinned temporal-ui-image-arm64/pull-temporal-ui-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -900,6 +1186,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-temporal-ui-image-arm64-term-afe0bd0cf410:
     name: 'Verify and package outputs: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -907,6 +1194,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-temporal-pull-temporal-chart:
     name: 'Acquire pinned temporal/pull-temporal-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -914,6 +1202,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    outputs: *private-transfer-outputs
   nvkr-process-temporal-terminal-observe-pa-d14ae446c67c:
     name: 'Verify and package outputs: temporal'
     runs-on: 'ubuntu-24.04'
@@ -921,6 +1210,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-temporal-pull-temporal-chart]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    outputs: *private-transfer-outputs
   nvkr-tool-cosign:
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
@@ -928,6 +1218,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-nvke-node-image-arm64:
     name: 'Create and verify SBOM attestations: output-nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -939,6 +1230,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-nvke-node-image-arm64:
     name: 'Publish output-nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -953,6 +1245,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-nvke-node-image-arm64:
     name: 'Sign and attest release and deliverables: output-nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -968,6 +1261,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-tool-syft:
     name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
@@ -975,6 +1269,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76:
     name: 'Verify artifacts and generate SBOMs: capnico-controller-arm64, cluster-api-provider-provisioned-arm64, controller-chart, controller-profiles, csi-node-driver-registrar-image-arm64, cwe, installer-tools-arm64, nicosim-tools-arm64, nktp, nvkectl, operator-tools, ovn-chart-arm64, ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -984,6 +1279,7 @@ jobs:
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
+      - *private-transfer-context
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
@@ -998,6 +1294,8 @@ jobs:
       - *operation-execute-node-part-11
       - *operation-execute-node-part-12
       - *operation-execute-node-part-13
+      - *private-transfer-index
+    outputs: *private-transfer-outputs
   nvkr-package-publication-capnico-controller-arm64:
     name: 'Package publication bundle: publication-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1005,6 +1303,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-capnico-controller-arm64:
     name: 'Create and verify SBOM attestations: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1016,6 +1315,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-cluster-api-prov-7d1ac851fb60:
     name: 'Package publication bundle: publication-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1023,6 +1323,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-cluster-api-prov-64867884a7ca:
     name: 'Create and verify SBOM attestations: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1034,6 +1335,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-controller-chart:
     name: 'Package publication bundle: publication-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1041,6 +1343,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-controller-chart-build-nvke-controller-chart, nvkr-cwe-build-nvke-controller, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-controller-chart:
     name: 'Create and verify SBOM attestations: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1052,6 +1355,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-controller-profiles:
     name: 'Package publication bundle: publication-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1059,6 +1363,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-controller-profiles-build-nvke-local-profiles, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-controller-profiles:
     name: 'Create and verify SBOM attestations: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1070,6 +1375,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-csi-node-driver-02a78ae16d16:
     name: 'Package publication bundle: publication-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1077,6 +1383,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442:
     name: 'Create and verify SBOM attestations: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1088,6 +1395,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-cwe:
     name: 'Package publication bundle: publication-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1095,6 +1403,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-cwe-build-nvke-controller, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-cwe:
     name: 'Create and verify SBOM attestations: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1106,6 +1415,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-installer-tools-arm64:
     name: 'Package publication bundle: publication-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1113,6 +1423,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-pull-helm, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-installer-tools-arm64:
     name: 'Create and verify SBOM attestations: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1124,6 +1435,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-nicosim-tools-arm64:
     name: 'Package publication bundle: publication-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1131,6 +1443,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nicosim-tools-arm64-build-nico-simctl, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-nicosim-tools-arm64:
     name: 'Create and verify SBOM attestations: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1142,6 +1455,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-nktp:
     name: 'Package publication bundle: publication-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1149,6 +1463,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-nktp-build-nktp-chart, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-nktp:
     name: 'Create and verify SBOM attestations: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1160,6 +1475,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-nvkectl:
     name: 'Package publication bundle: publication-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -1167,6 +1483,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-nvkectl-build-nvkectl, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-nvkectl:
     name: 'Create and verify SBOM attestations: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -1178,6 +1495,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-operator-tools:
     name: 'Package publication bundle: publication-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1185,6 +1503,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-operator-tools:
     name: 'Create and verify SBOM attestations: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1196,6 +1515,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-ovn-chart-arm64:
     name: 'Package publication bundle: publication-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1203,6 +1523,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-ovn-chart-arm64-build-ovn-kubernetes-chart, nvkr-ovn-image-arm64-build-ovn-kube-ubuntu, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-ovn-chart-arm64:
     name: 'Create and verify SBOM attestations: output-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1214,6 +1535,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-ovn-image-arm64:
     name: 'Package publication bundle: publication-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1221,6 +1543,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-ovn-image-arm64-build-ovn-kube-ubuntu, nvkr-process-capnico-controller-arm64-sbo-fbb055bceb76, nvkr-process-ovn-image-arm64-terminal-obs-adb79920eec5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-ovn-image-arm64:
     name: 'Create and verify SBOM attestations: output-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1232,6 +1555,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-postgresql-image-arm64-sbom:
     name: 'Generate SBOMs: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1239,6 +1563,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-process-postgresql-image-arm64-termi-767810e8a49e, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-postgresql-image-arm64:
     name: 'Package publication bundle: publication-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1246,6 +1571,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-postgresql-image-arm64-sbom, nvkr-process-postgresql-image-arm64-termi-767810e8a49e]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-postgresql-image-arm64:
     name: 'Create and verify SBOM attestations: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1257,6 +1583,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-postgresql-sbom:
     name: 'Generate SBOMs: postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1264,6 +1591,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-postgresql-pull-postgresql-chart, nvkr-process-postgresql-terminal-observe-555d0da8f385, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-postgresql:
     name: 'Package publication bundle: publication-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1271,6 +1599,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-postgresql-pull-postgresql-chart, nvkr-postgresql-sbom, nvkr-process-postgresql-terminal-observe-555d0da8f385]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-postgresql:
     name: 'Create and verify SBOM attestations: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1282,6 +1611,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-capnico-controller-arm64:
     name: 'Publish output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1296,6 +1626,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-cluster-api-provider-4b7d31608734:
     name: 'Publish output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1310,6 +1641,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-controller-chart:
     name: 'Publish output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1324,6 +1656,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-controller-profiles:
     name: 'Publish output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1338,6 +1671,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb:
     name: 'Publish output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1352,6 +1686,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-cwe:
     name: 'Publish output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1366,6 +1701,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-installer-tools-arm64:
     name: 'Publish output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1380,6 +1716,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-nicosim-tools-arm64:
     name: 'Publish output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1394,6 +1731,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-nktp:
     name: 'Publish output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1408,6 +1746,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-nvkectl:
     name: 'Publish output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -1422,6 +1761,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-operator-tools:
     name: 'Publish output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1436,6 +1776,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-ovn-chart-arm64:
     name: 'Publish output-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1450,6 +1791,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-ovn-image-arm64:
     name: 'Publish output-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1464,6 +1806,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-postgresql:
     name: 'Publish output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1478,6 +1821,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-postgresql-image-arm64:
     name: 'Publish output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1492,6 +1836,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-capnico-controller-arm64:
     name: 'Sign and attest release and deliverables: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1507,6 +1852,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-cluster-api-provider-pro-9543d5c3a952:
     name: 'Sign and attest release and deliverables: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1522,6 +1868,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-controller-chart:
     name: 'Sign and attest release and deliverables: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -1537,6 +1884,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-controller-profiles:
     name: 'Sign and attest release and deliverables: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -1552,6 +1900,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9:
     name: 'Sign and attest release and deliverables: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1567,6 +1916,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-cwe:
     name: 'Sign and attest release and deliverables: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -1582,6 +1932,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-installer-tools-arm64:
     name: 'Sign and attest release and deliverables: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1597,6 +1948,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-nicosim-tools-arm64:
     name: 'Sign and attest release and deliverables: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1612,6 +1964,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-nktp:
     name: 'Sign and attest release and deliverables: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1627,6 +1980,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-nvkectl:
     name: 'Sign and attest release and deliverables: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -1642,6 +1996,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-operator-tools:
     name: 'Sign and attest release and deliverables: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -1657,6 +2012,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-ovn-chart-arm64:
     name: 'Sign and attest release and deliverables: output-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1672,6 +2028,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-ovn-image-arm64:
     name: 'Sign and attest release and deliverables: output-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1687,6 +2044,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-postgresql:
     name: 'Sign and attest release and deliverables: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -1702,6 +2060,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-postgresql-image-arm64:
     name: 'Sign and attest release and deliverables: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1717,6 +2076,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spiffe-csi-image-arm64-sbom:
     name: 'Generate SBOMs: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1724,6 +2084,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spiffe-csi-image-arm64-termi-d00be006cc85, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spiffe-csi-image-arm64:
     name: 'Package publication bundle: publication-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1731,6 +2092,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spiffe-csi-image-arm64-termi-d00be006cc85, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-spiffe-csi-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spiffe-csi-image-arm64:
     name: 'Create and verify SBOM attestations: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1742,6 +2104,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spiffe-csi-image-arm64:
     name: 'Publish output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1756,6 +2119,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spiffe-csi-image-arm64:
     name: 'Sign and attest release and deliverables: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1771,6 +2135,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-agent-image-arm64-sbom:
     name: 'Generate SBOMs: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1778,6 +2143,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-agent-image-arm64-term-612d2fcd65a0, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire-agent-image-arm64:
     name: 'Package publication bundle: publication-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1785,6 +2151,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-agent-image-arm64-term-612d2fcd65a0, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-agent-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire-agent-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1796,6 +2163,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire-agent-image-arm64:
     name: 'Publish output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1810,6 +2178,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire-agent-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1825,6 +2194,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-bash-image-arm64-sbom:
     name: 'Generate SBOMs: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1832,6 +2202,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-bash-image-arm64-termi-ff2c63c9283e, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire-bash-image-arm64:
     name: 'Package publication bundle: publication-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1839,6 +2210,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-bash-image-arm64-termi-ff2c63c9283e, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-spire-bash-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire-bash-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1850,6 +2222,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire-bash-image-arm64:
     name: 'Publish output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1864,6 +2237,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire-bash-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1879,6 +2253,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-controller-manager-image-arm64-sbom:
     name: 'Generate SBOMs: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1886,6 +2261,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-controller-manager-ima-ea43a2dafd83, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire-controller-14366a611047:
     name: 'Package publication bundle: publication-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1893,6 +2269,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-controller-manager-ima-ea43a2dafd83, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-spire-controller-manager-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire-controller-f3890ce97c17:
     name: 'Create and verify SBOM attestations: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1904,6 +2281,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire-controller-mana-4c760c0ddb13:
     name: 'Publish output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1918,6 +2296,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire-controller-manager-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1933,6 +2312,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-crds-sbom:
     name: 'Generate SBOMs: spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -1940,6 +2320,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-crds-terminal-observe-82be9f86e106, nvkr-spire-crds-pull-spire-crds-chart, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire-crds:
     name: 'Package publication bundle: publication-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -1947,6 +2328,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-crds-terminal-observe-82be9f86e106, nvkr-spire-crds-pull-spire-crds-chart, nvkr-spire-crds-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire-crds:
     name: 'Create and verify SBOM attestations: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -1958,6 +2340,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire-crds:
     name: 'Publish output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -1972,6 +2355,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire-crds:
     name: 'Sign and attest release and deliverables: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -1987,6 +2371,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-oidc-image-arm64-sbom:
     name: 'Generate SBOMs: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1994,6 +2379,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-oidc-image-arm64-termi-efb32831475e, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire-oidc-image-arm64:
     name: 'Package publication bundle: publication-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2001,6 +2387,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-oidc-image-arm64-termi-efb32831475e, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-spire-oidc-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire-oidc-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2012,6 +2399,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire-oidc-image-arm64:
     name: 'Publish output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2026,6 +2414,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire-oidc-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2041,6 +2430,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-server-image-arm64-sbom:
     name: 'Generate SBOMs: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2048,6 +2438,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-server-image-arm64-ter-2de675367149, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire-server-image-arm64:
     name: 'Package publication bundle: publication-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2055,6 +2446,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-server-image-arm64-ter-2de675367149, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-spire-server-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2066,6 +2458,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire-server-image-arm64:
     name: 'Publish output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2080,6 +2473,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2095,6 +2489,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-tpm-server-image-arm64-sbom:
     name: 'Generate SBOMs: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2102,6 +2497,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-tpm-server-image-arm64-bf43cd0dcc3a, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire-tpm-server-image-arm64:
     name: 'Package publication bundle: publication-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2109,6 +2505,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-tpm-server-image-arm64-bf43cd0dcc3a, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-spire-tpm-server-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire-tpm-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2120,6 +2517,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire-tpm-server-image-arm64:
     name: 'Publish output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2134,6 +2532,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire-tpm-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2149,6 +2548,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-spire-sbom:
     name: 'Generate SBOMs: spire'
     runs-on: 'ubuntu-24.04'
@@ -2156,6 +2556,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-terminal-observe-package-spire, nvkr-spire-pull-spire-chart, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-spire:
     name: 'Package publication bundle: publication-spire'
     runs-on: 'ubuntu-24.04'
@@ -2163,6 +2564,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-spire-terminal-observe-package-spire, nvkr-spire-pull-spire-chart, nvkr-spire-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-spire:
     name: 'Create and verify SBOM attestations: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -2174,6 +2576,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-spire:
     name: 'Publish output-spire'
     runs-on: 'ubuntu-24.04'
@@ -2188,6 +2591,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-spire:
     name: 'Sign and attest release and deliverables: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -2203,6 +2607,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-temporal-admin-tools-image-arm64-sbom:
     name: 'Generate SBOMs: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2210,6 +2615,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-admin-tools-image-a-a7a48d5a7683, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-temporal-admin-t-619203c9c277:
     name: 'Package publication bundle: publication-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2217,6 +2623,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-admin-tools-image-a-a7a48d5a7683, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-admin-tools-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-temporal-admin-t-9e993584a415:
     name: 'Create and verify SBOM attestations: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2228,6 +2635,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-temporal-admin-tools-image-arm64:
     name: 'Publish output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2242,6 +2650,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-temporal-admin-tools-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2257,6 +2666,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-temporal-server-image-arm64-sbom:
     name: 'Generate SBOMs: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2264,6 +2674,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-server-image-arm64-656a59441bb1, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-temporal-server-image-arm64:
     name: 'Package publication bundle: publication-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2271,6 +2682,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-server-image-arm64-656a59441bb1, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-temporal-server-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-temporal-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2282,6 +2694,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-temporal-server-image-arm64:
     name: 'Publish output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2296,6 +2709,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-temporal-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2311,6 +2725,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-temporal-ui-image-arm64-sbom:
     name: 'Generate SBOMs: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2318,6 +2733,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-ui-image-arm64-term-afe0bd0cf410, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-temporal-ui-image-arm64:
     name: 'Package publication bundle: publication-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2325,6 +2741,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-ui-image-arm64-term-afe0bd0cf410, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-temporal-ui-image-arm64-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-temporal-ui-image-arm64:
     name: 'Create and verify SBOM attestations: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2336,6 +2753,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-temporal-ui-image-arm64:
     name: 'Publish output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2350,6 +2768,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-temporal-ui-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2365,6 +2784,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-temporal-sbom:
     name: 'Generate SBOMs: temporal'
     runs-on: 'ubuntu-24.04'
@@ -2372,6 +2792,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-terminal-observe-pa-d14ae446c67c, nvkr-temporal-pull-temporal-chart, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-publication-temporal:
     name: 'Package publication bundle: publication-temporal'
     runs-on: 'ubuntu-24.04'
@@ -2379,6 +2800,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04, nvkr-process-temporal-terminal-observe-pa-d14ae446c67c, nvkr-temporal-pull-temporal-chart, nvkr-temporal-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-attest-sboms-output-temporal:
     name: 'Create and verify SBOM attestations: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -2390,6 +2812,7 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-output-temporal:
     name: 'Publish output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -2404,6 +2827,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-output-temporal:
     name: 'Sign and attest release and deliverables: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -2419,6 +2843,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-capnico-co-a41756165d77:
     name: 'Verify release and deliverable signatures: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2433,6 +2858,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-cluster-ap-f52c14e947ce:
     name: 'Verify release and deliverable signatures: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2447,6 +2873,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-controller-chart:
     name: 'Verify release and deliverable signatures: output-controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -2461,6 +2888,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-controller-profiles:
     name: 'Verify release and deliverable signatures: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -2475,6 +2903,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-csi-node-d-ed501e7759bf:
     name: 'Verify release and deliverable signatures: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2489,6 +2918,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-cwe:
     name: 'Verify release and deliverable signatures: output-cwe'
     runs-on: 'ubuntu-24.04'
@@ -2503,6 +2933,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-installer-tools-arm64:
     name: 'Verify release and deliverable signatures: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2517,6 +2948,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-nicosim-tools-arm64:
     name: 'Verify release and deliverable signatures: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2531,6 +2963,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-nktp:
     name: 'Verify release and deliverable signatures: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -2545,6 +2978,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-nvke-node-image-arm64:
     name: 'Verify release and deliverable signatures: output-nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2559,6 +2993,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-nvkectl:
     name: 'Verify release and deliverable signatures: output-nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -2573,6 +3008,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-operator-tools:
     name: 'Verify release and deliverable signatures: output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -2587,6 +3023,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-ovn-chart-arm64:
     name: 'Verify release and deliverable signatures: output-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2601,6 +3038,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-ovn-image-arm64:
     name: 'Verify release and deliverable signatures: output-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2615,6 +3053,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-postgresql:
     name: 'Verify release and deliverable signatures: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -2629,6 +3068,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-postgresql-image-arm64:
     name: 'Verify release and deliverable signatures: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2643,6 +3083,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spiffe-csi-image-arm64:
     name: 'Verify release and deliverable signatures: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2657,6 +3098,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire:
     name: 'Verify release and deliverable signatures: output-spire'
     runs-on: 'ubuntu-24.04'
@@ -2671,6 +3113,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire-agen-690d58615fef:
     name: 'Verify release and deliverable signatures: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2685,6 +3128,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire-bash-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2699,6 +3143,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91:
     name: 'Verify release and deliverable signatures: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2713,6 +3158,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire-crds:
     name: 'Verify release and deliverable signatures: output-spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -2727,6 +3173,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire-oidc-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2741,6 +3188,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire-serv-2ffabff52266:
     name: 'Verify release and deliverable signatures: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2755,6 +3203,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-spire-tpm-fdd5a5adf925:
     name: 'Verify release and deliverable signatures: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2769,6 +3218,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-temporal:
     name: 'Verify release and deliverable signatures: output-temporal'
     runs-on: 'ubuntu-24.04'
@@ -2783,6 +3233,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-temporal-a-325229721989:
     name: 'Verify release and deliverable signatures: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2797,6 +3248,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-temporal-s-030929bd4981:
     name: 'Verify release and deliverable signatures: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2811,6 +3263,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac:
     name: 'Verify release and deliverable signatures: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2825,6 +3278,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-package-release:
     name: 'Assemble release from verified output references'
     runs-on: 'ubuntu-24.04'
@@ -2839,6 +3293,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-publish-release:
     name: 'Publish release'
     runs-on: 'ubuntu-24.04'
@@ -2853,6 +3308,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-sign-release:
     name: 'Sign and attest release and deliverables: release'
     runs-on: 'ubuntu-24.04'
@@ -2868,6 +3324,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-verify-publication-release:
     name: 'Verify release and deliverable signatures: release'
     runs-on: 'ubuntu-24.04'
@@ -2882,6 +3339,7 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
+    outputs: *private-transfer-outputs
   nvkr-lifecycle-run:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
@@ -2898,16 +3356,28 @@ jobs:
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
+      - *private-transfer-context
+      - name: Project producer outcomes for recovery
+        id: nvkr-transfer-results
+        if: ${{ always() }}
+        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/private-transfer
+        with:
+          mode: results
+          expected-index-file: ${{ steps.nvkr-transfer-context.outputs.path }}
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - name: Download artifacts and evidence
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/download-carriers
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
+          transfer-needs: ${{ steps.nvkr-transfer-context.outputs.path }}
+          transfer-read: ${{ secrets.NVKR_TRANSFER_READ }}
+          transfer-registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          transfer-user: ${{ vars.NVKR_TRANSFER_USER }}
         continue-on-error: true
       - name: recover inputs part-1
         uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/recover-inputs
         with:
-          nvkr-job-results: ${{ toJSON(needs) }}
+          nvkr-job-results: ${{ steps.nvkr-transfer-results.outputs.results }}
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
       - name: Finalize Run and check completeness
         id: finalize-catalog
@@ -2939,12 +3409,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - name: Upload complete qualification handoff
-        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/upload-carrier
-        with:
-          with-path: ""
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-2'] }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: ${{ success() }}
         timeout-minutes: 5
+        with:
+          if-no-files-found: error
+          include-hidden-files: "true"
+          name: nvkr-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .nvkr/qualification/handoff.json
+          retention-days: "7"
       - name: Summarize Run result
         id: summarize-run-end
         if: ${{ always() }}
@@ -3006,3 +3479,5 @@ jobs:
             fi
             printf 'This summary is diagnostic; the Run record carries the completeness result.\n'
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - *private-transfer-index
+    outputs: *private-transfer-outputs

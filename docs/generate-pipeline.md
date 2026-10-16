@@ -141,6 +141,59 @@ workflow. Producer jobs retain explicit dependencies and separate results; produ
 callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native
 worker and selected-platform matrix (ADR-21).
 
+## Configure private transfers before dispatch
+
+Generated jobs exchange compiled helpers, fetched tools, sources, binaries and intermediate layouts through
+a private/internal GHCR package. They do not attach these bytes to the workflow Run. Metadata-only Run
+records and qualification handoffs may still be downloaded from Actions. The transfer package is execution
+storage, separate from the published Release repositories.
+
+Provision one package before dispatch, keeping it unlinked from any repository, then configure:
+
+| GitHub setting | Value |
+|---|---|
+| Variable `NVKR_TRANSFER_PACKAGE` | Exact untagged package, for example `ghcr.io/example-org/nvkr-transfers` |
+| Variable `NVKR_TRANSFER_USER` | Dedicated package-owning transfer account |
+| Secret `NVKR_TRANSFER_WRITE` | That account's classic PAT with `write:packages`, without unnecessary `repo` scope |
+| Secret `NVKR_TRANSFER_READ` | Separate classic PAT with `read:packages` |
+
+Both tokens must reach the admitted transfer steps, including bootstrap and ARC jobs. Keep the principal
+separate from production publishing and give it no production-package access. Review branch code before
+credentialed dispatch. The generated action validates private/internal visibility and absence of a linked
+repository before transfer, then binds immutable manifest references to this workflow, Run, attempt and
+exact transfer name. Missing credentials, public/linked packages, changed bytes and wrong-run references fail.
+There is no fallback upload to Actions artifacts.
+
+Disable inherited repository permissions and do not grant the future public repository access under
+**Manage Actions access**. GitHub warns that such a grant
+[may expose private packages to forks](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#ensuring-workflow-access-to-your-package).
+The action cannot inspect every hidden ACL, team or enterprise grant. Select private visibility if internal
+enterprise access is too broad. Before making the repository public, independently test anonymous,
+unrelated-user and fork access to the transfer package, and audit the existing release and toolchain packages
+as well. Their existing access configuration is not proved safe by this transport change.
+
+Before making the repository public, also inventory and explicitly remove historical Actions artifacts and
+caches that contain binaries, source archives, images or other compiled payloads. Changing future upload
+paths does not remove earlier Run attachments or caches. Complete that migration while the repository is
+still private, and verify the remaining retained artifacts are metadata-only. This implementation does not
+delete historical storage or claim that the repository is ready to expose publicly.
+
+Transfers split carrier bytes into layers no larger than 1 GiB; consumers verify the immutable manifest and
+layer digests before existing carrier restoration and evidence checks. Keep enough quota for native disk
+carriers and retries. GHCR versions do not expire with Actions artifact retention: transfer cleanup remains
+an operator task, separate from development-publication cleanup. This includes diagnostic uploads; the
+inherited `retention-days` action input is compatibility metadata and does not expire registry versions.
+Do not remove versions needed by an active
+Run or retained retry. If required transfers are deleted, start a complete new Run.
+For both production and development, retry with **rerun all jobs** or a new dispatch. Failed-job-only
+reruns retain earlier-attempt dependency outputs, which the exact-attempt transfer check rejects.
+
+The scheduler may keep compatible offline observation, inventory and packaging beside their producer,
+reducing intermediate job transfers. Each operation retains its checks and pinned container. Source-fetch,
+OIDC attestation/signing, publication and read-only verification boundaries remain separate. This preserves
+the existing `pipeline-attested` claim; it does not establish SLSA Build L3. Hosted GHCR access, native action
+execution and large-carrier interoperability require external validation before operational acceptance.
+
 ## Recover interrupted qualification generation
 
 When generation includes `--qualification-policy`, an interrupted write can leave files such as

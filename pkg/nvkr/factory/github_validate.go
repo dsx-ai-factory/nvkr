@@ -38,6 +38,7 @@ type githubJob struct {
 	If             string                     `json:"if,omitempty"`
 	Permissions    map[string]string          `json:"permissions,omitempty"`
 	Env            map[string]string          `json:"env,omitempty"`
+	Outputs        map[string]string          `json:"outputs,omitempty"`
 	Steps          []githubStep               `json:"steps"`
 }
 
@@ -47,6 +48,7 @@ type githubStep struct {
 	Name            string            `json:"name,omitempty"`
 	Uses            string            `json:"uses,omitempty"`
 	Run             string            `json:"run,omitempty"`
+	Shell           string            `json:"shell,omitempty"`
 	ContinueOnError bool              `json:"continue-on-error,omitempty"`
 	If              string            `json:"if,omitempty"`
 	With            map[string]string `json:"with,omitempty"`

@@ -247,6 +247,27 @@ func TestGitHubSharedAttemptUploadNamesPreserveProviderContext(t *testing.T) {
 			if found != 1 {
 				t.Fatalf("expected one exact %q upload, got %d", want.Name, found)
 			}
+			if test.name == "qualification handoff" {
+				// This fixed metadata-only Actions exception is intentionally
+				// visible in the workflow instead of a shared carrier interface.
+				workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+				found = 0
+				for _, job := range workflow.Jobs {
+					for _, step := range job.Steps {
+						if step.Name != want.Name {
+							continue
+						}
+						found++
+						if !reflect.DeepEqual(step, want) {
+							t.Fatalf("direct handoff changed its exact metadata boundary: %+v", step)
+						}
+					}
+				}
+				if found != 1 {
+					t.Fatalf("expected one direct metadata handoff upload, got %d", found)
+				}
+				return
+			}
 			data := sharedGitHubActionData(t, bundle)
 			found = 0
 			for _, entry := range data.Entries {

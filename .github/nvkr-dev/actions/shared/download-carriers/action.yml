@@ -8,13 +8,31 @@ inputs:
   parameters:
     description: Plan-derived parameters for this operation; never shell source
     required: true
+  transfer-needs:
+    description: Private GHCR transport binding
+    required: true
+  transfer-read:
+    description: Private GHCR transport binding
+    required: true
+  transfer-registry:
+    description: Private GHCR transport binding
+    required: true
+  transfer-user:
+    description: Private GHCR transport binding
+    required: true
 runs:
   using: composite
   steps:
     - name: ${{ fromJSON(inputs.parameters).download_name }}
       id: operation_download
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      uses: ./.github/nvkr-dev/actions/private-transfer
       with:
         merge-multiple: ${{ fromJSON(inputs.parameters).download_with_merge_multiple }}
         path: ${{ fromJSON(inputs.parameters).download_with_path }}
         pattern: ${{ fromJSON(inputs.parameters).download_with_pattern }}
+        mode: download
+        recovery: ${{ github.job == 'nvkr-lifecycle-run' }}
+        expected-index-file: ${{ inputs.transfer-needs }}
+        registry: ${{ inputs.transfer-registry }}
+        token: ${{ inputs.transfer-read }}
+        username: ${{ inputs.transfer-user }}

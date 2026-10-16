@@ -8,14 +8,32 @@ runs:
   using: composite
   steps:
     - name: 'Download NVKR runner'
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/private-transfer
       with:
         name: ${{ inputs.runner-artifact }}
         path: '.'
+        mode: download
+        recovery: ${{ github.job == 'nvkr-lifecycle-run' }}
+        expected-index-file: ${{ inputs.transfer-needs }}
+        registry: ${{ inputs.transfer-registry }}
+        token: ${{ inputs.transfer-read }}
+        username: ${{ inputs.transfer-user }}
     - name: Prepare helper
       run: chmod +x ./nvkr-exec
       shell: bash -e {0}
 inputs:
   runner-artifact:
     description: Same-Run helper artifact name
+    required: true
+  transfer-needs:
+    description: Private GHCR transport binding
+    required: true
+  transfer-read:
+    description: Private GHCR transport binding
+    required: true
+  transfer-registry:
+    description: Private GHCR transport binding
+    required: true
+  transfer-user:
+    description: Private GHCR transport binding
     required: true

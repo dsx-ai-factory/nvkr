@@ -48,6 +48,15 @@ Each derived route owns exactly one publisher and its publication reference. Whe
 its sign and verification operations bind that same route's package, reference and signature artifacts.
 Another publisher or signer cannot acquire route authority merely by naming an existing target.
 
+ADR-18's private GHCR job-transfer package is separate execution storage. Its fixed workflow variables,
+dedicated reader/writer credentials and run-bound digest references do not create a publication route or
+change Build identity. Its principal must have no production-package grants; visibility and an unlinked
+package are checked before transfer, while provider ACLs remain an operator prerequisite. Existing release
+packages must retain private/internal visibility and independent access control when the source repository
+becomes public. A private label alone does not prove that inherited repository access or Actions grants
+exclude unrelated users and forks. Transfer-package retention is operator-managed; the development
+publication cleanup protocol does not cover it.
+
 The publisher uploads each publication root by its content digest, without creating or advancing `latest`,
 a fixed version tag, or a development tag. It returns the digest-pinned reference recorded in the Run.
 Explicit low-level tagged publication remains a discovery operation; automatic version/channel aliases and
@@ -152,7 +161,7 @@ policy is implied by accepting a disk. The separate raw diagnostic route remains
 
 ### 3. The emitted publish phase
 
-The generated pipeline gains a **publish phase after the unconditional terminal verify**:
+The generated pipeline gains a **publish phase after successful terminal verification**:
 
 - **only verified artifacts publish** — publish is gated on verify;
 - for an atomic release, publish and promote are gated on the **completeness check** (ADR-16), so a partial set is
@@ -341,6 +350,10 @@ numbers must satisfy preparation ≤ signing ≤ the consuming attempt. Differen
 changed Plans or missing evidence fail closed. Signing may retry against an earlier prepared root without
 rewriting its metadata or original predicate. This exception is limited to pipeline-attested metadata
 assembly/finalization; it does not relax qualified execution or live disk ownership.
+This is a publication-module capability, not a generated workflow retry promise. ADR-18's private GHCR
+carrier protocol requires the exact current attempt and rejects earlier-attempt dependency indices.
+Generated production and development workflows therefore require rerunning all jobs or starting a new Run;
+failed-job-only provider reruns cannot exercise publication reuse through stale carriers.
 Output-local chart reproduction transports its bound image packages and their producer/evidence
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.
@@ -353,7 +366,8 @@ The aggregate identifies its current assembly invocation. Each output's `publica
 the digest-pinned output-local root reference and its original preparation and signing invocation IDs.
 These descriptions acquire authority only through the authenticated release; assembly derives them from
 the verified output receipt. A finalizer retry may authenticate an unchanged aggregate from an earlier
-attempt of the same run under the same ordering and Plan checks.
+attempt of the same run under the same ordering and Plan checks at the module boundary. The generated
+private-transfer workflow still requires a complete attempt as described above.
 Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
 and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
 verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.

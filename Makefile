@@ -113,9 +113,11 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Require Python and check the existing CI report tools.
+test-ci-tools: ## Check CI report tools and the private GHCR transport contracts.
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
+	node -e 'if (Number(process.versions.node.split(".")[0]) < 24) throw new Error("Node.js 24+ is required for private transport tests")'
+	node --test pkg/nvkr/factory/github_transfer_action_test.js
 
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.

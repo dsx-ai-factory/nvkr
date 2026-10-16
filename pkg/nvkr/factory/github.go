@@ -397,6 +397,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err != nil {
 		return nil, err
 	}
+	workflow, err = lowerGitHubPrivateTransfers(plan, workflow, actionFiles, actions)
+	if err != nil {
+		return nil, err
+	}
 	for name, raw := range actionFiles {
 		files[name] = raw
 	}

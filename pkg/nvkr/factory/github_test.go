@@ -439,6 +439,10 @@ func relowerGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflow, err = lowerGitHubPrivateTransfers(plan, workflow, changed.Files, testActionRefs(t, plan))
+	if err != nil {
+		t.Fatal(err)
+	}
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return changed
@@ -471,6 +475,9 @@ func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
 	actions := 0
 	for name := range bundle.Files {
 		if name == bundle.PlanPath || name == GitHubWorkflowPath || name == GitHubActionDataPath {
+			continue
+		}
+		if name == ".github/nvkr-run/actions/private-transfer/index.js" && bytes.Equal(bundle.Files[name], githubTransferScript) {
 			continue
 		}
 		if !strings.HasPrefix(name, ".github/nvkr-run/actions/") || !strings.HasSuffix(name, "/action.yml") {

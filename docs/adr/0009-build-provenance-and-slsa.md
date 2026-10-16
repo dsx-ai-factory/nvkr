@@ -116,6 +116,9 @@ from another run or relabel an earlier artifact as rebuilt by the current attemp
 Production and reproduction validators reject each other's shapes; coercion is forbidden. Hosted finalization
 reconstructs expected production semantics from the admitted plan and checks dependencies, build metadata,
 workflow identity, and exact subject rather than accepting any well-formed predicate.
+That publication-record reuse capability does not authorize replay of ADR-18's private transfer carriers,
+whose indices bind the current attempt exactly. Generated workflow retries rerun all jobs or start a new
+Run; the original provenance identity remains unchanged whenever the module-level reuse protocol is used.
 
 Acquired provenance is NVKR's acquisition record (upstream reference, lock pin, fetch time); it makes no upstream
 build or signature-verification claim. Without declared digest-pinned upstream evidence it remains

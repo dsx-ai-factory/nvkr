@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-10-13. ADR-01–22 own the lane-specific engineering contracts pending named-decider
+Reviewed 2026-10-15. ADR-01–22 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -280,6 +280,44 @@ that remains outstanding after merge.
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 | 23 Artifact test interfaces | Proposed ADR merged in PR #139; upstream interface, Go Plan helper and diagnostic adapter implementation remain separate drafts | [Implementation guide and local CLI proof](https://github.com/dsx-ai-factory/nvkr/blob/65d13f4becb358015dead41fd1bc440d13118556/docs/artifact-testing.md) retain their stated limits. Maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
 
+## Private hosted transfers and producer job grouping
+
+ADR-18 now requires binary helpers and all generated source/tool/payload carriers to use a separate
+pre-existing private/internal GHCR package. The generated Node 24 transport action checks package visibility
+and absence of a linked repository before transfer, chunks layers to at most 1 GiB, verifies OCI/blob digests,
+and binds dependency-selected references to repository, workflow, run, attempt and exact carrier name.
+Only metadata-only final Run records and qualification handoffs retain Actions artifact storage. Dedicated
+reader/writer principals require operator configuration and no production-package grants; failure cannot
+fall back to public or Actions payload storage. Transfer versions have operator-managed retention, with
+automatic cleanup deferred. Development publication cleanup does not own this storage.
+
+The scheduler can append offline observation, SBOM and packaging work whose complete inputs are already
+owned by one build/acquisition stage, with matching effective runner/platform and compatible Build target.
+Each logical operation keeps its pinned container, checks and results. The sixteen-node and summed-timeout
+bounds and projected DAG validation remain. Source fetch, OIDC attestation/signing, publication and read-only
+publication verification retain separate credential boundaries. A failed grouped job leaves all its members
+unsuccessful for unconditional finalization; no earlier carrier proves successful completion.
+
+Local regeneration reduces each maintained production/development workflow from 562 jobs to 524
+(38 fewer, 6.8%) without changing its Plan bytes. Full dependency indices travel through a bounded
+temporary file; finalization projects only producer outcomes into its recovery environment. The
+600-job transport regression covers this provider-output boundary, including shell metacharacters.
+
+Local macOS validation passed all ordinary Go packages uncached. The initial whole-suite run reached
+the default ten-minute package timeout in factory, delivery and lifecycle without an assertion failure;
+those three packages passed when rerun with `-timeout=30m -p=2`. Focused factory race checks, eighteen
+Node transport tests, nine Python tooling tests, vet, lint, license headers, ShellCheck and vulnerability
+scanning passed. All four maintained bundles passed regeneration drift checks; Actionlint, YAML lint and
+the published documentation checks also passed. These are local contract results, not hosted acceptance.
+
+These changes preserve pipeline-attested semantics without claiming SLSA Build L3 or qualified reproduction.
+The local gate establishes contract coverage only; no new hosted Run, private GHCR upload/download round trip, native
+Node 24 execution, large-disk transfer, retry, or anonymous/unrelated-user/fork denial has been recorded.
+The metadata API cannot prove hidden ACLs. Operators must separately audit transfer, release and toolchain
+package access before the repository becomes public, including inherited and public-repository Actions grants.
+Historical workflow artifacts and caches containing compiled payloads also require inventory and authorized
+purging before publication. The migration does not delete them; public-repository readiness remains unproved.
+
 ## Feature-branch pipeline development
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
@@ -291,7 +329,7 @@ finalization retains its Run record without emitting the production qualificatio
 admission returns a capability error before qualification evidence collection. Production handoffs retain seven days.
 
 Unsigned development remains hosted build-only, static-unqualified, automatically cancelling older
-same-branch Runs and retaining transfers for one day. Signed development requires the prescribed
+same-branch Runs. Signed development requires the prescribed
 `nvkr-dev.yml` branch identity, GitHub issuer, `per-output-v1` and reserved GHCR development namespace.
 It uses `nvkr-dev-release`/`nvkr-dev-arc`, fixed dedicated read/write credential names and no repository-token
 package-write permission. The native ARC labels and exact runtime/evidence admission are unchanged.
@@ -300,9 +338,11 @@ Provider pool/credential/ACL configuration is an external prerequisite, not esta
 
 The factory owner derives registry targets beneath the current run and attempt without mutating committed
 Plan bytes or Build identity. Subject/reference, metadata and predicate checks reject another attempt's
-publication. Production authenticated earlier-attempt reuse is unchanged; development retries rerun all
-jobs or dispatch a complete new Run. Signed-development helpers/carriers and all final Run records retain
-seven days; disk diagnostics retain one day. Full signed development is non-canceling.
+publication. The publication module retains its earlier-attempt record checks, but private transfer indices
+reject earlier attempts. Production and development retries rerun all jobs or dispatch a complete new Run.
+Helpers, carriers and disk diagnostics use private GHCR with operator-managed retention;
+metadata-only final Run records retain seven days in Actions.
+Full signed development is non-canceling.
 
 The development cleanup module inventories only private packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
@@ -401,7 +441,7 @@ class and the strict inspection join, leaving separate cleanup headroom. The sha
 public image pulls and per-output offline publication preparation; the fifteen-minute provider reserve is
 shared by pre-steps and successful carrier packing/uploads. No per-step transfer/max-byte or remaining-provider-time
 proof is implemented, so near-ceiling transfer headroom remains an operational risk (ADR-18 §3). Failure-only Packer diagnostic transport
-selects only one successfully sealed sink-issued route with bounded retention; early admission failures cannot
+selects only one successfully sealed sink-issued route with operator-managed private GHCR retention; early admission failures cannot
 select workspace content. Both-native generation and tampering tests cover this projection, not a fresh
 ephemeral-runner timeout or diagnostic-upload exercise.
 
@@ -409,7 +449,7 @@ Strict inspection separately retains bounded, sanitized phase/timing diagnostics
 coordinates and timeout summaries. A separate parsing ceiling rejects excessive diagnostic input while
 draining the child; truncation preserves the last accepted phase. Diagnostics grant no receipt and timing
 does not enter evidence identity. Hosted retention uses one atomically published, no-replace file and an
-optional, failure-tolerant, always-run upload with one-day retention and a separate five-minute allowance.
+optional, failure-tolerant, always-run upload to private GHCR with operator-managed retention and a separate five-minute allowance.
 Required evidence uploads remain mandatory. M2 build-provenance mode emits neither inspection nor this
 upload. Rebuilt-helper deployment, full native inspection and corrected production timeout behavior remain
 unexercised.
@@ -920,7 +960,9 @@ Release consumer's artifact-publication scope still checks complete payloads.
 
 ADR-20 admits earlier-attempt output roots only within the same GitHub run and unchanged Plan, with exact
 repository/builder and preparation/signing/consuming-attempt ordering. Contracts cover retries, mixed
-attempts, re-signing and finalizer reuse; hosted retry acceptance remains unexercised. Cross-run reuse,
+attempts, re-signing and finalizer reuse at the module boundary. Generated private transfers reject
+earlier-attempt indices, so failed-job-only workflow retries are unavailable; rerun all jobs or dispatch a
+new Run. Hosted retry acceptance remains unexercised. Cross-run reuse,
 remote rollback and an atomic multi-repository transaction are not provided. Failed/missing provider jobs
 still prevent completion. Production finalization restores the six aggregate/tool control carriers plus each output’s
 original publication reference, signing record and predicate for the qualification handoff, without
@@ -1024,9 +1066,10 @@ the sequence form. Static expansion resolves aliases into
 independent nodes before substitution so sibling selectors and credentials cannot be mutated together.
 Operation calls with provider controls stay explicit. The combined candidate retains all members under
 the existing workflow-size bound; this is local generation/expansion evidence, not hosted execution.
-The current production workflow is 390,337 bytes (109,663 bytes of provider headroom); development is
-370,394 bytes. Both retain 562 jobs. The named ARM64 nightly workflows are 175,850 and 176,953 bytes,
-each retaining 254 jobs. Whole-step sharing preserves the complete expanded values of all four workflows.
+Before producer job grouping and private GHCR transfer, the production workflow was 390,337 bytes
+(109,663 bytes of provider headroom); development was
+370,394 bytes. Both retained 562 jobs. The named ARM64 nightly workflows were 175,850 and 176,953 bytes,
+each retaining 254 jobs. Those measurements describe the previous rendering, not the current generated bundle.
 The maintained rendering test fails above a 95% soft budget, before the unchanged
 500,000-byte provider admission bound, directing membership changes to compaction work.
 Matrix scheduling and reusable callable workflows remain deferred, and no fresh hosted execution of this

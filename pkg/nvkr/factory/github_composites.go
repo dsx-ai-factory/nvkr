@@ -359,6 +359,10 @@ func githubActionInput(description string) *yamlv3.Node {
 // Exact regeneration additionally authenticates every action and its call sites.
 func expandGitHubActions(plan *Plan, raw []byte, files map[string][]byte) ([]byte, error) {
 	var err error
+	raw, files, err = projectGitHubPrivateTransfers(plan, raw, files)
+	if err != nil {
+		return nil, err
+	}
 	raw, files, err = materializeGitHubSharedActions(plan, raw, files)
 	if err != nil {
 		return nil, err

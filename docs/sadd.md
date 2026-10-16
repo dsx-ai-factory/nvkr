@@ -187,7 +187,7 @@ flowchart TB
     Helper --> Runtime["Container runtime"]
     Runtime --> Build["Pinned build container"]
     Build --> Workspace["Produced bytes and run records"]
-    Workspace --> Transport["Declared inter-job artifact transport"]
+    Workspace --> Transport["Private GHCR job-transfer carriers"]
     Transport --> Package["Package and evidence jobs"]
     Package --> Publish["Publication and signing jobs"]
     PullBack["Pull-back verification job"]
@@ -199,7 +199,10 @@ flowchart TB
 ```
 
 The graph describes logical dependencies; it does not require one job per logical node in every lane. Ordinary
-factory nodes exchange declared artifacts through provider transport. The native ARC disk group keeps the
+factory nodes exchange declared artifacts through private GHCR carriers. Compatible offline observation,
+inventory and packaging nodes can share their producer job, retaining separate pinned container invocations
+and exact node results; credentialed source fetch, attestation, publication and verification remain separate.
+The native ARC disk group keeps the
 original producer and held disk open through disk-evidence packaging. Declared carriers then transport the
 package and evidence to separate generic hosted publication, signing and verification jobs, each with its own
 credential boundary (ADR-18/20). Fused large-output wrapped publication and verification remain deferred (ADR-10).
@@ -209,12 +212,18 @@ credential boundary (ADR-18/20). Fused large-output wrapped publication and veri
 | Repository → compiler | Definition, catalog selection, pins, Environment | Validate the complete input model; secrets remain references |
 | Compiler → committed bundle | Canonical plan, graph, provider files and manifest | Same inputs regenerate the owned files exactly; an editable workflow is not the source of truth |
 | Runner helper → build container | Declared sources, pinned toolchain and allowed environment | Runtime performs isolation; build code receives only the capabilities permitted by its source lane |
-| Job → next job | Exact declared artifact edges and run records | Provider storage transports bytes; presence in storage is not verification |
+| Job → next job | Exact declared artifact edges and run records | Private GHCR manifests selected by dependency outputs bind repository/workflow/run/attempt; consumers verify blob digests and their own artifact closure |
 | Publisher → registry | OCI content followed by signatures and attestations | Remote writes can be visible before the whole run succeeds |
 | Registry → verifier | Digest-selected manifest and associated evidence | Recompute identity and enforce signer/issuer policy |
 
-Runner workspaces and provider job artifacts are execution storage, not the release authority. Retention of
-published bytes and evidence belongs to the registry owner. The local factory runner executes the same logical
+Runner workspaces and private GHCR carriers are execution storage, not the release authority. Compiled helpers,
+tools and payloads do not enter Actions artifact storage; metadata-only final Run records and qualification
+handoffs may use it. Transfer admission requires a pre-existing private/internal package unlinked from a
+repository. Dedicated read/write tokens are confined to transport steps and have no production-package grants.
+The operator must independently exclude inherited repository access and public-repository Actions grants;
+package metadata cannot prove all hidden ACLs. Layers are bounded to 1 GiB and downloads use immutable digests.
+Transfer-package retention is operator-managed, with automatic cleanup deferred; publication retention remains
+separate. This preserves pipeline-attested scope without establishing SLSA Build L3. The local factory runner executes the same logical
 graph for development, with local workspaces and optional publication; it cannot establish hosted-workflow identity.
 
 ### Object relationships and identity
@@ -529,7 +538,7 @@ references without adding a topology model.
 |---|---|---|
 | Git/source transport | Upstream or mirror → source fetch or pin-set revalidation step | Retrieve pinned Git trees and check commit/tree; repository-scoped credentials limited to source retrieval and pin-set revalidation |
 | Container runtime | Helper → pinned toolchain container | Apply declared platform/network/privilege; qualified execution additionally requires runtime receipts |
-| CI artifact transport | Producer job → dependent job | Carry declared artifact edges; graph admission and identity checks remain NVKR responsibilities |
+| Private GHCR job transport | Producer job → dependent job | Separate package and principals, checked visibility, immutable digest selection, exact run/attempt/workflow bindings; graph admission and identity checks remain NVKR responsibilities |
 | OCI distribution | Packager/publisher ↔ registry | Content selected by digest; layout/manifest integrity checked; remote failure cannot imply successful publication |
 | Keyless signing | Signing module ↔ cosign/Fulcio/Rekor | Exact pinned executable and subject, explicit identity/issuer; registry credentials in private `DOCKER_CONFIG` |
 | Consumer verification | Registry → independent verifier | Signature and production attestation against the digest and published identity policy; planned qualification uses a distinct identity |
@@ -897,12 +906,14 @@ signing-identity policies that admit the selected workflow ref. Other production
 Development admits branch dispatch and supports the same native ARC route only with its explicit signed
 publication contract. Generic hosted runners retain bootstrap, source retrieval, publication, signing and
 finalization. The development account must lack production-package write/admin access; namespace names
-cannot enforce provider ACLs. Unsigned development cancels superseded Runs and retains transfers for one day.
-Signed development and production remain non-canceling with seven-day transfers; final Run records retain
-seven days and disk diagnostics one day. Development registry packages are isolated per run attempt and
+cannot enforce provider ACLs. Unsigned development cancels superseded Runs; signed development and production
+remain non-canceling. Private GHCR transfer retention belongs to the operator and has no automatic Actions-style
+expiry, including for disk diagnostics; metadata-only final Run records retain seven days in Actions. Development publication
+packages are isolated per run attempt and
 become cleanup candidates after completion and 24 hours of inactivity. A default-branch-only owner
 rechecks authenticated provider metadata before whole-package deletion; it never executes branch artifacts.
-Expired transfers or a development retry require a complete attempt; cancellation can prevent finalization.
+Deleted transfers and production/development retries require a complete attempt; failed-job-only reruns
+cannot replay earlier-attempt carrier indices. Cancellation can prevent finalization.
 These are contract-tested behaviors pending external execution, access-policy and deletion evidence.
 Repository Merge Gate checks both producer bundles and the qualification pair for PR drift.
 

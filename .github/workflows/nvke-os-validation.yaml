@@ -38,7 +38,7 @@ on:
         required: false
         type: string
       retain_qcow2:
-        description: Upload the multi-GB QCOW2 after a successful full validation
+        description: Retain QCOW2 privately after full validation of this exact trusted workflow commit
         required: true
         default: false
         type: boolean
@@ -122,6 +122,12 @@ jobs:
             true|false) ;;
             *) echo "retain_qcow2 must be true or false" >&2; exit 1 ;;
           esac
+          # A candidate executes host code and must never precede a step that
+          # receives the private-transfer write credential on that runner.
+          if [[ "${retain_qcow2}" == true && "${commit}" != "${EVENT_SHA}" ]]; then
+            echo "private QCOW2 retention requires the exact trusted workflow commit" >&2
+            exit 1
+          fi
           if [[ "${mode}" == preflight ]]; then
             test "$(git rev-parse HEAD)" = "${commit}"
           elif [[ -n "${mirror_pr}" ]]; then
@@ -425,9 +431,17 @@ jobs:
     timeout-minutes: 30
     outputs:
       archive_digest: ${{ steps.package.outputs.archive_digest }}
+      nvkr-transfer-index: ${{ steps.nvkr-transfer-index.outputs.index }}
     steps:
       # This job contains no checkout or executable code from the selected
       # candidate. Its NVKE credential never enters either build runner job.
+      - name: Check out trusted transport implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Check out exact pinned NVKE source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -464,16 +478,24 @@ jobs:
           digest="$(sha256sum .handoff/nvke-source.tar | cut -d' ' -f1)"
           echo "archive_digest=${digest}" >>"${GITHUB_OUTPUT}"
 
-      - name: Upload one-day NVKE source handoff
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Upload private NVKE source handoff
+        uses: ./.github/nvkr-run/actions/private-transfer
         with:
+          mode: upload
+          registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          username: ${{ vars.NVKR_TRANSFER_USER }}
+          token: ${{ secrets.NVKR_TRANSFER_WRITE }}
           name: nvke-os-source-${{ github.run_id }}
-          overwrite: true
           path: .handoff/nvke-source.tar
           if-no-files-found: error
           include-hidden-files: true
-          compression-level: 0
-          retention-days: 1
+
+      - name: Record private source transfer digest
+        id: nvkr-transfer-index
+        if: always()
+        uses: ./.github/nvkr-run/actions/private-transfer
+        with:
+          mode: index
 
   validate-full:
     name: NVKE OS full validation (${{ matrix.arch }})
@@ -489,9 +511,21 @@ jobs:
       - name: Admit native KVM runner
         run: *native_kvm_preflight
 
-      - name: Download exact NVKE source handoff
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - name: Check out trusted transport implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download exact NVKE source handoff
+        uses: ./.github/nvkr-run/actions/private-transfer
+        with:
+          mode: download
+          registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          username: ${{ vars.NVKR_TRANSFER_USER }}
+          token: ${{ secrets.NVKR_TRANSFER_READ }}
+          expected-index: ${{ toJSON(needs) }}
           name: nvke-os-source-${{ github.run_id }}
           path: .trusted-transfer
 
@@ -705,17 +739,67 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           path: |
-            .candidate/.nvkr/evidence/**
+            .candidate/.nvkr/evidence/context.json
+            .candidate/.nvkr/evidence/metadata.json
+            .candidate/.nvkr/evidence/attempt-${{ matrix.arch }}
+            .candidate/.nvkr/evidence/packer-dispatch-${{ matrix.arch }}.log
+            .candidate/.nvkr/evidence/lifecycle-${{ matrix.arch }}.log
+            .candidate/.nvkr/evidence/boot-smoke-${{ matrix.arch }}.log
+            .candidate/.nvkr/evidence/toolchain-${{ matrix.arch }}.image-id
+            .candidate/.nvkr/evidence/qcow2-${{ matrix.arch }}.digest
+            .candidate/.nvkr/evidence/qcow2-${{ matrix.arch }}.size
             .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/.runner/plan.json
-            .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/diagnostics/packer/**
             .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/lifecycle.json
 
-      - name: Upload retained QCOW2
-        if: success() && needs.select.outputs.retain_qcow2 == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # The Packer log collector admits arbitrary bounded regular files. Keep
+      # that raw tree private; selected candidates do not receive write secrets.
+      - name: Find trusted private Packer diagnostics
+        id: private-diagnostics
+        if: always() && needs.select.outputs.commit == github.sha
+        env:
+          DIAGNOSTICS: .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/diagnostics/packer
+        run: |
+          if [ -d "${DIAGNOSTICS}" ]; then
+            printf 'present=true\n' >>"${GITHUB_OUTPUT}"
+          fi
+
+      - name: Upload raw Packer diagnostics privately
+        if: always() && needs.select.outputs.commit == github.sha && steps.private-diagnostics.outputs.present == 'true'
+        uses: ./.github/nvkr-run/actions/private-transfer
         with:
+          mode: upload
+          registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          username: ${{ vars.NVKR_TRANSFER_USER }}
+          token: ${{ secrets.NVKR_TRANSFER_WRITE }}
+          name: nvke-os-${{ matrix.arch }}-packer-diagnostics-${{ needs.select.outputs.commit }}-${{ github.run_attempt }}
+          path: .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/diagnostics/packer
+
+      - name: Upload retained QCOW2 privately
+        if: success() && needs.select.outputs.retain_qcow2 == 'true' && needs.select.outputs.commit == github.sha
+        uses: ./.github/nvkr-run/actions/private-transfer
+        with:
+          mode: upload
+          registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          username: ${{ vars.NVKR_TRANSFER_USER }}
+          token: ${{ secrets.NVKR_TRANSFER_WRITE }}
           name: nvke-os-${{ matrix.arch }}-qcow2-${{ needs.select.outputs.commit }}-${{ github.run_attempt }}
           if-no-files-found: error
           include-hidden-files: true
-          retention-days: 3
           path: .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/outputs/nvke-node-image-${{ matrix.arch }}.qcow2
+
+      - name: Record retained private transfer digests
+        id: nvkr-transfer-index
+        if: always() && needs.select.outputs.commit == github.sha
+        uses: ./.github/nvkr-run/actions/private-transfer
+        with:
+          mode: index
+
+      - name: Report private retention locations
+        if: always() && needs.select.outputs.commit == github.sha && steps.nvkr-transfer-index.outputs.index != ''
+        env:
+          TRANSFER_INDEX: ${{ steps.nvkr-transfer-index.outputs.index }}
+          TRANSFER_PACKAGE: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+        run: |
+          jq -r --arg package "${TRANSFER_PACKAGE}" \
+            '.entries | to_entries[] | "- " + .key + ": " + $package + "@" + .value' \
+            <<<"${TRANSFER_INDEX}" >>"${GITHUB_STEP_SUMMARY}"

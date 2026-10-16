@@ -63,15 +63,11 @@ func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	const jobID = "nvkr-lifecycle-run"
-	_, part, role := githubTestSharedUpload(t, bundle, jobID, "Upload complete qualification handoff")
-	if role != "upload" {
-		t.Fatal("handoff must use the standalone upload role")
-	}
 	for _, test := range []struct{ name, field, old, replacement, reason string }{
 		{"unchanged", "", "", "", ""},
 		{"wrong attempt", "with.name", githubQualificationHandoffName, "nvkr-qualification-latest", "complete handoff for this successful exact attempt"},
-		{"whole workspace", "with.path", githubQualificationHandoffPath, ".nvkr", "unsupported provider-attempt name"},
-		{"failure upload", "if", "${{ success() }}", "${{ always() }}", "must preserve its transport cancellation condition"},
+		{"whole workspace", "with.path", githubQualificationHandoffPath, ".nvkr", "complete handoff for this successful exact attempt"},
+		{"failure upload", "if", "${{ success() }}", "${{ always() }}", "complete handoff for this successful exact attempt"},
 		{"no deadline", "timeout-minutes", "5", "", "complete handoff for this successful exact attempt"},
 		{"missing capture", "run", " --handoff .nvkr/qualification/handoff.json", "", "exact admitted rendering"},
 		{"hidden omission", "with.include-hidden-files", "true", "false", "complete handoff for this successful exact attempt"},
@@ -80,26 +76,7 @@ func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			changed := bundle
-			switch {
-			case strings.HasPrefix(test.field, "with."):
-				changed = mutateGitHubActionParameters(t, bundle, jobID, part, func(values map[string]string) {
-					field := "upload_with_" + strings.ReplaceAll(strings.TrimPrefix(test.field, "with."), "-", "_")
-					old := values[field]
-					if test.field == "with.name" {
-						if values["upload_name_attempt"] != "true" {
-							t.Fatal("fixture handoff name is not attempt-scoped")
-						}
-						old += githubAttemptUploadNameSuffix
-						values["upload_name_attempt"] = "false"
-					}
-					if old != test.old || values[field+"_present"] != "true" {
-						t.Fatalf("handoff parameter %s = %q, want %q", field, old, test.old)
-					}
-					// An altered path with the original attempt name is rejected by
-					// the shared interface before downstream handoff validation.
-					values[field] = test.replacement
-				})
-			case test.field != "":
+			if test.field != "" {
 				changed = mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
 					steps := githubTestYAMLField(t, root, "jobs", jobID, "steps")
 					if test.field == "run" {
@@ -112,7 +89,12 @@ func TestGitHubQualificationHandoffRejectsWeakenedUpload(t *testing.T) {
 						return
 					}
 					step := githubTestYAMLStep(t, steps, "name", "Upload complete qualification handoff")
-					field := githubTestYAMLField(t, step, test.field)
+					// The metadata-only public exception stays directly inspectable
+					// in the workflow, outside the private carrier interfaces.
+					if githubTestYAMLField(t, step, "uses").Value != plan.Actions["upload-artifact"].Uses() {
+						t.Fatal("handoff must use the direct metadata upload action")
+					}
+					field := githubTestYAMLField(t, step, strings.Split(test.field, ".")...)
 					if field.Value != test.old {
 						t.Fatalf("handoff caller field %s = %q, want %q", test.field, field.Value, test.old)
 					}

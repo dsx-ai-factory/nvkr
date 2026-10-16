@@ -11,17 +11,19 @@ Ordinary local source admission uses Git's bounded `ls-files --format` query to 
 an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
 if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
-for `make test-ci-tools`, which runs the CI report parser and all local adapter contract suites using
-only the Python standard library. Go-test adapter wrappers report an explicit skip when Python is
+and Node.js 24 (`node` on `PATH`) for `make test-ci-tools`. That target runs the Python CI report/adapter
+contracts and the dependency-free JavaScript private-transfer contract suite. Generated GitHub transfer
+actions use the runner's Node 24 action runtime. Go-test adapter wrappers report an explicit skip when Python is
 absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
 runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
-On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
+On macOS with Homebrew, install the additional tools with:
 
 ```sh
-brew install jq coreutils python
+brew install jq coreutils python node@24
 ```
 
 The lab discovers `gtimeout` directly on macOS; no `timeout` alias or unprefixed coreutils setup is needed.
+Add the installed Node 24 binary directory to `PATH` if the versioned formula is not linked.
 
 ```sh
 make build
@@ -139,6 +141,15 @@ repository read access to the retained private native toolchain packages. Their 
 is removed before producer execution. Branch code participates in these operations, so run reviewed branches;
 the workflow is not an untrusted-code sandbox. The generator does not provision or attest provider access policy.
 
+Configure the separate private GHCR transfer package and `NVKR_TRANSFER_PACKAGE`, `NVKR_TRANSFER_USER`,
+`NVKR_TRANSFER_WRITE` and `NVKR_TRANSFER_READ` as described in
+[pipeline generation](docs/generate-pipeline.md#configure-private-transfers-before-dispatch). These credentials
+serve generated bootstrap, producer and downstream transport steps, with no production-package grants.
+The transfer package must be private/internal and unlinked, with no public-repository Actions-access grant.
+Before changing repository visibility, audit the existing private toolchain and release access separately:
+GitHub warns that public-repository package grants may expose private packages to forks. The current
+toolchain preparation configuration is not a confidentiality proof for a future public repository.
+
 The development signing policy accepts this repository's `nvkr-dev.yml` branch identities only, using the
 GitHub OIDC issuer. Production consumer policies pinned to `nvkr-run.yml` do not accept those identities.
 A real signed development result is `pipeline-attested` under that development policy, with the same explicit
@@ -168,8 +179,10 @@ repository, workflow, run and attempt without changing logical Build identity or
 Signed development Runs are non-canceling. To retry, dispatch a complete new Run (or rerun **all** jobs).
 Failed-job-only reruns cannot reuse publications from an earlier attempt's disposable namespace. A cancelled
 Run can leave partial publications and may have no final record; cleanup discovers packages independently
-of successful finalization. CI helpers/carriers and final Run records retain seven days; disk diagnostics
-retain one day. After CI transfers expire, start a complete new Run.
+of successful finalization. Helpers, carriers and disk diagnostics use private GHCR with operator-managed
+retention; automatic transfer cleanup is not implemented. Metadata-only final Run records retain seven days
+in Actions. After required transfers are deleted, start a complete new Run. The development
+publication cleanup below does not delete the separate transfer package.
 
 ### Disposable registry cleanup
 
@@ -194,7 +207,7 @@ failure. Its CI artifact retains seven days. A timed-out deletion has an unknown
 within the command. Inspect the next preview before retrying.
 
 The three-output unsigned Environment in `definitions/nvke-v1/environment-github-dev.yaml` remains a
-smaller scratch-generation example. It uses one-day transfers, automatic cancellation and no publication.
+smaller scratch-generation example. It uses the same operator-managed private transfers, automatic cancellation and no publication.
 It does not supply the committed full-development bundle. Hosted execution, credential/pool setup and
 actual registry deletion still need a recorded external Run; local contract tests establish none of those.
 
@@ -216,9 +229,11 @@ exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconcilia
 ## Test timing and cache use
 
 Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached ordinary test events. CI retains the
-event stream for seven days and summarizes slow packages/tests, including failures. Its check
-cache is scoped by platform, exact Go version, dependencies, and commit; a compatible prior check cache is
-restored and an updated cache saved only after successful checks. Other jobs cannot populate that key.
+event stream for seven days and summarizes slow packages/tests, including failures. Hosted Go and lint
+caches are disabled because they can retain compiled payloads accessible through a public repository.
+Local build caches remain available. CodeQL retains analysis results but disables database uploads and
+caches; debug reruns fail before initialization because the pinned action otherwise uploads compiled
+databases automatically. Rerun that check with debug logging disabled.
 
 [CI test performance](docs/ci-test-performance.md) owns the measured Merge Gate follow-up and focused
 profiling commands.

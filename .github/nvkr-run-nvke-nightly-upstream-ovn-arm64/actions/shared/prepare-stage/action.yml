@@ -11,6 +11,18 @@ inputs:
   action:
     description: Stable job selector
     required: true
+  transfer-needs:
+    description: Private GHCR transport binding
+    required: true
+  transfer-read:
+    description: Private GHCR transport binding
+    required: true
+  transfer-registry:
+    description: Private GHCR transport binding
+    required: true
+  transfer-user:
+    description: Private GHCR transport binding
+    required: true
 outputs:
   data:
     description: Plan-derived operation parameters
@@ -22,6 +34,10 @@ runs:
       uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/prepare-runner
       with:
         runner-artifact: ${{ inputs.runner-artifact }}
+        transfer-needs: ${{ inputs.transfer-needs }}
+        transfer-read: ${{ inputs.transfer-read }}
+        transfer-registry: ${{ inputs.transfer-registry }}
+        transfer-user: ${{ inputs.transfer-user }}
     - name: Resolve job parameters from the admitted Plan
       id: describe
       env:

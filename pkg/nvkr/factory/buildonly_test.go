@@ -84,7 +84,8 @@ func buildOnlyPlan(t *testing.T, deliveryRunsOn string) *Plan {
 }
 
 // TestBuildOnlyDeliveryPublishesNothing is the core guarantee of the build-only mode: no publish
-// node in the graph, and no publish/credential/registry surface in the generated pipeline.
+// node in the graph and no release-publishing credential in its operations.
+// Private inter-job transport has a distinct, package-scoped credential.
 func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 	plan := buildOnlyPlan(t, "")
 	for _, n := range plan.Graph.Nodes {
@@ -114,7 +115,7 @@ func TestBuildOnlyDeliveryPublishesNothing(t *testing.T) {
 
 // TestCommittedCanonicalMembersHaveNoTrailingNewline guards every canonical bundle member
 // (Plan and action parameter data) that is decoded with canonical.UnmarshalExact,
-// which rejects a trailing newline. Workflow and action YAML may end with one.
+// which rejects a trailing newline. YAML and JavaScript sources may end with one.
 func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 	plan := buildOnlyPlan(t, "ubuntu-24.04")
 	b, err := RenderGitHub(context.Background(), plan)
@@ -122,7 +123,7 @@ func TestCommittedCanonicalMembersHaveNoTrailingNewline(t *testing.T) {
 		t.Fatal(err)
 	}
 	for path, raw := range b.Files {
-		if strings.HasSuffix(path, ".yml") {
+		if !strings.HasSuffix(path, ".json") {
 			continue
 		}
 		if strings.HasSuffix(string(raw), "\n") {

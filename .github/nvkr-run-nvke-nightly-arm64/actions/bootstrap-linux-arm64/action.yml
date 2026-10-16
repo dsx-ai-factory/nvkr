@@ -11,6 +11,15 @@ inputs:
   runner-artifact:
     description: Same-Run helper artifact name
     required: true
+  transfer-registry:
+    description: Private GHCR transport binding
+    required: true
+  transfer-user:
+    description: Private GHCR transport binding
+    required: true
+  transfer-write:
+    description: Private GHCR transport binding
+    required: true
 runs:
   using: composite
   steps:
@@ -44,9 +53,13 @@ runs:
         ./nvkr-exec run generate --engine github --definition definitions/nvke-nightly-arm64/definition.json --environment definitions/nvke-nightly-arm64/environment-github.json --root . --check
       shell: bash -e {0}
     - name: 'Upload NVKR runner'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/private-transfer
       with:
         name: ${{ inputs.runner-artifact }}
         path: 'nvkr-exec'
         if-no-files-found: error
         retention-days: 7
+        mode: upload
+        registry: ${{ inputs.transfer-registry }}
+        token: ${{ inputs.transfer-write }}
+        username: ${{ inputs.transfer-user }}

@@ -125,6 +125,15 @@ Development and production use separate fixed bundle layouts selected by their E
 compiler and independent ownership manifests. A development bundle is not a release authorization.
 _Avoid_: Release, binary bundle, editable workflow scaffold
 
+**Job-transfer carrier**:
+Generated execution storage that moves an exact helper, tool, source, payload or intermediate layout between
+declared jobs. Hosted carriers use a private/internal GHCR package separate from release publication;
+immutable manifest references and repository/workflow/run/attempt bindings identify each transfer.
+Visibility checks and blob digests establish transport restrictions and integrity, not artifact acceptance,
+provenance authority or qualified execution. Provider ACLs and retention remain operator responsibilities.
+Compatible offline work can share a producer job while preserving each logical node and its evidence checks.
+_Avoid_: Release, public download, signed provenance, authored transport plan
+
 **Catalog maintenance candidate**:
 A review-only lock and regenerated execution-bundle change under explicit source-selection constraints.
 Static checks and optional complete local diagnostic execution precede candidate handoff; neither is release

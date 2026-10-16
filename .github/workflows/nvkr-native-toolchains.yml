@@ -43,7 +43,30 @@ jobs:
             .nvkr/native-toolchains/${{ matrix.arch }}/measurement.json
             .nvkr/native-toolchains/${{ matrix.arch }}/executables.sha256
             .nvkr/native-toolchains/${{ matrix.arch }}/packages.tsv
-            .nvkr/native-toolchains/${{ matrix.arch }}/images.tar.gz
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+      - name: Retain native images privately
+        uses: ./.github/nvkr-run/actions/private-transfer
+        with:
+          mode: upload
+          registry: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+          username: ${{ vars.NVKR_TRANSFER_USER }}
+          token: ${{ secrets.NVKR_TRANSFER_WRITE }}
+          name: native-toolchain-images-${{ matrix.arch }}-${{ github.sha }}
+          path: .nvkr/native-toolchains/${{ matrix.arch }}/images.tar.gz
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Record private image transfer digests
+        id: nvkr-transfer-index
+        uses: ./.github/nvkr-run/actions/private-transfer
+        with:
+          mode: index
+      - name: Report private image locations
+        env:
+          TRANSFER_INDEX: ${{ steps.nvkr-transfer-index.outputs.index }}
+          TRANSFER_PACKAGE: ${{ vars.NVKR_TRANSFER_PACKAGE }}
+        run: |
+          jq -r --arg package "${TRANSFER_PACKAGE}" \
+            '.entries | to_entries[] | "- " + .key + ": " + $package + "@" + .value' \
+            <<<"${TRANSFER_INDEX}" >>"${GITHUB_STEP_SUMMARY}"
