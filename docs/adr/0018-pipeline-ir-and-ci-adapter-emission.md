@@ -149,8 +149,15 @@ copies; private GHCR authentication and payload restoration are unchanged. Missi
 fail closed during restoration and completeness checking. A helper is
 built from the exact checkout with the pinned Go toolchain before private downloads, so bootstrap needs no
 public binary delivery. The source bootstrap owns fresh Go build and module caches beneath the runner's
-temporary directory. A fixed Python 3 supervisor bounds compilation, stops and joins its child before
-removing those caches on success, failure or cancellation, and completes cleanup before private downloads.
+temporary directory. A fixed Python 3 supervisor gives dependency acquisition and compilation one
+900-second deadline. Public module acquisition may retry at most three times, with one- and two-second
+cancellable waits, only when every reported failure is the admitted `proxy.golang.org` module ZIP's
+HTTP/2 `INTERNAL_ERROR` received from its peer. Unknown, malformed, checksum, certificate and other
+download failures stop. The two small dependency manifests are copied into the disposable directory so
+Go cannot normalize the checkout; their exact bytes must remain unchanged. Compilation runs once with
+read-only module metadata and proxy/checksum-database networking disabled. No producer, signing,
+verification or publication operation is retried by this bootstrap policy. The supervisor stops and joins
+each child before retry or cache cleanup, and completes cleanup before private downloads.
 The installed Go toolchain and produced helper remain available; ambient runner caches are not cleanup
 targets. Missing supervisor/toolchain capabilities or failed cleanup fail closed. This remains separate
 from qualified exact-helper-byte verification.

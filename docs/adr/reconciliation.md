@@ -1269,8 +1269,31 @@ validated locator JSON without fetching private GHCR payloads. This establishes 
 for that selection; it does not exercise a rate-limit retry, hosted step credentials or complete aggregate
 release acceptance. Repository build, vet and lint, Linux AMD64/ARM64 compilation, four-bundle
 regeneration/drift, Actionlint, YAML, formatting, license, shell and diff checks passed; the vulnerability
-scan found no vulnerabilities. Generated entry workflows and job counts are unchanged. Hosted acceptance
-of this path is not yet recorded; unit, race and Python suites remain unexecuted at the operator's request.
+scan found no vulnerabilities. Generated entry workflows and job counts are unchanged. Unit, race and
+Python suites remain unexecuted at the operator's request.
+
+[Development Run 38937379327](https://github.com/dsx-ai-factory/nvkr/actions/runs/38937379327), head
+`491341bef3015c7f0ffc41666b14b0cca3834c1c`, attempt 1, subsequently exercised the serial locator path in
+hosted jobs: 507 helper-preparation steps succeeded and 23 output signature verifiers passed. These are
+provider step observations, not an independent audit of every attachment. One
+[verification job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38937379327/job/117101950150)
+failed before locator acquisition when the Go bootstrap's public module ZIP download returned an HTTP/2
+`INTERNAL_ERROR` from its peer. The remaining work was canceled because aggregate completion was no
+longer possible. The Run ended with 488 successful, 90 canceled and two failed jobs out of 580; the second
+failure was the finalizer's expected rejection of the incomplete provider closure. No aggregate acceptance
+follows from this Run.
+
+The bootstrap now separates credential-free public dependency acquisition from a single offline compiler
+invocation. Only the exact observed module-proxy ZIP error permits up to three acquisition attempts, with
+bounded waits and one shared deadline. Disposable copies of the two small dependency manifests prevent
+checkout normalization and must remain exact. Unknown or integrity failures and compiler failures do not
+retry. This does not replay producer, publication or evidence operations. Focused contract source and
+independent review cover the restriction. The exact generated bootstrap completed on macOS with fresh
+disposable Go caches: real dependency acquisition and one compilation succeeded, both manifests stayed
+exact, and the supervisor removed its caches. This did not inject or exercise the retry branch. Vet, lint,
+four-bundle regeneration/drift, Actionlint, YAML, Python syntax, shell, formatting, license and diff checks
+passed; the vulnerability scan found no vulnerabilities. Entry workflows and job counts are unchanged.
+Unit/race/Python suites remain skipped; hosted acceptance of this bootstrap change remains open.
 
 For Run 38867619968, the plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP
 containing one 527-byte canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256
