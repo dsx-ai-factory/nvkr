@@ -44,6 +44,21 @@ jobs:
           go test -race -p=2 ./internal/sourcegit ./internal/ownedcmd ./pkg/nvkr/pipeline ./pkg/nvkr/factory ./cmd/nvkr \
             -run 'Test(ImportLocal|ArtifactDiagnostic|LocalGitRejectsExternal|Reaper|ExecCmdCancellation|CombinedOutputPreservesContextCancellation|OutputCleansDescendants)' \
             -count=3 -v 2>&1 | tee .nvkr/pr138-review-verification/race.log
+      - name: Refuse deliberately late cleanup observation
+        run: |
+          set -euo pipefail
+          awk '/go func\(\) \{/ { print; print "\t\t\t\ttime.Sleep(3 * time.Second)"; next } { print }' \
+            pkg/nvkr/pipeline/artifact_diagnostic_process_unix_test.go > "$RUNNER_TEMP/late-observer.go"
+          printf '{"Replace":{"%s":"%s"}}\n' \
+            "$PWD/pkg/nvkr/pipeline/artifact_diagnostic_process_unix_test.go" "$RUNNER_TEMP/late-observer.go" > "$RUNNER_TEMP/overlay.json"
+          log=.nvkr/pr138-review-verification/late-observer-refusal.log
+          if go test -overlay "$RUNNER_TEMP/overlay.json" ./pkg/nvkr/pipeline \
+            -run '^TestArtifactDiagnosticProcessCleanup/parent-canceled-during-cleanup$' -count=1 > "$log" 2>&1; then
+            echo 'Late observation incorrectly passed' >&2
+            exit 1
+          fi
+          rg 'observed after the diagnostic returned' "$log"
+          rg 'parent was not canceled during cleanup' "$log"
       - name: Retain verification records
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
