@@ -50,8 +50,25 @@ This is scoped candidate pipeline-attested delivery, not a claim of main-only wo
 independent full-payload disk consumption, strict full-disk inspection, organizational toolchain approval
 or completed M1–M4 acceptance.
 
-The renamed toolchain image pins are measured from local image archives. Registry publication,
-read-back, publication admission for these exact bytes and native AMD64 runtime validation remain pending.
+On October 16, 2026, the user extended the internal M2 candidate publication exception to the four
+renamed toolchain subjects below. They were published from the previously measured local archives under
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/`. Exact-digest read-back compared every manifest and
+configuration byte with its archive and downloaded every compressed layer through the registry client's
+digest-verifying reader. Both GHCR packages report `internal` visibility.
+
+| Image | Platform | Published manifest digest | Configuration digest |
+| --- | --- | --- | --- |
+| packer | linux/amd64 | `sha256:2a8d3ca5b447fe9d4694aa6cd977c6353299b336656b23688bc6dc11b8ab98f2` | `sha256:3f4d0b48004189cdde490973ee9daa4c073856adf92d9ce4c7f2ae17f2f64117` |
+| packer | linux/arm64 | `sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2` | `sha256:3499d012b6b54bde744a423dc9e55cd6e18d4a8272f9d5f9933a05f1ee16219b` |
+| inspector | linux/amd64 | `sha256:d330a9f8bc17dad13399b9b56de2434bbf2a4ea8fe5511ee83531f1545de30d5` | `sha256:36aea677046c9453384dd5481e7158eaaf520ba66892f8131679ebed499fea91` |
+| inspector | linux/arm64 | `sha256:0eeef5936cc090b1f89961d03a27688adddd9badd3ef236139e26771380b0119` | `sha256:be8b924b9c62aa871e15a263eb47ca8079e7f38cfaac11aea406e5dc72dc4fb4` |
+
+This establishes registry transport availability with the publishing credential, not a rebuild from the
+current PR head, hosted provenance, native AMD64 runtime validation or completed organizational
+license/security review. The source locks retain their unresolved general approval gates. Both packages
+report no linked repository; pull access with the maintained workflows' repository-scoped `GITHUB_TOKEN`
+remains unverified. Configure the package's Actions access for `dsx-ai-factory/nvkr` and verify a workflow
+pull before relying on these subjects in hosted execution.
 
 Strict disk inspection and reconciliation are deferred hardening outside the approved M3 MVP. Controlled receipt/export/transport
 contracts and retained-disk diagnostics exist, but a successful real native NVKE live-Run full-content join
