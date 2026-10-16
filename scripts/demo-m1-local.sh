@@ -100,6 +100,13 @@ demo_need_command git
 demo_need_command curl
 docker info >/dev/null 2>&1 || demo_die "Docker daemon is not reachable"
 
+# Detect an occupied endpoint before building the CLI. Docker still owns final
+# port admission; an HTTP response here is enough to reject another service.
+running_containers=$(docker container ls --format '{{.Names}}') || demo_die "cannot read running registry containers"
+if ! printf '%s\n' "$running_containers" | grep -Fx -- "$REGISTRY_CONTAINER" >/dev/null &&
+  curl --silent --output /dev/null --connect-timeout 2 --max-time 3 --noproxy '*' "http://$REGISTRY_HOSTPORT/v2/"; then
+  demo_die "registry endpoint $REGISTRY_HOSTPORT is already in use; stop the existing service or select another REGISTRY_HOSTPORT"
+fi
 
 # Pretty-print a small canonical JSON record. python3 is a convenience for reading, never
 # a correctness dependency: without it the raw canonical bytes are shown instead.
