@@ -112,17 +112,26 @@ func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 			}
 		}
 	}()
-	_, _ = fmt.Fprintf(options.Stdout, "Workspace: %s (retained=%t)\n", workspace, options.Keep)
+	_, deliveryErr := fmt.Fprintf(options.Stdout, "Workspace: %s (retained=%t)\n", workspace, options.Keep)
+	defer func() {
+		// Output delivery cannot replace a source or suite failure.
+		if returnErr == nil && deliveryErr != nil {
+			returnErr = e.Wrap(e.CodeBuildFailed, deliveryErr, "writing artifact diagnostic output")
+		}
+	}()
 	staged := filepath.Join(workspace, "nvkectl")
 	copy, err := os.OpenFile(staged, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o555)
 	if err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "staging executable")
 	}
 	hash := sha256.New() // exact blob integrity, not structured identity or authority
-	_, copyErr := io.Copy(io.MultiWriter(copy, hash), artifact)
+	copyErr := copyArtifactDiagnostic(ctx, io.MultiWriter(copy, hash), artifact, e.CodeBuildFailed, "copying staged executable")
 	closeErr := copy.Close()
-	if err := errors.Join(copyErr, closeErr); err != nil {
-		return e.Wrap(e.CodeBuildFailed, err, "copying staged executable")
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeErr != nil {
+		return e.Wrap(e.CodeBuildFailed, closeErr, "closing staged executable")
 	}
 	checksum := hex.EncodeToString(hash.Sum(nil))
 	if err := importSource(ctx, os.Environ(), filepath.Join(workspace, "nvke"), inputs.Repo, inputs.Commit, inputs.TreeHash, options.Stderr); err != nil {
@@ -154,10 +163,10 @@ func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 		return e.Wrap(e.CodeVerifyFailed, err, "reopening staged executable")
 	}
 	hash.Reset()
-	_, hashErr := io.Copy(hash, file)
+	hashErr := copyArtifactDiagnostic(ctx, hash, file, e.CodeVerifyFailed, "hashing staged executable")
 	_ = file.Close()
 	if hashErr != nil {
-		return e.Wrap(e.CodeVerifyFailed, hashErr, "hashing staged executable")
+		return hashErr
 	}
 	if hex.EncodeToString(hash.Sum(nil)) != checksum {
 		return e.New(e.CodeVerifyFailed, "staged artifact bytes changed during testing")
@@ -174,8 +183,20 @@ func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 	if err := os.WriteFile(filepath.Join(workspace, "result.json"), append(raw, '\n'), 0o600); err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "writing diagnostic result")
 	}
-	_, _ = fmt.Fprintln(options.Stdout, string(raw))
-	_, _ = fmt.Fprintf(options.Stdout, "PASS: upstream %s suite; staged artifact checksum unchanged\n", options.Suite)
+	_, jsonErr := fmt.Fprintln(options.Stdout, string(raw))
+	_, passErr := fmt.Fprintf(options.Stdout, "PASS: upstream %s suite; staged artifact checksum unchanged\n", options.Suite)
+	deliveryErr = errors.Join(deliveryErr, jsonErr, passErr)
+	return nil
+}
+
+func copyArtifactDiagnostic(ctx context.Context, destination io.Writer, source io.Reader, failure e.Code, phase string) error {
+	_, err := copyContext(ctx, destination, source)
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "%s canceled", phase)
+	}
+	if err != nil {
+		return e.Wrap(failure, err, "%s", phase)
+	}
 	return nil
 }
 

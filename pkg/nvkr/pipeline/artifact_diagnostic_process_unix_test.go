@@ -81,12 +81,16 @@ func TestArtifactDiagnosticProcessCleanup(t *testing.T) {
 			}
 			err := RunArtifactDiagnostic(ctx, ArtifactDiagnostic{Workspace: workspace, Image: "fixture", Version: "v1", Platform: "linux/amd64", Suite: "contract", Timeout: timeout}, io.Discard, io.Discard)
 			finished := time.Now()
+			parentErrAtReturn := ctx.Err()
 			stopWatch()
 			<-watchDone // Join the observer before reading its timestamp.
 			if entered.IsZero() {
 				t.Fatal("cleanup client entry was not observed")
 			}
-			if test.cancelParent && !errors.Is(ctx.Err(), context.Canceled) {
+			if entered.After(finished) {
+				t.Error("cleanup entry was observed after the diagnostic returned")
+			}
+			if test.cancelParent && !errors.Is(parentErrAtReturn, context.Canceled) {
 				t.Error("parent was not canceled during cleanup")
 			}
 			var coded *e.Error

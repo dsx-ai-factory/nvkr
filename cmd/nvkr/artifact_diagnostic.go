@@ -13,7 +13,8 @@ import (
 
 func cmdArtifactTest() *cli.Command {
 	return &cli.Command{Name: "artifact-test", Hidden: true,
-		Usage: "run matching upstream CLI tests against a supplied executable (unqualified diagnostic)",
+		Usage:       "run matching upstream CLI tests against a supplied executable (Docker-only, unqualified diagnostic)",
+		Description: "Uses Docker regardless of the runtime selected by the Plan Environment.",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "plan"}, &cli.StringFlag{Name: "artifact"},
 			&cli.StringFlag{Name: "output"}, &cli.StringFlag{Name: "suite", Value: "contract"},

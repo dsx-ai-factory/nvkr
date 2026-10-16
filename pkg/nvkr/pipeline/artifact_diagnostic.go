@@ -114,15 +114,21 @@ func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout
 	closeErr := log.Close()
 	// Replay only after child completion: a closed output consumer cannot replace
 	// the process's primary failure or truncate its retained raw log.
+	var replayErr error
 	if raw, openErr := os.Open(log.Name()); openErr == nil {
-		_, _ = io.Copy(stdout, raw)
+		_, replayErr = io.Copy(stdout, raw)
 		_ = raw.Close()
+	} else {
+		replayErr = openErr
 	}
 	if runErr != nil {
 		return runErr
 	}
 	if closeErr != nil {
 		return e.Wrap(e.CodeBuildFailed, closeErr, "closing diagnostic log")
+	}
+	if replayErr != nil {
+		return e.Wrap(e.CodeBuildFailed, replayErr, "replaying diagnostic log")
 	}
 	return nil
 }

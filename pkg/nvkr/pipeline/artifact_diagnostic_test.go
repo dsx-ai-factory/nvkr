@@ -27,6 +27,43 @@ func unexpectedArtifactCleanup(t *testing.T) reaperCleanupCommand {
 	}
 }
 
+type diagnosticClosedWriter struct{}
+
+func (diagnosticClosedWriter) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
+
+func TestArtifactDiagnosticReplayFailurePreservesPrimary(t *testing.T) {
+	primary := errors.New("suite failed")
+	for _, failed := range []bool{false, true} {
+		t.Run(map[bool]string{true: "suite-failed", false: "suite-passed"}[failed], func(t *testing.T) {
+			calls := 0
+			err := runArtifactDiagnostic(t.Context(), ArtifactDiagnostic{Workspace: t.TempDir(), Image: "fixture", Version: "v1", Platform: "linux/amd64", Suite: "contract"}, diagnosticClosedWriter{}, io.Discard,
+				func(opts RunOptions, _ ...string) error {
+					calls++
+					if calls == 1 {
+						return nil
+					}
+					if _, err := io.WriteString(opts.Stdout, "retained events\n"); err != nil {
+						return err
+					}
+					if failed {
+						return primary
+					}
+					return nil
+				}, func(context.Context, time.Duration, string, *heldRuntimeExecutable, []string) error { return nil })
+			if failed {
+				if !errors.Is(err, primary) {
+					t.Fatal("replay replaced suite failure", err)
+				}
+			} else {
+				var coded *e.Error
+				if !errors.Is(err, io.ErrClosedPipe) || !errors.As(err, &coded) || coded.Code != e.CodeBuildFailed {
+					t.Fatal("replay failure was not coded", err)
+				}
+			}
+		})
+	}
+}
+
 func TestArtifactDiagnosticIsolationAndCommands(t *testing.T) {
 	for _, suite := range []string{"contract", "cli"} {
 		t.Run(suite, func(t *testing.T) {

@@ -17,6 +17,7 @@ bin/nvkr run artifact-test \
 ```
 
 Requires the repository-pinned Go version to build NVKR, Git, and Docker.
+This diagnostic uses Docker even when the Plan Environment selects Podman.
 The command calls the Go Plan loader directly; no helper subprocess or local
 NVKE clone is required.
 
@@ -66,7 +67,11 @@ atomic publication; an intervening mount boundary fails without partial output.
 
 Errors use NVKR's coded exit contract; timeouts and cancellation use the timeout
 code, while a failed suite preserves its positive process exit status. A failed
-command never writes a successful result.
+suite never writes a successful result. Output delivery failures also return a
+coded error after otherwise successful execution; with `--keep`, a completed
+passing result may still be retained. Output failures do not replace a failed
+suite's primary status. Executable staging and rehashing observe cancellation at
+copy chunk boundaries; cancellation cannot interrupt an already-blocked kernel I/O.
 
 ## Validation and remaining work
 
