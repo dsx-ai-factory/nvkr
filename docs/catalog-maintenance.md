@@ -139,6 +139,31 @@ pull requests and workflows write. The repository's own `GITHUB_TOKEN` stays rea
 bytes before installing them. Re-render after the catalog's action pins change. The rendered header records the
 flags that reproduce the file.
 
+### Create the publishing GitHub App
+
+An organization owner sets up the App once, before the workflow is installed:
+
+1. [Register a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)
+   owned by the organization, with the webhook inactive and installation limited to this account.
+2. Grant these [repository permissions](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app):
+
+   | Permission | Access | Used to |
+   |---|---|---|
+   | Contents | Read and write | Create the review commit and move or delete the `catalog-maintenance/<definition>` branch. |
+   | Pull requests | Read and write | Open, update and close the pull request. |
+   | Workflows | Read and write | Publish a candidate that regenerates a generated file under `.github/workflows/`. |
+
+3. [Install the App](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app) with
+   **Only select repositories**, choosing this repository.
+4. Copy the App's client ID, [generate a private key](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps),
+   and store both as the [repository secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)
+   named by `--app-secrets`:
+
+   ```sh
+   gh secret set RELEASE_BOT_CLIENT --body '<client-id>'
+   gh secret set RELEASE_BOT_SECRET < '<private-key>.pem'
+   ```
+
 The rendered workflow has the four jobs described under [Scheduled catalog refresh](#scheduled-catalog-refresh):
 `discover`, `refresh`, `select` and `pull-request`. It admits only the repository's default branch and checks out
 the exact triggering commit. Its token has repository-content read permission, and a newer run for the same ref
@@ -164,8 +189,8 @@ If no pin changes exist for a Definition, its validation and description steps a
 `changed` marker so `select` can tell a refreshed no-op from a failure. A changed Definition's patch holds only
 its lock and the generated files of the policy's closure (the production Run and, when named, the development
 Run, the qualification pair and the additional Runs); unrelated files and private source contents are excluded.
-The `pull-request` job alone writes, with a GitHub App installation token it mints for this repository only,
-limited to contents, pull requests and workflows, and revokes when the leg ends. For a changed Definition it
+The `pull-request` job alone writes, with a GitHub App installation token minted for this repository only,
+limited to contents, pull requests and workflows, and revoked when the job ends. For a changed Definition it
 applies the patch to `catalog-maintenance/<definition>` and opens or updates the PR; for an unchanged one it
 closes a stale PR and deletes its branch. The `refresh` job writes the PR body with `jq` from the `catalog
 refresh --json` result, so the body is part of the rendered workflow. Unlike `GITHUB_TOKEN` writes, the App's

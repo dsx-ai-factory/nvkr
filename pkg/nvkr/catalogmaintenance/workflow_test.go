@@ -667,3 +667,28 @@ func TestCommittedPoliciesLoad(t *testing.T) {
 		})
 	}
 }
+
+// The App setup guide lists exactly the permissions the token step requests and the default secrets, so an owner
+// who follows it can mint the token.
+func TestAppSetupGuideListsTheRequestedPermissions(t *testing.T) {
+	guide, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "catalog-maintenance.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, section, _ := strings.Cut(string(guide), "### Create the publishing GitHub App\n")
+	section, _, _ = strings.Cut(section, "\n## ")
+	permissions := AppPermissions()
+	if len(permissions) == 0 || strings.Count(section, "| Read and write |") != len(permissions) {
+		t.Fatalf("the guide must list exactly the %d requested permissions", len(permissions))
+	}
+	for _, permission := range permissions {
+		if !strings.Contains(section, "| "+permission.Name+" | Read and write |") {
+			t.Fatalf("the guide omits the %s permission", permission.Name)
+		}
+	}
+	for _, secret := range []string{DefaultAppClientSecret, DefaultAppKeySecret} {
+		if !strings.Contains(section, "gh secret set "+secret) {
+			t.Fatalf("the guide omits the %s secret", secret)
+		}
+	}
+}

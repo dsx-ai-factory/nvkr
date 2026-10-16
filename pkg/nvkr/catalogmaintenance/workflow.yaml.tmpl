@@ -295,9 +295,9 @@ jobs:
         with:
           client-id: ${{ secrets.[[.AppClientSecret]] }}
           private-key: ${{ secrets.[[.AppKeySecret]] }}
-          permission-contents: write
-          permission-pull-requests: write
-          permission-workflows: write
+[[- range .AppPermissions]]
+          permission-[[.Input]]: write
+[[- end]]
       # GitHub attributes the API commit to the App's bot user, so its DCO sign-off names that user.
       - name: Resolve the App bot identity
         id: bot

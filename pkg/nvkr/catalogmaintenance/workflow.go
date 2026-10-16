@@ -60,6 +60,18 @@ const (
 	DefaultAppKeySecret    = "RELEASE_BOT_SECRET"
 )
 
+// AppPermission is one repository permission the publishing GitHub App must hold with write access.
+type AppPermission struct {
+	// Name is the label GitHub's App settings show; Input is the create-github-app-token input suffix.
+	Name, Input string
+}
+
+// AppPermissions are the repository permissions, all write, that the rendered workflow requests for the App
+// token. The App's registration and installation must grant each one, or GitHub refuses the token.
+func AppPermissions() []AppPermission {
+	return []AppPermission{{"Contents", "contents"}, {"Pull requests", "pull-requests"}, {"Workflows", "workflows"}}
+}
+
 // The App token action is pinned here because it is a maintenance-workflow dependency, not a Run action the
 // catalog supplies.
 const (
@@ -169,6 +181,7 @@ func Workflow(ctx context.Context, options WorkflowOptions, generatorVersion str
 		Actions pipeline.GitHubActionRefs
 		// AppTokenAction and AppTokenVersion are the pinned App token action and its release.
 		AppTokenAction, AppTokenVersion string
+		AppPermissions                  []AppPermission
 		Versions                        map[string]string
 		LinkerFlags                     string
 		// Flags reproduces the options in the generated header; Transport is the private-source Git rewrite.
@@ -178,7 +191,7 @@ func Workflow(ctx context.Context, options WorkflowOptions, generatorVersion str
 		Directories, Files []string
 		// PolicyDirectory and PolicySuffix locate the policy the workflow discovers.
 		PolicyDirectory, PolicySuffix string
-	}{options, actions, appTokenAction, appTokenVersion, versions, linkerFlags, options.flags(), transportFor(options.SourceRepository), directories, files, PolicyDirectory, PolicySuffix}
+	}{options, actions, appTokenAction, appTokenVersion, AppPermissions(), versions, linkerFlags, options.flags(), transportFor(options.SourceRepository), directories, files, PolicyDirectory, PolicySuffix}
 	if err := tmpl.Execute(&out, data); err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "rendering maintenance workflow")
 	}
