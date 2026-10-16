@@ -1211,6 +1211,16 @@ preflight and full admission. No runner permission change is recorded. The
 recovered private artifacts after listing 1,050 attachments, then correctly rejected the incomplete provider
 closure with `NVKR-E-PROVENANCE-MISSING`. Unit contracts remain unexecuted at the operator's request.
 
+The follow-up generator adds a one-minute, credential-free `/dev/kvm` character-device and read/write-open
+check before checkout and downloads in every native disk producer. It avoids restoring inputs to a runner
+that already lacks access; it does not grant access, replace held runtime admission or apply to ARC finalizers.
+Exact generated-step validation rejects changes to its order, command or failure controls. This early
+rejection has not yet been exercised in a hosted generated Run; it does not resolve the runner configuration.
+Repository build/vet and lint, four-bundle regeneration/drift, Actionlint, YAML, format, license, shell and
+diff checks passed. The largest workflow uses 47,431 expanded YAML parsing events, below the maintained
+47,500-event headroom bound. Regression contracts cover ordering, tampering and finalizer exclusion;
+they remain unexecuted at the operator's request.
+
 The plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP containing one 527-byte
 canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256
 `8346896ddd5dba69678d6e0773478a0ecee60bb12bd4d9b32b26dadb90387557`, exact Run/head/attempt and

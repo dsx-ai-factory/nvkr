@@ -257,6 +257,13 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if err := writeGitHubPlatformCheck(&body, plan, node.RunsOn); err != nil {
 			return nil, err
 		}
+		if stage.DiskOutput != "" {
+			check := githubKVMAccessCheck()
+			fmt.Fprintf(&body, "      - name: %s\n        timeout-minutes: %d\n        run: |-\n", check.Name, check.TimeoutMinutes)
+			for _, line := range strings.Split(check.Run, "\n") {
+				fmt.Fprintf(&body, "          %s\n", line)
+			}
+		}
 		actions.writeCheckoutStep(&body)
 		actions.writeDownloadStep(&body, "NVKR runner", "nvkr-exec-"+shortStableName(node.RunsOn), githubHelperDownloadPath(plan))
 		// upload-artifact/download-artifact do not preserve the execute bit, so the helper

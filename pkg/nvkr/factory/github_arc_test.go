@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
 
 func arcTestPlan(t *testing.T, platform string) *Plan {
@@ -90,6 +92,155 @@ func TestARCNativeDiskGeneration(t *testing.T) {
 			if err != nil || !bytes.Equal(bundle.Files[GitHubWorkflowPath], second.Files[GitHubWorkflowPath]) {
 				t.Fatal("non-deterministic generation", err)
 			}
+		})
+	}
+}
+
+func TestARCKVMAccessPrecedesCheckoutAndPrivateTransfers(t *testing.T) {
+	for _, test := range []struct {
+		name, platform       string
+		buildOnly, nativeMap bool
+	}{
+		{name: "publication-amd64", platform: "linux/amd64"},
+		{name: "publication-arm64-native-map", platform: "linux/arm64", nativeMap: true},
+		{name: "build-only-amd64-native-map", platform: "linux/amd64", buildOnly: true, nativeMap: true},
+		{name: "build-only-arm64", platform: "linux/arm64", buildOnly: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var plan *Plan
+			if test.buildOnly {
+				plan = githubDiskBuildPlan(t, test.platform, "luks2")
+			} else {
+				plan = arcTestPlan(t, test.platform)
+			}
+			if test.nativeMap {
+				environment := plan.Environment.Clone()
+				environment.GitHubRunners = map[string]string{
+					"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm",
+				}
+				stack, err := catalog.ApplyStack(plan.CatalogSnapshot)
+				if err != nil {
+					t.Fatal(err)
+				}
+				compiled, err := Compile(t.Context(), plan.Definition, environment, stack, plan.GeneratorVersion)
+				if err != nil {
+					t.Fatal(err)
+				}
+				compiled.DefinitionPath, compiled.EnvironmentPath = plan.DefinitionPath, plan.EnvironmentPath
+				plan = compiled
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateGitHubBundle(t.Context(), plan, bundle); err != nil {
+				t.Fatal(err)
+			}
+			stages, _, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			diskJobs := map[string]bool{}
+			for _, stage := range stages {
+				if stage.DiskOutput != "" {
+					diskJobs[stage.ID] = true
+				}
+			}
+			if len(diskJobs) != 1 {
+				t.Fatalf("expected one native producer group, got %d", len(diskJobs))
+			}
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			want, actions := githubKVMAccessCheck(), testActionRefs(t, plan)
+			for id, job := range document.Jobs {
+				checks, executors := 0, 0
+				for index, step := range job.Steps {
+					if strings.Contains(step.Run, "factory github run-disk ") {
+						executors++
+					}
+					if step.Name != want.Name {
+						continue
+					}
+					checks++
+					first := 0
+					if test.nativeMap {
+						first = 1
+					}
+					if !diskJobs[id] || index != first || !reflect.DeepEqual(step, want) ||
+						index+1 >= len(job.Steps) || job.Steps[index+1].Uses != actions.Checkout {
+						t.Fatalf("job %s did not retain its exact KVM check before checkout and all transfers", id)
+					}
+				}
+				if diskJobs[id] && (checks != 1 || executors != 1) {
+					t.Fatalf("disk job %s requires one early access check and its full later executor", id)
+				}
+				if !diskJobs[id] && checks != 0 {
+					t.Fatalf("non-producer job %s acquired a KVM requirement", id)
+				}
+			}
+			if test.buildOnly && document.Jobs["nvkr-lifecycle-run"].RunsOn != githubARCRunner(test.platform) {
+				t.Fatal("fixture must prove that an ARC finalizer remains independent of KVM access")
+			}
+		})
+	}
+}
+
+func TestARCKVMAccessCheckRejectsTampering(t *testing.T) {
+	plan := arcTestPlan(t, "linux/amd64")
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, _, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobID := ""
+	for _, stage := range stages {
+		if stage.DiskOutput != "" {
+			jobID = stage.ID
+		}
+	}
+	if jobID == "" {
+		t.Fatal("fixture has no native disk producer")
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(*yamlv3.Node, int)
+	}{
+		{"missing", func(steps *yamlv3.Node, index int) {
+			steps.Content = append(steps.Content[:index], steps.Content[index+1:]...)
+		}},
+		{"after checkout", func(steps *yamlv3.Node, index int) {
+			steps.Content[index], steps.Content[index+1] = steps.Content[index+1], steps.Content[index]
+		}},
+		{"bypassed", func(steps *yamlv3.Node, index int) {
+			githubYAMLSet(steps.Content[index], "run", githubYAMLString("true"))
+		}},
+		{"conditional", func(steps *yamlv3.Node, index int) {
+			githubYAMLSet(steps.Content[index], "if", githubYAMLString("${{ false }}"))
+		}},
+		{"ignored failure", func(steps *yamlv3.Node, index int) {
+			githubYAMLSet(steps.Content[index], "continue-on-error", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "true"})
+		}},
+		{"credential environment", func(steps *yamlv3.Node, index int) {
+			githubYAMLSet(steps.Content[index], "env", githubYAMLMap("NVKR_CREDENTIAL", githubYAMLString("${{ github.token }}")))
+		}},
+		{"unbounded", func(steps *yamlv3.Node, index int) {
+			githubYAMLRemove(steps.Content[index], "timeout-minutes")
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changed := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+				steps := githubTestYAMLField(t, root, "jobs", jobID, "steps")
+				for index, step := range steps.Content {
+					if githubYAMLValue(step, "name") == githubKVMAccessCheck().Name {
+						test.mutate(steps, index)
+						return
+					}
+				}
+				t.Fatal("fixture lacks its inline early KVM check")
+			})
+			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
 }

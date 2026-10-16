@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
@@ -12,6 +13,28 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
+
+// Reject a missing or inaccessible device before downloading any disk-stage
+// inputs. This point-in-time access check grants no authority: the helper still
+// admits native capacity and holds an API-validated KVM descriptor before work.
+// Only disk producers need it; a build-only finalizer on ARC does not use KVM.
+func githubKVMAccessCheck() githubStep {
+	return githubStep{
+		Name:           "Check KVM access before transfer",
+		TimeoutMinutes: 1,
+		Run: fmt.Sprintf(`set -eu
+if [ ! -c /dev/kvm ]; then
+  printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+  exit %[1]d
+fi
+if ! (exec 3<>/dev/kvm && exec 3>&-); then
+  printf 'NVKR-E-ENGINE-CAPABILITY: runner requires read/write access to /dev/kvm; configure the ARC device group\n' >&2
+  id >&2 || true
+  stat -c 'uid=%%u gid=%%g mode=%%a' /dev/kvm >&2 || true
+  exit %[1]d
+fi`, e.ExitCode(e.New(e.CodeEngineCapability, "KVM access unavailable"))),
+	}
+}
 
 // The explicit policy trusts these operator-managed, single-job ARC pools.
 // Runtime admission still measures native capacity and holds KVM; a label alone

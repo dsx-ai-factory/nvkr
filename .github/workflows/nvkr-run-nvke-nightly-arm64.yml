@@ -531,6 +531,20 @@ jobs:
       packages: read
     steps:
       - *check-native-linux-arm64
+      - name: Check KVM access before transfer
+        timeout-minutes: 1
+        run: |-
+          set -eu
+          if [ ! -c /dev/kvm ]; then
+            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+            exit 29
+          fi
+          if ! (exec 3<>/dev/kvm && exec 3>&-); then
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner requires read/write access to /dev/kvm; configure the ARC device group\n' >&2
+            id >&2 || true
+            stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
+            exit 29
+          fi
       - *checkout-workflow-source
       - name: Prepare NVKR runner and job parameters
         id: nvkr-context

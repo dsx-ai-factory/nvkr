@@ -131,6 +131,17 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err != nil {
 		return err
 	}
+	for _, stage := range stages {
+		if stage.DiskOutput == "" {
+			continue
+		}
+		job := document.Jobs[stage.ID]
+		if len(job.Steps) == 0 || !reflect.DeepEqual(job.Steps[0], githubKVMAccessCheck()) {
+			return e.New(e.CodeEngineCapability, "GitHub disk job %q must check KVM access before checkout or input transport", stage.ID)
+		}
+		job.Steps = job.Steps[1:]
+		document.Jobs[stage.ID] = job
+	}
 	if err := validateGitHubCarrierUploads(plan, document, stages, artifacts, nodeJobs, actions); err != nil {
 		return err
 	}

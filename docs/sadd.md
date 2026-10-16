@@ -566,7 +566,9 @@ recomputes selected values from the admitted Plan; templates contain fixed comma
 with no executable script inputs. Controlled transport
 wrappers contain one upload/download and retain their
 provider controls on the caller. Native preflight and checkout stay explicit in each execution job;
-operator setup, timed producers and steps with referenced outcomes/outputs remain inline in the entry workflow.
+disk producers also reject missing or inaccessible KVM devices before checkout or input transfer, while
+retaining full helper-owned capacity and KVM API admission before work.
+Operator setup, timed producers and steps with referenced outcomes/outputs remain inline in the entry workflow.
 This includes finalization and the final Run upload used by the
 closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only

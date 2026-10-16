@@ -288,6 +288,11 @@ but mismatched record, and pulls only after a failed local lookup. Image/platfor
 admission remains required. No registry credential is forwarded into producer containers.
 The package owner must grant the workflow repository Actions read access separately.
 
+Each generated native disk producer first performs a bounded, credential-free character-device and
+read/write-open check of `/dev/kvm`, before checkout, helper downloads or input restoration. Missing or
+inaccessible devices fail with `engine-capability`; the check never changes device permissions or runner
+identity. It is only early rejection, not a retained capability or authorization. ARC finalizers do not use
+KVM and do not run this check.
 Before toolchain preparation or producer work the helper binds the native host and observes cgroup-capped
 CPU/memory, held-workspace capacity and KVM through the existing single-use VM admission. It repeats admission
 inside the producer deadline, uses the same guarded Docker device projection, and closes/joins all held owners.

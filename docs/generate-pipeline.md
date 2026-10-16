@@ -143,6 +143,11 @@ signing, publication and remote verification keep separate jobs and permissions.
 inside their producing job are not packed or uploaded unless finalization needs them. This avoids shipping
 an intermediate disk package as well as its prepared publication layout.
 
+Native disk producers check that `/dev/kvm` is a character device they can open read/write before checkout
+or helper/input downloads. An unusable runner therefore rejects the job before transferring its inputs. This check
+does not change device permissions; full native capacity and KVM API admission still occurs in the helper.
+Finalizers placed on ARC for disk retention do not use KVM and omit this check.
+
 The per-output pipeline gives each remaining payload transfer a specific purpose:
 
 | Handoff | Bytes moved | Purpose |
