@@ -10,6 +10,9 @@ DEMO_TEST_BIN ?= bin/nvke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
+# Bound each package explicitly; the hosted factory suite can exceed Go's
+# implicit 10-minute default while still executing its ordinary contracts.
+GO_TEST_TIMEOUT ?= 20m
 # Dispatch is explicit about the repository: a checkout may have a fork and upstream.
 PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
@@ -101,7 +104,7 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
-	go test $(GO_TEST_FLAGS) $(PKG)
+	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
