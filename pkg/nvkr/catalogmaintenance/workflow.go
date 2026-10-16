@@ -60,6 +60,13 @@ const (
 	DefaultAppKeySecret    = "RELEASE_BOT_SECRET"
 )
 
+// The App token action is pinned here because it is a maintenance-workflow dependency, not a Run action the
+// catalog supplies.
+const (
+	appTokenAction  = "actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510"
+	appTokenVersion = "v3.3.0"
+)
+
 // WorkflowOptions are the only settings a policy file cannot supply, because
 // they belong to the whole workflow rather than to one Definition.
 type WorkflowOptions struct {
@@ -159,9 +166,11 @@ func Workflow(ctx context.Context, options WorkflowOptions, generatorVersion str
 	var out bytes.Buffer
 	data := struct {
 		WorkflowOptions
-		Actions     pipeline.GitHubActionRefs
-		Versions    map[string]string
-		LinkerFlags string
+		Actions pipeline.GitHubActionRefs
+		// AppTokenAction and AppTokenVersion are the pinned App token action and its release.
+		AppTokenAction, AppTokenVersion string
+		Versions                        map[string]string
+		LinkerFlags                     string
 		// Flags reproduces the options in the generated header; Transport is the private-source Git rewrite.
 		Flags     string
 		Transport sourceTransport
@@ -169,7 +178,7 @@ func Workflow(ctx context.Context, options WorkflowOptions, generatorVersion str
 		Directories, Files []string
 		// PolicyDirectory and PolicySuffix locate the policy the workflow discovers.
 		PolicyDirectory, PolicySuffix string
-	}{options, actions, versions, linkerFlags, options.flags(), transportFor(options.SourceRepository), directories, files, PolicyDirectory, PolicySuffix}
+	}{options, actions, appTokenAction, appTokenVersion, versions, linkerFlags, options.flags(), transportFor(options.SourceRepository), directories, files, PolicyDirectory, PolicySuffix}
 	if err := tmpl.Execute(&out, data); err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "rendering maintenance workflow")
 	}

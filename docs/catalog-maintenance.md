@@ -256,11 +256,10 @@ constraints. It cannot widen them.
   request is neither updated nor closed. The `pull-request` job runs once per listed Definition and is skipped
   only when no refresh succeeded or `select` itself failed.
 - **`pull-request` (one leg per listed Definition).** The only job that writes. Its `GITHUB_TOKEN` stays
-  `contents: read`, like every other job's. A step signs an RS256 App JWT with the private key, looks up the App
-  and this repository's installation, and mints an installation token limited to this repository with contents,
-  pull requests and workflows write; it also derives the App's bot user for the DCO sign-off. The JWT and the
-  token are masked and reach `curl` and `gh` only through header files and `GH_TOKEN`, never as process
-  arguments; a final step revokes the token whatever the leg's outcome. The job runs no repository or producer
+  `contents: read`, like every other job's. The SHA-pinned `actions/create-github-app-token` action mints an
+  installation token limited to this repository with contents, pull requests and workflows write, and revokes it
+  when the job ends, whatever the leg's outcome. A following step derives the App's bot user for the DCO
+  sign-off. The token reaches `gh` only through `GH_TOKEN`, never as a process argument. The job runs no repository or producer
   code, and it first refuses a Definition name outside `[a-z0-9-]`. For a changed Definition it admits only the
   lock named by the base checkout's policy and the exact generated closure that policy names (the production Run
   directory and workflow, plus the development Run and qualification pair when configured), only as regular
@@ -314,14 +313,13 @@ constraints. It cannot widen them.
   the generated Run files through that merge. The workflow fails closed on its own inputs, not on these settings.
 
 The renderer's tests parse the rendered workflow and assert its job graph and gates (`if` and `needs` per job),
-a read-only `GITHUB_TOKEN` in every job, the App secrets reaching only the token step's environment and the App
-token only the publish, cleanup and revoke steps, the source secret reaching exactly one credential-free
+a read-only `GITHUB_TOKEN` in every job, the App secrets reaching only the token action's inputs and the App
+token only the bot identity, publish and cleanup steps, the source secret reaching exactly one credential-free
 checkout step with no other secret in any `env` or script, `persist-credentials: false` and the triggering
 commit on every default-branch checkout, the exact private-source Git rewrite, the generated header and
 SHA-pinned actions. They also run the rendered `discover`, `select`, Definition-name, patch-admission,
-description, App token, revoke, publication and cleanup steps against fixtures: a real RSA key whose JWT
-signature and claims are verified, the requested repository and permissions, lookup failures at every App call,
-a slug or bot id that could reach the step outputs, zero, one and several downloaded artifacts, unexpected
+description, bot identity, publication and cleanup steps against fixtures: a failed bot user lookup, a slug or
+bot id that could reach the step outputs, zero, one and several downloaded artifacts, unexpected
 files, executable files and symlinks, a table of paths the allowlist must reject, a real `Refresh` result with
 hostile values (backticks, pipes, newlines, bidirectional, zero-width, control and other non-ASCII characters, a
 missing plan digest, no change), a new, a stale, a current and a human-closed branch and PR, and failing lookups

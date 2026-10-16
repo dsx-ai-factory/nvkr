@@ -291,53 +291,34 @@ jobs:
             esac
           done < <(git diff --cached --raw --no-renames)
       # Mint the App installation token that publishes or cleans up, limited to this repository and to contents,
-      # pull requests and workflows. The JWT is signed locally; neither it nor the token reaches a command argument.
+      # pull requests and workflows. The action revokes it when the job ends, whatever its outcome.
       - name: Create the App token
         id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_CLIENT }}
+          private-key: ${{ secrets.RELEASE_BOT_SECRET }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+      # GitHub attributes the API commit to the App's bot user, so its DCO sign-off names that user.
+      - name: Resolve the App bot identity
+        id: bot
         env:
-          APP_CLIENT_ID: ${{ secrets.RELEASE_BOT_CLIENT }}
-          APP_PRIVATE_KEY: ${{ secrets.RELEASE_BOT_SECRET }}
-          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
           set -euo pipefail
-          if [ -z "$APP_CLIENT_ID" ] || [ -z "$APP_PRIVATE_KEY" ]; then
-            echo "the GitHub App client ID or private key secret is empty" >&2
-            exit 1
-          fi
-          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
-          now=$(date +%s)
-          header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64url)
-          payload=$(jq -cn --arg iss "$APP_CLIENT_ID" --argjson now "$now" '{iat: ($now - 60), exp: ($now + 540), iss: $iss}' | b64url)
-          signature=$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -binary -sign <(printf '%s\n' "$APP_PRIVATE_KEY") | b64url)
-          jwt="${header}.${payload}.${signature}"
-          echo "::add-mask::${jwt}"
-          # Only the signed JWT is needed from here on, so later commands do not inherit the private key.
-          unset APP_PRIVATE_KEY
-          # The credential is a function argument, which never reaches a process argument list.
-          api() {
-            local credential=$1
-            shift
-            curl --fail-with-body --silent --show-error --proto '=https' --max-time 30 -H 'Accept: application/vnd.github+json' \
-              -H 'X-GitHub-Api-Version: 2022-11-28' -H @<(printf 'Authorization: Bearer %s\n' "$credential") "$@"
-          }
-          slug=$(api "$jwt" "${GITHUB_API_URL}/app" | jq -er '.slug')
-          installation=$(api "$jwt" "${GITHUB_API_URL}/repos/${GH_REPO}/installation" | jq -er '.id')
-          token=$(jq -cn --arg repo "${GH_REPO#*/}" '{repositories: [$repo], permissions: {contents: "write", pull_requests: "write", workflows: "write"}}' |
-            api "$jwt" --request POST --data @- "${GITHUB_API_URL}/app/installations/${installation}/access_tokens" | jq -er '.token')
-          echo "::add-mask::${token}"
-          # Hand the token to the revoke step before anything else can fail, so a minted token is always revoked.
-          echo "token=${token}" >> "$GITHUB_OUTPUT"
-          # GitHub attributes the API commit to the App's bot user, so its DCO sign-off names that user.
-          case "$slug" in
+          case "$APP_SLUG" in
             '' | -* | *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) echo "unsupported App slug" >&2; exit 1 ;;
           esac
-          id=$(api "$token" "${GITHUB_API_URL}/users/${slug}%5Bbot%5D" | jq -er '.id')
+          id=$(gh api "users/${APP_SLUG}%5Bbot%5D" --jq .id)
           case "$id" in
             '' | *[!0123456789]*) echo "unsupported App bot user id" >&2; exit 1 ;;
           esac
           {
-            echo "bot-name=${slug}[bot]"
-            echo "bot-email=${id}+${slug}[bot]@users.noreply.github.com"
+            echo "name=${APP_SLUG}[bot]"
+            echo "email=${id}+${APP_SLUG}[bot]@users.noreply.github.com"
           } >> "$GITHUB_OUTPUT"
       # Create the review commit through the GitHub API, so GitHub signs it, and move the Definition's branch to it. Then
       # open its pull request, or update the one that is open. A branch that already holds this candidate on this base
@@ -347,8 +328,8 @@ jobs:
         env:
           DEFINITION: ${{ matrix.leg.definition }}
           GH_TOKEN: ${{ steps.app.outputs.token }}
-          BOT_NAME: ${{ steps.app.outputs.bot-name }}
-          BOT_EMAIL: ${{ steps.app.outputs.bot-email }}
+          BOT_NAME: ${{ steps.bot.outputs.name }}
+          BOT_EMAIL: ${{ steps.bot.outputs.email }}
           GH_REPO: ${{ github.repository }}
           BASE_BRANCH: ${{ github.event.repository.default_branch }}
           BASE_SHA: ${{ github.sha }}
@@ -440,12 +421,3 @@ jobs:
           if [ "$held" != 0 ]; then
             gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${branch}"
           fi
-      # Revoke the installation token as soon as the leg ends, whatever its outcome.
-      - name: Revoke the App token
-        if: ${{ always() && steps.app.outputs.token != '' }}
-        env:
-          TOKEN: ${{ steps.app.outputs.token }}
-        run: |
-          set -euo pipefail
-          curl --fail-with-body --silent --show-error --proto '=https' --max-time 30 --request DELETE -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' -H @<(printf 'Authorization: Bearer %s\n' "$TOKEN") "${GITHUB_API_URL}/installation/token"
