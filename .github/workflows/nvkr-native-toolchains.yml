@@ -159,6 +159,7 @@ jobs:
             --pull=never --platform "linux/$NATIVE_ARCH" --network none
             --read-only --cap-drop ALL --security-opt no-new-privileges
             --user 65534:65534 --env HOME=/nvkr/work/home
+            --env TMPDIR=/nvkr/work
             --env CHECKPOINT_DISABLE=1
             --tmpfs '/nvkr/work:rw,nosuid,nodev,size=16777216,mode=1777')
           "${run[@]}" --entrypoint /bin/sh "$PACKER_IMAGE" -ec '
