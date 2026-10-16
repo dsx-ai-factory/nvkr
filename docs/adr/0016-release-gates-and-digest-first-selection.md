@@ -307,10 +307,28 @@ in ADR-01 before use. Signing and attachment use the admitted
 signing machinery. All-verdicts-before-signing is a preflight guarantee, not a transaction across registry
 attachments: an operational failure marks the invocation unsuccessful and blocks release even when earlier
 attachments remain. The release consumer must authenticate complete successful qualification publication;
-presence of one attachment cannot prove success for the set. M4's release manifest remains a separate deferred
-consumer and grants no qualified-lane clearance. Its acceptance tests must reject an earlier output's surviving
-attachment when a later attachment fails or the qualification invocation is canceled, even if the surviving
-predicate records a complete passing preflight set.
+presence of one attachment cannot prove success for the set.
+
+The M4 release manifest is that consumer and grants no qualified-lane clearance. Issuance runs in the
+qualification process while it holds the live artifact-check receipt; decoded evidence, a publisher's
+`Successful` field or a caller-supplied digest cannot substitute for it. The receipt also exposes, for each
+output, the source lane and exact predicate digest of its already verified production provenance. The issuer
+takes the exact canonical qualification evidence bytes and an independently selected policy naming the exact
+qualification certificate identity and qualification-policy digest; the evidence cannot name its own trusted
+signer. Before constructing a signer it requires the strict v2 evidence to validate with every verdict
+passing, to describe exactly the receipt's artifact checks, and to carry the selected identity and policy.
+It then authenticates those exact evidence bytes on every member subject under that identity and the GitHub
+issuer. A missing, failed, incomplete, wrong-signer or mismatched member refuses issuance, so an earlier
+output's surviving attachment cannot stand in for a later failed or canceled one. Only then does it attest the
+canonical manifest (ADR-01) to the publication root under the qualification identity and verify the exact
+attached bytes again. The receipt is rechecked and cancellation is observed between every step. Issuance uses
+M2's existing bytes and never rebuilds, repacks or relabels a member.
+
+An opaque manifest receipt is returned only after that verification; decoding a manifest cannot restore it.
+Attestation and verification are not atomic: an operational failure may leave a manifest attachment and is
+reported as a failed issuance. The release tag rule, tag creation, publisher exclusion, consumer manifest
+verification and interruption handling belong to the separate M4 publication step; a manifest attachment alone
+does not establish a release.
 
 Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated
 verify-only dispatch and incremental reuse are deferred hardening. External qualification suites such as

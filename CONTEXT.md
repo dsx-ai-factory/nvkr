@@ -228,6 +228,14 @@ External suites outside the MVP are reported as not evaluated, never passed; a r
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
 
+**Release manifest**:
+The pipeline-attested document naming one Run's complete qualified artifact set: the Definition and exact
+inputs, originating Run, each member's exact digest, source lane and verified build provenance, and the exact
+qualification evidence. It is issued only after that evidence is authenticated on every member under the
+independently selected qualification identity, and is attested to the publication root under that identity.
+A manifest attachment alone is not a published release; tags, channels and revocation are separate.
+_Avoid_: Release clearance, ReleaseSet, qualified release, tag
+
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
 _Avoid_: List of successful outputs, component catalog

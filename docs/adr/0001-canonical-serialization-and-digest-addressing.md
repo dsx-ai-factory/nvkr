@@ -194,9 +194,27 @@ verified certificate, then validates complete, disjoint member coverage. Generat
 unsigned report fields never restore a smoke receipt. These registrations state the wire contracts;
 reconciliation separately records runtime, worker authentication and hosted acceptance implementation.
 
-The M4 release-manifest document remains deferred and requires its own registered canonical schema and
-domain-separated identity before implementation. Pretty-printed JSON hashes are insufficient for either
-document. Reconciliation records implementation and external acceptance independently of schema registration.
+M4 release issuance (ADR-16 §5) registers the following distinct schema and family. It is
+pipeline-attested release membership; it does not reuse the reserved clearance, publication or
+publication-manifest families.
+
+| Object | Canonical schema | Frozen family kind | Attestation predicate type |
+|---|---|---|---|
+| Release manifest | `nvkr.dev/release-manifest/v1` | `nvkr.release-manifest` | `https://nvkr.dev/release-manifest/v1` |
+
+The manifest states the `pipeline-attested` lane and binds the immutable publication root it is attached to;
+the originating repository, Run, attempt, commit, workflow/ref and build invocation; the Definition,
+Environment, Plan, catalog, content-subject and release Verification Policy identities; and the separately
+authenticated qualification invocation, gate version, qualification-policy digest and the
+`nvkr.qualification-evidence` digest of the exact evidence attached to every member. Each member carries its
+name, kind, digest-pinned reference and digest, Build Digest, native platform, sorted producer subjects, source
+lane (`hermetic-build`, `wrapped-build` or `acquired`, read from its verified production provenance build type)
+and the exact-blob SHA-256 of that verified production predicate. An aggregate image member names its index;
+the bound qualification evidence enumerates its native children. Disk members state producer-only scope.
+Members are sorted by name and unique. Unknown fields, versions, lanes or kinds, noncanonical bytes, missing
+identities and inexact bindings fail closed. The canonical document is bounded by the qualification signing
+transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
+implementation and external acceptance independently of schema registration.
 
 ## Consequences
 
