@@ -284,7 +284,7 @@ func TestGitHubDiskBuildOnlyPrivateImageBoundary(t *testing.T) {
 		want   bool
 	}{
 		{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true},
-		{"ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true},
+		{"ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false},
 		{"ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/other/packer", false},
 		{"ghcr.io/other/nke-recipes/m2-candidate/toolchains/packer", false},
 	} {

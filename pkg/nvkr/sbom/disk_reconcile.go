@@ -136,8 +136,7 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 type diskPackageKey struct{ name, version, format, architecture string }
 
 const (
-	// New helpers and documents use NVKR. The bound runtime-report decoder
-	// projects the four exact legacy keys for existing pinned inspector images.
+	// Property names emitted and consumed by the NVKR inspection report.
 	diskContentClassProperty        = "nvkr:diskContentClass"
 	diskPackageFormatProperty       = "nvkr:packageFormat"
 	diskPackageArchitectureProperty = "nvkr:packageArchitecture"

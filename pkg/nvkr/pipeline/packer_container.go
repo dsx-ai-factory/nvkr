@@ -29,23 +29,9 @@ const (
 	packerContainerOutputPath   = packerContainerWorkRoot + "/output"
 	packerContainerBuildLogPath = packerContainerWorkRoot + "/build-logs"
 	packerContainerHTTPPath     = packerContainerWorkRoot + "/http-data"
-	packerContainerPluginPath   = "/nvkr/toolchain/packer/plugins"
-	packerContainerPATH         = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-	// The two fixed layouts are inside the already-admitted immutable image.
-	// Arguments remain positional; no caller text is evaluated as shell code.
-	// Warn on build so version/validation retain their exact clean-output gates.
-	packerPluginEntrypoint = `if [ -d /nvkr/toolchain/packer/plugins ]; then
-  export PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins
-elif [ -d /nkd/toolchain/packer/plugins ]; then
-  export PACKER_PLUGIN_PATH=/nkd/toolchain/packer/plugins
-  if [ "${2-}" = build ]; then
-    printf '%s\n' 'Warning: deprecated Packer plugin layout; rebuild and measure the NVKR Packer image before updating its pin.' >&2 || :
-  fi
-else
-  printf '%s\n' 'NVKR Packer plugin directory is missing' >&2
-  exit 2
-fi
-exec "$@"`
+	// In-image ABI of the digest-pinned closure, not a caller namespace alias.
+	packerContainerPluginPath = "/nvkr/toolchain/packer/plugins"
+	packerContainerPATH       = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	// Open the transported tar once, authenticate that held inode, then extract
 	// the same inode. The fixed script is part of NVKR's runtime contract; only
 	// the canonical expected digest and fixed container path are arguments.
@@ -239,12 +225,6 @@ func packerContainerCreateArgs(runtimeName string, request packerContainerCreate
 		entrypoint = "packer"
 	}
 	commandArgs := request.packerArgs
-	if entrypoint == "packer" {
-		// Prefer the renamed layout. Existing immutable images keep their original
-		// plugin directory; never retry a failed Packer command under another ABI.
-		commandArgs = append([]string{"-ec", packerPluginEntrypoint, "nvkr-packer", entrypoint}, commandArgs...)
-		entrypoint = "sh"
-	}
 	if request.kvmProjection != nil {
 		commandArgs = append([]string{"-ec", packerKVMProjectionScript, "nvkr-kvm-projection",
 			request.kvmProjection.bootID, request.kvmProjection.deviceNumber, "/dev/kvm", entrypoint}, commandArgs...)

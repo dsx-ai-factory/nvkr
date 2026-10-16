@@ -6,7 +6,6 @@ package nvkedemo
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,18 +18,8 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
-	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
-
-const legacyNetworkRecoveryRevision = "3b24beb5cb04df352e74a8d5405bd593871412b5"
-const legacyNetworkRecoveryHelper = "scripts/nke-local-demo.py"
-
-func legacyNetworkRecoveryError() error {
-	return nvkrerr.New(nvkrerr.CodePreflightFailed,
-		"legacy network journal version 1 is not supported by Go recovery; restore with %s at commit %s before upgrading; no legacy recovery was attempted",
-		legacyNetworkRecoveryHelper, legacyNetworkRecoveryRevision)
-}
 
 func readNetworkState(work string) (networkState, error) {
 	var state networkState
@@ -53,21 +42,6 @@ func readNetworkState(work string) (networkState, error) {
 	if len(raw) > 65536 {
 		return state, fmt.Errorf("recovery journal exceeds bound")
 	}
-	// The old Python schema used different field shapes. Inspect only its version
-	// for an actionable refusal; no legacy state is adopted or executed. Existing
-	// JSON validation rejects duplicate names and trailing/invalid documents.
-	if err = canonical.ValidateJSONDocument(raw); err != nil {
-		return state, err
-	}
-	var header struct {
-		Version int `json:"version"`
-	}
-	if err = json.Unmarshal(raw, &header); err != nil {
-		return state, err
-	}
-	if header.Version == 1 {
-		return state, legacyNetworkRecoveryError()
-	}
 	if err = canonical.UnmarshalExact(raw, &state); err != nil {
 		return state, err
 	}
@@ -79,19 +53,12 @@ func readNetworkState(work string) (networkState, error) {
 
 func validNetworkID(id networkFileID) bool { return id.Inode > 0 && id.Mode <= 0o7777 }
 func validateNetworkState(s networkState, work string) error {
-	if s.Version == 1 {
-		return legacyNetworkRecoveryError()
-	}
-	if (s.Version != 2 && s.Version != 3) || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
+	if s.Version != 3 || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
 		return fmt.Errorf("recovery journal version/work/owner differs")
 	}
-	ownerPrefix, stagingPrefix := "nvke-demo-", ".nvke-policy-"
-	if s.Version == 2 {
-		ownerPrefix, stagingPrefix = "nkd-demo-", ".nkd-policy-"
-	}
-	owner := strings.TrimPrefix(s.Owner, ownerPrefix)
+	owner := strings.TrimPrefix(s.Owner, "nvke-demo-")
 	raw, err := hex.DecodeString(owner)
-	if err != nil || len(raw) != 16 || s.Owner != ownerPrefix+hex.EncodeToString(raw) {
+	if err != nil || len(raw) != 16 || s.Owner != "nvke-demo-"+hex.EncodeToString(raw) {
 		return fmt.Errorf("invalid firewall owner")
 	}
 	boot := strings.Split(s.Boot, "-")
@@ -128,7 +95,7 @@ func validateNetworkState(s networkState, work string) error {
 		return fmt.Errorf("unsupported bridge policy identity")
 	}
 	if s.Staging != nil {
-		if s.Staging.Path != filepath.Join(filepath.Dir(qemuPolicy), stagingPrefix+owner) {
+		if s.Staging.Path != filepath.Join(filepath.Dir(qemuPolicy), ".nvke-policy-"+owner) {
 			return fmt.Errorf("unsupported root staging path")
 		}
 		if id := s.Staging.Binding; id != nil && (!validNetworkID(*id) || id.Mode != 0o600 || id.UID != 0 || id.GID != 0) {
@@ -208,9 +175,8 @@ func validateNetworkState(s networkState, work string) error {
 }
 
 // RecoverNetworkGuard authenticates only the original operator recovery journal.
-// It never signals serialized PIDs or resumes builds. Versions 2 and 3 retain their exact
-// original host namespaces; former Python version1 journals must be restored by their original
-// implementation before migration, never silently adopted.
+// It never signals serialized PIDs or resumes builds. Only version-3 journals
+// are supported.
 func RecoverNetworkGuard(ctx context.Context, runner Runner) (*NetworkGuard, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
@@ -232,10 +198,7 @@ func RecoverNetworkGuard(ctx context.Context, runner Runner) (*NetworkGuard, err
 		_ = directory.Close()
 		return nil, err
 	}
-	if s.Version == 2 && runner.Progress != nil {
-		_, _ = fmt.Fprintln(runner.Progress, "Warning: network journal version 2 is deprecated; restore its controls before starting a new version-3 session. Do not edit the journal version.")
-	}
-	g := &NetworkGuard{version: s.Version, Work: work, Owner: s.Owner, BridgeMAC: s.BridgeMAC, BridgeID: s.BridgeID, KindCIDR: s.KindCIDR, BridgeIntent: s.BridgeIntent, BGPIntent: s.BGPIntent, runner: runner, directory: directory, boot: s.Boot, pid: s.PID, helperID: s.HelperID, helperHash: s.HelperHash, helperGranted: s.HelperGranted, policyID: s.PolicyID, staging: s.Staging, sysctls: s.Sysctls, sysctlIntents: s.SysctlIntents, rules: s.Rules, caps: s.Caps, finished: s.Finished, helperPath: qemuHelper, policyPath: qemuPolicy, cleaning: true, journal: true}
+	g := &NetworkGuard{Work: work, Owner: s.Owner, BridgeMAC: s.BridgeMAC, BridgeID: s.BridgeID, KindCIDR: s.KindCIDR, BridgeIntent: s.BridgeIntent, BGPIntent: s.BGPIntent, runner: runner, directory: directory, boot: s.Boot, pid: s.PID, helperID: s.HelperID, helperHash: s.HelperHash, helperGranted: s.HelperGranted, policyID: s.PolicyID, staging: s.Staging, sysctls: s.Sysctls, sysctlIntents: s.SysctlIntents, rules: s.Rules, caps: s.Caps, finished: s.Finished, helperPath: qemuHelper, policyPath: qemuPolicy, cleaning: true, journal: true}
 	g.kindGateway = s.KindGateway
 	if err = g.acquireLock(); err != nil {
 		g.releaseHandles()

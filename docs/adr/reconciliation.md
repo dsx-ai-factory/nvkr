@@ -50,6 +50,9 @@ This is scoped candidate pipeline-attested delivery, not a claim of main-only wo
 independent full-payload disk consumption, strict full-disk inspection, organizational toolchain approval
 or completed M1–M4 acceptance.
 
+The renamed toolchain image pins are measured from local image archives. Registry publication,
+read-back, publication admission for these exact bytes and native AMD64 runtime validation remain pending.
+
 Strict disk inspection and reconciliation are deferred hardening outside the approved M3 MVP. Controlled receipt/export/transport
 contracts and retained-disk diagnostics exist, but a successful real native NVKE live-Run full-content join
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
@@ -858,7 +861,7 @@ TCP/UDP 53 and UDP 67 collision rows additionally require native ARM64 root.
 Ordinary hosted tests do not establish those privileged socket observations.
 These tests do not prove real SIGINT during
 NVKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
-at every build/deployment phase. Network-only recovery uses version-2 or version-3 journals
+at every build/deployment phase. Network-only recovery uses version-3 journals
 and never kills serialized PIDs; restore legacy live controls before upgrading.
 A full tenant crash/restart and recovery matrix remains unverified.
 
@@ -1229,51 +1232,6 @@ PR #97 branch. Removing an authored exception neither changes those provider pol
 The existing provider secret is `NKE_SOURCE_TOKEN`; the rename retains that exact
 credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Package Actions read access, native pool capacity and successful exact-head
 execution remain external acceptance requirements.
-
-## Framework and product naming cutover
-
-The NVKR namespace migration renames authored inputs, Go packages, public commands,
-schema/media types and structured identity families. These contracts do not convert
-historical signed bytes or imply external deployment acceptance. Generated records
-must be regenerated from the renamed authored inputs.
-
-The current hosted path retains the existing provider-owned `nkd-arc` and
-`nkd-release` protected environments and `NKE_SOURCE_TOKEN`. CODEOWNERS uses the
-provider-renamed `nvke-write` team with verified NVKR repository write access;
-the old `nke-write` slug no longer exists. Published Packer/inspector subjects
-stay at their exact
-`ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/` addresses with the
-existing digests. New source builds use NVKR toolchain paths and report properties;
-fixed adapters retain compatibility with the pinned images. Report projection
-checks subject/runtime bindings and rejects duplicate semantic properties without
-rewriting original bytes. Legacy interface use emits a deprecation warning.
-The external package-capture envelope remains `nkd.dev/package-acquisitions/v1`,
-as emitted by the selected NVKE producer. New network sessions write version 3;
-version-2 recovery preserves its original resources and both share coordination
-locks. Local ARM64 toolchain builds and launcher checks covered both layouts;
-Linux ARM64 race tests covered both recovery versions. These checks do not prove
-QCOW2 production, privileged recovery, publication or qualification. Maintained
-registry pins and provider environment references remain unchanged.
-
-Retained node, package, Kubernetes and Packer names are compatibility contracts,
-not missing rebranding work. Source repinning or an independently changed ABI
-requires its own validation and is not part of this naming cutover.
-
-Private toolchain credential preparation includes one narrowly scoped naming-cutover
-exception: the maintained `ghcr.io/dsx-ai-factory/nvkr/m2-candidate` publication
-prefix can pull digest-pinned images from the existing `nke-recipes/m2-candidate/toolchains/`
-namespace. It does not grant a credential to arbitrary images or other publication
-prefixes. Remove that compatibility exception only after all selected legacy
-toolchain subjects have authenticated replacement pins under the normal publication
-namespace and the regenerated Run passes its credential-boundary checks.
-
-The standalone renamed execution helper has measured AMD64/ARM64 executable pins;
-its image pins remain unpublished. Any independently chosen provider-name or
-runtime-publication migration requires verified provisioning, permissions,
-digest measurements and operational read-back; retaining existing contracts
-does not require that migration. Contract tests do not establish an external
-cutover, hosted publication, independent consumer acceptance or qualification.
-
 
 ## Maintained input and schema boundaries
 

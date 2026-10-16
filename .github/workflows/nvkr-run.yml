@@ -805,7 +805,7 @@ jobs:
     timeout-minutes: 1045
     needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-dc6f3464c691, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-arc'
+    environment: 'nvkr-arc'
     permissions:
       contents: read
       packages: read
@@ -993,7 +993,7 @@ jobs:
     timeout-minutes: 1045
     needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-arc'
+    environment: 'nvkr-arc'
     permissions:
       contents: read
       packages: read
@@ -1113,7 +1113,7 @@ jobs:
     timeout-minutes: 1045
     needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-arc'
+    environment: 'nvkr-arc'
     permissions:
       contents: read
       packages: read
@@ -1227,7 +1227,7 @@ jobs:
     timeout-minutes: 1045
     needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-arc'
+    environment: 'nvkr-arc'
     permissions:
       contents: read
       packages: read
@@ -2189,7 +2189,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-disk-nvke-node-fde-amd64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2200,7 +2200,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-disk-nvke-node-fde-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2211,7 +2211,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-disk-nvke-node-image-amd64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2222,7 +2222,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-disk-nvke-node-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2233,7 +2233,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvke-node-fde-amd64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -2247,7 +2247,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvke-node-fde-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -2261,7 +2261,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvke-node-image-amd64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -2275,7 +2275,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvke-node-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -2289,7 +2289,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvke-node-fde-amd64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2304,7 +2304,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvke-node-fde-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2319,7 +2319,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvke-node-image-amd64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2334,7 +2334,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvke-node-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2398,7 +2398,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-capi-controller-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2416,7 +2416,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-capi-controller-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2434,7 +2434,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-capi-kubeadm-bootstrap-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2452,7 +2452,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2470,7 +2470,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-capi-kubeadm-con-4fe0740f8f62, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2488,7 +2488,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-capi-kubeadm-con-b43cc041198e, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2506,7 +2506,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-capnico-controller, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2524,7 +2524,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cert-manager-cai-2887e3e2c736, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2542,7 +2542,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cert-manager-cai-ce1a9c1fcd69, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2560,7 +2560,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cert-manager-con-61609993557f, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2578,7 +2578,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cert-manager-con-552847309ea5, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2596,7 +2596,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cert-manager-webhook-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2614,7 +2614,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cert-manager-web-d17d677e59de, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2632,7 +2632,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cluster-api-prov-6fe85337de7c, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2650,7 +2650,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-controller-chart, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2668,7 +2668,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-csi-node-driver-75d8004e6ab4, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2686,7 +2686,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2704,7 +2704,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-cwe, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2722,7 +2722,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nico-reference-p-ee3d0b71da16, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2740,7 +2740,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2758,7 +2758,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-collector-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2776,7 +2776,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-collector-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2794,7 +2794,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-kube-state-406133f7921f, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2812,7 +2812,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-kube-state-40b969e892aa, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2830,7 +2830,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-kubectl-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2848,7 +2848,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-kubectl-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2866,7 +2866,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-lgtm-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2884,7 +2884,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-lgtm-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2902,7 +2902,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-metrics-server-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2920,7 +2920,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-metrics-ser-eebe54e615ac, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2938,7 +2938,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-node-exporter-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2956,7 +2956,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-node-export-749c6d4505fc, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2974,7 +2974,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-operator-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -2992,7 +2992,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-operator-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3010,7 +3010,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-target-allocator-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3028,7 +3028,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp-target-allo-fd174f2cfe07, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3046,7 +3046,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nvkectl, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3064,7 +3064,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-nvkectl-linux-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3082,7 +3082,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-operator-tools, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3100,7 +3100,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-postgresql-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3118,7 +3118,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-postgresql-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3136,7 +3136,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-postgresql, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3147,7 +3147,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capi-controller-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3161,7 +3161,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capi-controller-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3175,7 +3175,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capi-kubeadm-bootstrap-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3189,7 +3189,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capi-kubeadm-boo-bcd3e61be11a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3203,7 +3203,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capi-kubeadm-con-aff5fe5bef73]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3217,7 +3217,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capi-kubeadm-con-a5cbb6fd910a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3231,7 +3231,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capnico-controller]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3245,7 +3245,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cert-manager-cai-f039262ad3e2]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3259,7 +3259,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cert-manager-cai-63e467a9fe7a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3273,7 +3273,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3287,7 +3287,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cert-manager-con-d61492d4f3a1]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3301,7 +3301,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cert-manager-webhook-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3315,7 +3315,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cert-manager-web-cf7074e21b0b]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3329,7 +3329,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cluster-api-prov-270146b5b019]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3343,7 +3343,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3357,7 +3357,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-csi-node-driver-13d6b4ada789]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3371,7 +3371,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3385,7 +3385,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3399,7 +3399,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nico-reference-p-bcab49542eb0]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3413,7 +3413,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3427,7 +3427,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-collector-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3441,7 +3441,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-collector-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3455,7 +3455,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-kube-state-5427c42def27]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3469,7 +3469,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-kube-state-6248dc6aafc3]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3483,7 +3483,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-kubectl-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3497,7 +3497,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-kubectl-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3511,7 +3511,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-lgtm-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3525,7 +3525,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-lgtm-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3539,7 +3539,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-metrics-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3553,7 +3553,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-metrics-ser-cc131630b796]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3567,7 +3567,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-node-exporter-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3581,7 +3581,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-node-export-a5e0b32a9940]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3595,7 +3595,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-operator-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3609,7 +3609,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-operator-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3623,7 +3623,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-target-allocator-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3637,7 +3637,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp-target-allo-bbd05f2a1798]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3651,7 +3651,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3665,7 +3665,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvkectl-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3679,7 +3679,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3693,7 +3693,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3707,7 +3707,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-postgresql-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3721,7 +3721,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -3735,7 +3735,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capi-controller-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3750,7 +3750,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capi-controller-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3765,7 +3765,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capi-kubeadm-bootstrap-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3780,7 +3780,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3795,7 +3795,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capi-kubeadm-control-plane-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3810,7 +3810,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capi-kubeadm-control-189e7620a1e0]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3825,7 +3825,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capnico-controller]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3840,7 +3840,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cert-manager-cainjector-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3855,7 +3855,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cert-manager-cainject-37550fcc232b]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3870,7 +3870,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cert-manager-controller-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3885,7 +3885,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cert-manager-controll-1c8e088fb6a6]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3900,7 +3900,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cert-manager-webhook-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3915,7 +3915,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cert-manager-webhook-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3930,7 +3930,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cluster-api-provider-provisioned]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3945,7 +3945,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3960,7 +3960,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-csi-node-driver-registrar-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3975,7 +3975,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -3990,7 +3990,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4005,7 +4005,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nico-reference-profiles-fixture]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4020,7 +4020,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4035,7 +4035,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-collector-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4050,7 +4050,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-collector-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4065,7 +4065,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-kube-state-metrics-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4080,7 +4080,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-kube-state-metri-cecf76dda028]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4095,7 +4095,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-kubectl-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4110,7 +4110,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-kubectl-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4125,7 +4125,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-lgtm-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4140,7 +4140,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-lgtm-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4155,7 +4155,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-metrics-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4170,7 +4170,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-metrics-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4185,7 +4185,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-node-exporter-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4200,7 +4200,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-node-exporter-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4215,7 +4215,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-operator-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4230,7 +4230,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-operator-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4245,7 +4245,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-target-allocator-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4260,7 +4260,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp-target-allocator-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4275,7 +4275,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4290,7 +4290,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvkectl-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4305,7 +4305,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4320,7 +4320,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4335,7 +4335,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-postgresql-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4350,7 +4350,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4372,7 +4372,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spiffe-csi-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4383,7 +4383,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4397,7 +4397,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4419,7 +4419,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spiffe-csi-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4430,7 +4430,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spiffe-csi-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4444,7 +4444,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spiffe-csi-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4466,7 +4466,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-agent-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4477,7 +4477,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4491,7 +4491,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4513,7 +4513,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-agent-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4524,7 +4524,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-agent-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4538,7 +4538,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-agent-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4560,7 +4560,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-bash-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4571,7 +4571,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4585,7 +4585,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4607,7 +4607,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-bash-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4618,7 +4618,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-bash-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4632,7 +4632,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-bash-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4654,7 +4654,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-controller-14366a611047, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4665,7 +4665,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-controller-f3890ce97c17]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4679,7 +4679,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-controller-mana-4c760c0ddb13]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4701,7 +4701,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-controller-5481257fcee6, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4712,7 +4712,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-controller-aebdd6dca7a8]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4726,7 +4726,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-controller-manager-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4748,7 +4748,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-crds, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4759,7 +4759,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4773,7 +4773,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4795,7 +4795,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-oidc-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4806,7 +4806,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4820,7 +4820,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4842,7 +4842,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-oidc-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4853,7 +4853,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-oidc-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4867,7 +4867,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-oidc-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4889,7 +4889,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-server-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4900,7 +4900,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4914,7 +4914,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4936,7 +4936,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-server-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4947,7 +4947,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -4961,7 +4961,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4983,7 +4983,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -4994,7 +4994,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5008,7 +5008,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5030,7 +5030,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-tpm-server-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5041,7 +5041,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-tpm-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5055,7 +5055,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-tpm-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5077,7 +5077,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5088,7 +5088,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5102,7 +5102,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5124,7 +5124,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5135,7 +5135,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-admin-t-9e993584a415]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5149,7 +5149,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-admin-tools-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5171,7 +5171,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-admin-tools-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5182,7 +5182,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-admin-tools-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5196,7 +5196,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-admin-tools-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5218,7 +5218,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-server-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5229,7 +5229,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5243,7 +5243,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5265,7 +5265,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-server-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5276,7 +5276,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5290,7 +5290,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5312,7 +5312,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-ui-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5323,7 +5323,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5337,7 +5337,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5359,7 +5359,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-ui-image, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5370,7 +5370,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-ui-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5384,7 +5384,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-ui-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5406,7 +5406,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5417,7 +5417,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -5431,7 +5431,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -5446,7 +5446,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capi-controller-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5460,7 +5460,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capi-controller-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5474,7 +5474,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capi-kubeadm-bootstrap-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5488,7 +5488,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capi-kubeadm-bootstrap-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5502,7 +5502,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capi-kubeadm-control-plane-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5516,7 +5516,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capi-kubeadm-control-pla-d95378faf55b]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5530,7 +5530,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capnico-controller]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5544,7 +5544,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cert-manager-cainjector-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5558,7 +5558,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cert-manager-cainjector-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5572,7 +5572,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cert-manager-controller-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5586,7 +5586,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cert-manager-controller-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5600,7 +5600,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cert-manager-webhook-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5614,7 +5614,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cert-manager-webhook-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5628,7 +5628,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cluster-api-provider-provisioned]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5642,7 +5642,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5656,7 +5656,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-csi-node-driver-registrar-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5670,7 +5670,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5684,7 +5684,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5698,7 +5698,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nico-reference-profiles-fixture]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5712,7 +5712,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5726,7 +5726,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-collector-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5740,7 +5740,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-collector-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5754,7 +5754,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-kube-state-metrics-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5768,7 +5768,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-kube-state-metrics-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5782,7 +5782,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-kubectl-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5796,7 +5796,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-kubectl-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5810,7 +5810,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-lgtm-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5824,7 +5824,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-lgtm-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5838,7 +5838,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-metrics-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5852,7 +5852,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-metrics-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5866,7 +5866,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-node-exporter-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5880,7 +5880,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-node-exporter-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5894,7 +5894,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-operator-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5908,7 +5908,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-operator-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5922,7 +5922,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-target-allocator-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5936,7 +5936,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp-target-allocator-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5950,7 +5950,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvke-node-fde-amd64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5964,7 +5964,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvke-node-fde-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5978,7 +5978,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvke-node-image-amd64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -5992,7 +5992,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvke-node-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6006,7 +6006,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6020,7 +6020,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvkectl-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6034,7 +6034,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6048,7 +6048,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6062,7 +6062,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-postgresql-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6076,7 +6076,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6090,7 +6090,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spiffe-csi-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6104,7 +6104,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6118,7 +6118,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6132,7 +6132,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-agent-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6146,7 +6146,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6160,7 +6160,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-bash-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6174,7 +6174,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6188,7 +6188,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-controller-manager-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6202,7 +6202,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-controller-manager-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6216,7 +6216,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6230,7 +6230,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-oidc-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6244,7 +6244,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6258,7 +6258,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6272,7 +6272,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6286,7 +6286,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-tpm-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6300,7 +6300,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6314,7 +6314,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6328,7 +6328,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-admin-tools-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6342,7 +6342,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-admin-tools-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6356,7 +6356,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-server-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6370,7 +6370,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6384,7 +6384,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-ui-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6398,7 +6398,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6412,7 +6412,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-capi-controller-image, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-cert-manag-02f76d39d687, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-cert-manag-eecf216a547d, nvkr-verify-publication-output-cert-manag-f1997a85223a, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe, nvkr-verify-publication-output-nktp, nvkr-verify-publication-output-nktp-colle-3037712057c4, nvkr-verify-publication-output-nktp-collector-image, nvkr-verify-publication-output-nktp-kube-59673e96b3e2, nvkr-verify-publication-output-nktp-kube-8edb2f9f5644, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-nktp-kubectl-image, nvkr-verify-publication-output-nktp-lgtm-image, nvkr-verify-publication-output-nktp-lgtm-image-arm64, nvkr-verify-publication-output-nktp-metri-4773ec2231a9, nvkr-verify-publication-output-nktp-metri-72d2044749d1, nvkr-verify-publication-output-nktp-node-308c6a04d0d9, nvkr-verify-publication-output-nktp-node-89687b0a3b8b, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-nktp-operator-image, nvkr-verify-publication-output-nktp-targe-83f6218e2759, nvkr-verify-publication-output-nktp-targe-c21c44003a70, nvkr-verify-publication-output-nvke-node-fde-amd64, nvkr-verify-publication-output-nvke-node-fde-arm64, nvkr-verify-publication-output-nvke-node-image-amd64, nvkr-verify-publication-output-nvke-node-image-arm64, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-nvkectl-linux-arm64, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-agent-image, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-server-image, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-a-9109bef2fded, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-server-image, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-verify-publication-output-temporal-ui-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6426,7 +6426,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-release]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: write
@@ -6440,7 +6440,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-release]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       id-token: write
@@ -6455,7 +6455,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-release]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read
@@ -6677,7 +6677,7 @@ jobs:
     timeout-minutes: 15
     needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0c, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
       contents: read
       packages: read

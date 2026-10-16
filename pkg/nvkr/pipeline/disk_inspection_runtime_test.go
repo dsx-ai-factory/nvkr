@@ -4,14 +4,12 @@
 package pipeline
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
 	"math"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
@@ -25,73 +23,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
-
-func TestInspectorEntrypointUsesExactNewOrLegacyExecutable(t *testing.T) {
-	for _, test := range []struct {
-		name         string
-		current, old bool
-		status       int
-	}{
-		{"new", true, false, 0},
-		{"legacy", false, true, 0},
-		{"prefer new", true, true, 0},
-		{"never retry helper failure", true, true, 42},
-		{"missing", false, false, 0},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			dir := t.TempDir()
-			current, old := filepath.Join(dir, "nvkr-disk-inspect"), filepath.Join(dir, "nkd-disk-inspect")
-			for _, helper := range []struct {
-				path, label string
-				present     bool
-				status      int
-			}{{current, "new", test.current, test.status}, {old, "legacy", test.old, 0}} {
-				if helper.present {
-					body := "#!/bin/sh\nprintf '%s\\n' '" + helper.label + "' \"$@\"\nexit " + strconv.Itoa(helper.status) + "\n"
-					if err := os.WriteFile(helper.path, []byte(body), 0o700); err != nil {
-						t.Fatal(err)
-					}
-				}
-			}
-			script := strings.NewReplacer("/usr/local/bin/nvkr-disk-inspect", `"$CURRENT_HELPER"`, "/usr/local/bin/nkd-disk-inspect", `"$LEGACY_HELPER"`).Replace(diskInspectionEntrypoint)
-			argument := `literal $(exit 99); untouched`
-			cmd := exec.CommandContext(t.Context(), "/bin/sh", "-ec", script, "nvkr-disk-inspect", argument)
-			cmd.Env = append(os.Environ(), "CURRENT_HELPER="+current, "LEGACY_HELPER="+old)
-			var stderr bytes.Buffer
-			cmd.Stderr = &stderr
-			output, err := cmd.Output()
-			if !test.current && !test.old {
-				if err == nil {
-					t.Fatal("missing helper was admitted")
-				}
-				return
-			}
-			label := "new"
-			if !test.current {
-				label = "legacy"
-			}
-			if string(output) != label+"\n"+argument+"\n" {
-				t.Fatalf("selected helper or literal argument differs: %q", output)
-			}
-			wantWarning := ""
-			if !test.current {
-				wantWarning = diskdiagnostic.LegacyWarning + "\n"
-			}
-			if stderr.String() != wantWarning {
-				t.Fatalf("deprecation diagnostic = %q, want %q", stderr.String(), wantWarning)
-			}
-			if test.status == 0 && err != nil {
-				t.Fatal(err)
-			}
-			if test.status != 0 {
-				var exit *exec.ExitError
-				if !errors.As(err, &exit) || exit.ExitCode() != test.status {
-					t.Fatalf("helper outcome changed: %v", err)
-				}
-			}
-		})
-	}
-}
 
 func TestDiagnosticContentKindParity(t *testing.T) {
 	for _, kind := range []string{"disk-image", "installer-iso", "installer-content", "tarball", "apt-acquisition", "host-package", "oci-image", "", "unknown"} {
@@ -571,7 +502,7 @@ func TestDiskInspectionContainerArgumentsEnforceContainment(t *testing.T) {
 			if !slices.Contains(args, "--log-driver=none") {
 				t.Fatal("daemon log persistence was not disabled")
 			}
-			for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65534:65534", "--init", "--pids-limit=256", "--pull=never", "--no-healthcheck", "--memory=16384m", "--memory-swap=16384m", "/tmp:rw,nosuid,nodev,size=16384m,mode=1777", selection.Platform, "--entrypoint=/bin/sh", diskInspectionEntrypoint, "nvkr-disk-inspect", subject.Digest()} {
+			for _, required := range []string{"--network=none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65534:65534", "--init", "--pids-limit=256", "--pull=never", "--no-healthcheck", "--memory=16384m", "--memory-swap=16384m", "/tmp:rw,nosuid,nodev,size=16384m,mode=1777", selection.Platform, "--entrypoint=/usr/local/bin/nvkr-disk-inspect", subject.Digest()} {
 				if !slices.Contains(args, required) {
 					t.Fatalf("missing containment argument %q", required)
 				}

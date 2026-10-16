@@ -29,58 +29,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-func TestPackerPluginEntrypointChoosesLayoutAndPreservesArguments(t *testing.T) {
-	for _, fixture := range []struct{ layout, command string }{
-		{"new", "build"}, {"legacy", "build"}, {"both", "build"}, {"missing", "build"},
-		{"legacy", "version"}, {"legacy", "validate"},
-	} {
-		t.Run(fixture.layout+"/"+fixture.command, func(t *testing.T) {
-			layout := fixture.layout
-			dir := t.TempDir()
-			current, old := filepath.Join(dir, "new"), filepath.Join(dir, "old")
-			for _, path := range []string{current, old} {
-				if layout == "both" || layout == "new" && path == current || layout == "legacy" && path == old {
-					if err := os.Mkdir(path, 0o700); err != nil {
-						t.Fatal(err)
-					}
-				}
-			}
-			script := strings.NewReplacer("/nvkr/toolchain/packer/plugins", `"$CURRENT_PLUGINS"`, "/nkd/toolchain/packer/plugins", `"$LEGACY_PLUGINS"`).Replace(packerPluginEntrypoint)
-			argument := `literal $(exit 99); untouched`
-			packer := filepath.Join(dir, "packer")
-			if err := os.WriteFile(packer, []byte("#!/bin/sh\nprintf '%s\\n' \"$PACKER_PLUGIN_PATH\" \"$1\" \"$2\"\nexit 42\n"), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			cmd := exec.CommandContext(t.Context(), "/bin/sh", "-ec", script, "nvkr-packer", packer, fixture.command, argument)
-			cmd.Env = append(os.Environ(), "CURRENT_PLUGINS="+current, "LEGACY_PLUGINS="+old)
-			var stderr bytes.Buffer
-			cmd.Stderr = &stderr
-			output, err := cmd.Output()
-			var exit *exec.ExitError
-			if !errors.As(err, &exit) {
-				t.Fatalf("missing expected terminal outcome: %v", err)
-			}
-			if layout == "missing" {
-				if exit.ExitCode() != 2 || !strings.Contains(stderr.String(), "plugin directory is missing") {
-					t.Fatalf("missing plugins admitted: %v %s", err, output)
-				}
-				return
-			}
-			want := current
-			if layout == "legacy" {
-				want = old
-			}
-			if exit.ExitCode() != 42 || string(output) != want+"\n"+fixture.command+"\n"+argument+"\n" {
-				t.Fatalf("plugin path, arguments or owner status changed: %v %q", err, output)
-			}
-			warned := strings.Contains(stderr.String(), "Warning: deprecated Packer plugin layout")
-			if warned != (layout == "legacy" && fixture.command == "build") {
-				t.Fatalf("incorrect deprecation diagnostic: %q", stderr.String())
-			}
-		})
-	}
-}
-
 func TestPreparePackerContainerIdentity(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -384,8 +332,8 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		"--env", "PACKER_CONFIG=/nvkr/input/config/packer.json", "--env", "PACKER_NO_COLOR=1",
 		"--env", "PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins",
 		"--env", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		"--env", "TMPDIR=/nvkr/work/tmp", "--entrypoint=sh",
-		"registry.example/packer@sha256:" + repeatHex("a"), "-ec", packerPluginEntrypoint, "nvkr-packer", "packer", "build", "-only=build.qemu.node", ".",
+		"--env", "TMPDIR=/nvkr/work/tmp", "--entrypoint=packer",
+		"registry.example/packer@sha256:" + repeatHex("a"), "build", "-only=build.qemu.node", ".",
 	}
 	if !reflect.DeepEqual(withoutKVM, want) {
 		t.Fatalf("container args = %#v, want %#v", withoutKVM, want)
@@ -419,8 +367,8 @@ func TestPackerContainerCreateArgsEnforceIsolation(t *testing.T) {
 		!slices.Contains(withKVM, "--entrypoint=sh") || !slices.Contains(withKVM, packerKVMProjectionScript) {
 		t.Fatalf("KVM container args do not use the minimal rw device grant: %#v", withKVM)
 	}
-	if !reflect.DeepEqual(withKVM[len(withKVM)-14:], []string{"-ec", packerKVMProjectionScript,
-		"nvkr-kvm-projection", "test-boot", "a:e8", "/dev/kvm", "sh", "-ec", packerPluginEntrypoint, "nvkr-packer", "packer", "build", "-only=build.qemu.node", "."}) {
+	if !reflect.DeepEqual(withKVM[len(withKVM)-10:], []string{"-ec", packerKVMProjectionScript,
+		"nvkr-kvm-projection", "test-boot", "a:e8", "/dev/kvm", "packer", "build", "-only=build.qemu.node", "."}) {
 		t.Fatalf("Docker KVM projection does not guard the exact Packer argv: %#v", withKVM)
 	}
 	request.network = ir.NetworkDefault

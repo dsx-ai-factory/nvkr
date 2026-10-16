@@ -33,8 +33,7 @@ import (
 )
 
 const (
-	// New version-3 sessions use the NVKE namespace. Recovery retains the exact
-	// version-2 names and both versions share the original coordination lock.
+	// Durable namespace for version-3 NVKE demo network journals.
 	BridgeName     = "nvkevm0"
 	GuestCIDR      = "172.30.0.0/24"
 	GuestGateway   = "172.30.0.1"
@@ -119,8 +118,7 @@ type NetworkGuard struct {
 	runner                                     Runner
 	sequence                                   atomic.Uint64
 	unjoined                                   atomic.Bool
-	directory, lock, legacyLock                *os.File
-	version                                    int
+	directory, lock                            *os.File
 	boot                                       string
 	pid                                        int
 	helperID                                   networkFileID
@@ -195,7 +193,7 @@ func newNetworkGuard(runner Runner, kindCIDR string) (*NetworkGuard, error) {
 	}
 	marker := append([]byte(nil), token[:6]...)
 	marker[0] = (marker[0] | 2) & 0xfe
-	return &NetworkGuard{Work: work, version: 3, Owner: "nvke-demo-" + hex.EncodeToString(token[:]), BridgeMAC: net.HardwareAddr(marker).String(), KindCIDR: kindCIDR, runner: runner, directory: directory, pid: os.Getpid(), sysctls: map[string]string{}, helperPath: qemuHelper, policyPath: qemuPolicy}, nil
+	return &NetworkGuard{Work: work, Owner: "nvke-demo-" + hex.EncodeToString(token[:]), BridgeMAC: net.HardwareAddr(marker).String(), KindCIDR: kindCIDR, runner: runner, directory: directory, pid: os.Getpid(), sysctls: map[string]string{}, helperPath: qemuHelper, policyPath: qemuPolicy}, nil
 }
 func validateNetworkKind(kindCIDR string) error {
 	kind, err := netip.ParsePrefix(kindCIDR)
@@ -375,49 +373,25 @@ func (g *NetworkGuard) probePrivilegedPorts(ctx context.Context) error {
 
 func (g *NetworkGuard) acquireLock() error {
 	path := fmt.Sprintf("/tmp/nvke-local-network-%d.lock", os.Getuid())
-	legacyPath := fmt.Sprintf("/tmp/nkd-local-network-%d.lock", os.Getuid())
 	if g.lockPath != "" {
 		path = g.lockPath
-		legacyPath = path + ".legacy"
 	}
-	// Older binaries know only the original inode. Hold it first as well as the
-	// renamed lock so mixed-version sessions cannot mutate shared host controls.
-	legacy, err := holdNetworkLock(legacyPath)
-	if err != nil {
-		return err
-	}
-	held, err := holdNetworkLock(path)
-	if err != nil {
-		_ = legacy.Close()
-		return err
-	}
-	g.lock, g.legacyLock = held, legacy
-	return nil
-}
-
-func holdNetworkLock(path string) (*os.File, error) {
 	fd, err := unix.Open(path, unix.O_CREAT|unix.O_NOFOLLOW|unix.O_RDWR|unix.O_CLOEXEC, 0o600)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	held := os.NewFile(uintptr(fd), path)
 	var st unix.Stat_t
 	if err = unix.Fstat(fd, &st); err != nil || st.Mode&unix.S_IFMT != unix.S_IFREG || st.Nlink != 1 || st.Uid != uint32(os.Getuid()) || st.Mode&0o7777 != 0o600 {
 		_ = held.Close()
-		return nil, fmt.Errorf("network guard lock ownership differs")
+		return fmt.Errorf("network guard lock ownership differs")
 	}
 	if err = unix.Flock(fd, unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		_ = held.Close()
-		return nil, fmt.Errorf("another network guard is active: %w", err)
+		return fmt.Errorf("another network guard is active: %w", err)
 	}
-	return held, nil
-}
-
-func networkBridge(owner string) string {
-	if strings.HasPrefix(owner, "nkd-demo-") {
-		return "nkdvm0"
-	}
-	return BridgeName
+	g.lock = held
+	return nil
 }
 
 func networkBootID() (string, error) {
@@ -450,8 +424,8 @@ func (g *NetworkGuard) admit(ctx context.Context) error {
 		return err
 	}
 	for _, row := range links {
-		if row.Name == BridgeName || row.Name == "nkdvm0" {
-			return fmt.Errorf("refusing pre-existing demo bridge; recover its original work directory")
+		if row.Name == BridgeName {
+			return fmt.Errorf("refusing pre-existing demo bridge")
 		}
 	}
 	if _, err := os.Lstat(g.policyPath); !errors.Is(err, os.ErrNotExist) {
@@ -620,7 +594,7 @@ func networkFile(ctx context.Context, path string, private bool) (networkFileID,
 }
 
 func (g *NetworkGuard) snapshot() networkState {
-	return networkState{Version: g.version, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, KindGateway: g.kindGateway, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
+	return networkState{Version: 3, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, KindGateway: g.kindGateway, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
 }
 
 func (g *NetworkGuard) Checkpoint(ctx context.Context) error {
@@ -710,11 +684,11 @@ func (g *NetworkGuard) cleanupCheckpoint(ctx context.Context) {
 func networkRules(owner, kind string) []networkRule {
 	var rows []networkRule
 	for _, row := range [][2]string{{"udp", "67"}, {"udp", "53"}, {"tcp", "53"}, {"tcp", "7777"}, {"tcp", "10179"}, {"tcp", "18080"}} {
-		rows = append(rows, networkRule{"filter", "INPUT", []string{"-i", networkBridge(owner), "-p", row[0], "--dport", row[1], "-j", "ACCEPT"}})
+		rows = append(rows, networkRule{"filter", "INPUT", []string{"-i", BridgeName, "-p", row[0], "--dport", row[1], "-j", "ACCEPT"}})
 	}
-	rows = append(rows, networkRule{"filter", "FORWARD", []string{"-i", networkBridge(owner), "-s", GuestCIDR, "-j", "ACCEPT"}}, networkRule{"filter", "FORWARD", []string{"-o", networkBridge(owner), "-d", GuestCIDR, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"}}, networkRule{"filter", "FORWARD", []string{"-o", networkBridge(owner), "-s", kind, "-d", VIPCIDR, "-p", "tcp", "--dport", "6443", "-j", "ACCEPT"}}, networkRule{"nat", "POSTROUTING", []string{"-s", GuestCIDR, "!", "-d", GuestCIDR, "-j", "MASQUERADE"}})
+	rows = append(rows, networkRule{"filter", "FORWARD", []string{"-i", BridgeName, "-s", GuestCIDR, "-j", "ACCEPT"}}, networkRule{"filter", "FORWARD", []string{"-o", BridgeName, "-d", GuestCIDR, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"}}, networkRule{"filter", "FORWARD", []string{"-o", BridgeName, "-s", kind, "-d", VIPCIDR, "-p", "tcp", "--dport", "6443", "-j", "ACCEPT"}}, networkRule{"nat", "POSTROUTING", []string{"-s", GuestCIDR, "!", "-d", GuestCIDR, "-j", "MASQUERADE"}})
 	for _, row := range [][2]string{{"80", "7777"}, {"179", "10179"}} {
-		rows = append(rows, networkRule{"nat", "PREROUTING", []string{"-i", networkBridge(owner), "-d", GuestGateway, "-p", "tcp", "--dport", row[0], "-j", "REDIRECT", "--to-port", row[1]}})
+		rows = append(rows, networkRule{"nat", "PREROUTING", []string{"-i", BridgeName, "-d", GuestGateway, "-p", "tcp", "--dport", row[0], "-j", "REDIRECT", "--to-port", row[1]}})
 	}
 	for i := range rows {
 		rows[i].Args = append([]string{"-m", "comment", "--comment", owner}, rows[i].Args...)
@@ -753,7 +727,7 @@ func (g *NetworkGuard) BridgeBinding(ctx context.Context) (string, error) {
 	}
 	var found []networkLink
 	for _, row := range rows {
-		if row.Name == networkBridge(g.Owner) {
+		if row.Name == BridgeName {
 			found = append(found, row)
 		}
 	}
@@ -784,7 +758,7 @@ func (g *NetworkGuard) Start(ctx context.Context) (resultErr error) {
 	if err := g.checkpoint(ctx); err != nil {
 		return err
 	}
-	if _, err := g.Command(ctx, []string{"ip", "link", "add", "name", networkBridge(g.Owner), "address", g.BridgeMAC, "type", "bridge"}, true); err != nil {
+	if _, err := g.Command(ctx, []string{"ip", "link", "add", "name", BridgeName, "address", g.BridgeMAC, "type", "bridge"}, true); err != nil {
 		return err
 	}
 	index, err := g.BridgeBinding(ctx)
@@ -796,15 +770,15 @@ func (g *NetworkGuard) Start(ctx context.Context) (resultErr error) {
 		return err
 	}
 	for _, address := range []string{GuestGateway + "/24", "169.254.169.254/32"} {
-		if _, err = g.Command(ctx, []string{"ip", "address", "add", address, "dev", networkBridge(g.Owner)}, true); err != nil {
+		if _, err = g.Command(ctx, []string{"ip", "address", "add", address, "dev", BridgeName}, true); err != nil {
 			return err
 		}
 	}
-	if _, err = g.Command(ctx, []string{"ip", "link", "set", networkBridge(g.Owner), "up"}, true); err != nil {
+	if _, err = g.Command(ctx, []string{"ip", "link", "set", BridgeName, "up"}, true); err != nil {
 		return err
 	}
 	policy := filepath.Join(g.Work, "bridge-policy")
-	if err = networkWriteExclusive(policy, []byte("allow "+networkBridge(g.Owner)+"\n"), 0o600); err != nil {
+	if err = networkWriteExclusive(policy, []byte("allow "+BridgeName+"\n"), 0o600); err != nil {
 		return err
 	}
 	if _, err = g.Command(ctx, []string{"install", "-d", "-m", "0755", filepath.Dir(g.policyPath)}, true); err != nil {
@@ -913,7 +887,7 @@ func (g *NetworkGuard) Start(ctx context.Context) (resultErr error) {
 	if err = g.grant(ctx, binary, networkCapabilities["dnsmasq"]); err != nil {
 		return err
 	}
-	args := []string{binary, "--keep-in-foreground", "--conf-file=/dev/null", "--interface=" + networkBridge(g.Owner), "--bind-interfaces", "--except-interface=lo", "--dhcp-range=172.30.0.10,172.30.0.254,255.255.255.0,30m", "--dhcp-hostsdir=" + filepath.Join(g.Work, "dhcp-hosts"), "--dhcp-leasefile=" + filepath.Join(g.Work, "leases"), "--dhcp-option=option:router," + GuestGateway, "--dhcp-option=option:dns-server," + GuestGateway, "--resolv-file=/etc/resolv.conf", "--no-hosts", "--address=/carbide-pxe.forge/" + GuestGateway, "--pid-file=", "--log-dhcp", "--log-facility=-", "--dhcp-ignore-clid"}
+	args := []string{binary, "--keep-in-foreground", "--conf-file=/dev/null", "--interface=" + BridgeName, "--bind-interfaces", "--except-interface=lo", "--dhcp-range=172.30.0.10,172.30.0.254,255.255.255.0,30m", "--dhcp-hostsdir=" + filepath.Join(g.Work, "dhcp-hosts"), "--dhcp-leasefile=" + filepath.Join(g.Work, "leases"), "--dhcp-option=option:router," + GuestGateway, "--dhcp-option=option:dns-server," + GuestGateway, "--resolv-file=/etc/resolv.conf", "--no-hosts", "--address=/carbide-pxe.forge/" + GuestGateway, "--pid-file=", "--log-dhcp", "--log-facility=-", "--dhcp-ignore-clid"}
 	g.dns, err = g.runner.Start(ctx, args, "dnsmasq")
 	return err
 }
@@ -971,7 +945,7 @@ func (g *NetworkGuard) grant(ctx context.Context, path, capabilities string) err
 }
 
 func guestTCPRule(owner, address string, port int) networkRule {
-	return networkRule{"raw", "PREROUTING", []string{"-m", "comment", "--comment", owner, "-i", networkBridge(owner), "-s", GuestCIDR, "-d", address, "-p", "tcp", "--dport", strconv.Itoa(port), "-j", "ACCEPT"}}
+	return networkRule{"raw", "PREROUTING", []string{"-m", "comment", "--comment", owner, "-i", BridgeName, "-s", GuestCIDR, "-d", address, "-p", "tcp", "--dport", strconv.Itoa(port), "-j", "ACCEPT"}}
 }
 
 func kindSimulatorRule(owner, kind, gateway string) networkRule {
@@ -1163,7 +1137,7 @@ func (g *NetworkGuard) stageBinding(ctx context.Context) (networkFileID, error) 
 	if st.Mode&unix.S_IFMT != unix.S_IFREG || st.Nlink != 1 || id.UID != 0 || id.GID != 0 || id.Mode != 0o600 && id.Mode != 0o644 || g.staging.Binding != nil && (id.Device != g.staging.Binding.Device || id.Inode != g.staging.Binding.Inode) {
 		return networkFileID{}, fmt.Errorf("root policy staging changed")
 	}
-	expected := sha256.Sum256([]byte("allow " + networkBridge(g.Owner) + "\n"))
+	expected := sha256.Sum256([]byte("allow " + BridgeName + "\n"))
 	raw, err := g.Command(ctx, []string{"sha256sum", path}, true)
 	if err != nil {
 		return networkFileID{}, err
@@ -1333,7 +1307,7 @@ func (g *NetworkGuard) Close(ctx context.Context) (resultErr error) {
 	if g.policyID != nil {
 		if _, err = os.Lstat(g.policyPath); err == nil {
 			id, digest, readErr := networkFile(ctx, g.policyPath, false)
-			want := sha256.Sum256([]byte("allow " + networkBridge(g.Owner) + "\n"))
+			want := sha256.Sum256([]byte("allow " + BridgeName + "\n"))
 			if readErr != nil || id != *g.policyID || digest != "sha256:"+hex.EncodeToString(want[:]) {
 				return fmt.Errorf("bridge policy changed")
 			}
@@ -1374,7 +1348,7 @@ func (g *NetworkGuard) Close(ctx context.Context) (resultErr error) {
 		if current != bridge {
 			return fmt.Errorf("bridge changed during restoration")
 		}
-		if _, err = g.Command(ctx, []string{"ip", "link", "delete", networkBridge(g.Owner), "type", "bridge"}, true); err != nil {
+		if _, err = g.Command(ctx, []string{"ip", "link", "delete", BridgeName, "type", "bridge"}, true); err != nil {
 			return err
 		}
 		current, err = g.BridgeBinding(ctx)
@@ -1398,10 +1372,6 @@ func (g *NetworkGuard) releaseHandles() {
 	if g.directory != nil {
 		_ = g.directory.Close()
 		g.directory = nil
-	}
-	if g.legacyLock != nil {
-		_ = g.legacyLock.Close()
-		g.legacyLock = nil
 	}
 	if g.lock != nil {
 		_ = g.lock.Close()

@@ -52,7 +52,7 @@ func TestEnvironmentRejectsInvalidExecutionAndPublicationInputs(t *testing.T) {
 		want   e.Code
 	}{
 		{"schema", func(v *Environment) { v.APIVersion = "future" }, e.CodeInvalidCatalog},
-		{"pre-rename namespace", func(v *Environment) { v.APIVersion = "nkd.dev/environment/v1" }, e.CodeInvalidCatalog},
+		{"unsupported namespace", func(v *Environment) { v.APIVersion = "unsupported.dev/environment/v1" }, e.CodeInvalidCatalog},
 		{"platform", func(v *Environment) { v.UtilityPlatform = "windows/amd64" }, e.CodeUnpinnedSource},
 		{"mutable utility", func(v *Environment) { v.UtilityContainer = "golang:latest" }, e.CodeUnpinnedSource},
 		{"runner newline", func(v *Environment) { v.RunsOn = "ubuntu\nother" }, e.CodeInvalidCatalog},

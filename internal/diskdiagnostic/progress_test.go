@@ -25,9 +25,8 @@ func TestReceiverOnlyAcceptsAllowlistedRecords(t *testing.T) {
 		rejected    bool
 	}{
 		{"valid", valid, false},
-		{"pinned image literal", "NKD_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", false},
-		{"renamed protocol", "NVKR_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", false},
-		{"unknown protocol", "NKR_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", true},
+		{"pinned image literal", "NVKR_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", false},
+		{"unsupported protocol", "UNSUPPORTED_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", true},
 		{"warning", "scanner warning token=secret\n", true},
 		{"unknown phase", strings.Replace(valid, "root-scan", "password=secret", 1), true},
 		{"unknown event", strings.Replace(valid, "start", "secret", 1), true},
@@ -64,64 +63,6 @@ func TestReceiverOnlyAcceptsAllowlistedRecords(t *testing.T) {
 				t.Fatal("secret escaped sanitized boundary")
 			}
 		})
-	}
-}
-
-func TestLegacyInspectionDeprecation(t *testing.T) {
-	for _, test := range []struct {
-		name, input       string
-		warning, rejected bool
-	}{
-		{"current", Prefix + `{"phase":"root-scan","event":"start","elapsedMillis":1}` + "\n", false, false},
-		{"legacy prefix", legacyPrefix + `{"phase":"root-scan","event":"start","elapsedMillis":1}` + "\n", true, false},
-		{"legacy entrypoint", LegacyWarning + "\n", true, false},
-		{"unrecognized warning", LegacyWarning + " token=secret\n", false, true},
-		{"invalid legacy record", legacyPrefix + `{"phase":"secret","event":"start","elapsedMillis":1}` + "\n", false, true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			collector := NewCollector()
-			receiver := NewReceiver(collector)
-			for _, value := range []byte(test.input) {
-				_, _ = receiver.Write([]byte{value})
-			}
-			receiver.Finish()
-			if got := collector.DeprecationWarning() != ""; got != test.warning || receiver.Unexpected() != test.rejected {
-				t.Fatalf("warning=%q rejected=%t", collector.DeprecationWarning(), receiver.Unexpected())
-			}
-			// Later progress and retention eviction must not erase the warning.
-			for i := range 600 {
-				_, _ = fmt.Fprintf(receiver, "%s{\"phase\":\"nested-scan\",\"event\":\"start\",\"elapsedMillis\":1,\"ordinal\":%d}\n", Prefix, i)
-			}
-			receiver.Finish()
-			retained, _ := collector.Snapshot()
-			if got := collector.DeprecationWarning() != ""; got != test.warning || bytes.Contains(retained, []byte("secret")) || bytes.Contains(retained, []byte("Warning:")) {
-				t.Fatal("warning lost or mixed into progress records")
-			}
-		})
-	}
-}
-
-func TestLegacyWarningPreservesParsingCeiling(t *testing.T) {
-	collector := NewCollector()
-	receiver := NewReceiver(collector)
-	receiver.parsedRecords = MaxParsedRecords - 1
-	_, _ = io.WriteString(receiver, LegacyWarning+"\n"+Prefix+`{"phase":"root-scan","event":"start","elapsedMillis":1}`+"\n")
-	receiver.Finish()
-	if receiver.exhausted || receiver.Unexpected() || receiver.parsedRecords != MaxParsedRecords || collector.DeprecationWarning() != LegacyWarning {
-		t.Fatal("legacy warning consumed the existing progress allowance")
-	}
-	_, _ = io.WriteString(receiver, Prefix+`{"phase":"root-scan","event":"complete","elapsedMillis":2}`+"\n")
-	if !receiver.exhausted || !receiver.Unexpected() {
-		t.Fatal("progress exceeded its existing parsing allowance")
-	}
-}
-
-func TestLegacyWarningRejectsRepetition(t *testing.T) {
-	receiver := NewReceiver(nil)
-	_, _ = io.WriteString(receiver, strings.Repeat(LegacyWarning+"\n", 2))
-	receiver.Finish()
-	if !receiver.Unexpected() || receiver.parsedRecords != 0 {
-		t.Fatal("repeated launcher warnings were accepted or parsed as JSON")
 	}
 }
 

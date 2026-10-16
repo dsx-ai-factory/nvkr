@@ -6,15 +6,12 @@
 package nvkedemo
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -27,17 +24,9 @@ func TestRecoveredKindSimulatorJournalCheckpointsExactBinding(t *testing.T) {
 	if runtime.GOARCH != "arm64" || os.Getenv("NVKR_TEST_NETWORK_RECOVERY") != "1" {
 		t.Skip("opt-in isolated Linux ARM64 recovery fixture")
 	}
-	for _, fixture := range []struct {
-		version int
-		gateway string
-	}{{2, "172.18.0.1"}, {2, "172.18.0.2"}, {3, "172.18.0.1"}, {3, "172.18.0.2"}} {
-		t.Run(fmt.Sprintf("v%d/%s", fixture.version, fixture.gateway), func(t *testing.T) {
-			gateway := fixture.gateway
+	for _, gateway := range []string{"172.18.0.1", "172.18.0.2"} {
+		t.Run(gateway, func(t *testing.T) {
 			original := networkFixture(t)
-			original.version = fixture.version
-			if fixture.version == 2 {
-				original.Owner = "nkd-demo-" + strings.TrimPrefix(original.Owner, "nvke-demo-")
-			}
 			original.kindGateway = gateway
 			row := kindSimulatorRule(original.Owner, original.KindCIDR, gateway)
 			original.rules = []networkRule{row}
@@ -54,15 +43,11 @@ func TestRecoveredKindSimulatorJournalCheckpointsExactBinding(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			var progress bytes.Buffer
-			recovered, err := RecoverNetworkGuard(t.Context(), Runner{Work: original.Work, Env: []string{"PATH=" + tools}, Progress: &progress})
+			recovered, err := RecoverNetworkGuard(t.Context(), Runner{Work: original.Work, Env: []string{"PATH=" + tools}})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer recovered.releaseHandles()
-			if got := strings.Contains(progress.String(), "version 2 is deprecated"); got != (fixture.version == 2) {
-				t.Fatalf("incorrect recovery deprecation diagnostic: %q", progress.String())
-			}
 			if recovered.kindGateway != gateway || len(recovered.rules) != 1 || !slices.Equal(recovered.rules[0].Args, row.Args) {
 				t.Fatal("recovery discarded its authenticated Kind route binding")
 			}
@@ -71,7 +56,7 @@ func TestRecoveredKindSimulatorJournalCheckpointsExactBinding(t *testing.T) {
 				t.Fatal("recovered guard could not persist its original gateway", recovered.persistenceFailures)
 			}
 			state, err := readNetworkState(original.Work)
-			if err != nil || state.KindGateway != gateway || state.Version != fixture.version || networkBridge(state.Owner) != networkBridge(original.Owner) {
+			if err != nil || state.KindGateway != gateway {
 				t.Fatal("checkpoint changed or lost the original gateway", err)
 			}
 			present, deletes := true, 0

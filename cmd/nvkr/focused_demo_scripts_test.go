@@ -66,43 +66,6 @@ func TestMaintainedDemoScriptsAdvertiseRunnableHonestJourneys(t *testing.T) {
 	}
 }
 
-func TestM1DemoRejectsLegacyConfigurationBeforeExecution(t *testing.T) {
-	for _, variable := range []struct{ old, replacement string }{
-		{"NKE_LOCAL_CLONE", "NVKE_LOCAL_CLONE"},
-		{"NKDCTL_BIN", "NVKR_BIN"},
-	} {
-		t.Run(variable.old, func(t *testing.T) {
-			cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-m1-local.sh"))
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), variable.old + "=/legacy"}
-			output, err := cmd.CombinedOutput()
-			if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 ||
-				!strings.Contains(string(output), variable.old+" was renamed to "+variable.replacement) {
-				t.Fatalf("legacy variable was not rejected with migration guidance: %v\n%s", err, output)
-			}
-		})
-	}
-}
-
-func TestM1DemoRejectsLegacyRegistryWithoutMutatingIt(t *testing.T) {
-	temp := t.TempDir()
-	calls := filepath.Join(temp, "calls")
-	docker := filepath.Join(temp, "docker")
-	if err := os.WriteFile(docker, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CAPTURE_CALLS\"\ncase \"$*\" in\n  info|'container inspect nkd-m1-registry') exit 0 ;;\n  *) exit 99 ;;\nesac\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-m1-local.sh"))
-	cmd.Env = []string{"PATH=" + temp + string(os.PathListSeparator) + os.Getenv("PATH"), "CAPTURE_CALLS=" + calls}
-	output, err := cmd.CombinedOutput()
-	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 ||
-		!strings.Contains(string(output), "legacy nkd-m1-registry container exists; inspect and stop/remove it explicitly") {
-		t.Fatalf("legacy registry was not rejected with migration guidance: %v\n%s", err, output)
-	}
-	raw, err := os.ReadFile(calls)
-	if err != nil || string(raw) != "info\ncontainer inspect nkd-m1-registry\n" {
-		t.Fatalf("launcher performed unexpected Docker operations: %q %v", raw, err)
-	}
-}
-
 func TestReleaseConsumerRequiresOneReferenceAndExplicitPolicy(t *testing.T) {
 	raw, err := os.ReadFile(demoScript(t, "demo-release-consumer.sh"))
 	if err != nil {

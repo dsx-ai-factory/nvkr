@@ -146,7 +146,7 @@ func TestNetworkJournalUsesNVKENamespace(t *testing.T) {
 	g := networkFixture(t)
 	state := g.snapshot()
 	if state.Version != 3 || BridgeName != "nvkevm0" || !strings.HasPrefix(state.Owner, "nvke-demo-") {
-		t.Fatal("new journal did not use the version-3 NVKE namespace")
+		t.Fatal("journal must use the NVKE namespace")
 	}
 	state.Staging = &networkStaging{Path: filepath.Join(filepath.Dir(qemuPolicy), ".nvke-policy-"+strings.TrimPrefix(state.Owner, "nvke-demo-"))}
 	if err := validateNetworkState(state, g.Work); err != nil {
@@ -154,86 +154,30 @@ func TestNetworkJournalUsesNVKENamespace(t *testing.T) {
 	}
 }
 
-func TestNetworkJournalNamespaceIsVersionBound(t *testing.T) {
-	for _, version := range []int{2, 3} {
-		for _, mixed := range []bool{false, true} {
-			t.Run(fmt.Sprintf("v%d/mixed=%t", version, mixed), func(t *testing.T) {
-				g := networkFixture(t)
-				state := g.snapshot()
-				state.Version = version
-				prefix, stage, bridge := "nvke-demo-", ".nvke-policy-", "nvkevm0"
-				if version == 2 {
-					prefix, stage, bridge = "nkd-demo-", ".nkd-policy-", "nkdvm0"
-				}
-				state.Owner = prefix + strings.Repeat("a", 32)
-				state.Staging = &networkStaging{Path: filepath.Join(filepath.Dir(qemuPolicy), stage+strings.Repeat("a", 32))}
-				state.Rules = networkRules(state.Owner, state.KindCIDR)
-				state.Rules = append(state.Rules, guestTCPRule(state.Owner, "172.18.0.2", 30443))
-				if networkBridge(state.Owner) != bridge {
-					t.Fatal("recovery selected another bridge namespace")
-				}
-				if mixed {
-					state.Version = 5 - version
-				}
-				if err := validateNetworkState(state, g.Work); (err != nil) != mixed {
-					t.Fatalf("version/namespace binding: %v", err)
-				}
-			})
-		}
-	}
-}
-
-func TestNetworkRenamedLockCoordinatesWithLegacyOwners(t *testing.T) {
-	for _, occupied := range []string{"legacy", "renamed"} {
-		t.Run(occupied, func(t *testing.T) {
+func TestUnsupportedNetworkJournalRefusesBeforeActions(t *testing.T) {
+	for _, version := range []int{1, 2, 4} {
+		t.Run(strconv.Itoa(version), func(t *testing.T) {
 			g := networkFixture(t)
-			g.lockPath = filepath.Join(g.Work, "network.lock")
-			path := g.lockPath
-			if occupied == "legacy" {
-				path += ".legacy"
-			}
-			old, err := holdNetworkLock(path)
+			state := g.snapshot()
+			state.Version = version
+			raw, err := canonical.Marshal(state)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer old.Close()
-			if err := g.acquireLock(); err == nil || g.lock != nil || g.legacyLock != nil {
-				t.Fatal("mixed-version concurrent owner admitted or failed lock retained")
+			path := filepath.Join(g.Work, networkJournal)
+			if err := networkWriteExclusive(path, raw, 0o600); err != nil {
+				t.Fatal(err)
 			}
-			if occupied == "renamed" {
-				legacy, err := holdNetworkLock(g.lockPath + ".legacy")
-				if err != nil {
-					t.Fatal("second-lock failure leaked the first lock", err)
-				}
-				_ = legacy.Close()
-			}
-			_ = old.Close()
-			if err := g.acquireLock(); err != nil {
-				t.Fatal("released owner still blocks the new namespace", err)
-			}
-		})
-	}
-}
-
-func TestNetworkAdmissionRefusesEitherExistingBridge(t *testing.T) {
-	for _, bridge := range []string{"nvkevm0", "nkdvm0"} {
-		t.Run(bridge, func(t *testing.T) {
-			g := networkFixture(t)
-			g.lockPath = filepath.Join(g.Work, "network.lock")
-			calls := 0
-			g.capture = func(_ context.Context, args []string, privileged bool) ([]byte, error) {
-				calls++
-				if slices.Equal(args, []string{"true"}) && privileged {
-					return nil, nil
-				}
-				if slices.Equal(args, []string{"ip", "-j", "link", "show"}) && !privileged {
-					return []byte(`[{"ifname":"` + bridge + `"}]`), nil
-				}
-				t.Fatalf("admission performed unexpected host work: %v", args)
+			g.capture = func(context.Context, []string, bool) ([]byte, error) {
+				t.Fatal("unsupported journal reached host commands")
 				return nil, nil
 			}
-			if err := g.admit(t.Context()); err == nil || !strings.Contains(err.Error(), "pre-existing demo bridge") || calls != 2 {
-				t.Fatalf("existing bridge was not refused before mutation: %v calls=%d", err, calls)
+			if err := g.Start(t.Context()); err == nil {
+				t.Fatal("unsupported journal accepted")
+			}
+			after, err := os.ReadFile(path)
+			if err != nil || string(after) != string(raw) {
+				t.Fatal("unsupported journal was changed", err)
 			}
 		})
 	}
@@ -243,7 +187,7 @@ func TestNetworkJournalContracts(t *testing.T) {
 	for _, row := range []struct {
 		name   string
 		mutate func(networkState) networkState
-	}{{"valid", func(s networkState) networkState { return s }}, {"foreign-work", func(s networkState) networkState { s.Work += "x"; return s }}, {"foreign-owner", func(s networkState) networkState { s.UID++; return s }}, {"old-version", func(s networkState) networkState { s.Version = 1; return s }}, {"bad-digest", func(s networkState) networkState { s.HelperHash = s.HelperHash[7:]; return s }}, {"upper-digest", func(s networkState) networkState { s.HelperHash = strings.ToUpper(s.HelperHash); return s }}, {"bad-mac", func(s networkState) networkState { s.BridgeMAC = "00:00:00:00:00:00"; return s }}, {"bad-index", func(s networkState) networkState { s.BridgeID = "042"; return s }}, {"arbitrary-command", func(s networkState) networkState {
+	}{{"valid", func(s networkState) networkState { return s }}, {"foreign-work", func(s networkState) networkState { s.Work += "x"; return s }}, {"foreign-owner", func(s networkState) networkState { s.UID++; return s }}, {"old-version", func(s networkState) networkState { s.Version = 2; return s }}, {"bad-digest", func(s networkState) networkState { s.HelperHash = s.HelperHash[7:]; return s }}, {"upper-digest", func(s networkState) networkState { s.HelperHash = strings.ToUpper(s.HelperHash); return s }}, {"bad-mac", func(s networkState) networkState { s.BridgeMAC = "00:00:00:00:00:00"; return s }}, {"bad-index", func(s networkState) networkState { s.BridgeID = "042"; return s }}, {"arbitrary-command", func(s networkState) networkState {
 		s.Rules = []networkRule{{"filter", "INPUT", []string{"-j", "DROP"}}}
 		return s
 	}}, {"foreign-cap", func(s networkState) networkState {
@@ -322,38 +266,6 @@ func TestNetworkJournalFilesystemAndJSONNegatives(t *testing.T) {
 				t.Fatal("invalid journal accepted")
 			}
 		})
-	}
-}
-
-func TestNetworkLegacyJournalRefusesBeforeActions(t *testing.T) {
-	g := networkFixture(t)
-	// Legacy array-shaped identities must be diagnosed before Go v2 decoding.
-	raw := []byte(`{"version":1,"helperID":[1,2,493,0,0],"rules":[],"caps":[]}`)
-	path := filepath.Join(g.Work, networkJournal)
-	if err := networkWriteExclusive(path, raw, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	calls := 0
-	g.capture = func(context.Context, []string, bool) ([]byte, error) { calls++; return nil, nil }
-	err := g.Start(t.Context())
-	var coded *nvkrerr.Error
-	if !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed ||
-		!strings.Contains(err.Error(), legacyNetworkRecoveryRevision) ||
-		!strings.Contains(err.Error(), legacyNetworkRecoveryHelper) ||
-		!strings.Contains(err.Error(), "scripts/nke-local-demo.py") ||
-		!strings.Contains(err.Error(), "version 1") {
-		t.Fatalf("legacy refusal=%v", err)
-	}
-	if calls != 0 {
-		t.Fatal("legacy refusal executed host commands")
-	}
-	after, err := os.ReadFile(path)
-	if err != nil || string(after) != string(raw) {
-		t.Fatal("legacy refusal changed the journal", err)
-	}
-	entries, err := os.ReadDir(g.Work)
-	if err != nil || len(entries) != 1 {
-		t.Fatal("legacy refusal created recovery files", entries, err)
 	}
 }
 
@@ -634,13 +546,13 @@ func TestNetworkKindSimulatorInvalidBeforeWork(t *testing.T) {
 }
 
 func TestNetworkKindSimulatorJournalExactClosure(t *testing.T) {
-	for _, name := range []string{"legacy", "valid", "gateway-outside", "unbound-rule", "wrong-source", "wrong-target", "wrong-port", "foreign-owner", "duplicate", "arbitrary-interface"} {
+	for _, name := range []string{"without-gateway", "valid", "gateway-outside", "unbound-rule", "wrong-source", "wrong-target", "wrong-port", "foreign-owner", "duplicate", "arbitrary-interface"} {
 		t.Run(name, func(t *testing.T) {
 			g := networkFixture(t)
 			state := g.snapshot()
 			state.Rules = networkRules(state.Owner, state.KindCIDR)
 			state.Rules = append(state.Rules, guestTCPRule(state.Owner, "172.18.0.2", 30440), guestTCPRule(state.Owner, "172.18.0.2", 30443))
-			if name != "legacy" {
+			if name != "without-gateway" {
 				state.KindGateway = "172.18.0.1"
 				state.Rules = append(state.Rules, kindSimulatorRule(state.Owner, state.KindCIDR, state.KindGateway))
 			}
@@ -666,14 +578,14 @@ func TestNetworkKindSimulatorJournalExactClosure(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if name == "legacy" && strings.Contains(string(raw), "kindGateway") {
-				t.Fatal("legacy v2 bytes gained an empty field")
+			if name == "without-gateway" && strings.Contains(string(raw), "kindGateway") {
+				t.Fatal("journal without a gateway gained an empty field")
 			}
 			if err = networkWriteExclusive(filepath.Join(g.Work, networkJournal), raw, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			_, err = readNetworkState(g.Work)
-			if (err == nil) != (name == "legacy" || name == "valid") {
+			if (err == nil) != (name == "without-gateway" || name == "valid") {
 				t.Fatalf("journal accepted=%v: %v", err == nil, err)
 			}
 		})
@@ -993,19 +905,9 @@ func TestNetworkCleanupSurvivesJournalFailureButCannotReportSuccess(t *testing.T
 }
 
 func TestNetworkAmbiguousBridgeCreationCleanup(t *testing.T) {
-	for _, row := range []struct {
-		version int
-		foreign bool
-	}{{2, false}, {2, true}, {3, false}, {3, true}} {
-		t.Run(fmt.Sprintf("v%d/foreign=%t", row.version, row.foreign), func(t *testing.T) {
-			foreign := row.foreign
+	for _, foreign := range []bool{false, true} {
+		t.Run(fmt.Sprint(foreign), func(t *testing.T) {
 			g := networkFixture(t)
-			g.version = row.version
-			bridge := "nvkevm0"
-			if row.version == 2 {
-				g.Owner = "nkd-demo-" + strings.TrimPrefix(g.Owner, "nvke-demo-")
-				bridge = "nkdvm0"
-			}
 			g.BridgeIntent = true
 			present, deleted := true, false
 			g.capture = func(_ context.Context, args []string, _ bool) ([]byte, error) {
@@ -1013,9 +915,6 @@ func TestNetworkAmbiguousBridgeCreationCleanup(t *testing.T) {
 					return nil, nil
 				}
 				if slices.Contains(args, "delete") {
-					if !slices.Equal(args, []string{"ip", "link", "delete", bridge, "type", "bridge"}) {
-						t.Fatalf("cleanup targeted another namespace: %v", args)
-					}
 					deleted = true
 					present = false
 					return nil, nil
@@ -1027,7 +926,7 @@ func TestNetworkAmbiguousBridgeCreationCleanup(t *testing.T) {
 				if foreign {
 					mac = "02:00:00:00:00:00"
 				}
-				return []byte(fmt.Sprintf(`[{"ifname":%q,"ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, bridge, mac)), nil
+				return []byte(fmt.Sprintf(`[{"ifname":"nvkevm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, mac)), nil
 			}
 			err := g.Close(t.Context())
 			if foreign {

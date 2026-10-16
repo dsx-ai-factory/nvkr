@@ -85,7 +85,9 @@ RUN --mount=type=secret,id=nvkr_ca_bundle,mode=0444 --mount=type=bind,from=nvkr_
     printf '%s  %s\n' "${CRANE_ARCHIVE_SHA256}" "/tmp/${crane_archive}" | sha256sum -c; \
     printf '%s  %s\n' "${NFPM_ARCHIVE_SHA256}" "/tmp/${nfpm_archive}" | sha256sum -c
 
-FROM ${BASE_IMAGE} AS fetch
+# Extraction and checksum verification run on the builder; target binaries are
+# copied without execution. Native validation remains a separate build step.
+FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS fetch
 
 ARG TARGETARCH
 ARG UBUNTU_SNAPSHOT

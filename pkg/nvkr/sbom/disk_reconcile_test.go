@@ -33,8 +33,7 @@ func contentFixture(kind, architecture, payload string) *DiskContentInspection {
 		Files: []DiskFile{{Path: "usr/bin/tool", Kind: "regular", Digest: pin, Size: 12}}}}
 }
 
-// Literal keys pin the new helper report vocabulary independently of the writer.
-// The bound decoder separately covers existing legacy-image reports.
+// Literal keys pin the helper report vocabulary independently of the writer.
 func TestNVKRDiskReportPropertyABI(t *testing.T) {
 	for _, architecture := range []string{"amd64", "arm64"} {
 		t.Run(architecture, func(t *testing.T) {

@@ -74,16 +74,6 @@ type DiskInspectionContainer struct {
 }
 
 const (
-	// The image closure is authenticated before this fixed launcher runs. Prefer
-	// the new executable, retaining only the original pinned-image path as a
-	// compatibility choice. A helper failure is never retried under another name.
-	diskInspectionEntrypoint = `if [ -x /usr/local/bin/nvkr-disk-inspect ]; then
-  exec /usr/local/bin/nvkr-disk-inspect "$@"
-fi
-if [ -x /usr/local/bin/nkd-disk-inspect ]; then
-  printf '%s\n' '` + diskdiagnostic.LegacyWarning + `' >&2 || :
-fi
-exec /usr/local/bin/nkd-disk-inspect "$@"`
 	diskInspectionPIDsLimit    uint64 = 256
 	diskInspectionApplianceMiB uint64 = 2048
 	// MaxDiagnosticDiskBytes bounds the held diagnostic subject and its copies.
@@ -738,7 +728,7 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 	}
 	args = append(args,
 		"--env", "PATH=/usr/bin:/bin", "--env", "HOME=/tmp", "--env", "LC_ALL=C", "--env", "TZ=UTC",
-		"--entrypoint=/bin/sh", image, "-ec", diskInspectionEntrypoint, "nvkr-disk-inspect",
+		"--entrypoint=/usr/local/bin/nvkr-disk-inspect", image,
 		selection.InspectorDigest, selection.CodecDigest, subject.Digest(), strconv.FormatInt(subject.Size(), 10))
 	if selection.compositionKind != "" {
 		args = append(args, "composition", selection.compositionKind, selection.GuestfishDigest, selection.ScannerDigest, selection.PackageReaderDigest, strconv.FormatUint(selection.MaxFilesystemBytes, 10), selection.consumerPlatform)

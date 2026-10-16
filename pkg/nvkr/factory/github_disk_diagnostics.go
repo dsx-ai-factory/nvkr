@@ -26,9 +26,6 @@ func finishGitHubInspectionDiagnostics(ctx context.Context, workspace *os.File, 
 	if collector == nil {
 		return
 	}
-	if warning := collector.DeprecationWarning(); warning != "" && options.Stderr != nil {
-		_, _ = fmt.Fprintln(options.Stderr, warning)
-	}
 	raw, truncated := collector.Snapshot()
 	retentionCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer stop()

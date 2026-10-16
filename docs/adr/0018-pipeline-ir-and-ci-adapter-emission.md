@@ -155,7 +155,7 @@ publication; secret-valued FDE, encrypted inspection and qualified execution fai
 Their execution classes select exactly
 `arc-amd64-kvm` and `arc-arm64-kvm`. This is an explicit operator-trusted runner/daemon boundary: it does not
 claim an authenticated provider allocation, subordinate identity, independent sandbox attestation or qualification.
-Production and standalone diagnostic disk jobs use the `nkd-arc` protected Environment, with pool access
+Production and standalone diagnostic disk jobs use the `nvkr-arc` protected Environment, with pool access
 restricted to reviewed producer workflows on the default branch and any exact branches explicitly admitted by
 `githubDispatchBranches`. The separate signed-development policy is described below. The separately authored
 downstream E2E adapter has its own trust and provider-admission requirements in this section's
@@ -168,9 +168,9 @@ producer. Its grouped executor retains the live owner through exact QCOW2 export
 recording, then transports the raw disk as a same-Run Actions artifact. Finalization rechecks the selected
 output's bytes and result membership without reconstructing runtime or publication authority. No disk
 inspection, release wrapper, registry upload, signing or OIDC job is emitted. The workflow still requires
-the exact dispatch branch and `nkd-arc` deployment policy. Generated build-only workflows admit exactly one
+the exact dispatch branch and `nvkr-arc` deployment policy. Generated build-only workflows admit exactly one
 disk output. Their finalizer restores the complete source/material/raw-disk closure on that output's selected
-native ARC pool, using its matching helper and `nkd-arc` Environment with only `contents: read`. Its two-hour
+native ARC pool, using its matching helper and `nvkr-arc` Environment with only `contents: read`. Its two-hour
 job bound covers transfer, recovery and exact-byte observation; it does not rebuild, inspect or use KVM.
 If the catalog selects a private pin set, existing catalog-source credentials remain scoped to the
 final catalog-recompilation step; they are not passed to recovery or disk execution.
@@ -182,12 +182,12 @@ as a surrogate for build credentials. Real native FDE execution is acceptance ev
 
 The operator must provision ephemeral single-job runners and restrict pool access to reviewed workflows and
 admitted refs. Production uses the default branch plus exact `githubDispatchBranches` entries and the
-`nkd-arc` protected Environment. Signed development uses the separate `nvkr-dev-arc` Environment and its
+`nvkr-arc` protected Environment. Signed development uses the separate `nvkr-dev-arc` Environment and its
 reviewed branch policy described below, with the same two fixed runner labels and execution contracts.
 Provider configuration and fresh native interoperability are external acceptance requirements; emitting a
 label or naming an Environment does not establish those facts.
 
-Production `nkd-arc`/`nkd-release` and development `nvkr-dev-arc`/`nvkr-dev-release` deployment policies
+Production `nvkr-arc`/`nvkr-release` and development `nvkr-dev-arc`/`nvkr-dev-release` deployment policies
 and the corresponding signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
 Docker is the initial admitted runtime. For publication workflows, bootstrap, source fetch, registry publication,
@@ -335,7 +335,7 @@ belong to Environment/profile configuration; component toolchains remain produce
 
 #### Repository NVKE E2E adapter outside generated execution
 
-The separately authored repository CI adapter uses `arc-arm64-kvm` and `nkd-arc`
+The separately authored repository CI adapter uses `arc-arm64-kvm` and `nvkr-arc`
 for kind management plus native KVM tenant guests. This engineering contract is
 outside generated Run execution and v1 product qualification acceptance; it adds
 no Environment runtime engine, public runtime API or qualified runner claim.
@@ -743,7 +743,7 @@ rejects this GitHub-only option. Omitting it preserves default-branch-only execu
 Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
 or outputs change. Default-branch push
 publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
-`nkd-release` GitHub deployment environment; operators must configure its deployment policy to admit only
+`nvkr-release` GitHub deployment environment; operators must configure its deployment policy to admit only
 the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
 recognize those exact workflow refs. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
 The SBOM job receives no registry credentials or package permissions. The verifier needs registry read

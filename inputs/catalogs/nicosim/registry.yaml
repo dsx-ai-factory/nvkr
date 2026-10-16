@@ -14,7 +14,7 @@ sources:
     # freshly validated bytes; this pin does not prove current-source reproduction
     # or completed organizational review.
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
       - bash
       - -euc

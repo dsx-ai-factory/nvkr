@@ -10,7 +10,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/assemble"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -22,8 +21,7 @@ import (
 // concrete sandbox, rather than accepting callers' isolation promises. Factory
 // remains the owner of the original output/Plan/Run binding and live lifetime.
 type DiskInspectionRuntime struct {
-	container   *pipeline.DiskInspectionContainer
-	diagnostics *diskdiagnostic.Collector
+	container *pipeline.DiskInspectionContainer
 }
 
 // OpenDiskInspectionRuntime checks an already-local exact image and observes
@@ -35,7 +33,7 @@ func OpenDiskInspectionRuntime(ctx context.Context, selection pipeline.DiskInspe
 	if err != nil {
 		return nil, err
 	}
-	return &DiskInspectionRuntime{container: container, diagnostics: selection.Diagnostics}, nil
+	return &DiskInspectionRuntime{container: container}, nil
 }
 
 func (runtime *DiskInspectionRuntime) BindingContext(ctx context.Context) (image, inspector, codec string, err error) {
@@ -67,7 +65,7 @@ func (runtime *DiskInspectionRuntime) InspectPackerContent(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	return contentFromContainerObservation(observation, runtime.diagnostics)
+	return contentFromContainerObservation(observation)
 }
 
 func (runtime *DiskInspectionRuntime) InspectPackerAcquisitionsContent(ctx context.Context, artifact *pipeline.PackerArtifact, platform string) (*DiskContentInspection, error) {
@@ -78,7 +76,7 @@ func (runtime *DiskInspectionRuntime) InspectPackerAcquisitionsContent(ctx conte
 	if err != nil {
 		return nil, err
 	}
-	return contentFromContainerObservation(observation, runtime.diagnostics)
+	return contentFromContainerObservation(observation)
 }
 
 // InspectHeldInstalledPackages accepts only held subject authority. The fixed
