@@ -9,8 +9,10 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -33,10 +35,10 @@ func (b *backend) downloadGitHubNested(ctx context.Context, request Request, ind
 	if admission.Name == "" {
 		admission.Name = "private-ci-index"
 	}
-	ctx, cancel, options, err := admit(ctx, admission, options)
-	if err != nil {
+	if err := ValidateGitHubRequest(ctx, admission); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
 	defer cancel()
 	clean, names, roots, err := admitNestedSelections(request, selections)
 	if err != nil {
@@ -45,6 +47,15 @@ func (b *backend) downloadGitHubNested(ctx context.Context, request Request, ind
 	locators, err := readNestedIndex(ctx, request, index, clean)
 	if err != nil {
 		return err
+	}
+	for _, name := range names {
+		if locators[name].Metadata == nil {
+			selected := request
+			selected.Name = name
+			if err := ValidateGitHubTransfer(ctx, selected, options); err != nil {
+				return err
+			}
+		}
 	}
 	if err := checkNestedDestinations(ctx, destination, roots); err != nil {
 		return err
@@ -110,6 +121,7 @@ func readNestedIndex(ctx context.Context, request Request, index string, selecti
 		return nil, e.New(e.CodeVerifyFailed, "nested CI index contains extra entries")
 	}
 	locators := make(map[string]Locator, len(selections))
+	totalBytes := 0
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "reading nested CI index canceled")
@@ -138,6 +150,14 @@ func readNestedIndex(ctx context.Context, request Request, index string, selecti
 		}
 		if err := matchNestedLocator(locator, selection); err != nil {
 			return nil, err
+		}
+		raw, marshalErr := canonical.Marshal(locator)
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		totalBytes += len(raw)
+		if totalBytes > maxGitHubIndexBytes {
+			return nil, e.New(e.CodeVerifyFailed, "nested CI metadata index exceeds its aggregate bound")
 		}
 		locators[name] = locator
 	}
@@ -187,10 +207,10 @@ func readNestedLocator(ctx context.Context, directory *os.File, name string, req
 		return Locator{}, e.Wrap(e.CodeVerifyFailed, err, "holding nested CI locator")
 	}
 	defer file.Close()
-	if before.Size() <= 0 || before.Size() > MaxLocatorBytes {
+	if before.Size() <= 0 || before.Size() > MaxMetadataRecordBytes {
 		return Locator{}, e.New(e.CodeVerifyFailed, "nested CI locator exceeds its metadata bound")
 	}
-	raw, err := io.ReadAll(io.LimitReader(contextReader{ctx: ctx, r: file}, MaxLocatorBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(contextReader{ctx: ctx, r: file}, MaxMetadataRecordBytes+1))
 	if err != nil {
 		return Locator{}, safeIOError(ctx, e.CodeVerifyFailed, "reading nested CI locator")
 	}

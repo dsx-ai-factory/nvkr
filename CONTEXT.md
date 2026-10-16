@@ -131,8 +131,10 @@ Other nodes keep separate jobs. Signing, publication and remote verification ret
 which waits for its acquisition and restoration before observation. Required aggregate accounting changes,
 and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
 generated files do not supply scheduling state.
-Payload carriers use an unlinked private/internal GHCR package with separate storage credentials; only
-JSON locators enter Actions artifact storage. Digest-verified chunked transport grants no release authority.
+Payload carriers use an unlinked private/internal GHCR package with separate storage credentials.
+Actions stores their JSON locators and separately validated metadata records with exact schemas and file
+inventories. Metadata delivery uses workflow identity, preserves exact bytes and grants no release authority.
+Unknown/mixed contents remain private; control layouts cannot carry output payload blobs.
 Carrier and GHCR publication admission use the automatic repository token for source metadata separately
 from package credentials; that token is not added to producer execution.
 Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.

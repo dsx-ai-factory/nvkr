@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package cistore transports CI workspace carriers through an independently
-// private GHCR package. A locator describes transport bytes, never a release or
-// an authenticated build. Consumers retain their own provider-origin checks.
+// Package cistore transports payload carriers through private GHCR and validated
+// metadata through Actions. Records describe transport bytes, never release or
+// build authority. Consumers retain their own artifact authentication checks.
 package cistore
 
 import (
@@ -28,7 +28,7 @@ const (
 	SchemaVersion = "nvkr.dev/ci-carrier/v2"
 	// BindingLabel joins the OCI config to all locator fields except Reference.
 	BindingLabel = "nvkr.dev/ci-carrier"
-	// MaxLocatorBytes bounds metadata received from the Actions artifact API.
+	// MaxLocatorBytes bounds private v2 locators; public metadata has its own bound.
 	MaxLocatorBytes = 32 << 10
 )
 
@@ -54,13 +54,14 @@ type Options struct {
 // Paths retain original workspace-relative roots; StripPrefix gives the upload
 // action's least common ancestor. Reference authenticates the image/config bytes.
 type Locator struct {
-	SchemaVersion string   `json:"schemaVersion"`
-	Request       Request  `json:"request"`
-	Reference     string   `json:"reference"`
-	ArchiveDigest string   `json:"archiveDigest"`
-	ArchiveSize   int64    `json:"archiveSize"`
-	Paths         []string `json:"paths"`
-	StripPrefix   string   `json:"stripPrefix"`
+	SchemaVersion string           `json:"schemaVersion"`
+	Request       Request          `json:"request"`
+	Reference     string           `json:"reference"`
+	ArchiveDigest string           `json:"archiveDigest"`
+	ArchiveSize   int64            `json:"archiveSize"`
+	Paths         []string         `json:"paths"`
+	StripPrefix   string           `json:"stripPrefix"`
+	Metadata      *MetadataContent `json:"metadata,omitempty"`
 }
 
 type binding struct {
@@ -80,7 +81,7 @@ func (l Locator) bindingBytes() ([]byte, error) {
 // shape, not provider origin, registry privacy, or consumer artifact authority.
 func DecodeLocator(raw []byte) (Locator, error) {
 	var l Locator
-	if len(raw) == 0 || len(raw) > MaxLocatorBytes {
+	if len(raw) == 0 || len(raw) > MaxMetadataRecordBytes {
 		return l, e.New(e.CodeVerifyFailed, "CI locator exceeds its metadata bound")
 	}
 	if err := canonical.UnmarshalExact(raw, &l); err != nil {
@@ -97,6 +98,9 @@ func DecodeLocator(raw []byte) (Locator, error) {
 func (l Locator) Validate(request Request) error {
 	if err := request.validate(); err != nil {
 		return err
+	}
+	if l.Metadata != nil || l.SchemaVersion == metadataSchema {
+		return l.validateMetadata(request)
 	}
 	if l.SchemaVersion != SchemaVersion || l.Request != request {
 		return e.New(e.CodeVerifyFailed, "CI locator does not match the exact source request")

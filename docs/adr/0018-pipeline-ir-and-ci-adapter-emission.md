@@ -123,20 +123,41 @@ materialize pinned inputs first; hermetic build and verification nodes enforce n
 private output and a fixed credential-free environment. The local byte-observation exception in §8 executes
 no producer code and carries no container-isolation or qualification claim. Shared code prevents semantic
 drift; it does not alone prove byte identity across hosts.
-The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions locator delivery.
-Actions uploads contain only bounded JSON locators; workspace carriers, source archives, tools and binary
-outputs are stored in a separately checked private or internal GHCR package. The CI transport binds each
-locator to its repository, Run, attempt and artifact name, an exact image/config, and the archive digest and
-size before existing carrier restoration. It confers no release or qualification authority. The generated
-workflow admits at most 2,000 locator uploads per generated attempt, counting helper, diagnostic and finalization uploads even
-when conditional. The Go transport owner acquires at most 2,000 selected locators serially, looking up each
-fixed artifact name through the authenticated same-Run API before downloading its ZIP. Exact-name queries
-avoid the former action's 1,000-entry listing cutoff and dependence on page positions while unrelated
-jobs add artifacts. The selected Run-attempt response binds repository IDs and head; each name lookup
-must return zero or one matching artifact. Each ZIP is bounded to 64 KiB and must match its provider
-SHA-256; it must contain one canonical locator of at most 32 KiB bound to the exact repository, Run,
-attempt and selected name.
-Provider digests and all selected locators are checked in memory before the locator index is written.
+The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions delivery.
+Binary payloads, source archives, tools, unknown/mixed artifacts and raw diagnostics remain in a separately
+checked private or internal GHCR package. Their v2 JSON locators bind repository, Run, attempt, artifact
+name, exact image/config, and archive digest/size. There is no public-payload fallback.
+
+A separate `nvkr.dev/ci-metadata/v1` record carries admitted metadata directly in Actions storage.
+The factory derives its selection from the complete Plan and validates the held carrier's exact inventory:
+publication/signing/prepared/attested control layouts, provenance predicates, signing/verification records,
+immutable publication references, producer results, source receipts, terminal observations and SBOM sets.
+A kind or filename only selects the validator; it does not authorize the bytes. Closed record schemas and
+indexed SBOM membership are checked by their owners. Control layouts must pass metadata-only delivery
+inspection, exclude output payload blobs and unreachable members, and contain only the exact OCI control
+files and JSON blobs. Unknown fields in canonical records, executable file modes, links, binary members,
+extra files and unsupported shapes fail before publication. No invalid metadata silently falls back.
+The factory keeps an operation-local admitted snapshot until publication; layout validators use a bounded
+private snapshot that must be cleaned up before export. Single-record and SBOM-set validation stays in memory.
+Only validated text bytes, paths and modes enter the record; TAR headers, padding and opaque archives do not.
+
+Metadata records retain exact file bytes (including signed predicate terminators), one factory carrier
+member and its exact inner root. A record permits at most 4,096 entries, 8 MiB per file, 16 MiB total text
+and 32 MiB serialized JSON. Larger metadata is refused, not truncated or silently sent through another lane.
+Both transport forms confer no release or qualification authority. Signer separation, consumer signatures,
+exact artifact digests, source closure checks and finalizer completeness remain mandatory.
+
+The generated workflow admits at most 2,000 Actions uploads per attempt, counting helper, diagnostic and
+finalization uploads even when conditional. The Go transport owner acquires selected records serially,
+looking up each fixed name through the authenticated same-Run API. Exact-name queries avoid listing cutoffs
+and page-position races. The Run-attempt response binds repository IDs and head; each lookup must return
+zero or one matching artifact. Each ZIP must match its provider SHA-256 and contain one canonical record
+bound to repository, Run, attempt and selected name. Private locators retain their 32 KiB decoded limit;
+public metadata uses the bounds above. ZIPs are bounded to 33 MiB and the complete decoded index to 128 MiB.
+Provider digests and all selected records are checked before publishing the fresh index. Actions acquisition
+uses the repository workflow token; metadata-only restoration needs no registry credential or package API
+request. Mixed stage batches admit their complete selection and private credentials before transfer. Private
+payload privacy admission is unchanged and remains mandatory for every private carrier.
 API request starts are separated by at least 100 milliseconds. Each API request permits at most four
 attempts, only for HTTP 429 or an HTTP 403 JSON response identifying a secondary rate limit. Cancellable
 waits honor `Retry-After` up to 120 seconds, with a 60-second exponentially increasing fallback and an
@@ -1009,8 +1030,8 @@ permissions, source credential scope, pinned actions and explicit operator setup
 step from source fetch so it receives no source credential. No authored transport manifest or arbitrary
 command argument is added.
 
-Each stage selects one exact set of external input carriers from its admitted Plan. Its private transfer
-operation admits the complete provider locator index before payload work: missing, extra or duplicate
+Each stage selects one exact set of external input carriers from its admitted Plan. Its split transfer
+operation admits the complete provider record index before payload work: missing, extra or duplicate
 locators fail, as do mismatched carrier members and overlapping or pre-existing destination roots.
 The generated semantic download/restore pair executes as one scoped transfer operation. It streams the
 outer private-registry TAR's single exact factory-TAR member into private extracted roots, without storing
@@ -1022,7 +1043,9 @@ Archive traversal, entry and byte limits, no-follow access and exact Plan-select
 Carrier consistency is transport validation, not artifact or release authority; consumers still authenticate
 their own exact closures. Inversion of the fixed private template preserves the logical download/restore
 pair for graph validation, and complete regeneration checks the executable projection and invocation data.
-The standalone local carrier restorer and finalizer recovery retain their held-inode extraction paths.
+Public metadata reconstructs its small deterministic archive in memory and uses the same no-replace
+restoration owner. The finalizer materializes that small carrier only to retain its existing per-artifact
+recovery interface. The standalone local carrier restorer and finalizer recovery retain their held-inode extraction paths.
 Successful local restoration removes its exact regular carrier; failed and unrequested carriers remain untouched.
 Each operation prepares only outputs needed outside its stage or by finalization, with an independent upload
 for each selected carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated

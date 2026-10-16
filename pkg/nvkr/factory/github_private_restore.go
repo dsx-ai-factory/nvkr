@@ -53,12 +53,7 @@ func RestoreGitHubPrivateInputs(ctx context.Context, plan *Plan, stageID string,
 		selections[name] = cistore.NestedArchive{Member: carrierPath(id), Allowed: []string{artifacts[id].Path}}
 		details = append(details, githubArtifactDetail(plan, "Input", id))
 	}
-	admission := request
-	admission.Name = githubArtifactName(inputs[0])
-	if err := cistore.ValidateGitHubTransfer(ctx, admission, storage); err != nil {
-		return err
-	}
-	return githubProgress(ctx, options, "Restore stage inputs from private GHCR", details, func(progress *githubStepProgress) error {
+	return githubProgress(ctx, options, "Restore stage metadata and private payloads", details, func(progress *githubStepProgress) error {
 		progress.phase("authenticate and stream required carriers")
 		return cistore.DownloadGitHubNested(ctx, request, index, ".", selections, storage)
 	})

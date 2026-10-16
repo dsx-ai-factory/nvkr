@@ -140,13 +140,18 @@ func (g *githubLocatorClient) fetch(ctx context.Context, request Request, index 
 		ids[artifact.ID] = true
 		artifacts = append(artifacts, artifact)
 	}
-	// At most 2000 * 32 KiB is retained. No destination member is written until
+	// The complete selection has a shared 128 MiB bound. No member is written until
 	// every selected archive's provider digest and exact locator binding pass.
 	locators := make([]githubLocatorBytes, 0, len(artifacts))
+	totalBytes := 0
 	for _, artifact := range artifacts {
 		raw, err := g.downloadLocator(ctx, request, artifact)
 		if err != nil {
 			return err
+		}
+		totalBytes += len(raw)
+		if totalBytes > maxGitHubIndexBytes {
+			return e.New(e.CodeVerifyFailed, "CI metadata index exceeds its aggregate bound")
 		}
 		locators = append(locators, githubLocatorBytes{name: artifact.Name, raw: raw})
 	}

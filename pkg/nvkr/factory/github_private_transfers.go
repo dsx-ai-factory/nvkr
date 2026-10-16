@@ -399,8 +399,8 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				githubYAMLSet(env, field.env, githubYAMLString("${{ inputs."+field.input+" }}"))
 			}
 			githubYAMLSet(env, "NVKR_CI_INDEX", githubYAMLString("${{ steps.directory.outputs.path }}"))
-			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Store bytes in private GHCR"), "id", githubYAMLString("store"), "if", githubYAMLString(githubCIStoreCondition), "shell", githubYAMLString("bash"), "env", env, "run", githubYAMLString("set -eu\n./nvkr-exec factory github ci-upload --name \"$NVKR_CI_NAME\" --path \"$NVKR_CI_PATH\" --if-no-files-found \"${NVKR_CI_MISSING:-error}\" --include-hidden-files=\"${NVKR_CI_HIDDEN:-false}\" --out \"$NVKR_CI_INDEX\"")))
-			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Upload only the private locator"), "id", githubYAMLString("index"), "if", githubYAMLString(githubCIIndexCondition), "uses", githubYAMLString(actions.Upload), "with", githubYAMLMap("name", githubYAMLString("${{ inputs.name }}"), "path", githubYAMLString("${{ steps.store.outputs.locator_path }}"), "include-hidden-files", githubYAMLString("true"), "if-no-files-found", githubYAMLString("error"), "retention-days", githubYAMLString("${{ inputs.retention-days || '7' }}"))))
+			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Admit public metadata or store private payload"), "id", githubYAMLString("store"), "if", githubYAMLString(githubCIStoreCondition), "shell", githubYAMLString("bash"), "env", env, "run", githubYAMLString("set -eu\n./nvkr-exec factory github ci-upload --plan "+shellQuote(githubLayoutFor(plan).planPath)+" --name \"$NVKR_CI_NAME\" --path \"$NVKR_CI_PATH\" --if-no-files-found \"${NVKR_CI_MISSING:-error}\" --include-hidden-files=\"${NVKR_CI_HIDDEN:-false}\" --out \"$NVKR_CI_INDEX\"")))
+			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Upload validated metadata or private locator"), "id", githubYAMLString("index"), "if", githubYAMLString(githubCIIndexCondition), "uses", githubYAMLString(actions.Upload), "with", githubYAMLMap("name", githubYAMLString("${{ inputs.name }}"), "path", githubYAMLString("${{ steps.store.outputs.locator_path }}"), "include-hidden-files", githubYAMLString("true"), "if-no-files-found", githubYAMLString("error"), "retention-days", githubYAMLString("${{ inputs.retention-days || '7' }}"))))
 			for _, field := range []string{"artifact-id", "artifact-url", "artifact-digest"} {
 				githubYAMLSet(outputs, field, githubYAMLMap("description", githubYAMLString("Locator index "+field), "value", githubYAMLString("${{ steps.index.outputs."+field+" }}")))
 			}
@@ -419,7 +419,7 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				"NVKR_CI_MERGE", githubYAMLString("${{ inputs.merge-multiple || 'false' }}"),
 				"NVKR_CI_RUN", githubYAMLString("${{ inputs.run-id }}"), "NVKR_CI_ATTEMPT", githubYAMLString("${{ inputs.attempt }}"))
 			locatorCommand := "set -eu\nexec " + helper + " factory github ci-fetch-locators --index-dir \"$NVKR_CI_INDEX\" --name \"$NVKR_CI_NAME\" --pattern \"$NVKR_CI_PATTERN\" --merge-multiple=\"$NVKR_CI_MERGE\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
-			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download only private locators"), "shell", githubYAMLString("bash"), "env", locatorEnv, "run", githubYAMLString(locatorCommand)))
+			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download metadata and private locators"), "shell", githubYAMLString("bash"), "env", locatorEnv, "run", githubYAMLString(locatorCommand)))
 			download := helper + " factory github ci-download --index-dir \"$NVKR_CI_INDEX\" --destination \"${NVKR_CI_DESTINATION:-.}\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
 			command := "set -eu\n"
 			if mode == "download" {
@@ -427,10 +427,10 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				command += "if [ -n \"$NVKR_CI_STAGE\" ]; then\n  exec " + download + " --plan " + shellQuote(githubLayoutFor(plan).planPath) + " --stage \"$NVKR_CI_STAGE\"\nfi\n"
 			}
 			command += "exec " + download
-			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Restore bytes from private GHCR"), "shell", githubYAMLString("bash"), "env", env, "run", githubYAMLString(command)))
+			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Restore metadata and private payloads"), "shell", githubYAMLString("bash"), "env", env, "run", githubYAMLString(command)))
 			githubYAMLSet(outputs, "download-path", githubYAMLMap("description", githubYAMLString("Requested private transfer destination"), "value", githubYAMLString("${{ inputs.path }}")))
 		}
-		document := githubYAMLMap("name", githubYAMLString("Private CI "+mode), "description", githubYAMLString("Generated private transport; Actions artifacts contain only locator JSON."), "inputs", inputs, "outputs", outputs, "runs", githubYAMLMap("using", githubYAMLString("composite"), "steps", steps))
+		document := githubYAMLMap("name", githubYAMLString("Private CI "+mode), "description", githubYAMLString("Generated split transport; Actions artifacts contain validated metadata or private-payload locators."), "inputs", inputs, "outputs", outputs, "runs", githubYAMLMap("using", githubYAMLString("composite"), "steps", steps))
 		document.HeadComment = "SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\nSPDX-License-Identifier: Apache-2.0\n\nGENERATED BY nvkr run generate — DO NOT EDIT"
 		raw, err := encodeGitHubYAML(document)
 		if err != nil {

@@ -1295,6 +1295,19 @@ four-bundle regeneration/drift, Actionlint, YAML, Python syntax, shell, formatti
 passed; the vulnerability scan found no vulnerabilities. Entry workflows and job counts are unchanged.
 Unit/race/Python suites remain skipped; hosted acceptance of this bootstrap change remains open.
 
+The current split transport exports the twelve admitted metadata families directly through Actions,
+including metadata-only OCI controls, while binary/source/tool carriers and unknown/mixed contents remain
+private GHCR transfers. A held carrier is projected to a bounded text inventory, checked against its exact
+record schema or complete metadata layout, and bound to repository/Run/attempt/name before publication.
+Consumers retain the serial provider-digest checks, complete Plan selection, no-replace restoration and
+existing evidence authentication. Public records require no registry credential or package metadata calls.
+The unchanged full-success development graph projects 853 public metadata uploads and 1,202 reads,
+removing 2,908 package REST requests (5,501 to 2,593 before retries or conditional revalidation).
+This is a static projection, not measured quota usage. Contract cases are authored but unexecuted at the
+operator's request. Go compilation for macOS and Linux amd64/arm64, vet, lint, four-bundle drift checks,
+Actionlint, YAML lint, shellcheck, license and formatting checks passed; the vulnerability scan found no
+vulnerabilities. Full hosted acceptance and an attachment audit of the new format remain unproved.
+
 For Run 38867619968, the plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP
 containing one 527-byte canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256
 `8346896ddd5dba69678d6e0773478a0ecee60bb12bd4d9b32b26dadb90387557`, exact Run/head/attempt and

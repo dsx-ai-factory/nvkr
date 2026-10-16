@@ -576,11 +576,11 @@ func TestGitHubPrivateTransfersRejectPayloadFallbackAndCredentialTampering(t *te
 			githubTestYAMLField(t, step, "with", "cache").Value = "true"
 		}},
 		{"missing locator context", githubCITransferPath(plan, "download") + "/action.yml", func(root *yamlv3.Node) {
-			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Download only private locators")
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Download metadata and private locators")
 			githubYAMLRemove(step, "env")
 		}},
 		{"wildcard bootstrap locator discovery", githubCITransferPath(plan, "bootstrap-download") + "/action.yml", func(root *yamlv3.Node) {
-			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Download only private locators")
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Download metadata and private locators")
 			githubTestYAMLField(t, step, "env", "NVKR_CI_PATTERN").Value = "*"
 		}},
 		{"credential scope", bundle.WorkflowPath, func(root *yamlv3.Node) {

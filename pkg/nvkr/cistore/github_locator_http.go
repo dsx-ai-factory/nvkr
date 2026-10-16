@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	maxGitHubLocatorZIPBytes = 64 << 10
+	maxGitHubLocatorZIPBytes = MaxMetadataRecordBytes + (1 << 20)
 	maxGitHubLocatorAPIBytes = 1 << 20
 	githubLocatorAPIAttempts = 4
 	githubLocatorAPISpacing  = 100 * time.Millisecond

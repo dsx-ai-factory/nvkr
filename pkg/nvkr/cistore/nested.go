@@ -40,6 +40,9 @@ func (b *backend) downloadNested(ctx context.Context, request Request, locator L
 	if err := matchNestedLocator(locator, clean); err != nil {
 		return err
 	}
+	if locator.Metadata != nil {
+		return restoreMetadata(ctx, request, locator, destination, &clean)
+	}
 	return b.downloadRestored(ctx, request, locator, destination, options,
 		func(ctx context.Context, layers []v1.Layer, manifest *v1.Manifest, locator Locator, destination string) error {
 			return restoreNestedLayers(ctx, layers, manifest, locator, destination, clean)
@@ -68,6 +71,9 @@ func admitNestedArchive(selection NestedArchive) (NestedArchive, error) {
 }
 
 func matchNestedLocator(locator Locator, selection NestedArchive) error {
+	if locator.Metadata != nil && !slices.Equal(selection.Allowed, []string{locator.Metadata.Root}) {
+		return e.New(e.CodeVerifyFailed, "public metadata differs from the complete Plan selection")
+	}
 	prefix := path.Dir(selection.Member)
 	if prefix == "." {
 		prefix = ""

@@ -129,6 +129,9 @@ func Download(ctx context.Context, request Request, locator Locator, destination
 }
 
 func (b *backend) download(ctx context.Context, request Request, l Locator, destination string, opts Options) error {
+	if l.Metadata != nil {
+		return restoreMetadata(ctx, request, l, destination, nil)
+	}
 	return b.downloadRestored(ctx, request, l, destination, opts, restoreLayers)
 }
 

@@ -593,7 +593,10 @@ can share descriptive YAML anchors for native preflight, credential-free checkou
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
 Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
-retain only JSON locators. Dedicated read/write credentials do not elevate repository-token permissions.
+retain their JSON locators plus separately admitted metadata records. The factory validates exact schemas
+and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
+digests and downstream artifact authentication remain required. Metadata-only transfers use workflow
+identity without package API calls. Dedicated read/write credentials do not elevate repository-token permissions.
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
 from the credential that accesses package metadata and registry bytes. Producers receive neither through
 these admission paths.

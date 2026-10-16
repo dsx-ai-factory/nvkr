@@ -15,9 +15,10 @@ import (
 
 func cmdFactoryCIUpload() *cli.Command {
 	return &cli.Command{
-		Name: "ci-upload", Hidden: true, Usage: "transfer an exact CI carrier to admitted private storage",
+		Name: "ci-upload", Hidden: true, Usage: "transfer validated metadata to Actions or an exact payload to private storage",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "name"},
+			&cli.StringFlag{Name: "plan"},
 			&cli.StringFlag{Name: "path"},
 			&cli.StringFlag{Name: "out"},
 			&cli.StringFlag{Name: "if-no-files-found", Value: "error"},
@@ -32,7 +33,7 @@ func cmdFactoryCIUpload() *cli.Command {
 				return err
 			}
 			request.Name = c.String("name")
-			if err := cistore.ValidateGitHubTransfer(c.Context, request, options); err != nil {
+			if err := cistore.ValidateGitHubRequest(c.Context, request); err != nil {
 				return err
 			}
 			output, err := cistore.OpenGitHubOutput(c.Context, os.Getenv("GITHUB_OUTPUT"))
@@ -40,11 +41,24 @@ func cmdFactoryCIUpload() *cli.Command {
 				return err
 			}
 			defer func() { _ = output.Close() }()
-			path, err := cistore.UploadGitHub(c.Context, cistore.GitHubUpload{
+			input := cistore.GitHubUpload{
 				Request: request, Options: options, Root: ".", Paths: c.String("path"),
 				OutputDirectory: c.String("out"), IfNoFilesFound: c.String("if-no-files-found"),
 				IncludeHiddenFiles: c.Bool("include-hidden-files"),
-			})
+			}
+			var path string
+			if c.String("plan") != "" {
+				plan, loadErr := factory.LoadPlanContext(c.Context, c.String("plan"))
+				if loadErr != nil {
+					return loadErr
+				}
+				path, err = factory.UploadGitHubCarrier(c.Context, plan, input)
+			} else {
+				if err := cistore.ValidateGitHubTransfer(c.Context, request, options); err != nil {
+					return err
+				}
+				path, err = cistore.UploadGitHub(c.Context, input)
+			}
 			if err != nil {
 				return err
 			}
@@ -91,7 +105,7 @@ func cmdFactoryCIFetchLocators() *cli.Command {
 
 func cmdFactoryCIDownload() *cli.Command {
 	return &cli.Command{
-		Name: "ci-download", Hidden: true, Usage: "restore exact private CI carriers from provider locator records",
+		Name: "ci-download", Hidden: true, Usage: "restore exact metadata and private carriers from provider records",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "index-dir"}, &cli.StringFlag{Name: "destination"},
 			&cli.StringFlag{Name: "run-id"}, &cli.StringFlag{Name: "attempt"},
@@ -135,7 +149,7 @@ func factoryCIContext() (cistore.Request, cistore.Options, error) {
 		return cistore.Request{}, cistore.Options{}, e.New(e.CodeEngineCapability, "private CI transfer requires the GitHub runner context")
 	}
 	if strings.TrimSpace(os.Getenv("NVKR_CI_STORAGE_USER")) == "" {
-		return cistore.Request{}, cistore.Options{}, e.New(e.CodeTrustPolicyMissing, "private CI transfer requires an explicit storage username")
+		return cistore.Request{}, cistore.Options{}, e.New(e.CodeTrustPolicyMissing, "CI transfer requires its configured storage username")
 	}
 	return cistore.Request{Repository: os.Getenv("GITHUB_REPOSITORY"), RunID: os.Getenv("GITHUB_RUN_ID"), Attempt: os.Getenv("GITHUB_RUN_ATTEMPT")},
 		cistore.Options{Token: os.Getenv("NVKR_CI_STORAGE_TOKEN"), RepositoryToken: os.Getenv("NVKR_CI_REPOSITORY_TOKEN"), Username: os.Getenv("NVKR_CI_STORAGE_USER")}, nil

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
@@ -201,13 +202,15 @@ func (b *backend) downloadGitHub(ctx context.Context, request Request, index, de
 	if admission.Name == "" {
 		admission.Name = "private-ci-index"
 	}
-	ctx, cancel, options, err := admit(ctx, admission, options)
-	if err != nil {
+	if err := ValidateGitHubRequest(ctx, admission); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
 	defer cancel()
+	totalBytes := 0
+	seen := map[string]bool{}
 	count := 0
-	err = filepath.WalkDir(index, func(name string, entry fs.DirEntry, walkErr error) error {
+	err := filepath.WalkDir(index, func(name string, entry fs.DirEntry, walkErr error) error {
 		if err := ctx.Err(); err != nil {
 			return e.Wrap(e.CodeTimeout, err, "private CI index traversal canceled")
 		}
@@ -220,14 +223,18 @@ func (b *backend) downloadGitHub(ctx context.Context, request Request, index, de
 		if entry.Type() != 0 || !strings.HasSuffix(entry.Name(), locatorSuffix) {
 			return e.New(e.CodeVerifyFailed, "CI index contains a non-locator member")
 		}
-		file, err := heldfile.OpenContext(ctx, name, heldfile.Options{Label: "private CI locator", MaxBytes: 32 << 10})
+		file, err := heldfile.OpenContext(ctx, name, heldfile.Options{Label: "private CI locator", MaxBytes: MaxMetadataRecordBytes})
 		if err != nil {
 			return e.Wrap(e.CodeFetchFailed, err, "open private CI locator")
 		}
-		raw, readErr := file.ReadAllContext(ctx, 32<<10)
+		raw, readErr := file.ReadAllContext(ctx, MaxMetadataRecordBytes)
 		closeErr := file.Close()
 		if readErr != nil || closeErr != nil {
 			return e.New(e.CodeFetchFailed, "read private CI locator failed")
+		}
+		totalBytes += len(raw)
+		if totalBytes > maxGitHubIndexBytes || count >= MaxGitHubLocatorArtifacts {
+			return e.New(e.CodeVerifyFailed, "CI index exceeds its aggregate bound")
 		}
 		locator, err := DecodeLocator(raw)
 		if err != nil {
@@ -237,6 +244,15 @@ func (b *backend) downloadGitHub(ctx context.Context, request Request, index, de
 		selected.Name = strings.TrimSuffix(entry.Name(), locatorSuffix)
 		if request.Name != "" && request.Name != selected.Name {
 			return e.New(e.CodeVerifyFailed, "CI index name differs from the selected artifact")
+		}
+		if seen[selected.Name] {
+			return e.New(e.CodeVerifyFailed, "CI index repeats a selected artifact")
+		}
+		seen[selected.Name] = true
+		if locator.Metadata == nil {
+			if err := ValidateGitHubTransfer(ctx, selected, options); err != nil {
+				return err
+			}
 		}
 		parent, err := filepath.Rel(index, filepath.Dir(name))
 		if err != nil || !filepath.IsLocal(parent) {

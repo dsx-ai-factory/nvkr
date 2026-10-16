@@ -66,19 +66,19 @@ func unpackGitHubLocator(ctx context.Context, raw []byte, request Request) ([]by
 		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP must contain exactly one regular locator")
 	}
 	member := archive.File[0]
-	if member.Name != request.Name+locatorSuffix || !member.Mode().IsRegular() || member.UncompressedSize64 == 0 || member.UncompressedSize64 > MaxLocatorBytes {
+	if member.Name != request.Name+locatorSuffix || !member.Mode().IsRegular() || member.UncompressedSize64 == 0 || member.UncompressedSize64 > MaxMetadataRecordBytes {
 		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP member has invalid name, type or size")
 	}
 	file, err := member.Open()
 	if err != nil {
 		return nil, e.New(e.CodeVerifyFailed, "opening CI locator ZIP member failed")
 	}
-	locator, readErr := io.ReadAll(io.LimitReader(file, MaxLocatorBytes+1))
+	locator, readErr := io.ReadAll(io.LimitReader(file, MaxMetadataRecordBytes+1))
 	closeErr := file.Close()
 	if ctx.Err() != nil {
 		return nil, safeIOError(ctx, e.CodeTimeout, "CI locator ZIP decoding canceled")
 	}
-	if readErr != nil || closeErr != nil || len(locator) > MaxLocatorBytes || uint64(len(locator)) != member.UncompressedSize64 {
+	if readErr != nil || closeErr != nil || len(locator) > MaxMetadataRecordBytes || uint64(len(locator)) != member.UncompressedSize64 {
 		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP member integrity failed")
 	}
 	description, err := DecodeLocator(locator)

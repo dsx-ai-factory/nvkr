@@ -100,8 +100,11 @@ membership and Environment policy without writing files. Changes outside that co
 regeneration and review. This mode neither follows floating upstream versions nor changes the default
 or development bundle contract; ordinary `--check` remains a complete byte comparison.
 
-Generated GitHub transfers retain JSON locators in Actions and move their payloads to
-`ghcr.io/<owner>/<repository>/ci-artifacts`. Configure separate repository secrets
+Generated GitHub transfers keep validated metadata in Actions artifacts using the workflow identity.
+Provenance, SBOMs, signing/verification records and control layouts must pass their exact schemas and
+complete file inventories; metadata layouts cannot contain output payload blobs. Their exact bytes and
+Run bindings remain verified. Binaries, tools, source archives, unknown/mixed contents and raw diagnostics
+use private/internal `ghcr.io/<owner>/<repository>/ci-artifacts` storage. Configure separate repository secrets
 `NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN` with access only to that private/internal
 storage package, plus repository variables `NVKR_CI_STORAGE_READ_USER` and `NVKR_CI_STORAGE_WRITE_USER`
 for the corresponding token owners. The package must have no linked repository; public, unknown, inaccessible or linked
@@ -132,11 +135,14 @@ Compiled-output caches and CodeQL database uploads are disabled. Candidate OS bu
 only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
 The nightly coordinator attaches its constructed cycle summary; raw suite report files are not public artifacts.
 
-Generated workflows admit at most 2,000 locator uploads per attempt, including conditional diagnostic and
-finalization uploads. The helper looks up exact selected names and fetches their small locator ZIPs serially,
+Generated workflows admit at most 2,000 record uploads per attempt, including conditional diagnostic and
+finalization uploads. The helper looks up exact selected names and fetches their record ZIPs serially,
 with bounded, cancellable waits for GitHub rate limits. Exact-name discovery avoids truncating a growing
 inventory at a fixed page count. Each ZIP must match its provider digest and contain one bounded canonical
-locator for the selected Run and attempt. Private payload restoration follows its existing checks. The
+record for the selected Run and attempt. Public metadata is limited to 4,096 entries, 8 MiB per file,
+16 MiB total text and 32 MiB encoded JSON; the complete downloaded index is capped at 128 MiB.
+Oversized or invalid metadata fails closed. Metadata-only transfers need no registry token or package API
+checks. Private payload restoration follows its existing checks. The
 generator rejects larger bundles before writing them; signed development retries require a fresh complete Run.
 
 The generator rejects workflows above 500,000 bytes or 50,000 expanded YAML parsing events. YAML aliases
