@@ -88,6 +88,7 @@ type GitHub struct {
 	client          *http.Client
 	api             string
 	storageToken    string
+	storageUsername string
 	downloadPrivate privateArtifactDownload
 }
 
@@ -97,17 +98,27 @@ type GitHub struct {
 // storage destinations; environment proxy settings are not used. Archive reads
 // never receive the API credential. An approved proxy route is not supported.
 func NewGitHub(token string) *GitHub {
-	return NewGitHubWithCIStorage(token, token)
+	return NewGitHubWithCIStorage(token, "")
 }
 
-// NewGitHubWithCIStorage separates provider API reads from private CI payload
-// access. An empty storage token retains the API-token fallback. Credentials are
-// explicit and never selected from the environment.
+// NewGitHubWithCIStorage preserves the legacy token-only constructor. Private CI
+// payloads require the explicit username supplied by NewGitHubWithCIStorageCredential.
 func NewGitHubWithCIStorage(apiToken, storageToken string) *GitHub {
-	if storageToken == "" {
-		storageToken = apiToken
-	}
-	return &GitHub{token: apiToken, storageToken: storageToken, downloadPrivate: cistore.Download, api: "https://api.github.com", client: &http.Client{
+	return NewGitHubWithCIStorageCredential(apiToken, CIStorageCredential{Token: storageToken})
+}
+
+// CIStorageCredential identifies the independent private-package account and
+// its read token. The account is not inferred from the source owner or actor.
+type CIStorageCredential struct {
+	Username string
+	Token    string
+}
+
+// NewGitHubWithCIStorageCredential separates provider API reads from private CI
+// payload access. Both storage fields are required for private payloads; public
+// provider reads retain their existing behavior. No credential is ambient.
+func NewGitHubWithCIStorageCredential(apiToken string, storage CIStorageCredential) *GitHub {
+	return &GitHub{token: apiToken, storageToken: storage.Token, storageUsername: storage.Username, downloadPrivate: cistore.Download, api: "https://api.github.com", client: &http.Client{
 		Timeout:       30 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{

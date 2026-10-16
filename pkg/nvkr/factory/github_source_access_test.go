@@ -315,10 +315,13 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 	if bootstraps == 0 || found["validate-catalog"] != bootstraps || found["finalize-catalog"] != 1 {
 		t.Fatalf("catalog revalidation credentials missing: %v", found)
 	}
-	for _, tc := range []struct{ name, old, replacement string }{
-		{"wrong secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER"},
-		{"wrong mirror", "credential.https://github.com/dsx-ai-factory/nvke.helper", "credential.https://github.com/other/repo.helper"},
-		{"missing presence check", strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0"), "true"},
+	for _, tc := range []struct {
+		name, old, replacement string
+		allOccurrences         bool
+	}{
+		{"wrong secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER", false},
+		{"wrong mirror", "credential.https://github.com/dsx-ai-factory/nvke.helper", "credential.https://github.com/other/repo.helper", true},
+		{"missing presence check", strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0"), "true", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var tree yamlv3.Node
@@ -328,8 +331,10 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			mutated := false
 			var mutate func(*yamlv3.Node)
 			mutate = func(node *yamlv3.Node) {
-				if !mutated && node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, tc.old) {
-					node.Value = strings.Replace(node.Value, tc.old, tc.replacement, 1)
+				if (!mutated || tc.allOccurrences) && node.Kind == yamlv3.ScalarNode && strings.Contains(node.Value, tc.old) {
+					// Keep shared bootstrap programs equal so validation rejects
+					// the credential scope or guard, not template divergence.
+					node.Value = strings.ReplaceAll(node.Value, tc.old, tc.replacement)
 					mutated = true
 				}
 				for _, child := range node.Content {

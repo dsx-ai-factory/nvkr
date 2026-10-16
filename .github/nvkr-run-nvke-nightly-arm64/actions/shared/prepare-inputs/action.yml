@@ -8,8 +8,8 @@ inputs:
   parameters:
     description: Plan-derived parameters for this operation; never shell source
     required: true
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, forwarded only to transfer steps
+  nvkr-ci-storage-read-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true
 runs:
   using: composite
@@ -21,7 +21,7 @@ runs:
         merge-multiple: ${{ fromJSON(inputs.parameters).download_with_merge_multiple }}
         path: ${{ fromJSON(inputs.parameters).download_with_path }}
         pattern: ${{ fromJSON(inputs.parameters).download_with_pattern }}
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-read-token: ${{ inputs.nvkr-ci-storage-read-token }}
     - name: ${{ fromJSON(inputs.parameters).restore_name }}
       id: operation_restore
       run: ./nvkr-exec factory github restore-inputs --plan .github/nvkr-run-nvke-nightly-arm64/plan.json --stage "$NVKR_ACTION_SELECTOR"

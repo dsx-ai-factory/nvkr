@@ -8,11 +8,8 @@ inputs:
   runner-artifact:
     description: Same-Run helper artifact
     required: true
-  action:
-    description: Stable job selector
-    required: true
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, forwarded only to transfer steps
+  nvkr-ci-storage-read-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true
 outputs:
   data:
@@ -25,10 +22,10 @@ runs:
       uses: ./.github/nvkr-dev/actions/prepare-runner
       with:
         runner-artifact: ${{ inputs.runner-artifact }}
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-read-token: ${{ inputs.nvkr-ci-storage-read-token }}
     - name: Resolve job parameters from the admitted Plan
       id: describe
       env:
-        NVKR_ACTION: ${{ inputs.action }}
+        NVKR_ACTION: ${{ github.job }}
       shell: bash -e {0}
       run: ./nvkr-exec factory github describe-action --plan .github/nvkr-dev/plan.json --action "$NVKR_ACTION"

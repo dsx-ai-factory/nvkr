@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
@@ -70,8 +71,8 @@ func (g *GitHub) resolvePrivateArtifact(ctx context.Context, require func() erro
 	if locator.ArchiveSize > maxArchiveBytes {
 		return nil, true, e.New(e.CodeVerifyFailed, "private artifact locator differs from exact origin or payload bound")
 	}
-	if g.storageToken == "" || g.downloadPrivate == nil {
-		return nil, true, e.New(e.CodeEngineCapability, "private CI payload retrieval requires an explicit storage credential")
+	if g.storageToken == "" || strings.TrimSpace(g.storageUsername) == "" || g.downloadPrivate == nil {
+		return nil, true, e.New(e.CodeEngineCapability, "private CI payload retrieval requires an explicit storage username and token")
 	}
 	if err = ctx.Err(); err != nil {
 		return nil, true, e.Wrap(e.CodeTimeout, err, "private artifact download canceled")
@@ -90,7 +91,7 @@ func (g *GitHub) resolvePrivateArtifact(ctx context.Context, require func() erro
 		}
 	}()
 	destination := filepath.Join(root, "payload")
-	if err = g.downloadPrivate(ctx, request, locator, destination, cistore.Options{Token: g.storageToken}); err != nil {
+	if err = g.downloadPrivate(ctx, request, locator, destination, cistore.Options{Token: g.storageToken, Username: g.storageUsername, RepositoryToken: g.token}); err != nil {
 		return nil, true, err
 	}
 	if err = require(); err != nil {

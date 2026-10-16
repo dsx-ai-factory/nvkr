@@ -242,7 +242,7 @@ jobs:
         if: steps.candidate.outputs.runtime_plan == 'true'
         uses: ./.github/nvkr-run/actions/ci-download
         with:
-          nvkr-ci-storage-token: ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           name: nvkr-runtime-inputs
           run-id: ${{ steps.candidate.outputs.producer_run }}
           attempt: '1'
@@ -305,7 +305,8 @@ jobs:
           GOTOOLCHAIN: local
           GH_TOKEN: ${{ github.token }}
           NVKR_NIGHTLY_ENABLE: '1'
-          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
+          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
           NVKR_NIGHTLY_PROFILE: ${{ matrix.name }}
           NVKR_NIGHTLY_PROFILES: ${{ github.workspace }}/inputs/testing/nightly-profiles.json
           NVKR_NIGHTLY_BUILD: ${{ github.workspace }}/.nightly-private/build/build.json
@@ -324,11 +325,11 @@ jobs:
             .coordinatorRun == $run and .coordinatorAttempt == $attempt and
             .sourceCommit == $sha and .qualificationAuthority == "none"
           ' "$NVKR_NIGHTLY_REPORTS/cycle.json" >/dev/null
-      - name: Preserve public runtime and cleanup reports
+      - name: Preserve the public runtime verdict
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: nightly-runtime-report-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/nightly-reports-${{ matrix.name }}/*
+          path: ${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json
           if-no-files-found: warn
           retention-days: 7

@@ -11,8 +11,8 @@ inputs:
   runner-artifact:
     description: Same-Run helper artifact name
     required: true
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, forwarded only to transfer steps
+  nvkr-ci-storage-write-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true
 runs:
   using: composite
@@ -57,7 +57,7 @@ runs:
         include-hidden-files: 'true'
         if-no-files-found: error
         retention-days: 7
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-write-token: ${{ inputs.nvkr-ci-storage-write-token }}
     - name: 'Upload NVKR runner'
       uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-upload
       with:
@@ -70,4 +70,4 @@ runs:
         include-hidden-files: 'true'
         if-no-files-found: error
         retention-days: 7
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-write-token: ${{ inputs.nvkr-ci-storage-write-token }}

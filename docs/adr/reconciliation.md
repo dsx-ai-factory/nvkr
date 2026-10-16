@@ -1,6 +1,6 @@
 # Architecture implementation and evidence
 
-Reviewed 2026-10-13. ADR-01–22 own the lane-specific engineering contracts pending named-decider
+Reviewed 2026-10-15. ADR-01–22 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -996,7 +996,27 @@ contracts do not establish GHCR interoperability, signing-service behavior,
 runtime compatibility, installation or external acceptance of the new format projections; earlier browsing
 and publication records do not establish that acceptance.
 
-The generator/validator/writer enforce a 500,000-byte limit for each workflow file. The entry workflow retains
+Private CI payload transport uses the existing Go registry and bounded archive owners. Actions attachments
+carry canonical JSON locators; source archives, helpers, tools and compiled payloads stay in an API-confirmed
+private/internal GHCR package with no reported repository association. Separate read/write package credentials
+and their configured usernames are scoped to transfer steps. The repository token authenticates repository
+metadata and Actions locator reads; it is not a package-credential fallback. Publication retains its separate
+private destination and inspected-root admission. The v2 carrier uses at most 64 ordered raw chunks of at most
+1 GiB, checking each digest, config binding and complete archive before extraction. Earlier draft v1 locators
+require a new producing Run. Controlled local-registry contracts cover multiple chunks, corrupt/reordered or
+truncated bytes, bounds, no-overwrite extraction and joined cancellation; they do not prove GHCR service
+acceptance. Raw chunks trade compression for predictable layer bounds. Registry retention, effective hidden
+package grants and anonymous/unrelated-user/fork access remain operator responsibilities. Old workflow
+artifacts and caches are not migrated or purged. No complete hosted private-transfer Run is recorded.
+
+Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
+and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage
+writer are admitted only for the exact trusted workflow commit. The nightly public runtime attachment
+contains the constructed cycle summary, not raw suite-report files. These safeguards and job consolidation
+retain the existing `pipeline-attested` boundary; they do not establish SLSA Build L3 or qualified execution.
+
+The generator/validator/writer enforce a 500,000-byte limit and 50,000 expanded YAML parsing-event limit
+for each workflow file. The entry workflow retains
 the original named job slots, prerequisite closure, conditions and credential boundaries. Manifest-owned local
 composite actions expose fixed semantic interfaces for execution, input/image preparation, output collection
 and carrier transfer. Grouped jobs reuse the node interface; declared optional slots and further individual
@@ -1026,12 +1046,15 @@ All producer jobs retain their IDs, runners, timeouts, conditions and credential
 workflow. Preparation binds its selector through `github.job`; aliases resolve into independent nodes
 before per-job substitution. Producer generation emits no reusable child workflows. The separately owned
 qualification worker remains callable under its existing qualification contract.
-Ordinary scheduling now pairs only the same BuildTarget's terminal observation and directly dependent
+Ordinary scheduling first appends offline observation, SBOM and packaging to a producer stage when that
+stage owns every input, effective runner/platform and target agree, and the sixteen-node and summed-timeout
+bounds hold. Cross-output joins and credential-bearing signing/publication remain separate. Where that rule
+does not apply, scheduling pairs only the same BuildTarget's terminal observation and directly dependent
 SBOM with compatible offline runtime. An additional input is admitted only for a pinned pipeline tool
 from an independent root acquisition with no BuildTarget, IR instruction or inputs. The pair waits for
 acquisition and restores the tool before observation; failure prevents pair completion. Additional source
-or output dependencies are not admitted. Packaging and other ordinary nodes own
-separate jobs; native ARC disk groups retain their existing live-owner membership. Global topological
+or output dependencies are not admitted. Packaging with inputs outside one producer stage and other ordinary
+nodes own separate jobs; native ARC disk groups retain their existing live-owner membership. Global topological
 adjacency and fixed-size chunks no longer choose membership. This makes independent output additions
 local to their own jobs, required aggregate assembly/publication, finalizer accounting and opening summary.
 An earlier new owner can relocate an identical YAML anchor without changing the expanded existing jobs.
@@ -1047,14 +1070,16 @@ requires successful collectors, their exact Plan-derived partition and strict bo
 The closing summary counts original outcomes, not collector success. Local contracts cover duplicate,
 missing, extra, failed, skipped, canceled, oversized and inconsistent reports, including build-only Plans.
 
-The current production entry workflow is 362,014 bytes (137,986 bytes below the admission bound);
-development is 340,021 bytes. Each has 596 original jobs, 16 collectors and 1,438 dependency edges instead
-of 2,546. The named ARM64 nightly and upstream-OVN entries are 166,854 and 168,278 bytes, each with 266
-original jobs, 16 collectors and 643 edges. All four bundles keep their jobs inline. The writer retired the
-12 legacy producer child files; the workflow files are 77,917 bytes smaller in total. Logical Plans, shared
-action implementations and invocation data remain byte-identical. The earlier output-local grouping
-migration removed accidental unrelated-output failure barriers; dependency reduction preserves the
-resulting ancestor closure.
+The combined production/development layout has 564 original jobs and 16 collectors, down from
+596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.
+The production dependency graph has 1,375 edges, down from 1,438. Logical Plan identity and original
+per-node result accounting remain unchanged by scheduling. Shared preparation selects the current
+`github.job` internally, removing a redundant caller input while retaining exact projection checks.
+Production is 376,191 bytes and 47,304 expanded YAML events; development is 355,428 bytes and 46,861 events.
+The named ARM64 nightly and upstream-OVN entries are respectively 180,553/181,470 bytes and
+22,058/22,050 events, each with 282 jobs and 644 dependency edges.
+All four producer bundles keep their jobs inline. The earlier output-local grouping migration removed
+accidental unrelated-output failure barriers; dependency reduction preserves the resulting ancestor closure.
 The addition/removal regression compiles binary, native binary, collected native binary, source and signed
 per-output publication fixtures with new output names sorting before, between and after existing outputs.
 All 15 cases preserve existing job IDs, relative emission order, expanded operations, invocation values
@@ -1065,8 +1090,15 @@ missing, failed or skipped
 package/scanner jobs. All maintained generated workflows have been regenerated, pass their exact drift
 checks, and pass actionlint and yamllint. These are local contract and static validation results, not hosted
 execution or runtime cost measurements.
-The maintained rendering test fails above a 95% soft budget, before the unchanged
-500,000-byte provider admission bound, directing membership changes to compaction work.
+The maintained rendering test fails above a 95% soft budget for both file bytes and expanded YAML events,
+directing membership changes to compaction work. Alias expansion counts scalars, keys and container
+start/end events; aliases reduce file bytes without reducing the provider's parsing count. The public
+parser implementation supplies the 50,000-event bound, not a permanent provider service contract.
+The private-storage draft at `afe87da2132bf91dc663a2cd0bfe6b7adb4e9ee6` exceeded that bound with 69,519
+production events. GitHub rejected [Run 38833290328](https://github.com/dsx-ai-factory/nvkr/actions/runs/38833290328)
+on push with `Maximum YAML nodes exceeded`; its API reports zero jobs and zero artifacts. That record is
+workflow-validation failure evidence, not producer execution. The draft's generated producer trigger
+remained manual dispatch. Local parsing admission does not establish hosted acceptance of the combined branch.
 On 2026-10-15, a guarded diagnostic of the original 596-job, 2,546-edge representation at
 `a49dafff794b360f2722d53912dc824243395ae6` still returned a dispatch 502 after replacing execution bodies
 with no-ops. An independent 596-job graph was accepted in

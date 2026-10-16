@@ -12,7 +12,7 @@ runs:
       with:
         name: ${{ inputs.runner-artifact }}
         path: '.nvkr/runtime-runner'
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-read-token: ${{ inputs.nvkr-ci-storage-read-token }}
     - name: Prepare helper
       run: |
         set -eu
@@ -31,6 +31,6 @@ inputs:
   runner-artifact:
     description: Same-Run helper artifact name
     required: true
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, forwarded only to transfer steps
+  nvkr-ci-storage-read-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true

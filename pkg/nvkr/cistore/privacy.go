@@ -44,11 +44,11 @@ type account struct {
 }
 
 type repositoryRecord struct {
-	ID         uint64  `json:"id"`
-	FullName   string  `json:"full_name"`
-	Owner      account `json:"owner"`
-	Private    *bool   `json:"private"`
-	Visibility string  `json:"visibility"`
+	ID         uint64          `json:"id"`
+	FullName   string          `json:"full_name"`
+	Owner      account         `json:"owner"`
+	Private    *bool           `json:"private"`
+	Visibility json.RawMessage `json:"visibility"`
 }
 
 type packageRecord struct {
@@ -61,7 +61,11 @@ type packageRecord struct {
 
 func (b *backend) source(ctx context.Context, repository string, opts Options) (repositoryRecord, error) {
 	var record repositoryRecord
-	status, err := b.get(ctx, "/repos/"+repository, opts.Token, &record)
+	token := opts.RepositoryToken
+	if token == "" {
+		token = opts.Token
+	}
+	status, err := b.get(ctx, "/repos/"+repository, token, &record)
 	if err != nil {
 		return record, err
 	}
@@ -71,15 +75,14 @@ func (b *backend) source(ctx context.Context, repository string, opts Options) (
 	return record, nil
 }
 
-// checkPrivacy performs no registry payload access. A private package linked to
-// a public repository is deliberately rejected: repository Actions grants may
-// expose it to forks. Null linkage is permitted, but this API does not prove all
-// independent package grants; operators retain that access-policy obligation.
+// Transfer packages must have no reported repository association even while the
+// source repository is private. Publication separately permits private linkage.
+// Neither check proves independent grants; operators retain that ACL obligation.
 func (b *backend) checkPrivacy(ctx context.Context, request Request, source repositoryRecord, opts Options) (bool, error) {
-	return b.checkPackagePrivacy(ctx, strings.ToLower(strings.Split(request.Repository, "/")[1])+"/ci-artifacts", source, opts)
+	return b.checkPackagePrivacy(ctx, strings.ToLower(strings.Split(request.Repository, "/")[1])+"/ci-artifacts", source, opts, true)
 }
 
-func (b *backend) checkPackagePrivacy(ctx context.Context, packageName string, source repositoryRecord, opts Options) (bool, error) {
+func (b *backend) checkPackagePrivacy(ctx context.Context, packageName string, source repositoryRecord, opts Options, requireUnlinked bool) (bool, error) {
 	kind := "users"
 	if source.Owner.Type == "Organization" {
 		kind = "orgs"
@@ -99,23 +102,27 @@ func (b *backend) checkPackagePrivacy(ctx context.Context, packageName string, s
 	if record.Name != packageName || record.PackageType != "container" || !strings.EqualFold(record.Owner.Login, source.Owner.Login) || !privateVisibility(record.Visibility) {
 		return false, e.New(e.CodeTrustPolicyMissing, "CI storage requires the exact private or internal GHCR package")
 	}
-	if len(record.Repository) == 0 {
-		return false, e.New(e.CodeTrustPolicyMissing, "CI storage package repository association is unknown")
-	}
-	if !bytes.Equal(bytes.TrimSpace(record.Repository), []byte("null")) {
+	// GitHub's package schema makes repository optional and nullable; its GET
+	// example omits the field. Both forms report no association. This is only
+	// provider metadata, not proof of effective grants or future visibility.
+	// https://docs.github.com/en/rest/packages/packages#get-a-package-for-an-organization
+	if len(record.Repository) != 0 && !bytes.Equal(bytes.TrimSpace(record.Repository), []byte("null")) {
+		if requireUnlinked {
+			return false, e.New(e.CodeTrustPolicyMissing, "CI transfer requires an unlinked private/internal package")
+		}
 		var linked repositoryRecord
-		if err := json.Unmarshal(record.Repository, &linked); err != nil || linked.ID == 0 || linked.FullName == "" || linked.Private == nil || !*linked.Private || !privateVisibility(linked.Visibility) {
+		if err := json.Unmarshal(record.Repository, &linked); err != nil || linked.ID == 0 || linked.FullName == "" || linked.Private == nil || !*linked.Private || !privateRepositoryVisibility(linked.Visibility) {
 			return false, e.New(e.CodeTrustPolicyMissing, "CI storage rejects public or unknown linked repository access; a public source GITHUB_TOKEN may auto-link an unsuitable package")
 		}
 	}
 	return true, nil
 }
 
-func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repository, source repositoryRecord, opts Options) error {
+func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repository, source repositoryRecord, opts Options, requireUnlinked bool) error {
 	// The repository was admitted before this operation; GitHub names packages
 	// relative to the already-authenticated owner namespace.
 	packageName := strings.TrimPrefix(repository.RepositoryStr(), strings.ToLower(source.Owner.Login)+"/")
-	exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts)
+	exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts, requireUnlinked)
 	if err != nil || exists {
 		return err
 	}
@@ -128,7 +135,7 @@ func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repo
 	if err := remote.Write(repository.Tag("privacy-probe-v1"), seed, b.registryOptions(ctx, opts)...); err != nil {
 		return safeIOError(ctx, e.CodeFetchFailed, "seeding metadata-only private package")
 	}
-	exists, err = b.checkPackagePrivacy(ctx, packageName, source, opts)
+	exists, err = b.checkPackagePrivacy(ctx, packageName, source, opts, requireUnlinked)
 	if err != nil {
 		return err
 	}
@@ -140,6 +147,17 @@ func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repo
 
 func privateVisibility(visibility string) bool {
 	return visibility == "private" || visibility == "internal"
+}
+
+// GitHub's minimal repository schema requires private, checked by the caller,
+// but permits visibility to be omitted. A supplied value must still be known
+// and private/internal; explicit null, empty, public and malformed values fail.
+func privateRepositoryVisibility(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return true
+	}
+	var visibility string
+	return json.Unmarshal(raw, &visibility) == nil && privateVisibility(visibility)
 }
 
 func (b *backend) get(ctx context.Context, endpoint, token string, result any) (int, error) {
@@ -201,6 +219,9 @@ func admitSource(ctx context.Context, repository string, opts Options) (context.
 	}
 	if err := validateSourceRepository(repository); err != nil {
 		return nil, nil, opts, err
+	}
+	if opts.RepositoryToken != "" && !safeText(opts.RepositoryToken, 16384) {
+		return nil, nil, opts, e.New(e.CodeTrustPolicyMissing, "repository metadata credential is malformed")
 	}
 	if !safeText(opts.Token, 16384) {
 		return nil, nil, opts, e.New(e.CodeTrustPolicyMissing, "CI storage requires an explicit access token")

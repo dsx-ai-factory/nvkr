@@ -5,6 +5,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -89,6 +90,9 @@ func factoryCIContext() (cistore.Request, cistore.Options, error) {
 	if os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("GITHUB_SERVER_URL") != "https://github.com" {
 		return cistore.Request{}, cistore.Options{}, e.New(e.CodeEngineCapability, "private CI transfer requires the GitHub runner context")
 	}
+	if strings.TrimSpace(os.Getenv("NVKR_CI_STORAGE_USER")) == "" {
+		return cistore.Request{}, cistore.Options{}, e.New(e.CodeTrustPolicyMissing, "private CI transfer requires an explicit storage username")
+	}
 	return cistore.Request{Repository: os.Getenv("GITHUB_REPOSITORY"), RunID: os.Getenv("GITHUB_RUN_ID"), Attempt: os.Getenv("GITHUB_RUN_ATTEMPT")},
-		cistore.Options{Token: os.Getenv("NVKR_CI_STORAGE_TOKEN"), Username: os.Getenv("NVKR_CI_STORAGE_USER")}, nil
+		cistore.Options{Token: os.Getenv("NVKR_CI_STORAGE_TOKEN"), RepositoryToken: os.Getenv("NVKR_CI_REPOSITORY_TOKEN"), Username: os.Getenv("NVKR_CI_STORAGE_USER")}, nil
 }

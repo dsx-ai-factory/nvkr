@@ -99,20 +99,32 @@ regeneration and review. This mode neither follows floating upstream versions no
 or development bundle contract; ordinary `--check` remains a complete byte comparison.
 
 Generated GitHub transfers retain JSON locators in Actions and move their payloads to
-`ghcr.io/<owner>/<repository>/ci-artifacts`. Transfer steps admit the package's actual private/internal
-visibility and reject public or unknown linked repositories before reading or uploading payload bytes.
-There is no public Actions fallback. The workflow token is used unless `NVKR_CI_STORAGE_TOKEN` is supplied;
-that optional credential belongs only to the transfer operations. Package-write permission is required on
-jobs which upload private carriers. Producer commands do not receive the storage token.
-Final GitHub-hosted GHCR publication separately checks every destination package with its publication
-credential and binds the push to the inspected metadata root. Unsupported hosted GHCR metadata contracts
-fail closed. Provider locator retention does not automatically expire private carrier blobs.
+`ghcr.io/<owner>/<repository>/ci-artifacts`. Configure separate repository secrets
+`NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN` with access only to that private/internal
+storage package, plus repository variables `NVKR_CI_STORAGE_READ_USER` and `NVKR_CI_STORAGE_WRITE_USER`
+for the corresponding token owners. The package must have no linked repository; public, unknown, inaccessible or linked
+policy fails closed. A missing package can receive a metadata-only seed before the same checks are repeated.
+There is no repository-token or public Actions payload fallback. The repository token separately authenticates
+repository metadata; storage credentials belong only to transfer operations and do not add package permissions
+to build jobs. Producer commands do not receive them.
 
-Making the source repository public does not establish safe access to its linked packages. The built-in
-token's auto-linked storage package will be rejected if that link becomes public; an independently
-restricted storage package and credential must be configured before public-repository execution is ready.
-Previously retained Actions artifacts, caches, active runs and old workflow refs also require a separate transition check. This change does
-not migrate or delete historical payloads.
+The Go transport stores ordered chunks no larger than 1 GiB and verifies their digests and the assembled
+archive before restoring files. The v2 locator format replaces the unshipped single-layer draft; old v1
+locators require a new run. Final hosted GHCR publication separately checks every destination package with
+its publication credential and binds the push to the inspected metadata root. Provider locator retention
+does not expire private carrier blobs; configure registry retention separately.
+
+Before making the source public, verify hidden package grants and anonymous, unrelated-user and fork access
+for storage, toolchain and release packages. Previously retained Actions artifacts, caches, active runs and
+old workflow refs also require separate handling; this change does not migrate or delete historical payloads.
+Compiled-output caches and CodeQL database uploads are disabled. Candidate OS builds retain private files
+only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
+The nightly coordinator attaches its constructed cycle summary; raw suite report files are not public artifacts.
+
+The generator rejects workflows above 500,000 bytes or 50,000 expanded YAML parsing events. YAML aliases
+reduce file size but do not reduce the parser's expanded count. Maintained rendering tests reserve five
+percent headroom. Compatible offline observation, SBOM and packaging steps share their producer job;
+signing, publication and remote verification keep separate jobs and permissions.
 
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can

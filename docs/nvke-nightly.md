@@ -17,19 +17,22 @@ The daily trigger is retained as explicitly requested by the user.
 Binary carriers, source handoffs, OCI images, charts and disks use private CI storage under
 `ghcr.io/dsx-ai-factory/nvkr/ci-artifacts`; Actions retain only their small location-and-digest records.
 The existing NVKR helper owns this transport. Uploads and downloads check package visibility and its
-linked repository; public or unknown access policy stops the transfer. A failed private transfer never
+repository association; any link or public/unknown access policy stops the transfer. A failed private transfer never
 falls back to uploading the payload to Actions. Final release artifacts retain the profile-owned nightly
 publication prefixes below the Environment's configured registry path.
-Their GHCR destination packages receive the same private/internal visibility and repository-link checks
+Their GHCR destination packages receive private/internal visibility checks and reject public or unknown repository links
 using the publication credential before product uploads; the checked metadata root binds the actual push.
 
-The default workflow token can operate while its storage package is independently admitted. A package
-linked to a public source repository is rejected. Before making NVKR public, configure independently
-restricted package access and, if required, `NVKR_CI_STORAGE_TOKEN`; verify the actual workflow token and
-fork access behavior. Previously retained binary Actions artifacts, caches, active runs and old workflow refs require
-separate handling before that transition. None is migrated or deleted by generating a new workflow.
-Private transport contracts do not establish a successful hosted transfer or public-repository readiness.
-Provider locator retention does not expire the private carrier blobs; registry retention is separate.
+Configure dedicated `NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN` secrets with access
+only to the unlinked private/internal CI package. Set repository variables `NVKR_CI_STORAGE_READ_USER`
+and `NVKR_CI_STORAGE_WRITE_USER` to the corresponding token owners. Transfer never falls back to the workflow token. The
+nightly consumer and qualification reader receive only the read credential. Before making NVKR public,
+verify independent package grants and actual anonymous, unrelated-user and fork access behavior.
+Previously retained binary Actions artifacts, caches, active runs and old workflow refs require separate
+handling; none is migrated or deleted by generation. Private transport contracts do not establish a
+successful hosted transfer or public-repository readiness. Provider locator retention does not expire
+private carrier blobs; registry retention is separate. The public runtime attachment contains the constructed
+`cycle.json` summary only; raw suite reports are not attached.
 
 Both nightly Environments opt into runtime Plan preparation. Each producer's first bootstrap reads the
 current catalog pins from that dispatch's exact repository commit and freezes fresh Plan data. Other

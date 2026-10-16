@@ -131,14 +131,31 @@ size before existing carrier restoration. It confers no release or qualification
 built from the exact checkout with the pinned Go toolchain before private downloads, so bootstrap needs no
 public binary delivery. This remains separate from qualified exact-helper-byte verification.
 
-CI storage admission checks the actual package visibility and linked repository before payload access.
-Public, unknown or inaccessible package policy and public or unknown linked-repository policy fail closed.
-A missing package may receive an empty metadata-only seed; payload upload requires a subsequent successful
-privacy check. There is no Actions-payload fallback. The default workflow token can serve an internal
-repository; a package linked to a future public source is rejected. An independent storage credential and
-independently restricted package access must be established before claiming that public-repository CI works.
+CI transfer admission requires an API-confirmed private/internal package with no linked repository,
+including while the source remains private. A missing package may receive an empty metadata-only seed;
+payload upload requires a subsequent successful privacy check. Transfers require separate dedicated read
+and write credentials with their configured account usernames, scoped only to their consuming steps, without repository-token fallback or extra
+repository package permissions. The repository token authenticates repository metadata separately from the
+package credential. These principals must have no production publication grants. No Actions-payload fallback
+exists. GHCR supports the automatic workflow token, but its Actions grants are repository-scoped;
+GitHub [warns that granting a public repository private-package access can also expose packages to forks](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#ensuring-workflow-access-to-your-package).
+Separate secrets avoid granting that public-repository token access to the CI package. Moving execution
+to a private build repository could use that repository's automatic token instead, but requires separate
+source, invocation and signing-policy admission and is not implemented by this transport change.
+The v2 transport splits the held archive into ordered raw chunks of at most 1 GiB (at most 64), binds
+their digests in the OCI manifest/config, and verifies each chunk plus the complete archive before restoration.
+This avoids GHCR's per-layer size bound without a second transport runtime or gzip expansion. It increases
+bandwidth and registry storage compared with compressed carriers. Provider locator expiry does not delete
+registry blobs; retention is operator-managed.
 Visibility checks do not authenticate all enterprise grants or prove the absence of manually granted fork
 access. Historical Actions artifacts, caches, active runs and old workflow refs must be handled before making a repository public.
+Repository checks disable compiled-output caches and CodeQL database/TRAP/overlay uploads; runner debug
+mode is rejected before CodeQL initialization because it enables extra diagnostic uploads. The authored OS
+validation workflow retains private post-build files only when the selected candidate equals its exact
+trusted workflow commit. Arbitrary candidate execution receives no later storage credential and retains no
+file artifacts; trusted selection summaries and runner logs remain diagnostic. The nightly coordinator
+attaches only its constructed cycle summary, never unvalidated raw suite report files. These limits are not SLSA
+Build L3 or qualified execution claims.
 
 The explicit diagnostic `validate` route is separate from generated producer execution. It is Linux-only
 and executes authenticated, held tool bytes on the host with the selected embedded kubeconfig. Private
@@ -178,12 +195,13 @@ producer admission does not establish admission of that downstream workflow.
 With publication and signing omitted, the same native policy also admits a **build-only diagnostic**
 workflow at `static-unqualified`. It accepts plain disks and ADR-10's explicit public-bootstrap LUKS2
 producer. Its grouped executor retains the live owner through exact QCOW2 export and producer-result
-recording, then transports the raw disk as a same-Run Actions artifact. Finalization rechecks the selected
+recording, then transports the raw disk through private GHCR with a same-Run Actions locator. Finalization rechecks the selected
 output's bytes and result membership without reconstructing runtime or publication authority. No disk
-inspection, release wrapper, registry upload, signing or OIDC job is emitted. The workflow still requires
+inspection, release wrapper, product publication, signing or OIDC job is emitted. The workflow still requires
 the exact dispatch branch and `nkd-arc` deployment policy. Generated build-only workflows admit exactly one
 disk output. Their finalizer restores the complete source/material/raw-disk closure on that output's selected
-native ARC pool, using its matching helper and `nkd-arc` Environment with only `contents: read`. Its two-hour
+native ARC pool, using its matching helper and `nkd-arc` Environment with repository `contents: read` and
+`actions: read` permissions and the dedicated storage reader. Its two-hour
 job bound covers transfer, recovery and exact-byte observation; it does not rebuild, inspect or use KVM.
 If the catalog selects a private pin set, existing catalog-source credentials remain scoped to the
 final catalog-recompilation step; they are not passed to recovery or disk execution.
@@ -210,8 +228,8 @@ session and held disk survive through packaging; strict mode additionally requir
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
 remain required. Only fixed source-fetch steps receive private-source credentials. ARC producer commands
 receive no source token, CI-storage credential or OIDC signing token. Separate private-carrier transfer
-steps receive an explicit storage token; using the workflow token requires job-level package-write
-permission. Step environment isolation does not turn that token into a package-scoped credential or isolate
+steps receive an explicit dedicated storage token; transfer does not use the workflow token for package
+access or add package-write permission. Step environment isolation does not enforce package-scoped grants or isolate
 it from trusted root-equivalent code sharing the runner. Product publication remains on hosted runners.
 With `publication.mode: per-output-v1`, the
 same ARC group also prepares that disk's offline publication layout using its existing material files. The
@@ -764,7 +782,7 @@ publication and in-repository PR builds remain deferred. Live publication/signin
 the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
 recognize those exact workflow refs. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
 The SBOM job receives no product-publication credentials. Private carrier upload steps require the
-separate CI storage token and job-level package-write permission. The verifier needs product registry read
+dedicated CI storage write token; they do not elevate repository-token package permissions. The verifier needs product registry read
 access and obtains no identity token; its private report-carrier uploads use the same CI storage boundary. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
 finalization still run after failures within an admitted execution. The generated Run workflow does not
@@ -792,9 +810,8 @@ admission rejects development before qualification evidence collection.
 
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
 They never inherit the production deployment environments. Dedicated write and read registry credentials
-are delivered only to their corresponding phases. Development jobs that upload private carriers require
-job-level package-write permission, including when the workflow token supplies storage access; this does
-not grant a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation can still use
+are delivered only to their corresponding phases. Private carrier uploads use a separate storage writer
+without additional repository-token permissions or a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation can still use
 the repository token for exact retained private M2 toolchain roots; credentials are removed before producer
 execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
@@ -833,13 +850,20 @@ reported as not evaluated. Source/build authentication and all verdict collectio
 or attachment failure can leave earlier attachments but never produces successful qualification. ADR-16 owns
 the evidence and publication contract; reconciliation separately records implementation and hosted acceptance.
 
-The v1 scheduler pairs only a terminal observation and its directly dependent SBOM for the same exact
+The v1 scheduler first appends offline terminal observation, SBOM and packaging work to one Build/Acquire
+stage only when every input is already produced inside that stage, effective runner/platform agree and
+Build targets are compatible. The group is bounded to sixteen nodes and its summed timeout must fit the
+provider ceiling. Every operation retains its pinned execution and result slot; failure marks the whole
+provider stage unsuccessful for finalization. Source fetch, OIDC attestation/signing, publication and remote
+publication verification remain separate. No extra external prerequisite or cross-output barrier is introduced.
+
+When this closed-input grouping is unavailable, the scheduler pairs a terminal observation and its directly dependent SBOM for the same exact
 BuildTarget, with identical runner, container and platform and offline execution. Every external SBOM input
 must already be an observation input or a pinned pipeline tool from an independent root acquisition:
 `pipeline-tool` produced by `NodeAcquire` with no BuildTarget, IR instruction or inputs. The pair waits for
 and restores that tool before observation; failed tool acquisition prevents pair completion. No additional
 source or output dependency is admitted, so a new dependency cannot leave and reenter the pair. Other
-ordinary nodes, including packaging, each own a provider job. The explicit native ARC disk group remains
+ordinary nodes, including packaging whose inputs cross producer stages, each own a provider job. The explicit native ARC disk group remains
 the separate live-owner exception above. Membership never depends on adjacency in the global topological
 order or on a fixed-size chunk of unrelated nodes; the projected provider graph must remain acyclic.
 Every logical node retains its exact command, isolation and carrier. The paired nodes use the same
@@ -1103,7 +1127,10 @@ Every generated run script, including scripts inside composite actions, remains 
 bootstrap commands. The generator also rejects a workflow file over 500,000 UTF-8 bytes before returning a
 bundle or writing generated files; validation and bundle persistence enforce the same bound. The limit follows GitHub's
 [500 KB workflow-file ceiling](https://docs.github.com/en/actions/reference/limits#workflow-file-size);
-files that remain oversized fail closed instead of generating an unstartable workflow.
+files that remain oversized fail closed instead of generating an unstartable workflow. Admission also
+bounds expanded YAML parsing events to 50,000, counting repeated aliases and container start/end events
+without materializing alias expansion. This follows the [public parser implementation](https://github.com/actions/runner/blob/796cc18ffaaafd5cea525d6231f5a8c93c11c603/src/Sdk/WorkflowParser/Conversion/YamlObjectReader.cs#L420),
+not a permanent service contract. Maintained rendering tests reserve five percent headroom for both bounds.
 Local rendering and expanded-graph validation do not establish provider execution of the composite layout;
 reconciliation records which regression checks have actually run.
 Provider outage or failed local outcome storage can

@@ -25,7 +25,7 @@ import (
 
 const (
 	// SchemaVersion identifies this CI transport metadata format.
-	SchemaVersion = "nvkr.dev/ci-carrier/v1"
+	SchemaVersion = "nvkr.dev/ci-carrier/v2"
 	// BindingLabel joins the OCI config to all locator fields except Reference.
 	BindingLabel = "nvkr.dev/ci-carrier"
 	// MaxLocatorBytes bounds metadata received from the Actions artifact API.
@@ -45,6 +45,9 @@ type Request struct {
 type Options struct {
 	Token    string
 	Username string
+	// RepositoryToken authenticates source repository metadata independently of
+	// the package credential. When empty, Token supplies that explicit fallback.
+	RepositoryToken string
 }
 
 // Locator is descriptive metadata suitable for a small Actions artifact.

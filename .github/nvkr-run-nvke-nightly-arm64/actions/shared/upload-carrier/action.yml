@@ -12,8 +12,8 @@ inputs:
     description: Caller diagnostic path, or empty for the Plan-derived path
     required: false
     default: ""
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, forwarded only to transfer steps
+  nvkr-ci-storage-write-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true
 runs:
   using: composite
@@ -27,4 +27,4 @@ runs:
         name: ${{ fromJSON(inputs.parameters).upload_name_attempt == 'true' && format('{0}-{1}-{2}', fromJSON(inputs.parameters).upload_with_name, github.run_id, github.run_attempt) || fromJSON(inputs.parameters).upload_with_name }}
         path: ${{ inputs.with-path || fromJSON(inputs.parameters).upload_with_path }}
         retention-days: ${{ fromJSON(inputs.parameters).upload_with_retention_days }}
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-write-token: ${{ inputs.nvkr-ci-storage-write-token }}

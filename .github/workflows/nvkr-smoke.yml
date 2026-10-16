@@ -4,8 +4,8 @@ name: 'nvkr-smoke-nvke-m2'
 'on':
   workflow_call:
     secrets:
-      NVKR_CI_STORAGE_TOKEN:
-        required: false
+      NVKR_CI_STORAGE_READ_TOKEN:
+        required: true
       NKE_SOURCE_TOKEN:
         required: true
 permissions:
@@ -92,7 +92,8 @@ jobs:
           NVKR_PULL_REGISTRY: ghcr.io
           NVKR_PULL_REGISTRY_USER: ${{ github.actor }}
           NVKR_PULL_REGISTRY_PASSWORD: ${{ github.token }}
-          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
+          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
           GIT_CONFIG_COUNT: '4'
           GIT_CONFIG_GLOBAL: '/dev/null'
           GIT_CONFIG_KEY_0: 'credential.helper'

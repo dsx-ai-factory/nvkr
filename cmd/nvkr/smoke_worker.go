@@ -37,6 +37,7 @@ func cmdRunSmokeWorkerWithRunner(run smokeWorkerRunner) *cli.Command {
 			}
 		}
 		options := lifecycle.QualificationRuntimeOptions{WorkspaceRoot: qualification.SmokeWorkerWorkspace, GitHubToken: os.Getenv("NVKR_GITHUB_TOKEN"),
+			CIStorageToken: os.Getenv("NVKR_CI_STORAGE_TOKEN"), CIStorageUsername: os.Getenv("NVKR_CI_STORAGE_USER"),
 			Credential: sign.Credential{Registry: os.Getenv("NVKR_PULL_REGISTRY"), Username: os.Getenv("NVKR_PULL_REGISTRY_USER"), Password: os.Getenv("NVKR_PULL_REGISTRY_PASSWORD")},
 			Registry:   delivery.RegistryOptions{Username: os.Getenv("NVKR_PULL_REGISTRY_USER"), Password: os.Getenv("NVKR_PULL_REGISTRY_PASSWORD")},
 		}

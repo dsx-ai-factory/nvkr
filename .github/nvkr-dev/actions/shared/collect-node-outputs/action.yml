@@ -8,8 +8,8 @@ inputs:
   parameters:
     description: Plan-derived parameters for this operation; never shell source
     required: true
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, forwarded only to transfer steps
+  nvkr-ci-storage-write-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true
 runs:
   using: composite
@@ -30,7 +30,7 @@ runs:
         name: ${{ fromJSON(inputs.parameters).upload_with_name }}
         path: ${{ fromJSON(inputs.parameters).upload_with_path }}
         retention-days: ${{ fromJSON(inputs.parameters).upload_with_retention_days }}
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-write-token: ${{ inputs.nvkr-ci-storage-write-token }}
     - name: ${{ fromJSON(inputs.parameters).extra_upload_name }}
       id: operation_extra_upload
       if: ${{ fromJSON(inputs.parameters).extra_upload_present == 'true' }}
@@ -41,4 +41,4 @@ runs:
         name: ${{ fromJSON(inputs.parameters).extra_upload_with_name }}
         path: ${{ fromJSON(inputs.parameters).extra_upload_with_path }}
         retention-days: ${{ fromJSON(inputs.parameters).extra_upload_with_retention_days }}
-        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
+        nvkr-ci-storage-write-token: ${{ inputs.nvkr-ci-storage-write-token }}

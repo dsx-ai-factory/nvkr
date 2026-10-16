@@ -573,12 +573,14 @@ reduce routine pin churn without changing executable Plan/IR identities. Workflo
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
 bytes, preserving credential scope and per-job finalizer results. Edit locality separately preserves existing
-jobs when an independent output is added. Ordinary grouping pairs only a terminal observation and its
-dependent SBOM for the same BuildTarget and compatible offline runtime. A shared pinned tool acquired by
+jobs when an independent output is added. Offline observation, SBOM and packaging can share a producer
+stage only when that stage owns their complete inputs and runtime/target constraints agree. The bounded
+group preserves each operation and marks all members unsuccessful if its provider job fails. Otherwise
+ordinary grouping pairs a terminal observation and its dependent SBOM for the same BuildTarget and compatible offline runtime. A shared pinned tool acquired by
 an independent root operation may be an additional prerequisite; the pair waits for acquisition and
 restores the tool before observation. Failed acquisition prevents pair completion. No additional source
 or output dependency is admitted.
-Other ordinary nodes, including packaging, retain their own jobs and success conditions; the explicit ARC
+Other ordinary nodes, including packaging with external inputs, retain their own jobs and success conditions; the explicit ARC
 disk group preserves its live owner. Membership does not follow global adjacency or fixed-size chunks.
 Aggregate accounting and summaries change with the complete required set, and finalization still requires
 every job. The current Plan determines scheduling without previous-generated-state input.
@@ -586,7 +588,9 @@ Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
-No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
+Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
+retain only JSON locators. Dedicated read/write credentials do not elevate repository-token permissions.
+Admission bounds expanded YAML parsing events as well as file bytes. No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
 prerequisite closure preserved; authored setup, runtime variables, images or services that mention the
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must

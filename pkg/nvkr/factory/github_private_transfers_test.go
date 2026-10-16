@@ -5,6 +5,7 @@ package factory
 
 import (
 	"bytes"
+	"maps"
 	"strings"
 	"testing"
 
@@ -76,7 +77,7 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 					}
 					if env := githubYAMLField(node, "env"); env != nil && githubYAMLField(env, "NVKR_CI_STORAGE_TOKEN") != nil {
 						run := githubYAMLValue(node, "run")
-						if (!strings.Contains(run, " factory github ci-upload ") && !strings.Contains(run, " factory github ci-download ")) || githubYAMLValue(env, "NVKR_CI_STORAGE_TOKEN") != "${{ inputs."+githubCIStorageInput+" }}" {
+						if (!strings.Contains(run, " factory github ci-upload ") && !strings.Contains(run, " factory github ci-download ")) || (githubYAMLValue(env, "NVKR_CI_STORAGE_TOKEN") != githubCICredential(githubCIStorageInput, false) && githubYAMLValue(env, "NVKR_CI_STORAGE_TOKEN") != githubCICredential(githubCIReadInput, false)) {
 							t.Fatalf("storage token escapes fixed transfer commands in %s", name)
 						}
 					}
@@ -90,14 +91,21 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 				t.Fatalf("closed transport template membership changed: uploads=%d downloads=%d bootstraps=%d", uploads, downloads, builds)
 			}
 			actual := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			basePermissions, err := githubCIBasePermissions(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
 			for id, job := range actual.Jobs {
 				transfer, err := githubCIJobTransfers(plan, githubTestYAMLField(t, documents[bundle.WorkflowPath].Content[0], "jobs", id), documents, map[string]bool{})
 				if err != nil {
 					t.Fatal(err)
 				}
-				if transfer.upload && job.Permissions["packages"] != "write" {
-					t.Fatalf("upload job %s lacks its explicit private transport permission", id)
+				if !maps.Equal(job.Permissions, githubCITransferPermissions(basePermissions[id], transfer)) {
+					t.Fatalf("job %s elevated repository token permissions for transport", id)
 				}
+			}
+			if bytes.Contains(bundle.Files[bundle.WorkflowPath], []byte("|| github.token")) {
+				t.Fatal("private transport falls back to repository credentials")
 			}
 			if err := ValidateGitHubBundle(t.Context(), plan, bundle); err != nil {
 				t.Fatal("private projection changed logical graph authority", err)
@@ -228,8 +236,8 @@ func TestGitHubPrivateTransfersRejectPayloadFallbackAndCredentialTampering(t *te
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, job, "steps"), "name", "Prepare NVKR runner (ubuntu-24.04)")
 			githubTestYAMLField(t, step, "with", githubCIStorageInput).Value = "${{ secrets.UNRELATED }}"
 		}},
-		{"missing package scope", bundle.WorkflowPath, func(root *yamlv3.Node) {
-			githubTestYAMLField(t, root, "jobs", bootstrap, "permissions", "packages").Value = "read"
+		{"elevated package scope", bundle.WorkflowPath, func(root *yamlv3.Node) {
+			githubYAMLSet(githubTestYAMLField(t, root, "jobs", bootstrap), "permissions", githubYAMLMap("contents", githubYAMLString("read"), "packages", githubYAMLString("write")))
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {

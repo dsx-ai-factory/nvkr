@@ -5,8 +5,8 @@
 name: Private CI download
 description: Generated private transport; Actions artifacts contain only locator JSON.
 inputs:
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, scoped only to transfer steps
+  nvkr-ci-storage-read-token:
+    description: Dedicated private CI storage credential, scoped only to transfer steps
     required: true
   name:
     description: Original generated transport setting name
@@ -61,8 +61,9 @@ runs:
     - name: Restore bytes from private GHCR
       shell: bash
       env:
-        NVKR_CI_STORAGE_TOKEN: ${{ inputs.nvkr-ci-storage-token }}
-        NVKR_CI_STORAGE_USER: ${{ github.actor }}
+        NVKR_CI_STORAGE_TOKEN: ${{ inputs.nvkr-ci-storage-read-token }}
+        NVKR_CI_REPOSITORY_TOKEN: ${{ github.token }}
+        NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         NVKR_CI_INDEX: ${{ steps.directory.outputs.path }}
         NVKR_CI_DESTINATION: ${{ inputs.path }}
         NVKR_CI_RUN: ${{ inputs.run-id }}

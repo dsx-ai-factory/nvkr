@@ -94,7 +94,8 @@ func newStorageFixture(t *testing.T, policy func(int) (int, any)) *storageFixtur
 }
 
 func privatePackage() map[string]any {
-	return map[string]any{"name": "source/ci-artifacts", "package_type": "container", "visibility": "private", "owner": map[string]any{"login": "Example"}, "repository": nil}
+	// GitHub's documented unlinked package response omits repository.
+	return map[string]any{"name": "source/ci-artifacts", "package_type": "container", "visibility": "private", "owner": map[string]any{"login": "Example"}}
 }
 
 func admittedPolicy(int) (int, any) { return http.StatusOK, privatePackage() }
@@ -199,9 +200,12 @@ func TestPrivateCarrierDeniesPrivacyBeforePayloadAccess(t *testing.T) {
 	}{
 		{"public package", func(p map[string]any) { p["visibility"] = "public" }, 200},
 		{"unknown visibility", func(p map[string]any) { delete(p, "visibility") }, 200},
-		{"unknown association", func(p map[string]any) { delete(p, "repository") }, 200},
+		{"malformed association", func(p map[string]any) { p["repository"] = []any{} }, 200},
 		{"public linked repository", func(p map[string]any) {
 			p["repository"] = map[string]any{"id": 2, "full_name": "Example/Source", "private": false, "visibility": "public"}
+		}, 200},
+		{"private linked repository", func(p map[string]any) {
+			p["repository"] = map[string]any{"id": 2, "full_name": "Example/Source", "private": true, "visibility": "private"}
 		}, 200},
 		{"unknown linked privacy", func(p map[string]any) {
 			p["repository"] = map[string]any{"id": 2, "full_name": "Example/Source", "private": true}
@@ -329,7 +333,7 @@ func TestPrivateCarrierPrivacyRecheckAndDownloadAdmission(t *testing.T) {
 		linked     any
 	}{
 		{"private unlinked", "private", nil},
-		{"internal private linked", "internal", map[string]any{"id": 2, "full_name": "Example/Private", "private": true, "visibility": "private"}},
+		{"internal unlinked", "internal", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			deny := false

@@ -280,7 +280,7 @@ func nightlyZIPFixture(t *testing.T, headers []zip.FileHeader, raw []byte) []byt
 }
 
 func TestNightlyPrivateLocatorPreservesProviderPinsAndCleanup(t *testing.T) {
-	for _, scenario := range []string{"success", "wrong attempt", "provider digest", "no token", "storage failure", "unexpected file", "canceled"} {
+	for _, scenario := range []string{"success", "wrong attempt", "provider digest", "no token", "no username", "storage failure", "unexpected file", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
 			_, build := nightlyIdentityFixture()
 			artifact := nightlyAPIArtifact("nvkr-lifecycle-run", build)
@@ -300,16 +300,19 @@ func TestNightlyPrivateLocatorPreservesProviderPinsAndCleanup(t *testing.T) {
 			if scenario == "provider digest" {
 				artifact.Digest = "sha256:" + strings.Repeat("c", 64)
 			}
-			options := cistore.Options{Token: "private-storage-read"}
+			options := cistore.Options{Token: "private-storage-read", Username: "storage-reader", RepositoryToken: "repository-read"}
 			if scenario == "no token" {
 				options.Token = ""
+			}
+			if scenario == "no username" {
+				options.Username = ""
 			}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			called, staged := false, ""
 			download := func(_ context.Context, got cistore.Request, gotLocator cistore.Locator, destination string, gotOptions cistore.Options) error {
 				called, staged = true, destination
-				if got != request || gotLocator.Request != request || gotOptions.Token != "private-storage-read" {
+				if got != request || gotLocator.Request != request || gotOptions != options {
 					t.Fatal("nightly private storage lost exact request or explicit token")
 				}
 				if scenario == "storage failure" {
@@ -335,7 +338,7 @@ func TestNightlyPrivateLocatorPreservesProviderPinsAndCleanup(t *testing.T) {
 			} else {
 				code := e.CodeVerifyFailed
 				switch scenario {
-				case "no token":
+				case "no token", "no username":
 					code = e.CodeEngineCapability
 				case "storage failure":
 					code = e.CodeFetchFailed
@@ -354,6 +357,23 @@ func TestNightlyPrivateLocatorPreservesProviderPinsAndCleanup(t *testing.T) {
 				if _, err := os.Stat(filepath.Dir(staged)); !os.IsNotExist(err) {
 					t.Fatal("nightly private payload staging survived completion")
 				}
+			}
+		})
+	}
+}
+
+func TestNightlyStorageCredentialUsesExplicitAccount(t *testing.T) {
+	t.Setenv("GH_TOKEN", "repository-read")
+	t.Setenv("GITHUB_ACTOR", "unrelated-actor")
+	for _, tc := range []struct{ username, token string }{
+		{"storage-reader", "private-token"}, {"storage-reader", ""}, {"", "private-token"},
+	} {
+		t.Run(tc.username+"/"+tc.token, func(t *testing.T) {
+			t.Setenv("NVKR_CI_STORAGE_USER", tc.username)
+			t.Setenv("NVKR_CI_STORAGE_TOKEN", tc.token)
+			got := nightlyCIStorageOptions()
+			if got.Username != tc.username || got.Token != tc.token || got.RepositoryToken != "repository-read" {
+				t.Fatal("nightly substituted an actor, owner, or provider credential for the private account")
 			}
 		})
 	}

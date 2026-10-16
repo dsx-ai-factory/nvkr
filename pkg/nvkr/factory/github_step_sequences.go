@@ -75,7 +75,7 @@ func githubStepSequenceName(plan *Plan, job *yamlv3.Node, actions githubActionRe
 	shared := "./" + githubActionsDirectoryFor(plan) + "shared/"
 	if githubYAMLLength(prepare) != 8 || githubYAMLValue(prepare, "name") != "Prepare NVKR runner and job parameters" ||
 		githubYAMLValue(prepare, "id") != githubContextStepID || githubYAMLValue(prepare, "uses") != shared+"prepare-stage" ||
-		githubCISequenceArgumentLength(prepareWith) != 4 || githubYAMLValue(prepareWith, "action") != "${{ github.job }}" ||
+		githubCISequenceArgumentLength(prepareWith) != 2 ||
 		githubYAMLValue(prepareWith, "runner-artifact") != "nvkr-exec-"+shortStableName(runner) {
 		return ""
 	}

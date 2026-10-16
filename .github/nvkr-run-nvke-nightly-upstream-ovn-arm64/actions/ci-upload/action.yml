@@ -5,8 +5,8 @@
 name: Private CI upload
 description: Generated private transport; Actions artifacts contain only locator JSON.
 inputs:
-  nvkr-ci-storage-token:
-    description: Private CI storage credential, scoped only to transfer steps
+  nvkr-ci-storage-write-token:
+    description: Dedicated private CI storage credential, scoped only to transfer steps
     required: true
   nvkr-ci-always:
     description: Preserve the caller's admitted always-run upload through cancellation
@@ -65,8 +65,9 @@ runs:
       if: ${{ always() && steps.directory.outcome == 'success' && (inputs.nvkr-ci-always == 'true' || success()) }}
       shell: bash
       env:
-        NVKR_CI_STORAGE_TOKEN: ${{ inputs.nvkr-ci-storage-token }}
-        NVKR_CI_STORAGE_USER: ${{ github.actor }}
+        NVKR_CI_STORAGE_TOKEN: ${{ inputs.nvkr-ci-storage-write-token }}
+        NVKR_CI_REPOSITORY_TOKEN: ${{ github.token }}
+        NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         NVKR_CI_NAME: ${{ inputs.name }}
         NVKR_CI_PATH: ${{ inputs.path }}
         NVKR_CI_MISSING: ${{ inputs.if-no-files-found }}

@@ -237,6 +237,88 @@ func TestGitHubWorkflowSizeAdmission(t *testing.T) {
 	}
 }
 
+func TestGitHubWorkflowYAMLNodeAdmission(t *testing.T) {
+	// Stream, document and sequence start/end events account for six nodes.
+	for _, tc := range []struct {
+		name  string
+		items int
+		valid bool
+	}{
+		{"under", maxGitHubWorkflowYAMLNodes - 7, true},
+		{"exact", maxGitHubWorkflowYAMLNodes - 6, true},
+		{"over", maxGitHubWorkflowYAMLNodes - 5, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := []byte(strings.Repeat("- x\n", tc.items))
+			err := validateGitHubWorkflowSize(raw)
+			if !tc.valid {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes, err := countGitHubWorkflowYAMLNodes(raw)
+			if err != nil || nodes != tc.items+6 {
+				t.Fatalf("nodes=%d error=%v, want %d parsing events", nodes, err, tc.items+6)
+			}
+		})
+	}
+}
+
+func TestGitHubWorkflowYAMLNodeAccounting(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		want int
+	}{
+		{"scalar", "value\n", 5},
+		{"mapping keys and values", "key: [one, two]\n", 11},
+		{"replayed sequence", "- &pair [one, two]\n- *pair\n", 14},
+		{"nested aliases", "- &value x\n- &pair [*value, *value]\n- *pair\n", 15},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			nodes, err := countGitHubWorkflowYAMLNodes([]byte(tc.raw))
+			if err != nil || nodes != tc.want {
+				t.Fatalf("nodes=%d error=%v, want %d parsing events", nodes, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestGitHubWorkflowYAMLAdmissionRejectsMalformedGraphs(t *testing.T) {
+	assertFactoryErrorCode(t, validateGitHubWorkflowSize(nil), e.CodeInvalidCatalog)
+	assertFactoryErrorCode(t, validateGitHubWorkflowSize([]byte("# no workflow\n")), e.CodeInvalidCatalog)
+	for _, tc := range []struct {
+		name string
+		raw  string
+	}{
+		{"malformed", "key: [\n"},
+		{"missing alias", "key: *absent\n"},
+		{"recursive alias", "key: &cycle [*cycle]\n"},
+		{"multiple documents", "first\n---\nsecond\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertFactoryErrorCode(t, validateGitHubWorkflowSize([]byte(tc.raw)), e.CodePipelineDrift)
+		})
+	}
+	deep := strings.Repeat("[", maxGitHubWorkflowYAMLDepth) + "x" + strings.Repeat("]", maxGitHubWorkflowYAMLDepth)
+	assertFactoryErrorCode(t, validateGitHubWorkflowSize([]byte(deep)), e.CodeEngineCapability)
+}
+
+func TestGitHubWorkflowYAMLAliasExpansionStopsAtBudget(t *testing.T) {
+	var raw strings.Builder
+	raw.WriteString("a0: &a0 [x]\n")
+	for i := 1; i <= 20; i++ {
+		fmt.Fprintf(&raw, "a%d: &a%d [*a%d, *a%d]\n", i, i, i-1, i-1)
+	}
+	nodes, err := countGitHubWorkflowYAMLNodes([]byte(raw.String()))
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if nodes > maxGitHubWorkflowYAMLNodes {
+		t.Fatalf("alias traversal exceeded its budget: %d", nodes)
+	}
+}
+
 func TestOversizedWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 	plan := githubTestPlan(t)
 	bundle, err := RenderGitHub(t.Context(), plan)
@@ -250,6 +332,22 @@ func TestOversizedWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), out, bundle), e.CodeEngineCapability)
 	if _, err := os.Stat(out); !os.IsNotExist(err) {
 		t.Fatalf("oversized workflow wrote output: %v", err)
+	}
+}
+
+func TestOvercomplexWorkflowCannotWriteGeneratedBundle(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(strings.Repeat("- x\n", maxGitHubWorkflowYAMLNodes))
+	bundle.Files[GitHubWorkflowPath] = raw
+	bundle.WorkflowDigest = pipeline.FileDigest(raw)
+	out := filepath.Join(t.TempDir(), "must-not-exist")
+	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), out, bundle), e.CodeEngineCapability)
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatalf("overcomplex workflow wrote output: %v", err)
 	}
 }
 
@@ -297,7 +395,14 @@ func TestMaintainedM2RenderingFitsGitHubFileLimit(t *testing.T) {
 	if len(raw) > maxGitHubWorkflowBytes*95/100 {
 		t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
 	}
-	t.Logf("maintained M2 rendering: %d bytes (%d bytes below GitHub limit)", len(raw), maxGitHubWorkflowBytes-len(raw))
+	nodes, err := countGitHubWorkflowYAMLNodes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
+		t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
+	}
+	t.Logf("maintained M2 rendering: %d bytes (%d below GitHub limit), %d YAML events (%d below parser limit)", len(raw), maxGitHubWorkflowBytes-len(raw), nodes, maxGitHubWorkflowYAMLNodes-nodes)
 }
 
 func TestMaintainedGitHubBundlesKeepJobsInEntryWorkflow(t *testing.T) {

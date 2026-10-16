@@ -13,7 +13,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
-      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +45,7 @@ jobs:
         if: always() && steps.ci-helper.outcome == 'success'
         uses: ./.github/nvkr-run/actions/ci-upload
         with:
-          nvkr-ci-storage-token: ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
           nvkr-ci-always: 'true'
           name: native-toolchains-${{ matrix.arch }}-${{ github.sha }}
           path: .nvkr/native-toolchains/${{ matrix.arch }}

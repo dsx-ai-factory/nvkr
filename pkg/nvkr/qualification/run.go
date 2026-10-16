@@ -44,7 +44,8 @@ func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecyc
 	if err != nil {
 		return nil, err
 	}
-	provider := qualificationorigin.NewGitHubWithCIStorage(options.GitHubToken, options.CIStorageToken)
+	storage := qualificationorigin.CIStorageCredential{Username: options.CIStorageUsername, Token: options.CIStorageToken}
+	provider := qualificationorigin.NewGitHubWithCIStorageCredential(options.GitHubToken, storage)
 	source, err := provider.AuthenticateTriggeredSource(ctx, policy.Source)
 	if err != nil {
 		return nil, err
@@ -67,7 +68,7 @@ func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecyc
 		return &Publication{ArtifactChecks: report, Verdicts: []Verdict{}, PublishedSubjects: []string{}}, err
 	}
 	defer func() { _ = checks.Close() }()
-	smoke, err := lifecycle.AuthenticateHostedToolSmokeWithCIStorage(ctx, checks, invocation, policy, options.GitHubToken, options.CIStorageToken)
+	smoke, err := lifecycle.AuthenticateHostedToolSmokeWithCIStorageCredential(ctx, checks, invocation, policy, options.GitHubToken, storage)
 	if err != nil {
 		return smokeFailurePublication(report, err)
 	}

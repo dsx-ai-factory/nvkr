@@ -5,8 +5,6 @@ package cistore
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -24,7 +22,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"golang.org/x/sys/unix"
 )
@@ -46,7 +43,7 @@ func (b *backend) upload(ctx context.Context, request Request, root string, path
 		return Locator{}, err
 	}
 	packageRepository, _ := name.NewRepository(request.packageName(), name.StrictValidation)
-	if err := b.ensurePrivatePackage(ctx, packageRepository, source, opts); err != nil {
+	if err := b.ensurePrivatePackage(ctx, packageRepository, source, opts, true); err != nil {
 		return Locator{}, err
 	}
 	clean, prefix, err := uploadPaths(ctx, root, paths)
@@ -67,21 +64,12 @@ func (b *backend) upload(ctx context.Context, request Request, root string, path
 		return Locator{}, e.Wrap(e.CodeVerifyFailed, err, "holding packed CI carrier")
 	}
 	defer file.Close()
-	digest, err := fileDigest(ctx, file, info.Size())
+	layers, digest, err := chunkArchive(ctx, file, info.Size(), maxChunkBytes)
 	if err != nil {
 		return Locator{}, err
 	}
 	l := Locator{SchemaVersion: SchemaVersion, Request: request, ArchiveDigest: digest, ArchiveSize: info.Size(), Paths: clean, StripPrefix: prefix}
-	layer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
-		return io.NopCloser(contextReader{ctx, io.NewSectionReader(file, 0, info.Size())}), nil
-	}, tarball.WithMediaType(types.OCILayer))
-	if err != nil {
-		return Locator{}, safeIOError(ctx, e.CodeBuildFailed, "constructing CI carrier filesystem layer")
-	}
-	if size, err := layer.Size(); err != nil || size <= 0 || size > transportarchive.MaxArchiveBytes {
-		return Locator{}, safeIOError(ctx, e.CodeVerifyFailed, "CI carrier layer exceeds its byte bound")
-	}
-	image, err := carrierImage(layer, l)
+	image, err := carrierImage(layers, l)
 	if err != nil {
 		return Locator{}, err
 	}
@@ -111,12 +99,12 @@ func (b *backend) upload(ctx context.Context, request Request, root string, path
 	return l, nil
 }
 
-func carrierImage(layer v1.Layer, l Locator) (v1.Image, error) {
+func carrierImage(layers []v1.Layer, l Locator) (v1.Image, error) {
 	raw, err := l.bindingBytes()
 	if err != nil {
 		return nil, err
 	}
-	image, err := mutate.AppendLayers(empty.Image, layer)
+	image, err := mutate.AppendLayers(empty.Image, layers...)
 	if err != nil {
 		return nil, e.New(e.CodeInternal, "constructing CI carrier image")
 	}
@@ -168,8 +156,11 @@ func (b *backend) download(ctx context.Context, request Request, l Locator, dest
 		return safeIOError(ctx, e.CodeFetchFailed, "fetching private CI carrier manifest")
 	}
 	manifest, err := image.Manifest()
-	if err != nil || manifest.MediaType != types.OCIManifestSchema1 || len(manifest.Layers) != 1 || manifest.Config.Size <= 0 || manifest.Config.Size > MaxLocatorBytes*2 || manifest.Config.MediaType != types.OCIConfigJSON || manifest.Layers[0].MediaType != types.OCILayer || manifest.Layers[0].Size <= 0 || manifest.Layers[0].Size > transportarchive.MaxArchiveBytes {
-		return e.New(e.CodeVerifyFailed, "CI carrier requires one exact bounded filesystem layer and config")
+	if err != nil {
+		return safeIOError(ctx, e.CodeVerifyFailed, "reading CI carrier manifest")
+	}
+	if err := validateChunkManifest(manifest, l.ArchiveSize); err != nil {
+		return err
 	}
 	actual, err := image.Digest()
 	if err != nil || actual.String() != ref.DigestStr() {
@@ -183,14 +174,19 @@ func (b *backend) download(ctx context.Context, request Request, l Locator, dest
 	if err != nil {
 		return err
 	}
-	if config.Config.Labels[BindingLabel] != string(want) || len(config.RootFS.DiffIDs) != 1 || config.RootFS.DiffIDs[0].String() != l.ArchiveDigest {
+	if config.Config.Labels[BindingLabel] != string(want) || len(config.RootFS.DiffIDs) != len(manifest.Layers) {
 		return e.New(e.CodeVerifyFailed, "CI carrier config does not bind the exact locator")
 	}
-	layers, err := image.Layers()
-	if err != nil || len(layers) != 1 {
-		return e.New(e.CodeVerifyFailed, "reading CI carrier filesystem layer")
+	for i, descriptor := range manifest.Layers {
+		if config.RootFS.DiffIDs[i] != descriptor.Digest {
+			return e.New(e.CodeVerifyFailed, "CI carrier config does not bind the ordered raw chunks")
+		}
 	}
-	return restoreLayer(ctx, layers[0], l, destination)
+	layers, err := image.Layers()
+	if err != nil || len(layers) != len(manifest.Layers) {
+		return e.New(e.CodeVerifyFailed, "reading CI carrier chunk layers")
+	}
+	return restoreLayers(ctx, layers, manifest, l, destination)
 }
 
 func (b *backend) registryOptions(ctx context.Context, opts Options) []remote.Option {
@@ -262,19 +258,13 @@ func (r contextReader) Read(p []byte) (int, error) {
 	return r.r.Read(p)
 }
 
-func fileDigest(ctx context.Context, file *os.File, size int64) (string, error) {
-	if size <= 0 || size > transportarchive.MaxArchiveBytes {
-		return "", e.New(e.CodeVerifyFailed, "CI carrier archive exceeds its byte bound")
+func restoreLayers(ctx context.Context, layers []v1.Layer, manifest *v1.Manifest, l Locator, destination string) error {
+	if err := validateChunkManifest(manifest, l.ArchiveSize); err != nil {
+		return err
 	}
-	hash := sha256.New()
-	n, err := io.Copy(hash, contextReader{ctx, io.NewSectionReader(file, 0, size)})
-	if err != nil || n != size {
-		return "", safeIOError(ctx, e.CodeVerifyFailed, "hashing held CI archive")
+	if len(layers) != len(manifest.Layers) {
+		return e.New(e.CodeVerifyFailed, "CI carrier chunk count mismatch")
 	}
-	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-func restoreLayer(ctx context.Context, layer v1.Layer, l Locator, destination string) error {
 	if err := os.MkdirAll(destination, 0o700); err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "creating private CI destination")
 	}
@@ -293,18 +283,8 @@ func restoreLayer(ctx context.Context, layer v1.Layer, l Locator, destination st
 		return e.Wrap(e.CodeBuildFailed, err, "creating CI download archive")
 	}
 	defer file.Close()
-	reader, err := layer.Uncompressed()
-	if err != nil {
-		return safeIOError(ctx, e.CodeFetchFailed, "opening private CI payload")
-	}
-	hash := sha256.New()
-	n, copyErr := io.Copy(io.MultiWriter(file, hash), contextReader{ctx, io.LimitReader(reader, l.ArchiveSize+1)})
-	closeErr := reader.Close()
-	if copyErr != nil || closeErr != nil {
-		return safeIOError(ctx, e.CodeFetchFailed, "reading private CI payload")
-	}
-	if n != l.ArchiveSize || "sha256:"+hex.EncodeToString(hash.Sum(nil)) != l.ArchiveDigest {
-		return e.New(e.CodeVerifyFailed, "private CI payload size or digest mismatch")
+	if err := assembleChunks(ctx, file, layers, manifest.Layers, l.ArchiveDigest); err != nil {
+		return err
 	}
 	restored := filepath.Join(temporary, "restored")
 	if err := transportarchive.UnpackOpen(ctx, file, restored, l.Paths); err != nil {

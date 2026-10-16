@@ -13,7 +13,8 @@ import (
 	yamlv3 "go.yaml.in/yaml/v3"
 )
 
-const githubCIStorageInput = "nvkr-ci-storage-token"
+const githubCIStorageInput = "nvkr-ci-storage-write-token"
+const githubCIReadInput = "nvkr-ci-storage-read-token"
 const githubCIAlwaysInput = "nvkr-ci-always"
 
 const githubCIUploadCondition = "${{ always() && (inputs.nvkr-ci-always == 'true' || success()) }}"
@@ -22,15 +23,37 @@ const githubCIIndexCondition = "${{ always() && steps.store.outcome == 'success'
 
 type githubCITransfer struct{ upload, download bool }
 
-// The final transport projection adds exactly one credential binding to calls.
-// Complete sequence sharing still compares every byte and never admits arbitrary
-// extra inputs or a different credential expression.
+// Credentials are distinct explicit inputs and never add package authority to
+// the repository token. Complete sequence sharing compares both bindings.
 func githubCISequenceArgumentLength(node *yamlv3.Node) int {
 	length := githubYAMLLength(node)
-	if githubYAMLValue(node, githubCIStorageInput) == "${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}" {
-		length -= 2
+	for _, key := range []string{githubCIReadInput, githubCIStorageInput} {
+		if githubYAMLValue(node, key) == githubCICredential(key, true) {
+			length -= 2
+		}
 	}
 	return length
+}
+
+func githubCICredential(input string, caller bool) string {
+	if !caller {
+		return "${{ inputs." + input + " }}"
+	}
+	if input == githubCIReadInput {
+		return "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}"
+	}
+	return "${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}"
+}
+
+func (t githubCITransfer) inputs() []string {
+	var result []string
+	if t.download {
+		result = append(result, githubCIReadInput)
+	}
+	if t.upload {
+		result = append(result, githubCIStorageInput)
+	}
+	return result
 }
 
 func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, error) {
@@ -99,7 +122,11 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 	}
 	files := map[string][]byte{}
 	for _, mode := range []string{"upload", "download", "bootstrap-download"} {
-		inputs := githubYAMLMap(githubCIStorageInput, githubActionInput("Private CI storage credential, scoped only to transfer steps"))
+		credentialInput := githubCIReadInput
+		if mode == "upload" {
+			credentialInput = githubCIStorageInput
+		}
+		inputs := githubYAMLMap(credentialInput, githubActionInput("Dedicated private CI storage credential, scoped only to transfer steps"))
 		if mode == "upload" {
 			githubYAMLSet(inputs, githubCIAlwaysInput, githubYAMLMap("description", githubYAMLString("Preserve the caller's admitted always-run upload through cancellation"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}, "default", githubYAMLString("false")))
 		}
@@ -114,7 +141,11 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				githubYAMLMap("name", githubYAMLString("Build private transport helper from this checkout"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString("set -eu\nmkdir -p .nvkr/ci-bootstrap\nCGO_ENABLED=0 go build -trimpath -ldflags "+shellQuote(linker)+" -o .nvkr/ci-bootstrap/nvkr-exec ./cmd/nvkr")))
 		}
 		steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Create a fresh locator directory"), "id", githubYAMLString("directory"), "shell", githubYAMLString("bash"), "run", githubYAMLString("set -eu\ndirectory=$(mktemp -d \"$RUNNER_TEMP/nvkr-ci-index.XXXXXX\")\nprintf 'path=%s\\n' \"$directory\" >> \"$GITHUB_OUTPUT\"")))
-		env := githubYAMLMap("NVKR_CI_STORAGE_TOKEN", githubYAMLString("${{ inputs."+githubCIStorageInput+" }}"), "NVKR_CI_STORAGE_USER", githubYAMLString("${{ github.actor }}"))
+		username := "${{ vars.NVKR_CI_STORAGE_READ_USER }}"
+		if mode == "upload" {
+			username = "${{ vars.NVKR_CI_STORAGE_WRITE_USER }}"
+		}
+		env := githubYAMLMap("NVKR_CI_STORAGE_TOKEN", githubYAMLString("${{ inputs."+credentialInput+" }}"), "NVKR_CI_REPOSITORY_TOKEN", githubYAMLString("${{ github.token }}"), "NVKR_CI_STORAGE_USER", githubYAMLString(username))
 		outputs := githubYAMLMap()
 		if mode == "upload" {
 			githubYAMLSet(steps.Content[0], "if", githubYAMLString(githubCIUploadCondition))
@@ -240,19 +271,17 @@ func githubCISetPermissions(job *yamlv3.Node, permissions map[string]string) {
 }
 
 func githubCITransferPermissions(base map[string]string, transfer githubCITransfer) map[string]string {
-	if !transfer.upload && !transfer.download {
+	// Locator downloads use the authenticated Actions API. Registry access still
+	// belongs only to dedicated package credentials, never the repository token.
+	if !transfer.download {
 		return base
 	}
-	result := maps.Clone(base)
-	if result == nil {
-		result = map[string]string{"contents": "read"}
+	permissions := maps.Clone(base)
+	if permissions == nil {
+		permissions = map[string]string{"contents": "read"}
 	}
-	if transfer.upload {
-		result["packages"] = "write"
-	} else if result["packages"] != "write" {
-		result["packages"] = "read"
-	}
-	return result
+	permissions["actions"] = "read"
+	return permissions
 }
 
 // Project after logical action sharing. Each provider artifact becomes a locator
@@ -306,10 +335,12 @@ func privatizeGitHubTransfers(plan *Plan, workflow []byte, files map[string][]by
 				inputs = githubYAMLMap()
 				githubYAMLSet(document.Content[0], "inputs", inputs)
 			}
-			if githubYAMLField(inputs, githubCIStorageInput) != nil {
-				return nil, nil, e.New(e.CodeEngineCapability, "generated action conflicts with private transport input")
+			for _, key := range transfer.inputs() {
+				if githubYAMLField(inputs, key) != nil {
+					return nil, nil, e.New(e.CodeEngineCapability, "generated action conflicts with private transport input")
+				}
+				githubYAMLSet(inputs, key, githubActionInput("Dedicated private CI credential, forwarded only to its transfer steps"))
 			}
-			githubYAMLSet(inputs, githubCIStorageInput, githubActionInput("Private CI storage credential, forwarded only to transfer steps"))
 		}
 		if err := githubCIWalkSteps(document, func(step *yamlv3.Node) error {
 			selected, err := githubCIJobTransfers(plan, step, documents, map[string]bool{})
@@ -321,11 +352,9 @@ func privatizeGitHubTransfers(plan *Plan, workflow []byte, files map[string][]by
 				with = githubYAMLMap()
 				githubYAMLSet(step, "with", with)
 			}
-			token := "${{ inputs." + githubCIStorageInput + " }}"
-			if name == entry {
-				token = "${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}"
+			for _, key := range selected.inputs() {
+				githubYAMLSet(with, key, githubYAMLString(githubCICredential(key, name == entry)))
 			}
-			githubYAMLSet(with, githubCIStorageInput, githubYAMLString(token))
 			return nil
 		}); err != nil {
 			return nil, nil, err
@@ -349,23 +378,6 @@ func privatizeGitHubTransfers(plan *Plan, workflow []byte, files map[string][]by
 	if err := anchorGitHubPreflight(plan, jobs, actions); err != nil {
 		return nil, nil, err
 	}
-	var firstToken *yamlv3.Node
-	if err := githubCIWalkSteps(jobs, func(step *yamlv3.Node) error {
-		with := githubYAMLField(step, "with")
-		token := githubYAMLField(with, githubCIStorageInput)
-		if token == nil || token.Kind != yamlv3.ScalarNode {
-			return nil
-		}
-		if firstToken == nil {
-			firstToken = token
-			token.Anchor = "nvkr-ci-storage-token"
-		} else if token.Value == firstToken.Value {
-			githubYAMLSet(with, githubCIStorageInput, &yamlv3.Node{Kind: yamlv3.AliasNode, Value: firstToken.Anchor, Alias: firstToken})
-		}
-		return nil
-	}); err != nil {
-		return nil, nil, err
-	}
 	result := maps.Clone(files)
 	for name, document := range documents {
 		raw, err := encodeGitHubYAML(document)
@@ -386,7 +398,7 @@ func privatizeGitHubTransfers(plan *Plan, workflow []byte, files map[string][]by
 // for the existing logical validator. Final all-member regeneration additionally
 // checks the actual executable projection, not just these restored descriptions.
 func materializeGitHubPrivateTransfers(plan *Plan, workflow []byte, files map[string][]byte) ([]byte, map[string][]byte, error) {
-	if !strings.Contains(string(workflow), githubCIStorageInput) {
+	if !strings.Contains(string(workflow), githubCIStorageInput) && !strings.Contains(string(workflow), githubCIReadInput) {
 		return workflow, files, nil
 	}
 	actions, err := resolveGitHubActions(plan.Actions)
@@ -441,7 +453,6 @@ func materializeGitHubPrivateTransfers(plan *Plan, workflow []byte, files map[st
 		}
 		if err := githubCIWalkSteps(document, func(step *yamlv3.Node) error {
 			with := githubYAMLField(step, "with")
-			token := githubYAMLField(with, githubCIStorageInput)
 			mode := githubCITransferMode(plan, githubYAMLValue(step, "uses"))
 			always := githubYAMLField(with, githubCIAlwaysInput)
 			wantsAlways := mode == "upload" && githubYAMLValue(step, "if") == githubAlwaysCondition
@@ -453,21 +464,20 @@ func materializeGitHubPrivateTransfers(plan *Plan, workflow []byte, files map[st
 				return e.New(e.CodeEngineCapability, "private transfer changes its admitted cancellation behavior")
 			}
 			githubYAMLRemove(with, githubCIAlwaysInput)
-			if token == nil {
-				if mode != "" {
-					return e.New(e.CodeEngineCapability, "private transfer omits its explicit credential input")
+			for _, key := range []string{githubCIReadInput, githubCIStorageInput} {
+				token := githubYAMLField(with, key)
+				if token == nil {
+					if (mode == "upload" && key == githubCIStorageInput) || ((mode == "download" || mode == "bootstrap-download") && key == githubCIReadInput) {
+						return e.New(e.CodeEngineCapability, "private transfer omits its explicit credential input")
+					}
+					continue
 				}
-				return nil
+				if token.Kind != yamlv3.ScalarNode || token.Value != githubCICredential(key, name == entry) {
+					return e.New(e.CodeEngineCapability, "private transfer changes its fixed credential binding")
+				}
+				githubYAMLRemove(with, key)
 			}
-			want := "${{ inputs." + githubCIStorageInput + " }}"
-			if name == entry {
-				want = "${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}"
-			}
-			if token.Kind != yamlv3.ScalarNode || token.Value != want {
-				return e.New(e.CodeEngineCapability, "private transfer changes its fixed credential binding")
-			}
-			githubYAMLRemove(with, githubCIStorageInput)
-			if len(with.Content) == 0 {
+			if with != nil && len(with.Content) == 0 {
 				githubYAMLRemove(step, "with")
 			}
 			if mode != "" {
@@ -484,6 +494,7 @@ func materializeGitHubPrivateTransfers(plan *Plan, workflow []byte, files map[st
 		inputs := githubYAMLField(document.Content[0], "inputs")
 		if inputs != nil {
 			githubYAMLRemove(inputs, githubCIStorageInput)
+			githubYAMLRemove(inputs, githubCIReadInput)
 		}
 		if inputs != nil && len(inputs.Content) == 0 {
 			githubYAMLRemove(document.Content[0], "inputs")

@@ -55,9 +55,9 @@ func qualificationSourceAuthentication(plan *factory.Plan) (qualificationSourceA
 }
 func (auth qualificationSourceAuth) writeCallerSecrets(out *bytes.Buffer) {
 	fmt.Fprintln(out, "    secrets:")
-	fmt.Fprintln(out, "      NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_TOKEN }}")
+	fmt.Fprintln(out, "      NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}")
 	for _, name := range auth.secrets {
-		if name == "NVKR_CI_STORAGE_TOKEN" {
+		if name == "NVKR_CI_STORAGE_READ_TOKEN" {
 			continue
 		}
 		fmt.Fprintf(out, "      %s: ${{ secrets.%s }}\n", name, name)
@@ -65,9 +65,9 @@ func (auth qualificationSourceAuth) writeCallerSecrets(out *bytes.Buffer) {
 }
 func (auth qualificationSourceAuth) writeCallContract(out *bytes.Buffer) {
 	fmt.Fprintln(out, "    secrets:")
-	fmt.Fprintln(out, "      NVKR_CI_STORAGE_TOKEN:\n        required: false")
+	fmt.Fprintln(out, "      NVKR_CI_STORAGE_READ_TOKEN:\n        required: true")
 	for _, name := range auth.secrets {
-		if name == "NVKR_CI_STORAGE_TOKEN" {
+		if name == "NVKR_CI_STORAGE_READ_TOKEN" {
 			continue
 		}
 		fmt.Fprintf(out, "      %s:\n        required: true\n", name)

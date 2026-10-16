@@ -362,8 +362,10 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 		mutate func(*yamlv3.Node)
 	}{
 		{name: "publish-grabs-id-token",
-			old: []byte("    permissions:\n      contents: read\n      packages: write\n    env:\n      NVKR_CREDENTIAL"),
-			new: []byte("    permissions:\n      contents: read\n      id-token: write\n      packages: write\n    env:\n      NVKR_CREDENTIAL")},
+			mutate: func(root *yamlv3.Node) {
+				permissions := githubTestYAMLField(t, root, "jobs", githubJobID("publish/release"), "permissions")
+				githubYAMLSet(permissions, "id-token", githubYAMLString("write"))
+			}},
 		{name: "deployment-environment-removed",
 			old: []byte("    environment: 'nkd-release'\n"), new: []byte("")},
 		{name: "verify-grabs-id-token",

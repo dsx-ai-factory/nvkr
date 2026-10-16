@@ -81,8 +81,15 @@ func AuthenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckRecei
 }
 
 // AuthenticateHostedToolSmokeWithCIStorage additionally accepts an independent
-// private-payload read credential. Empty retains the provider-token fallback.
+// private-payload token. Private payloads also require the explicit account in
+// AuthenticateHostedToolSmokeWithCIStorageCredential; no provider-token fallback exists.
 func AuthenticateHostedToolSmokeWithCIStorage(ctx context.Context, checks *ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, policy QualificationPolicy, githubToken, storageToken string) (*ToolSmokeReceipt, error) {
+	return AuthenticateHostedToolSmokeWithCIStorageCredential(ctx, checks, invocation, policy, githubToken, qualificationorigin.CIStorageCredential{Token: storageToken})
+}
+
+// AuthenticateHostedToolSmokeWithCIStorageCredential accepts an independent
+// private-package account and read token alongside the provider API credential.
+func AuthenticateHostedToolSmokeWithCIStorageCredential(ctx context.Context, checks *ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, policy QualificationPolicy, githubToken string, storage qualificationorigin.CIStorageCredential) (*ToolSmokeReceipt, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "hosted smoke requires context")
 	}
@@ -100,7 +107,7 @@ func AuthenticateHostedToolSmokeWithCIStorage(ctx context.Context, checks *Artif
 	if err != nil {
 		return nil, err
 	}
-	provider := qualificationorigin.NewGitHubWithCIStorage(githubToken, storageToken)
+	provider := qualificationorigin.NewGitHubWithCIStorageCredential(githubToken, storage)
 	return authenticateHostedToolSmoke(ctx, checks, invocation, policy, verifier, func(ctx context.Context, platforms []string) ([]qualificationorigin.NativeSmokeArtifact, error) {
 		return provider.DownloadNativeSmoke(ctx, invocation, platforms)
 	})

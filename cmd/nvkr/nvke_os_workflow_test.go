@@ -230,8 +230,8 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 	git("-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "candidate fixture")
 	head := git("rev-parse", "HEAD")
 	for _, test := range []struct {
-		name, mode, ref, commit, event, mirror, retain string
-		want                                           bool
+		name, mode, ref, commit, event, mirror, retain, workflow string
+		want                                                     bool
 	}{
 		{name: "exact branch probe", mode: "preflight", ref: "refs/heads/probe", commit: head, want: true},
 		{name: "different workflow commit", mode: "preflight", ref: "refs/heads/probe", commit: main},
@@ -241,6 +241,8 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 		{name: "mirror probe", mode: "preflight", ref: "refs/heads/probe", commit: head, mirror: "59"},
 		{name: "image upload probe", mode: "preflight", ref: "refs/heads/probe", commit: head, retain: "true"},
 		{name: "main full dispatch", mode: "full", ref: "refs/heads/main", commit: main, want: true},
+		{name: "trusted full image retention", mode: "full", ref: "refs/heads/main", commit: main, workflow: main, retain: "true", want: true},
+		{name: "candidate image retention", mode: "full", ref: "refs/heads/main", commit: main, workflow: head, retain: "true"},
 		{name: "main merge push", ref: "refs/heads/main", commit: main, event: "push", want: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -256,15 +258,22 @@ func TestOSWorkflowPreflightSelection(t *testing.T) {
 			if event == "push" {
 				eventSHA = main
 			}
+			workflowSHA := test.workflow
+			if workflowSHA == "" {
+				workflowSHA = eventSHA
+			}
 			cmd := exec.CommandContext(t.Context(), "bash", "-c", selection)
 			cmd.Dir = repo
-			cmd.Env = append(os.Environ(), "EVENT_NAME="+event, "EVENT_REF="+test.ref, "EVENT_SHA="+eventSHA,
+			cmd.Env = append(os.Environ(), "EVENT_NAME="+event, "EVENT_REF="+test.ref, "EVENT_SHA="+eventSHA, "WORKFLOW_SHA="+workflowSHA,
 				"DISPATCH_COMMIT="+test.commit, "DISPATCH_MODE="+test.mode, "DISPATCH_ARCH=both",
 				"DISPATCH_MIRROR_PR="+test.mirror, "DISPATCH_RETAIN_QCOW2="+retain,
 				"GH_TOKEN=", "REPOSITORY=dsx-ai-factory/nvkr", "GITHUB_OUTPUT="+filepath.Join(t.TempDir(), "outputs"))
 			output, err := cmd.CombinedOutput()
 			if (err == nil) != test.want {
 				t.Fatalf("selection error=%v, want accepted=%t: %s", err, test.want, output)
+			}
+			if test.name == "candidate image retention" && !strings.Contains(string(output), "NVKR-E-ENGINE-CAPABILITY") {
+				t.Fatalf("candidate retention was not rejected by the capability gate: %s", output)
 			}
 		})
 	}

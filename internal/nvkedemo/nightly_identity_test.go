@@ -352,6 +352,10 @@ func (reader *nightlyZIPReaderAt) ReadAt(p []byte, offset int64) (int, error) {
 
 type nightlyCapture func(context.Context, []string, string, time.Duration) ([]byte, error)
 
+func nightlyCIStorageOptions() cistore.Options {
+	return cistore.Options{Token: os.Getenv("NVKR_CI_STORAGE_TOKEN"), Username: os.Getenv("NVKR_CI_STORAGE_USER"), RepositoryToken: os.Getenv("GH_TOKEN")}
+}
+
 func newNightlyInputs(ctx context.Context, profile NightlyProfile, build NightlyBuild, plan *factory.Plan, definition lifecycle.Definition, environment lifecycle.Environment, workspace string) (*NightlyInputs, error) {
 	if os.Getenv("GITHUB_SERVER_URL") != "https://github.com" || os.Getenv("GITHUB_REF") != "refs/heads/main" || os.Getenv("GH_TOKEN") == "" {
 		return nil, e.New(e.CodeEngineCapability, "nightly artifact retrieval requires explicit main-branch GitHub identity and API token")
@@ -457,11 +461,7 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 	}
 	memberNames := []string{"run.json", "publication-release.tar"}
 	members := make([][]byte, len(memberNames))
-	storageToken := os.Getenv("NVKR_CI_STORAGE_TOKEN")
-	if storageToken == "" {
-		storageToken = os.Getenv("GH_TOKEN")
-	}
-	privateOptions := cistore.Options{Token: storageToken}
+	privateOptions := nightlyCIStorageOptions()
 	privateRequest := cistore.Request{Repository: repository, RunID: strconv.FormatInt(build.ProducerRun, 10), Attempt: strconv.FormatInt(build.ProducerAttempt, 10)}
 	for i := range memberNames {
 		privateRequest.Name = names[i]
@@ -595,8 +595,8 @@ func nightlyTransportMembers(ctx context.Context, archive []byte, artifact night
 	if request.Name != artifact.Name || locator.ArchiveSize > diagnosticLimit {
 		return nil, e.New(e.CodeVerifyFailed, "private nightly locator differs from exact artifact origin or payload bound")
 	}
-	if options.Token == "" || download == nil {
-		return nil, e.New(e.CodeEngineCapability, "private nightly payload requires an explicit storage credential")
+	if options.Token == "" || strings.TrimSpace(options.Username) == "" || download == nil {
+		return nil, e.New(e.CodeEngineCapability, "private nightly payload requires an explicit storage username and token")
 	}
 	root, err := os.MkdirTemp(workspace, "nightly-private-")
 	if err != nil {

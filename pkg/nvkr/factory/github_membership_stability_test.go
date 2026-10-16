@@ -34,9 +34,9 @@ func TestGitHubUnrelatedOutputPreservesExistingJobs(t *testing.T) {
 				inputs.environment.RunsOn = ""
 				inputs.environment.GitHubRunners = map[string]string{"linux/amd64": "ubuntu-24.04", "linux/arm64": "ubuntu-24.04-arm"}
 				inputs.definition.Outputs[0].Name = "bravo"
-				// Cross the direct-result limit even after shared source work and
-				// Verify/SBOM pairing reduce the number of provider jobs.
-				for index := 1; index < 32; index++ {
+				// Cross the direct-result limit even when each output's complete
+				// offline closure stays in its producer job.
+				for index := 1; index < githubMaximumResultInputs; index++ {
 					output := inputs.definition.Outputs[0]
 					output.Name = fmt.Sprintf("omega-%02d", index)
 					inputs.definition.Outputs = append(inputs.definition.Outputs, output)

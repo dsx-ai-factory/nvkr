@@ -114,7 +114,7 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 		}
 		if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
 			publicUpload = step.If == "always()" &&
-				step.With["path"] == "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/*"
+				step.With["path"] == "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json"
 		}
 	}
 	if !executed || !checkedSource || !publicUpload || len(profiles) != 2 {

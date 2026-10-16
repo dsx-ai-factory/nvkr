@@ -21,7 +21,7 @@ import (
 
 func privateLocatorZIP(t *testing.T, name string, request cistore.Request, edit func(map[string]any)) []byte {
 	t.Helper()
-	value := map[string]any{"schemaVersion": "nvkr.dev/ci-carrier/v1", "request": request,
+	value := map[string]any{"schemaVersion": cistore.SchemaVersion, "request": request,
 		"reference":     "ghcr.io/example/nvkr/ci-artifacts@sha256:" + strings.Repeat("a", 64),
 		"archiveDigest": "sha256:" + strings.Repeat("b", 64), "archiveSize": 10240,
 		"paths": []string{"handoff.json"}, "stripPrefix": ""}
@@ -41,23 +41,27 @@ func setPrivateHandoffArchive(fixture *handoffDownloadFixture, archive []byte) {
 	fixture.list.Artifacts[0].Size = json.Number(strconv.Itoa(len(archive)))
 }
 
-func TestPrivateStorageCredentialsAreExplicitWithLegacyFallback(t *testing.T) {
+func TestPrivateStorageCredentialsRequireExplicitPackageAccess(t *testing.T) {
+	t.Setenv("GITHUB_ACTOR", "unrelated-actor")
 	for _, tc := range []struct {
-		name, api, storage, want string
+		name, api, storage, username string
 	}{
-		{"separate", "api-read", "storage-read", "storage-read"},
-		{"fallback", "api-read", "", "api-read"},
+		{"separate", "api-read", "storage-read", "storage-reader"},
+		{"no fallback", "api-read", "", ""},
 		{"empty", "", "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			g := NewGitHubWithCIStorage(tc.api, tc.storage)
-			if g.token != tc.api || g.storageToken != tc.want || g.downloadPrivate == nil {
+			g := NewGitHubWithCIStorageCredential(tc.api, CIStorageCredential{Username: tc.username, Token: tc.storage})
+			if g.token != tc.api || g.storageToken != tc.storage || g.storageUsername != tc.username || g.downloadPrivate == nil {
 				t.Fatal("provider and private storage credentials were conflated or implicit")
 			}
 		})
 	}
-	if g := NewGitHub("legacy-read"); g.token != "legacy-read" || g.storageToken != "legacy-read" {
-		t.Fatal("legacy constructor lost its explicit read-token fallback")
+	if g := NewGitHub("legacy-read"); g.token != "legacy-read" || g.storageToken != "" {
+		t.Fatal("provider credential implicitly authorizes private storage")
+	}
+	if g := NewGitHubWithCIStorage("legacy-read", "storage-read"); g.storageUsername != "" {
+		t.Fatal("legacy token-only constructor inferred a private registry account")
 	}
 }
 
@@ -67,10 +71,11 @@ func TestPrivateQualificationHandoffKeepsProviderAndStorageBindings(t *testing.T
 	setPrivateHandoffArchive(fixture, privateLocatorZIP(t, request.Name, request, nil))
 	g := fixture.github(t)
 	g.storageToken = "private-read-secret"
+	g.storageUsername = "storage-reader"
 	called, staged := false, ""
 	g.downloadPrivate = func(ctx context.Context, got cistore.Request, locator cistore.Locator, destination string, options cistore.Options) error {
 		called, staged = true, destination
-		if ctx.Err() != nil || got != request || locator.Request != request || options.Token != "private-read-secret" {
+		if ctx.Err() != nil || got != request || locator.Request != request || options.Token != "private-read-secret" || options.Username != "storage-reader" || options.RepositoryToken != "read-secret" {
 			t.Fatal("private download lost its exact origin or separate explicit credential")
 		}
 		if _, err := os.Stat(destination); !os.IsNotExist(err) {
@@ -111,6 +116,12 @@ func TestPrivateQualificationHandoffRejectsBeforeStorageAndNeverFallsBack(t *tes
 			(*v)["archiveSize"] = maxQualificationArchiveBytes + 1
 		}, e.CodeVerifyFailed},
 		{"no storage token", func(_ *handoffDownloadFixture, g *GitHub, _ *cistore.Request, _ *map[string]any) { g.storageToken = "" }, e.CodeEngineCapability},
+		{"no storage username", func(_ *handoffDownloadFixture, g *GitHub, _ *cistore.Request, _ *map[string]any) {
+			g.storageUsername = ""
+		}, e.CodeEngineCapability},
+		{"blank storage username", func(_ *handoffDownloadFixture, g *GitHub, _ *cistore.Request, _ *map[string]any) {
+			g.storageUsername = " "
+		}, e.CodeEngineCapability},
 		{"provider size", func(f *handoffDownloadFixture, _ *GitHub, _ *cistore.Request, _ *map[string]any) {
 			f.list.Artifacts[0].Size = "1"
 		}, e.CodeVerifyFailed},
@@ -121,6 +132,7 @@ func TestPrivateQualificationHandoffRejectsBeforeStorageAndNeverFallsBack(t *tes
 		t.Run(tc.name, func(t *testing.T) {
 			fixture := newHandoffDownloadFixture(t)
 			g := fixture.github(t)
+			g.storageToken, g.storageUsername = "private-read-secret", "storage-reader"
 			request := cistore.Request{Repository: "example/nvkr", RunID: "1234", Attempt: "2", Name: fixture.list.Artifacts[0].Name}
 			values := map[string]any{}
 			tc.edit(fixture, g, &request, &values)
@@ -157,6 +169,7 @@ func TestPrivateQualificationHandoffOwnsFailureAndCancellationCleanup(t *testing
 			request := cistore.Request{Repository: "example/nvkr", RunID: "1234", Attempt: "2", Name: fixture.list.Artifacts[0].Name}
 			setPrivateHandoffArchive(fixture, privateLocatorZIP(t, request.Name, request, nil))
 			g := fixture.github(t)
+			g.storageToken, g.storageUsername = "private-read-secret", "storage-reader"
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			staged := ""
@@ -222,10 +235,11 @@ func TestPrivateNativeSmokeRetainsExactPlatformAndCompleteEvidence(t *testing.T)
 				fixture.archives[string(listing.Artifacts[0].ID)] = archive
 			}
 			g := fixture.github(t)
+			g.storageToken, g.storageUsername = "private-read-secret", "storage-reader"
 			var staged []string
 			g.downloadPrivate = func(_ context.Context, request cistore.Request, locator cistore.Locator, destination string, options cistore.Options) error {
 				staged = append(staged, destination)
-				if request.Repository != "example/nvkr" || request.RunID != "2345" || request.Attempt != "3" || request != locator.Request || options.Token != "read-secret" {
+				if request.Repository != "example/nvkr" || request.RunID != "2345" || request.Attempt != "3" || request != locator.Request || options.Token != "private-read-secret" || options.Username != "storage-reader" || options.RepositoryToken != "read-secret" {
 					t.Fatal("worker locator escaped its exact qualifier attempt or explicit credential")
 				}
 				if scenario == "storage failure" {

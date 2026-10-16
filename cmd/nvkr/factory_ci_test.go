@@ -15,7 +15,7 @@ import (
 )
 
 func TestPrivateCIUploadCommandAdmitsBeforePathsOrTransfer(t *testing.T) {
-	for _, scenario := range []string{"missing token", "invalid repository", "invalid artifact", "missing output", "symlink output", "symlink directory", "canceled", "empty optional upload"} {
+	for _, scenario := range []string{"missing token", "missing username", "invalid repository", "invalid artifact", "missing output", "symlink output", "symlink directory", "canceled", "empty optional upload"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
 			t.Chdir(root)
@@ -37,6 +37,9 @@ func TestPrivateCIUploadCommandAdmitsBeforePathsOrTransfer(t *testing.T) {
 			switch scenario {
 			case "missing token":
 				t.Setenv("NVKR_CI_STORAGE_TOKEN", "")
+				code = e.CodeTrustPolicyMissing
+			case "missing username":
+				t.Setenv("NVKR_CI_STORAGE_USER", "")
 				code = e.CodeTrustPolicyMissing
 			case "invalid repository":
 				t.Setenv("GITHUB_REPOSITORY", "../invalid")
@@ -99,6 +102,7 @@ func TestPrivateCIDownloadCommandRequiresExactCrossRunAttempt(t *testing.T) {
 	t.Setenv("GITHUB_RUN_ID", "123")
 	t.Setenv("GITHUB_RUN_ATTEMPT", "2")
 	t.Setenv("NVKR_CI_STORAGE_TOKEN", "private-read")
+	t.Setenv("NVKR_CI_STORAGE_USER", "storage-reader")
 	for _, flags := range [][]string{{"--run-id", "456"}, {"--attempt", "3"}, {"--run-id", "00", "--attempt", "3"}} {
 		_, err := invokeLifecycleCLI(t, append([]string{"factory", "github", "ci-download", "--index-dir", "/missing", "--destination", "/must-not-create"}, flags...)...)
 		var coded *e.Error
