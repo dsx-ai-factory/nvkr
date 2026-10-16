@@ -19,9 +19,14 @@ func TestDemoQualificationGate(t *testing.T) {
 	for _, tc := range []struct {
 		name                      string
 		status, attempt, exit     string
+		prefix, suffix            string
 		existing, malformed, pass bool
 	}{
 		{name: "success", status: "passed", attempt: "fresh", exit: "0", pass: true},
+		{name: "extra newline", status: "passed", attempt: "fresh", exit: "0", suffix: "\n"},
+		{name: "trailing space", status: "passed", attempt: "fresh", exit: "0", suffix: " "},
+		{name: "leading space", status: "passed", attempt: "fresh", exit: "0", prefix: " "},
+		{name: "second document", status: "passed", attempt: "fresh", exit: "0", suffix: "{}"},
 		{name: "failed check", status: "failed", attempt: "fresh", exit: "0"},
 		{name: "wrong attempt", status: "passed", attempt: "other", exit: "0"},
 		{name: "failed process", status: "passed", attempt: "fresh", exit: "1"},
@@ -42,6 +47,7 @@ func TestDemoQualificationGate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			raw = []byte(tc.prefix + string(raw) + "\n" + tc.suffix)
 			if tc.malformed {
 				raw = []byte("not JSON")
 			}

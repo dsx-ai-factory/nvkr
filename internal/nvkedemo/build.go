@@ -44,7 +44,7 @@ func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	return result, nil
 }
-func buildArtifacts(ctx context.Context, cfg BuildConfig) (result BuiltInputs, resultErr error) {
+func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if err := validateAutomaticQualification(cfg.QualifyLocal, cfg.Prepared, cfg.QualificationPolicy, cfg.Qualification); err != nil {
 		return BuiltInputs{}, err
 	}
@@ -112,18 +112,35 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (result BuiltInputs, r
 		return BuiltInputs{}, err
 	}
 	cfg.Repository = repo
+	return executeBuildQualification(ctx, runner, script, cfg, buildQualificationSteps{
+		prepare: prepareLocalArtifacts, setup: SetupQualification,
+		build: buildLocalArtifacts, qualify: qualifyBuiltArtifacts, stop: StopQualificationRegistry,
+	})
+}
+
+// The private seam joins admitted operations without replacing their authority
+// checks. Production always supplies the concrete owners above.
+type buildQualificationSteps struct {
+	prepare func(context.Context, Runner, string, BuildConfig) error
+	setup   func(context.Context, DemoFile, string, io.Writer) (string, error)
+	build   func(context.Context, Runner, string, BuildConfig) error
+	qualify func(context.Context, BuildConfig) error
+	stop    func(context.Context, string) error
+}
+
+func executeBuildQualification(ctx context.Context, runner Runner, script string, cfg BuildConfig, steps buildQualificationSteps) (result BuiltInputs, resultErr error) {
 	if cfg.QualifyLocal {
-		if err := prepareLocalArtifacts(ctx, runner, script, cfg); err != nil {
+		if err := steps.prepare(ctx, runner, script, cfg); err != nil {
 			return BuiltInputs{}, err
 		}
-		out := filepath.Join(repo, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "qualification")
-		file := DemoFile{Version: 1, Build: BuildFile{Repo: repo, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs}, Run: RunFile{Network: cfg.Network}}
-		path, err := SetupQualification(ctx, file, out, cfg.Progress)
+		out := filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "qualification")
+		file := DemoFile{Version: 1, Build: BuildFile{Repo: cfg.Repository, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs}, Run: RunFile{Network: cfg.Network}}
+		path, err := steps.setup(ctx, file, out, cfg.Progress)
 		if err != nil {
 			return BuiltInputs{}, err
 		}
 		defer func() {
-			resultErr = errors.Join(resultErr, finishAutomaticQualification(ctx, out, StopQualificationRegistry))
+			resultErr = errors.Join(resultErr, finishAutomaticQualification(ctx, out, steps.stop))
 			if resultErr != nil {
 				result = BuiltInputs{}
 			}
@@ -140,13 +157,13 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (result BuiltInputs, r
 			fmt.Fprintf(cfg.Progress, "Local qualification files and evidence: %s\n", out)
 		}
 	}
-	if err = buildLocalArtifacts(ctx, runner, script, cfg); err != nil {
+	if err := steps.build(ctx, runner, script, cfg); err != nil {
 		return BuiltInputs{}, err
 	}
-	if err = qualifyBuiltArtifacts(ctx, cfg); err != nil {
+	if err := steps.qualify(ctx, cfg); err != nil {
 		return BuiltInputs{}, err
 	}
-	return builtInputs(repo, cfg.AttemptPrefix), nil
+	return builtInputs(cfg.Repository, cfg.AttemptPrefix), nil
 }
 
 func builtInputs(repo, attempt string) BuiltInputs {

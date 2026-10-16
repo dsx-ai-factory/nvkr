@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -76,9 +77,12 @@ func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, s
 }
 
 // PullDiskArtifact materializes only an exact standard disk manifest and bounded
-// payload. The caller admits destination disk capacity. No decoded metadata or
+// payload. The caller admits capacity for download staging plus held export. No decoded metadata or
 // registry location grants signing, provenance or qualification authority.
 func PullDiskArtifact(ctx context.Context, reference, out, platform string, maxPayloadBytes int64, options RegistryOptions) (err error) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		return e.New(e.CodeEngineCapability, "disk download requires no-replace filesystem support")
+	}
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
@@ -135,7 +139,7 @@ func PullDiskArtifact(ctx context.Context, reference, out, platform string, maxP
 	if int64(len(configRaw)) != manifest.Config.Size || digestBytes(configRaw) != manifest.Config.Digest.String() {
 		return e.New(e.CodeVerifyFailed, "disk config differs from its descriptor")
 	}
-	stage, commit, cleanup, err := stageLayout(out)
+	stage, _, cleanup, err := stageLayout(out)
 	if err != nil {
 		return err
 	}
@@ -191,12 +195,8 @@ func PullDiskArtifact(ctx context.Context, reference, out, platform string, maxP
 	if err != nil {
 		return err
 	}
-	profileErr := owner.RequireStandardProfile(ctx)
-	if err := errors.Join(profileErr, owner.Close()); err != nil {
-		return err
-	}
-	if err := deliveryContext(ctx); err != nil {
-		return err
-	}
-	return commit()
+	// Export from the authenticated held payload through the descriptor-relative
+	// no-replace owner. The temporary download is never renamed over a caller's
+	// destination, even if that destination appears while the stream is active.
+	return errors.Join(owner.WriteLayout(ctx, out), owner.Close())
 }

@@ -32,16 +32,8 @@ import (
 // selected prepared demo. It creates descriptions, never verification receipts.
 // Existing keys, policy files, registries and evidence are never reused.
 func SetupQualification(ctx context.Context, file DemoFile, out string, progress io.Writer) (result string, err error) {
-	defer func() {
-		if err != nil {
-			code := e.CodePreflightFailed
-			var coded *e.Error
-			if errors.As(err, &coded) {
-				code = coded.Code
-			}
-			err = e.Wrap(code, err, "local qualification setup failed; retained setup files are not successful evidence")
-		}
-	}()
+	retained := ""
+	defer func() { err = qualificationSetupFailure(err, retained) }()
 	if err := requireContext(ctx); err != nil {
 		return "", err
 	}
@@ -107,6 +99,7 @@ func SetupQualification(ctx context.Context, file DemoFile, out string, progress
 	if err := os.Mkdir(out, 0700); err != nil {
 		return "", err
 	}
+	retained = out
 	for _, name := range []string{"scratch", "registry-data", "diagnostics"} {
 		if err := os.Mkdir(filepath.Join(out, name), 0700); err != nil {
 			return "", err
@@ -282,4 +275,20 @@ func finishAutomaticQualification(ctx context.Context, out string, stop func(con
 	cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 	defer cancel()
 	return stop(cleanup, out)
+}
+
+// Failed private setup is preserved; only a fresh destination may be retried.
+func qualificationSetupFailure(err error, retained string) error {
+	if err == nil {
+		return nil
+	}
+	code := e.CodePreflightFailed
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		code = coded.Code
+	}
+	if retained != "" {
+		return e.Wrap(code, err, "local qualification setup failed; files retained at %q are not successful evidence; manual setup requires a fresh --out; automatic --qualify-local requires a fresh --attempt", retained)
+	}
+	return e.Wrap(code, err, "local qualification setup failed before creating setup files")
 }

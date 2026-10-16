@@ -590,9 +590,10 @@ This is admission only: no local source, artifact or qualification receipt is is
 The demo's optional prepared-Plan admission loads this policy; complete qualification configuration also
 requires the owned qualification child to succeed before deployment inputs are returned.
 
-The local qualification command and fixture coverage are described above. Real complete-demo smoke,
-production-sized publication/read-back, controlled operational negative demonstrations and a live exercise
-of the demo's qualification-to-deployment gate remain open. No successful local M3 E2E is claimed.
+The standalone local rehearsal `m3-patched-all-02`, recorded above, passed complete-demo tool smoke,
+production-sized publication/read-back and controlled operational negatives. The earlier scoped exercises
+below retain their original limits; they are not the current aggregate status. A live automatic
+build/qualify/deploy handoff remains unexercised. No successful combined local M3/demo E2E is claimed.
 The local demo's current 29-output selection includes Kind, clusterctl, ORAS, NICoSim tools and a
 non-executable NICoSim runtime-assets archive. Fixed Kind, clusterctl and ORAS profiles now have
 contract coverage for expected versions/source stamps, exact responses, and refusal of changed

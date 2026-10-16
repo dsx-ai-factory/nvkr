@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/urfave/cli/v2"
@@ -27,7 +28,7 @@ func TestQualifyLocalCommand(t *testing.T) {
 				if mode == "failure" {
 					return &lifecycle.LocalQualificationResult{Status: "failed"}, e.New(e.CodeGateUnmet, "fixture refusal")
 				}
-				return &lifecycle.LocalQualificationResult{Status: "passed", Lane: "unqualified-local-execution"}, nil
+				return &lifecycle.LocalQualificationResult{SchemaVersion: "nvkr.dev/local-qualification-result/v1", Status: "passed", Lane: "unqualified-local-execution", Attempt: "attempt", ContentSubject: "sha256:" + strings.Repeat("a", 64), Publication: lifecycle.LocalQualificationReferences{Evidence: "localhost:5000/demo@sha256:" + strings.Repeat("b", 64)}}, nil
 			})
 			args := []string{"nvkr", "qualify-local", "--workspace", "attempt", "--policy", "policy", "--builder-key", "builder", "--smoke-key", "smoke", "--qualifier-key", "qualifier", "--cosign", "cosign", "--repository", "localhost:5000/demo", "--scratch", "scratch", "--evidence-out", "evidence", "--plain-http", "--anonymous"}
 			if mode == "missing" {
@@ -52,6 +53,9 @@ func TestQualifyLocalCommand(t *testing.T) {
 					t.Fatal("failure was not preserved", err)
 				}
 				return
+			}
+			if err := nvkedemo.ValidateLocalQualificationResult(output.Bytes(), "attempt"); err != nil {
+				t.Fatalf("actual CLI output refused by demo reader: %v", err)
 			}
 			if err != nil || !strings.Contains(output.String(), `"lane":"unqualified-local-execution"`) {
 				t.Fatal("local result missing", err)

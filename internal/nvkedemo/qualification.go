@@ -145,11 +145,19 @@ func qualifyBuiltArtifacts(ctx context.Context, cfg BuildConfig) error {
 	if err := errors.Join(runErr, writeErr, transcript.Close()); err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "local M3 qualification or result retention failed; deployment refused")
 	}
+	return ValidateLocalQualificationResult(raw, cfg.AttemptPrefix)
+}
+
+// ValidateLocalQualificationResult checks the CLI's descriptive result framing
+// and expected attempt. It grants no authority: callers must also require their
+// owned qualification child to exit successfully before deployment handoff.
+func ValidateLocalQualificationResult(raw []byte, attempt string) error {
 	var result lifecycle.LocalQualificationResult
-	if err := canonical.UnmarshalExact(raw, &result); err != nil {
+	// Admit exactly one CLI framing newline; preserve all other whitespace.
+	if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &result); err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "invalid local qualification result; deployment refused")
 	}
-	if result.SchemaVersion != "nvkr.dev/local-qualification-result/v1" || result.Lane != factory.TierLocalExecution.String() || result.Status != "passed" || result.Attempt != cfg.AttemptPrefix || !canonical.IsDigest(result.ContentSubject) || result.FailureCode != "" || result.Publication.Evidence == "" {
+	if result.SchemaVersion != "nvkr.dev/local-qualification-result/v1" || result.Lane != factory.TierLocalExecution.String() || result.Status != "passed" || result.Attempt != attempt || !canonical.IsDigest(result.ContentSubject) || result.FailureCode != "" || result.Publication.Evidence == "" {
 		return nvkrerr.New(nvkrerr.CodeBuildFailed, "local qualification did not pass for the built attempt; deployment refused")
 	}
 	return nil

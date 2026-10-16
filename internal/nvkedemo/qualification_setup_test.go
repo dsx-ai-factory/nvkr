@@ -246,3 +246,28 @@ func TestAutomaticQualificationCleanupSurvivesCancellation(t *testing.T) {
 		})
 	}
 }
+
+func TestQualificationSetupFailureRecovery(t *testing.T) {
+	for _, retained := range []string{"", "/private/failed-setup"} {
+		t.Run(retained, func(t *testing.T) {
+			cause := e.New(e.CodeUnpinnedInput, "pin mismatch")
+			err := qualificationSetupFailure(cause, retained)
+			assertNightlyCode(t, err, e.CodeUnpinnedInput)
+			if !errors.Is(err, cause) {
+				t.Fatal("lost original cause")
+			}
+			if retained != "" {
+				for _, want := range []string{retained, "fresh --out", "fresh --attempt", "not successful evidence"} {
+					if !strings.Contains(err.Error(), want) {
+						t.Fatalf("missing recovery %q: %v", want, err)
+					}
+				}
+			} else if !strings.Contains(err.Error(), "before creating") {
+				t.Fatal(err)
+			}
+			if qualificationSetupFailure(nil, retained) != nil {
+				t.Fatal("success changed")
+			}
+		})
+	}
+}
