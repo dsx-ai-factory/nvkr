@@ -149,6 +149,12 @@ bind the uploaded bytes, including when registry deduplication skips a body. Dow
 chunks while extracting into private staging, then checks exact size, source EOF and the complete archive
 digest before publishing any restored root. These paths preserve the v2 wire format and remove the outer
 archive's full-size disk copy; generic directory/multiple-root uploads retain their bounded packing path.
+An interrupted chunk body may restart extraction only for narrowly typed transient read failures, at most
+three attempts with one- and two-second cancellable waits under the original deadline. Each attempt opens
+fresh bodies from the authenticated immutable descriptors and repeats full archive verification. Failed
+responses must close and all failed extraction staging must be removed before retry. Integrity, archive,
+filesystem, cleanup and publication failures do not authorize this recovery. Diagnostics expose fixed
+categories and byte counts without retaining provider URLs, credentials or response bodies.
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;

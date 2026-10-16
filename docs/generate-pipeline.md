@@ -116,6 +116,13 @@ locators require a new run. Final hosted GHCR publication separately checks ever
 its publication credential and binds the push to the inspected metadata root. Provider locator retention
 does not expire private carrier blobs; configure registry retention separately.
 
+Downloads can restart an incomplete extraction for a narrowly identified transient body-read failure,
+with at most three attempts under the original deadline. Each retry closes the failed response, removes
+its private staging and rechecks the entire archive from fresh responses; it adds no archive copy.
+Invalid bytes, unsafe archive entries, filesystem or cleanup failures stop immediately. Publication and
+destination replacement are outside the retry boundary. Error reports include only a fixed category,
+chunk number and byte counts, keeping provider URLs and response bodies out of logs.
+
 Before making the source public, verify hidden package grants and anonymous, unrelated-user and fork access
 for storage, toolchain and release packages. Previously retained Actions artifacts, caches, active runs and
 old workflow refs also require separate handling; this change does not migrate or delete historical payloads.
@@ -157,6 +164,15 @@ Local factory restoration still retains its carrier while extracting into a priv
 the held source before atomic publication. That copy supports the current mutation and incomplete-stream
 checks. It is distinct from the removed outer GHCR archive staging. A future direct registry-to-factory
 restore would need to preserve both transport authentication and the exact Plan-selected extraction gate.
+
+This is not a zero-copy pipeline. Native disk collection still stages the container archive and its
+extracted payload; packaging captures the authenticated disk into a private OCI layout, and preparation
+imports that layout. Publication also constructs a temporary one-image layout from held, hash-checked
+blobs. That last copy gives the current registry adapter private bytes independent of subsequent changes
+to the original inode. These are implementation choices supporting ownership and integrity checks, not
+SLSA requirements. Removing them requires bounded streaming or exclusive ownership transfer with the
+same digest, mutation, retry, cleanup and atomic-completion guarantees. Those further optimizations are
+not implemented; direct path reuse or hardlinks alone do not preserve the current guarantees.
 
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can

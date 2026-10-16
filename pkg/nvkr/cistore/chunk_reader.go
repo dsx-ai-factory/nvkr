@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"hash"
 	"io"
 
@@ -70,24 +71,35 @@ func (r *chunkReader) Read(p []byte) (int, error) {
 			buffer = probe[:]
 		}
 		n, readErr := r.source.Read(buffer)
-		if probing && n != 0 {
-			return 0, r.fail(e.New(e.CodeVerifyFailed, "private CI chunk exceeds its exact size"))
-		}
 		if !probing && n != 0 {
 			_, _ = r.hash.Write(p[:n])
 			r.remaining -= int64(n)
 		}
+		if r.ctx.Err() != nil {
+			if probing {
+				n = 0
+			}
+			return n, r.fail(r.ioFailure("reading", readErr))
+		}
+		if probing && n != 0 {
+			return 0, r.fail(e.New(e.CodeVerifyFailed, "private CI chunk exceeds its exact size"))
+		}
+		// Once all declared bytes are present, a known digest failure takes
+		// precedence over any simultaneous transient body-read error.
+		if r.remaining == 0 && hex.EncodeToString(r.hash.Sum(nil)) != r.descriptors[r.index].Digest.Hex {
+			return n, r.fail(e.New(e.CodeVerifyFailed, "private CI chunk digest mismatch"))
+		}
 		if readErr != nil && readErr != io.EOF {
-			return n, r.fail(safeIOError(r.ctx, e.CodeFetchFailed, "reading private CI chunk"))
+			return n, r.fail(r.ioFailure("reading", readErr))
 		}
 		if readErr == io.EOF {
-			if r.remaining != 0 || hex.EncodeToString(r.hash.Sum(nil)) != r.descriptors[r.index].Digest.Hex {
-				return n, r.fail(e.New(e.CodeVerifyFailed, "private CI chunk size or digest mismatch"))
+			if r.remaining != 0 {
+				return n, r.fail(e.New(e.CodeVerifyFailed, "private CI chunk size mismatch"))
 			}
 			closeErr := r.source.Close()
 			r.source = nil
 			if closeErr != nil {
-				return n, r.fail(safeIOError(r.ctx, e.CodeFetchFailed, "closing private CI chunk"))
+				return n, r.fail(r.ioFailure("closing", closeErr))
 			}
 			r.index++
 			if n == 0 {
@@ -108,6 +120,7 @@ func (r *chunkReader) Read(p []byte) (int, error) {
 func (r *chunkReader) open() error {
 	layer := r.layers[r.index]
 	descriptor := r.descriptors[r.index]
+	r.remaining = descriptor.Size
 	digest, digestErr := layer.Digest()
 	size, sizeErr := layer.Size()
 	mediaType, mediaErr := layer.MediaType()
@@ -119,7 +132,7 @@ func (r *chunkReader) open() error {
 		if source != nil {
 			_ = source.Close()
 		}
-		return safeIOError(r.ctx, e.CodeFetchFailed, "opening private CI chunk")
+		return r.ioFailure("opening", err)
 	}
 	if source == nil {
 		return e.New(e.CodeFetchFailed, "private CI chunk returned no reader")
@@ -129,11 +142,20 @@ func (r *chunkReader) open() error {
 }
 
 func (r *chunkReader) fail(err error) error {
-	r.err = err
 	if r.source != nil {
-		_ = r.source.Close()
+		closeErr := r.source.Close()
 		r.source = nil
+		if closeErr != nil {
+			// Retain both sanitized diagnostics, but no retry permission may
+			// survive a failure to close the previous response.
+			code := e.CodeFetchFailed
+			if r.ctx.Err() != nil {
+				code = e.CodeTimeout
+			}
+			err = &chunkTransferError{safe: e.Wrap(code, errors.Join(err, r.ioFailure("closing", closeErr)), "closing failed private CI chunk response")}
+		}
 	}
+	r.err = err
 	return err
 }
 
@@ -145,7 +167,7 @@ func (r *chunkReader) Close() error {
 		err := r.source.Close()
 		r.source = nil
 		if err != nil {
-			return r.fail(safeIOError(r.ctx, e.CodeFetchFailed, "closing private CI chunk"))
+			return r.fail(r.ioFailure("closing", err))
 		}
 	}
 	return nil

@@ -274,15 +274,8 @@ func restoreLayers(ctx context.Context, layers []v1.Layer, manifest *v1.Manifest
 		return e.Wrap(e.CodeBuildFailed, err, "creating private CI download staging")
 	}
 	defer os.RemoveAll(temporary)
-	stream := newChunkReader(ctx, layers, manifest.Layers)
-	// Successful consumption checks every response close at EOF. On early
-	// rejection, retain the original failure while releasing the active response.
-	defer func() { _ = stream.Close() }()
 	restored := filepath.Join(temporary, "restored")
-	if err := transportarchive.UnpackStream(ctx, stream, l.ArchiveSize, l.ArchiveDigest, restored, l.Paths); err != nil {
-		if stream.err != nil {
-			return stream.err
-		}
+	if err := unpackChunkArchive(ctx, layers, manifest, l, restored, waitChunkRetry, os.RemoveAll); err != nil {
 		return err
 	}
 	if _, actualPrefix, err := uploadPaths(ctx, restored, l.Paths); err != nil {

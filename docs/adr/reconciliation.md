@@ -1149,6 +1149,20 @@ path, not hosted action execution. Four-bundle generation and drift checks, buil
 license checks, workflow/YAML lint and diff checks passed. The complete hosted path still requires a fresh
 successful Run; unit tests remain unexecuted at the operator's request.
 
+The next [development Run 38859949586](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586),
+commit `9ef9c841ebbebef854c30be7beedd8983367234f`, encountered a separate private-chunk read failure in
+the [ARM64 SPIRE agent signing job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586/job/116843230395).
+Its three locator ZIPs downloaded and matched provider digests with 771 artifacts listed. Private restoration
+then returned `NVKR-E-FETCH-FAILED` before signing executed. The underlying read cause was discarded, so
+this record does not establish a transient network fault or an integrity failure. Chunk diagnostics now
+retain fixed categories and bounded progress counts without provider text. Extraction-only recovery admits
+at most three attempts for narrowly typed transient body-read errors, closes responses and checks failed
+staging removal, and repeats complete archive authentication before destination publication. Independent
+archive, integrity, filesystem and cleanup failures cannot authorize recovery. This adds no outer archive
+copy and does not retry publication. Package build/vet, Linux vet, global lint, formatting, license and
+four-bundle drift checks passed, with independent source review. Regression contracts are authored but
+unexecuted at the operator's request. Recovery of an actual interrupted hosted response remains unproved.
+
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage
 writer are admitted only for the exact trusted workflow commit. The nightly public runtime attachment
