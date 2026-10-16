@@ -46,6 +46,8 @@ type Config struct {
 // BuildConfig selects the existing local launcher, which bootstraps and invokes
 // nvkr. It does not introduce a second build engine or in-process SDK path.
 type BuildConfig struct {
+	// QualifyLocal provisions disposable trust and owns registry shutdown.
+	QualifyLocal bool
 	// QualificationPolicy optionally admits the prepared Plan's complete M3
 	// scope before producers execute. It does not qualify completed artifacts.
 	QualificationPolicy string

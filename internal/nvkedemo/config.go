@@ -38,6 +38,7 @@ type DemoFile struct {
 }
 
 type BuildFile struct {
+	QualifyLocal        bool              `yaml:"qualifyLocal" mapstructure:"qualifyLocal"`
 	Prepared            bool              `yaml:"prepared" mapstructure:"prepared"`
 	Qualification       QualificationFile `yaml:"qualification" mapstructure:"qualification"`
 	QualificationPolicy string            `yaml:"qualificationPolicy" mapstructure:"qualificationPolicy"`
@@ -172,6 +173,13 @@ func configString(value string) bool {
 
 func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 	build := file.Build
+	if err := validateAutomaticQualification(build.QualifyLocal, build.Prepared, build.QualificationPolicy, build.Qualification); err != nil {
+		return BuildConfig{}, err
+	}
+	network, err := normalizeNetwork(file.Run.Network)
+	if err != nil {
+		return BuildConfig{}, err
+	}
 	if build.Prepared && !configString(build.QualificationPolicy) {
 		return BuildConfig{}, configUsage("prepared builds require an explicit qualification policy")
 	}
@@ -184,7 +192,7 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 	if file.Version != 1 || !configString(build.Repo) || !configString(build.Attempt) || build.Jobs < 1 || (build.NVKEClone != "" && !configString(build.NVKEClone)) {
 		return BuildConfig{}, configUsage("build requires version 1, repo, attempt and positive jobs")
 	}
-	return BuildConfig{Repository: build.Repo, NVKEClone: build.NVKEClone, AttemptPrefix: build.Attempt, Jobs: build.Jobs, Progress: progress, QualificationPolicy: build.QualificationPolicy, Qualification: build.Qualification, Prepared: build.Prepared}, nil
+	return BuildConfig{QualifyLocal: build.QualifyLocal, Repository: build.Repo, NVKEClone: build.NVKEClone, AttemptPrefix: build.Attempt, Jobs: build.Jobs, Progress: progress, QualificationPolicy: build.QualificationPolicy, Qualification: build.Qualification, Prepared: build.Prepared, Network: network}, nil
 }
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {

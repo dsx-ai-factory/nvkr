@@ -232,7 +232,10 @@ build/evidence checks with explicit local origins and distinct local signing rol
 the unqualified local lane and cannot replace authenticated hosted acceptance or grant release authority.
 `run qualify-local` owns the retained-attempt rehearsal through independent registry read-back; its
 canonical result describes that local check only. An explicitly configured demo gates deployment inputs
-on successful qualification of its built attempt. Reconciliation records actual demo-tool execution,
+on successful qualification of its built attempt. The demo’s explicit `qualifyLocal` opt-in owns preparation and registry shutdown around qualification.
+Explicit demo setup can also generate disposable local keys
+and a Plan-bound policy from the maintained complete demo scope; this is local operator trust, not
+independent organizational approval. Setup files grant no verification receipt. Reconciliation records actual demo-tool execution,
 consumer verification, negative cases and the scope of deployment-gate testing separately.
 External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
 subject-bound evidence.

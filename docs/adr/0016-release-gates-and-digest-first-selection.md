@@ -510,6 +510,23 @@ It requires a new producer Run destination and an explicit policy, validates the
 invocation, and recompiles current inputs through the same executable before policy admission.
 Stored previews and bootstrap paths confer no authority; final qualification still checks the
 execution's captured inputs. This is a prepare/execute split, not general Run resumption.
+The downstream demo may automate preparation and local setup through an explicit `qualifyLocal`
+opt-in on a fresh build or e2e invocation. It rejects combination with prepared or caller-authored trust
+settings. It owns the registry through independent read-back and attempts bounded shutdown on success,
+failure and cancellation before returning deployment inputs; shutdown failure blocks handoff. It retains
+private files and registry data, while registry references are offline after shutdown. Explicit setup for a
+prepared attempt remains available for operators who need a longer-lived registry. Setup selects a maintained,
+independently authored complete demo scope, generates three distinct local keys, and binds a new public
+policy to the prepared input identities. It must not infer smoke exemptions or trusted signer identities
+from candidate artifacts. These keys represent one local operator's disposable trust, not independent
+organizational actors. Recompilation, complete-scope admission and private-key preflight remain mandatory;
+setup descriptions confer no signing or execution receipt. A fresh private directory owns the pinned
+cosign download, keys, policy, scratch, diagnostics and disk-backed registry data. The registry binds only
+loopback, uses a pinned image and a dynamic port, and remains available for consumer read-back. Explicit
+stop checks exact container ownership, image, mount and network configuration and retains data and evidence.
+Existing trust and setup directories cannot be overwritten. Failure after registry startup attempts bounded
+owned cleanup; interruption or cleanup failure never establishes readiness. Full qualification repeats the
+existing admission and verification, and no generated setup file upgrades the unqualified local lane.
 The owned child must exit successfully and report the exact attempt, local lane and passed status;
 decoding a successful result cannot replace successful process completion. The demo retains a separate
 diagnostic transcript, reserving its destination before child execution without overwriting previous

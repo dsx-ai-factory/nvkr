@@ -104,7 +104,78 @@ Its result remains `unqualified-local-execution`. The native ARM64 29-output reh
 command, including all 10 delivered tool members. Exact artifact references and remaining checks are tracked in
 [reconciliation](adr/reconciliation.md#local-m3-demo-rehearsal).
 
-Supply an independently authored `nvkr.dev/local-qualification-policy/v1` JSON policy with the exact
+For a new complete demo, add `--qualify-local` to the normal native Linux ARM64 command:
+
+```sh
+nvke-demo e2e --config /native/demo.yaml --qualify-local
+# Build, sign, smoke and publish without deployment:
+nvke-demo build --config /native/demo.yaml --qualify-local
+```
+
+Alternatively set `build.qualifyLocal: true` in the base YAML. Use a fresh attempt; do not combine
+this option with `prepared`, `qualificationPolicy` or explicit qualification settings. The command
+prepares the attempt, generates disposable trust, builds, qualifies and verifies registry read-back.
+It automatically stops its qualification registry before returning build inputs, including on failure
+or cancellation. A stop failure prevents deployment. Data, keys and evidence remain under
+`.nvkr/laptop-bootstrap/<attempt>/qualification/`; registry references are offline after stop.
+The normal demo retain/cleanup behavior is unchanged. Host prerequisites are the same as the base
+demo, plus network access for the pinned signing executable and images and disk space for publication.
+This one-command flow has contract coverage; it has not yet had a fresh full native build/qualify/deploy run.
+
+For advanced use that keeps the registry running for later consumer checks, explicit setup remains:
+
+```sh
+bash scripts/nvke-full-arm64-local.sh --prepare-only first-all 2 all
+export NVKE_DEMO="$PWD/.nvkr/laptop-bootstrap/first-all/nvke-demo"
+mkdir -p .nvkr/qualification
+"$NVKE_DEMO" qualification-setup --config /native/demo.yaml \
+  --out .nvkr/qualification/first-all
+"$NVKE_DEMO" build --config .nvkr/qualification/first-all/demo.yaml
+```
+
+The base YAML must match the prepared repository, attempt, jobs, source clone and network, with no
+existing qualification, `qualifyLocal` or `prepared` settings.
+For `run.network: upstream-ovn`, add `--network upstream-ovn` to the prepare-only command.
+Build-only invocation now preserves the configuration's network selection too. A minimal base YAML is:
+
+```yaml
+version: 1
+build:
+  repo: /native/nvkr
+  attempt: first-all
+  jobs: 2
+run:
+  network: ovn
+  out: /native/first-all-deployment
+```
+
+Setup downloads cosign v3.1.3 over HTTPS and checks its maintained ARM64 byte digest before executing
+it, generates three fresh passwordless local keys, writes a public policy bound to the prepared Plan,
+recompiles the inputs and runs signing preflight, pulls the pinned smoke and registry images, and starts
+a dedicated registry on a dynamically allocated loopback port. Its fixed demo profile covers the exact
+29 selected outputs; changed membership, unsupported tools or a mismatched prepared invocation fail.
+The profile supports the maintained NVIDIA and upstream OVN selections and the explicit Calico diagnostic.
+It does not learn smoke exemptions or signer trust from candidate artifacts. Generated keys all belong to
+this local operator; setup does not establish independent organizational approval.
+
+The new setup directory contains `demo.yaml`, `policy.json`, role keys, pinned `cosign`, `scratch/`,
+private diagnostics and disk-backed `registry-data/`. Its parent must exist on native disk, and setup
+never overwrites an existing directory. The registry stays running for qualification and later consumer
+read-back; its storage is separate from the base demo's small deployment registry. Stop it explicitly:
+
+```sh
+"$NVKE_DEMO" qualification-registry-stop --out .nvkr/qualification/first-all
+```
+
+Stop verifies the container ID, owner labels, pinned image, storage mount and loopback binding, then
+stops only that container. It retains the container, keys, data and evidence. Stopping makes registry
+references unavailable until the retained container is started again. Failed setup retains diagnostic
+files and stops any registry it has started when cleanup can complete; an interrupted setup must not be
+treated as ready. Neither setup nor stop deletes data, prunes Docker, installs host packages or changes
+existing trust. Existing completed Runs continue to use the explicit `run qualify-local` interface below.
+
+For externally managed trust or an already completed Run, use the explicit configuration below instead
+of setup. Supply an independently authored `nvkr.dev/local-qualification-policy/v1` JSON policy with the exact
 Definition, Environment and Plan digests, native Linux platform, pinned cosign executable digest, three
 distinct P-256 public keys, pinned smoke image and complete supported tool profiles. The command accepts
 explicit passwordless private-key files for those roles. It rejects unsupported or omitted smoke members;

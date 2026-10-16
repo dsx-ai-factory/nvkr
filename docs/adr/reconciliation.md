@@ -269,6 +269,38 @@ that remains outstanding after merge.
 
 ### Local M3 demo rehearsal
 
+`build` and `e2e` now accept `--qualify-local` (or `build.qualifyLocal: true`) for a fresh attempt.
+The adapter prepares once, invokes the same setup, then uses the existing prepared build and local
+qualification gate. Its registry is stopped after read-back or failure using a cancellation-independent
+bounded cleanup; stop failure blocks deployment. Files remain in the bootstrap's `qualification/`
+directory. Explicit setup/stop remain available. Contract tests cover configuration conflicts, flag
+overrides and canceled-context cleanup/error propagation. This combined command has not yet been
+externally exercised through a fresh complete build/qualify/deploy run; the setup-only and earlier
+qualification evidence below retain their original scope.
+The simplified flow passed `make check` with uncached tests, targeted automatic-cleanup race checks,
+`make docs-check`, and Linux ARM64 cross-compilation. No fresh full native e2e run is claimed.
+
+The demo now offers `qualification-setup` for a fresh prepare-only ARM64 attempt. It generates three
+distinct private local keys and a public policy using the maintained exact 29-output NVIDIA/upstream
+OVN demo scope, downloads and checks pinned cosign v3.1.3, recompiles the selected inputs, runs key
+preflight and starts a pinned disk-backed registry on a dynamic loopback port. It writes prepared demo
+YAML and retains private diagnostics. `qualification-registry-stop` checks exact ownership, image,
+mount and port configuration before stopping the container, retaining its data, keys and evidence.
+Contract tests cover authored scope parity, changed/missing/duplicate outputs, changed components and
+formats, unknown networks, registry ownership/configuration refusal, readiness/redirect/cancellation,
+wrong executable bytes and unsupported-host admission. Build-only configuration now preserves its
+network selection, so a prepared upstream-OVN attempt keeps its selected inputs.
+The setup command passed on native ARM64 Linux with prepared attempt `m3-auto-setup-01`, Plan
+`sha256:1b5a8df0f16346d5ba8d79e4db98aaff4b50b457ccb354492565b516264199f3`:
+actual cosign download and pin verification, three-role key generation, compiler replay, signing
+preflight, image pulls and registry readiness succeeded. A separate check confirmed distinct public
+keys, mode-0700 setup directory, mode-0600 private keys and a live registry API. The owned stop command
+succeeded twice, including its already-stopped case, without deleting data. This is setup evidence;
+no new producers or complete build/qualify/deploy sequence were run by this exercise.
+The final `make check` passed all 56 package suites with uncached tests, plus its formatting, license,
+vet, lint, shell, Python and vulnerability gates. Targeted setup race checks and the documentation
+gate also passed. Repeating setup into an existing directory was refused without changing its policy.
+
 The requested local NVKE qualification rehearsal is governed by ADR-16's local qualification contract.
 Execution-scope admission now has a shared internal owner independent of GitHub workflow identity:
 native image pins, fixed tool profiles, exact output membership and expected versions remain mandatory.

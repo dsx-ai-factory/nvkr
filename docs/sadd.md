@@ -688,7 +688,12 @@ binds exact input identities, native execution pins and three distinct normalize
 validation supplies no receipt. `run qualify-local` now delegates the complete retained-attempt check,
 three-role signing, native smoke and registry read-back sequence to lifecycle and emits canonical local
 results. An explicitly configured demo requires that command to succeed on the built attempt before
-returning deployment inputs. Real-signature integration fixtures use simulated smoke; the separately
+returning deployment inputs. The `qualifyLocal` option owns preparation, setup and bounded registry
+shutdown around this flow; cleanup failure blocks handoff, and private evidence/data remain retained.
+An explicit setup command automates fresh local keys, a policy bound to a
+prepared Plan and fixed complete demo scope, pinned cosign, scratch and a disk-backed loopback registry.
+It rechecks the prepared inputs and signing roles before registry startup; generated descriptions confer
+no authority. An ownership-checked stop retains data and evidence. Real-signature integration fixtures use simulated smoke; the separately
 recorded native ARM64 rehearsal has now checked all 29 actual outputs, executed all 10 delivered tools,
 signed through the three local roles and passed registry read-back. The demo handoff has process-fixture
 coverage; downstream cluster deployment is a separate scope. Reconciliation tracks independent consumer

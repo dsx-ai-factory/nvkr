@@ -44,7 +44,10 @@ func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	return result, nil
 }
-func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
+func buildArtifacts(ctx context.Context, cfg BuildConfig) (result BuiltInputs, resultErr error) {
+	if err := validateAutomaticQualification(cfg.QualifyLocal, cfg.Prepared, cfg.QualificationPolicy, cfg.Qualification); err != nil {
+		return BuiltInputs{}, err
+	}
 	if err := requireContext(ctx); err != nil {
 		return BuiltInputs{}, err
 	}
@@ -109,6 +112,34 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		return BuiltInputs{}, err
 	}
 	cfg.Repository = repo
+	if cfg.QualifyLocal {
+		if err := prepareLocalArtifacts(ctx, runner, script, cfg); err != nil {
+			return BuiltInputs{}, err
+		}
+		out := filepath.Join(repo, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "qualification")
+		file := DemoFile{Version: 1, Build: BuildFile{Repo: repo, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs}, Run: RunFile{Network: cfg.Network}}
+		path, err := SetupQualification(ctx, file, out, cfg.Progress)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
+		defer func() {
+			resultErr = errors.Join(resultErr, finishAutomaticQualification(ctx, out, StopQualificationRegistry))
+			if resultErr != nil {
+				result = BuiltInputs{}
+			}
+		}()
+		selected, err := LoadDemoFile(ctx, path)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
+		cfg, err = selected.BuildConfig(cfg.Progress)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
+		if cfg.Progress != nil {
+			fmt.Fprintf(cfg.Progress, "Local qualification files and evidence: %s\n", out)
+		}
+	}
 	if err = buildLocalArtifacts(ctx, runner, script, cfg); err != nil {
 		return BuiltInputs{}, err
 	}
@@ -144,10 +175,6 @@ func localBuildEnvironment() ([]string, error) {
 }
 
 func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {
-	launcherFlags, err := buildNetworkFlags(cfg.Network)
-	if err != nil {
-		return err
-	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Hour)
 	defer cancel()
 	boundary := beginProgress(runner.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
@@ -157,9 +184,8 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	}
 	// Bootstrap gets no activity pipe. Its selected Plan, previews and source
 	// preparation remain at the existing owner before the final direct child.
-	prepare := append([]string{"bash", script, "--prepare-only"}, launcherFlags...)
 	if !cfg.Prepared {
-		if err := runner.Run(ctx, append(prepare, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour); err != nil {
+		if err := prepareLocalArtifacts(ctx, runner, script, cfg); err != nil {
 			return err
 		}
 	}
@@ -279,4 +305,13 @@ func preparedBuildEnvironment(environment []string, cfg BuildConfig) ([]string, 
 		return nil, err
 	}
 	return SetEnv(env, map[string]string{"TMPDIR": filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "tmp")}), nil
+}
+
+func prepareLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) error {
+	flags, err := buildNetworkFlags(cfg.Network)
+	if err != nil {
+		return err
+	}
+	args := append([]string{"bash", script, "--prepare-only"}, flags...)
+	return runner.Run(ctx, append(args, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour)
 }

@@ -117,6 +117,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 		},
 	})
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
+	root.AddCommand(newQualificationSetupCommand(out, actions, &config), newQualificationRegistryStopCommand())
 	root.AddCommand(newSessionCommand("status", out, actions), newSessionCommand("cleanup", out, actions), newSessionCommand("retained-owner", out, actions))
 	root.InitDefaultCompletionCmd()
 	for _, command := range root.Commands() {
@@ -289,6 +290,7 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 }
 func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 	flags := command.Flags()
+	flags.BoolVar(&cfg.QualifyLocal, "qualify-local", false, "automatically prepare local M3 trust, qualify outputs and stop the owned registry")
 	flags.BoolVar(&cfg.Prepared, "prepared", false, "use an existing prepare-only bootstrap; requires a matching qualification policy and no existing Run")
 	flags.StringVar(&cfg.Repo, "repo", "", "native Linux repository path")
 	flags.StringVar(&cfg.NVKEClone, "nvke-clone", "", "optional local source Git clone")
@@ -362,6 +364,9 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 	}
 	if command.Flags().Changed("jobs") {
 		selected.Build.Jobs = flags.Build.Jobs
+	}
+	if command.Flags().Changed("qualify-local") {
+		selected.Build.QualifyLocal = flags.Build.QualifyLocal
 	}
 	if command.Flags().Changed("prepared") {
 		selected.Build.Prepared = flags.Build.Prepared
