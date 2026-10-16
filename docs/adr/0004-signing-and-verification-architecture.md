@@ -139,6 +139,16 @@ referrer manifest beside the associated deliverable; source evidence retains its
 Hosted pull-back verification independently checks every bundle. Keyless creation/verification remains
 Linux-only and raw preparation layouts cannot satisfy authenticated release consumption.
 
+SBOM bundle creation permits at most three fresh keyless invocations within one three-minute deadline,
+with cancellation-aware one- and two-second delays, only when Rekor v1 reports its explicit HTTP 409
+`createLogEntryConflict` failure. Each attempt retains the same frozen predicate and exact subject and uses
+a separate private bundle output. A conflict is never accepted as evidence: only a successful invocation
+followed by the unchanged predicate, identity, issuer and transparency checks can return a bundle. Other
+failures, output overflow and verification failures are not retried. This compensates for the conflict-recovery
+gap in the pinned Cosign dependency, addressed upstream in
+[sigstore-go PR 647](https://github.com/sigstore/sigstore-go/pull/647). Fresh signatures can leave unused
+transparency entries. This policy does not add retries to OCI release signing or qualification attestation.
+
 The signer re-derives the subject from held artifact bytes and requires equality with the Run's observed subject.
 The subsequent verifier re-resolves the registry reference, recomputes the served manifest digest, and verifies
 both signature and subject-bound production provenance (ADR-09). A mismatch fails the Run and returns no

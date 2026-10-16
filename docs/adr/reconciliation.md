@@ -1003,7 +1003,8 @@ and their configured usernames are scoped to transfer steps. The repository toke
 metadata and Actions locator reads; it is not a package-credential fallback. Publication retains its separate
 private destination and inspected-root admission. GHCR publication jobs also pass their automatic repository
 token separately for the source metadata lookup; development publisher tokens remain package-scoped. Local
-contracts cover this credential separation and its generated projection, not a live package-only PAT run.
+contracts cover this credential separation and its generated projection; the development publication job
+recorded below also exercised these separate bindings.
 The v2 carrier uses at most 64 ordered raw chunks of at most
 1 GiB, checking each digest, config binding and complete archive before extraction. Earlier draft v1 locators
 require a new producing Run. Controlled local-registry contracts cover multiple chunks, corrupt/reordered or
@@ -1012,14 +1013,27 @@ acceptance. Raw chunks trade compression for predictable layer bounds. Registry 
 package grants and anonymous/unrelated-user/fork access remain operator responsibilities. Old workflow
 artifacts and caches are not migrated or purged. No complete hosted private-transfer Run is recorded.
 
-The first combined-branch development attempt,
-[Run 38841923994](https://github.com/dsx-ai-factory/nvkr/actions/runs/38841923994) at
-`b59e974860514aa1414eebee3bc033b0bed644d2`, compiled both native helpers and passed committed-generation
-validation. All four bootstrap jobs then failed before payload transfer because GitHub's composite-action
-schema rejects the `vars` context. The generated workflow now binds the two nonsecret storage usernames
-from repository variables into workflow environment values; nested transfer actions consume the supported
-`env` context. Authored nightly, native-toolchain and OS-validation callers supply the corresponding username explicitly.
-That failed attempt does not establish registry authentication, transfer, runner admission, or publication.
+The generated workflow binds the two nonsecret storage usernames from repository variables into workflow
+environment values; nested transfer actions consume the supported `env` context. Authored nightly,
+native-toolchain and OS-validation callers supply the corresponding username explicitly.
+[Development Run 38842595104](https://github.com/dsx-ai-factory/nvkr/actions/runs/38842595104), commit
+`3b0d86f61afab587bd5ed1a1a86d0f1cc9fb4921`, exercised all four bootstrap uploads and downstream helper
+downloads. The CI package metadata reported internal visibility and null repository association. Bootstrap
+attachment `12022225123` contained only a 437-byte locator JSON referencing a 31,075,328-byte helper archive
+at GHCR digest `sha256:0f2688d46c23635668f62ded0dcb90412827b0401dd169d848cf93e25c0ab889`.
+The anonymous registry challenge and subsequent anonymous pull-token exchange both returned HTTP 401;
+unrelated authenticated users, enterprise grants and fork identities were not exercised.
+[Output publication job 116787811052](https://github.com/dsx-ai-factory/nvkr/actions/runs/38842595104/job/116787811052)
+succeeded with the separate repository/package credentials. All four native disk jobs passed runner and
+private toolchain preparation. SBOM attestation jobs encountered Cosign/Rekor duplicate-entry conflicts;
+these partial observations do not establish a complete successful Run or release acceptance.
+
+For the first failed SBOM attestation, Rekor returned the reported existing entry at log index `3272949380`,
+integrated at `2026-10-16T02:59:31Z`, before Cosign failed at `03:00:01Z`. The pinned Cosign 3.1.3 dependency
+does not recover that conflict into a bundle. SBOM creation now has ADR-04's bounded fresh-invocation recovery;
+the exact predicate, subject and full verification remain mandatory. Regression cases were added but not run
+at the operator's request; package compilation, static analysis and review passed. Hosted recovery remains
+unproved until a corrected Run completes.
 
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage
