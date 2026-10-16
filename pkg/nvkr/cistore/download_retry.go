@@ -26,12 +26,20 @@ const maxChunkReadAttempts = 3
 func unpackChunkArchive(ctx context.Context, layers []v1.Layer, manifest *v1.Manifest, locator Locator, restored string,
 	wait func(context.Context, time.Duration) error, cleanup func(string) error,
 ) error {
+	return unpackChunkAttempts(ctx, layers, manifest, restored, func(source *chunkReader) error {
+		return transportarchive.UnpackStream(ctx, source, locator.ArchiveSize, locator.ArchiveDigest, restored, locator.Paths)
+	}, wait, cleanup)
+}
+
+func unpackChunkAttempts(ctx context.Context, layers []v1.Layer, manifest *v1.Manifest, restored string,
+	unpack func(*chunkReader) error, wait func(context.Context, time.Duration) error, cleanup func(string) error,
+) error {
 	for attempt := 1; attempt <= maxChunkReadAttempts; attempt++ {
 		if ctx.Err() != nil {
 			return safeIOError(ctx, e.CodeTimeout, "private CI archive read canceled")
 		}
 		stream := newChunkReader(ctx, layers, manifest.Layers)
-		err := transportarchive.UnpackStream(ctx, stream, locator.ArchiveSize, locator.ArchiveDigest, restored, locator.Paths)
+		err := unpack(stream)
 		closeErr := stream.Close()
 		if err == nil && closeErr == nil {
 			return nil

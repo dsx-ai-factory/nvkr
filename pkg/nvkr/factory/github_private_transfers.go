@@ -272,6 +272,9 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 		for _, field := range fields {
 			githubYAMLSet(inputs, field, githubYAMLMap("description", githubYAMLString("Original generated transport setting "+field), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}))
 		}
+		if mode == "download" {
+			githubYAMLSet(inputs, githubCIRestoreStageInput, githubYAMLMap("description", githubYAMLString("Exact Plan stage whose carriers are streamed into their final roots"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}))
+		}
 		steps := &yamlv3.Node{Kind: yamlv3.SequenceNode, Tag: "!!seq"}
 		if mode == "bootstrap-download" {
 			steps.Content = append(steps.Content,
@@ -306,7 +309,14 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 			if mode == "bootstrap-download" {
 				helper = "./.nvkr/ci-bootstrap/nvkr-exec"
 			}
-			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Restore bytes from private GHCR"), "shell", githubYAMLString("bash"), "env", env, "run", githubYAMLString("set -eu\n"+helper+" factory github ci-download --index-dir \"$NVKR_CI_INDEX\" --destination \"${NVKR_CI_DESTINATION:-.}\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\"")))
+			download := helper + " factory github ci-download --index-dir \"$NVKR_CI_INDEX\" --destination \"${NVKR_CI_DESTINATION:-.}\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
+			command := "set -eu\n"
+			if mode == "download" {
+				githubYAMLSet(env, "NVKR_CI_STAGE", githubYAMLString("${{ inputs."+githubCIRestoreStageInput+" }}"))
+				command += "if [ -n \"$NVKR_CI_STAGE\" ]; then\n  exec " + download + " --plan " + shellQuote(githubLayoutFor(plan).planPath) + " --stage \"$NVKR_CI_STAGE\"\nfi\n"
+			}
+			command += "exec " + download
+			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Restore bytes from private GHCR"), "shell", githubYAMLString("bash"), "env", env, "run", githubYAMLString(command)))
 			githubYAMLSet(outputs, "download-path", githubYAMLMap("description", githubYAMLString("Requested private transfer destination"), "value", githubYAMLString("${{ inputs.path }}")))
 		}
 		document := githubYAMLMap("name", githubYAMLString("Private CI "+mode), "description", githubYAMLString("Generated private transport; Actions artifacts contain only locator JSON."), "inputs", inputs, "outputs", outputs, "runs", githubYAMLMap("using", githubYAMLString("composite"), "steps", steps))
@@ -443,7 +453,7 @@ func privatizeGitHubTransfers(plan *Plan, workflow []byte, files map[string][]by
 	if err := admitGitHubCIUserEnvironment(documents, entry); err != nil {
 		return nil, nil, err
 	}
-	for _, document := range documents {
+	for name, document := range documents {
 		if err := githubCIWalkSteps(document, func(step *yamlv3.Node) error {
 			mode := ""
 			switch githubYAMLValue(step, "uses") {
@@ -468,6 +478,9 @@ func privatizeGitHubTransfers(plan *Plan, workflow []byte, files map[string][]by
 			}
 			return nil
 		}); err != nil {
+			return nil, nil, err
+		}
+		if err := projectGitHubPrivateRestore(plan, name, document, false); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -605,6 +618,9 @@ func materializeGitHubPrivateTransfers(plan *Plan, workflow []byte, files map[st
 		if _, template := templates[name]; template {
 			delete(result, name)
 			continue
+		}
+		if err := projectGitHubPrivateRestore(plan, name, document, true); err != nil {
+			return nil, nil, err
 		}
 		if err := githubCIWalkSteps(document, func(step *yamlv3.Node) error {
 			with := githubYAMLField(step, "with")

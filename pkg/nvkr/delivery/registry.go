@@ -118,6 +118,12 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 			}
 			continue
 		}
+		if object.Output != nil && object.Output.Format == "disk-image" {
+			if err := pushRegistryDisk(ctx, layoutPath, object, child, options); err != nil {
+				return "", err
+			}
+			continue
+		}
 		img, cleanup, err := outputImage(ctx, layoutPath, object)
 		if err != nil {
 			return "", err
@@ -182,23 +188,26 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 	if err != nil {
 		return Inspection{}, e.Wrap(e.CodeUnpinnedSource, err, "parsing digest-pinned publication reference")
 	}
+	return pullWithRecovery(ctx, out, func(attemptCtx context.Context, stage string) (Inspection, error) {
+		return pullToStage(attemptCtx, ref, stage, options)
+	})
+}
+
+// pullToStage only acquires and authenticates bytes in private staging. Commit
+// and post-commit inspection belong to the recovery owner and are never retried.
+func pullToStage(ctx context.Context, ref name.Digest, stage string, options RegistryOptions) (Inspection, error) {
 	remoteOptions := registryOptions(ctx, options)
 	index, err := remote.Index(ref, remoteOptions...)
 	if err != nil {
 		if ctx.Err() != nil {
 			return Inspection{}, e.Wrap(e.CodeTimeout, ctx.Err(), "pulling OCI release root")
 		}
-		return Inspection{}, e.Wrap(e.CodeUnavailable, err, "pulling OCI release root %s", reference)
+		return Inspection{}, e.Wrap(e.CodeUnavailable, err, "pulling OCI release root %s", ref.Name())
 	}
 	digest, err := index.Digest()
 	if err != nil || digest.String() != ref.DigestStr() {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "registry publication root does not match requested digest")
 	}
-	stage, commit, cleanup, err := stageLayout(out)
-	if err != nil {
-		return Inspection{}, err
-	}
-	defer cleanup()
 	if _, err := layout.Write(stage, index); err != nil {
 		if ctx.Err() != nil {
 			return Inspection{}, e.Wrap(e.CodeTimeout, ctx.Err(), "materializing OCI release root")
@@ -241,7 +250,11 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 			if err != nil {
 				return e.Wrap(e.CodeVerifyFailed, err, "opening delivered manifest")
 			}
-			if err := layout.Path(stage).WriteImage(img); err != nil {
+			if err := writePulledImage(ctx, stage, object, img); err != nil {
+				var coded *e.Error
+				if errors.As(err, &coded) {
+					return err
+				}
 				return e.Wrap(e.CodeUnavailable, err, "materializing deliverable %q", object.Name)
 			}
 		}
@@ -252,14 +265,6 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 	}
 	if inspection.RootDigest != ref.DigestStr() {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "materialized publication root digest does not match requested reference")
-	}
-	if err := commit(); err != nil {
-		return Inspection{}, err
-	}
-	inspection, err = Inspect(ctx, out)
-	if err != nil {
-		_ = os.RemoveAll(out)
-		return Inspection{}, err
 	}
 	return inspection, nil
 }
@@ -446,7 +451,7 @@ func outputReferences(root name.Reference, publication PublicationRoot, insecure
 	return result, nil
 }
 
-// outputImage supplies the standard OCI layout reader with a temporary one-image
+// outputImage supplies nondisk outputs to the standard OCI layout reader with a temporary one-image
 // index. It copies held, hash-checked blobs; neither the publication index nor
 // registry storage gains an extra wrapper or duplicate deliverable.
 func outputImage(ctx context.Context, root string, object PublishedObject) (v1.Image, func(), error) {

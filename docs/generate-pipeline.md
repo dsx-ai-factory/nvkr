@@ -160,19 +160,27 @@ checks. The SBOM and signing jobs do not download or re-upload output payloads. 
 is not payload verification; the independent remote readback remains required. This is the existing
 `pipeline-attested` claim, not qualification or a new SLSA level.
 
-Local factory restoration still retains its carrier while extracting into a private tree, then rehashes
-the held source before atomic publication. That copy supports the current mutation and incomplete-stream
-checks. It is distinct from the removed outer GHCR archive staging. A future direct registry-to-factory
-restore would need to preserve both transport authentication and the exact Plan-selected extraction gate.
+Generated stage restoration streams the nested factory carrier directly from private registry chunks into
+its extracted files. The admitted Plan selects the complete locator set, exact carrier members and permitted
+inner roots before payload transfer. Both TAR layers and every chunk are checked, including complete outer
+size, digest and source EOF, before any extracted root becomes visible. No full carrier TAR is stored beside
+the extracted payload. Atomic no-replace publication moves the private staging roots within the workspace;
+it does not copy their contents. Bootstrap/helper transfers and finalizer recovery retain their separate paths.
+
+Disk publication reads the existing QCOW2 through a held no-follow descriptor instead of copying it into a
+temporary one-image layout. Each upload body checks its exact size, digest and unchanged inode metadata;
+independent bodies support HTTP retries without reopening a pathname. A final full rehash is mandatory even
+when the registry skips the body because it already has that digest. Remote immutable-reference checks remain.
+Independent disk verification can restart an interrupted one-layer download for the typed HTTP/2 peer-reset
+failure observed in development. Recovery is bounded to three attempts under one deadline and removes the
+failed layout before retrying. It rechecks the complete immutable closure; it does not retry publication or signing.
 
 This is not a zero-copy pipeline. Native disk collection still stages the container archive and its
 extracted payload; packaging captures the authenticated disk into a private OCI layout, and preparation
-imports that layout. Publication also constructs a temporary one-image layout from held, hash-checked
-blobs. That last copy gives the current registry adapter private bytes independent of subsequent changes
-to the original inode. These are implementation choices supporting ownership and integrity checks, not
-SLSA requirements. Removing them requires bounded streaming or exclusive ownership transfer with the
-same digest, mutation, retry, cleanup and atomic-completion guarantees. Those further optimizations are
-not implemented; direct path reuse or hardlinks alone do not preserve the current guarantees.
+imports that layout. Ordinary nondisk publication also retains its temporary layout. These remaining copies
+support the current ownership and mutation checks; they are implementation choices, not SLSA requirements.
+Further removal needs equivalent bounded reads or exclusive ownership transfer, with unchanged digest,
+cleanup and atomic-completion guarantees. Direct pathname reuse or hardlinks alone do not provide them.
 
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can

@@ -21,10 +21,5 @@ runs:
         merge-multiple: ${{ fromJSON(inputs.parameters).download_with_merge_multiple }}
         path: ${{ fromJSON(inputs.parameters).download_with_path }}
         pattern: ${{ fromJSON(inputs.parameters).download_with_pattern }}
+        restore-stage: ${{ fromJSON(inputs.parameters).restore_selector }}
         nvkr-ci-storage-read-token: ${{ inputs.nvkr-ci-storage-read-token }}
-    - name: ${{ fromJSON(inputs.parameters).restore_name }}
-      id: operation_restore
-      run: ./nvkr-exec factory github restore-inputs --plan .github/nvkr-run/plan.json --stage "$NVKR_ACTION_SELECTOR"
-      shell: bash -e {0}
-      env:
-        NVKR_ACTION_SELECTOR: ${{ fromJSON(inputs.parameters).restore_selector }}

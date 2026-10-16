@@ -969,16 +969,21 @@ permissions, source credential scope, pinned actions and explicit operator setup
 step from source fetch so it receives no source credential. No authored transport manifest or arbitrary
 command argument is added.
 
-Each stage downloads one exact set of external input carriers, then restores each required carrier in one
-helper step. Missing or invalid carriers fail before consumer execution, including when a provider batch matches only
-part of the requested set. Restoration holds the opened carrier inode and streams extraction into a private
-staging tree while hashing every carrier byte. It then rehashes that same held inode and checks unchanged
-metadata before publishing any extracted root. This uses no additional full-archive snapshot; the retained
-carrier and extracted tree coexist until validation completes. Archive traversal, entry and byte limits,
-no-follow access and atomic no-replace publication remain mandatory. Carrier consistency is transport
-validation, not artifact or release authority; consumers still authenticate their own exact closures.
-After a successful restore, the helper deletes that exact regular carrier file to
-avoid retaining both the archive and its unpacked contents. Failed and unrequested carriers remain untouched.
+Each stage selects one exact set of external input carriers from its admitted Plan. Its private transfer
+operation admits the complete provider locator index before payload work: missing, extra or duplicate
+locators fail, as do mismatched carrier members and overlapping or pre-existing destination roots.
+The generated semantic download/restore pair executes as one scoped transfer operation. It streams the
+outer private-registry TAR's single exact factory-TAR member into private extracted roots, without storing
+either archive on disk. Before root publication, it checks all chunk digests, both TAR boundaries, complete
+outer size/digest and actual source EOF. Bounded extraction recovery discards failed staging before a fresh
+read; final destination publication remains outside retry. The existing transport owner performs checked
+no-replace renames and rollback, so staging-to-destination publication does not copy payload files.
+Archive traversal, entry and byte limits, no-follow access and exact Plan-selected roots remain mandatory.
+Carrier consistency is transport validation, not artifact or release authority; consumers still authenticate
+their own exact closures. Inversion of the fixed private template preserves the logical download/restore
+pair for graph validation, and complete regeneration checks the executable projection and invocation data.
+The standalone local carrier restorer and finalizer recovery retain their held-inode extraction paths.
+Successful local restoration removes its exact regular carrier; failed and unrequested carriers remain untouched.
 Each operation prepares only outputs needed outside its stage or by finalization, with an independent upload
 for each selected carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
 artifacts. Logical commands, transport authentication and isolation remain unchanged.

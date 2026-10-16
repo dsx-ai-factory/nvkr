@@ -106,6 +106,20 @@ verified in one payload pass. Every copy/export still rehashes its held bytes; s
 and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
 The evidence-attestation handoff consumes the private preparation under §6, transferring unchanged blobs
 without another payload copy. It still revalidates the complete source and final closures.
+The disk publisher adapts the held QCOW2 directly to the registry image interface, without copying its bytes
+into another local OCI layout. Exact bounded manifest/config bytes remain detached from mutable paths.
+Every upload body independently reads and hashes the held inode, checks its exact size and unchanged
+metadata, and remembers local integrity failures across transport retries. After the registry write, an
+unconditional full rehash covers deduplication paths that skipped the body; immutable-reference readback
+remains mandatory before release-root publication. Closing the owner cancels future reads, joins active
+file reads and revokes body adapters. It issues no live producer receipt or stronger evidence claim.
+Other native output kinds retain their existing private publication layout.
+Remote acquisition may restart only a one-layer disk body interrupted by a typed HTTP/2 peer
+`PROTOCOL_ERROR` reset. At most three attempts share the caller's deadline (or a thirty-minute default
+when none exists), with one- and two-second cancellable waits. Each failed private layout must be removed
+before another attempt starts, and the same immutable root and complete closure are reauthenticated.
+Close, filesystem, integrity and other protocol errors do not authorize recovery. Destination commit and
+post-commit inspection remain outside retry; no publication or signing operation is repeated.
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.

@@ -1163,6 +1163,42 @@ copy and does not retry publication. Package build/vet, Linux vet, global lint, 
 four-bundle drift checks passed, with independent source review. Regression contracts are authored but
 unexecuted at the operator's request. Recovery of an actual interrupted hosted response remains unproved.
 
+The same Run externally exercised the locator pagination fix: its successful
+[ARM64 plain disk signer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586/job/116850300612)
+listed 1,046 artifacts with the 2,000 bound, selected the older Cosign locator (`12028567478`) and both
+route locators, restored the private bytes and completed actual signing (`dryRun=false`) at
+`2026-10-16T06:50:11Z`. This proves the previously failing late-job discovery path, not complete Run acceptance.
+
+That Run finished with 569 successful, four failed and seven skipped jobs. All four native producers,
+69 SBOM attestations and 68 output publications succeeded; 66 outputs completed independent remote
+verification. Besides the SPIRE chunk read, the
+[AMD64 FDE publisher](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586/job/116854048985)
+completed its private download but exhausted local disk while unpacking the retained factory TAR. Its
+locator (`12030463435`) declared 6,731,396,096 archive bytes; the 564-byte locator ZIP matched provider
+SHA-256 `051ab577468a9c39af11b6d77c45beb0893f49a98fa0ea93515942a626eefe1f` and exact Run/head/attempt
+bindings. This is a bounded locator sample, not a payload download or peak-space measurement.
+The [ARM64 FDE verifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586/job/116853852574)
+failed during remote layer materialization with HTTP/2 `PROTOCOL_ERROR`; its log does not establish the
+peer's underlying reason. The [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586/job/116857487854)
+successfully selected its locator from 1,082 attachments, then rejected the incomplete provider closure
+with `NVKR-E-PROVENANCE-MISSING`. No complete release acceptance follows from this failed Run.
+
+The follow-up implementation streams Plan-selected factory carriers directly into extracted roots and
+publishes disk payloads from checked held descriptors, removing the retained input TAR and disk publisher's
+full temporary copy. It preserves complete transport authentication, no-replace publication, source mutation
+checks and unconditional post-upload rehash even for registry deduplication. These two copy removals require
+a fresh hosted Run; the failed Run above did not exercise them. Unit contracts remain unexecuted at the
+operator's request.
+Remote disk acquisition also admits at most three fresh reads for the narrowly typed one-layer HTTP/2 peer
+reset, with checked cleanup, one shared deadline and destination commit outside retry. The public HTTP/2
+error type is pinned through `golang.org/x/net v0.61.0`; the Go 1.27 standard library supports that typed
+error conversion. This recovery path has not yet been exercised against an interrupted hosted response.
+Repository build/vet and lint, affected Linux build/vet, four-bundle drift, formatting, license, shell,
+Actionlint and YAML checks passed. The affected delivery vulnerability scan reported no vulnerabilities.
+An offline inspection found exact nonoverlapping roots for all 463 development/production and 221
+per-nightly stage selections. Independent source review covered nested extraction, held disk publication
+and recovery boundaries. The unit/race suites and complete test gate were not run at the operator's request.
+
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage
 writer are admitted only for the exact trusted workflow commit. The nightly public runtime attachment

@@ -9,6 +9,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/urfave/cli/v2"
 )
 
@@ -66,10 +67,17 @@ func cmdFactoryCIDownload() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "index-dir"}, &cli.StringFlag{Name: "destination"},
 			&cli.StringFlag{Name: "run-id"}, &cli.StringFlag{Name: "attempt"},
+			&cli.StringFlag{Name: "plan"}, &cli.StringFlag{Name: "stage"},
 		},
 		Action: func(c *cli.Context) error {
 			if c.Args().Present() || c.String("index-dir") == "" || c.String("destination") == "" {
 				return e.New(e.CodeUsage, "ci-download requires --index-dir and --destination without positional arguments")
+			}
+			if (c.String("plan") == "") != (c.String("stage") == "") {
+				return e.New(e.CodeUsage, "streamed CI stage restoration requires both --plan and --stage")
+			}
+			if c.String("stage") != "" && (c.String("destination") != ".nvkr/carriers" || c.String("run-id") != "" || c.String("attempt") != "") {
+				return e.New(e.CodeUsage, "streamed CI stage restoration requires current-Run carriers at the generated destination")
 			}
 			request, options, err := factoryCIContext()
 			if err != nil {
@@ -80,6 +88,14 @@ func cmdFactoryCIDownload() *cli.Command {
 			}
 			if c.String("run-id") != "" {
 				request.RunID, request.Attempt = c.String("run-id"), c.String("attempt")
+			}
+			if c.String("stage") != "" {
+				plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
+				if err != nil {
+					return err
+				}
+				return factory.RestoreGitHubPrivateInputs(c.Context, plan, c.String("stage"), request, c.String("index-dir"), options,
+					factory.GitHubStepOptions{Stdout: os.Stdout, Stderr: os.Stderr})
 			}
 			return cistore.DownloadGitHub(c.Context, request, c.String("index-dir"), c.String("destination"), options)
 		},

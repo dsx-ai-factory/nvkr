@@ -164,4 +164,4 @@ runs:
         NVKR_CI_ATTEMPT: ${{ inputs.attempt }}
       run: |-
         set -eu
-        ./.nvkr/ci-bootstrap/nvkr-exec factory github ci-download --index-dir "$NVKR_CI_INDEX" --destination "${NVKR_CI_DESTINATION:-.}" --run-id "$NVKR_CI_RUN" --attempt "$NVKR_CI_ATTEMPT"
+        exec ./.nvkr/ci-bootstrap/nvkr-exec factory github ci-download --index-dir "$NVKR_CI_INDEX" --destination "${NVKR_CI_DESTINATION:-.}" --run-id "$NVKR_CI_RUN" --attempt "$NVKR_CI_ATTEMPT"

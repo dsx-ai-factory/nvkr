@@ -19,20 +19,30 @@ import (
 // integrity only; callers must authenticate its binding to the intended carrier.
 // The caller owns source's lifetime and cancellation of any blocking source I/O.
 func UnpackStream(ctx context.Context, source io.Reader, size int64, digest, root string, allowed []string) error {
-	if err := requireTransportContext(ctx, "unpacking streamed transport"); err != nil {
+	stream, verify, err := boundedTransportStream(ctx, source, size, digest)
+	if err != nil {
 		return err
-	}
-	if source == nil || size < 0 || size > maxTransportBytes {
-		return e.New(e.CodeVerifyFailed, "streamed transport requires a source within the archive size bound")
-	}
-	hexDigest := strings.TrimPrefix(digest, "sha256:")
-	decoded, err := hex.DecodeString(hexDigest)
-	if err != nil || len(decoded) != sha256.Size || digest != "sha256:"+hex.EncodeToString(decoded) {
-		return e.New(e.CodeVerifyFailed, "streamed transport requires an exact SHA-256 digest")
 	}
 	rootAbs, cleanAllowed, err := transportRoots(root, allowed)
 	if err != nil {
 		return err
+	}
+	return unpackSource(ctx, stream, rootAbs, cleanAllowed, false, verify)
+}
+
+// boundedTransportStream prepares exact-byte checking without reading source or
+// touching a filesystem. Its verifier must run only after draining the stream.
+func boundedTransportStream(ctx context.Context, source io.Reader, size int64, digest string) (io.Reader, func() error, error) {
+	if err := requireTransportContext(ctx, "unpacking streamed transport"); err != nil {
+		return nil, nil, err
+	}
+	if source == nil || size < 0 || size > maxTransportBytes {
+		return nil, nil, e.New(e.CodeVerifyFailed, "streamed transport requires a source within the archive size bound")
+	}
+	hexDigest := strings.TrimPrefix(digest, "sha256:")
+	decoded, err := hex.DecodeString(hexDigest)
+	if err != nil || len(decoded) != sha256.Size || digest != "sha256:"+hex.EncodeToString(decoded) {
+		return nil, nil, e.New(e.CodeVerifyFailed, "streamed transport requires an exact SHA-256 digest")
 	}
 	raw := &io.LimitedReader{R: source, N: size}
 	hash := sha256.New()
@@ -57,5 +67,5 @@ func UnpackStream(ctx context.Context, source io.Reader, size int64, digest, roo
 		}
 		return nil
 	}
-	return unpackSource(ctx, stream, rootAbs, cleanAllowed, false, verify)
+	return stream, verify, nil
 }

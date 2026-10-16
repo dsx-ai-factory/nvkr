@@ -129,6 +129,14 @@ func Download(ctx context.Context, request Request, locator Locator, destination
 }
 
 func (b *backend) download(ctx context.Context, request Request, l Locator, destination string, opts Options) error {
+	return b.downloadRestored(ctx, request, l, destination, opts, restoreLayers)
+}
+
+// The private restorer chooses a transport projection only. Every projection
+// passes through the same request, privacy and exact manifest/config admission.
+func (b *backend) downloadRestored(ctx context.Context, request Request, l Locator, destination string, opts Options,
+	restore func(context.Context, []v1.Layer, *v1.Manifest, Locator, string) error,
+) error {
 	ctx, cancel, opts, err := admit(ctx, request, opts)
 	if err != nil {
 		return err
@@ -182,7 +190,7 @@ func (b *backend) download(ctx context.Context, request Request, l Locator, dest
 	if err != nil || len(layers) != len(manifest.Layers) {
 		return e.New(e.CodeVerifyFailed, "reading CI carrier chunk layers")
 	}
-	return restoreLayers(ctx, layers, manifest, l, destination)
+	return restore(ctx, layers, manifest, l, destination)
 }
 
 func (b *backend) registryOptions(ctx context.Context, opts Options) []remote.Option {
