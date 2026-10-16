@@ -2,7 +2,14 @@
 ---
 name: Prepare native NVKR toolchains
 'on':
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      verify_published:
+        description: >-
+          Pull the committed image pins and smoke their native tools
+          without rebuilding
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -10,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   measure:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && !inputs.verify_published
     permissions:
       contents: read
       packages: write
@@ -25,10 +32,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # 7.0.0
         with:
           go-version-file: .go-version
           cache: false
@@ -46,10 +53,135 @@ jobs:
         if: always() && steps.ci-helper.outcome == 'success'
         uses: ./.github/nvkr-run/actions/ci-upload
         with:
-          nvkr-ci-storage-token: ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
+          nvkr-ci-storage-token: >-
+            ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
           nvkr-ci-always: 'true'
           name: native-toolchains-${{ matrix.arch }}-${{ github.sha }}
           path: .nvkr/native-toolchains/${{ matrix.arch }}
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+  verify-published:
+    if: inputs.verify_published && startsWith(github.ref, 'refs/heads/')
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Check native host
+        timeout-minutes: 1
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          case "$NATIVE_ARCH:$(uname -s)/$(uname -m)" in
+            amd64:Linux/x86_64|arm64:Linux/aarch64) ;;
+            *) echo 'native Linux architecture mismatch' >&2; exit 1 ;;
+          esac
+          daemon=$(docker info --format '{{.OSType}}/{{.Architecture}}')
+          case "$NATIVE_ARCH:$daemon" in
+            amd64:linux/x86_64|amd64:linux/amd64) ;;
+            arm64:linux/aarch64|arm64:linux/arm64) ;;
+            *) echo 'native Docker architecture mismatch' >&2; exit 1 ;;
+          esac
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
+        with:
+          persist-credentials: false
+      - name: Select committed image pins
+        id: pins
+        timeout-minutes: 1
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          plan=.github/nvkr-run/plan.json
+          platform="linux/$NATIVE_ARCH"
+          repository=ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
+          packer=$(jq -er --arg platform "$platform" \
+            --arg repository "$repository/packer@" '
+            [.builds[] | select(.platform == $platform) |
+             .executionGraph.nodes[] |
+             .toolchain // empty |
+             select(startswith($repository))] | unique |
+            if length == 1 then .[0]
+            else error("expected one selected Packer image") end
+          ' "$plan")
+          inspector=$(jq -er --arg platform "$platform" \
+            '.environment.diskInspectionProfiles[$platform].image' "$plan")
+          case "$inspector" in
+            "$repository/inspector@sha256:"*) ;;
+            *) echo 'unexpected inspector repository' >&2; exit 1 ;;
+          esac
+          printf 'packer=%s\ninspector=%s\n' "$packer" "$inspector" \
+            >> "$GITHUB_OUTPUT"
+      - name: Pull exact images with the repository workflow token
+        timeout-minutes: 10
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+          PACKER_IMAGE: ${{ steps.pins.outputs.packer }}
+          INSPECTOR_IMAGE: ${{ steps.pins.outputs.inspector }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DOCKER_CONFIG=$(mktemp -d "$RUNNER_TEMP/nvkr-toolchain-pull.XXXXXX")
+          export DOCKER_CONFIG
+          trap 'find "$DOCKER_CONFIG" -depth -delete' EXIT
+          printf '%s' "$GHCR_TOKEN" |
+            docker login ghcr.io --username "$GHCR_USER" --password-stdin
+          docker pull --platform "linux/$NATIVE_ARCH" "$PACKER_IMAGE"
+          docker pull --platform "linux/$NATIVE_ARCH" "$INSPECTOR_IMAGE"
+      - name: Verify native tool entrypoints without registry credentials
+        timeout-minutes: 4
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+          PACKER_IMAGE: ${{ steps.pins.outputs.packer }}
+          INSPECTOR_IMAGE: ${{ steps.pins.outputs.inspector }}
+        run: |
+          set -euo pipefail
+          for image in "$PACKER_IMAGE" "$INSPECTOR_IMAGE"; do
+            platform=$(docker image inspect \
+              --format '{{.Os}}/{{.Architecture}}' "$image")
+            test "$platform" = "linux/$NATIVE_ARCH"
+            docker image inspect --format '{{json .RepoDigests}}' "$image" |
+              jq -e --arg image "$image" 'index($image) != null'
+          done
+          run=(timeout --signal=TERM --kill-after=10s 60s docker run --rm
+            --pull=never --platform "linux/$NATIVE_ARCH" --network none
+            --read-only --cap-drop ALL --security-opt no-new-privileges
+            --user 65534:65534 --env HOME=/nvkr/work/home
+            --env CHECKPOINT_DISABLE=1
+            --tmpfs '/nvkr/work:rw,nosuid,nodev,size=16777216,mode=1777')
+          "${run[@]}" --entrypoint /bin/sh "$PACKER_IMAGE" -ec '
+            mkdir -p /nvkr/work/home
+            test -d /nvkr/toolchain/packer/plugins
+            export PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins
+            /usr/local/bin/packer version
+            /usr/local/bin/packer plugins installed
+          '
+          "${run[@]}" --entrypoint /bin/sh "$INSPECTOR_IMAGE" -ec '
+            virt-inspector --version
+            qemu-img --version
+            guestfish --version
+            syft version
+            dpkg-deb --version
+          '
+          helper_status=0
+          "${run[@]}" --entrypoint /usr/local/bin/nvkr-disk-inspect \
+            "$INSPECTOR_IMAGE" > "$RUNNER_TEMP/nvkr-helper.stdout" \
+            2> "$RUNNER_TEMP/nvkr-helper.stderr" || helper_status=$?
+          test "$helper_status" = 2
+          test ! -s "$RUNNER_TEMP/nvkr-helper.stdout"
+          grep -F '[NVKR-E-USAGE]' "$RUNNER_TEMP/nvkr-helper.stderr"
+          printf 'Verified pull and native entrypoints: %s\n%s\n%s\n' \
+            "linux/$NATIVE_ARCH" "$PACKER_IMAGE" "$INSPECTOR_IMAGE" \
+            >> "$GITHUB_STEP_SUMMARY"
