@@ -565,9 +565,11 @@ invocation-data member holds parameters with named operation roles. The runtime 
 recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
 with no executable script inputs. Controlled transport
 wrappers contain one upload/download and retain their
-provider controls on the caller. Native preflight and checkout stay explicit in each execution job;
-disk producers also reject missing or inaccessible KVM devices before checkout or input transfer, while
-retaining full helper-owned capacity and KVM API admission before work.
+provider controls on the caller. Native preflight and checkout stay explicit in each execution job.
+Before checkout or input transfer, disk producers reject missing, symlink or non-character KVM devices.
+If the runner cannot open the fixed device read/write, one bounded noninteractive permission bootstrap
+sets mode 0666 and requires a successful open afterward. Failed mutation or access remains a capability
+rejection. Full helper-owned capacity and held KVM API admission remain required before work.
 Operator setup, timed producers and steps with referenced outcomes/outputs remain inline in the entry workflow.
 This includes finalization and the final Run upload used by the
 closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
@@ -1021,7 +1023,12 @@ required ownership/filesystem capabilities. Consumer execution uses the invoking
 adapter does not supply subordinate identities or user-namespace remapping; an escaped consumer would
 retain that user's host access. Qualified execution therefore needs a stronger authenticated boundary.
 The native ARC policy instead explicitly trusts the operator's ephemeral runner/daemon, enforces current
-native capacity/KVM admission and bounds the complete group. Source, registry-write and OIDC credentials
+native capacity/KVM admission and bounds the complete group. Its fixed access bootstrap may change a
+host-backed/shared KVM device's permissions beyond the job; an ephemeral runner alone does not establish
+exclusive ownership of that device. The operator accepts this behavior for the native route. It does not
+establish SLSA Build L3 isolation or qualified execution, and producer identity and the selected evidence
+lane remain unchanged. The separately authored OS-validation preflight remains read-only.
+Source, registry-write and OIDC credentials
 remain outside producer jobs. Internal toolchain pulls use a separate read-only preparation step whose
 temporary credential configuration is removed before source/producer execution.
 

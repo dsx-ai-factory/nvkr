@@ -288,11 +288,23 @@ but mismatched record, and pulls only after a failed local lookup. Image/platfor
 admission remains required. No registry credential is forwarded into producer containers.
 The package owner must grant the workflow repository Actions read access separately.
 
-Each generated native disk producer first performs a bounded, credential-free character-device and
-read/write-open check of `/dev/kvm`, before checkout, helper downloads or input restoration. Missing or
-inaccessible devices fail with `engine-capability`; the check never changes device permissions or runner
-identity. It is only early rejection, not a retained capability or authorization. ARC finalizers do not use
-KVM and do not run this check.
+Each generated native disk producer first prepares access to the fixed `/dev/kvm` path, before checkout,
+helper downloads or input restoration. The credential-free, one-minute step rejects a missing device,
+symlink or non-character device. If the invoking runner cannot open it read/write, the step makes one
+noninteractive `sudo -n -- chmod 0666 /dev/kvm` attempt, bounded to fifteen seconds with a five-second kill
+grace. A failed permission change or subsequent runner read/write-open fails with `engine-capability`.
+An already-accessible device requires no mutation. There is no arbitrary path, background retry or change
+to the producer's UID/GID. ARC finalizers do not use KVM and omit this step. The separately authored
+repository OS-validation workflow retains its read-only, no-chmod preflight.
+
+This fixed bootstrap is an explicit exception within the operator-trusted native ARC policy. Mode 0666
+permits access by other identities that can reach the device; a host-backed or shared device can retain
+that change beyond the runner job. Ephemeral single-job runner pods alone do not establish exclusive host
+device ownership. The operator accepts that effect when selecting this route; provisioning the device's
+numeric group on the runner remains an alternative that avoids this mutation. The bootstrap does not
+establish SLSA Build L3 isolation, qualified execution or provider allocation. The selected evidence lane
+and producer/publication/signing separation remain unchanged. Successful open is only an access check,
+not a retained capability or execution authorization.
 Before toolchain preparation or producer work the helper binds the native host and observes cgroup-capped
 CPU/memory, held-workspace capacity and KVM through the existing single-use VM admission. It repeats admission
 inside the producer deadline, uses the same guarded Docker device projection, and closes/joins all held owners.
@@ -650,8 +662,9 @@ admitted KVM descriptor, observes its character-device major/minor numbers and t
 and requests only the daemon's fixed `/dev/kvm` with read/write access. A fixed guard in the pinned build container
 requires the same kernel boot ID and device numbers before it execs Packer. Missing or mismatched observations
 fail closed; no source-owned command runs in that build container before the guard. This is a same-kernel device projection, not transfer
-of the open descriptor or qualified consumption evidence. It adds no privilege, host PID namespace, arbitrary
-device selection or network grant. The local Podman route retains its existing procfs descriptor path.
+of the open descriptor or qualified consumption evidence. The container projection itself adds no privilege,
+host PID namespace, arbitrary device selection or network grant; the fixed ARC access bootstrap above is a
+separate operator-trusted permission operation. The local Podman route retains its existing procfs descriptor path.
 
 `vm-image` execution dispatches the typed producer driver owned by ADR-10. The connected `packer` driver invokes the
 authenticated containerized Packer against the selected source-owned HCL project without parsing or generating

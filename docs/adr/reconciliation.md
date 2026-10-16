@@ -1205,21 +1205,40 @@ confirmed device permission failure. A diagnostics-only follow-up at
 `4c95efbc1a5f742b7884ff8635c60fe1b1afe337`,
 [preflight 38873740116](https://github.com/dsx-ai-factory/nvkr/actions/runs/38873740116/job/116883799563),
 reported `/dev/kvm` UID 0, GID 108 and mode 0660; runner UID/GID 1001 and groups 27, 100 and 123 lacked access.
-The ARC configuration needs the device's numeric group, consistent across eligible nodes, followed by fresh
-preflight and full admission. No runner permission change is recorded. The
+These read-only probes made no runner permission change. Provisioning the device's numeric group,
+consistent across eligible nodes, is one repair; the fixed generated bootstrap below is the selected
+workflow alternative. The
 [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38867619968/job/116883648755)
 recovered private artifacts after listing 1,050 attachments, then correctly rejected the incomplete provider
 closure with `NVKR-E-PROVENANCE-MISSING`. Unit contracts remain unexecuted at the operator's request.
 
-The follow-up generator adds a one-minute, credential-free `/dev/kvm` character-device and read/write-open
-check before checkout and downloads in every native disk producer. It avoids restoring inputs to a runner
-that already lacks access; it does not grant access, replace held runtime admission or apply to ARC finalizers.
-Exact generated-step validation rejects changes to its order, command or failure controls. This early
-rejection has not yet been exercised in a hosted generated Run; it does not resolve the runner configuration.
-Repository build/vet and lint, four-bundle regeneration/drift, Actionlint, YAML, format, license, shell and
-diff checks passed. The largest workflow uses 47,431 expanded YAML parsing events, below the maintained
-47,500-event headroom bound. Regression contracts cover ordering, tampering and finalizer exclusion;
-they remain unexecuted at the operator's request.
+The separate [NVKE Run 38912781090](https://github.com/dsx-ai-factory/nvke/actions/runs/38912781090),
+head `c47c9d6c8e8ef8e1141eb7e3028ad6c9c5bdb139`, exercised `sudo chmod 666 /dev/kvm` and real KVM guest boot in
+[AMD64 job 117014068930](https://github.com/dsx-ai-factory/nvke/actions/runs/38912781090/job/117014068930).
+That establishes access after its workflow bootstrap on its observed runner. The shared runner label and
+different registration names do not establish the same Kubernetes cluster, node or deployment as NVKR.
+
+The generated native disk step now rejects missing, symlink or non-character `/dev/kvm` paths before
+checkout and downloads. When the runner cannot open the device read/write, it makes one fixed,
+noninteractive `sudo -n -- chmod 0666 /dev/kvm` attempt with a fifteen-second timeout and five-second kill
+grace, then requires a successful runner read/write-open. Permission-change or access failure remains a
+coded capability rejection. Already-accessible devices are unchanged. Exact generated-step validation
+retains the fixed command, ordering and failure controls; ARC finalizers omit it. The independently authored
+OS-validation diagnostic workflow remains read-only.
+
+This is an operator-accepted native ARC permission bootstrap, not SLSA Build L3 isolation or a qualified
+execution claim. Mode 0666 can widen access to a host-backed/shared device beyond the runner job; it is
+not assumed to be confined to an ephemeral pod. Producer identity, held native capacity/KVM API admission,
+guarded Docker projection and the pipeline-attested evidence lane remain unchanged. The generated bootstrap
+and a complete 69-output Run with it have not yet been exercised; the NVKE result is not a substitute for
+that evidence. Unit contracts remain unexecuted at the operator's request.
+
+For this bootstrap implementation, repository build/vet and lint, four-bundle regeneration/drift,
+Actionlint, YAML syntax/style checks, formatting, license, shell and diff checks passed; the vulnerability
+scan found no vulnerabilities. Generated YAML retains its existing long-line and document-start style.
+Expanded YAML parsing counts remain 47,431/46,988/22,120/22,112 for production, development and the two
+nightlies, below the 47,500-event headroom bound. Unit, race and Python test suites were skipped at the
+operator's request; these static checks do not establish hosted execution.
 
 The plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP containing one 527-byte
 canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256

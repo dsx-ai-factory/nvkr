@@ -143,10 +143,20 @@ signing, publication and remote verification keep separate jobs and permissions.
 inside their producing job are not packed or uploaded unless finalization needs them. This avoids shipping
 an intermediate disk package as well as its prepared publication layout.
 
-Native disk producers check that `/dev/kvm` is a character device they can open read/write before checkout
-or helper/input downloads. An unusable runner therefore rejects the job before transferring its inputs. This check
-does not change device permissions; full native capacity and KVM API admission still occurs in the helper.
-Finalizers placed on ARC for disk retention do not use KVM and omit this check.
+Native disk producers prepare access to `/dev/kvm` before checkout or helper/input downloads. Missing,
+symlink and non-character devices fail immediately. If the runner cannot open the device read/write, one
+fixed noninteractive `sudo chmod 0666 /dev/kvm` attempt runs under a fifteen-second timeout and five-second
+kill grace. A failed change or subsequent open rejects the job; an already-accessible device is unchanged.
+Full native capacity and held KVM API admission still occurs in the helper with the same producer identity.
+Finalizers placed on ARC for disk retention do not use KVM and omit this step. The separately authored
+OS-validation preflight remains read-only and can therefore report an inaccessible baseline that the
+generated producer would attempt to repair.
+
+The operator-trusted ARC policy explicitly accepts this bootstrap: changing a host-backed/shared device
+to mode 0666 can affect access outside the runner job. It does not establish SLSA Build L3 isolation or
+upgrade the evidence lane. Provisioning the correct numeric device group on runners avoids the mutation.
+The generated bootstrap has not yet completed a real full build; see [reconciliation](adr/reconciliation.md)
+for the separately observed NVKE bootstrap and the remaining NVKR acceptance evidence.
 
 The per-output pipeline gives each remaining payload transfer a specific purpose:
 

@@ -137,7 +137,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		job := document.Jobs[stage.ID]
 		if len(job.Steps) == 0 || !reflect.DeepEqual(job.Steps[0], githubKVMAccessCheck()) {
-			return e.New(e.CodeEngineCapability, "GitHub disk job %q must check KVM access before checkout or input transport", stage.ID)
+			return e.New(e.CodeEngineCapability, "GitHub disk job %q must prepare KVM access before checkout or input transport", stage.ID)
 		}
 		job.Steps = job.Steps[1:]
 		document.Jobs[stage.ID] = job
