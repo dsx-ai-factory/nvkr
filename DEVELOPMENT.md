@@ -117,6 +117,15 @@ Merge the development and cleanup workflows onto the default branch before dispa
 [manual-dispatch registration](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
 requires that default-branch presence. Keep the generated development bundle on each tested branch.
 
+Configure repository secrets `NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN`, plus
+repository variables `NVKR_CI_STORAGE_READ_USER` and `NVKR_CI_STORAGE_WRITE_USER`. These are the package
+credentials and corresponding GitHub usernames for the separate
+`ghcr.io/dsx-ai-factory/nvkr/ci-artifacts` transport package. It must be private/internal and unlinked from
+any repository. A writer allowed to create packages can seed it with metadata only; the reader must then
+have access before consumer jobs start. Use separate read/write token scopes and verify actual account
+permissions; a token name or package prefix does not restrict its authority. See
+[private CI transport](docs/generate-pipeline.md) for privacy and retention requirements.
+
 Configure these **separate development environments**, retaining the existing production environments:
 
 | Environment | Configuration |
@@ -136,9 +145,13 @@ and [package deletion requirements](https://docs.github.com/en/packages/learn-gi
 Do not use a production administrator's token for these secrets. The generated development jobs grant
 no package-write permission to their repository `GITHUB_TOKEN`; verification, assembly and finalization
 receive only the dedicated read credential. Only artifact signing and SBOM attestation receive OIDC.
+GHCR publication jobs use the automatic repository token separately for source-repository metadata checks;
+the development publishing token does not need repository scope for that lookup.
 
-Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Grant the workflow
-repository read access to the retained private native toolchain packages. Their temporary read credential
+Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Verify the workflow
+can read its retained native Packer toolchain package. Internal package access can already come from the
+enterprise policy; do not add a public-repository Actions grant without reviewing its fork-access implications.
+The temporary toolchain read credential
 is removed before producer execution. Branch code participates in these operations, so run reviewed branches;
 the workflow is not an untrusted-code sandbox. The generator does not provision or attest provider access policy.
 
@@ -150,15 +163,18 @@ Keyless signatures use the existing transparency services, whose records are not
 
 ### Inspect results and repeat
 
-The helper prints a commit-filtered command for finding the Run. Inspect its head SHA, completion and final
-record before using any outputs:
+The helper prints a commit-filtered command for finding the Run. Inspect its head SHA, completion and
+Actions summary:
 
 ```sh
 gh run watch RUN_ID --repo dsx-ai-factory/nvkr --exit-status
 gh run view RUN_ID --repo dsx-ai-factory/nvkr --log-failed
-gh run download RUN_ID --repo dsx-ai-factory/nvkr \
-  --name nvkr-lifecycle-run --dir /tmp/nvkr-dev-record-RUN_ID
 ```
+
+The `nvkr-lifecycle-run` Actions attachment now contains only locator JSON. `gh run download` does not
+restore `run.json` by itself. The Run payload remains in private GHCR and requires an authorized consumer
+with the storage reader, matching repository/Run/attempt context and the private transfer helper. Verify
+that final record before treating its published references as a completed Run.
 
 Each attempt publishes into
 `ghcr.io/dsx-ai-factory/nvkr/development/runs/RUN_ID/attempts/ATTEMPT/`.
@@ -171,8 +187,9 @@ repository, workflow, run and attempt without changing logical Build identity or
 Signed development Runs are non-canceling. To retry, dispatch a complete new Run (or rerun **all** jobs).
 Failed-job-only reruns cannot reuse publications from an earlier attempt's disposable namespace. A cancelled
 Run can leave partial publications and may have no final record; cleanup discovers packages independently
-of successful finalization. CI helpers/carriers and final Run records retain seven days; disk diagnostics
-retain one day. After CI transfers expire, start a complete new Run.
+of successful finalization. Actions locators for CI helpers/carriers and final Run records retain seven
+days; disk diagnostic locators retain one day. GHCR carrier blobs require separate retention management.
+After locator transfers expire, start a complete new Run.
 
 ### Disposable registry cleanup
 

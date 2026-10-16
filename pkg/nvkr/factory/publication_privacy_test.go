@@ -21,6 +21,7 @@ import (
 func TestHostedPublicationPrivacyPrecedesLayoutAccess(t *testing.T) {
 	t.Setenv("NVKR_CREDENTIAL", "publisher-credential")
 	t.Setenv("NVKR_REGISTRY_USER", "publisher")
+	t.Setenv(githubRepositoryTokenEnv, "source-repository-credential")
 	t.Setenv("NVKR_CI_STORAGE_TOKEN", "must-not-be-used")
 	t.Setenv("GITHUB_REPOSITORY", "example/project")
 	for _, test := range []struct {
@@ -40,7 +41,7 @@ func TestHostedPublicationPrivacyPrecedesLayoutAccess(t *testing.T) {
 			called := false
 			_, err := admitGitHubPublication(t.Context(), Target{Ref: test.target}, "missing-layout", func(_ context.Context, source string, repositories []string, opts cistore.Options) error {
 				called = true
-				if source != "example/project" || !slices.Equal(repositories, []string{test.target}) || opts.Token != "publisher-credential" || opts.Username != "publisher" {
+				if source != "example/project" || !slices.Equal(repositories, []string{test.target}) || opts.Token != "publisher-credential" || opts.Username != "publisher" || opts.RepositoryToken != "source-repository-credential" {
 					t.Fatalf("publisher admission lost exact destination or credential: %s %v", source, repositories)
 				}
 				return e.New(e.CodeTrustPolicyMissing, "fixture package policy is not private")
@@ -61,6 +62,8 @@ func TestHostedPublicationPrivacyPrecedesLayoutAccess(t *testing.T) {
 
 func TestHostedPublicationPrivacyUsesExactMetadataRepositoriesWithoutPayloads(t *testing.T) {
 	plan, artifacts, _ := referenceMetadataFixture(t)
+	t.Setenv(githubRepositoryTokenEnv, "source-repository-credential")
+	t.Setenv("NVKR_CREDENTIAL", "publisher-credential")
 	output := plan.LifecycleOutputs[0]
 	source := artifacts["package/"+outputPublicationPackage(output.Name)].Path
 	metadata := filepath.Join(t.TempDir(), "metadata")
@@ -89,8 +92,11 @@ func TestHostedPublicationPrivacyUsesExactMetadataRepositoriesWithoutPayloads(t 
 	for _, denied := range []bool{false, true} {
 		t.Run(map[bool]string{false: "private closure", true: "public sibling"}[denied], func(t *testing.T) {
 			calls := 0
-			digest, err := admitGitHubPublication(t.Context(), target, metadata, func(_ context.Context, _ string, repositories []string, _ cistore.Options) error {
+			digest, err := admitGitHubPublication(t.Context(), target, metadata, func(_ context.Context, _ string, repositories []string, opts cistore.Options) error {
 				calls++
+				if opts.Token != "publisher-credential" || opts.RepositoryToken != "source-repository-credential" {
+					t.Fatal("destination or sibling admission mixed repository and package credentials")
+				}
 				if calls == 1 {
 					if !slices.Equal(repositories, []string{target.Ref}) {
 						t.Fatalf("first admission = %v", repositories)
@@ -120,12 +126,36 @@ func TestHostedPublicationPrivacyUsesExactMetadataRepositoriesWithoutPayloads(t 
 	}
 }
 
+func TestHostedPublicationRequiresRepositoryIdentityBeforeWork(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "true")
+	t.Setenv("GITHUB_SERVER_URL", "https://github.com")
+	t.Setenv("GITHUB_REPOSITORY", "example/project")
+	t.Setenv("NVKR_REGISTRY_USER", "publisher")
+	t.Setenv("NVKR_CREDENTIAL", "package-only-credential")
+	for _, token := range []string{"", "repository-only-credential"} {
+		t.Run(map[bool]string{false: "missing", true: "configured"}[token != ""], func(t *testing.T) {
+			t.Setenv(githubRepositoryTokenEnv, token)
+			called := false
+			_, err := admitGitHubPublication(t.Context(), Target{Ref: "ghcr.io/example/project/releases"}, "missing-layout",
+				func(context.Context, string, []string, cistore.Options) error {
+					called = true
+					return e.New(e.CodeTrustPolicyMissing, "fixture stops before package or layout access")
+				})
+			assertFactoryErrorCode(t, err, e.CodeTrustPolicyMissing)
+			if called != (token != "") {
+				t.Fatal("repository identity was not admitted before external policy or layout work")
+			}
+		})
+	}
+}
+
 func TestHostedPublicationRejectsMissingSourceBeforeOutput(t *testing.T) {
 	t.Setenv("GITHUB_ACTIONS", "true")
 	t.Setenv("GITHUB_SERVER_URL", "https://github.com")
 	t.Setenv("GITHUB_REPOSITORY", "")
 	t.Setenv("NVKR_REGISTRY_USER", "publisher")
 	t.Setenv("NVKR_CREDENTIAL", "credential")
+	t.Setenv(githubRepositoryTokenEnv, "repository-credential")
 	out := filepath.Join(t.TempDir(), "published.ref")
 	plan := &Plan{Targets: map[string]Target{"release": {Kind: TargetOCI, Ref: "ghcr.io/example/project/releases"}}}
 	node := Node{ID: "publish/release", Target: "release", Inputs: []string{"input"}, Outputs: []string{"result"}}
@@ -140,6 +170,7 @@ func TestHostedPublicationLegacyLayoutFailsClosed(t *testing.T) {
 	t.Setenv("GITHUB_ACTIONS", "true")
 	t.Setenv("GITHUB_SERVER_URL", "https://github.com")
 	t.Setenv("GITHUB_REPOSITORY", "example/project")
+	t.Setenv(githubRepositoryTokenEnv, "repository-credential")
 	root := filepath.Join(t.TempDir(), "diagnostic")
 	_, err := delivery.BuildPublicationRoot(t.Context(), root, delivery.PublicationRequest{Objects: []delivery.ObjectInput{{
 		Name: "record", Kind: "record", Bytes: []byte("diagnostic"), SemanticDigest: "sha256:" + strings.Repeat("a", 64),
@@ -161,6 +192,7 @@ func TestHostedPublicationCancellationPrecedesLayout(t *testing.T) {
 	t.Setenv("GITHUB_SERVER_URL", "https://github.com")
 	t.Setenv("GITHUB_REPOSITORY", "example/project")
 	t.Setenv("NVKR_CREDENTIAL", "credential")
+	t.Setenv(githubRepositoryTokenEnv, "repository-credential")
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := admitGitHubPublication(ctx, Target{Ref: "ghcr.io/example/project/releases"}, "missing-layout", cistore.AdmitPrivatePublication)

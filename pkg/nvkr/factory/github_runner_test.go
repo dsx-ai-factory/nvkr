@@ -357,6 +357,7 @@ func TestPublicationUtilityCarriesOnlyPublicRunIdentity(t *testing.T) {
 	location := utilityRunnerLocation{runtime: plan.Environment.RuntimeBinary(), mountSource: "/fixture", mountTarget: "/workspace", helper: "/workspace/nvkr-exec", plan: FactoryPlanPath, publicationRunContext: true}
 	t.Setenv("GITHUB_ACTIONS", "true")
 	t.Setenv("GITHUB_TOKEN", "must-not-cross")
+	t.Setenv(githubRepositoryTokenEnv, "repository-token-must-not-cross")
 	if err := executeUtilityNode(t.Context(), node, location, io.Discard, io.Discard); err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +370,7 @@ func TestPublicationUtilityCarriesOnlyPublicRunIdentity(t *testing.T) {
 			t.Fatalf("missing run identity %s", key)
 		}
 	}
-	for _, forbidden := range []string{"GITHUB_TOKEN", "ACTIONS_ID_TOKEN", sourceTokenEnv, "NVKR_CREDENTIAL", "must-not-cross"} {
+	for _, forbidden := range []string{"GITHUB_TOKEN", "ACTIONS_ID_TOKEN", sourceTokenEnv, "NVKR_CREDENTIAL", githubRepositoryTokenEnv, "must-not-cross"} {
 		if strings.Contains(string(raw), forbidden) {
 			t.Fatalf("credential crossed utility boundary: %s", forbidden)
 		}

@@ -1001,7 +1001,10 @@ carry canonical JSON locators; source archives, helpers, tools and compiled payl
 private/internal GHCR package with no reported repository association. Separate read/write package credentials
 and their configured usernames are scoped to transfer steps. The repository token authenticates repository
 metadata and Actions locator reads; it is not a package-credential fallback. Publication retains its separate
-private destination and inspected-root admission. The v2 carrier uses at most 64 ordered raw chunks of at most
+private destination and inspected-root admission. GHCR publication jobs also pass their automatic repository
+token separately for the source metadata lookup; development publisher tokens remain package-scoped. Local
+contracts cover this credential separation and its generated projection, not a live package-only PAT run.
+The v2 carrier uses at most 64 ordered raw chunks of at most
 1 GiB, checking each digest, config binding and complete archive before extraction. Earlier draft v1 locators
 require a new producing Run. Controlled local-registry contracts cover multiple chunks, corrupt/reordered or
 truncated bytes, bounds, no-overwrite extraction and joined cancellation; they do not prove GHCR service
@@ -1075,9 +1078,9 @@ The combined production/development layout has 564 original jobs and 16 collecto
 The production dependency graph has 1,375 edges, down from 1,438. Logical Plan identity and original
 per-node result accounting remain unchanged by scheduling. Shared preparation selects the current
 `github.job` internally, removing a redundant caller input while retaining exact projection checks.
-Production is 376,191 bytes and 47,304 expanded YAML events; development is 355,428 bytes and 46,861 events.
-The named ARM64 nightly and upstream-OVN entries are respectively 180,553/181,470 bytes and
-22,058/22,050 events, each with 282 jobs and 644 dependency edges.
+Production is 379,971 bytes and 47,444 expanded YAML events; development is 359,208 bytes and 47,001 events.
+The named ARM64 nightly and upstream-OVN entries are respectively 182,173/183,090 bytes and
+22,118/22,110 events, each with 282 jobs and 644 dependency edges.
 All four producer bundles keep their jobs inline. The earlier output-local grouping migration removed
 accidental unrelated-output failure barriers; dependency reduction preserves the resulting ancestor closure.
 The addition/removal regression compiles binary, native binary, collected native binary, source and signed

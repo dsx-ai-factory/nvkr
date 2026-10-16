@@ -133,6 +133,8 @@ and an identical YAML anchor may gain an earlier owner without changing expanded
 generated files do not supply scheduling state.
 Payload carriers use an unlinked private/internal GHCR package with separate storage credentials; only
 JSON locators enter Actions artifact storage. Digest-verified chunked transport grants no release authority.
+Carrier and GHCR publication admission use the automatic repository token for source metadata separately
+from package credentials; that token is not added to producer execution.
 Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
 Development and production use separate fixed bundle layouts selected by their Environment, with the same
 compiler and independent ownership manifests. A development bundle is not a release authorization.

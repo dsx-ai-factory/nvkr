@@ -2453,6 +2453,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -2467,6 +2468,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -2481,6 +2483,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -2495,6 +2498,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3793,6 +3797,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3807,6 +3812,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3821,6 +3827,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3835,6 +3842,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3849,6 +3857,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3863,6 +3872,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3877,6 +3887,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3891,6 +3902,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3905,6 +3917,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3919,6 +3932,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3933,6 +3947,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3947,6 +3962,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3961,6 +3977,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3975,6 +3992,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -3989,6 +4007,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4003,6 +4022,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4017,6 +4037,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4031,6 +4052,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4045,6 +4067,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4059,6 +4082,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4073,6 +4097,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4087,6 +4112,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4101,6 +4127,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4115,6 +4142,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4129,6 +4157,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4143,6 +4172,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4157,6 +4187,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4171,6 +4202,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4185,6 +4217,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4199,6 +4232,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4213,6 +4247,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4227,6 +4262,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4241,6 +4277,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4255,6 +4292,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4269,6 +4307,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4283,6 +4322,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4297,6 +4337,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4311,6 +4352,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4325,6 +4367,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4339,6 +4382,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4353,6 +4397,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -4367,6 +4412,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5033,6 +5079,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5094,6 +5141,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5145,6 +5193,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5206,6 +5255,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5257,6 +5307,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5318,6 +5369,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5369,6 +5421,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5430,6 +5483,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5491,6 +5545,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5542,6 +5597,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5603,6 +5659,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5654,6 +5711,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5715,6 +5773,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5766,6 +5825,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5827,6 +5887,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5888,6 +5949,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -5939,6 +6001,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -6000,6 +6063,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -6051,6 +6115,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -6112,6 +6177,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -6163,6 +6229,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -6224,6 +6291,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -6285,6 +6353,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
@@ -7294,6 +7363,7 @@ jobs:
       actions: read
       contents: read
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node

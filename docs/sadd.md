@@ -590,6 +590,9 @@ and one or two uncontrolled node calls. Expansion restores independent nodes bef
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
 Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
 retain only JSON locators. Dedicated read/write credentials do not elevate repository-token permissions.
+Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
+from the credential that accesses package metadata and registry bytes. Producers receive neither through
+these admission paths.
 Admission bounds expanded YAML parsing events as well as file bytes. No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
 prerequisite closure preserved; authored setup, runtime variables, images or services that mention the
 direct dependency context retain the original lists.

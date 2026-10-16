@@ -244,6 +244,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				env[key] = value
 			}
 		}
+		if token := githubPublicationRepositoryToken(plan, node); token != "" {
+			env[githubRepositoryTokenEnv] = token
+		}
 		if len(env) > 0 {
 			fmt.Fprintln(&body, "    env:")
 			for _, k := range sortedKeys(env) {
@@ -491,6 +494,17 @@ func githubRegistryEnvironment(plan *Plan, kind, targetName string) (map[string]
 		}
 	}
 	return map[string]string{"NVKR_CREDENTIAL": "${{ secrets." + secret + " }}", "NVKR_REGISTRY_USER": user}, nil
+}
+
+// GHCR privacy admission authenticates the source repository with the automatic
+// workflow token. Package inspection and writes keep the publisher's credential.
+// Only publication performs this admission; producers and other release stages
+// receive no repository metadata credential through their job environment.
+func githubPublicationRepositoryToken(plan *Plan, node Node) string {
+	if node.Kind == NodePublish && strings.HasPrefix(plan.Targets[node.Target].Ref, "ghcr.io/") {
+		return "${{ github.token }}"
+	}
+	return ""
 }
 
 func githubCancelInProgress(plan *Plan) bool {

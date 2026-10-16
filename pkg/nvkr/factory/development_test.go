@@ -253,6 +253,7 @@ func assertDevelopmentRejectsStaleMetadataBeforePublication(t *testing.T, plan *
 	t.Setenv("GITHUB_RUN_ATTEMPT", "2")
 	t.Setenv("NVKR_REGISTRY_USER", "dev-user")
 	t.Setenv("NVKR_CREDENTIAL", "dev-credential")
+	t.Setenv(githubRepositoryTokenEnv, "repository-credential")
 	route := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
 	node := planNode(plan, NodePublish+"/"+route)
 	calls := 0
