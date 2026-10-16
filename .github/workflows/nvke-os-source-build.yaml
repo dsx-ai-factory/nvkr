@@ -57,8 +57,8 @@ jobs:
             echo 'Late observation incorrectly passed' >&2
             exit 1
           fi
-          rg 'observed after the diagnostic returned' "$log"
-          rg 'parent was not canceled during cleanup' "$log"
+          grep -F 'observed after the diagnostic returned' "$log"
+          grep -F 'parent was not canceled during cleanup' "$log"
       - name: Retain verification records
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
