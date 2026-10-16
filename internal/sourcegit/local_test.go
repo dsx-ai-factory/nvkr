@@ -1022,6 +1022,37 @@ func TestLocalGitRejectsCleartextBeforeNetworkAcquisition(t *testing.T) {
 	}
 }
 
+func TestLocalGitRejectsExternalHelperBeforeExecution(t *testing.T) {
+	root := t.TempDir()
+	helper, marker := filepath.Join(root, "helper"), filepath.Join(root, "helper-ran")
+	script := "#!/bin/sh\n: > '" + strings.ReplaceAll(marker, "'", "'\"'\"'") + "'\n"
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Prove the harmless fixture can create its marker before checking refusal.
+	if err := exec.CommandContext(t.Context(), helper).Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal("helper did not create its marker", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	cmd, err := LocalCommand(ctx, []string{"PATH=" + os.Getenv("PATH")}, "", "ls-remote", "ext::"+helper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &output, &output
+	err = ownedcmd.Run(ctx, cmd)
+	if err == nil || ctx.Err() != nil || cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 128 || !strings.Contains(output.String(), "transport 'ext' not allowed") {
+		t.Fatalf("external helper transport was not refused: %v %s", err, &output)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("external helper was executed", err)
+	}
+}
+
 func TestLocalGitAdmissionContextIsCoded(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()

@@ -40,6 +40,7 @@ func TestArtifactDiagnosticResults(t *testing.T) {
 	}{
 		{"contract", valid, "contract", true},
 		{"cli", diagnosticEvents("github.com/dsx-ai-factory/nvke/cli/cmd/nvkectl", "TestContract"), "cli", true},
+		{"cli-rejects-contract-package", valid, "cli", false},
 		{"ordinary-only-limitation", diagnosticEvents("command-line-arguments", "TestOrdinaryUnitOnly"), "contract", true},
 		{"empty", "", "contract", false}, {"missing-package", valid[:strings.LastIndex(strings.TrimSpace(valid), "\n")], "contract", false},
 		{"pass-without-run", strings.Join(strings.Split(valid, "\n")[1:], "\n"), "contract", false},
@@ -52,6 +53,9 @@ func TestArtifactDiagnosticResults(t *testing.T) {
 			counts, err := summarizeArtifactTests(strings.NewReader(test.raw), test.suite)
 			if (err == nil) != test.pass {
 				t.Fatalf("%+v %v", counts, err)
+			}
+			if !test.pass {
+				assertFactoryErrorCode(t, err, e.CodeBuildFailed)
 			}
 			if test.pass && (counts.TopLevelTests != 1 || counts.Packages != 1) {
 				t.Fatal(counts)
@@ -233,6 +237,126 @@ func TestArtifactDiagnosticCompletedExecutionSurvivesCleanupCancellation(t *test
 		t.Run(test.name, func(t *testing.T) {
 			if got := GitHubStepExitCode(diagnosticError(ctx, test.err)); got != test.want {
 				t.Fatalf("completed execution reclassified during cleanup: got %d want %d", got, test.want)
+			}
+		})
+	}
+}
+
+type diagnosticWriterFunc func([]byte) (int, error)
+
+func (write diagnosticWriterFunc) Write(raw []byte) (int, error) { return write(raw) }
+
+func TestArtifactDiagnosticOutputFailurePreservesPrimary(t *testing.T) {
+	plan := writeCLIPlan(t, cliTestPlan(t, "amd64", "scalar", 1))
+	childErr := exec.CommandContext(t.Context(), "sh", "-c", "exit 7").Run()
+	for _, phase := range []string{"success", "source-failed", "suite-failed"} {
+		for _, failAt := range []int{0, 1, 2, 3} {
+			for _, keep := range []bool{false, true} {
+				t.Run(phase+string(rune('0'+failAt))+map[bool]string{true: "/keep", false: "/clean"}[keep], func(t *testing.T) {
+					root := t.TempDir()
+					artifact := filepath.Join(root, "artifact")
+					if err := os.WriteFile(artifact, []byte("executable"), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					calls := 0
+					output := diagnosticWriterFunc(func(raw []byte) (int, error) {
+						calls++
+						if failAt == 0 || calls == failAt {
+							return 0, io.ErrClosedPipe
+						}
+						return len(raw), nil
+					})
+					workspace := ""
+					options := ArtifactTestOptions{Plan: plan, Artifact: artifact, WorkspaceRoot: filepath.Join(root, "workspaces"), Stdout: output, Keep: keep}
+					err := testCLIArtifact(t.Context(), options,
+						func(_ context.Context, _ []string, directory, _, _, _ string, _ io.Writer) error {
+							workspace = filepath.Dir(directory)
+							if phase == "source-failed" {
+								return e.New(e.CodeFetchFailed, "source failed")
+							}
+							if err := os.MkdirAll(filepath.Join(directory, "cli"), 0o700); err != nil {
+								return err
+							}
+							return os.WriteFile(filepath.Join(directory, "cli", "Makefile"), []byte("test-artifact:\n"), 0o600)
+						}, func(_ context.Context, input pipeline.ArtifactDiagnostic, _, _ io.Writer) error {
+							if phase == "suite-failed" {
+								return childErr
+							}
+							return os.WriteFile(filepath.Join(input.Workspace, "tests.jsonl"), []byte(diagnosticEvents("command-line-arguments", "TestContract")), 0o600)
+						})
+					switch phase {
+					case "source-failed":
+						assertFactoryErrorCode(t, err, e.CodeFetchFailed)
+					case "suite-failed":
+						if got := GitHubStepExitCode(err); got != 7 {
+							t.Fatalf("output replaced suite exit: %d %v", got, err)
+						}
+					default:
+						assertFactoryErrorCode(t, err, e.CodeBuildFailed)
+						if !errors.Is(err, io.ErrClosedPipe) || calls != 3 {
+							t.Fatalf("delivery failure missing: calls=%d error=%v", calls, err)
+						}
+					}
+					_, statErr := os.Stat(workspace)
+					if !keep && !os.IsNotExist(statErr) {
+						t.Fatal("default workspace retained", statErr)
+					}
+					if keep {
+						_, resultErr := os.Stat(filepath.Join(workspace, "result.json"))
+						if phase == "success" && resultErr != nil {
+							t.Fatal("completed tests lost their retained result", resultErr)
+						}
+						if phase != "success" && !os.IsNotExist(resultErr) {
+							t.Fatal("failed execution published success", resultErr)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestArtifactDiagnosticCopyCancellation(t *testing.T) {
+	for _, phase := range []struct {
+		name string
+		code e.Code
+	}{{"copying staged executable", e.CodeBuildFailed}, {"hashing staged executable", e.CodeVerifyFailed}} {
+		t.Run(phase.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "artifact")
+			if err := os.WriteFile(path, []byte(strings.Repeat("x", 1<<20)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			for _, canceled := range []bool{false, true} {
+				t.Run(map[bool]string{true: "canceled", false: "io-failure"}[canceled], func(t *testing.T) {
+					file, err := os.Open(path)
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer file.Close()
+					ctx, cancel := context.WithCancel(t.Context())
+					defer cancel()
+					copied := 0
+					writer := diagnosticWriterFunc(func(raw []byte) (int, error) {
+						if !canceled {
+							return 0, io.ErrClosedPipe
+						}
+						copied += len(raw)
+						cancel()
+						return len(raw), nil
+					})
+					err = copyArtifactDiagnostic(ctx, writer, file, phase.code, phase.name)
+					if canceled {
+						assertFactoryErrorCode(t, err, e.CodeTimeout)
+						if !errors.Is(err, context.Canceled) || copied == 0 || copied > 128<<10 || !strings.Contains(err.Error(), phase.name) {
+							t.Fatalf("copy did not stop at a chunk boundary: copied=%d error=%v", copied, err)
+						}
+					} else {
+						assertFactoryErrorCode(t, err, phase.code)
+						if !errors.Is(err, io.ErrClosedPipe) {
+							t.Fatal(err)
+						}
+					}
+				})
 			}
 		})
 	}
