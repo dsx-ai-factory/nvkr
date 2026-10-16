@@ -28,8 +28,9 @@ var sourceLanes = map[string]string{
 }
 
 // QualificationReleaseMember is a defensive projection of one authenticated
-// output's production provenance. ProvenanceDigest is the exact-blob SHA-256
-// of the verified predicate bytes. Decoding it restores no receipt.
+// output's production provenance. ProvenanceDigest is the SHA-256 of the
+// verified predicate's canonical JSON, without the optional transport newline
+// the signature verifier also ignores. Decoding it restores no receipt.
 type QualificationReleaseMember struct {
 	Output           string `json:"output"`
 	SourceLane       string `json:"sourceLane"`
@@ -70,15 +71,17 @@ func qualificationReleaseMembers(outputs []ArtifactCheckOutput, predicates map[s
 		if !found {
 			return nil, e.New(e.CodeProvenanceMissing, "qualification omits production provenance for output %q", output.Name)
 		}
+		// UnmarshalExact proves these bytes are the canonical representation.
+		exact := bytes.TrimSuffix(raw, []byte{'\n'})
 		var predicate provenance.Predicate
-		if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &predicate); err != nil {
+		if err := canonical.UnmarshalExact(exact, &predicate); err != nil {
 			return nil, e.Wrap(e.CodeProvenanceMissing, err, "decoding production provenance for output %q", output.Name)
 		}
 		lane, found := sourceLanes[predicate.BuildDefinition.BuildType]
 		if !found {
 			return nil, e.New(e.CodeProvenanceMissing, "output %q has an unsupported production build type", output.Name)
 		}
-		sum := sha256.Sum256(raw)
+		sum := sha256.Sum256(exact)
 		members = append(members, QualificationReleaseMember{Output: output.Name, SourceLane: lane, ProvenanceDigest: "sha256:" + hex.EncodeToString(sum[:])})
 	}
 	return members, nil

@@ -52,7 +52,7 @@ type Qualification struct {
 	PredicateType  string                          `json:"predicateType"`
 }
 
-// Provenance binds the exact verified production predicate bytes of a member.
+// Provenance binds the canonical verified production predicate of a member.
 type Provenance struct {
 	Digest        string `json:"digest"`
 	PredicateType string `json:"predicateType"`

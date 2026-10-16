@@ -209,7 +209,8 @@ authenticated qualification invocation, gate version, qualification-policy diges
 `nvkr.qualification-evidence` digest of the exact evidence attached to every member. Each member carries its
 name, kind, digest-pinned reference and digest, Build Digest, native platform, sorted producer subjects, source
 lane (`hermetic-build`, `wrapped-build` or `acquired`, read from its verified production provenance build type)
-and the exact-blob SHA-256 of that verified production predicate. An aggregate image member names its index;
+and the SHA-256 of that verified production predicate's canonical JSON, excluding the optional trailing
+transport newline that signature verification also ignores. An aggregate image member names its index;
 the bound qualification evidence enumerates its native children. Disk members state producer-only scope.
 Members are sorted by name and unique. Unknown fields, versions, lanes or kinds, noncanonical bytes, missing
 identities and inexact bindings fail closed. The canonical document is bounded by the qualification signing

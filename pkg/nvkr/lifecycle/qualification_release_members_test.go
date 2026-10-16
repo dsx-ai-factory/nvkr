@@ -25,7 +25,7 @@ func TestArtifactCheckReceiptReleaseMembersUseVerifiedProvenance(t *testing.T) {
 	if err := canonical.UnmarshalExact(bytes.TrimSuffix(verifier.predicate, []byte{'\n'}), &predicate); err != nil {
 		t.Fatal(err)
 	}
-	sum := sha256.Sum256(verifier.predicate)
+	sum := sha256.Sum256(bytes.TrimSuffix(verifier.predicate, []byte{'\n'}))
 	members, err := receipt.ReleaseMembers()
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +98,31 @@ func TestQualificationReleaseMembersMapClosedSourceLanes(t *testing.T) {
 			}
 			if len(members) != 1 || members[0].Output != output.Name || members[0].SourceLane != tc.lane {
 				t.Fatalf("members=%+v", members)
+			}
+		})
+	}
+}
+
+func TestQualificationReleaseMembersHashCanonicalPredicate(t *testing.T) {
+	request, _, verifier := newQualificationFixture(t)
+	exact := bytes.TrimSuffix(verifier.predicate, []byte{'\n'})
+	sum := sha256.Sum256(exact)
+	want := "sha256:" + hex.EncodeToString(sum[:])
+	output := ArtifactCheckOutput{Name: "cli", Reference: request.Predicates[1].Reference}
+	for _, tc := range []struct {
+		name string
+		raw  []byte
+	}{
+		{name: "canonical", raw: exact},
+		{name: "transport newline", raw: append(append([]byte(nil), exact...), '\n')},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			members, err := qualificationReleaseMembers([]ArtifactCheckOutput{output}, map[string][]byte{output.Reference: tc.raw})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if members[0].ProvenanceDigest != want {
+				t.Fatalf("digest=%s want %s", members[0].ProvenanceDigest, want)
 			}
 		})
 	}
