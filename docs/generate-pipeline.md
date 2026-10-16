@@ -182,6 +182,21 @@ support the current ownership and mutation checks; they are implementation choic
 Further removal needs equivalent bounded reads or exclusive ownership transfer, with unchanged digest,
 cleanup and atomic-completion guarantees. Direct pathname reuse or hardlinks alone do not provide them.
 
+For the native `build-provenance-v1` disk route, the remaining producer-side materializations are:
+
+| Materialization after Packer writes the original QCOW2 | Current purpose | Requirement for removing it |
+|---|---|---|
+| Container output → Docker TAR file → sealed Linux memory file | Bound container output, join the Docker command and freeze its complete archive before extraction | Stream the bounded archive into private extraction while retaining complete archive validation and command stop/join ownership |
+| Held TAR → extracted QCOW2 | Validate the exact archive member and create the held disk owner | Retain one authenticated final payload; the archive staging above is the removable duplication |
+| Live disk owner → export temporary → OCI wrapper blob | Bind export to the exact Plan/output, then commit a complete verified OCI transaction | Let the authenticated export write directly into the transaction's final staged blob |
+| OCI wrapper blob → prepared publication blob | Give the publication transaction independent ownership and verify its complete closure | Consume exclusively owned blobs with atomic same-filesystem moves and complete closure checks |
+| Prepared publication → inner transfer TAR | Produce a deterministic carrier for private registry transport | Stream deterministic TAR bytes over held, verified source files with bounded replay and unchanged integrity checks |
+
+This accounts for six payload-scale filesystem writes and one sealed memory snapshot after the original
+QCOW2 on that route. It is an inventory of writes, not seven simultaneous disk copies or a measured peak.
+These are implementation costs to eliminate where the replacement preserves the stated guarantees;
+SLSA does not require these intermediate files. The replacement paths in the last column are not implemented.
+
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can
 schedule dispatches; that scheduling and runtime-test ownership are separate

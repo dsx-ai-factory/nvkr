@@ -1107,8 +1107,8 @@ chains removes one full-layout upload and two downloads; each disk route also re
 package upload. Native disk jobs additionally omit ten unused intermediate payload uploads each. These
 changes do not move OIDC into producers or publishers.
 Single-file CI uploads expose the existing TAR format as a virtual reader; downloads authenticate and extract
-ordered chunks directly into private staging. Neither direction writes an extra full outer TAR. Factory restore
-retains its inner carrier alongside extraction for held-source mutation detection and atomic publication.
+ordered chunks directly into private staging. Neither direction writes an extra full outer TAR. At that revision,
+factory restore retained its inner carrier alongside extraction for held-source mutation detection and atomic publication.
 Bootstrap compilation also releases its own disposable caches after joining the compiler. Repository build,
 vet, lint, format, license, shell and vulnerability checks, four-bundle regeneration/drift, Actionlint, YAML
 lint and independent source review passed. Regression contracts were added but not executed at the operator's
@@ -1186,9 +1186,47 @@ with `NVKR-E-PROVENANCE-MISSING`. No complete release acceptance follows from th
 The follow-up implementation streams Plan-selected factory carriers directly into extracted roots and
 publishes disk payloads from checked held descriptors, removing the retained input TAR and disk publisher's
 full temporary copy. It preserves complete transport authentication, no-replace publication, source mutation
-checks and unconditional post-upload rehash even for registry deduplication. These two copy removals require
-a fresh hosted Run; the failed Run above did not exercise them. Unit contracts remain unexecuted at the
-operator's request.
+checks and unconditional post-upload rehash even for registry deduplication. The subsequent
+[development Run 38867619968](https://github.com/dsx-ai-factory/nvkr/actions/runs/38867619968), commit
+`53e28a56c85cd3818e07574b7eb25add6934687a`, finished with 565 successful, three failed and 12 skipped jobs.
+All 65 nondisk outputs and both ARM64 disk outputs completed SBOM attestation, publication, signing and
+independent remote verification. The [plain ARM64 publisher](https://github.com/dsx-ai-factory/nvkr/actions/runs/38867619968/job/116874186795)
+streamed restoration in 48 seconds and published in 125 seconds; the
+[ARM64 FDE publisher](https://github.com/dsx-ai-factory/nvkr/actions/runs/38867619968/job/116875695907)
+streamed restoration in 186 seconds and published in 409 seconds. The
+[plain verifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/38867619968/job/116876558917)
+and [FDE verifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/38867619968/job/116881062118)
+completed real verification (`dryRun=false`) of the output and release-wrapper references. These are
+successful hosted disk paths at this revision, not measured peak storage, AMD64 disk acceptance or a complete release.
+
+Both AMD64 disk jobs restored inputs but failed KVM admission before building. The initial
+[preflight 38869133168](https://github.com/dsx-ai-factory/nvkr/actions/runs/38869133168/job/116868903097)
+confirmed device permission failure. A diagnostics-only follow-up at
+`4c95efbc1a5f742b7884ff8635c60fe1b1afe337`,
+[preflight 38873740116](https://github.com/dsx-ai-factory/nvkr/actions/runs/38873740116/job/116883799563),
+reported `/dev/kvm` UID 0, GID 108 and mode 0660; runner UID/GID 1001 and groups 27, 100 and 123 lacked access.
+The ARC configuration needs the device's numeric group, consistent across eligible nodes, followed by fresh
+preflight and full admission. No runner permission change is recorded. The
+[finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38867619968/job/116883648755)
+recovered private artifacts after listing 1,050 attachments, then correctly rejected the incomplete provider
+closure with `NVKR-E-PROVENANCE-MISSING`. Unit contracts remain unexecuted at the operator's request.
+
+The plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP containing one 527-byte
+canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256
+`8346896ddd5dba69678d6e0773478a0ecee60bb12bd4d9b32b26dadb90387557`, exact Run/head/attempt and
+carrier bindings were checked without downloading the payload. At `2026-10-16T08:11:54Z`, anonymous manifest
+requests and their exact anonymous pull-token exchanges both returned 401 for that carrier and the published
+plain ARM64 release wrapper. Authenticated package metadata reported internal visibility and no linked
+repository for CI storage and that output package. This establishes the sampled anonymous denial, not
+hidden authenticated, enterprise or fork grants, future visibility or aggregate release availability.
+
+After the Run finished, a complete attachment audit concluded at `2026-10-16T08:36:43Z`. All 1,051 Actions
+attachment ZIPs matched their provider SHA-256 digests and contained only one canonical, Run-bound v2
+locator each. Their combined size was 592,517 bytes; individual ZIPs ranged from 478 to 591 bytes.
+The audit rechecked the terminal failed conclusion, exact head and attempt, and unchanged final inventory
+(`sha256:583cc95163932dba53750a022414a95db16d25c2cd7bdae5312a8766507cf2ee`). This verifies every attachment
+in this Run; it excludes logs, caches, historical runs, registry ACLs and functional release acceptance.
+
 Remote disk acquisition also admits at most three fresh reads for the narrowly typed one-layer HTTP/2 peer
 reset, with checked cleanup, one shared deadline and destination commit outside retry. The public HTTP/2
 error type is pinned through `golang.org/x/net v0.61.0`; the Go 1.27 standard library supports that typed
