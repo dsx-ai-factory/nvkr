@@ -354,8 +354,9 @@ predictably when two runs overlap or a run is interrupted part-way.
 - **Pin detection and regeneration.** A scheduled workflow detects new upstream versions, refreshes source pins,
   lockfile pins, and action pins in one pass, regenerates the workflows, and opens a pull request using a GitHub
   App installation token (the workflow's own token does not trigger pull-request workflows; a personal token is
-  not used) scoped to contents and pull requests on this repository only. The App's private key is the only
-  long-lived secret the pin-update workflow holds and is absent from every other workflow. The App authors the PR,
+  not used) scoped to contents, pull requests and workflows on this repository only, so a regenerated workflow
+  travels in the same reviewed pull request. The App's private key is the only
+  long-lived write secret the pin-update workflow holds and is absent from every other workflow. The App authors the PR,
   cannot approve it, and a code-owner approval is required to merge. The PR body lists, for every changed pin,
   the old and new tag, commit, tree hash, and digest. Merging to the default branch is the release decision for
   v1; the pin-update PR is the one that changes which pins are released.
@@ -409,7 +410,7 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 
 **Definition of done**
 - Tests cover the pin refresh end to end on a fixture definition and lockfile, deterministic serialization of the release manifest, the "already released" no-op on a re-run, tag immutability and conditional tag creation against a registry, the channel winner rule, the interrupted-publication re-run, the revocation marker's shape and role, and release-scope verification rejecting a revoked digest.
-- An independent review of the release step, the pin tooling, the revocation dispatch's identity and environment restriction, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required) is closed before the release run is declared evidence; the final decision-record text is reviewed.
+- An independent review of the release step, the pin tooling, the revocation dispatch's identity and environment restriction, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required, and the repository settings that protect the pull-request branch) is closed before the release run is declared evidence; the final decision-record text is reviewed.
 - The evidence log records the pull request URL, run URLs, manifest reference, consumer transcripts, the tag-move refusal, the overlapping-run and interrupted-run logs, and the revocation transcript.
 - The owning decision records are final, including the release-manifest and revocation-marker schemas registered before implementation, the tag rule, the winner rule and the durable-record store and retention period; the implementation record, contributor guidance (including the explicit list of capabilities excluded from v1), and this specification's artifact source/delivery matrix match what shipped.
 

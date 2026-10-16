@@ -164,6 +164,7 @@ jobs:
               - '.github/nvkr-qualification/**'
               - '.github/workflows/nvkr-dev.yml'
               - '.github/nvkr-dev/**'
+              - '.github/workflows/catalog-refresh.yaml'
               - 'cmd/**'
               - 'client/**'
               - 'internal/**'
@@ -269,6 +270,9 @@ jobs:
       - name: test (fast default)
         id: tests
         shell: bash
+        env:
+          # Rendered workflow-step tests fail instead of skipping when bash, git, jq or yq is missing.
+          NVKR_REQUIRE_SHELL_TOOLS: '1'
         run: make test GO_TEST_FLAGS=-json | tee "$RUNNER_TEMP/go-test.jsonl"
 
       - name: Summarize test timings
@@ -423,7 +427,7 @@ jobs:
           token: ${{ secrets.NKE_SOURCE_TOKEN }}
           persist-credentials: false
 
-      - name: Verify committed producer and qualification generation is current
+      - name: Verify committed producer, qualification and catalog refresh generation is current
         env:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nvkr-inputs/nvke/.insteadOf

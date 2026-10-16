@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -254,11 +255,18 @@ func nvkeM2ControllerCatalogFixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const sourceCommit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
+	// The release is whatever the authored lock records, so a reviewed catalog
+	// maintenance bump does not break this fixture. The chart-owning nvke source
+	// and its chart source are one maintained release cohort and must agree; the
+	// independent nvke-cli role only has to be a complete commit.
+	sourceCommit := lock.Pins["nvke"].Commit
 	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
-		if lock.Pins[name].Commit != sourceCommit {
-			t.Fatalf("authored %s source=%s, want %s", name, lock.Pins[name].Commit, sourceCommit)
+		if !fullCommit.MatchString(lock.Pins[name].Commit) {
+			t.Fatalf("authored %s source=%q is not a full commit", name, lock.Pins[name].Commit)
 		}
+	}
+	if lock.Pins["nvke-helm"].Commit != sourceCommit {
+		t.Fatalf("authored nvke-helm source=%s, want the nvke source %s", lock.Pins["nvke-helm"].Commit, sourceCommit)
 	}
 	repo := t.TempDir()
 	if err := os.CopyFS(repo, os.DirFS("pkg/nvkr/catalog/testdata/nvke-pin-set")); err != nil {
@@ -310,3 +318,5 @@ func nvkeM2ControllerCatalogFixture(t *testing.T) string {
 	}
 	return directory
 }
+
+var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)

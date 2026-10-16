@@ -1,0 +1,226 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package catalogmaintenance
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
+)
+
+// packageDir is this package's directory, captured before fixtures change the working directory.
+var packageDir = func() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	return dir
+}()
+
+const qualificationFixturePolicy = "qualification.yaml"
+
+// qualificationFixture turns the maintenance fixture into a signing, publishing
+// Run with a committed qualification pair. Its trust pins are synthetic: the
+// fixture exercises the generation owners, not GHCR, cosign or a hosted run.
+func qualificationFixture(t *testing.T) (Config, func(string)) {
+	t.Helper()
+	cfg, promote := maintenanceFixture(t)
+	// Borrow the maintained catalog's pinned signing tools; nothing downloads them here.
+	maintained, err := filepath.Abs(filepath.Join(packageDir, "../../../inputs/catalogs/nvke/module-tags"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	maintainedSources, err := catalog.ReadSourcesContext(t.Context(), catalog.Dir(maintained))
+	if err != nil {
+		t.Fatal(err)
+	}
+	maintainedLock, err := catalog.LoadLockContext(t.Context(), maintained)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registry map[string]any
+	if err := json.Unmarshal(readFixture(t, "catalog/registry.yaml"), &registry); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"cosign", "syft"} {
+		registry["sources"].(map[string]any)[name] = maintainedSources[name]
+	}
+	writeJSON(t, "catalog/registry.yaml", registry)
+	// The lock's compare-and-swap snapshot binds the registry bytes, so load it after the registry edit.
+	lock, err := catalog.LoadLockContext(t.Context(), "catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"cosign", "syft"} {
+		lock.Pins[name] = maintainedLock.Pins[name]
+	}
+	if err := catalog.WriteLockContext(t.Context(), "catalog", lock); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, cfg.Definition, []byte(strings.Replace(string(readFixture(t, cfg.Definition)), "catalog: {base: catalog}\n", "catalog: {base: catalog}\nsbomTool: syft\ncosignTool: cosign\n", 1)))
+	digest := func(c string) string { return "sha256:" + strings.Repeat(c, 64) }
+	writeFixture(t, cfg.Environment, []byte(string(readFixture(t, cfg.Environment))+
+		"publication:\n  mode: per-output-v1\n  credentialRef: github:GITHUB_TOKEN\n  repositoryPrefix: ghcr.io/example/nvkr/fixture\n"+
+		"signing:\n  identity: ^https://github\\.com/example/nvkr/\\.github/workflows/nvkr-run\\.yml@refs/heads/main$\n"+
+		"  issuer: https://token.actions.githubusercontent.com\n  mode: cosign\n"))
+	writeFixture(t, qualificationFixturePolicy, []byte("schemaVersion: nvkr.dev/qualification-policy/v1\n"+
+		"source: {repository: example/nvkr, workflow: .github/workflows/nvkr-run.yml, defaultBranch: main}\n"+
+		"qualificationWorkflow: .github/workflows/nvkr-qualify.yml\n"+
+		"cosign:\n  version: v3.1.3\n  platformDigests: {linux/amd64: "+digest("a")+"}\n"+
+		"smoke:\n  workflow: .github/workflows/nvkr-smoke.yml\n  images: {linux/amd64: registry.example.test/smoke@"+digest("c")+"}\n"+
+		"  tools: {tool: helm-version}\n"))
+	cfg.QualificationPolicy = qualificationFixturePolicy
+	if _, err := qualification.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, cfg.QualificationPolicy, "test (deadbeef)", "github", ".", false); err != nil {
+		t.Fatal(err)
+	}
+	return cfg, promote
+}
+
+func checkQualification(t *testing.T, cfg Config) error {
+	t.Helper()
+	_, err := qualification.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, cfg.QualificationPolicy, "test (deadbeef)", "github", ".", true)
+	return err
+}
+
+// treeSnapshot maps every regular file under the working directory to its mode and bytes.
+func treeSnapshot(t *testing.T) map[string]string {
+	t.Helper()
+	files := map[string]string{}
+	err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(path)] = info.Mode().String() + " " + string(raw)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}
+
+func manifestPlanDigest(t *testing.T, path string) string {
+	t.Helper()
+	var manifest struct {
+		PlanDigest string `json:"planDigest"`
+	}
+	if err := json.Unmarshal(readFixture(t, path), &manifest); err != nil || manifest.PlanDigest == "" {
+		t.Fatalf("%s has no plan digest: %v", path, err)
+	}
+	return manifest.PlanDigest
+}
+
+// A changed pin moves the production Plan, so the qualification manifest that binds its digest must be
+// regenerated by the qualification owner and carried with the Run. Synthetic trust pins; no GHCR or cosign.
+func TestRefreshRegeneratesTheQualificationPairThatBindsTheChangedPlan(t *testing.T) {
+	cfg, promote := qualificationFixture(t)
+	if err := checkQualification(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	before := treeSnapshot(t)
+	oldPlan := manifestPlanDigest(t, qualification.QualificationManifestPath)
+	promote("1.1.0")
+	result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false, "")
+	if err != nil || !result.Changed {
+		t.Fatalf("apply: %+v %v", result, err)
+	}
+	newPlan := manifestPlanDigest(t, qualification.QualificationManifestPath)
+	if newPlan == oldPlan || newPlan != result.PlanDigest || newPlan != manifestPlanDigest(t, ".github/nvkr-run/manifest.json") {
+		t.Fatalf("qualification manifest binds %s, want the new production Plan %s (was %s)", newPlan, result.PlanDigest, oldPlan)
+	}
+	if err := checkQualification(t, cfg); err != nil {
+		t.Fatalf("qualification pair is stale after refresh: %v", err)
+	}
+	// Every changed path is one the workflow transports, as a regular 0644 file.
+	after := treeSnapshot(t)
+	transported := func(path string) bool {
+		switch path {
+		case "catalog/pins.lock.yaml", ".github/workflows/nvkr-run.yml", ".github/workflows/nvkr-qualify.yml", ".github/workflows/nvkr-smoke.yml":
+			return true
+		}
+		return strings.HasPrefix(path, ".github/nvkr-run/") || strings.HasPrefix(path, ".github/nvkr-qualification/")
+	}
+	changed := 0
+	for path, content := range after {
+		if before[path] == content {
+			continue
+		}
+		changed++
+		// A pin-only refresh must leave every workflow intact; only a topology or interface change may move one.
+		if strings.HasPrefix(path, ".github/workflows/") {
+			t.Fatalf("pin-only refresh changed workflow %s", path)
+		}
+		if !transported(path) {
+			t.Fatalf("refresh changed %s, which the workflow does not transport", path)
+		}
+		if !strings.HasPrefix(content, "-rw-r--r-- ") {
+			t.Fatalf("%s is not a regular 0644 file: %.10s", path, content)
+		}
+	}
+	for path := range before {
+		if _, ok := after[path]; !ok && !transported(path) {
+			t.Fatalf("refresh removed %s, which the workflow does not transport", path)
+		}
+	}
+	if before[qualification.QualificationManifestPath] == after[qualification.QualificationManifestPath] || changed == 0 {
+		t.Fatal("the qualification manifest did not move with the Plan")
+	}
+	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", false, "")
+	if err != nil || result.Changed {
+		t.Fatalf("second refresh: %+v %v", result, err)
+	}
+	for path, content := range treeSnapshot(t) {
+		if after[path] != content {
+			t.Fatalf("no-op refresh changed %s", path)
+		}
+	}
+}
+
+// The qualification owner's own coded failure reaches the caller before any pin work.
+func TestRefreshKeepsTheQualificationOwnersFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*testing.T, Config)
+		code e.Code
+	}{
+		{"stale qualification workflow", func(t *testing.T, _ Config) {
+			writeFixture(t, ".github/workflows/nvkr-qualify.yml", []byte("tampered\n"))
+		}, e.CodePipelineDrift},
+		{"unpinned cosign", func(t *testing.T, cfg Config) {
+			writeFixture(t, cfg.QualificationPolicy, []byte(strings.Replace(string(readFixture(t, cfg.QualificationPolicy)), "version: v3.1.3\n", "", 1)))
+		}, e.CodeUnpinnedInput},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, promote := qualificationFixture(t)
+			promote("1.1.0")
+			beforeLock := readFixture(t, "catalog/pins.lock.yaml")
+			tc.edit(t, cfg)
+			calls := 0
+			_, err := refresh(t.Context(), cfg, "test (deadbeef)", false, "", func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+				calls++
+				return catalog.SourcePinUpdate{}, nil
+			})
+			assertCode(t, err, tc.code)
+			if calls != 0 || !bytes.Equal(beforeLock, readFixture(t, "catalog/pins.lock.yaml")) {
+				t.Fatal("a qualification owner failure reached the pin transaction")
+			}
+		})
+	}
+}
