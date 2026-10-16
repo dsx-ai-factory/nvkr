@@ -19,7 +19,7 @@ components:
     toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
     patches:
       - name: patches/local-profile.patch
-        sha256: sha256:34344d76509f31051230f44d1209eed6cb29fe4d6d7903920ce949e46d1a2169
+        sha256: sha256:e0a9bd1571a45554f7751fbfe0cf9205034a18f5d1af411bfb41740e5e439397
     artifactPath: bin/nvke-local-profiles-{{.Arch}}.oci.tar
     writeDir: bin
     outputType: oci-image

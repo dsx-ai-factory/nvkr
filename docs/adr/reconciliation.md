@@ -523,9 +523,9 @@ historical M2 Docker candidate, not a newly measured current toolchain. Local Do
 launchers still freeze their freshly validated image into an attempt overlay.
 Static Plan and wrapper tests cover these selections, not a new native bake.
 
-The local OS selects the PR #113 NVKE/NVIDIA OVN fork at pinned tag `v2.4.1`,
-commit `9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7`; profile packages and tenant
-requests select its `2.4.1` chart stream. The combined Definition also declares standalone
+The local OS selects the PR #113 NVKE/NVIDIA OVN fork at pinned tag `v2.4.2`,
+commit `8af51273d52dfa07454435d18d37230e582d797a`; profile packages and tenant
+requests select its `2.4.2` chart stream. The combined Definition also declares standalone
 OVN OCI image and bound Helm OCI outputs. Disk-embedded and standalone outputs
 are independently produced; this does not close original-owner cross-output
 reuse or establish equal bytes. The recorded exercises below were performed
@@ -539,11 +539,14 @@ including the fork OS bake, with 29 expected and 29 observed outputs in the
 `unqualified-local-execution` lane. Its exact Run identity and original records
 remain private; no retrievable external artifact is cited here.
 Artifact completion does not establish tenant acceptance or default OVN startup.
-For the current `2.4.1` pin, static catalog/overlay/graph contract checks and a
+For the current `2.4.2` pin, static catalog/overlay/graph contract checks and a
 local pinned-chart Helm rendering with loopback OCI push/pull are recorded, again
 without a retrievable evidence attachment. The equivalent exercises recorded
-earlier against the superseded pin `12ca20e67b516f1a023da85a22deeaf8d2d70d0b` and
-its `2.4.0` stream retain that scope. No Run, OS bake or tenant exercise has
+earlier against the superseded pins `9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7`
+(stream `2.4.1`) and `12ca20e67b516f1a023da85a22deeaf8d2d70d0b` (stream `2.4.0`)
+retain that scope. The `2.4.2` chart adds an always-installed node-annotation
+`ValidatingAdmissionPolicy` and control-plane resource limits; no running
+cluster has exercised either. No Run, OS bake or tenant exercise has
 been executed against the current pin, which also ships its single-node-zone
 values file as a link to `values.yaml`. Image binding admits regular files
 only, and a copy would carry the source image digests that binding replaces in

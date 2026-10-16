@@ -33,10 +33,10 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const ovnForkCommit = "9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7"
+const ovnForkCommit = "8af51273d52dfa07454435d18d37230e582d797a"
 
 // ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
-const ovnForkStream = "2.4.1"
+const ovnForkStream = "2.4.2"
 
 // Both source trees use a vendored JSON adapter incompatible with Go 1.27.
 const ovnGoBuilder = "quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564"

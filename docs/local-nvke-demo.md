@@ -525,9 +525,9 @@ resource reservation; choose it within your host's available memory and disk.
 
 The local OS selection builds OVN-Kubernetes from the NVKE/NVIDIA
 [`dsx-ai-factory/ovn-kubernetes`](https://github.com/dsx-ai-factory/ovn-kubernetes)
-fork at tag `v2.4.1`, commit `9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7`, using the
+fork at tag `v2.4.2`, commit `8af51273d52dfa07454435d18d37230e582d797a`, using the
 producer catalog introduced in PR #113. The image carries its chart/image packages
-for stream `2.4.1`, and the tenant requests that stream. This uses the fork's
+for stream `2.4.2`, and the tenant requests that stream. This uses the fork's
 `Dockerfile.ubuntu.nv` producer with its base image overridden to a pinned public
 `ubuntu:24.04` digest, not its private FIPS/STIG base. Access to the fork must
 work from the Linux execution host.
