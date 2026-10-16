@@ -188,7 +188,7 @@ func (b *backend) get(ctx context.Context, endpoint, token string, result any) (
 		// sent in this request. The cache alone never grants access.
 		etags := response.Header.Values("ETag")
 		if !conditional || req.Header.Get("If-None-Match") != held.etag ||
-			len(etags) > 1 || (len(etags) == 1 && etags[0] != held.etag) ||
+			len(etags) > 1 || (len(etags) == 1 && !matchingAdmissionETags(etags[0], held.etag)) ||
 			json.Unmarshal(held.raw, result) != nil {
 			b.responses.forget(key)
 			return 0, e.New(e.CodeTrustPolicyMissing, "CI storage admission received an invalid conditional response")

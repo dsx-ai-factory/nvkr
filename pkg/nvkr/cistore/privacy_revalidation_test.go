@@ -33,12 +33,18 @@ func TestAdmissionRevalidatesPrivacyAndNeverUsesStaleSuccess(t *testing.T) {
 		name   string
 		status int
 		etag   string
+		held   string
 		body   string
 		fail   bool
 		cancel bool
 		code   e.Code
 	}{
 		{name: "matching representation", status: 304, etag: `"private-v1"`},
+		{name: "weak becomes strong", status: 304, held: `W/"private-v1"`, etag: `"private-v1"`},
+		{name: "strong becomes weak", status: 304, etag: `W/"private-v1"`},
+		{name: "different weak opaque tag", status: 304, held: `W/"private-v1"`, etag: `W/"different"`, code: e.CodeTrustPolicyMissing},
+		{name: "different strong opaque tag", status: 304, held: `W/"private-v1"`, etag: `"different"`, code: e.CodeTrustPolicyMissing},
+		{name: "invalid weak prefix", status: 304, etag: `w/"private-v1"`, code: e.CodeTrustPolicyMissing},
 		{name: "304 omits optional validator", status: 304},
 		{name: "changed public package", status: 200, etag: `"public-v2"`, body: strings.Replace(admissionPrivatePackage, `"private"`, `"public"`, 1), code: e.CodeTrustPolicyMissing},
 		{name: "access revoked", status: 403, code: e.CodeTrustPolicyMissing},
@@ -52,6 +58,10 @@ func TestAdmissionRevalidatesPrivacyAndNeverUsesStaleSuccess(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			calls := 0
+			held := tc.held
+			if held == "" {
+				held = `"private-v1"`
+			}
 			b := newBackend()
 			b.client.Transport = admissionTransportFunc(func(r *http.Request) (*http.Response, error) {
 				calls++
@@ -62,9 +72,9 @@ func TestAdmissionRevalidatesPrivacyAndNeverUsesStaleSuccess(t *testing.T) {
 					if r.Header.Get("If-None-Match") != "" {
 						t.Fatal("first request was conditional")
 					}
-					return admissionResponseFor(r, 200, `"private-v1"`, admissionPrivatePackage), nil
+					return admissionResponseFor(r, 200, held, admissionPrivatePackage), nil
 				}
-				if r.Header.Get("If-None-Match") != `"private-v1"` {
+				if r.Header.Get("If-None-Match") != held {
 					t.Fatal("second boundary did not revalidate the held representation")
 				}
 				if tc.cancel {

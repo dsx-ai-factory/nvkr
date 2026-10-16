@@ -145,7 +145,9 @@ source, invocation and signing-policy admission and is not implemented by this t
 Repeated metadata checks within one transfer or publication operation may use authenticated HTTP ETag
 revalidation. Every existing admission boundary still contacts GitHub. A `304 Not Modified` response may
 reuse only the exact successful response bytes retained in memory for the same endpoint and credential;
-changed responses undergo the full policy check. No disk, cross-job or stale-on-error cache is admitted.
+response ETags use HTTP's weak comparison for `If-None-Match` (the same opaque tag with or without `W/`).
+Different opaque tags are rejected; changed responses undergo the full policy check. No disk, cross-job
+or stale-on-error cache is admitted.
 The bounded operation-local cache is an optimization, not authority: a missing validator uses an ordinary
 request, and inaccessible or malformed policy still fails closed. GitHub documents that authenticated
 [`304` responses do not consume the primary API quota](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#use-conditional-requests).

@@ -1049,7 +1049,14 @@ The storage owner now uses ADR-18's operation-local authenticated ETag revalidat
 network policy check. One download batch shares a backend; its in-memory response cache is bounded to 128
 entries and 8 MiB, with exact URL/credential isolation and no stale-on-error fallback. Regression cases
 were added but not executed at the operator's request. Compilation, vet, lint and independent static review
-passed; hosted quota savings and a complete Run remain to be demonstrated.
+passed. An authenticated package API probe at `2026-10-16T03:39:42Z` returned a `200` response followed by
+`304`, with primary quota usage unchanged at one request. The provider's `200` ETag used the weak `W/`
+prefix while its matching `304` ETag omitted it. The strict string comparison in
+[bootstrap job 116798618159](https://github.com/dsx-ai-factory/nvkr/actions/runs/38846651931/job/116798618159)
+therefore failed closed; comparison now follows
+[HTTP's weak entity-tag rule](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.8.3.2), preserving opaque-tag
+equality and every privacy check. This probe establishes endpoint revalidation behavior, not full-Run quota
+savings or completion; those remain to be demonstrated.
 
 Six sampled attachments in that Run (IDs `12022647313`, `12022133262`, `12023070943`, `12022991328`,
 `12022558957`, and `12023125384`) covered helper, tool, artifact, result, source and package carriers. Each

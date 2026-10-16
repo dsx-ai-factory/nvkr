@@ -82,3 +82,11 @@ func validAdmissionETag(value string) bool {
 	}
 	return true
 }
+
+// If-None-Match uses weak comparison: a W/ prefix does not change an opaque
+// tag's match. GitHub can omit that prefix on its 304 response.
+// https://www.rfc-editor.org/rfc/rfc9110.html#section-13.1.2
+func matchingAdmissionETags(first, second string) bool {
+	return validAdmissionETag(first) && validAdmissionETag(second) &&
+		strings.TrimPrefix(first, "W/") == strings.TrimPrefix(second, "W/")
+}
