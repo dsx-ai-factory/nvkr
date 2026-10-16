@@ -100,3 +100,22 @@ func TestPublicMetadataRejectsWholeSelectionBeforeRestore(t *testing.T) {
 		t.Fatalf("failed admission wrote outputs: %v %v", entries, readErr)
 	}
 }
+
+func TestPublishGitHubMetadataCanceledPreservesIndex(t *testing.T) {
+	l := publicMetadataFixture()
+	index := t.TempDir()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	result, err := PublishGitHubMetadata(ctx, testRequest, l.Paths[0], index, *l.Metadata)
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
+		t.Fatalf("want timeout, got %v", err)
+	}
+	if result != "" {
+		t.Fatalf("canceled publication returned locator %q", result)
+	}
+	entries, err := os.ReadDir(index)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("canceled publication changed empty index: %v %v", entries, err)
+	}
+}
