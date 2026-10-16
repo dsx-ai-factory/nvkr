@@ -591,6 +591,26 @@ func TestGitHubPrivateTransfersRejectPayloadFallbackAndCredentialTampering(t *te
 		{"elevated package scope", bundle.WorkflowPath, func(root *yamlv3.Node) {
 			githubYAMLSet(githubTestYAMLField(t, root, "jobs", bootstrap), "permissions", githubYAMLMap("contents", githubYAMLString("read"), "packages", githubYAMLString("write")))
 		}},
+		{"root read account", bundle.WorkflowPath, func(root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "env", "NVKR_CI_STORAGE_READ_USER").Value = "untrusted"
+		}},
+		{"root write account", bundle.WorkflowPath, func(root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "env", "NVKR_CI_STORAGE_WRITE_USER").Value = "untrusted"
+		}},
+		{"job read override", bundle.WorkflowPath, func(root *yamlv3.Node) {
+			githubYAMLSet(githubTestYAMLField(t, root, "jobs", bootstrap), "env", githubYAMLMap("NVKR_CI_STORAGE_READ_USER", githubYAMLString("untrusted")))
+		}},
+		{"job write override", bundle.WorkflowPath, func(root *yamlv3.Node) {
+			githubYAMLSet(githubTestYAMLField(t, root, "jobs", bootstrap), "env", githubYAMLMap("NVKR_CI_STORAGE_WRITE_USER", githubYAMLString("untrusted")))
+		}},
+		{"step read override", bundle.WorkflowPath, func(root *yamlv3.Node) {
+			step := githubTestYAMLField(t, root, "jobs", bootstrap, "steps").Content[0]
+			githubYAMLSet(step, "env", githubYAMLMap("NVKR_CI_STORAGE_READ_USER", githubYAMLString("untrusted")))
+		}},
+		{"step write override", bundle.WorkflowPath, func(root *yamlv3.Node) {
+			step := githubTestYAMLField(t, root, "jobs", bootstrap, "steps").Content[0]
+			githubYAMLSet(step, "env", githubYAMLMap("NVKR_CI_STORAGE_WRITE_USER", githubYAMLString("untrusted")))
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			changed := mutateGitHubBundleYAML(t, bundle, test.member, test.mutate)
@@ -607,6 +627,30 @@ func TestGitHubPrivateTransfersRejectPayloadFallbackAndCredentialTampering(t *te
 				}
 			}
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &changed), e.CodeEngineCapability)
+		})
+	}
+}
+
+func TestGitHubPrivateTransferRejectsExistingWorkflowEnvironmentBeforeOutput(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions, err := resolveGitHubActions(plan.Actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"UNRELATED", "NVKR_CI_STORAGE_READ_USER", "NVKR_CI_STORAGE_WRITE_USER"} {
+		t.Run(key, func(t *testing.T) {
+			changed := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+				githubYAMLSet(root, "env", githubYAMLMap(key, githubYAMLString("preexisting")))
+			})
+			workflow, files, err := privatizeGitHubTransfers(plan, changed.Files[bundle.WorkflowPath], changed.Files, actions)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if workflow != nil || files != nil {
+				t.Fatal("rejected environment produced transfer output")
+			}
 		})
 	}
 }

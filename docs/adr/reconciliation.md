@@ -1316,6 +1316,14 @@ updated for consumed preparations, local-only payloads and metadata-only downloa
 remain skipped at the operator's request; hosted checks must confirm these corrections. The initial
 registry pull retains ADR-20's thirty-minute default deadline when the caller supplies none; the review
 suggestion to leave the initial attempt unbounded is not adopted.
+The follow-up coverage now composes actual SBOM, predicate, OCI-control and source-receipt producers with
+factory metadata export and restoration; it checks exact bytes, membership and indexed digests. Negative
+archive cases cover traversal, links, duplicate entries, invalid layouts and cancellation without a receipt
+or retained validation snapshot. Additional cases cover empty/partial nonmerged selection restoration and
+complete-selection rejection, storage-account overrides, and a real bootstrap descendant retaining captured
+pipes. KVM branch tests execute the emitted script against safe filesystem fixtures and simulated open/repair
+results; they neither change real device permissions nor prove runner KVM capability. These additions are
+compiled and statically checked; local unit execution remains skipped and hosted results are pending.
 
 For Run 38867619968, the plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP
 containing one 527-byte canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256

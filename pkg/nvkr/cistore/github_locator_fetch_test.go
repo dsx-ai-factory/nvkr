@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -56,12 +57,12 @@ func TestGitHubLocatorSelectionAdmission(t *testing.T) {
 }
 
 func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
-	for _, scenario := range []string{"success flat", "success subdirectories", "singleton subdirectory", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
+	for _, scenario := range []string{"success flat", "success subdirectories", "singleton subdirectory", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
 		t.Run(scenario, func(t *testing.T) {
 			index := t.TempDir()
 			request := testRequest
 			request.Name = ""
-			selection := GitHubLocatorSelection{Pattern: "{nvkr-a,nvkr-b}", MergeMultiple: scenario != "success subdirectories" && scenario != "singleton subdirectory"}
+			selection := GitHubLocatorSelection{Pattern: "{nvkr-a,nvkr-b}", MergeMultiple: scenario != "success subdirectories" && scenario != "singleton subdirectory" && scenario != "partial nonmerged" && scenario != "empty nonmerged"}
 			if scenario == "singleton subdirectory" {
 				selection.Pattern = "nvkr-a"
 			}
@@ -81,7 +82,12 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				if scenario == "wrong attempt" && i == 1 {
 					selected.Attempt = "999"
 				}
-				locator, err := canonical.Marshal(githubAdapterLocator(selected))
+				value := githubAdapterLocator(selected)
+				if scenario == "partial nonmerged" || scenario == "empty nonmerged" {
+					value = publicMetadataFixture()
+					value.Request = selected
+				}
+				locator, err := canonical.Marshal(value)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -140,7 +146,7 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 						t.Fatal("unbounded exact-name query")
 					}
 					name := r.URL.Query().Get("name")
-					if scenario == "missing exact" || (scenario == "missing pattern" && name == "nvkr-b") {
+					if scenario == "missing exact" || scenario == "empty nonmerged" || ((scenario == "missing pattern" || scenario == "partial nonmerged") && name == "nvkr-b") {
 						return githubLocatorHTTPFixture(200, []byte(`{"total_count":0,"artifacts":[]}`), nil), nil
 					}
 					items := []githubLocatorArtifact{artifacts[name]}
@@ -158,6 +164,45 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				return nil, nil
 			})
 			err := g.fetch(t.Context(), request, index, selection)
+			if scenario == "partial nonmerged" || scenario == "empty nonmerged" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				destination := t.TempDir()
+				err = DownloadGitHub(t.Context(), request, index, destination, Options{})
+				if scenario == "empty nonmerged" {
+					assertCode(t, err, e.CodeReleaseIncomplete)
+				} else {
+					if err != nil {
+						t.Fatal(err)
+					}
+					l := publicMetadataFixture()
+					carrier := filepath.Join(destination, "nvkr-a", "metadata.tar")
+					if err := transportarchive.Unpack(t.Context(), carrier, destination, []string{l.Metadata.Root}); err != nil {
+						t.Fatal(err)
+					}
+					raw, err := os.ReadFile(filepath.Join(destination, l.Metadata.Root))
+					if err != nil || string(raw) != l.Metadata.Entries[0].Text {
+						t.Fatal("partial pattern changed nested bytes")
+					}
+					if _, err := os.Stat(filepath.Join(destination, "metadata.tar")); !os.IsNotExist(err) {
+						t.Fatal("partial pattern flattened artifact directory")
+					}
+				}
+				// A Plan needing both members must reject the partial/empty index
+				// before restoring even the valid surviving artifact.
+				complete := map[string]NestedArchive{
+					"nvkr-a": {Member: ".nvkr/carriers/metadata.tar", Allowed: []string{".nvkr/records/value.json"}},
+					"nvkr-b": {Member: ".nvkr/carriers/other.tar", Allowed: []string{".nvkr/records/other.json"}},
+				}
+				fresh := t.TempDir()
+				assertCode(t, DownloadGitHubNested(t.Context(), request, index, fresh, complete, Options{}), e.CodeReleaseIncomplete)
+				entries, err := os.ReadDir(fresh)
+				if err != nil || len(entries) != 0 {
+					t.Fatal("incomplete selection restored output")
+				}
+				return
+			}
 			switch scenario {
 			case "success flat", "success subdirectories", "singleton subdirectory", "missing pattern":
 				if err != nil {
