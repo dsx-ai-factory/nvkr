@@ -58,8 +58,8 @@ func TestWorkflowIsDeterministicAndConfinesWritePermissionToItsOwnJob(t *testing
 		"if-no-files-found: error", "fromJSON(needs.discover.outputs.definitions)", "fromJSON(needs.select.outputs.legs)",
 		"find inputs/policies -mindepth 1 -maxdepth 1 -name '*-catalog-maintenance.yaml'", "catalog refresh --config", "jq -er --arg definition",
 		"catalog-maintenance/${DEFINITION}", "gh pr create", "GH_TOKEN: ${{ steps.app.outputs.token }}",
-		"APP_CLIENT_ID: ${{ secrets.RELEASE_BOT_CLIENT }}", "APP_PRIVATE_KEY: ${{ secrets.RELEASE_BOT_SECRET }}",
-		`permissions: {contents: "write", pull_requests: "write", workflows: "write"}`, "/installation/token", "gh pr list --head", "git/commits", "git/refs", "-ldflags '-X main.version=test -X main.commit=deadbeef'",
+		"client-id: ${{ secrets.RELEASE_BOT_CLIENT }}", "private-key: ${{ secrets.RELEASE_BOT_SECRET }}",
+		"uses: " + appTokenAction + "  # " + appTokenVersion, "permission-contents: write", "permission-pull-requests: write", "permission-workflows: write", "gh pr list --head", "git/commits", "git/refs", "-ldflags '-X main.version=test -X main.commit=deadbeef'",
 		"run local", "steps.policy.outputs.validation == 'local-run'",
 		"cache: ${{ github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal' }}",
 	} {
@@ -67,7 +67,7 @@ func TestWorkflowIsDeterministicAndConfinesWritePermissionToItsOwnJob(t *testing
 			t.Fatalf("missing %s", want)
 		}
 	}
-	for _, bad := range []string{"pull_request_target", "id-token:", "--dry-run", "--publish", "self-hosted", "SOURCE_TOKEN", "https://x-access-token", "create-github-app-token", "NVKR_PIN_BOT", "workflows: write", "secrets.GITHUB_TOKEN", "git push", "extraheader", "x-access-token", "user.name"} {
+	for _, bad := range []string{"pull_request_target", "id-token:", "--dry-run", "--publish", "self-hosted", "SOURCE_TOKEN", "https://x-access-token", "NVKR_PIN_BOT", "secrets.GITHUB_TOKEN", "git push", "extraheader", "x-access-token", "user.name"} {
 		if strings.Contains(text, bad) {
 			t.Fatalf("unexpected %s", bad)
 		}
@@ -79,10 +79,10 @@ func TestWorkflowIsDeterministicAndConfinesWritePermissionToItsOwnJob(t *testing
 		}
 	}
 	// The workflow token never writes: no job grants a write permission and nothing reads it. The App token
-	// reaches gh only as GH_TOKEN in the publish and cleanup steps, plus the revoke step.
-	if strings.Contains(text, ": write") || strings.Contains(text, "github.token") || strings.Count(text, "GH_TOKEN: ${{ steps.app.outputs.token }}") != 2 ||
-		strings.Count(text, "steps.app.outputs.token") != 4 {
-		t.Fatal("the workflow token must stay read-only and the App token must reach only the publish, cleanup and revoke steps")
+	// reaches gh only as GH_TOKEN in the bot identity, publish and cleanup steps; the action revokes it.
+	if strings.Count(text, ": write") != 3 || strings.Contains(text, "github.token") || strings.Count(text, "GH_TOKEN: ${{ steps.app.outputs.token }}") != 3 ||
+		strings.Count(text, "steps.app.outputs.token") != 3 {
+		t.Fatal("the workflow token must stay read-only and the App token must reach only the bot identity, publish and cleanup steps")
 	}
 }
 
@@ -466,7 +466,7 @@ func TestWorkflowJobsAreGatedAndConfineCredentials(t *testing.T) {
 	}
 	// Exactly one step receives the source secret, and it is the credential-free private checkout. Exactly one
 	// step receives the App secrets, as the environment of the token step.
-	appSecrets := map[string]string{"APP_CLIENT_ID": "${{ secrets.RELEASE_BOT_CLIENT }}", "APP_PRIVATE_KEY": "${{ secrets.RELEASE_BOT_SECRET }}"}
+	appSecrets := map[string]string{"client-id": "${{ secrets.RELEASE_BOT_CLIENT }}", "private-key": "${{ secrets.RELEASE_BOT_SECRET }}"}
 	var holders []string
 	for name, job := range workflow.Jobs {
 		for key, value := range job.Env {
@@ -484,6 +484,16 @@ func TestWorkflowJobsAreGatedAndConfineCredentials(t *testing.T) {
 				}
 				holders = append(holders, name+"/"+step.Name+"/"+key)
 			}
+			for key, value := range step.With {
+				input, _ := value.(string)
+				if !strings.Contains(input, "secrets.") || key == "token" {
+					continue
+				}
+				if name != "pull-request" || step.Name != "Create the App token" || appSecrets[key] != input {
+					t.Fatalf("step %q input %s references a secret: %s", step.Name, key, input)
+				}
+				holders = append(holders, name+"/"+step.Name+"/"+key)
+			}
 			if token, ok := step.With["token"]; ok {
 				if token != "${{ secrets.SOURCE_TOKEN }}" {
 					t.Fatalf("step %q passes an unexpected token: %v", step.Name, token)
@@ -496,7 +506,7 @@ func TestWorkflowJobsAreGatedAndConfineCredentials(t *testing.T) {
 		}
 	}
 	sort.Strings(holders)
-	if want := []string{"pull-request/Create the App token/APP_CLIENT_ID", "pull-request/Create the App token/APP_PRIVATE_KEY", "refresh/Fetch the private source"}; !reflect.DeepEqual(holders, want) || strings.Count(string(raw), "secrets.") != 3 {
+	if want := []string{"pull-request/Create the App token/client-id", "pull-request/Create the App token/private-key", "refresh/Fetch the private source"}; !reflect.DeepEqual(holders, want) || strings.Count(string(raw), "secrets.") != 3 {
 		t.Fatalf("each secret must reach exactly one step: %v", holders)
 	}
 	// Every checkout is credential-free; each of the default branch pins the triggering commit.
@@ -522,7 +532,7 @@ func TestWorkflowJobsAreGatedAndConfineCredentials(t *testing.T) {
 	for name, job := range workflow.Jobs {
 		for _, step := range job.Steps {
 			holds := step.Env["GH_TOKEN"] == "${{ steps.app.outputs.token }}"
-			publishes := name == "pull-request" && (step.Name == "Open or update the pull request" || step.Name == "Close the stale pull request")
+			publishes := name == "pull-request" && (step.Name == "Resolve the App bot identity" || step.Name == "Open or update the pull request" || step.Name == "Close the stale pull request")
 			if holds != publishes {
 				t.Fatalf("%s/%s: App token held=%v, want %v", name, step.Name, holds, publishes)
 			}
@@ -533,8 +543,7 @@ func TestWorkflowJobsAreGatedAndConfineCredentials(t *testing.T) {
 	for name, want := range map[string]string{
 		"Check the Definition name": "", "Check out the base commit": "${{ matrix.leg.changed }}", "Download the candidate": "${{ matrix.leg.changed }}",
 		"Apply and check the candidate patch": "${{ matrix.leg.changed }}", "Open or update the pull request": "${{ matrix.leg.changed }}",
-		"Close the stale pull request": "${{ !matrix.leg.changed }}", "Create the App token": "",
-		"Revoke the App token": "${{ always() && steps.app.outputs.token != '' }}",
+		"Close the stale pull request": "${{ !matrix.leg.changed }}", "Create the App token": "", "Resolve the App bot identity": "",
 	} {
 		if got := pullRequest.step(t, name).If; got != want {
 			t.Fatalf("step %q: if %q, want %q", name, got, want)
