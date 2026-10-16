@@ -79,7 +79,7 @@ jobs:
         uses: [[.Actions.SetupGo]]  # [[index .Versions "setup-go"]]
         with:
           go-version-file: .go-version
-          cache: ${{ github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal' }}
+          cache: false
       # Build the nvkr CLI that performs the refresh.
       - name: Build the nvkr CLI
         run: go build -trimpath -ldflags '[[.LinkerFlags]]' -o "$RUNNER_TEMP/nvkr" ./cmd/nvkr

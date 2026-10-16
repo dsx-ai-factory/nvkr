@@ -56,12 +56,15 @@ func TestGitHubLocatorSelectionAdmission(t *testing.T) {
 }
 
 func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
-	for _, scenario := range []string{"success flat", "success subdirectories", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
+	for _, scenario := range []string{"success flat", "success subdirectories", "singleton subdirectory", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
 		t.Run(scenario, func(t *testing.T) {
 			index := t.TempDir()
 			request := testRequest
 			request.Name = ""
-			selection := GitHubLocatorSelection{Pattern: "{nvkr-a,nvkr-b}", MergeMultiple: scenario != "success subdirectories"}
+			selection := GitHubLocatorSelection{Pattern: "{nvkr-a,nvkr-b}", MergeMultiple: scenario != "success subdirectories" && scenario != "singleton subdirectory"}
+			if scenario == "singleton subdirectory" {
+				selection.Pattern = "nvkr-a"
+			}
 			if scenario == "missing exact" {
 				selection = GitHubLocatorSelection{Name: "nvkr-a"}
 			}
@@ -156,16 +159,16 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			})
 			err := g.fetch(t.Context(), request, index, selection)
 			switch scenario {
-			case "success flat", "success subdirectories", "missing pattern":
+			case "success flat", "success subdirectories", "singleton subdirectory", "missing pattern":
 				if err != nil {
 					t.Fatal(err)
 				}
 				for _, name := range []string{"nvkr-a", "nvkr-b"} {
-					if scenario == "missing pattern" && name == "nvkr-b" {
+					if (scenario == "missing pattern" || scenario == "singleton subdirectory") && name == "nvkr-b" {
 						continue
 					}
 					path := filepath.Join(index, name+locatorSuffix)
-					if scenario == "success subdirectories" {
+					if scenario == "success subdirectories" || scenario == "singleton subdirectory" {
 						path = filepath.Join(index, name, name+locatorSuffix)
 					}
 					if _, err := os.ReadFile(path); err != nil {

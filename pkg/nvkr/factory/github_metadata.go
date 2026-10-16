@@ -171,17 +171,29 @@ func snapshotGitHubMetadata(ctx context.Context, artifact Artifact, carrier stri
 			result = e.Wrap(e.CodeImmutableViolation, err, "remove metadata validation snapshot")
 		}
 	}()
+	snapshot, err := os.OpenRoot(temporary)
+	if err != nil {
+		return content, e.Wrap(e.CodeBuildFailed, err, "hold metadata validation snapshot")
+	}
+	defer func() {
+		if err := snapshot.Close(); err != nil {
+			result = e.Wrap(e.CodeImmutableViolation, err, "close metadata validation snapshot")
+		}
+	}()
 	for _, entry := range content.Entries {
 		if err := githubCarrierContext(ctx); err != nil {
 			return content, err
 		}
-		location := filepath.Join(temporary, filepath.FromSlash(entry.Path))
+		location := filepath.FromSlash(entry.Path)
+		if !filepath.IsLocal(location) {
+			return content, e.New(e.CodeVerifyFailed, "metadata snapshot member escapes its root")
+		}
 		if entry.Directory {
-			err = os.MkdirAll(location, 0o700)
+			err = snapshot.MkdirAll(location, 0o700)
 		} else {
-			err = os.MkdirAll(filepath.Dir(location), 0o700)
+			err = snapshot.MkdirAll(filepath.Dir(location), 0o700)
 			if err == nil {
-				err = os.WriteFile(location, []byte(entry.Text), 0o600)
+				err = snapshot.WriteFile(location, []byte(entry.Text), 0o600)
 			}
 		}
 		if err != nil {

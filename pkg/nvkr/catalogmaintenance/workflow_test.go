@@ -61,7 +61,7 @@ func TestWorkflowIsDeterministicAndConfinesWritePermissionToItsOwnJob(t *testing
 		"client-id: ${{ secrets.RELEASE_BOT_CLIENT }}", "private-key: ${{ secrets.RELEASE_BOT_SECRET }}",
 		"uses: " + appTokenAction + "  # " + appTokenVersion, "permission-contents: write", "permission-pull-requests: write", "permission-workflows: write", "gh pr list --head", "git/commits", "git/refs", "-ldflags '-X main.version=test -X main.commit=deadbeef'",
 		"run local", "steps.policy.outputs.validation == 'local-run'",
-		"cache: ${{ github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal' }}",
+		"cache: false",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %s", want)

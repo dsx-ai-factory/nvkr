@@ -164,7 +164,7 @@ generated producer would attempt to repair.
 The operator-trusted ARC policy explicitly accepts this bootstrap: changing a host-backed/shared device
 to mode 0666 can affect access outside the runner job. It does not establish SLSA Build L3 isolation or
 upgrade the evidence lane. Provisioning the correct numeric device group on runners avoids the mutation.
-The generated bootstrap has not yet completed a real full build; see [reconciliation](adr/reconciliation.md)
+The generated bootstrap has not yet completed a real full build; see [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md)
 for the separately observed NVKE bootstrap and the remaining NVKR acceptance evidence.
 
 The per-output pipeline gives each remaining payload transfer a specific purpose:

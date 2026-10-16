@@ -159,7 +159,14 @@ func TestGitHubDownloadRejectsInvalidContextAndMalformedIndexBeforeNetwork(t *te
 			code := e.CodeVerifyFailed
 			switch scenario {
 			case "empty token":
-				options.Token, index, code = "", "/missing-index", e.CodeTrustPolicyMissing
+				options.Token, code = "", e.CodeTrustPolicyMissing
+				// Metadata needs no token; a validated private locator must still
+				// reject missing credentials before any network or output work.
+				raw, err := canonical.Marshal(githubAdapterLocator(request))
+				if err != nil {
+					t.Fatal(err)
+				}
+				writePayload(t, index, request.Name+locatorSuffix, string(raw), 0o600)
 			case "invalid run":
 				request.RunID, index, code = "00", "/missing-index", e.CodeUsage
 			case "canceled":

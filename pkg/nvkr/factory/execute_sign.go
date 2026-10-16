@@ -213,7 +213,7 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if signer == nil {
 		return e.New(e.CodeInternal, "factory sign node %q resolved no signing adapter", node.ID)
 	}
-	if metadataOnly {
+	if metadataOnly && signing.Mode == SigningModeCosign {
 		if err := verifyMetadataSBOMs(ctx, signer, layoutArtifact.Path, inspection); err != nil {
 			return err
 		}

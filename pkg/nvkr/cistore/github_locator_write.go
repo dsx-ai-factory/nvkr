@@ -26,7 +26,7 @@ func writeGitHubLocatorSet(ctx context.Context, index string, directory *os.File
 	if !os.SameFile(info, currentInfo) || readErr != io.EOF || len(entries) != 0 || closeErr != nil {
 		return e.New(e.CodeImmutableViolation, "CI locator index changed before publication")
 	}
-	flat := selection.Name != "" || selection.MergeMultiple || len(locators) == 1
+	flat := selection.Name != "" || selection.MergeMultiple
 	committed := make([]string, 0, len(locators))
 	defer func() {
 		if result == nil {

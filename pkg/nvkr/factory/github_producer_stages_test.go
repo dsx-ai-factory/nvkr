@@ -121,8 +121,19 @@ func TestGitHubProducerStagePreservesSignedWorkflowBoundaries(t *testing.T) {
 		kinds[node.Kind]++
 		expected = append(expected, githubJobID(node.ID))
 		for _, output := range node.Outputs {
-			if !testActionRefs(t, plan).stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
-				t.Fatalf("co-location dropped exact output carrier %q", output)
+			if testActionRefs(t, plan).stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
+				continue
+			}
+			// Local-only intermediates stay on this producer. Every external
+			// consumer and finalizer must still receive its exact carrier.
+			_, artifacts := planIndex(plan)
+			if finalizerArtifact(plan, artifacts[output]) {
+				t.Fatalf("co-location dropped finalizer carrier %q", output)
+			}
+			for _, consumer := range plan.Graph.Nodes {
+				if containsString(consumer.Inputs, output) && jobs[consumer.ID] != stage.ID {
+					t.Fatalf("co-location dropped external input %q for %s", output, consumer.ID)
+				}
 			}
 		}
 	}

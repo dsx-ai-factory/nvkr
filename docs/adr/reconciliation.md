@@ -1308,6 +1308,15 @@ operator's request. Go compilation for macOS and Linux amd64/arm64, vet, lint, f
 Actionlint, YAML lint, shellcheck, license and formatting checks passed; the vulnerability scan found no
 vulnerabilities. Full hosted acceptance and an attachment audit of the new format remain unproved.
 
+PR #196 follow-up confines metadata validation-snapshot writes through an `os.Root` handle in addition
+to lexical path admission. Pattern downloads retain their artifact subdirectory even for a single match;
+dry-run signing does not request cryptographic SBOM verification. Catalog refresh disables Go caches
+unconditionally, including private repositories. Stale fixture paths and carrier/token assertions are
+updated for consumed preparations, local-only payloads and metadata-only downloads. Local unit suites
+remain skipped at the operator's request; hosted checks must confirm these corrections. The initial
+registry pull retains ADR-20's thirty-minute default deadline when the caller supplies none; the review
+suggestion to leave the initial attempt unbounded is not adopted.
+
 For Run 38867619968, the plain ARM64 prepared-payload attachment (`12032867746`) was a 568-byte ZIP
 containing one 527-byte canonical locator for a 3,250,255,360-byte private archive. Its provider ZIP SHA-256
 `8346896ddd5dba69678d6e0773478a0ecee60bb12bd4d9b32b26dadb90387557`, exact Run/head/attempt and

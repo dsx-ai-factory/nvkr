@@ -65,7 +65,9 @@ func TestHostedPublicationPrivacyUsesExactMetadataRepositoriesWithoutPayloads(t 
 	t.Setenv(githubRepositoryTokenEnv, "source-repository-credential")
 	t.Setenv("NVKR_CREDENTIAL", "publisher-credential")
 	output := plan.LifecycleOutputs[0]
-	source := artifacts["package/"+outputPublicationPackage(output.Name)].Path
+	payload := artifacts["package/"+outputPublicationPackage(output.Name)]
+	// Completion moves the preparation to the full publication layout.
+	source := filepath.Join(".nvkr", "factory", "packages", payload.Name)
 	metadata := filepath.Join(t.TempDir(), "metadata")
 	result, err := delivery.ExportMetadata(t.Context(), source, metadata)
 	if err != nil {
