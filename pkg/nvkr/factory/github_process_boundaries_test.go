@@ -96,6 +96,9 @@ PY
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
+			// The Python probe checks before compilation; this one checks after the
+			// supervisor returns, including the invalid-result path. An absent PID
+			// or zombie cannot race cache cleanup; execution or a probe error fails.
 			probe := exec.CommandContext(ctx, ps, "-o", "stat=", "-p", strings.TrimSpace(string(pidBytes)))
 			var probeStderr bytes.Buffer
 			probe.Stderr = &probeStderr

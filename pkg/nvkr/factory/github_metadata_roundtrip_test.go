@@ -85,6 +85,28 @@ func roundtripProducedGitHubMetadata(t *testing.T, plan *Plan, artifact Artifact
 	}
 }
 
+func TestUploadGitHubCarrierCanceledBeforeAdmission(t *testing.T) {
+	root, output, snapshots := t.TempDir(), t.TempDir(), t.TempDir()
+	t.Setenv("TMPDIR", snapshots)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	// Cancellation must win before Plan admission or reading a nonexistent carrier.
+	record, err := UploadGitHubCarrier(ctx, nil, cistore.GitHubUpload{
+		Request: cistore.Request{Repository: "example/nvkr", RunID: "12345", Attempt: "1", Name: "nvkr-metadata"},
+		Root:    root, Paths: "missing.tar", OutputDirectory: output, IfNoFilesFound: "error",
+	})
+	assertFactoryErrorCode(t, err, e.CodeTimeout)
+	if record != "" {
+		t.Fatalf("canceled upload returned locator %q", record)
+	}
+	for _, directory := range []string{root, output, snapshots} {
+		entries, err := os.ReadDir(directory)
+		if err != nil || len(entries) != 0 {
+			t.Fatalf("canceled upload changed %s: %v %v", directory, entries, err)
+		}
+	}
+}
+
 func TestGitHubMetadataProducedControlsRoundtrip(t *testing.T) {
 	plan, artifacts, _ := referenceMetadataFixture(t)
 	output := plan.LifecycleOutputs[0].Name
