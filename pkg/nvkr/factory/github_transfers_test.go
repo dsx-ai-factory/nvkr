@@ -107,6 +107,7 @@ func TestGitHubInternalDiskWrapperHasNoArchiveOrUpload(t *testing.T) {
 			}
 			// No wrapper exists on disk: an unnecessary packaging copy would fail.
 			t.Chdir(t.TempDir())
+			setDevelopmentRun(t)
 			if err := PackGitHubOutputs(t.Context(), plan, wrapper, GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
 				t.Fatal(err)
 			}

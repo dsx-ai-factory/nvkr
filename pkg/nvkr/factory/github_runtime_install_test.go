@@ -132,11 +132,7 @@ func TestInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T)
 					}
 				}
 				prior := githubRuntimeTree(t, root)
-				want := e.CodePipelineDrift
-				if member == "plan.json" && damage == "corrupt" {
-					want = e.CodeEngineCapability
-				}
-				assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(t.Context(), before, root), want)
+				assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(t.Context(), before, root), e.CodePipelineDrift)
 				if !reflect.DeepEqual(prior, githubRuntimeTree(t, root)) {
 					t.Fatal("rejected handoff changed existing files")
 				}
