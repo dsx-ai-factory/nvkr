@@ -13,26 +13,26 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 )
 
-// Exercise the generated stage's ownership handoff and outgoing carrier with
-// synthetic signer evidence. This does not exercise GitHub or cryptography.
-func TestAttestedPublicationTransportConsumesPreparedInput(t *testing.T) {
+// Exercise the metadata-only stage and outgoing carrier with synthetic signer
+// evidence. This does not exercise GitHub or cryptography.
+func TestAttestedEvidenceTransportExcludesPreparedPayload(t *testing.T) {
 	plan, artifacts, _ := referenceMetadataFixture(t)
 	nodes, _ := planIndex(plan)
 	for _, output := range plan.LifecycleOutputs {
 		t.Run(output.Name, func(t *testing.T) {
 			node := nodes[NodeAttestEvidence+"/"+outputPublicationRoute(output.Name)]
-			input, err := signNodeInput(node, artifacts, PackageOCI)
+			input, err := signNodeInput(node, artifacts, ArtifactPreparedEvidenceMetadata)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := os.Lstat(input.Path); !os.IsNotExist(err) {
-				t.Fatalf("prepared input remains after attestation: %v", err)
+			if _, err := os.Lstat(input.Path); err != nil {
+				t.Fatalf("prepared metadata was consumed during attestation: %v", err)
 			}
-			final, err := signNodeOutput(node, artifacts, PackageOCI)
+			final, err := signNodeOutput(node, artifacts, ArtifactAttestedEvidenceMetadata)
 			if err != nil {
 				t.Fatal(err)
 			}
-			before, err := delivery.Inspect(t.Context(), final.Path)
+			before, err := delivery.InspectMetadata(t.Context(), final.Path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -43,7 +43,7 @@ func TestAttestedPublicationTransportConsumesPreparedInput(t *testing.T) {
 			if err := transportarchive.Unpack(t.Context(), carrierPath(final.ID), destination, []string{final.Path}); err != nil {
 				t.Fatal(err)
 			}
-			after, err := delivery.Inspect(t.Context(), filepath.Join(destination, final.Path))
+			after, err := delivery.InspectMetadata(t.Context(), filepath.Join(destination, final.Path))
 			if err != nil {
 				t.Fatal(err)
 			}

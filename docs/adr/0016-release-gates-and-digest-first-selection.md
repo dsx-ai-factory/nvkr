@@ -230,11 +230,20 @@ The native MVP uses one fixed same-repository reusable GitHub Actions smoke work
 qualifier's exact commit. The existing `run generate --qualification-policy` operation emits this worker
 and the qualifier alongside the producer workflow; the worker is generated infrastructure, not a separately
 authored operator workflow. The independent policy selects native Linux AMD64/ARM64 image pins and fixed
-nvkectl, Helm or kubectl version profiles by exact component name. Every delivered executable member must be exercised;
-expected versions and nvkectl source stamps come from A's frozen Plan. OCI/APT non-tool scope requires an
+nvkectl, Helm, kubectl, Kind, clusterctl or ORAS version profiles by exact component name. Every delivered executable member must be exercised;
+expected versions and source stamps come from A's frozen Plan. Kind uses its quiet version response;
+clusterctl and ORAS additionally require the exact source commit, clean tree and native platform in
+their responses. A profile cannot substitute usage text or unsuccessful execution for a version check.
+OCI/APT non-tool scope requires an
 exact named output, kind, component set and deployment-image/package-repository role. It does not assert
-that those artifacts contain no tools. Disk and Helm use the explicit non-tool format rule. One pure
-lifecycle admission operation joins the frozen Plan and smoke policy before generation and runtime bundle
+that those artifacts contain no tools. Disk and Helm use the explicit non-tool format rule. An explicit
+member rule may select a source-built tarball as a `runtime-assets-archive` by exact output and member
+name inside a mixed executable bundle. Its delivered mode must be non-executable, its bytes remain
+covered by A's complete artifact checks, and at least one sibling tool must still be exercised. This
+rule makes no claim about executables embedded inside the archive and does not waive archive or
+provenance checks. The full policy binds the rule; missing, extra, duplicate or tool-overlapping
+member rules fail admission. The rule cannot classify a host-package producer as an archive.
+A pure lifecycle admission operation joins the frozen Plan and smoke policy before generation and runtime bundle
 reads. It rejects missing or extra tool profiles, non-tool membership and native execution images, and
 validates expected versions/source stamps. Generated workers cover exactly the selected executable
 platforms; the final AMD64 signer additionally requires its independently pinned cosign executable.
@@ -343,6 +352,208 @@ gated on reproduction. Unattended merge requires separate security authorization
 rerun behavior and revocation; ADR-04 owns explicit consumer scopes. An artifact-publication verification result
 does not establish full-release acceptance. Reconciliation owns implementation and external-acceptance status;
 the approved scope and these contracts do not establish milestone completion or organizational ratification.
+
+### Local qualification rehearsal — implementation in progress
+
+The user-requested local NVKE demo must exercise the complete M3 build/evidence flow on its
+actual locally built outputs: artifact/input checks, separate build signatures and provenance,
+isolated delivered-tool smoke, independently signed qualification evidence, publication/read-back,
+independent consumer verification and controlled negative cases. A smoke-only or unsigned diagnostic
+does not satisfy this request. This local rehearsal remains `unqualified-local-execution`; it cannot
+claim GitHub default-branch execution, OIDC identity, organizational approval or qualified reproduction.
+Hosted M3 acceptance still requires the provider exercises above.
+
+The local source owner must bind the completed immutable attempt, original Plan/input closure and
+every selected named output to independently re-opened and measured payloads. Caller-provided paths,
+digests and a serialized successful Run are descriptions, never receipts. A missing, substituted or
+partially committed attempt fails before signing. Rehearsal admission must cover all selected formats
+and smoke profiles before starting the build or publication; it cannot silently omit unsupported tools.
+
+Retained disk capture rechecks the exact compiled producer and saved Run subject against observed bytes, admits disk-backed
+scratch headroom, and copies into the existing standard OCI disk transport. A held descriptor owns
+the private snapshot after temporary paths are removed; each stream rechecks size and digest, and
+closure revokes shared handles. The snapshot supplies transport integrity only. It does not restore
+successful execution, material provenance or signing authority from the retained Run description.
+The live disk producer retains its result in memory, so later capture must not require a producer-result
+file that execution never persists. Capture measures the committed delivery file against the original
+Run's disk subject and compiled producer; complete material-export validation remains mandatory before
+signing. Neither saved description is an execution receipt.
+For local transport, that held disk can export a standard OCI layout without reopening producer
+paths. Export rechecks the standard wrapper identity and exact held payload stream, holds the owner
+through the no-replace layout transaction, and preserves manifest and raw payload digests separately.
+The caller admits disk capacity. This does not enable the scheduler's unsupported disk publication
+graph or grant hosted publication authority.
+The standalone disk registry adapter publishes the standard wrapper by manifest digest without tags.
+It exports held bytes into caller-admitted scratch before upload. Pull requires a canonical digest
+reference, expected platform and payload bound, checks metadata and the standard wrapper before payload
+transfer, bounds the stream and rechecks the full artifact before committing its layout. Both operations
+inherit caller cancellation with a 30-minute maximum. An upload error may leave registry blobs; the
+adapter reports the attempted immutable reference. This transport remains separate from release signing.
+
+Input-capturing local execution retains disk material descriptions before releasing the original
+factory Run. The `nvkr.dev/local-disk-materials/v1` export comes only from that live Run's observed
+producer-consumption graph and binds the named output, Plan, Build and disk bytes. Its sorted members
+and edges describe staged producer outputs and the exact consumed manifest identities. Network-enabled
+builds remain explicit, and coverage excludes private source vendoring and guest/network acquisitions.
+Lifecycle stores the bounded exports in an immutable `nvkr.dev/local-run-materials/v1` envelope bound
+to the attempt and Plan. Missing observations, cancellation or retention failure prevents a complete Run.
+These records preserve descriptions for later verification and signing; decoding them cannot recreate
+the live consumption receipt, and they do not authenticate production or authorize qualification.
+
+Use explicitly independent local build, smoke and qualification signing keys with an independently
+selected verifier policy. Local public-key authentication must use an explicit local evidence schema
+and origin, never fabricated GitHub responses, workflow environment or certificate claims. Reuse
+the existing canonical identity, packaging, version evaluation and isolated runtime owners. Keep
+provider admission separate from those common checks. Local receipts must be distinct from hosted
+receipts and cannot be passed to the hosted qualification publisher. The local smoke process receives
+neither build nor qualification keys or registry credentials.
+
+The local policy uses `nvkr.dev/local-qualification-policy/v1`, the explicit local unqualified lane,
+exact Definition/Environment/Plan identities, one native Linux platform, a pinned cosign executable,
+three distinct public keys and complete shared smoke scope. It rejects hosted worker identities.
+Its digest uses the existing qualification-policy family with this distinct schema, normalized public
+keys and sorted scope sets. Role assignment changes identity. Loading the bounded JSON document
+rejects duplicate or unknown fields and trailing documents; no candidate record supplies trust defaults.
+Policy validation and matching a Plan are descriptive admission, not artifact or signing receipts.
+
+The local build-evidence document uses `nvkr.dev/local-build-evidence/v1` with origin
+`retained-local-run` and the unqualified lane. It binds the independent policy identity, original
+attempt/input identities, content subject, every named output and its transport identity. Exact-byte
+digest/size references identify the accompanying compiler-read closure, original Plan and Run, and
+disk-material envelope where applicable. The Plan retains source, toolchain, acquisition, patch and
+configuration bindings; consumers must replay its referenced compiler inputs rather than trust those
+descriptions alone. Raw blob hashes supply transport integrity only. Preparation requires still-open
+captured payload owners and emits bounded canonical bytes, not a signing or execution receipt. Builder
+signing, complete attachment transport and independent verification remain separate required operations.
+
+Local execution hands the captured compiler closure to factory as descriptive bytes. Factory replays
+it against the executing Plan, establishes workspace ownership, then commits the snapshot without
+replacement before runner preparation or producers. Lifecycle does not populate an unowned factory
+directory. A failed or interrupted retention cannot authorize execution or reuse of a lifecycle attempt.
+
+Local native smoke uses a separate `nvkr.dev/local-tool-smoke/v1` report bound to exact signed
+build-evidence bytes, independent policy and the observed native runtime. It covers every selected
+tool through the shared fixed-profile executor and evaluator; nonnative members cannot be omitted.
+A process-local receipt is issued only after all checks and runtime cleanup succeed. It borrows the
+verified build lifetime: closing that build cancels and joins active smoke before releasing payloads,
+and revokes later use of the receipt. Serialized reports do not restore execution authority. Smoke-key
+signing and independent complete-report authentication remain required before qualification signing.
+The smoke signer admits only the live execution receipt and the policy's smoke key; the verifier
+accepts only bounded canonical reports with exact source, policy, native platform, runtime and member
+bindings. Authenticated reports receive a distinct borrowed owner, never a reconstructed execution
+receipt. Both signing and verification participate in build-owner cancellation and joining.
+
+NICoSim version smoke admits two explicit profiles. `nicosim-version-json` requires an unpatched
+source build and a `clean` tree stamp; `nicosim-patched-version-json` requires declared source patches
+and a `patched` tree stamp. Both execute only `version --output=json` and compare version, full source
+commit and native platform with the frozen Plan. The tree stamp is a consistency check, not patch
+authentication: the source owner authenticates the ordered patch bytes and resulting source inputs.
+Unknown or dirty tree stamps cannot satisfy either profile.
+
+Executable bundles may contain `raw` or `host-package` tool producers. Both require executable delivered
+mode and native ELF validation; a raw declaration alone proves neither. The NVKE CLI profile accepts a
+commit version only when the normalized producer version is its exact full source commit and its version
+stamp matches that commit without a prefix. Release versions retain their exact `v`-prefixed expectation.
+
+The local qualification gate uses `nvkr.dev/local-qualification-evidence/v1`, gate version
+`local-m3-v1`, and the unqualified lane. It binds the content subject, attempt, independent policy
+and exact-byte references to the build document/signature and smoke document/signature. Only live
+independently verified build and smoke owners for the same captured source may reach the qualifier
+key. Verification recomputes those references and accepts only the qualifier key; a builder or smoke
+signature is not qualification authority. Closing either borrowed source revokes later use. The
+signed gate document is not end-to-end success until required publication and independent read-back
+complete, and never upgrades the evidence lane to qualified reproduction.
+
+The verified local gate retains the exact qualifier signature for transport. Its evidence export
+requires live borrowed owners and emits defensive copies of all three documents and signatures,
+the original Plan, Run and compiler-read closure, and disk materials when present. These exported
+bytes carry no process-local authority. Publication must also carry every payload, and a fresh
+consumer must independently authenticate the complete handoff against its own policy.
+The retained-attempt consumer admits a bounded exact evidence file set, authenticates each signing
+role, replays inputs and captures payloads through its own build owner, then compares every transported
+metadata byte to the verified set. It accepts no producer receipts or signing keys. A failed phase
+closes all acquired owners; successful consumers own their snapshots independently of the producer.
+This retained-file operation makes no registry read-back claim.
+The layout consumer instead accepts the evidence file set, one ordinary OCI closure and exact named
+disk layouts. It authenticates the builder statement before layout I/O, replays the same bounded compiler
+inputs without a producer workspace, checks every layout against the signed transport identities, and
+reconstructs the exact build statement before smoke and qualification verification. Missing or extra
+locators fail admission; any later failure closes acquired owners. Imported disk owners retain their
+checked inode and rehash subsequent streams. Layout verification alone does not prove registry transport.
+The evidence-only carrier uses canonical `nvkr.dev/local-evidence-bundle/v1` JSON with exact file
+bytes, bounded to 128 MiB. The writer stages beneath a held destination parent, syncs the protected
+file, publishes without replacement and syncs the parent. A post-publication durability error reports
+the surviving destination rather than claiming success. Readers reject linked files and noncanonical
+or incomplete envelopes; decoding supplies bytes only, which still require independent authentication.
+Payload transport remains separate from this evidence carrier.
+Registry evidence transport carries the envelope as one bounded OCI document layer with config and
+layer media type `application/vnd.nvkr.local-evidence-bundle.v1+json`. It publishes only a digest
+reference, never a discovery tag. Download checks the requested digest, family, single-layer membership,
+size and exact reconstructed wrapper before returning bytes; operations inherit cancellation with a
+five-minute maximum. The local gate owner remains live through upload. An attempted immutable reference
+is retained on upload failure because remote bytes may survive. Downloaded envelopes remain descriptions
+until the independent consumer verifies their signatures, inputs and complete payload set.
+The local publication owner admits canonical repositories, registry options, the actual pinned consumer
+verifier and disk-backed scratch headroom before upload. Capacity observation includes three copies of
+held payload bytes plus metadata headroom; it does not reserve storage. Under the source owner's joined
+lifetime and a two-hour limit, it publishes ordinary outputs, sorted named disks and evidence, downloads
+the complete set, and opens the independent layout consumer. Success requires consumer verification and
+scratch cleanup. Failure reports attempted immutable references without acceptance; remote artifacts are
+not rolled back. The returned consumer owns its imported payloads independently of temporary paths.
+
+All required checks and smoke observations must pass before qualification signing. Attachment failure
+leaves the rehearsal unsuccessful and reports any surviving attachments. The independent consumer
+must verify exact complete-set membership and all required signatures, provenance and qualification
+evidence against the selected keys; signatures alone do not authenticate the inputs or payloads.
+Negative demonstrations use separate attempt-owned scratch publications, preserve the successful
+candidate, assert specific coded refusals and prove no qualification evidence was issued after a
+failed check. Disk evidence remains producer-only, and external runtime suites remain outside M3 MVP.
+
+`run qualify-local` delegates to `lifecycle.QualifyLocalRun` for a completed captured attempt. The owning
+operation admits the policy, native platform and distinct private keys, signs checked build evidence,
+executes smoke, verifies both signed reports, retains a new evidence envelope, and invokes publication
+with independent read-back. Private keys are explicitly read with bounds and never passed to the smoke
+runtime. Canonical `nvkr.dev/local-qualification-result/v1` output reports the local lane, status and
+attempted references, including failures. All owners must close successfully before `passed` is reported.
+It runs without tenant provisioning. When the demo explicitly configures complete local qualification,
+its build adapter invokes this command on the newly built attempt before returning deployment inputs.
+Before producers execute, `lifecycle.PreflightLocalQualification` validates the complete prepared Plan,
+independent policy, registry destinations, evidence destination and preliminary disk-backed scratch,
+then authenticates each private key against its policy role with fixed non-artifact challenges through
+the pinned cosign owner. It publishes nothing and issues no reusable receipt. The final operation repeats
+admission and checks capacity against the actual payloads. Runtime/registry availability and storage
+reservation are not established by this preflight.
+The demo's explicit prepared-build mode allows policy authoring after bootstrap/toolchain selection.
+It requires a new producer Run destination and an explicit policy, validates the fixed prepared
+invocation, and recompiles current inputs through the same executable before policy admission.
+Stored previews and bootstrap paths confer no authority; final qualification still checks the
+execution's captured inputs. This is a prepare/execute split, not general Run resumption.
+The downstream demo may automate preparation and local setup through an explicit `qualifyLocal`
+opt-in on a fresh build or e2e invocation. It rejects combination with prepared or caller-authored trust
+settings. It owns the registry through independent read-back and attempts bounded shutdown on success,
+failure and cancellation before returning deployment inputs; shutdown failure blocks handoff. It retains
+private files and registry data, while registry references are offline after shutdown. Explicit setup for a
+prepared attempt remains available for operators who need a longer-lived registry. Setup selects a maintained,
+independently authored complete demo scope, generates three distinct local keys, and binds a new public
+policy to the prepared input identities. It must not infer smoke exemptions or trusted signer identities
+from candidate artifacts. These keys represent one local operator's disposable trust, not independent
+organizational actors. Recompilation, complete-scope admission and private-key preflight remain mandatory;
+setup descriptions confer no signing or execution receipt. A fresh private directory owns the pinned
+cosign download, keys, policy, scratch, diagnostics and disk-backed registry data. The registry binds only
+loopback, uses a pinned image and a dynamic port, and remains available for consumer read-back. Explicit
+stop checks exact container ownership, image, mount and network configuration and retains data and evidence.
+Existing trust and setup directories cannot be overwritten. Failure after registry startup attempts bounded
+owned cleanup; interruption or cleanup failure never establishes readiness. Full qualification repeats the
+existing admission and verification, and no generated setup file upgrades the unqualified local lane.
+The owned child must exit successfully and report the exact attempt, local lane and passed status;
+decoding a successful result cannot replace successful process completion. The demo retains a separate
+diagnostic transcript, reserving its destination before child execution without overwriting previous
+bytes. An interruption may leave an empty diagnostic file, which does not establish success and
+prevents reuse of the attempt's transcript. This workflow gate grants no durable receipt
+or deployment qualification; the downstream deployment consumer still checks its inputs independently.
+Interrupted runs, reused evidence destinations,
+cancellation and cleanup failures must fail closed. Reconciliation owns the implementation and live
+verification status; command availability does not establish a successful full NVKE rehearsal.
 
 ### 6. Passive external qualification handoff — deferred producer protocol
 

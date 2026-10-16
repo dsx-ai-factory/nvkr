@@ -14,6 +14,26 @@ ordinary generated M2 workflow retains its default paths; named bundles use the
 existing generator and manifest owner. The coordinator is authored separately.
 The daily trigger is retained as explicitly requested by the user.
 
+Binary carriers, source handoffs, OCI images, charts and disks use private CI storage under
+`ghcr.io/dsx-ai-factory/nvkr/ci-artifacts`; Actions retain only their small location-and-digest records.
+The existing NVKR helper owns this transport. Uploads and downloads check package visibility and its
+repository association; any link or public/unknown access policy stops the transfer. A failed private transfer never
+falls back to uploading the payload to Actions. Final release artifacts retain the profile-owned nightly
+publication prefixes below the Environment's configured registry path.
+Their GHCR destination packages receive private/internal visibility checks and reject public or unknown repository links
+using the publication credential before product uploads; the checked metadata root binds the actual push.
+
+Configure dedicated `NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN` secrets with access
+only to the unlinked private/internal CI package. Set repository variables `NVKR_CI_STORAGE_READ_USER`
+and `NVKR_CI_STORAGE_WRITE_USER` to the corresponding token owners. Transfer never falls back to the workflow token. The
+nightly consumer and qualification reader receive only the read credential. Before making NVKR public,
+verify independent package grants and actual anonymous, unrelated-user and fork access behavior.
+Previously retained binary Actions artifacts, caches, active runs and old workflow refs require separate
+handling; none is migrated or deleted by generation. Private transport contracts do not establish a
+successful hosted transfer or public-repository readiness. Provider locator retention does not expire
+private carrier blobs; registry retention is separate. The public runtime attachment contains the constructed
+`cycle.json` summary only; raw suite reports are not attached.
+
 Both nightly Environments opt into runtime Plan preparation. Each producer's first bootstrap reads the
 current catalog pins from that dispatch's exact repository commit and freezes fresh Plan data. Other
 helper bootstraps restore the same data and verify it against those inputs; every producer job and the

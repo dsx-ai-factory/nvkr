@@ -140,7 +140,11 @@ current pinned inputs and distributes its exact data through same-Run helper art
 invocation data plus the derived manifest may change; every workflow/action byte, member path,
 Environment digest and authored input path stays fixed. Source-version updates within that contract need
 no regeneration commit. `--runtime --check` validates that contract without writes; ordinary `--check`
-still compares the complete current bundle. ADR-18 owns bootstrap ordering and transport. Neither an
+still compares the complete current bundle. Secondary bootstraps restore the three runtime JSON files into
+a fresh staging directory, then admit their exact rendered bytes and current authored selection against
+the complete committed baseline. The generation owner installs the admitted bundle using its existing
+lock, per-file atomic replacement and manifest-last semantics; this is not an atomic directory transaction.
+Private transport never overwrites checked-out files. ADR-18 owns bootstrap ordering and transport. Neither an
 unchanged workflow nor runtime compilation establishes execution or publication acceptance.
 
 Same-input determinism and edit locality are separate contracts. Adding an independent named output must

@@ -92,11 +92,134 @@ inputs and regenerate instead of editing generated files.
 Named production Environments can opt into `githubRuntimePlan: true`. Generate their initial complete
 bundle normally. On each dispatch the first bootstrap compiles the repository's current catalog pins
 with `run generate --runtime`, freezes the resulting Plan, and carries that exact data to every job.
+Secondary helper bootstraps restore the three JSON files into fresh staging, validate them against the
+committed bundle and current authored inputs, then install them through the generated-file writer.
 Routine source-version updates therefore do not require a regenerated bundle commit. CI uses the same
 inputs with `--runtime --check`: it checks baseline integrity and unchanged workflow/action bytes,
 membership and Environment policy without writing files. Changes outside that contract require normal
 regeneration and review. This mode neither follows floating upstream versions nor changes the default
 or development bundle contract; ordinary `--check` remains a complete byte comparison.
+
+Generated GitHub transfers keep validated metadata in Actions artifacts using the workflow identity.
+Provenance, SBOMs, signing/verification records and control layouts must pass their exact schemas and
+complete file inventories; metadata layouts cannot contain output payload blobs. Their exact bytes and
+Run bindings remain verified. Binaries, tools, source archives, unknown/mixed contents and raw diagnostics
+use private/internal `ghcr.io/<owner>/<repository>/ci-artifacts` storage. Configure separate repository secrets
+`NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN` with access only to that private/internal
+storage package, plus repository variables `NVKR_CI_STORAGE_READ_USER` and `NVKR_CI_STORAGE_WRITE_USER`
+for the corresponding token owners. The package must have no linked repository; public, unknown, inaccessible or linked
+policy fails closed. A missing package can receive a metadata-only seed before the same checks are repeated.
+There is no repository-token or public Actions payload fallback. The repository token separately authenticates
+repository metadata; storage credentials belong only to transfer operations and do not add package permissions
+to build jobs. Producer commands do not receive them.
+
+The Go transport stores ordered chunks no larger than 1 GiB. Single-file uploads stream deterministic archive
+framing around the held carrier, without another full archive on disk. Downloads extract directly from the
+ordered chunks into private staging and verify each chunk, the complete archive, exact size and source EOF
+before exposing restored files. The v2 locator format replaces the unshipped single-layer draft; old v1
+locators require a new run. Final hosted GHCR publication separately checks every destination package with
+its publication credential and binds the push to the inspected metadata root. Provider locator retention
+does not expire private carrier blobs; configure registry retention separately.
+
+Downloads can restart an incomplete extraction for a narrowly identified transient body-read failure,
+with at most three attempts under the original deadline. Each retry closes the failed response, removes
+its private staging and rechecks the entire archive from fresh responses; it adds no archive copy.
+Invalid bytes, unsafe archive entries, filesystem or cleanup failures stop immediately. Publication and
+destination replacement are outside the retry boundary. Error reports include only a fixed category,
+chunk number and byte counts, keeping provider URLs and response bodies out of logs.
+
+Before making the source public, verify hidden package grants and anonymous, unrelated-user and fork access
+for storage, toolchain and release packages. Previously retained Actions artifacts, caches, active runs and
+old workflow refs also require separate handling; this change does not migrate or delete historical payloads.
+Compiled-output caches and CodeQL database uploads are disabled. Candidate OS builds retain private files
+only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
+The nightly coordinator attaches its constructed cycle summary; raw suite report files are not public artifacts.
+
+Generated workflows admit at most 2,000 record uploads per attempt, including conditional diagnostic and
+finalization uploads. The helper looks up exact selected names and fetches their record ZIPs serially,
+with bounded, cancellable waits for GitHub rate limits. Exact-name discovery avoids truncating a growing
+inventory at a fixed page count. Each ZIP must match its provider digest and contain one bounded canonical
+record for the selected Run and attempt. Public metadata is limited to 4,096 entries, 8 MiB per file,
+16 MiB total text and 32 MiB encoded JSON; the complete downloaded index is capped at 128 MiB.
+Oversized or invalid metadata fails closed. Metadata-only transfers need no registry token or package API
+checks. Private payload restoration follows its existing checks. The
+generator rejects larger bundles before writing them; signed development retries require a fresh complete Run.
+
+The generator rejects workflows above 500,000 bytes or 50,000 expanded YAML parsing events. YAML aliases
+reduce file size but do not reduce the parser's expanded count. Maintained rendering tests reserve five
+percent headroom. Compatible offline observation, SBOM and packaging steps share their producer job;
+signing, publication and remote verification keep separate jobs and permissions. Payloads consumed only
+inside their producing job are not packed or uploaded unless finalization needs them. This avoids shipping
+an intermediate disk package as well as its prepared publication layout.
+
+Native disk producers prepare access to `/dev/kvm` before checkout or helper/input downloads. Missing,
+symlink and non-character devices fail immediately. If the runner cannot open the device read/write, one
+fixed noninteractive `sudo chmod 0666 /dev/kvm` attempt runs under a fifteen-second timeout and five-second
+kill grace. A failed change or subsequent open rejects the job; an already-accessible device is unchanged.
+Full native capacity and held KVM API admission still occurs in the helper with the same producer identity.
+Finalizers placed on ARC for disk retention do not use KVM and omit this step. The separately authored
+OS-validation preflight remains read-only and can therefore report an inaccessible baseline that the
+generated producer would attempt to repair.
+
+The operator-trusted ARC policy explicitly accepts this bootstrap: changing a host-backed/shared device
+to mode 0666 can affect access outside the runner job. It does not establish SLSA Build L3 isolation or
+upgrade the evidence lane. Provisioning the correct numeric device group on runners avoids the mutation.
+The generated bootstrap has not yet completed a real full build; see [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md)
+for the separately observed NVKE bootstrap and the remaining NVKR acceptance evidence.
+
+The per-output pipeline gives each remaining payload transfer a specific purpose:
+
+| Handoff | Bytes moved | Purpose |
+|---|---|---|
+| Preparation producer → private CI storage → publisher | Original prepared payload and its metadata | Cross the producer/publication credential boundary; validate and publish the native output closure |
+| Preparation producer → SBOM attester → publisher | Bounded metadata, canonical SBOM documents and signed bundles | Keep OIDC outside the producer while binding evidence to unchanged subjects |
+| Publisher → product registry | Complete validated output closure | Publish the independently consumable native artifact |
+| Publisher → artifact signer | Exact-root-bound metadata and reference | Derive signing subjects and verify evidence without another payload download |
+| Product registry → independent verifier | Complete served payload closure | Verify the bytes actually published, plus signatures, provenance and SBOMs |
+| Verifier → release assembly/finalization | Metadata, references and evidence records | Authenticate membership and completeness without retrieving payloads |
+
+The publisher authenticates the attested metadata against the original preparation, verifies each bundle
+and its exact decoded SBOM, and moves unchanged blobs into the final layout before full-byte publication
+checks. The SBOM and signing jobs do not download or re-upload output payloads. Metadata inspection alone
+is not payload verification; the independent remote readback remains required. This is the existing
+`pipeline-attested` claim, not qualification or a new SLSA level.
+
+Generated stage restoration streams the nested factory carrier directly from private registry chunks into
+its extracted files. The admitted Plan selects the complete locator set, exact carrier members and permitted
+inner roots before payload transfer. Both TAR layers and every chunk are checked, including complete outer
+size, digest and source EOF, before any extracted root becomes visible. No full carrier TAR is stored beside
+the extracted payload. Atomic no-replace publication moves the private staging roots within the workspace;
+it does not copy their contents. Bootstrap/helper transfers and finalizer recovery retain their separate paths.
+
+Disk publication reads the existing QCOW2 through a held no-follow descriptor instead of copying it into a
+temporary one-image layout. Each upload body checks its exact size, digest and unchanged inode metadata;
+independent bodies support HTTP retries without reopening a pathname. A final full rehash is mandatory even
+when the registry skips the body because it already has that digest. Remote immutable-reference checks remain.
+Independent disk verification can restart an interrupted one-layer download for the typed HTTP/2 peer-reset
+failure observed in development. Recovery is bounded to three attempts under one deadline and removes the
+failed layout before retrying. It rechecks the complete immutable closure; it does not retry publication or signing.
+
+This is not a zero-copy pipeline. Native disk collection still stages the container archive and its
+extracted payload; packaging captures the authenticated disk into a private OCI layout, and preparation
+imports that layout. Ordinary nondisk publication also retains its temporary layout. These remaining copies
+support the current ownership and mutation checks; they are implementation choices, not SLSA requirements.
+Further removal needs equivalent bounded reads or exclusive ownership transfer, with unchanged digest,
+cleanup and atomic-completion guarantees. Direct pathname reuse or hardlinks alone do not provide them.
+
+For the native `build-provenance-v1` disk route, the remaining producer-side materializations are:
+
+| Materialization after Packer writes the original QCOW2 | Current purpose | Requirement for removing it |
+|---|---|---|
+| Container output → Docker TAR file → sealed Linux memory file | Bound container output, join the Docker command and freeze its complete archive before extraction | Stream the bounded archive into private extraction while retaining complete archive validation and command stop/join ownership |
+| Held TAR → extracted QCOW2 | Validate the exact archive member and create the held disk owner | Retain one authenticated final payload; the archive staging above is the removable duplication |
+| Live disk owner → export temporary → OCI wrapper blob | Bind export to the exact Plan/output, then commit a complete verified OCI transaction | Let the authenticated export write directly into the transaction's final staged blob |
+| OCI wrapper blob → prepared publication blob | Give the publication transaction independent ownership and verify its complete closure | Consume exclusively owned blobs with atomic same-filesystem moves and complete closure checks |
+| Prepared publication → inner transfer TAR | Produce a deterministic carrier for private registry transport | Stream deterministic TAR bytes over held, verified source files with bounded replay and unchanged integrity checks |
+
+This accounts for six payload-scale filesystem writes and one sealed memory snapshot after the original
+QCOW2 on that route. It is an inventory of writes, not seven simultaneous disk copies or a measured peak.
+These are implementation costs to eliminate where the replacement preserves the stated guarantees;
+SLSA does not require these intermediate files. The replacement paths in the last column are not implemented.
 
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can

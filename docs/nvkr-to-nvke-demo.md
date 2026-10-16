@@ -243,27 +243,7 @@ After SIGKILL/OOM or VM restart:
    unexpected routes cause refusal. Inspect the discrepancy rather than forcing
    removal.
 
-The Go command accepts only version 2 journals. A Python-era version 1 journal
-must be restored **before upgrading**, using the last compatible revision
-`3b24beb5cb04df352e74a8d5405bd593871412b5`. If already upgraded, preserve the
-original output and use a separate checkout of that revision on the same Linux
-host/account, with its Python 3.12+ prerequisites:
-
-```sh
-git worktree add --detach /absolute/Linux/path/to/legacy-recovery \
-  3b24beb5cb04df352e74a8d5405bd593871412b5
-python3 /absolute/Linux/path/to/legacy-recovery/scripts/nke-local-demo.py \
-  restore --work /absolute/Linux/path/to/original-demo-output
-```
-
-Run `git worktree add` from a Git checkout containing that commit, not an
-archive-exported directory. The old CLI uses `scripts/nke-local-network.py` from
-the same revision. Current Go recovery diagnoses and refuses version 1; it does
-not migrate journals or execute the removed helper automatically. Do not change
-the journal's version number to bypass this boundary. Go version-2 journals retain
-the original `nkdvm0` bridge, firewall-owner prefix, policy-staging prefix and
-shared per-user coordination lock, so an upgrade does not strand existing grants
-or permit a second session to bypass the original lock.
+Recovery accepts version-3 journals. Unsupported journal versions fail before host mutation.
 
 Restoration takes the same kernel-released lock, never kills serialized PIDs
 and, on the same boot, waits 40 seconds for in-flight bounded sudo work. This

@@ -8,10 +8,11 @@ runs:
   using: composite
   steps:
     - name: 'Download NVKR runner'
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-bootstrap-download
       with:
         name: ${{ inputs.runner-artifact }}
         path: '.nvkr/runtime-runner'
+        nvkr-ci-storage-read-token: ${{ inputs.nvkr-ci-storage-read-token }}
     - name: Prepare helper
       run: |
         set -eu
@@ -29,4 +30,7 @@ runs:
 inputs:
   runner-artifact:
     description: Same-Run helper artifact name
+    required: true
+  nvkr-ci-storage-read-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
     required: true

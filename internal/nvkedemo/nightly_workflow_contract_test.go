@@ -225,7 +225,12 @@ func TestNightlyWorkflowFreshArtifactAndSuiteCheckoutAreOrderedAndBound(t *testi
 			candidate = index
 		case step.With["name"] == "nvkr-runtime-inputs":
 			download = index
-			if step.If != "steps.candidate.outputs.runtime_plan == 'true'" || step.With["run-id"] != "${{ steps.candidate.outputs.producer_run }}" || step.With["github-token"] != "${{ github.token }}" || step.With["path"] != ".nightly-private/runtime-inputs" {
+			if step.If != "steps.candidate.outputs.runtime_plan == 'true'" ||
+				step.Uses != "./.github/nvkr-run/actions/ci-download" ||
+				step.With["run-id"] != "${{ steps.candidate.outputs.producer_run }}" ||
+				step.With["attempt"] != "1" ||
+				step.With["nvkr-ci-storage-read-token"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
+				step.With["path"] != ".nightly-private/runtime-inputs" {
 				t.Fatal("runtime artifact download lost exact producer or policy binding")
 			}
 		case step.ID == "suite":

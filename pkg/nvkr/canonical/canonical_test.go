@@ -69,7 +69,7 @@ func TestDigestDomainSeparation(t *testing.T) {
 }
 
 func TestDigestRejectsUnregisteredDomain(t *testing.T) {
-	for _, domain := range []string{"nvkr.recipe-typo", "nkd.build", "nkd.recipe"} {
+	for _, domain := range []string{"nvkr.recipe-typo", "unsupported.build", "unsupported.recipe"} {
 		t.Run(domain, func(t *testing.T) {
 			digest, err := Digest(domain, map[string]string{"value": "same"})
 			var coded *e.Error

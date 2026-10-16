@@ -151,7 +151,7 @@ go run ./cmd/nvkr run generate \
 Production execution requires installing that generated bundle in an admitted
 consumer checkout. The generator owns one `nvkr-run.yml` per root; this candidate does
 not replace the maintained M2 bundle. Dispatch remains default-branch-only,
-with the existing protected `nkd-release` environment and main signer policy.
+with the existing protected `nvkr-release` environment and main signer policy.
 `NKE_SOURCE_TOKEN` must separately have read access to the internal OVN fork;
 secret existence does not prove that access. Registry write and OIDC tokens stay
 out of producer containers. Ordinary PR tests compile and regenerate without them.

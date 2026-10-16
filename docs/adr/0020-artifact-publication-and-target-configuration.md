@@ -106,6 +106,20 @@ verified in one payload pass. Every copy/export still rehashes its held bytes; s
 and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
 The evidence-attestation handoff consumes the private preparation under §6, transferring unchanged blobs
 without another payload copy. It still revalidates the complete source and final closures.
+The disk publisher adapts the held QCOW2 directly to the registry image interface, without copying its bytes
+into another local OCI layout. Exact bounded manifest/config bytes remain detached from mutable paths.
+Every upload body independently reads and hashes the held inode, checks its exact size and unchanged
+metadata, and remembers local integrity failures across transport retries. After the registry write, an
+unconditional full rehash covers deduplication paths that skipped the body; immutable-reference readback
+remains mandatory before release-root publication. Closing the owner cancels future reads, joins active
+file reads and revokes body adapters. It issues no live producer receipt or stronger evidence claim.
+Other native output kinds retain their existing private publication layout.
+Remote acquisition may restart only a one-layer disk body interrupted by a typed HTTP/2 peer
+`PROTOCOL_ERROR` reset. At most three attempts share the caller's deadline (or a thirty-minute default
+when none exists), with one- and two-second cancellable waits. Each failed private layout must be removed
+before another attempt starts, and the same immutable root and complete closure are reauthenticated.
+Close, filesystem, integrity and other protocol errors do not authorize recovery. Destination commit and
+post-commit inspection remain outside retry; no publication or signing operation is repeated.
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
@@ -303,13 +317,29 @@ NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI r
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
 one release index from named outputs; normal authors do not wire payload → root → route.
 
+GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
+package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
+null or nonpublic repository linkage, using the publication credential independently of CI carrier storage.
+The source repository metadata lookup uses the job's automatic repository token, passed separately only to
+GHCR publication jobs. Package-scoped development credentials therefore need no source-repository scope
+for this admission check. The repository token does not replace the publication credential for package
+metadata or registry operations and is not added to producer execution.
+Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
+admission check is skipped, and errors cannot reuse an earlier successful policy response.
+Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
+seed before admission. The existing metadata inspector derives sibling references without opening product
+payloads; the actual push must retain that inspected root digest. Hosted GHCR layouts outside this metadata
+contract are rejected rather than falling back to unchecked publication. Local and other-registry transport
+contracts remain unchanged. These checks cannot lock future provider visibility or establish independent
+package grants; public-source access configuration and hosted execution remain separate operational evidence.
+
 The signed metadata references each deliverable manifest once in its own sibling repository: binary bundle,
 unchanged native container image, Helm artifact or exact-QCOW2 wrapper. The OCI index directly references only its metadata manifest. Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
 standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NVKR-specific
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
-SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
+Full-layout SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
 exclusive ownership with no concurrent users or writers; source and destination must share a filesystem.
 Admission rejects overlapping paths, unexpected layout entries, symlinks within the source tree and
 hardlinked files before signing. The inventory has the existing bounded OCI blob count.
@@ -344,6 +374,28 @@ assembly/finalization; it does not relax qualified execution or live disk owners
 Output-local chart reproduction transports its bound image packages and their producer/evidence
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.
+
+Per-output GitHub handoffs move only the bytes required by each role. The preparation producer retains
+complete-byte inspection and exports a bounded control/evidence layout with the same root digest. Its
+payload carrier goes directly to the publisher; the isolated OIDC SBOM job receives only those controls
+and canonical documents, and returns only attested controls and bundles. Before any publication side
+effect, the publisher re-inspects the original complete preparation and requires the returned metadata to
+preserve every output descriptor, repository, payload digest/size, Build Subject and release identity.
+Only raw CycloneDX evidence may become a verified bundle containing the identical decoded document.
+The publisher verifies those bundles under the admitted signer policy, consumes unchanged prepared blobs
+through the exclusive rename mechanism, and inspects the complete final layout before committing it.
+There is no payload download or re-upload in the SBOM job, no hardlinked retained preparation, and no
+caller-supplied verification flag.
+
+After the existing full-byte/privacy/push gate, the publisher exports separate bounded signing metadata
+whose root must equal the digest-pinned publication reference before the metadata is committed. This is a
+pre-sign description, distinct from the remote verifier's authenticated output handoff. The signer checks
+its exact route, named output, Plan, Definition, Environment and invocation bindings, re-derives all signing
+subjects, and verifies required SBOM bundles before signing. The subsequent independent remote verifier
+still retrieves and authenticates the complete served payload closure. Signing metadata cannot issue a
+full-payload receipt, bypass remote readback, or authorize finalization by itself. Legacy and aggregate
+routes retain their existing contracts. This reduces repeated transport within the pipeline-attested lane;
+it does not establish qualified execution or a stronger SLSA level.
 
 Release assembly authenticates every output-local root and its exact production predicate under the configured
 workflow identity/issuer, verifies its SBOM bundles, and joins its named output to the independently frozen

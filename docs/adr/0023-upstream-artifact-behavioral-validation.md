@@ -21,6 +21,11 @@ or changing NVKE's normal build-and-test workflow.
 
 ## Decision
 
+The source and tooling dependency is one-way: NVKR consumes NVKE's sources and test interfaces.
+NVKE's build and test workflows must remain independent of NVKR code, recipes, Plans, and tooling.
+NVKE's artifact-test entrypoints accept externally built artifacts through a generic interface usable
+by any producer.
+
 1. **Keep tests upstream.** NVKE owns assertions, fixtures, and test entrypoints. NVKR requires upstream
    artifact-test entrypoints that accept externally produced artifacts while preserving the upstream
    default build-and-test behavior. Separating construction from execution lets NVKR test its own

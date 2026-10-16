@@ -81,7 +81,7 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				prepared, invoked := false, false
 				for _, step := range job.Steps {
 					if step.ID == githubContextStepID {
-						prepared = step.Uses == "./"+githubSharedDirectory+"prepare-stage" && step.With["action"] == "${{ github.job }}"
+						prepared = step.Uses == "./"+githubSharedDirectory+"prepare-stage" && len(step.With) == 1 && step.With["runner-artifact"] != ""
 						continue
 					}
 					if parameters := step.With["parameters"]; parameters != "" {
@@ -120,6 +120,79 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				t.Fatal("shared templates changed the jobs' concrete execution semantics")
 			}
 		})
+	}
+}
+
+func TestGitHubPrepareStageBindsCurrentJob(t *testing.T) {
+	plan := githubTestPlan(t)
+	for _, suffix := range []string{"", "-container"} {
+		for _, test := range []struct {
+			name   string
+			mutate func(call, action *yamlv3.Node)
+		}{
+			{name: "provider job"},
+			{name: "caller selects sibling", mutate: func(call, _ *yamlv3.Node) {
+				githubYAMLSet(githubYAMLField(call, "with"), "action", githubYAMLString("sibling"))
+			}},
+			{name: "redundant caller selector", mutate: func(call, _ *yamlv3.Node) {
+				githubYAMLSet(githubYAMLField(call, "with"), "action", githubYAMLString("${{ github.job }}"))
+			}},
+			{name: "selector input declaration", mutate: func(_, action *yamlv3.Node) {
+				githubYAMLSet(githubYAMLField(action, "inputs"), "action", githubActionInput("Injected selector"))
+			}},
+			{name: "action selects sibling", mutate: func(_, action *yamlv3.Node) {
+				steps := githubYAMLField(githubYAMLField(action, "runs"), "steps")
+				githubYAMLSet(githubYAMLField(steps.Content[1], "env"), "NVKR_ACTION", githubYAMLString("sibling"))
+			}},
+			{name: "action omits provider binding", mutate: func(_, action *yamlv3.Node) {
+				steps := githubYAMLField(githubYAMLField(action, "runs"), "steps")
+				githubYAMLRemove(steps.Content[1], "env")
+			}},
+		} {
+			t.Run("prepare-stage"+suffix+"/"+test.name, func(t *testing.T) {
+				files := map[string][]byte{}
+				helper := githubYAMLMap("uses", githubYAMLString("./"+githubActionsDirectoryFor(plan)+"prepare-runner"+suffix),
+					"with", githubYAMLMap("runner-artifact", githubYAMLString("nvkr-exec-linux-amd64")))
+				call, err := githubPrepareStage(plan, files, helper)
+				if err != nil {
+					t.Fatal(err)
+				}
+				path := strings.TrimPrefix(githubYAMLValue(call, "uses"), "./") + "/action.yml"
+				var action yamlv3.Node
+				if err := yamlv3.Unmarshal(files[path], &action); err != nil {
+					t.Fatal(err)
+				}
+				if test.mutate != nil {
+					test.mutate(call, action.Content[0])
+				}
+				files[path], err = encodeGitHubYAML(&action)
+				if err != nil {
+					t.Fatal(err)
+				}
+				files[githubActionDataPathFor(plan)], err = canonical.Marshal(githubActionDataDocument{Entries: map[string]githubActionDataEntry{
+					"current": {Template: "stage-context", Values: map[string]string{}},
+				}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				workflow, err := encodeGitHubYAML(githubYAMLMap("jobs", githubYAMLMap("current", githubYAMLMap(
+					"steps", &yamlv3.Node{Kind: yamlv3.SequenceNode, Tag: "!!seq", Content: []*yamlv3.Node{call}}))))
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, _, err = materializeGitHubSharedActions(plan, workflow, files)
+				if test.mutate == nil {
+					if err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "changes shared action preparation") {
+					t.Fatalf("changed selector reached the wrong admission guard: %v", err)
+				}
+			})
+		}
 	}
 }
 

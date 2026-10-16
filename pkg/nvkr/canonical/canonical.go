@@ -42,9 +42,7 @@ import (
 // objects share a tag, so the anti-collision guarantee is by construction, not by
 // luck.
 const (
-	// KindLegacyRecipe reserves the new namespace's counterpart of historical
-	// nkd.recipe. It was never minted in NVKR; Digest rejects both families.
-	// Active builds use KindBuild.
+	// KindLegacyRecipe is reserved; active builds use KindBuild.
 	KindLegacyRecipe            = "nvkr.recipe"
 	KindBuild                   = "nvkr.build"                    // the compiled IR / buildDigest (ADR-02)
 	KindBuilderProfile          = "nvkr.builder-profile"          // the signed builder profile (ADR-07)

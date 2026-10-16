@@ -8,7 +8,7 @@ producer. Other M2 outputs and the plain disk are absent. Material producers sti
 bytes are required by the FDE image; this does not introduce cross-Run cache reuse.
 
 The Environment selects Docker/KVM on `arc-amd64-kvm` and admits manual dispatch on
-`codex/fde-image-pipeline` as well as the default branch. GitHub's `nkd-arc` Environment must separately
+`codex/fde-image-pipeline` as well as the default branch. GitHub's `nvkr-arc` Environment must separately
 admit that exact branch. The source-fetch stages use the existing `NKE_SOURCE_TOKEN`; the producer job
 receives source bytes without the token. Native toolchain preparation uses the workflow token with
 read-only package access and removes its temporary registry configuration before execution.
@@ -61,8 +61,8 @@ registry publication. The maintained repository bundle and tests select the comb
 `make workflows-check` verifies that committed selection. Do not hand-edit rendered files or replace
 the maintained bundle with this alternate selection in a PR to main.
 
-The recorded diagnostic branch already contains its reviewed standalone bundle and exact `nkd-arc`
-branch admission. Its workflow can be dispatched separately:
+The diagnostic branch contains its standalone bundle. Dispatch requires its
+exact branch to be admitted by the selected GitHub Environment:
 
 ```sh
 gh workflow run nvkr-run.yml --repo dsx-ai-factory/nvkr --ref codex/fde-image-pipeline

@@ -43,6 +43,7 @@ jobs:
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   build-runner-ubuntu-24-04:
     name: 'Prepare NVKR runner (ubuntu-24.04)'
     runs-on: 'ubuntu-24.04'
@@ -61,6 +62,11 @@ jobs:
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   build-runner-ubuntu-24-04-arm:
     name: 'Prepare NVKR runner (ubuntu-24.04-arm)'
     runs-on: 'ubuntu-24.04-arm'
@@ -75,6 +81,11 @@ jobs:
         with:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a:
     name: 'Fetch pinned source for capnico-controller (capnico-controller-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -90,12 +101,17 @@ jobs:
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-stage
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
-          action: ${{ github.job }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - &operation-execute-node-part-1
         name: execute node part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-capnico-controller-arm64-build-capni-b3f328de28b1:
     name: 'Build capnico-controller (capnico-controller-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -103,6 +119,9 @@ jobs:
     needs: [nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-capnico-controller-arm64-ter-bb955af0200c:
     name: 'Verify artifacts and generate SBOMs: capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -118,12 +137,17 @@ jobs:
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-stage
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          action: ${{ github.job }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - *operation-execute-node-part-1
       - name: execute node part-2
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-cluster-api-provider-provisioned-arm-d53e503b7714:
     name: 'Fetch pinned source for cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -140,6 +164,11 @@ jobs:
         with:
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c:
     name: 'Build cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -147,6 +176,9 @@ jobs:
     needs: [nvkr-cluster-api-provider-provisioned-arm-d53e503b7714]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-cluster-api-provider-provisi-9a13d6f6b1eb:
     name: 'Verify artifacts and generate SBOMs: cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -154,6 +186,9 @@ jobs:
     needs: [nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-controller-chart-fetch-nvke-controller-chart:
     name: 'Fetch pinned source for nvke-controller-chart (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
@@ -165,6 +200,9 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-controller-chart-build-nvke-controller-chart:
     name: 'Build nvke-controller-chart (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
@@ -172,6 +210,9 @@ jobs:
     needs: [nvkr-controller-chart-fetch-nvke-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-controller-chart-terminal-ob-1c72a2221014:
     name: 'Verify artifacts and generate SBOMs: controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -179,6 +220,9 @@ jobs:
     needs: [nvkr-controller-chart-build-nvke-controller-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-controller-profiles-fetch-nvke-local-profiles:
     name: 'Fetch pinned source for nvke-local-profiles (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
@@ -190,6 +234,9 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-controller-profiles-build-nvke-local-profiles:
     name: 'Build nvke-local-profiles (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
@@ -197,6 +244,9 @@ jobs:
     needs: [nvkr-controller-profiles-fetch-nvke-local-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-controller-profiles-terminal-18270f0744b4:
     name: 'Verify artifacts and generate SBOMs: controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -204,6 +254,9 @@ jobs:
     needs: [nvkr-controller-profiles-build-nvke-local-profiles, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e:
     name: 'Acquire pinned csi-node-driver-registrar-image-arm64/pull-csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -211,6 +264,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-csi-node-driver-registrar-im-11c07063ce1a:
     name: 'Verify artifacts and generate SBOMs: csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -218,6 +274,9 @@ jobs:
     needs: [nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-cwe-fetch-nvke-controller:
     name: 'Fetch pinned source for nvke-controller (cwe)'
     runs-on: 'ubuntu-24.04-arm'
@@ -229,6 +288,9 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-cwe-build-nvke-controller:
     name: 'Build nvke-controller (cwe)'
     runs-on: 'ubuntu-24.04-arm'
@@ -236,6 +298,9 @@ jobs:
     needs: [nvkr-cwe-fetch-nvke-controller]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-cwe-terminal-observe-cwe-sbom:
     name: 'Verify artifacts and generate SBOMs: cwe'
     runs-on: 'ubuntu-24.04'
@@ -243,6 +308,9 @@ jobs:
     needs: [nvkr-cwe-build-nvke-controller, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-fetch-clusterctl:
     name: 'Fetch pinned source for clusterctl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -250,6 +318,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-build-clusterctl:
     name: 'Build clusterctl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -257,6 +328,9 @@ jobs:
     needs: [nvkr-installer-tools-arm64-fetch-clusterctl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-fetch-kind:
     name: 'Fetch pinned source for kind (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -264,6 +338,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-build-kind:
     name: 'Build kind (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -271,6 +348,9 @@ jobs:
     needs: [nvkr-installer-tools-arm64-fetch-kind]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-fetch-kubectl:
     name: 'Fetch pinned source for kubectl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -278,6 +358,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-build-kubectl:
     name: 'Build kubectl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -285,6 +368,9 @@ jobs:
     needs: [nvkr-installer-tools-arm64-fetch-kubectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-fetch-oras:
     name: 'Fetch pinned source for oras (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -292,6 +378,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-build-oras:
     name: 'Build oras (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -299,6 +388,9 @@ jobs:
     needs: [nvkr-installer-tools-arm64-fetch-oras]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-installer-tools-arm64-pull-helm:
     name: 'Acquire pinned installer-tools-arm64/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
@@ -306,6 +398,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-installer-tools-arm64-termin-de371e0bc9ee:
     name: 'Verify artifacts and generate SBOMs: installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -313,6 +408,9 @@ jobs:
     needs: [nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-pull-helm, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7:
     name: 'Fetch pinned source for nico-sim, nico-sim-runtime-assets, nico-simctl (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -320,6 +418,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps:
@@ -334,6 +433,7 @@ jobs:
     needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps: *steps-ubuntu-24-04-arm-node
@@ -344,6 +444,7 @@ jobs:
     needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps: *steps-ubuntu-24-04-arm-node
@@ -354,6 +455,7 @@ jobs:
     needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps: *steps-ubuntu-24-04-arm-node
@@ -364,6 +466,9 @@ jobs:
     needs: [nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nicosim-tools-arm64-build-nico-simctl, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-nktp-fetch-nktp-chart:
     name: 'Fetch pinned source for nktp-chart (nktp)'
     runs-on: 'ubuntu-24.04-arm'
@@ -375,6 +480,9 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-nktp-build-nktp-chart:
     name: 'Build nktp-chart (nktp)'
     runs-on: 'ubuntu-24.04-arm'
@@ -382,6 +490,9 @@ jobs:
     needs: [nvkr-nktp-fetch-nktp-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-nktp-terminal-observe-nktp-sbom:
     name: 'Verify artifacts and generate SBOMs: nktp'
     runs-on: 'ubuntu-24.04'
@@ -389,6 +500,9 @@ jobs:
     needs: [nvkr-nktp-build-nktp-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-image-upstream-ovn-arm64-f-1aec0b309b7c:
     name: 'Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -396,6 +510,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps:
@@ -409,23 +524,47 @@ jobs:
     timeout-minutes: 1045
     needs: [nvkr-nvke-node-image-upstream-ovn-arm64-f-09f9a2b3de02, nvkr-nvke-node-image-upstream-ovn-arm64-f-0b49c5f11821, nvkr-nvke-node-image-upstream-ovn-arm64-f-1aec0b309b7c, nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-nvke-node-image-upstream-ovn-arm64-f-78d2fff1af52, nvkr-nvke-node-image-upstream-ovn-arm64-f-8eddb001351f]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-arc'
+    environment: 'nvkr-arc'
     permissions:
+      actions: read
       contents: read
       packages: read
     steps:
       - *check-native-linux-arm64
+      - name: Prepare KVM access before transfer
+        timeout-minutes: 1
+        run: |-
+          set -eu
+          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
+            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
+            exit 29
+          fi
+          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
+            printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
+            if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
+              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
+              exit 29
+            fi
+          fi
+          if ! (exec 3<>/dev/kvm && exec 3>&-); then
+            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
+            id >&2 || true
+            stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
+            exit 29
+          fi
+          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
       - *checkout-workflow-source
       - name: Prepare NVKR runner and job parameters
         id: nvkr-context
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-stage
         with:
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
-          action: ${{ github.job }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - name: prepare inputs part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-inputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - name: prepare images part-2
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/prepare-images
         with:
@@ -438,68 +577,79 @@ jobs:
         with:
           with-path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
       - name: collect node outputs part-3
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-4
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-5
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-6
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-7
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-8
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-9
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-10
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-11
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-12
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-13
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-14
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-15
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: collect node outputs part-16
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
-      - name: collect node outputs part-17
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-upstream-ovn-arm64-f-09f9a2b3de02:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -507,6 +657,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps:
@@ -521,6 +672,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-image-upstream-ovn-arm64-f-0b49c5f11821:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-upstream-ovn-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -528,6 +682,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps:
@@ -542,6 +697,7 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
+      actions: read
       contents: read
       packages: read
     steps:
@@ -556,6 +712,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvkectl-fetch-nvkectl:
     name: 'Fetch pinned source for nvkectl (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
@@ -567,6 +726,9 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvkectl-build-nvkectl:
     name: 'Build nvkectl (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
@@ -574,6 +736,9 @@ jobs:
     needs: [nvkr-nvkectl-fetch-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-nvkectl-terminal-observe-nvkectl-sbom:
     name: 'Verify artifacts and generate SBOMs: nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -581,6 +746,9 @@ jobs:
     needs: [nvkr-nvkectl-build-nvkectl, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-operator-tools-pull-helm:
     name: 'Acquire pinned operator-tools/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
@@ -588,6 +756,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-operator-tools-pull-kubectl:
     name: 'Acquire pinned operator-tools/pull-kubectl'
     runs-on: 'ubuntu-24.04-arm'
@@ -595,6 +766,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-operator-tools-terminal-obse-ad40acf7eeda:
     name: 'Verify artifacts and generate SBOMs: operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -602,6 +776,9 @@ jobs:
     needs: [nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-capnico-controller-arm64:
     name: 'Package container image: capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -613,6 +790,9 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-node-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-cluster-api-provider-provisioned-arm64:
     name: 'Package container image: cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
@@ -620,6 +800,9 @@ jobs:
     needs: [nvkr-process-cluster-api-provider-provisi-9a13d6f6b1eb]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-controller-profiles:
     name: 'Package container image: controller-profiles'
     runs-on: 'ubuntu-24.04'
@@ -627,6 +810,9 @@ jobs:
     needs: [nvkr-process-controller-profiles-terminal-18270f0744b4]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-csi-node-driver-registrar-image-arm64:
     name: 'Package container image: csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -634,6 +820,9 @@ jobs:
     needs: [nvkr-process-csi-node-driver-registrar-im-11c07063ce1a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-cwe:
     name: 'Package container image: cwe'
     runs-on: 'ubuntu-24.04'
@@ -641,6 +830,9 @@ jobs:
     needs: [nvkr-process-cwe-terminal-observe-cwe-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-controller-chart:
     name: 'Bind image digest and package Helm: controller-chart'
     runs-on: 'ubuntu-24.04'
@@ -648,6 +840,9 @@ jobs:
     needs: [nvkr-package-cwe, nvkr-process-controller-chart-terminal-ob-1c72a2221014]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-installer-tools-arm64:
     name: 'Package binaries: installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -655,6 +850,9 @@ jobs:
     needs: [nvkr-process-installer-tools-arm64-termin-de371e0bc9ee]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-nicosim-tools-arm64:
     name: 'Package binaries: nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
@@ -662,6 +860,9 @@ jobs:
     needs: [nvkr-process-nicosim-tools-arm64-terminal-db7be8c7b6bb]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-nktp:
     name: 'Package Helm bundle: nktp'
     runs-on: 'ubuntu-24.04'
@@ -669,6 +870,9 @@ jobs:
     needs: [nvkr-process-nktp-terminal-observe-nktp-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-nvkectl:
     name: 'Package binaries: nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -676,6 +880,9 @@ jobs:
     needs: [nvkr-process-nvkectl-terminal-observe-nvkectl-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-operator-tools:
     name: 'Package binaries: operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -683,6 +890,9 @@ jobs:
     needs: [nvkr-process-operator-tools-terminal-obse-ad40acf7eeda]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-postgresql-image-arm64-pull-postgresql-image:
     name: 'Acquire pinned postgresql-image-arm64/pull-postgresql-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -690,6 +900,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79:
     name: 'Verify artifacts and generate SBOMs: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -697,6 +910,9 @@ jobs:
     needs: [nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-postgresql-image-arm64:
     name: 'Package container image: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -704,6 +920,9 @@ jobs:
     needs: [nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-postgresql-pull-postgresql-chart:
     name: 'Acquire pinned postgresql/pull-postgresql-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -711,6 +930,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-postgresql-terminal-observe-5a421f61f894:
     name: 'Verify artifacts and generate SBOMs: postgresql'
     runs-on: 'ubuntu-24.04'
@@ -718,6 +940,9 @@ jobs:
     needs: [nvkr-postgresql-pull-postgresql-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-postgresql:
     name: 'Package Helm bundle: postgresql'
     runs-on: 'ubuntu-24.04'
@@ -725,6 +950,9 @@ jobs:
     needs: [nvkr-process-postgresql-terminal-observe-5a421f61f894]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image:
     name: 'Acquire pinned spiffe-csi-image-arm64/pull-spiffe-csi-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -732,6 +960,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f:
     name: 'Verify artifacts and generate SBOMs: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -739,6 +970,9 @@ jobs:
     needs: [nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spiffe-csi-image-arm64:
     name: 'Package container image: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -746,6 +980,9 @@ jobs:
     needs: [nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-agent-image-arm64-pull-spire-agent-image:
     name: 'Acquire pinned spire-agent-image-arm64/pull-spire-agent-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -753,6 +990,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd:
     name: 'Verify artifacts and generate SBOMs: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -760,6 +1000,9 @@ jobs:
     needs: [nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire-agent-image-arm64:
     name: 'Package container image: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -767,6 +1010,9 @@ jobs:
     needs: [nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-bash-image-arm64-pull-spire-bash-image:
     name: 'Acquire pinned spire-bash-image-arm64/pull-spire-bash-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -774,6 +1020,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6:
     name: 'Verify artifacts and generate SBOMs: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -781,6 +1030,9 @@ jobs:
     needs: [nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire-bash-image-arm64:
     name: 'Package container image: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -788,6 +1040,9 @@ jobs:
     needs: [nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-controller-manager-image-arm64-92b22b7f2333:
     name: 'Acquire pinned spire-controller-manager-image-arm64/pull-spire-controller-manager-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -795,6 +1050,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-controller-manager-ima-3e5db62fee30:
     name: 'Verify artifacts and generate SBOMs: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -802,6 +1060,9 @@ jobs:
     needs: [nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire-controller-manager-image-arm64:
     name: 'Package container image: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -809,6 +1070,9 @@ jobs:
     needs: [nvkr-process-spire-controller-manager-ima-3e5db62fee30]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-crds-pull-spire-crds-chart:
     name: 'Acquire pinned spire-crds/pull-spire-crds-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -816,6 +1080,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-crds-terminal-observe-f6ed6995bc52:
     name: 'Verify artifacts and generate SBOMs: spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -823,6 +1090,9 @@ jobs:
     needs: [nvkr-spire-crds-pull-spire-crds-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire-crds:
     name: 'Package Helm bundle: spire-crds'
     runs-on: 'ubuntu-24.04'
@@ -830,6 +1100,9 @@ jobs:
     needs: [nvkr-process-spire-crds-terminal-observe-f6ed6995bc52]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-oidc-image-arm64-pull-spire-oidc-image:
     name: 'Acquire pinned spire-oidc-image-arm64/pull-spire-oidc-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -837,6 +1110,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b:
     name: 'Verify artifacts and generate SBOMs: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -844,6 +1120,9 @@ jobs:
     needs: [nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire-oidc-image-arm64:
     name: 'Package container image: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -851,6 +1130,9 @@ jobs:
     needs: [nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-server-image-arm64-pull-spire-server-image:
     name: 'Acquire pinned spire-server-image-arm64/pull-spire-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -858,6 +1140,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-server-image-arm64-ter-78345db78e5c:
     name: 'Verify artifacts and generate SBOMs: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -865,6 +1150,9 @@ jobs:
     needs: [nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire-server-image-arm64:
     name: 'Package container image: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -872,6 +1160,9 @@ jobs:
     needs: [nvkr-process-spire-server-image-arm64-ter-78345db78e5c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d:
     name: 'Acquire pinned spire-tpm-server-image-arm64/pull-spire-tpm-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -879,6 +1170,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7:
     name: 'Verify artifacts and generate SBOMs: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -886,6 +1180,9 @@ jobs:
     needs: [nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire-tpm-server-image-arm64:
     name: 'Package container image: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -893,6 +1190,9 @@ jobs:
     needs: [nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-spire-pull-spire-chart:
     name: 'Acquire pinned spire/pull-spire-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -900,6 +1200,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-spire-terminal-observe-spire-sbom:
     name: 'Verify artifacts and generate SBOMs: spire'
     runs-on: 'ubuntu-24.04'
@@ -907,6 +1210,9 @@ jobs:
     needs: [nvkr-spire-pull-spire-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-spire:
     name: 'Package Helm bundle: spire'
     runs-on: 'ubuntu-24.04'
@@ -914,6 +1220,9 @@ jobs:
     needs: [nvkr-process-spire-terminal-observe-spire-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3:
     name: 'Acquire pinned temporal-admin-tools-image-arm64/pull-temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -921,6 +1230,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-temporal-admin-tools-image-a-2e37748f989e:
     name: 'Verify artifacts and generate SBOMs: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -928,6 +1240,9 @@ jobs:
     needs: [nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-temporal-admin-tools-image-arm64:
     name: 'Package container image: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -935,6 +1250,9 @@ jobs:
     needs: [nvkr-process-temporal-admin-tools-image-a-2e37748f989e]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29:
     name: 'Acquire pinned temporal-server-image-arm64/pull-temporal-server-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -942,6 +1260,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-temporal-server-image-arm64-a7b9faf98be2:
     name: 'Verify artifacts and generate SBOMs: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -949,6 +1270,9 @@ jobs:
     needs: [nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-temporal-server-image-arm64:
     name: 'Package container image: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -956,6 +1280,9 @@ jobs:
     needs: [nvkr-process-temporal-server-image-arm64-a7b9faf98be2]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-temporal-ui-image-arm64-pull-temporal-ui-image:
     name: 'Acquire pinned temporal-ui-image-arm64/pull-temporal-ui-image'
     runs-on: 'ubuntu-24.04-arm'
@@ -963,6 +1290,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360:
     name: 'Verify artifacts and generate SBOMs: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -970,6 +1300,9 @@ jobs:
     needs: [nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-temporal-ui-image-arm64:
     name: 'Package container image: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -977,6 +1310,9 @@ jobs:
     needs: [nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-temporal-pull-temporal-chart:
     name: 'Acquire pinned temporal/pull-temporal-chart'
     runs-on: 'ubuntu-24.04-arm'
@@ -984,6 +1320,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-temporal-terminal-observe-temporal-sbom:
     name: 'Verify artifacts and generate SBOMs: temporal'
     runs-on: 'ubuntu-24.04'
@@ -991,6 +1330,9 @@ jobs:
     needs: [nvkr-temporal-pull-temporal-chart, nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-temporal:
     name: 'Package Helm bundle: temporal'
     runs-on: 'ubuntu-24.04'
@@ -998,6 +1340,9 @@ jobs:
     needs: [nvkr-process-temporal-terminal-observe-temporal-sbom]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-tool-cosign:
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
@@ -1005,14 +1350,18 @@ jobs:
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-nvke-node-image-3ffe05528fbf:
     name: 'Create and verify SBOM attestations: output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-disk-nvke-node-image-upstream-ovn-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1022,11 +1371,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvke-node-image-3ffe05528fbf]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1036,8 +1387,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvke-node-image-upstr-b4a1b43e5991]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1052,6 +1404,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-publication-capnico-controller-arm64:
     name: 'Package publication bundle: publication-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
@@ -1059,14 +1414,18 @@ jobs:
     needs: [nvkr-package-capnico-controller-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-capnico-controller-arm64:
     name: 'Create and verify SBOM attestations: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-capnico-controller-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1077,14 +1436,18 @@ jobs:
     needs: [nvkr-package-cluster-api-provider-provisioned-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-cluster-api-prov-64867884a7ca:
     name: 'Create and verify SBOM attestations: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-cluster-api-prov-7d1ac851fb60, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1095,14 +1458,18 @@ jobs:
     needs: [nvkr-package-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-controller-chart:
     name: 'Create and verify SBOM attestations: output-controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-controller-chart, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1113,14 +1480,18 @@ jobs:
     needs: [nvkr-package-controller-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-controller-profiles:
     name: 'Create and verify SBOM attestations: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-controller-profiles, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1131,14 +1502,18 @@ jobs:
     needs: [nvkr-package-csi-node-driver-registrar-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442:
     name: 'Create and verify SBOM attestations: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1149,14 +1524,18 @@ jobs:
     needs: [nvkr-package-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-cwe:
     name: 'Create and verify SBOM attestations: output-cwe'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-cwe, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1167,14 +1546,18 @@ jobs:
     needs: [nvkr-package-installer-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-installer-tools-arm64:
     name: 'Create and verify SBOM attestations: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-installer-tools-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1185,14 +1568,18 @@ jobs:
     needs: [nvkr-package-nicosim-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-nicosim-tools-arm64:
     name: 'Create and verify SBOM attestations: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-nicosim-tools-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1203,14 +1590,18 @@ jobs:
     needs: [nvkr-package-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-nktp:
     name: 'Create and verify SBOM attestations: output-nktp'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-nktp, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1221,14 +1612,18 @@ jobs:
     needs: [nvkr-package-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-nvkectl:
     name: 'Create and verify SBOM attestations: output-nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-nvkectl, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1239,14 +1634,18 @@ jobs:
     needs: [nvkr-package-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-operator-tools:
     name: 'Create and verify SBOM attestations: output-operator-tools'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-operator-tools, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1257,14 +1656,18 @@ jobs:
     needs: [nvkr-package-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-postgresql-image-arm64:
     name: 'Create and verify SBOM attestations: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-postgresql-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1275,14 +1678,18 @@ jobs:
     needs: [nvkr-package-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-postgresql:
     name: 'Create and verify SBOM attestations: output-postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-postgresql, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1292,11 +1699,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-capnico-controller-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1306,11 +1715,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cluster-api-prov-64867884a7ca]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1320,11 +1731,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1334,11 +1747,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-controller-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1348,11 +1763,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1362,11 +1779,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1376,11 +1795,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-installer-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1390,11 +1811,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nicosim-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1404,11 +1827,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1418,11 +1843,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1432,11 +1859,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1446,11 +1875,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1460,11 +1891,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1474,8 +1907,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-capnico-controller-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1489,8 +1923,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cluster-api-provider-4b7d31608734]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1504,8 +1939,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1519,8 +1955,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-controller-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1534,8 +1971,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1549,8 +1987,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1564,8 +2003,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-installer-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1579,8 +2019,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nicosim-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1594,8 +2035,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1609,8 +2051,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1624,8 +2067,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1639,8 +2083,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1654,8 +2099,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1670,14 +2116,18 @@ jobs:
     needs: [nvkr-package-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spiffe-csi-image-arm64:
     name: 'Create and verify SBOM attestations: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spiffe-csi-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1687,11 +2137,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1701,8 +2153,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1717,14 +2170,18 @@ jobs:
     needs: [nvkr-package-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire-agent-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-agent-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1734,11 +2191,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1748,8 +2207,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1764,14 +2224,18 @@ jobs:
     needs: [nvkr-package-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire-bash-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-bash-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1781,11 +2245,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1795,8 +2261,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1811,14 +2278,18 @@ jobs:
     needs: [nvkr-package-spire-controller-manager-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire-controller-f3890ce97c17:
     name: 'Create and verify SBOM attestations: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-controller-14366a611047, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1828,11 +2299,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-controller-f3890ce97c17]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1842,8 +2315,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-controller-mana-4c760c0ddb13]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1858,14 +2332,18 @@ jobs:
     needs: [nvkr-package-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire-crds:
     name: 'Create and verify SBOM attestations: output-spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-crds, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1875,11 +2353,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1889,8 +2369,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1905,14 +2386,18 @@ jobs:
     needs: [nvkr-package-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire-oidc-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-oidc-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1922,11 +2407,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1936,8 +2423,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1952,14 +2440,18 @@ jobs:
     needs: [nvkr-package-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-server-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -1969,11 +2461,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -1983,8 +2477,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -1999,14 +2494,18 @@ jobs:
     needs: [nvkr-package-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire-tpm-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2016,11 +2515,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2030,8 +2531,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2046,14 +2548,18 @@ jobs:
     needs: [nvkr-package-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-spire:
     name: 'Create and verify SBOM attestations: output-spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-spire, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2063,11 +2569,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2077,8 +2585,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2093,14 +2602,18 @@ jobs:
     needs: [nvkr-package-temporal-admin-tools-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-temporal-admin-t-9e993584a415:
     name: 'Create and verify SBOM attestations: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2110,11 +2623,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-admin-t-9e993584a415]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2124,8 +2639,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-admin-tools-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2140,14 +2656,18 @@ jobs:
     needs: [nvkr-package-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-temporal-server-image-arm64:
     name: 'Create and verify SBOM attestations: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-server-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2157,11 +2677,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2171,8 +2693,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2187,14 +2710,18 @@ jobs:
     needs: [nvkr-package-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-temporal-ui-image-arm64:
     name: 'Create and verify SBOM attestations: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal-ui-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2204,11 +2731,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2218,8 +2747,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2234,14 +2764,18 @@ jobs:
     needs: [nvkr-package-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-temporal:
     name: 'Create and verify SBOM attestations: output-temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-temporal, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2251,11 +2785,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2265,8 +2801,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2281,6 +2818,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e:
     name: 'Build ovn-kubernetes-chart (upstream-ovn-chart-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -2288,6 +2828,9 @@ jobs:
     needs: [nvkr-upstream-ovn-chart-arm64-fetch-ovn-k-15e776834961]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-upstream-ovn-chart-arm64-ter-d2d87c39005a:
     name: 'Verify artifacts and generate SBOMs: upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2295,6 +2838,9 @@ jobs:
     needs: [nvkr-tool-syft, nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-upstream-ovn-image-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (upstream-ovn-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -2302,6 +2848,9 @@ jobs:
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu:
     name: 'Build ovn-kube-ubuntu (upstream-ovn-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -2309,6 +2858,9 @@ jobs:
     needs: [nvkr-upstream-ovn-image-arm64-fetch-ovn-kube-ubuntu]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-process-upstream-ovn-image-arm64-ter-52e0c2ccb6dd:
     name: 'Verify artifacts and generate SBOMs: upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2316,6 +2868,9 @@ jobs:
     needs: [nvkr-tool-syft, nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-upstream-ovn-image-arm64:
     name: 'Package container image: upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2323,6 +2878,9 @@ jobs:
     needs: [nvkr-process-upstream-ovn-image-arm64-ter-52e0c2ccb6dd]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-upstream-ovn-chart-arm64:
     name: 'Bind image digest and package Helm: upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2330,6 +2888,9 @@ jobs:
     needs: [nvkr-package-upstream-ovn-image-arm64, nvkr-process-upstream-ovn-chart-arm64-ter-d2d87c39005a]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-publication-upstream-ovn-chart-arm64:
     name: 'Package publication bundle: publication-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
@@ -2337,14 +2898,18 @@ jobs:
     needs: [nvkr-package-upstream-ovn-chart-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-upstream-ovn-chart-arm64:
     name: 'Create and verify SBOM attestations: output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-upstream-ovn-chart-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2355,14 +2920,18 @@ jobs:
     needs: [nvkr-package-upstream-ovn-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-attest-sboms-output-upstream-ovn-image-arm64:
     name: 'Create and verify SBOM attestations: output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-upstream-ovn-image-arm64, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
@@ -2372,11 +2941,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-upstream-ovn-chart-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2386,11 +2957,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-attest-sboms-output-upstream-ovn-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2400,8 +2973,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-upstream-ovn-chart-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2415,8 +2989,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-output-upstream-ovn-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2430,8 +3005,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-capnico-controller-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2444,8 +3020,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cluster-api-provider-pro-9543d5c3a952]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2458,8 +3035,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-controller-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2472,8 +3050,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-controller-profiles]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2486,8 +3065,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2500,8 +3080,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-cwe]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2514,8 +3095,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-installer-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2528,8 +3110,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nicosim-tools-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2542,8 +3125,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nktp]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2556,8 +3140,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvke-node-image-upstream-ovn-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2570,8 +3155,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-nvkectl]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2584,8 +3170,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2598,8 +3185,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-postgresql]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2612,8 +3200,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-postgresql-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2626,8 +3215,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spiffe-csi-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2640,8 +3230,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2654,8 +3245,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-agent-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2668,8 +3260,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-bash-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2682,8 +3275,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-controller-manager-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2696,8 +3290,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-crds]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2710,8 +3305,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-oidc-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2724,8 +3320,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2738,8 +3335,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-spire-tpm-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2752,8 +3350,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2766,8 +3365,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-admin-tools-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2780,8 +3380,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-server-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2794,8 +3395,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-temporal-ui-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2808,8 +3410,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-upstream-ovn-chart-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2822,8 +3425,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-output-upstream-ovn-image-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2836,8 +3440,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-verify-publication-output-capnico-co-a41756165d77, nvkr-verify-publication-output-cluster-ap-f52c14e947ce, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-controller-profiles, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-installer-tools-arm64, nvkr-verify-publication-output-nicosim-tools-arm64, nvkr-verify-publication-output-nktp, nvkr-verify-publication-output-nvke-node-4ccfed0d3edb, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-verify-publication-output-upstream-o-49a3c983341d, nvkr-verify-publication-output-upstream-o-6a771d3e2e52]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -2850,11 +3455,13 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-package-release]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: write
     env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
       NVKR_REGISTRY_USER: '${{ github.actor }}'
     steps: *steps-ubuntu-24-04-node
@@ -2864,8 +3471,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-publish-release]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       id-token: write
       packages: write
@@ -2879,8 +3487,9 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-sign-release]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
+    environment: 'nvkr-release'
     permissions:
+      actions: read
       contents: read
       packages: read
     env:
@@ -3101,13 +3710,14 @@ jobs:
     timeout-minutes: 15
     needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0c, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nkd-release'
-    permissions:
-      contents: read
-      packages: read
+    environment: 'nvkr-release'
     env:
       NVKR_REGISTRY_USER: '${{ github.actor }}'
       NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
+    permissions:
+      actions: read
+      contents: read
+      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
@@ -3116,6 +3726,7 @@ jobs:
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/download-carriers
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
         continue-on-error: true
       - name: recover inputs part-1
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/recover-inputs
@@ -3144,18 +3755,21 @@ jobs:
           ./nvkr-exec run finalize --definition inputs/definitions/demo/arm64-upstream-kvm.json --environment inputs/environments/github-nightly-upstream.json --plan .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json --attempt "${{ github.run_id }}-${{ github.run_attempt }}" --workspace .nvkr/factory --out .nvkr/run.json --handoff .nvkr/qualification/handoff.json
       - name: Upload final Run record
         id: upload-run-record
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-upload
         if: ${{ always() }}
         with:
           name: nvkr-lifecycle-run
           path: .nvkr/run.json
           if-no-files-found: error
           retention-days: 7
+          nvkr-ci-always: "true"
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - name: Upload complete qualification handoff
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/upload-carrier
         with:
           with-path: ""
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-2'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: ${{ success() }}
         timeout-minutes: 5
       - name: Summarize Run result
@@ -3219,3 +3833,6 @@ jobs:
             fi
             printf 'This summary is diagnostic; the Run record carries the completeness result.\n'
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

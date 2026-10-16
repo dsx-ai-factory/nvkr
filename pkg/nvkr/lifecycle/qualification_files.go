@@ -26,13 +26,15 @@ type QualificationCandidate struct {
 }
 
 type QualificationFilesOptions struct {
-	DefinitionPath  string
-	EnvironmentPath string
-	PlanPath        string
-	CandidatePath   string
-	Source          qualificationorigin.SourceRequest
-	GitHubToken     string
-	Consumer        ConsumerOptions
+	DefinitionPath    string
+	EnvironmentPath   string
+	PlanPath          string
+	CandidatePath     string
+	Source            qualificationorigin.SourceRequest
+	GitHubToken       string
+	CIStorageToken    string
+	CIStorageUsername string
+	Consumer          ConsumerOptions
 }
 
 // CheckQualificationFiles owns file, provider and consumer orchestration for
@@ -103,7 +105,7 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	if got != want {
 		return nil, nil, e.New(e.CodePipelineDrift, "qualification Plan differs from the exact recompiled inputs")
 	}
-	origin, err := qualificationorigin.NewGitHub(options.GitHubToken).AuthenticateSource(ctx, options.Source)
+	origin, err := qualificationorigin.NewGitHubWithCIStorageCredential(options.GitHubToken, qualificationorigin.CIStorageCredential{Username: options.CIStorageUsername, Token: options.CIStorageToken}).AuthenticateSource(ctx, options.Source)
 	if err != nil {
 		return nil, nil, err
 	}

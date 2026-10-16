@@ -63,7 +63,7 @@ func RestoreGitHubInputs(ctx context.Context, plan *Plan, stageID string, option
 // PackGitHubOutputs prepares each exact output carrier for provider upload.
 // A missing or invalid output stops preparation at that artifact.
 func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options GitHubStepOptions) error {
-	stages, _, artifacts, err := admitGitHubCarriers(ctx, plan)
+	stages, nodeJobs, artifacts, err := admitGitHubCarriers(ctx, plan)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 	if selected == nil {
 		return e.New(e.CodeInvalidCatalog, "GitHub plan has no node %q", nodeID)
 	}
-	outputs := uniqueSorted(selected.Outputs)
+	outputs := githubCarrierOutputs(plan, *selected, artifacts, nodeJobs)
 	details := make([]string, 0, len(outputs))
 	for _, id := range outputs {
 		details = append(details, githubArtifactDetail(plan, "Output", id))

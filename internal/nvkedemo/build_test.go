@@ -309,7 +309,7 @@ func TestUpstreamBuildPreparationKeepsExplicitMode(t *testing.T) {
 
 func preparedInvocationFixture(cfg BuildConfig) []string {
 	root := ".nvkr/laptop-bootstrap/" + cfg.AttemptPrefix
-	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--ui=plain"}
+	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
 }
 
 func writeInvocationFixture(t *testing.T, cfg BuildConfig, args []string) {

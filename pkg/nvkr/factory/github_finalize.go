@@ -45,10 +45,9 @@ func githubFinalizerTimeoutMinutes(plan *Plan) int {
 }
 
 // writeGitHubFinalizerRestoreSteps emits the complete carrier download and restore
-// sequence for the lifecycle finalizer. actions/download-artifact v8.0.1 expands
-// the exact minimatch brace set, downloads up to five artifacts concurrently, and
-// merges their uniquely named carrier files into one directory. The action succeeds
-// when the pattern matches no artifacts, so every expected artifact still reaches
+// sequence for the lifecycle finalizer. The private transport projection fetches
+// the exact brace set serially and merges uniquely named carrier files into one
+// directory. Missing pattern members are left for recovery, so every expected artifact reaches
 // the per-producer status logic and the finalizer can persist a failed Run.
 func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs map[string]string) error {
 	if out == nil || plan == nil {

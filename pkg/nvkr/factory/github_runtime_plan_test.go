@@ -113,9 +113,9 @@ func TestPrepareGitHubRuntimeBundleRejectsChangedAuthorityWithoutWrites(t *testi
 		}},
 		{"runner policy", func(in *githubStabilityInputs) { in.environment.RunsOn = "ubuntu-22.04" }},
 		{"action template", func(in *githubStabilityInputs) {
-			pin := in.catalog.Actions["download-artifact"]
+			pin := in.catalog.Actions["setup-go"]
 			pin.SHA = nextGitHubStabilityPin(t, pin.SHA)
-			in.catalog.Actions["download-artifact"] = pin
+			in.catalog.Actions["setup-go"] = pin
 		}},
 		{"workflow action", func(in *githubStabilityInputs) {
 			pin := in.catalog.Actions["upload-artifact"]

@@ -223,25 +223,6 @@ jobs:
           go-version-file: .go-version
           cache: false
 
-      # This job owns its instrumented build cache. Other jobs must not win a
-      # shared immutable key with a cache that never compiled the race tests.
-      - name: Locate Go caches
-        id: cache-paths
-        run: |
-          echo "modules=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore check cache
-        id: go-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.cache-paths.outputs.modules }}
-            ${{ steps.cache-paths.outputs.build }}
-          key: nvkr-check-v1-${{ runner.os }}-${{ runner.arch }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'toolchains/govulncheck/go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            nvkr-check-v1-${{ runner.os }}-${{ runner.arch }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'toolchains/govulncheck/go.sum') }}-
-
       - name: fmt-check
         run: make fmt-check
 
@@ -260,6 +241,7 @@ jobs:
           # Build the importer with setup-go's exact SDK. Older release
           # binaries cannot read Go 1.27.2's version-5 export data.
           install-mode: goinstall
+          skip-cache: true
 
       - name: shellcheck
         run: make shellcheck
@@ -294,15 +276,6 @@ jobs:
 
       - name: Go vulnerability check
         run: make vulncheck
-
-      - name: Save check cache
-        if: success() && steps.go-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.cache-paths.outputs.modules }}
-            ${{ steps.cache-paths.outputs.build }}
-          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
   check-skip:
     needs: [check-paths]
@@ -411,7 +384,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
       # Catalog validation re-reads the pinned NVKE tree. Acquire it with a
       # fixed action before running checkout code; never pass this token to
@@ -476,7 +449,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
       - name: Verify THIRD_PARTY_NOTICES.md is current
         run: make notices-check
@@ -561,15 +534,32 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
+
+      # CodeQL automatically uploads complete/partial databases as Actions
+      # artifacts in runner debug mode, even when debug and upload-database are
+      # false. RUNNER_DEBUG is provider-owned and cannot be overridden by env.
+      - name: Admit CodeQL without database artifact uploads
+        run: |
+          if [ "${RUNNER_DEBUG:-0}" = '1' ]; then
+            echo '::error::[NVKR-E-ENGINE-CAPABILITY] CodeQL debug reruns upload compiled databases; rerun with debug logging disabled.'
+            exit 1
+          fi
 
       - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        env:
+          CODEQL_OVERLAY_DATABASE_MODE: none
         with:
           languages: go
+          debug: false
+          trap-caching: false
+          dependency-caching: false
 
       - run: go build ./...
 
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          upload-database: false
 
   analyze-skip:
     needs: [check-paths]

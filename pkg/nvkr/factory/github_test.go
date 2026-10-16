@@ -498,6 +498,10 @@ func relowerGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflow, changed.Files, err = privatizeGitHubTransfers(plan, workflow, changed.Files, testActionRefs(t, plan))
+	if err != nil {
+		t.Fatal(err)
+	}
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return changed

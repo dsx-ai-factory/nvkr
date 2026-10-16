@@ -20,6 +20,7 @@ type githubWorkflowDocument struct {
 	Name        string                     `json:"name"`
 	On          map[string]json.RawMessage `json:"on"`
 	Permissions map[string]string          `json:"permissions"`
+	Env         map[string]string          `json:"env,omitempty"`
 	Jobs        map[string]githubJob       `json:"jobs"`
 	Concurrency struct {
 		Group            string `json:"group"`
@@ -85,6 +86,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := yaml.UnmarshalStrict(expanded, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
 	}
+	if err := validateGitHubLocatorBudget(document, actions); err != nil {
+		return err
+	}
 	if err := admitGitHubNeeds(ctx, plan, &document); err != nil {
 		return err
 	}
@@ -126,6 +130,17 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	stages, nodeJobs, err := githubStages(plan)
 	if err != nil {
 		return err
+	}
+	for _, stage := range stages {
+		if stage.DiskOutput == "" {
+			continue
+		}
+		job := document.Jobs[stage.ID]
+		if len(job.Steps) == 0 || !reflect.DeepEqual(job.Steps[0], githubKVMAccessCheck()) {
+			return e.New(e.CodeEngineCapability, "GitHub disk job %q must prepare KVM access before checkout or input transport", stage.ID)
+		}
+		job.Steps = job.Steps[1:]
+		document.Jobs[stage.ID] = job
 	}
 	if err := validateGitHubCarrierUploads(plan, document, stages, artifacts, nodeJobs, actions); err != nil {
 		return err
@@ -307,6 +322,11 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			wantSteps = 6
 			if runner == sortedKeys(bootstrap)[0] {
 				command = githubRuntimeGenerationCommand(plan)
+			} else {
+				wantSteps = 7
+				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
+					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
+				}
 			}
 		}
 		wantCondition := ""
@@ -382,6 +402,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if job.If != wantCondition {
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on an admitted branch", jobID)
 		}
+		repositoryToken, repositoryTokenPresent := job.Env[githubRepositoryTokenEnv]
+		if want := githubPublicationRepositoryToken(plan, node); repositoryToken != want || repositoryTokenPresent != (want != "") {
+			return e.New(e.CodeEngineCapability, "GitHub job %q repository metadata credential differs from its publication scope", jobID)
+		}
 		if plan.Environment.GitHubDevelopment {
 			if err := validateGitHubRegistryEnvironment(plan, node.Kind, node.Target, jobID, job); err != nil {
 				return err
@@ -424,7 +448,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub signing job %q omits its credential reference", jobID)
 			}
 		}
-		for _, output := range node.Outputs {
+		for _, output := range githubCarrierOutputs(plan, node, artifacts, nodeJobs) {
 			if !hasExactGitHubRun(job.Steps, githubRunnerCommand(plan, "pack-outputs", "node", node.ID)) ||
 				!actions.stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
@@ -618,6 +642,9 @@ func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, s
 				carriers = append(carriers, artifact)
 			}
 			if _, raw := diskPublicationRequirement(plan, artifact); raw {
+				continue
+			}
+			if !githubArtifactNeedsCarrier(plan, artifact, nodeJobs) {
 				continue
 			}
 			if err := require(artifact.ID); err != nil {

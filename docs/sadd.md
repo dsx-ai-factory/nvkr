@@ -565,20 +565,26 @@ invocation-data member holds parameters with named operation roles. The runtime 
 recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
 with no executable script inputs. Controlled transport
 wrappers contain one upload/download and retain their
-provider controls on the caller. Native preflight and checkout stay explicit in each execution job;
-operator setup, timed producers and steps with referenced outcomes/outputs remain inline in the entry workflow.
+provider controls on the caller. Native preflight and checkout stay explicit in each execution job.
+Before checkout or input transfer, disk producers reject missing, symlink or non-character KVM devices.
+If the runner cannot open the fixed device read/write, one bounded noninteractive permission bootstrap
+sets mode 0666 and requires a successful open afterward. Failed mutation or access remains a capability
+rejection. Full helper-owned capacity and held KVM API admission remain required before work.
+Operator setup, timed producers and steps with referenced outcomes/outputs remain inline in the entry workflow.
 This includes finalization and the final Run upload used by the
 closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
 bytes, preserving credential scope and per-job finalizer results. Edit locality separately preserves existing
-jobs when an independent output is added. Ordinary grouping pairs only a terminal observation and its
-dependent SBOM for the same BuildTarget and compatible offline runtime. A shared pinned tool acquired by
+jobs when an independent output is added. Offline observation, SBOM and packaging can share a producer
+stage only when that stage owns their complete inputs and runtime/target constraints agree. The bounded
+group preserves each operation and marks all members unsuccessful if its provider job fails. Otherwise
+ordinary grouping pairs a terminal observation and its dependent SBOM for the same BuildTarget and compatible offline runtime. A shared pinned tool acquired by
 an independent root operation may be an additional prerequisite; the pair waits for acquisition and
 restores the tool before observation. Failed acquisition prevents pair completion. No additional source
 or output dependency is admitted.
-Other ordinary nodes, including packaging, retain their own jobs and success conditions; the explicit ARC
+Other ordinary nodes, including packaging with external inputs, retain their own jobs and success conditions; the explicit ARC
 disk group preserves its live owner. Membership does not follow global adjacency or fixed-size chunks.
 Aggregate accounting and summaries change with the complete required set, and finalization still requires
 every job. The current Plan determines scheduling without previous-generated-state input.
@@ -586,7 +592,15 @@ Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
-No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
+Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
+retain their JSON locators plus separately admitted metadata records. The factory validates exact schemas
+and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
+digests and downstream artifact authentication remain required. Metadata-only transfers use workflow
+identity without package API calls. Dedicated read/write credentials do not elevate repository-token permissions.
+Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
+from the credential that accesses package metadata and registry bytes. Producers receive neither through
+these admission paths.
+Admission bounds expanded YAML parsing events as well as file bytes. No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
 prerequisite closure preserved; authored setup, runtime variables, images or services that mention the
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
@@ -667,12 +681,37 @@ consume its held executable members in nonroot network-disabled containers and c
 frozen producer inputs. Their distinct signatures bind exact member observations, full policy and the current
 qualifier invocation. The final owner requires successful exact-attempt jobs, authenticates those signatures
 and certificate invocation claims, and recomputes complete native coverage before issuing a B receipt.
+For mixed executable bundles, independent policy may name an exact runtime-assets archive member.
+Shared admission requires its source-built tarball producer, a non-executable delivered mode and
+complete sibling tool coverage. The archive stays in A's authenticated artifact set; the rule does
+not assert that its internal contents contain no tools.
 The independently configured `run qualify --policy <path>` derives its source from the authenticated hosted
 event, consumes live A/B/invocation receipts and signs for every selected subject. The generator owns the
 same-commit worker pair and its secret/permission routing. These implementation contracts and local native
 execution do not establish hosted acceptance; reconciliation owns the remaining candidate and external gaps.
 Any failed verdict prevents all attestations; later signing/attachment failure marks qualification unsuccessful
 even if earlier attachments remain. Smoke execution has no qualification credentials.
+
+ADR-16 specifies a local NVKE qualification rehearsal using independently
+selected local signing keys and exact local Run/payload authentication. It must exercise the complete
+artifact, smoke, evidence-publication and consumer flow while retaining the local unqualified lane.
+Local origins and receipts cannot impersonate hosted workflows or authorize the hosted publisher.
+Execution-scope admission is shared, local preparation can retain compiler-read inputs, and a
+separate local-key signing adapter has real Linux interoperability coverage. The independent local policy
+binds exact input identities, native execution pins and three distinct normalized public keys; its
+validation supplies no receipt. `run qualify-local` now delegates the complete retained-attempt check,
+three-role signing, native smoke and registry read-back sequence to lifecycle and emits canonical local
+results. An explicitly configured demo requires that command to succeed on the built attempt before
+returning deployment inputs. The `qualifyLocal` option owns preparation, setup and bounded registry
+shutdown around this flow; cleanup failure blocks handoff, and private evidence/data remain retained.
+An explicit setup command automates fresh local keys, a policy bound to a
+prepared Plan and fixed complete demo scope, pinned cosign, scratch and a disk-backed loopback registry.
+It rechecks the prepared inputs and signing roles before registry startup; generated descriptions confer
+no authority. An ownership-checked stop retains data and evidence. Real-signature integration fixtures use simulated smoke; the separately
+recorded native ARM64 rehearsal has now checked all 29 actual outputs, executed all 10 delivered tools,
+signed through the three local roles and passed registry read-back. The demo handoff has process-fixture
+coverage; downstream cluster deployment is a separate scope. Reconciliation tracks independent consumer
+and negative-case evidence and the remaining hosted acceptance work.
 
 The MVP keeps disk evidence producer-only. Embedded declarations are optional; omission is not applicable,
 while authored declarations must match their referenced pinned upstream metadata. This supplies no effective
@@ -1014,7 +1053,12 @@ required ownership/filesystem capabilities. Consumer execution uses the invoking
 adapter does not supply subordinate identities or user-namespace remapping; an escaped consumer would
 retain that user's host access. Qualified execution therefore needs a stronger authenticated boundary.
 The native ARC policy instead explicitly trusts the operator's ephemeral runner/daemon, enforces current
-native capacity/KVM admission and bounds the complete group. Source, registry-write and OIDC credentials
+native capacity/KVM admission and bounds the complete group. Its fixed access bootstrap may change a
+host-backed/shared KVM device's permissions beyond the job; an ephemeral runner alone does not establish
+exclusive ownership of that device. The operator accepts this behavior for the native route. It does not
+establish SLSA Build L3 isolation or qualified execution, and producer identity and the selected evidence
+lane remain unchanged. The separately authored OS-validation preflight remains read-only.
+Source, registry-write and OIDC credentials
 remain outside producer jobs. Internal toolchain pulls use a separate read-only preparation step whose
 temporary credential configuration is removed before source/producer execution.
 

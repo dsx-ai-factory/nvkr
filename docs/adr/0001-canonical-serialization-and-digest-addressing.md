@@ -70,12 +70,9 @@ substitutes for that object's domain-separated identity or its authenticated rec
 
 ### 3. Domain-separated digests
 
-The NVKR rebrand allocates the `nvkr.*` family namespace and `nvkr.dev` schemas
-as a breaking framework-namespace cutover. It does not mutate historical `nkd.*`
-identities or signed bytes. Unsupported old namespaces fail strict dispatch;
-there is no implicit alias or conversion. Reserved names below are reserved
-within the NVKR namespace. Historical allocations remain historical. See the
-[cutover contract](../nvkr-rebranding.md) for producer and runtime boundaries.
+The framework uses the `nvkr.*` digest families and `nvkr.dev` schemas.
+Namespace changes never rewrite historical signed bytes. Unsupported namespaces
+fail strict dispatch. Reserved names below belong to the NVKR namespace.
 
 Every structured semantic object's digest is computed with a frozen **family-kind tag** and an unambiguous
 separator: `Digest(kind, obj) = sha256(UTF8(kind) ∥ 0x00 ∥ canonical-bytes)`. `schemaVersion` stays inside the
@@ -109,7 +106,7 @@ within the same family from being interpreted.
 
 The six public objects are Definition, Environment, Run, Artifact, Release, and Verification Policy. The
 compiler-derived logical build graph uses the new **`nvkr.build`** family. **`nvkr.recipe` is reserved and
-never minted**; historical `nkd.recipe` identities remain unsupported. Removing authored
+never minted**; unsupported identity families remain rejected. Removing authored
 Recipes does not rename, convert, or reauthenticate historical signed bytes. Cluster-definition,
 cluster-composition, cluster-realization and staging-manifest families are likewise reserved and cannot mint
 new identities. The removed compiler-handoff and copied execution-settings families are also reserved and

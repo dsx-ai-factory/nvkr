@@ -77,6 +77,19 @@ func (receipt *ToolSmokeReceipt) Require(checks ArtifactCheckDescription, invoca
 // AuthenticateHostedToolSmoke owns provider job/result admission and signature
 // verification. Caller-authored JSON, flags and booleans cannot issue a receipt.
 func AuthenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, policy QualificationPolicy, githubToken string) (*ToolSmokeReceipt, error) {
+	return AuthenticateHostedToolSmokeWithCIStorage(ctx, checks, invocation, policy, githubToken, "")
+}
+
+// AuthenticateHostedToolSmokeWithCIStorage additionally accepts an independent
+// private-payload token. Private payloads also require the explicit account in
+// AuthenticateHostedToolSmokeWithCIStorageCredential; no provider-token fallback exists.
+func AuthenticateHostedToolSmokeWithCIStorage(ctx context.Context, checks *ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, policy QualificationPolicy, githubToken, storageToken string) (*ToolSmokeReceipt, error) {
+	return AuthenticateHostedToolSmokeWithCIStorageCredential(ctx, checks, invocation, policy, githubToken, qualificationorigin.CIStorageCredential{Token: storageToken})
+}
+
+// AuthenticateHostedToolSmokeWithCIStorageCredential accepts an independent
+// private-package account and read token alongside the provider API credential.
+func AuthenticateHostedToolSmokeWithCIStorageCredential(ctx context.Context, checks *ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, policy QualificationPolicy, githubToken string, storage qualificationorigin.CIStorageCredential) (*ToolSmokeReceipt, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "hosted smoke requires context")
 	}
@@ -94,7 +107,7 @@ func AuthenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckRecei
 	if err != nil {
 		return nil, err
 	}
-	provider := qualificationorigin.NewGitHub(githubToken)
+	provider := qualificationorigin.NewGitHubWithCIStorageCredential(githubToken, storage)
 	return authenticateHostedToolSmoke(ctx, checks, invocation, policy, verifier, func(ctx context.Context, platforms []string) ([]qualificationorigin.NativeSmokeArtifact, error) {
 		return provider.DownloadNativeSmoke(ctx, invocation, platforms)
 	})
@@ -225,6 +238,9 @@ func freezeToolSmokePolicy(policy QualificationPolicy) (QualificationPolicy, err
 	}
 	sort.Strings(frozen.OutsideMVPSuites)
 	sort.Strings(frozen.RequiredSuites)
+	sort.Slice(frozen.Smoke.NonToolMembers, func(i, j int) bool {
+		return frozen.Smoke.NonToolMembers[i].key() < frozen.Smoke.NonToolMembers[j].key()
+	})
 	sort.Slice(frozen.Smoke.NonToolOutputs, func(i, j int) bool {
 		return frozen.Smoke.NonToolOutputs[i].Output < frozen.Smoke.NonToolOutputs[j].Output
 	})

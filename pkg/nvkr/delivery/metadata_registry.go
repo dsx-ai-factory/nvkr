@@ -239,17 +239,30 @@ func metadataFetchError(ctx context.Context, err error, operation string) error 
 // referenced manifest exists. Caller-owned signature/provenance gates authorize
 // release assembly; manifest existence alone is not acceptance.
 func PushMetadata(ctx context.Context, source, repository string, options RegistryOptions) (string, error) {
+	return PushMetadataWithOptions(ctx, source, repository, PushOptions{Registry: options})
+}
+
+// PushMetadataWithOptions binds optional prior metadata admission to the exact
+// root being published. Metadata publication cannot advance payload aliases.
+func PushMetadataWithOptions(ctx context.Context, source, repository string, request PushOptions) (string, error) {
+	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if err := options.Validate(); err != nil {
+	if err := request.Validate(); err != nil {
 		return "", err
+	}
+	if len(request.ImageTags) != 0 {
+		return "", e.New(e.CodeUsage, "metadata publication cannot advance image tags")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 	defer cancel()
 	inspection, err := InspectMetadata(ctx, source)
 	if err != nil {
 		return "", err
+	}
+	if request.ExpectedRootDigest != "" && inspection.RootDigest != request.ExpectedRootDigest {
+		return "", e.New(e.CodeVerifyFailed, "publication root changed after metadata admission")
 	}
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
@@ -280,6 +293,13 @@ func PushMetadata(ctx context.Context, source, repository string, options Regist
 	index, err := path.ImageIndex()
 	if err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "open metadata index")
+	}
+	digest, err := index.Digest()
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "digest metadata index")
+	}
+	if digest.String() != inspection.RootDigest {
+		return "", e.New(e.CodeVerifyFailed, "metadata index changed after membership inspection")
 	}
 	if err := remote.WriteIndex(ref, index, registryOptions(ctx, options)...); err != nil {
 		return "", classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publish metadata root"))

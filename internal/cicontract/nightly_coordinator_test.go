@@ -92,7 +92,7 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 	}
 	if !reflect.DeepEqual(build.Permissions, map[string]string{"contents": "read", "actions": "write"}) ||
 		!reflect.DeepEqual(runtime.Permissions, map[string]string{"contents": "read", "actions": "read", "packages": "read"}) ||
-		runtime.RunsOn != "arc-arm64-kvm" || runtime.Environment != "nkd-arc" ||
+		runtime.RunsOn != "arc-arm64-kvm" || runtime.Environment != "nvkr-arc" ||
 		runtime.Concurrency.CancelInProgress || runtime.Concurrency.Group != "nvkr-nightly-native-arm64-runtime" ||
 		runtime.TimeoutMinutes != 360 {
 		t.Fatal("dispatch credentials escaped into native runtime or shared target admission changed")
@@ -114,7 +114,7 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 		}
 		if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
 			publicUpload = step.If == "always()" &&
-				step.With["path"] == "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/*"
+				step.With["path"] == "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json"
 		}
 	}
 	if !executed || !checkedSource || !publicUpload || len(profiles) != 2 {

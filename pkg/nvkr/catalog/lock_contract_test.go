@@ -43,7 +43,7 @@ func TestLockSchemaDispatchIsExact(t *testing.T) {
 	}{
 		{"missing apiVersion", bytes.Replace(valid, []byte("apiVersion: nvkr.dev/lock/v1\n"), nil, 1)},
 		{"future apiVersion", bytes.Replace(valid, []byte("nvkr.dev/lock/v1"), []byte("nvkr.dev/lock/v2"), 1)},
-		{"pre-rebrand namespace", bytes.Replace(valid, []byte("nvkr.dev/lock/v1"), []byte("nkd.dev/lock/v1"), 1)},
+		{"unsupported namespace", bytes.Replace(valid, []byte("nvkr.dev/lock/v1"), []byte("unsupported.dev/lock/v1"), 1)},
 		{"missing kind", bytes.Replace(valid, []byte("kind: PinLock\n"), nil, 1)},
 		{"wrong kind", bytes.Replace(valid, []byte("PinLock"), []byte("OtherLock"), 1)},
 		{"unknown field", append(append([]byte(nil), valid...), []byte("futureField: true\n")...)},
@@ -61,7 +61,7 @@ func TestLockSchemaDispatchIsExact(t *testing.T) {
 func TestCatalogSchemaDispatchIsExact(t *testing.T) {
 	validLock := lockYAML("  s: {tag: v1.0.0, commit: " + strings.Repeat("a", 40) + ", treeHash: " + strings.Repeat("f", 40) + ", sourceDateEpoch: 1}\n")
 	for _, reg := range [][]byte{
-		bytes.Replace([]byte(lockTestRegistry), []byte("nvkr.dev/catalog/v3"), []byte("nkd.dev/catalog/v3"), 1),
+		bytes.Replace([]byte(lockTestRegistry), []byte("nvkr.dev/catalog/v3"), []byte("unsupported.dev/catalog/v3"), 1),
 		bytes.Replace([]byte(lockTestRegistry), []byte("nvkr.dev/catalog/v3"), []byte("nvkr.dev/catalog/v4"), 1),
 		bytes.Replace([]byte(lockTestRegistry), []byte("SourceBuildRegistry"), []byte("FutureRegistry"), 1),
 	} {

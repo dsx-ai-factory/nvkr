@@ -6,6 +6,7 @@ package sbom
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,7 +17,7 @@ import (
 // proof that the sandbox/helper/receipt issuer executed successfully.
 func TestBoundDiskContentDecoder(t *testing.T) {
 	for _, architecture := range []string{"amd64", "arm64"} {
-		for _, name := range []string{"valid", "subject", "size", "kind", "platform", "inspector", "codec", "guestfish", "scanner", "package-reader", "filesystem-bound", "image", "unknown-field", "duplicate-field", "trailing-document", "malformed", "empty", "unsorted-files", "duplicate-files", "unsafe-path", "missing-file-digest", "unknown-file-kind", "missing-class"} {
+		for _, name := range []string{"valid", "subject", "size", "kind", "platform", "inspector", "codec", "guestfish", "scanner", "package-reader", "filesystem-bound", "image", "unknown-field", "duplicate-field", "trailing-document", "malformed", "empty", "unsorted-files", "duplicate-files", "unsafe-path", "missing-file-digest", "unknown-file-kind", "missing-class", "unsorted-properties"} {
 			t.Run(architecture+"/"+name, func(t *testing.T) {
 				fixture := contentFixture("disk-image", architecture, "b")
 				report, binding, image := fixture.report, fixture.report, fixture.runtimeDigest
@@ -64,6 +65,9 @@ func TestBoundDiskContentDecoder(t *testing.T) {
 				case "unknown-file-kind":
 					report.Files[0].Kind = "socket"
 					want = e.CodeEngineCapability
+				case "unsorted-properties":
+					slices.Reverse(report.Components[0].Properties)
+					want = e.CodeInvalidCatalog
 				case "missing-class":
 					report.Components[0].Properties = report.Components[0].Properties[1:]
 					want = e.CodeProvenanceMissing

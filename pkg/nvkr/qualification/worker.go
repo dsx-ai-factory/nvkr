@@ -63,7 +63,7 @@ func RunTriggeredSmokeWorker(ctx context.Context, policyPath string, options lif
 	if options.WorkspaceRoot == "" {
 		options.WorkspaceRoot = SmokeWorkerWorkspace
 	}
-	provider := qualificationorigin.NewGitHub(options.GitHubToken)
+	provider := qualificationorigin.NewGitHubWithCIStorageCredential(options.GitHubToken, qualificationorigin.CIStorageCredential{Username: options.CIStorageUsername, Token: options.CIStorageToken})
 	source, err := provider.AuthenticateTriggeredSource(ctx, policy.Source)
 	if err != nil {
 		return nil, err

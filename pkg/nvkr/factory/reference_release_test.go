@@ -108,9 +108,15 @@ func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...strin
 		if err := executeAttestEvidence(t.Context(), plan, nodes[NodeAttestEvidence+"/"+route], artifacts, referenceSignerFactory(signer), io.Discard); err != nil {
 			t.Fatal(err)
 		}
-		source := artifacts["package/"+outputPublicationPackage(output.Name)].Path
+		source, err := completePublicationInput(t.Context(), plan, nodes[NodePublish+"/"+route], artifacts, referenceSignerFactory(signer), "")
+		if err != nil {
+			t.Fatal(err)
+		}
 		result, err := delivery.ExportMetadata(t.Context(), source, artifacts["metadata/"+route].Path)
 		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := delivery.ExportMetadataWithExpectedRoot(t.Context(), source, artifacts["signing-metadata/"+route].Path, result.RootDigest); err != nil {
 			t.Fatal(err)
 		}
 		writeReferenceSigningFixture(t, plan, artifacts, route, result.RootDigest)

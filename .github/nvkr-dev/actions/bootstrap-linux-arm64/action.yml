@@ -11,6 +11,9 @@ inputs:
   runner-artifact:
     description: Same-Run helper artifact name
     required: true
+  nvkr-ci-storage-write-token:
+    description: Dedicated private CI credential, forwarded only to its transfer steps
+    required: true
 runs:
   using: composite
   steps:
@@ -44,9 +47,10 @@ runs:
         ./nvkr-exec run generate --engine github --definition inputs/definitions/nvke/definition.yaml --environment inputs/environments/github-development.yaml --root . --check
       shell: bash -e {0}
     - name: 'Upload NVKR runner'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-dev/actions/ci-upload
       with:
         name: ${{ inputs.runner-artifact }}
         path: 'nvkr-exec'
         if-no-files-found: error
         retention-days: 7
+        nvkr-ci-storage-write-token: ${{ inputs.nvkr-ci-storage-write-token }}

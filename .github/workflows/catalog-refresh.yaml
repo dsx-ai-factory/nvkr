@@ -76,7 +76,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
       # Build the nvkr CLI that performs the refresh.
       - name: Build the nvkr CLI
         run: go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o "$RUNNER_TEMP/nvkr" ./cmd/nvkr

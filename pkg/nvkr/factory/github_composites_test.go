@@ -334,11 +334,11 @@ func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte, pl
 				} else if uses != sharedPrefix+"prepare-stage" {
 					t.Fatal("preparation alias names a different action")
 				}
-				if anchor != wantAnchor || len(target.Content) != 8 || githubYAMLLength(with) != 4 ||
+				if anchor != wantAnchor || len(target.Content) != 8 || githubYAMLLength(with) != 2 ||
 					githubYAMLValue(target, "name") != "Prepare NVKR runner and job parameters" ||
-					githubYAMLValue(target, "id") != githubContextStepID || githubYAMLValue(with, "action") != "${{ github.job }}" ||
+					githubYAMLValue(target, "id") != githubContextStepID ||
 					!strings.HasPrefix(artifact, "nvkr-exec-") {
-					t.Fatal("preparation alias changes its fixed helper delivery or current-job binding")
+					t.Fatal("preparation alias changes its fixed helper delivery")
 				}
 			}
 		}
@@ -373,7 +373,7 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 		}
 		for name, value := range step.With {
 			switch name {
-			case "parameters", "action", "runner-artifact":
+			case "parameters", "runner-artifact":
 				continue
 			case "with-path":
 				if value == "" {

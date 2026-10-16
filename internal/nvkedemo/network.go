@@ -33,10 +33,8 @@ import (
 )
 
 const (
-	// This durable host namespace is shared with pre-rename version-2 journals.
-	// Keep bridge, firewall owner, staging paths and the coordination lock stable
-	// together; renaming only one would strand grants or allow concurrent owners.
-	BridgeName     = "nkdvm0"
+	// Durable namespace for version-3 NVKE demo network journals.
+	BridgeName     = "nvkevm0"
 	GuestCIDR      = "172.30.0.0/24"
 	GuestGateway   = "172.30.0.1"
 	VIPCIDR        = "172.31.0.0/24"
@@ -195,7 +193,7 @@ func newNetworkGuard(runner Runner, kindCIDR string) (*NetworkGuard, error) {
 	}
 	marker := append([]byte(nil), token[:6]...)
 	marker[0] = (marker[0] | 2) & 0xfe
-	return &NetworkGuard{Work: work, Owner: "nkd-demo-" + hex.EncodeToString(token[:]), BridgeMAC: net.HardwareAddr(marker).String(), KindCIDR: kindCIDR, runner: runner, directory: directory, pid: os.Getpid(), sysctls: map[string]string{}, helperPath: qemuHelper, policyPath: qemuPolicy}, nil
+	return &NetworkGuard{Work: work, Owner: "nvke-demo-" + hex.EncodeToString(token[:]), BridgeMAC: net.HardwareAddr(marker).String(), KindCIDR: kindCIDR, runner: runner, directory: directory, pid: os.Getpid(), sysctls: map[string]string{}, helperPath: qemuHelper, policyPath: qemuPolicy}, nil
 }
 func validateNetworkKind(kindCIDR string) error {
 	kind, err := netip.ParsePrefix(kindCIDR)
@@ -374,7 +372,7 @@ func (g *NetworkGuard) probePrivilegedPorts(ctx context.Context) error {
 }
 
 func (g *NetworkGuard) acquireLock() error {
-	path := fmt.Sprintf("/tmp/nkd-local-network-%d.lock", os.Getuid())
+	path := fmt.Sprintf("/tmp/nvke-local-network-%d.lock", os.Getuid())
 	if g.lockPath != "" {
 		path = g.lockPath
 	}
@@ -596,7 +594,7 @@ func networkFile(ctx context.Context, path string, private bool) (networkFileID,
 }
 
 func (g *NetworkGuard) snapshot() networkState {
-	return networkState{Version: 2, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, KindGateway: g.kindGateway, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
+	return networkState{Version: 3, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, KindGateway: g.kindGateway, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
 }
 
 func (g *NetworkGuard) Checkpoint(ctx context.Context) error {
@@ -789,7 +787,7 @@ func (g *NetworkGuard) Start(ctx context.Context) (resultErr error) {
 	if _, err = os.Lstat(g.policyPath); !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("bridge policy appeared; refusing replacement")
 	}
-	stage := filepath.Join(filepath.Dir(g.policyPath), ".nkd-policy-"+strings.TrimPrefix(g.Owner, "nkd-demo-"))
+	stage := filepath.Join(filepath.Dir(g.policyPath), ".nvke-policy-"+strings.TrimPrefix(g.Owner, "nvke-demo-"))
 	if _, err = os.Lstat(stage); !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("root staging exists or cannot be inspected")
 	}

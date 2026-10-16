@@ -122,10 +122,9 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 			},
 		},
 		{
-			name: "download action pin", fixture: githubTestPlan, wantActions: true, spliceCode: e.CodeInvalidCatalog,
-			spliceMatch: func(name string, raw []byte) bool {
-				return strings.HasPrefix(name, githubSharedDirectory+"execute-") && bytes.Contains(raw, []byte("actions/download-artifact@"))
-			},
+			// Retained in the canonical Plan's logical action vocabulary; the
+			// private executable projection acquires locators through the helper.
+			name: "logical download action pin", fixture: githubTestPlan,
 			mutate: func(t *testing.T, inputs *githubStabilityInputs) {
 				pin := inputs.catalog.Actions["download-artifact"]
 				pin.SHA = nextGitHubStabilityPin(t, pin.SHA)
@@ -133,7 +132,7 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 			},
 		},
 		{
-			name: "summary-referenced upload action pin", fixture: githubTestPlan, wantActions: true, wantWorkflow: true, spliceCode: e.CodeEngineCapability,
+			name: "summary-referenced upload action pin", fixture: githubTestPlan, wantActions: true, spliceCode: e.CodeEngineCapability,
 			mutate: func(t *testing.T, inputs *githubStabilityInputs) {
 				pin := inputs.catalog.Actions["upload-artifact"]
 				pin.SHA = nextGitHubStabilityPin(t, pin.SHA)

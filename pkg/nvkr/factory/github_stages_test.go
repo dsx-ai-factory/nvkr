@@ -107,7 +107,7 @@ func TestGitHubStagesGroupOnlyTargetObservationAndSBOM(t *testing.T) {
 		{name: "container boundary", mutate: func(_, second *Node) { second.Container = "other@sha256:" + strings.Repeat("2", 64) }, want: 2},
 		{name: "platform boundary", mutate: func(_, second *Node) { second.Platform = "linux/arm64" }, want: 2},
 		{name: "runner boundary", mutate: func(_, second *Node) { second.RunsOn = "ubuntu-24.04-arm" }, want: 2},
-		{name: "build boundary", mutate: func(first, _ *Node) { first.Kind = NodeBuild }, want: 2},
+		{name: "closed producer consumer", mutate: func(first, _ *Node) { first.Kind = NodeBuild }, want: 1},
 		{name: "fetch boundary", mutate: func(_, second *Node) { second.Kind = NodeFetch }, want: 2},
 		{name: "package boundary", mutate: func(_, second *Node) { second.Kind = NodePackage }, want: 2},
 		{name: "different target", mutate: func(_, second *Node) { second.BuildTarget = "other" }, want: 2},

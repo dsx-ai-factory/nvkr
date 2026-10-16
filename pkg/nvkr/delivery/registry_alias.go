@@ -25,12 +25,18 @@ import (
 type PushOptions struct {
 	Registry  RegistryOptions
 	ImageTags map[string]string
+	// ExpectedRootDigest binds a prior metadata admission to the actual push.
+	// Empty retains the ordinary standalone publication contract.
+	ExpectedRootDigest string
 }
 
 // Validate admits transport credentials and tag syntax before local or remote I/O.
 func (options PushOptions) Validate() error {
 	if err := validateRegistryOptions(options.Registry); err != nil {
 		return err
+	}
+	if options.ExpectedRootDigest != "" && !isDigest(options.ExpectedRootDigest) {
+		return e.New(e.CodeUsage, "publication expected root must be an exact SHA-256 digest")
 	}
 	return ValidateImageTags(options.ImageTags)
 }

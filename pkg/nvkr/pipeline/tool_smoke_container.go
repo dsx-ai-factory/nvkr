@@ -28,11 +28,14 @@ test "$(wc -c < /work/tool)" -eq "$2"
 printf '%s  /work/tool\n' "$1" | sha256sum -c - >/dev/null
 chmod 0500 /work/tool
 shift 2
-exec /usr/bin/env -i PATH=/usr/bin:/bin HOME=/work TMPDIR=/work LC_ALL=C TZ=UTC /work/tool "$@"`
+exec /usr/bin/env -i PATH=/usr/bin:/bin HOME=/work TMPDIR=/work LC_ALL=C TZ=UTC CLUSTERCTL_DISABLE_VERSIONCHECK=true /work/tool "$@"`
 )
 
 func toolSmokeEnvironment() []string {
-	return []string{"PATH=/usr/bin:/bin", "HOME=/work", "TMPDIR=/work", "LC_ALL=C", "TZ=UTC"}
+	// clusterctl performs a network update check after even its version command.
+	// Disable that optional check while retaining the version output and all
+	// container isolation. This fixed value never comes from the caller.
+	return []string{"PATH=/usr/bin:/bin", "HOME=/work", "TMPDIR=/work", "LC_ALL=C", "TZ=UTC", "CLUSTERCTL_DISABLE_VERSIONCHECK=true"}
 }
 
 func toolSmokeCreateArgs(selection ToolSmokeSelection, image, attempt string, subject *heldfile.File, profile ToolSmokeProfile) []string {

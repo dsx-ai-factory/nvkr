@@ -4,12 +4,11 @@
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nvke-m2-native-toolchains
-requiresCatalogDigest: sha256:7b2edee8f03952f7efd8af71fd4a1beb43d4d883d7502d59398c6e50761db73c
-# Candidate-only exception: https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md.
+requiresCatalogDigest: sha256:1afb9ddc7c36207f8248b22490c63fc7b5a7f4b9533f6019a3281c95e30dd6e0
 toolchainSubstitutions:
   - arch: amd64
     from: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-    to: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013
+    to: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:2a8d3ca5b447fe9d4694aa6cd977c6353299b336656b23688bc6dc11b8ab98f2
     components:
       - nvke-agent
       - nvke-cni-calico

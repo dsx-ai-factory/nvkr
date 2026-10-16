@@ -8,7 +8,7 @@ import tarfile
 
 payload = b"Python tarfile compatibility fixture; not a Debian package"
 digest = hashlib.sha256(payload).hexdigest()
-manifest = {"schemaVersion": "nkd.dev/package-acquisitions/v1", "architecture": "arm64",
+manifest = {"schemaVersion": "nvkr.dev/package-acquisitions/v1", "architecture": "arm64",
             "scope": "apt-pre-install-pkgs", "packages": [{"name": "fixture", "version": "1:2.0-1",
             "architecture": "all", "digest": "sha256:" + digest, "size": len(payload),
             "path": "packages/" + digest + ".deb",

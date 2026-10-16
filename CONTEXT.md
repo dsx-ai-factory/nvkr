@@ -125,11 +125,18 @@ The workflow can remain byte-identical across routine pin updates when schedulin
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
 Edit locality additionally preserves existing output jobs when an independent output is added. Ordinary
-grouping pairs only one BuildTarget's terminal observation and dependent SBOM; packaging and other ordinary
-nodes keep separate jobs. A shared pinned root tool may be an additional prerequisite for the pair,
+grouping can append offline observation, SBOM and packaging to a producer when that one stage owns all
+inputs and runtime/target constraints agree; otherwise one BuildTarget's observation and SBOM may pair.
+Other nodes keep separate jobs. Signing, publication and remote verification retain their boundaries. A shared pinned root tool may be an additional prerequisite for the pair,
 which waits for its acquisition and restoration before observation. Required aggregate accounting changes,
 and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
 generated files do not supply scheduling state.
+Payload carriers use an unlinked private/internal GHCR package with separate storage credentials.
+Actions stores their JSON locators and separately validated metadata records with exact schemas and file
+inventories. Metadata delivery uses workflow identity, preserves exact bytes and grants no release authority.
+Unknown/mixed contents remain private; control layouts cannot carry output payload blobs.
+Carrier and GHCR publication admission use the automatic repository token for source metadata separately
+from package credentials; that token is not added to producer execution.
 Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
 Development and production use separate fixed bundle layouts selected by their Environment, with the same
 compiler and independent ownership manifests. A development bundle is not a release authorization.
@@ -224,6 +231,19 @@ Native workers exercise every selected delivered tool with fixed version checks 
 sign exact member observations. The final qualifier authenticates complete native coverage under the same
 independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
 they are not caller-authored pass records or release authorization.
+An exact runtime-assets archive member may be outside version smoke only when the Plan declares a
+source-built tarball and the delivered member is non-executable. Its artifact checks remain required;
+the rule does not exempt sibling tools or classify the archive's internal contents.
+The local qualification rehearsal specified in ADR-16 exercises the same
+build/evidence checks with explicit local origins and distinct local signing roles. Its results retain
+the unqualified local lane and cannot replace authenticated hosted acceptance or grant release authority.
+`run qualify-local` owns the retained-attempt rehearsal through independent registry read-back; its
+canonical result describes that local check only. An explicitly configured demo gates deployment inputs
+on successful qualification of its built attempt. The demo’s explicit `qualifyLocal` opt-in owns preparation and registry shutdown around qualification.
+Explicit demo setup can also generate disposable local keys
+and a Plan-bound policy from the maintained complete demo scope; this is local operator trust, not
+independent organizational approval. Setup files grant no verification receipt. Reconciliation records actual demo-tool execution,
+consumer verification, negative cases and the scope of deployment-gate testing separately.
 External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success

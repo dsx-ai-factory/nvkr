@@ -77,7 +77,7 @@ func TestGitHubRuntimeTransportCompilesOnceAndRestoresEveryHelper(t *testing.T) 
 			bootstrap := runtimeTransportBootstraps(t, plan)
 			first := bootstrap[sortedKeys(bootstrap)[0]]
 			paths := []string{bundle.PlanPath, path.Join(path.Dir(bundle.PlanPath), "action-data.json"), bundle.ManifestPath}
-			compileCount, runtimeUploads, runnerUploads, secondaryDownloads := 0, 0, 0, 0
+			compileCount, runtimeUploads, runnerUploads, secondaryDownloads, installations := 0, 0, 0, 0, 0
 			for runner, id := range bootstrap {
 				job := document.Jobs[id]
 				if job.RunsOn != githubBootstrapRunner(runner) || len(job.Permissions) != 0 || job.Environment != "" || job.TimeoutMinutes != githubSupportJobTimeoutMinutes {
@@ -106,9 +106,14 @@ func TestGitHubRuntimeTransportCompilesOnceAndRestoresEveryHelper(t *testing.T) 
 						}
 					case "Download NVKR runtime inputs":
 						secondaryDownloads++
-						want := map[string]string{"name": "nvkr-runtime-inputs", "path": path.Dir(bundle.PlanPath)}
-						if id == first || step.Uses != plan.Actions["download-artifact"].Uses() || !reflect.DeepEqual(step.With, want) || index+1 == len(job.Steps) || job.Steps[index+1].ID != "validate-catalog" {
-							t.Fatal("secondary bootstrap does not restore current-Run inputs before checking")
+						want := map[string]string{"name": "nvkr-runtime-inputs", "path": githubRuntimeInputDirectory}
+						if id == first || step.Uses != plan.Actions["download-artifact"].Uses() || !reflect.DeepEqual(step.With, want) || index+2 >= len(job.Steps) || strings.TrimSpace(job.Steps[index+1].Run) != githubRuntimeInstallCommand(plan) || job.Steps[index+2].ID != "validate-catalog" {
+							t.Fatal("secondary bootstrap does not stage and install current-Run inputs before checking")
+						}
+					case "Install NVKR runtime inputs":
+						installations++
+						if id == first || strings.TrimSpace(step.Run) != githubRuntimeInstallCommand(plan) || len(step.Env) != 0 {
+							t.Fatal("runtime installation escaped the credential-free secondary bootstrap")
 						}
 					case "Upload NVKR runner":
 						runnerUploads++
@@ -119,8 +124,8 @@ func TestGitHubRuntimeTransportCompilesOnceAndRestoresEveryHelper(t *testing.T) 
 					}
 				}
 			}
-			if compileCount != 1 || runtimeUploads != 1 || runnerUploads != len(bootstrap) || secondaryDownloads != len(bootstrap)-1 {
-				t.Fatalf("runtime transport owners: compile=%d inputs=%d helpers=%d secondary=%d", compileCount, runtimeUploads, runnerUploads, secondaryDownloads)
+			if compileCount != 1 || runtimeUploads != 1 || runnerUploads != len(bootstrap) || secondaryDownloads != len(bootstrap)-1 || installations != secondaryDownloads {
+				t.Fatalf("runtime transport owners: compile=%d inputs=%d helpers=%d secondary=%d installations=%d", compileCount, runtimeUploads, runnerUploads, secondaryDownloads, installations)
 			}
 			// Turning off runtime compilation must preserve every execution,
 			// credential, native route and finalizer step after helper restoration.
@@ -212,6 +217,13 @@ func TestGitHubRuntimeTransportRejectsMissingOrSwappedCarrierContracts(t *testin
 	t.Run("missing planner dependency", func(t *testing.T) {
 		changed := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
 			githubYAMLRemove(githubTestYAMLField(t, root, "jobs", second), "needs")
+		})
+		assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeInvalidCatalog)
+	})
+	t.Run("changed installation command", func(t *testing.T) {
+		changed := mutateGitHubBundleYAML(t, bundle, secondMember, func(root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Install NVKR runtime inputs")
+			githubYAMLSet(step, "run", githubYAMLString("true"))
 		})
 		assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeInvalidCatalog)
 	})

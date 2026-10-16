@@ -118,16 +118,36 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "write" || call.Permissions["packages"] != "read" || native.Permissions["packages"] != "read" {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
-	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" || len(call.Secrets) != 1 {
+	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
+		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || len(call.Secrets) != 2 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
+	}
+	contract, ok := worker.On["workflow_call"].(map[string]any)
+	if !ok {
+		t.Fatal("worker has no reusable workflow contract")
+	}
+	secrets, ok := contract["secrets"].(map[string]any)
+	if !ok {
+		t.Fatal("worker has no explicit secret contract")
+	}
+	readSecret, ok := secrets["NVKR_CI_STORAGE_READ_TOKEN"].(map[string]any)
+	if !ok || readSecret["required"] != true {
+		t.Fatal("private carrier read credential must be required")
 	}
 	for _, job := range []qualificationWorkflowJob{native, final} {
 		if len(job.Env) != 0 || job.Timeout != 30 {
 			t.Fatal("ambient job environment or missing timeout")
 		}
 		scoped := 0
+		storageScoped := 0
 		checkouts := 0
 		for _, step := range job.Steps {
+			if token, ok := step.Env["NVKR_CI_STORAGE_TOKEN"]; ok {
+				storageScoped++
+				if token != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || step.Env["NVKR_CI_STORAGE_USER"] != "${{ vars.NVKR_CI_STORAGE_READ_USER }}" || !strings.Contains(step.Run, "./nvkr-exec run ") {
+					t.Fatal("private carrier read credential escaped its owner or gained an ambient fallback")
+				}
+			}
 			if strings.HasPrefix(step.Uses, "actions/checkout@") {
 				checkouts++
 				if step.With["ref"] != "${{ github.workflow_sha }}" || step.With["persist-credentials"] != "false" {
@@ -144,7 +164,7 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 				}
 			}
 		}
-		if scoped != 1 || checkouts != 1 {
+		if scoped != 1 || storageScoped != 1 || checkouts != 1 {
 			t.Fatal("incorrect credential or checkout scope")
 		}
 	}
@@ -156,7 +176,7 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 		}
 	}
 	all := string(bundle.files[policy.QualificationWorkflow]) + string(bundle.files[policy.Smoke.Workflow])
-	for _, forbidden := range []string{"secrets: inherit", "refs/pull/", "ref: ${{ github.event.workflow_run.head_sha }}", "--run ", "--results ", "@main", "@v4"} {
+	for _, forbidden := range []string{"secrets.NVKR_CI_STORAGE_TOKEN", "secrets.NVKR_CI_STORAGE_WRITE_TOKEN", "secrets: inherit", "refs/pull/", "ref: ${{ github.event.workflow_run.head_sha }}", "--run ", "--results ", "@main", "@v4"} {
 		if strings.Contains(all, forbidden) {
 			t.Fatalf("unexpected generated surface %q", forbidden)
 		}

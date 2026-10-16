@@ -24,6 +24,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -351,6 +352,10 @@ func (reader *nightlyZIPReaderAt) ReadAt(p []byte, offset int64) (int, error) {
 
 type nightlyCapture func(context.Context, []string, string, time.Duration) ([]byte, error)
 
+func nightlyCIStorageOptions() cistore.Options {
+	return cistore.Options{Token: os.Getenv("NVKR_CI_STORAGE_TOKEN"), Username: os.Getenv("NVKR_CI_STORAGE_USER"), RepositoryToken: os.Getenv("GH_TOKEN")}
+}
+
 func newNightlyInputs(ctx context.Context, profile NightlyProfile, build NightlyBuild, plan *factory.Plan, definition lifecycle.Definition, environment lifecycle.Environment, workspace string) (*NightlyInputs, error) {
 	if os.Getenv("GITHUB_SERVER_URL") != "https://github.com" || os.Getenv("GITHUB_REF") != "refs/heads/main" || os.Getenv("GH_TOKEN") == "" {
 		return nil, e.New(e.CodeEngineCapability, "nightly artifact retrieval requires explicit main-branch GitHub identity and API token")
@@ -456,15 +461,26 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 	}
 	memberNames := []string{"run.json", "publication-release.tar"}
 	members := make([][]byte, len(memberNames))
+	privateOptions := nightlyCIStorageOptions()
+	privateRequest := cistore.Request{Repository: repository, RunID: strconv.FormatInt(build.ProducerRun, 10), Attempt: strconv.FormatInt(build.ProducerAttempt, 10)}
 	for i := range memberNames {
-		members[i], err = nightlyArchiveMember(ctx, archives[i], selected[i], memberNames[i])
+		privateRequest.Name = names[i]
+		var restored map[string][]byte
+		restored, err = nightlyTransportMembers(ctx, archives[i], selected[i], map[string]int64{memberNames[i]: 32 << 20}, workspace, privateRequest, privateOptions, cistore.Download)
 		if err != nil {
 			return nil, err
 		}
+		members[i] = restored[memberNames[i]]
 	}
 	harnessCommit := profile.HarnessCommit
 	if environment.GitHubRuntimePlan {
-		plan, err = nightlyRuntimePlan(ctx, archives[2], selected[2], profile, definition, environment)
+		privateRequest.Name = names[2]
+		var restored map[string][]byte
+		restored, err = nightlyTransportMembers(ctx, archives[2], selected[2], map[string]int64{"plan.json": factory.MaxPlanBytes, "action-data.json": 32 << 20, "manifest.json": 32 << 20}, workspace, privateRequest, privateOptions, cistore.Download)
+		if err != nil {
+			return nil, err
+		}
+		plan, err = nightlyRuntimePlanMembers(ctx, restored, profile, definition, environment)
 		if err != nil {
 			return nil, err
 		}
@@ -535,10 +551,9 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 	return &NightlyInputs{Reference: reference, Plan: plan, HarnessCommit: harnessCommit, LocatorRoot: locatorRoot, RunPath: filepath.Join(downloads[0], "run.json"), Run: run, ExpectedInvocation: fmt.Sprintf("https://github.com/%s/actions/runs/%d/attempts/%d", repository, build.ProducerRun, build.ProducerAttempt)}, nil
 }
 
-func nightlyRuntimePlan(ctx context.Context, archive []byte, artifact nightlyGitHubArtifact, profile NightlyProfile, definition lifecycle.Definition, environment lifecycle.Environment) (*factory.Plan, error) {
-	members, err := nightlyArchiveMembers(ctx, archive, artifact, map[string]int64{"plan.json": factory.MaxPlanBytes, "action-data.json": 32 << 20, "manifest.json": 32 << 20})
-	if err != nil {
-		return nil, err
+func nightlyRuntimePlanMembers(ctx context.Context, members map[string][]byte, profile NightlyProfile, definition lifecycle.Definition, environment lifecycle.Environment) (*factory.Plan, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "nightly runtime Plan admission canceled")
 	}
 	var plan factory.Plan
 	if err := canonical.UnmarshalExact(members["plan.json"], &plan); err != nil {
@@ -554,6 +569,82 @@ func nightlyRuntimePlan(ctx context.Context, archive []byte, artifact nightlyGit
 		return nil, err
 	}
 	return &plan, nil
+}
+
+type nightlyPrivateDownload func(context.Context, cistore.Request, cistore.Locator, string, cistore.Options) error
+
+// Provider ZIP pins describe transport bytes, not Release authority. A private
+// locator delegates payload admission to cistore and never falls back after
+// restoration fails; complete publication verification remains mandatory.
+func nightlyTransportMembers(ctx context.Context, archive []byte, artifact nightlyGitHubArtifact, expected map[string]int64, workspace string, request cistore.Request, options cistore.Options, download nightlyPrivateDownload) (members map[string][]byte, resultErr error) {
+	members, legacyErr := nightlyArchiveMembers(ctx, archive, artifact, expected)
+	if legacyErr == nil {
+		return members, nil
+	}
+	locatorMembers, err := nightlyArchiveMembers(ctx, archive, artifact, map[string]int64{artifact.Name + ".ci-locator.json": cistore.MaxLocatorBytes})
+	if err != nil {
+		return nil, err
+	}
+	locator, err := cistore.DecodeLocator(locatorMembers[artifact.Name+".ci-locator.json"])
+	if err != nil {
+		return nil, err
+	}
+	if err = locator.Validate(request); err != nil {
+		return nil, err
+	}
+	if request.Name != artifact.Name || locator.ArchiveSize > diagnosticLimit {
+		return nil, e.New(e.CodeVerifyFailed, "private nightly locator differs from exact artifact origin or payload bound")
+	}
+	if options.Token == "" || strings.TrimSpace(options.Username) == "" || download == nil {
+		return nil, e.New(e.CodeEngineCapability, "private nightly payload requires an explicit storage username and token")
+	}
+	root, err := os.MkdirTemp(workspace, "nightly-private-")
+	if err != nil {
+		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating private nightly payload directory")
+	}
+	defer func() {
+		if cleanupErr := os.RemoveAll(root); cleanupErr != nil {
+			members = nil
+			resultErr = errors.Join(resultErr, e.Wrap(e.CodeImmutableViolation, cleanupErr, "removing private nightly payload directory"))
+		}
+	}()
+	destination := filepath.Join(root, "payload")
+	if err = download(ctx, request, locator, destination, options); err != nil {
+		return nil, err
+	}
+	directory, _, err := securepath.OpenDirectory(destination)
+	if err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening restored private nightly payload")
+	}
+	defer func() { _ = directory.Close() }()
+	entries, err := directory.ReadDir(len(expected) + 1)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "reading private nightly payload membership")
+	}
+	if len(entries) != len(expected) {
+		return nil, e.New(e.CodeVerifyFailed, "private nightly payload differs from exact expected membership")
+	}
+	members = make(map[string][]byte, len(expected))
+	remaining := int64(32 << 20)
+	for _, entry := range entries {
+		limit, ok := expected[entry.Name()]
+		if !ok {
+			return nil, e.New(e.CodeVerifyFailed, "private nightly payload contains an unexpected file")
+		}
+		if limit > remaining {
+			limit = remaining
+		}
+		raw, readErr := readRunFile(ctx, destination, entry.Name(), limit)
+		if readErr != nil {
+			return nil, nightlyArchiveError(ctx, readErr, "reading private nightly payload")
+		}
+		remaining -= int64(len(raw))
+		members[entry.Name()] = raw
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "private nightly payload canceled")
+	}
+	return members, nil
 }
 
 // The current-source suite follows the one exact NVKE revision that produced all
