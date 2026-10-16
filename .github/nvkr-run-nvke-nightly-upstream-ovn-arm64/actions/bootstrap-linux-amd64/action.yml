@@ -11,6 +11,9 @@ inputs:
   runner-artifact:
     description: Same-Run helper artifact name
     required: true
+  nvkr-ci-storage-token:
+    description: Private CI storage credential, forwarded only to transfer steps
+    required: true
 runs:
   using: composite
   steps:
@@ -23,10 +26,11 @@ runs:
       run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o nvkr-exec ./cmd/nvkr
       shell: bash -e {0}
     - name: 'Download NVKR runtime inputs'
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-download
       with:
         name: 'nvkr-runtime-inputs'
         path: '.github/nvkr-run-nvke-nightly-upstream-ovn-arm64'
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
     - name: Verify committed Run generation is current
       id: validate-catalog
       env:
@@ -49,7 +53,7 @@ runs:
         ./nvkr-exec run generate --engine github --definition inputs/definitions/demo/arm64-upstream-kvm.json --environment inputs/environments/github-nightly-upstream.json --root . --check
       shell: bash -e {0}
     - name: 'Upload NVKR runner'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-upload
       with:
         name: ${{ inputs.runner-artifact }}
         path: |
@@ -60,3 +64,4 @@ runs:
         include-hidden-files: 'true'
         if-no-files-found: error
         retention-days: 7
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}

@@ -189,7 +189,9 @@ jobs:
       - name: Build the existing network privilege probe
         env:
           GOTOOLCHAIN: local
-        run: make demo
+        run: |
+          make demo
+          CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
       - name: Admit the configured native runtime host
         env:
           GOTOOLCHAIN: local
@@ -238,11 +240,12 @@ jobs:
           printf 'producer_run=%s\nruntime_plan=%s\n' "$producer" "$runtime" >> "$GITHUB_OUTPUT"
       - name: Download the producer's frozen runtime inputs
         if: steps.candidate.outputs.runtime_plan == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        uses: ./.github/nvkr-run/actions/ci-download
         with:
+          nvkr-ci-storage-token: ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
           name: nvkr-runtime-inputs
           run-id: ${{ steps.candidate.outputs.producer_run }}
-          github-token: ${{ github.token }}
+          attempt: '1'
           path: .nightly-private/runtime-inputs
       - name: Select the suite revision from the frozen product sources
         id: suite
@@ -302,6 +305,7 @@ jobs:
           GOTOOLCHAIN: local
           GH_TOKEN: ${{ github.token }}
           NVKR_NIGHTLY_ENABLE: '1'
+          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_TOKEN || github.token }}
           NVKR_NIGHTLY_PROFILE: ${{ matrix.name }}
           NVKR_NIGHTLY_PROFILES: ${{ github.workspace }}/inputs/testing/nightly-profiles.json
           NVKR_NIGHTLY_BUILD: ${{ github.workspace }}/.nightly-private/build/build.json

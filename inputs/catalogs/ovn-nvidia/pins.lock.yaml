@@ -3,7 +3,7 @@ apiVersion: nvkr.dev/lock/v1
 kind: PinLock
 pins:
   ovn-kubernetes:
-    commit: 9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7
-    sourceDateEpoch: 1792073875
-    tag: v2.4.1
-    treeHash: cc8e9d13008e0b70ab4b9ca9877fa2858be28c13
+    commit: 8af51273d52dfa07454435d18d37230e582d797a
+    sourceDateEpoch: 1792137152
+    tag: v2.4.2
+    treeHash: c4a54b0b3b615e5bd6df2d591451d7ab03dffc08

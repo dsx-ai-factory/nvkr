@@ -539,7 +539,9 @@ printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
   'run plan')
     if [ "$4" = .nvkr/laptop-bootstrap/id-probe/definition.json ]; then
-      jq -e '.outputs[0].catalog.overlays[-1] | endswith("/toolchain-attempt.json")' "$4" >/dev/null || exit 99
+      jq -e '.outputs[0].catalog.overlays[-1] == "./toolchain-attempt.json" and
+        .catalog.base == "../../../inputs/definitions/diagnostics/demo-arm64/../../../catalogs/nicosim" and
+        .outputs[0].catalog.base == .catalog.base' "$4" >/dev/null || exit 99
       printf '%s\n' "$TEST_PLAN" | jq '. + {selected: true}'
     else printf '%s\n' "$TEST_PLAN"; fi;;
   'run graph')
@@ -550,6 +552,7 @@ case "$1 $2" in
       printf '%s\n' "$TEST_SELECTED_GRAPH"
     else printf 'flowchart LR\n  fetch --> build\n'; fi;;
   'run local')
+    case " $* " in *' --capture-inputs-root=. '*) ;; *) exit 99;; esac
     jq -e --arg id "$TEST_VALIDATED" '.toolchainSubstitutions[0].to == $id' "$TEST_REPO/.nvkr/laptop-bootstrap/id-probe/toolchain-attempt.json" || exit 99
     if [ -n "${TEST_CAPTURE_REDIRECTS:-}" ]; then
       printf '%s\n' "$GIT_CONFIG_COUNT" >"$TEST_CAPTURE_REDIRECTS"
@@ -691,7 +694,7 @@ esac
 					t.Fatal(err)
 				}
 				var args []string
-				if err := json.Unmarshal(raw, &args); err != nil || len(args) != 18 || args[0] != ".nvkr/laptop-bootstrap/id-probe/nvkr" || args[8] != "id-probe" || args[14] != "1" || args[16] != "docker" || args[17] != "--ui=plain" {
+				if err := json.Unmarshal(raw, &args); err != nil || len(args) != 19 || args[0] != ".nvkr/laptop-bootstrap/id-probe/nvkr" || args[8] != "id-probe" || args[14] != "1" || args[16] != "docker" || args[17] != "--capture-inputs-root=." || args[18] != "--ui=plain" {
 					t.Fatalf("bad private invocation: %v %q", err, raw)
 				}
 				for _, arg := range args {
@@ -745,8 +748,9 @@ esac
 					t.Fatal(err)
 				}
 				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/nicosim")
-				if filepath.Clean(authored.Catalog.Base) != wantCatalog || len(authored.Outputs) != 1 ||
-					filepath.Clean(authored.Outputs[0].Catalog.Base) != wantCatalog {
+				definitionDir := filepath.Join(physicalDir, ".nvkr/laptop-bootstrap/id-probe")
+				if filepath.IsAbs(authored.Catalog.Base) || filepath.Join(definitionDir, authored.Catalog.Base) != wantCatalog || len(authored.Outputs) != 1 ||
+					filepath.IsAbs(authored.Outputs[0].Catalog.Base) || filepath.Join(definitionDir, authored.Outputs[0].Catalog.Base) != wantCatalog {
 					t.Fatal("frozen catalogs did not resolve relative to the selected Definition")
 				}
 				graph, err := os.ReadFile(filepath.Join(dir, ".nvkr/laptop-bootstrap/id-probe/graph.json"))

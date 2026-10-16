@@ -8,17 +8,21 @@ inputs:
   parameters:
     description: Plan-derived parameters for this operation; never shell source
     required: true
+  nvkr-ci-storage-token:
+    description: Private CI storage credential, forwarded only to transfer steps
+    required: true
 runs:
   using: composite
   steps:
     - name: ${{ fromJSON(inputs.parameters).download_name }}
       id: operation_download
       if: ${{ fromJSON(inputs.parameters).download_present == 'true' }}
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      uses: ./.github/nvkr-dev/actions/ci-download
       with:
         merge-multiple: ${{ fromJSON(inputs.parameters).download_with_merge_multiple }}
         path: ${{ fromJSON(inputs.parameters).download_with_path }}
         pattern: ${{ fromJSON(inputs.parameters).download_with_pattern }}
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
     - name: ${{ fromJSON(inputs.parameters).restore_name }}
       id: operation_restore
       if: ${{ fromJSON(inputs.parameters).restore_present == 'true' }}
@@ -51,20 +55,22 @@ runs:
     - name: ${{ fromJSON(inputs.parameters).upload_name }}
       id: operation_upload
       if: ${{ fromJSON(inputs.parameters).upload_present == 'true' }}
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-dev/actions/ci-upload
       with:
         if-no-files-found: ${{ fromJSON(inputs.parameters).upload_with_if_no_files_found }}
         include-hidden-files: ${{ fromJSON(inputs.parameters).upload_with_include_hidden_files }}
         name: ${{ fromJSON(inputs.parameters).upload_with_name }}
         path: ${{ fromJSON(inputs.parameters).upload_with_path }}
         retention-days: ${{ fromJSON(inputs.parameters).upload_with_retention_days }}
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
     - name: ${{ fromJSON(inputs.parameters).extra_upload_name }}
       id: operation_extra_upload
       if: ${{ fromJSON(inputs.parameters).extra_upload_present == 'true' }}
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-dev/actions/ci-upload
       with:
         if-no-files-found: ${{ fromJSON(inputs.parameters).extra_upload_with_if_no_files_found }}
         include-hidden-files: ${{ fromJSON(inputs.parameters).extra_upload_with_include_hidden_files }}
         name: ${{ fromJSON(inputs.parameters).extra_upload_with_name }}
         path: ${{ fromJSON(inputs.parameters).extra_upload_with_path }}
         retention-days: ${{ fromJSON(inputs.parameters).extra_upload_with_retention_days }}
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}

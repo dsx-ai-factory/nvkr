@@ -26,7 +26,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const siteOVNVersion = "2.4.1"
+const siteOVNVersion = "2.4.2"
 const upstreamSiteOVNVersion = "1.4.0"
 const siteOVSName = "nvkr-site-ovs"
 

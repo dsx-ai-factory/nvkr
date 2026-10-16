@@ -4,6 +4,21 @@ The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
 The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
+## CLI artifact test baseline
+
+```sh
+GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
+bin/nvkr run artifact-test --artifact /path/to/nvkectl --plan /path/to/matching/plan.json
+```
+
+Imports the matching pinned NVKE tests and invokes their `test-artifact` target
+against a supplied NVKR-built binary, without rebuilding it. See
+[artifact testing](../docs/artifact-testing.md) for prerequisites, results, and scope.
+This trusted-input diagnostic is implemented in Go. The guide separates prior
+Python-adapter runtime results from validation of the Go replacement.
+The current production pin lacks the upstream entrypoint; upstream adoption and
+explicit maintained-input refresh remain follow-ups. The guide distinguishes prior results from committed regressions.
+
 ## Definition → Run
 
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
@@ -28,6 +43,11 @@ data bundles, not a separate container image. No publication/signing is enabled.
 The launcher prints its exact shell-escaped `nvkr` invocations to stderr before execution, without printing environment values.
 
 Contract tests: `go test ./internal/nvkedemo ./cmd/nvke-demo -count=1`.
+For qualification, add `--qualify-local` to `nvke-demo build` or `nvke-demo e2e`.
+It prepares fresh local keys, a Plan-bound demo policy, pinned cosign, scratch and an owned disk-backed
+loopback registry, then stops that registry after qualification while retaining data and evidence.
+See [local qualification setup](../docs/local-development.md#rehearse-local-m3-qualification)
+for prerequisites and the advanced explicit setup/stop commands.
 See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;
 the reduced flow has not passed a new clean-machine end-to-end run. This is not
 a [full source-built distribution](../docs/full-nvke-source-build.md).

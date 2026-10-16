@@ -21,20 +21,19 @@ import (
 
 const checkoutRepo = "https://github.com/example/nvke"
 
+// checkoutOptions is the transport the rendered workflow would apply.
+var checkoutOptions = WorkflowOptions{SourceRepository: "example/nvke", SourceSecret: "SOURCE_TOKEN"}
+
 func sourceCheckoutFixture(t *testing.T) Config {
 	t.Helper()
 	cfg, _ := maintenanceFixture(t)
 	registry := bytes.ReplaceAll(readFixture(t, "catalog/registry.yaml"), []byte("https://maintenance.example.invalid/source"), []byte(checkoutRepo))
 	writeFixture(t, "catalog/registry.yaml", registry)
-	t.Setenv("GIT_CONFIG_VALUE_0", checkoutRepo)
-	// Match the trailing slash used by the generated workflow's local rewrite.
-	key := strings.TrimSuffix(os.Getenv("GIT_CONFIG_KEY_0"), ".insteadOf") + "/.insteadOf"
-	t.Setenv("GIT_CONFIG_KEY_0", key)
-	lock, err := catalog.LoadLockContext(t.Context(), "catalog")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.SourceCheckout = &SourceCheckout{Repository: "example/nvke", Ref: lock.Pins["root"].Commit, Secret: "SOURCE_TOKEN"}
+	// Apply the rewrite the generated workflow renders, with the local upstream standing in for the checkout.
+	transport := transportFor(checkoutOptions.SourceRepository)
+	upstream := strings.TrimSuffix(strings.TrimPrefix(os.Getenv("GIT_CONFIG_KEY_0"), "url."), ".insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_0", transport.Value)
+	t.Setenv("GIT_CONFIG_KEY_0", strings.Replace(transport.Key, workspaceExpression+"/"+sourceCheckoutPath, upstream, 1))
 	cfg.SameRelease = nil
 	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", false); err != nil {
 		t.Fatal(err)
@@ -106,13 +105,14 @@ func TestWorkflowRejectsSourceCheckoutPrefixCollisionsBeforeWork(t *testing.T) {
 				changed := bytes.Replace(definition, []byte("name: tools,"), []byte("name: tools, catalog: {base: output-catalog},"), 1)
 				writeFixture(t, cfg.Definition, changed)
 			}
-			raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+			enroll(t, cfg)
+			raw, err := Workflow(t.Context(), checkoutOptions, "test (deadbeef)")
 			assertCode(t, err, e.CodeEngineCapability)
 			if len(raw) != 0 || !strings.Contains(err.Error(), "would redirect distinct repository") {
 				t.Fatalf("collision emitted workflow or unrelated error: %s %v", raw, err)
 			}
 			calls := 0
-			_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+			_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, "example/nvke", func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
 				calls++
 				return catalog.SourcePinUpdate{}, nil
 			})
@@ -145,7 +145,8 @@ func TestWorkflowAllowsRepeatedRepositoryAndUnrelatedSources(t *testing.T) {
 			if !tc.selected {
 				cfg.Sources = []string{"root"}
 			}
-			raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+			enroll(t, cfg)
+			raw, err := Workflow(t.Context(), checkoutOptions, "test (deadbeef)")
 			if err != nil || len(raw) == 0 {
 				t.Fatalf("supported transport rejected: %v", err)
 			}
@@ -179,11 +180,12 @@ func TestSourceCheckoutWithOnlyAliasedRoots(t *testing.T) {
 				}
 				beforeLock := readFixture(t, "catalog/pins.lock.yaml")
 				beforePlan := readFixture(t, ".github/nvkr-run/plan.json")
-				raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+				enroll(t, cfg)
+				raw, err := Workflow(t.Context(), checkoutOptions, "test (deadbeef)")
 				if err != nil || len(raw) == 0 {
 					t.Errorf("alias-only workflow rejected: %v", err)
 				}
-				result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false)
+				result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false, "example/nvke")
 				if err != nil || result.Changed || result.PlanDigest == "" {
 					t.Errorf("alias-only refresh rejected or changed pinned release: %+v %v", result, err)
 				}
@@ -200,18 +202,53 @@ func TestAliasedRootStillRejectsDistinctRepository(t *testing.T) {
 	changeCheckoutSource(t, "catalog", "root", checkoutRepo+".git")
 	changeCheckoutSource(t, "catalog", "app", checkoutRepo+".git")
 	changeCheckoutSource(t, "catalog", "role", checkoutRepo+"-tools")
-	raw, err := Workflow(t.Context(), cfg, "maintenance.yaml", "test (deadbeef)")
+	enroll(t, cfg)
+	raw, err := Workflow(t.Context(), checkoutOptions, "test (deadbeef)")
 	assertCode(t, err, e.CodeEngineCapability)
 	if len(raw) != 0 {
 		t.Fatal("sibling collision emitted a workflow")
 	}
 	calls := 0
-	_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+	_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, "example/nvke", func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
 		calls++
 		return catalog.SourcePinUpdate{}, nil
 	})
 	assertCode(t, err, e.CodeEngineCapability)
 	if calls != 0 {
 		t.Fatal("sibling collision reached the pin transaction")
+	}
+}
+
+// An additional Run's catalogs are admitted before it is compiled: compilation
+// revalidates every declared pin set, so a pin-set root that only the additional
+// Run's catalog declares would otherwise be fetched through the prefix rewrite.
+func TestAdditionalRunCatalogsAreAdmittedBeforeCompilation(t *testing.T) {
+	cfg := sourceCheckoutFixture(t)
+	if err := os.Mkdir("extra-catalog", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"registry.yaml", "pins.lock.yaml"} {
+		writeFixture(t, filepath.Join("extra-catalog", name), readFixture(t, filepath.Join("catalog", name)))
+	}
+	changeCheckoutSource(t, "extra-catalog", "root", checkoutRepo+"-tools")
+	definition := bytes.Replace(readFixture(t, cfg.Definition), []byte("catalog: {base: catalog}"), []byte("catalog: {base: extra-catalog}"), 1)
+	writeFixture(t, "extra-definition.yaml", definition)
+	writeFixture(t, "environment-extra.yaml", append(readFixture(t, cfg.Environment), "githubBundle: extra\n"...))
+	cfg.AdditionalRuns = []RunInput{{Definition: "extra-definition.yaml", Environment: "environment-extra.yaml"}}
+	enroll(t, cfg)
+	beforeLock := readFixture(t, "catalog/pins.lock.yaml")
+	raw, err := Workflow(t.Context(), checkoutOptions, "test (deadbeef)")
+	assertCode(t, err, e.CodeEngineCapability)
+	if len(raw) != 0 || !strings.Contains(err.Error(), "would redirect distinct repository") {
+		t.Fatalf("the additional Run's pin-set root reached compilation: %s %v", raw, err)
+	}
+	calls := 0
+	_, err = refresh(t.Context(), cfg, "test (deadbeef)", false, "example/nvke", func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+		calls++
+		return catalog.SourcePinUpdate{}, nil
+	})
+	assertCode(t, err, e.CodeEngineCapability)
+	if calls != 0 || !bytes.Equal(beforeLock, readFixture(t, "catalog/pins.lock.yaml")) {
+		t.Fatal("the additional Run's collision reached pin mutation")
 	}
 }

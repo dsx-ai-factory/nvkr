@@ -98,6 +98,22 @@ membership and Environment policy without writing files. Changes outside that co
 regeneration and review. This mode neither follows floating upstream versions nor changes the default
 or development bundle contract; ordinary `--check` remains a complete byte comparison.
 
+Generated GitHub transfers retain JSON locators in Actions and move their payloads to
+`ghcr.io/<owner>/<repository>/ci-artifacts`. Transfer steps admit the package's actual private/internal
+visibility and reject public or unknown linked repositories before reading or uploading payload bytes.
+There is no public Actions fallback. The workflow token is used unless `NVKR_CI_STORAGE_TOKEN` is supplied;
+that optional credential belongs only to the transfer operations. Package-write permission is required on
+jobs which upload private carriers. Producer commands do not receive the storage token.
+Final GitHub-hosted GHCR publication separately checks every destination package with its publication
+credential and binds the push to the inspected metadata root. Unsupported hosted GHCR metadata contracts
+fail closed. Provider locator retention does not automatically expire private carrier blobs.
+
+Making the source repository public does not establish safe access to its linked packages. The built-in
+token's auto-linked storage package will be rejected if that link becomes public; an independently
+restricted storage package and credential must be configured before public-repository execution is ready.
+Previously retained Actions artifacts, caches, active runs and old workflow refs also require a separate transition check. This change does
+not migrate or delete historical payloads.
+
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can
 schedule dispatches; that scheduling and runtime-test ownership are separate

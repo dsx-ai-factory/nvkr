@@ -164,6 +164,7 @@ jobs:
               - '.github/nvkr-qualification/**'
               - '.github/workflows/nvkr-dev.yml'
               - '.github/nvkr-dev/**'
+              - '.github/workflows/catalog-refresh.yaml'
               - 'cmd/**'
               - 'client/**'
               - 'internal/**'
@@ -232,6 +233,7 @@ jobs:
 
       - name: Restore check cache
         id: go-cache
+        if: github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -259,6 +261,7 @@ jobs:
           # Build the importer with setup-go's exact SDK. Older release
           # binaries cannot read Go 1.27.2's version-5 export data.
           install-mode: goinstall
+          skip-cache: ${{ github.event.repository.visibility != 'private' && github.event.repository.visibility != 'internal' }}
 
       - name: shellcheck
         run: make shellcheck
@@ -269,6 +272,9 @@ jobs:
       - name: test (fast default)
         id: tests
         shell: bash
+        env:
+          # Rendered workflow-step tests fail instead of skipping when bash, git, jq or yq is missing.
+          NVKR_REQUIRE_SHELL_TOOLS: '1'
         run: make test GO_TEST_FLAGS=-json | tee "$RUNNER_TEMP/go-test.jsonl"
 
       - name: Summarize test timings
@@ -292,7 +298,7 @@ jobs:
         run: make vulncheck
 
       - name: Save check cache
-        if: success() && steps.go-cache.outputs.cache-hit != 'true'
+        if: success() && steps.go-cache.outputs.cache-hit != 'true' && (github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal')
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -407,7 +413,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: ${{ github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal' }}
 
       # Catalog validation re-reads the pinned NVKE tree. Acquire it with a
       # fixed action before running checkout code; never pass this token to
@@ -423,7 +429,7 @@ jobs:
           token: ${{ secrets.NKE_SOURCE_TOKEN }}
           persist-credentials: false
 
-      - name: Verify committed producer and qualification generation is current
+      - name: Verify committed producer, qualification and catalog refresh generation is current
         env:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nvkr-inputs/nvke/.insteadOf
@@ -472,7 +478,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: ${{ github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal' }}
 
       - name: Verify THIRD_PARTY_NOTICES.md is current
         run: make notices-check
@@ -557,7 +563,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: ${{ github.event.repository.visibility == 'private' || github.event.repository.visibility == 'internal' }}
 
       - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:

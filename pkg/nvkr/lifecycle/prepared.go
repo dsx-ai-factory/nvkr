@@ -6,6 +6,7 @@ package lifecycle
 import (
 	"context"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
@@ -14,6 +15,28 @@ import (
 type PreparedRun struct {
 	plan *factory.Plan
 	run  *Run
+	// Captured compiler reads are immutable transport, not signing authority.
+	inputs string
+}
+
+// PrepareCapturedFiles prepares the same lifecycle Run while retaining the exact
+// authored bytes read by compilation. Paths are logical repository-relative
+// paths beneath root. Local execution saves this snapshot before producer work;
+// qualification must still authenticate the Run and every output independently.
+func PrepareCapturedFiles(ctx context.Context, root, definitionPath, environmentPath, generatorVersion, attempt string) (*PreparedRun, error) {
+	plan, inputs, err := factory.CaptureCompileFiles(ctx, root, definitionPath, environmentPath, generatorVersion)
+	if err != nil {
+		return nil, err
+	}
+	run, err := PrepareRun(plan.Definition, plan.Environment, plan, attempt)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := canonical.Marshal(inputs)
+	if err != nil {
+		return nil, err
+	}
+	return &PreparedRun{plan: plan, run: run, inputs: string(raw)}, nil
 }
 
 func PrepareFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion, attempt string) (*PreparedRun, error) {

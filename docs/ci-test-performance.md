@@ -5,6 +5,14 @@ The ordinary gate runs contract tests without race or coverage instrumentation. 
 external integrations retain their explicit opt-ins; passing ordinary tests proves their exercised
 contracts, not registry, signing-service or production acceptance.
 
+`make test` gives each package an explicit 20-minute timeout, including the hosted Merge Gate.
+The factory suite exceeded Go's implicit 10-minute package limit in
+[PR #188's check job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38831324801/job/116750572956)
+while still executing contracts. The preceding green
+[PR #187 check](https://github.com/dsx-ai-factory/nvkr/actions/runs/38823898898/job/116726770763)
+already spent 515.003 seconds in that package. Override `GO_TEST_TIMEOUT` for diagnostics when needed; race,
+coverage and extended fixtures remain separate opt-ins.
+
 ## October 14, 2026 audit
 
 The audit started from `540c5d3d` and measured the complete ordinary suite before and after test-only

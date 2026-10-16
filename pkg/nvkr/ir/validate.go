@@ -58,6 +58,10 @@ var allowedBuildEnv = map[string]bool{
 	"NVKECTL_VERSION":     true,
 	"NVKECTL_COMMIT":      true,
 	"NVKECTL_DATE":        true,
+	// NICoSim source and explicitly patched tree stamps participate in build identity.
+	"NICO_SIM_VERSION": true,
+	"NICO_SIM_COMMIT":  true,
+	"NICO_SIM_TREE":    true,
 	// Upstream CWE Dockerfile build arguments, rendered from the source lock.
 	"BUILD_VERSION": true,
 	"GIT_VERSION":   true,

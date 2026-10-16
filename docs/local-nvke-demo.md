@@ -415,6 +415,11 @@ Tmpfs allocates memory as content is written; this ceiling is neither reserved
 RAM nor proof of available memory. The deployment host must still meet the
 complete-demo capacity checks above.
 
+To include local M3 signing, delivered-tool smoke and independent publication read-back before
+deployment, add `--qualify-local` to `e2e`; see [automatic qualification setup](local-development.md#rehearse-local-m3-qualification).
+It prepares fresh local trust and a separate disk-backed loopback registry, then stops that registry
+after qualification read-back, retaining data and evidence. The deployment registry described above remains managed separately.
+
 Run the checked-in example directly from the repository root. The flags below
 replace its placeholder repository and output paths; no YAML copy or editing
 is required. For each rerun, change both `--attempt` and `--out` to unused names.
@@ -525,9 +530,9 @@ resource reservation; choose it within your host's available memory and disk.
 
 The local OS selection builds OVN-Kubernetes from the NVKE/NVIDIA
 [`dsx-ai-factory/ovn-kubernetes`](https://github.com/dsx-ai-factory/ovn-kubernetes)
-fork at tag `v2.4.1`, commit `9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7`, using the
+fork at tag `v2.4.2`, commit `8af51273d52dfa07454435d18d37230e582d797a`, using the
 producer catalog introduced in PR #113. The image carries its chart/image packages
-for stream `2.4.1`, and the tenant requests that stream. This uses the fork's
+for stream `2.4.2`, and the tenant requests that stream. This uses the fork's
 `Dockerfile.ubuntu.nv` producer with its base image overridden to a pinned public
 `ubuntu:24.04` digest, not its private FIPS/STIG base. Access to the fork must
 work from the Linux execution host.

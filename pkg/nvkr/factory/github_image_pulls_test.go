@@ -247,8 +247,8 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 		name, member string
 		mutate       func(*testing.T, *yamlv3.Node)
 	}{
-		{"write scope", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
-			githubTestYAMLField(t, root, "jobs", jobID, "permissions", "packages").Value = "write"
+		{"source write scope", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			githubTestYAMLField(t, root, "jobs", jobID, "permissions", "contents").Value = "write"
 		}},
 		{"wrong credential", member, func(t *testing.T, root *yamlv3.Node) {
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")

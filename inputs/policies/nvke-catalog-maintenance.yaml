@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog-maintenance/v1
+name: nvke-m2
+# The NVKE release and its derived chart pins are the one supported update path.
+# Registry constraints stay authored; this policy never widens them.
+catalog: inputs/catalogs/nvke/release
+sources: [nvke, nvke-helm]
+sameRelease:
+  - [nvke, nvke-helm]
+definition: inputs/definitions/nvke/definition.yaml
+environment: inputs/environments/github-release.yaml
+# Generated bundles that share this catalog's pins. Each is checked, regenerated and
+# transported with the production Run; a committed bundle not named here is refused.
+developmentEnvironment: inputs/environments/github-development.yaml
+qualificationPolicy: inputs/policies/nvke-qualification.yaml
+additionalRuns:
+  - definition: inputs/definitions/demo/arm64-nvidia-kvm.json
+    environment: inputs/environments/github-nightly-nvidia.json
+  - definition: inputs/definitions/demo/arm64-upstream-kvm.json
+    environment: inputs/environments/github-nightly-upstream.json
+validation: static

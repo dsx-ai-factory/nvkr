@@ -136,7 +136,7 @@ func TestValidateGitHubBundleRejectsInspectionDiagnosticUploadTampering(t *testi
 				{"extra diagnostics", "exact admitted rendering", e.CodeEngineCapability, caller(func(_ *testing.T, steps, step *yamlv3.Node) {
 					steps.Content = append(steps.Content, step)
 				})},
-				{"missing action member", "shared action \"" + member + "\" is missing", e.CodePipelineDrift, func(*testing.T) *GeneratedBundle {
+				{"missing action member", "private transfer references missing or recursive action " + member, e.CodePipelineDrift, func(*testing.T) *GeneratedBundle {
 					changed := *bundle
 					changed.Files = maps.Clone(bundle.Files)
 					delete(changed.Files, member)

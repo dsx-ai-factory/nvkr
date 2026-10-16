@@ -21,7 +21,7 @@ func TestRefreshPreservesTimeoutAfterRealPinCommit(t *testing.T) {
 	beforePlan := readFixture(t, ".github/nvkr-run/plan.json")
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	result, err := refresh(ctx, cfg, "test (deadbeef)", false, func(ctx context.Context, request catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+	result, err := refresh(ctx, cfg, "test (deadbeef)", false, "", func(ctx context.Context, request catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
 		update, err := catalog.UpdateSourcePins(ctx, request)
 		if err == nil {
 			cancel()

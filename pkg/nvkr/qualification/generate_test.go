@@ -118,7 +118,8 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "write" || call.Permissions["packages"] != "read" || native.Permissions["packages"] != "read" {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
-	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" || len(call.Secrets) != 1 {
+	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
+		call.Secrets["NVKR_CI_STORAGE_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_TOKEN }}" || len(call.Secrets) != 2 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
 	}
 	for _, job := range []qualificationWorkflowJob{native, final} {

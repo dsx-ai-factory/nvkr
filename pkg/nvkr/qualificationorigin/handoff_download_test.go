@@ -17,6 +17,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func newHandoffDownloadFixture(t *testing.T) *handoffDownloadFixture {
 		locationStatus: http.StatusFound, downloadStatus: http.StatusOK, contentLength: -1,
 		transportError: map[string]error{},
 		list: qualificationArtifactList{TotalCount: "1", Artifacts: []qualificationArtifact{{
-			ID: "1234567890123456789", Name: "nvkr-qualification-1234-2", Size: json.Number("123"), Digest: handoffArchiveDigest(archive), Expired: &expired,
+			ID: "1234567890123456789", Name: "nvkr-qualification-1234-2", Size: json.Number(strconv.Itoa(len(archive))), Digest: handoffArchiveDigest(archive), Expired: &expired,
 			WorkflowRun: qualificationArtifactRun{ID: "1234", RepositoryID: "123", HeadRepositoryID: "123", HeadSHA: request.Commit, HeadBranch: "main"},
 		}}}}
 }

@@ -63,6 +63,23 @@ qualified contract. The mechanisms below have separate claims and admission requ
   explicitly part of the embedding caller's TCB.
 - **Keyed / KMS mode** is an optional operator fallback, not the default.
 
+The local M3 rehearsal uses a separate `LocalCosign` detached-document adapter with explicit
+passwordless demo keys. It holds the pinned static Linux executable, private/public key material and
+signature descriptors, bounds execution and output, removes ambient signing configuration, and verifies
+each newly signed document under the independently supplied public key before issuing its local receipt.
+Local signing explicitly disables public transparency submission; verification is offline under that key.
+The receipt binds exact document and public-key bytes and cannot be used as a keyless `SignedDocument`,
+hosted workflow identity or qualification verdict. The local qualification owner must independently
+enforce signer roles, complete artifact/input membership and all gates before invoking it. This is an
+explicit local rehearsal adapter, never a fallback when hosted signing fails. Reconciliation records
+real-key interoperability and the remaining end-to-end work separately.
+
+Local rehearsal key admission currently supports one P-256 PKIX `PUBLIC KEY` PEM block per role,
+matching the local cosign key-generation path. Parsing rejects other curves, malformed points,
+PEM headers, private-key labels, extra blocks and non-whitespace surrounding material. Canonical
+public-key encoding removes PEM presentation differences before checking that builder, smoke and
+qualifier keys are distinct. Role assignment remains part of the independently selected policy identity.
+
 ### 2. Trust store and resolution precedence
 
 Trust must originate from **outside** the verified object. Resolution precedence:

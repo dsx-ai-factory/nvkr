@@ -52,13 +52,17 @@ const (
 )
 
 func newReaper(ctx context.Context, docker string) *reaper {
+	return newReaperWithCleanup(ctx, docker, runReaperCleanupCommand)
+}
+
+func newReaperWithCleanup(ctx context.Context, docker string, cleanup reaperCleanupCommand) *reaper {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	r := &reaper{
 		names: map[string]bool{}, docker: docker,
 		cleanupTimeout: defaultReaperCleanupTimeout,
-		cleanupCommand: runReaperCleanupCommand,
+		cleanupCommand: cleanup,
 		stop:           make(chan struct{}),
 		done:           make(chan struct{}),
 	}

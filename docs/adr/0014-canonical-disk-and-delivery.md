@@ -163,6 +163,12 @@ metadata and format requirements govern admission; there is no node-role/categor
 staging manifest. Different disk contents are separate selected producers. The NVKE aggregate disk is an explicit
 output whose embedded inputs retain traced material identities and full-disk SBOM obligations.
 
+Mixed executable bundles retain loose tools and declared tarball assets as separate named members.
+Factory packages declared tarballs with mode `0644`; executable tools retain mode `0755`. The compiled
+producer type selects this mode, never the source file's permissions or filename extension. Bundle
+identity covers the mode as well as exact member bytes. Existing bundles retain their original identity;
+rebuilding a tarball previously packaged as executable changes the bundle identity.
+
 ISO is a separate canonical class because it is a flat logical stream, not a decode-to-RAW envelope.
 Deterministic production would require pinned tools, a frozen clock, sorted directory order and fixed volume
 identity. Current existing-byte measurement does not implement that production capability.

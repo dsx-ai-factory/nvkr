@@ -123,9 +123,22 @@ materialize pinned inputs first; hermetic build and verification nodes enforce n
 private output and a fixed credential-free environment. The local byte-observation exception in §8 executes
 no producer code and carries no container-isolation or qualification claim. Shared code prevents semantic
 drift; it does not alone prove byte identity across hosts.
-The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions artifact delivery;
-it does not independently checksum the downloaded helper before restoring its execute bit. This delivery
-contract is not the qualified exact-helper-byte verification required below.
+The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions locator delivery.
+Actions uploads contain only bounded JSON locators; workspace carriers, source archives, tools and binary
+outputs are stored in a separately checked private or internal GHCR package. The CI transport binds each
+locator to its repository, Run, attempt and artifact name, an exact image/config, and the archive digest and
+size before existing carrier restoration. It confers no release or qualification authority. A helper is
+built from the exact checkout with the pinned Go toolchain before private downloads, so bootstrap needs no
+public binary delivery. This remains separate from qualified exact-helper-byte verification.
+
+CI storage admission checks the actual package visibility and linked repository before payload access.
+Public, unknown or inaccessible package policy and public or unknown linked-repository policy fail closed.
+A missing package may receive an empty metadata-only seed; payload upload requires a subsequent successful
+privacy check. There is no Actions-payload fallback. The default workflow token can serve an internal
+repository; a package linked to a future public source is rejected. An independent storage credential and
+independently restricted package access must be established before claiming that public-repository CI works.
+Visibility checks do not authenticate all enterprise grants or prove the absence of manually granted fork
+access. Historical Actions artifacts, caches, active runs and old workflow refs must be handled before making a repository public.
 
 The explicit diagnostic `validate` route is separate from generated producer execution. It is Linux-only
 and executes authenticated, held tool bytes on the host with the selected embedded kubeconfig. Private
@@ -195,8 +208,12 @@ signing and finalization remain on generic hosted runners. Each disk output cont
 and packaging operations into one bounded helper invocation against the complete Plan. The original producer
 session and held disk survive through packaging; strict mode additionally requires reconciliation. The raw disk has no independent
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
-remain required. Only fixed source-fetch steps receive private-source credentials; ARC disk jobs receive no
-source token, registry-write credential or OIDC signing token. With `publication.mode: per-output-v1`, the
+remain required. Only fixed source-fetch steps receive private-source credentials. ARC producer commands
+receive no source token, CI-storage credential or OIDC signing token. Separate private-carrier transfer
+steps receive an explicit storage token; using the workflow token requires job-level package-write
+permission. Step environment isolation does not turn that token into a package-scoped credential or isolate
+it from trusted root-equivalent code sharing the runner. Product publication remains on hosted runners.
+With `publication.mode: per-output-v1`, the
 same ARC group also prepares that disk's offline publication layout using its existing material files. The
 exact derived OCI package node is admitted only with network disabled; SBOM attestation and all credentialed
 publication operations remain on hosted runners. Those runners restore the prepared layout rather than the
@@ -746,8 +763,9 @@ publication and in-repository PR builds remain deferred. Live publication/signin
 `nvkr-release` GitHub deployment environment; operators must configure its deployment policy to admit only
 the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
 recognize those exact workflow refs. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
-The SBOM job receives no registry credentials or package permissions. The verifier needs registry read
-access and obtains no identity token. Job timeouts are
+The SBOM job receives no product-publication credentials. Private carrier upload steps require the
+separate CI storage token and job-level package-write permission. The verifier needs product registry read
+access and obtains no identity token; its private report-carrier uploads use the same CI storage boundary. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
 finalization still run after failures within an admitted execution. The generated Run workflow does not
 start on pull requests.
@@ -774,8 +792,9 @@ admission rejects development before qualification evidence collection.
 
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
 They never inherit the production deployment environments. Dedicated write and read registry credentials
-are delivered only to their corresponding phases. Development jobs receive no repository-token package-write
-permission; only signing and SBOM attestation receive OIDC. Read-only toolchain preparation can still use
+are delivered only to their corresponding phases. Development jobs that upload private carriers require
+job-level package-write permission, including when the workflow token supplies storage access; this does
+not grant a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation can still use
 the repository token for exact retained private M2 toolchain roots; credentials are removed before producer
 execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
@@ -788,6 +807,8 @@ like production, is non-canceling and retains helpers/carriers for seven days to
 Final Run records and production qualification handoffs retain seven days and disk diagnostics one day. Provider cancellation or runner loss can
 prevent finalization. Expired carriers require a complete new Run. Signed development uses per-attempt
 registry namespaces and full-attempt retries; production's authenticated earlier-attempt reuse is unchanged.
+These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
+in this implementation; registry retention must be managed separately, without removing active Run inputs.
 ADR-20 owns the separate default-branch registry cleanup protocol. Actual dispatch, credential/pool
 isolation, provider expiry and remote deletion require external evidence.
 
@@ -811,6 +832,11 @@ workflow. Missing required smoke or external-suite results fail closed; declared
 reported as not evaluated. Source/build authentication and all verdict collection precede signing. A signing
 or attachment failure can leave earlier attachments but never produces successful qualification. ADR-16 owns
 the evidence and publication contract; reconciliation separately records implementation and hosted acceptance.
+The fixed smoke environment disables clusterctl's optional post-command update check with
+`CLUSTERCTL_DISABLE_VERSIONCHECK=true`. This constant is owned by the executor, not caller input;
+network isolation, exact version/source checks and the command timeout remain unchanged.
+Both NICoSim profiles use the executor-owned `version --output=json` arguments. ADR-16 owns their
+source-patch and tree-state requirements; neither profile permits caller-supplied executable arguments.
 
 The v1 scheduler pairs only a terminal observation and its directly dependent SBOM for the same exact
 BuildTarget, with identical runner, container and platform and offline execution. Every external SBOM input

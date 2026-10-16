@@ -18,6 +18,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/releaseasset"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -331,6 +332,12 @@ func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
 }
 
 func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
+	return executePublishWithAdmission(ctx, plan, node, artifacts, stdout, cistore.AdmitPrivatePublication)
+}
+
+func executePublishWithAdmission(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer,
+	admit func(context.Context, string, []string, cistore.Options) error,
+) error {
 	if len(node.Inputs) != 1 || len(node.Outputs) != 1 {
 		return e.New(e.CodePipelineDrift, "publish node %q is not unary", node.ID)
 	}
@@ -345,6 +352,10 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 	if target.CredentialRef != "" && (username == "" || password == "") {
 		return e.New(e.CodeTrustPolicyMissing,
 			"factory publication target %q requires its configured username and credential", node.Target)
+	}
+	expectedRoot, err := admitGitHubPublication(ctx, target, artifacts[node.Inputs[0]].Path, admit)
+	if err != nil {
+		return err
 	}
 	if plan.Environment.Signing != nil && plan.Environment.Signing.Mode == SigningModeCosign && len(plan.LifecycleOutputs) > 0 {
 		inspect := delivery.Inspect
@@ -363,10 +374,12 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		}
 	}
 	push := func(ctx context.Context, source, ref string, options delivery.RegistryOptions) (string, error) {
-		return delivery.PushWithOptions(ctx, source, ref, delivery.PushOptions{Registry: options, ImageTags: target.ImageTags})
+		return delivery.PushWithOptions(ctx, source, ref, delivery.PushOptions{Registry: options, ImageTags: target.ImageTags, ExpectedRootDigest: expectedRoot})
 	}
 	if PerOutputPublication(plan) && node.Target == "release" {
-		push = delivery.PushMetadata
+		push = func(ctx context.Context, source, ref string, options delivery.RegistryOptions) (string, error) {
+			return delivery.PushMetadataWithOptions(ctx, source, ref, delivery.PushOptions{Registry: options, ExpectedRootDigest: expectedRoot})
+		}
 	}
 	ref, err := push(ctx, artifacts[node.Inputs[0]].Path, target.Ref, delivery.RegistryOptions{
 		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous, Username: username, Password: password,

@@ -7,6 +7,9 @@ macOS supports development, planning and contract tests.
 
 The ordinary test gate (`go test ./...`, `make test`, and `make check`) also requires Bash 3.2 or later,
 Git 2.38 or later, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
+The catalog maintenance tests also run the rendered workflow steps with `yq` v4. Those tests skip locally when
+one of these tools is missing; with `NVKR_REQUIRE_SHELL_TOOLS=1` or `CI` set they fail instead, and the merge gate
+sets the variable.
 Ordinary local source admission uses Git's bounded `ls-files --format` query to reject indexed gitlinks;
 an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
@@ -18,7 +21,7 @@ runs every suite independently, so a Go-only test pass cannot stand in for the c
 On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
 
 ```sh
-brew install jq coreutils python
+brew install jq yq coreutils python
 ```
 
 The lab discovers `gtimeout` directly on macOS; no `timeout` alias or unprefixed coreutils setup is needed.

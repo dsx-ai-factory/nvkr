@@ -483,7 +483,7 @@ func copyContext(ctx context.Context, destination io.Writer, source io.Reader) (
 	var total int64
 	for {
 		if err := ctx.Err(); err != nil {
-			return total, e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
+			return total, e.Wrap(e.CodeTimeout, err, "copy canceled")
 		}
 		n, readErr := source.Read(buffer)
 		if n > 0 {

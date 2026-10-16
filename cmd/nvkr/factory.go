@@ -103,6 +103,8 @@ func factoryGeneratorVersion() string { return version + " (" + commit + ")" }
 // execution/transport behavior remain in the factory module.
 func cmdFactoryGitHub() *cli.Command {
 	return &cli.Command{Name: "github", Hidden: true, Usage: "execute exact generated GitHub steps", Subcommands: []*cli.Command{
+		cmdFactoryCIUpload(),
+		cmdFactoryCIDownload(),
 		githubFactoryCommand("check-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
 			return factory.CheckGitHubRuntimeInputs(c.Context, plan, ".")
 		}),

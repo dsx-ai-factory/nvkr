@@ -122,9 +122,9 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 			},
 		},
 		{
-			name: "download action pin", fixture: githubTestPlan, wantActions: true, spliceCode: e.CodeInvalidCatalog,
+			name: "download action pin", fixture: githubTestPlan, wantActions: true, spliceCode: e.CodeEngineCapability,
 			spliceMatch: func(name string, raw []byte) bool {
-				return strings.HasPrefix(name, githubSharedDirectory+"execute-") && bytes.Contains(raw, []byte("actions/download-artifact@"))
+				return strings.Contains(name, "/ci-download/") && bytes.Contains(raw, []byte("actions/download-artifact@"))
 			},
 			mutate: func(t *testing.T, inputs *githubStabilityInputs) {
 				pin := inputs.catalog.Actions["download-artifact"]
@@ -133,7 +133,7 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 			},
 		},
 		{
-			name: "summary-referenced upload action pin", fixture: githubTestPlan, wantActions: true, wantWorkflow: true, spliceCode: e.CodeEngineCapability,
+			name: "summary-referenced upload action pin", fixture: githubTestPlan, wantActions: true, spliceCode: e.CodeEngineCapability,
 			mutate: func(t *testing.T, inputs *githubStabilityInputs) {
 				pin := inputs.catalog.Actions["upload-artifact"]
 				pin.SHA = nextGitHubStabilityPin(t, pin.SHA)

@@ -141,7 +141,7 @@ new file mode 100644
 +{{- end }}
 +{{- if .OvnEnabled }}
 +  # The charts package is what the post-init CNI install reads.
-+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 nke-cni-ovn-images-2.4.1 nke-cni-ovn-charts-2.4.1 || exit 1
++  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 nke-cni-ovn-images-2.4.2 nke-cni-ovn-charts-2.4.2 || exit 1
 +{{- end }}
 +  - sysctl --system
 +  - systemctl daemon-reload

@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -355,9 +356,10 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 	}
 	original := bundle.Files[GitHubWorkflowPath]
 	tests := []struct {
-		name string
-		old  []byte
-		new  []byte
+		name   string
+		old    []byte
+		new    []byte
+		mutate func(*yamlv3.Node)
 	}{
 		{name: "publish-grabs-id-token",
 			old: []byte("    permissions:\n      contents: read\n      packages: write\n    env:\n      NVKR_CREDENTIAL"),
@@ -367,8 +369,10 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 		{name: "deployment-environment-replaced",
 			old: []byte("    environment: " + yamlSingle(githubReleaseEnvironment) + "\n"), new: []byte("    environment: 'unprovisioned-release'\n")},
 		{name: "verify-grabs-id-token",
-			old: []byte("      contents: read\n      packages: read\n"),
-			new: []byte("      contents: read\n      id-token: write\n      packages: read\n")},
+			mutate: func(root *yamlv3.Node) {
+				permissions := githubTestYAMLField(t, root, "jobs", githubJobID("verify-publication/release"), "permissions")
+				githubYAMLSet(permissions, "id-token", githubYAMLString("write"))
+			}},
 		{name: "sign-drops-id-token",
 			old: []byte("      contents: read\n      id-token: write\n      packages: write\n"),
 			new: []byte("      contents: read\n      packages: write\n")},
@@ -378,6 +382,11 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if test.mutate != nil {
+				mutated := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, test.mutate)
+				assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, mutated), e.CodeEngineCapability)
+				return
+			}
 			mutated := *bundle
 			mutated.Files = make(map[string][]byte, len(bundle.Files))
 			for name, raw := range bundle.Files {

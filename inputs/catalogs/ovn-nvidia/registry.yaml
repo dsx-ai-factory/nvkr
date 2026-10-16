@@ -38,7 +38,7 @@ components:
           --opt build-arg:UCA_OVN_VER=26.03.0-2~cloud0 \
           --opt build-arg:DOCA_RELEASE=3.5.0 \
           --opt build-arg:K8S_VER=v1.36 \
-          --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7
+          --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-8af51273d52dfa07454435d18d37230e582d797a
     writeDir: nvkr-output
     artifactPath: nvkr-output/ovn-kube-ubuntu.oci.tar
   ovn-kubernetes-chart:
@@ -80,7 +80,7 @@ components:
         readonly chart=/src/charts/ovn-kubernetes
         readonly out=/src/nvkr-output/ovn-kubernetes
         test -f "$chart/Chart.yaml"
-        grep -qx 'version: 2.4.1' "$chart/Chart.yaml"
+        grep -qx 'version: 2.4.2' "$chart/Chart.yaml"
         mkdir -p "$out"
         cp -a "$chart/." "$out/"
         # The pinned chart aliases upstream's values filename onto values.yaml.
@@ -103,8 +103,8 @@ components:
       - bash
       - -ec
       - |
-        readonly stream=2.4.1
-        readonly revision=1+git.9480bbe1377e
+        readonly stream=2.4.2
+        readonly revision=1+git.8af51273d52d
         readonly out=/src/nvkr-output
         readonly charts="$out/charts"
         readonly images="$out/images"
@@ -124,7 +124,7 @@ components:
           ovnkubeControlPlane:
             image: &built_image
               repository: localhost/nvke/ovn-kubernetes
-              tag: git-9480bbe1377e9d9dae550c6ae08f3d7b6460dbf7
+              tag: git-8af51273d52dfa07454435d18d37230e582d797a
               sha256: ""
         ovnkube-single-node-zone:
           ovnkubeSingleNodeZone:
@@ -160,8 +160,8 @@ components:
         # SPDX-License-Identifier: Apache-2.0
         set -euo pipefail
         [ "${1:-}" = configure ] || exit 0
-        readonly image_dir=/usr/lib/nke/cni-ovn/2.4.1
-        readonly image_name=ovn-images_2.4.1_linux_{{.Arch}}.tgz
+        readonly image_dir=/usr/lib/nke/cni-ovn/2.4.2
+        readonly image_name=ovn-images_2.4.2_linux_{{.Arch}}.tgz
         if [ -n "${NKE_CTR_BIN:-}" ]; then
           ctr="$(command -v "$NKE_CTR_BIN")" || { echo "OVN import: ctr is not executable: $NKE_CTR_BIN" >&2; exit 1; }
         elif [ -x /usr/local/bin/ctr ]; then

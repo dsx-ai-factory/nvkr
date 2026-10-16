@@ -192,6 +192,9 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
   template already supplies `{#slug}` anchors (the SADD). Promote a bold label to a
   heading only when it names a topic with substantial content beneath it.
 - Keep `docs/sadd.md` and `CONTEXT.md` (domain vocabulary) consistent with any ADR change.
+- Keep the GitHub App setup instructions current with the permissions the catalog maintenance workflow requests.
+  When `catalogmaintenance.AppPermissions` or the App secrets change, update the "Create the publishing GitHub
+  App" section of `docs/catalog-maintenance.md` in the same change.
 - Put example-specific commands beside their Definition or toolchain. Before adding a user guide, consult
   `docs/README.md` and update the existing task or reference owner. Cite immutable external Run/artifact
   references and their limits in reconciliation; historical investigations belong in Git history.

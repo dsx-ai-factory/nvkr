@@ -10,6 +10,9 @@ DEMO_TEST_BIN ?= bin/nvke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
+# Bound each package explicitly; the hosted factory suite can exceed Go's
+# implicit 10-minute default while still executing its ordinary contracts.
+GO_TEST_TIMEOUT ?= 20m
 # Dispatch is explicit about the repository: a checkout may have a fork and upstream.
 PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
@@ -101,7 +104,7 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
-	go test $(GO_TEST_FLAGS) $(PKG)
+	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
@@ -212,7 +215,7 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 .PHONY: workflows-check
-workflows-check: workflow-generator pipeline-dev-check ## Check committed producer, qualification and development bundles for drift.
+workflows-check: workflow-generator pipeline-dev-check catalog-refresh-check ## Check committed producer, qualification, development bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
 	@# Definitions. The generator still authenticates the complete bundle and inputs.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
@@ -228,6 +231,27 @@ workflows-check: workflow-generator pipeline-dev-check ## Check committed produc
 		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
 		--environment inputs/environments/github-nightly-upstream.json \
 		--root . --runtime --check
+
+# The private NVKE source the installed catalog refresh workflow was rendered with.
+CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN
+
+.PHONY: catalog-refresh-check
+catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
+	@# The installed file is generated, so it must equal the renderer's output for the
+	@# same source option and the canonical generator stamp. Regenerate it with
+	@# `make catalog-refresh-generate`; never edit the file by hand.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 { diff -u .github/workflows/catalog-refresh.yaml "$$rendered" || { \
+	   echo "catalog-refresh.yaml differs from catalog update-ci output; regenerate it from the generator" >&2; exit 1; }; }
+
+.PHONY: catalog-refresh-generate
+catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog refresh workflow with the canonical generator stamp.
+	@# Render to a temporary file and replace the installed workflow only after the renderer
+	@# succeeds: a refused render (source, stamp or closure admission) leaves it untouched.
+	@rendered="$$(mktemp .github/workflows/.catalog-refresh.XXXXXX)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate
 workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate producer, qualification and development bundles with their canonical generator stamp.

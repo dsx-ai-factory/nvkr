@@ -6,6 +6,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"io"
 	"runtime"
 	"sync/atomic"
 
@@ -317,12 +318,20 @@ func matchNativeSmokeOrigins(source, current qualificationorigin.Description, po
 }
 
 func runNativeSmokeMember(ctx context.Context, checks *ArtifactCheckReceipt, owner nativeSmokeRuntime, member ToolSmokeMember) (nativeSmokeObservation, error) {
+	return runHeldSmokeMember(ctx, checks.lifetime.verified.publication, owner, member)
+}
+
+type smokeMemberWriter interface {
+	WriteExecutableMember(context.Context, string, string, io.Writer) (int64, error)
+}
+
+func runHeldSmokeMember(ctx context.Context, publication smokeMemberWriter, owner nativeSmokeRuntime, member ToolSmokeMember) (nativeSmokeObservation, error) {
 	output, err := heldfile.NewOutput("qualification-tool", member.Size)
 	if err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "creating bounded held tool")
 	}
 	defer func() { _ = output.Close() }()
-	written, err := checks.lifetime.verified.publication.WriteExecutableMember(ctx, member.Output, member.Member, output.OSFile())
+	written, err := publication.WriteExecutableMember(ctx, member.Output, member.Member, output.OSFile())
 	if err != nil {
 		return nil, err
 	}

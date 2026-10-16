@@ -227,32 +227,13 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		env := map[string]string{}
 		privateImages := len(githubStagePrivateImages(plan, stage)) > 0
-		if privateImages {
-			fmt.Fprintln(&body, "    permissions:\n      contents: read\n      packages: read")
+		permissions, err := githubStagePermissions(plan, stage)
+		if err != nil {
+			return nil, err
 		}
+		writeGitHubPermissions(&body, permissions)
 		for k, v := range plan.Environment.Runtime.Variables {
 			env[k] = v
-		}
-		if node.Kind == NodePublish {
-			target := plan.Targets[node.Target]
-			fmt.Fprintf(&body, "    permissions:\n      contents: read\n")
-			if target.CredentialRef != "" && strings.HasPrefix(target.Ref, "ghcr.io/") && !plan.Environment.GitHubDevelopment {
-				fmt.Fprintf(&body, "      packages: write\n")
-			}
-		}
-		if signFamilyNode(node.Kind) {
-			signing := plan.Environment.Signing
-			if signing == nil {
-				return nil, e.New(e.CodeTrustPolicyMissing,
-					"GitHub node %q signs without a delivery signing profile", node.ID)
-			}
-			// Signing scopes are per-mode and per-kind, and `id-token: write` (the OIDC
-			// token keyless cosign exchanges for a certificate) is emitted only for artifact signing and SBOM attestation.
-			permissions := githubSigningPermissionsFor(plan, node.Kind)
-			fmt.Fprintf(&body, "    permissions:\n")
-			for _, name := range sortedKeys(permissions) {
-				fmt.Fprintf(&body, "      %s: %s\n", name, permissions[name])
-			}
 		}
 		if node.Kind == NodePublish || signFamilyNode(node.Kind) {
 			registryEnv, err := githubRegistryEnvironment(plan, node.Kind, node.Target)
@@ -368,14 +349,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))
 		if GitHubDiskBuildOnly(plan) {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubARCEnvironment))
-			fmt.Fprintln(&body, "    permissions:\n      contents: read")
 		}
 		if PerOutputPublication(plan) {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironmentFor(plan)))
-			fmt.Fprintln(&body, "    permissions:\n      contents: read")
-			if !plan.Environment.GitHubDevelopment {
-				fmt.Fprintln(&body, "      packages: read")
-			}
 			registryEnv, err := githubRegistryEnvironment(plan, NodeVerifyPublication, "release")
 			if err != nil {
 				return nil, err
@@ -384,6 +360,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				fmt.Fprintf(&body, "    env:\n      NVKR_REGISTRY_USER: %s\n      NVKR_CREDENTIAL: %s\n", yamlSingle(registryEnv["NVKR_REGISTRY_USER"]), yamlSingle(registryEnv["NVKR_CREDENTIAL"]))
 			}
 		}
+		writeGitHubPermissions(&body, githubFinalizerPermissions(plan))
 		fmt.Fprintln(&body, "    steps:")
 		if err := writeGitHubPlatformCheck(&body, plan, runner); err != nil {
 			return nil, err
@@ -420,6 +397,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		return nil, err
 	}
 	workflow, err = lowerGitHubNeeds(ctx, plan, workflow)
+	if err != nil {
+		return nil, err
+	}
+	workflow, actionFiles, err = privatizeGitHubTransfers(plan, workflow, actionFiles, actions)
 	if err != nil {
 		return nil, err
 	}

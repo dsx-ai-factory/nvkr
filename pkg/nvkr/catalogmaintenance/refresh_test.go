@@ -146,17 +146,17 @@ func TestRefreshRealLocalPinSetJourney(t *testing.T) {
 	oldPlan := readFixture(t, ".github/nvkr-run/plan.json")
 	oldWorkflow := readFixture(t, ".github/workflows/nvkr-run.yml")
 	oldManifest := readFixture(t, ".github/nvkr-run/manifest.json")
-	result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false)
+	result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false, "")
 	if err != nil || result.Changed || !bytes.Equal(baseline, readFixture(t, "catalog/pins.lock.yaml")) {
 		t.Fatalf("no-op: %+v %v", result, err)
 	}
 	promote("1.1.0")
-	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", true)
+	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", true, "")
 	assertCode(t, err, e.CodeDiff)
 	if !result.Changed || result.Update.Changed != 3 || !bytes.Equal(baseline, readFixture(t, "catalog/pins.lock.yaml")) || !bytes.Equal(oldPlan, readFixture(t, ".github/nvkr-run/plan.json")) {
 		t.Fatal("preview lost derived member or mutated files")
 	}
-	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", false)
+	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", false, "")
 	if err != nil || !result.Changed {
 		t.Fatalf("apply: %+v %v", result, err)
 	}
@@ -180,7 +180,7 @@ func TestRefreshRealLocalPinSetJourney(t *testing.T) {
 		t.Fatal("changed pins did not update the generated bundle manifest")
 	}
 	current := readFixture(t, "catalog/pins.lock.yaml")
-	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", false)
+	result, err = Refresh(t.Context(), cfg, "test (deadbeef)", false, "")
 	if err != nil || result.Changed || !bytes.Equal(current, readFixture(t, "catalog/pins.lock.yaml")) {
 		t.Fatalf("second no-op: %+v %v", result, err)
 	}
@@ -191,7 +191,7 @@ func TestRefreshRejectsStaleGenerationBeforePinWork(t *testing.T) {
 	before := readFixture(t, "catalog/pins.lock.yaml")
 	writeFixture(t, ".github/nvkr-run/plan.json", []byte("tampered"))
 	calls := 0
-	_, err := refresh(t.Context(), cfg, "test (deadbeef)", false, func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+	_, err := refresh(t.Context(), cfg, "test (deadbeef)", false, "", func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
 		calls++
 		return catalog.SourcePinUpdate{}, nil
 	})
@@ -212,7 +212,7 @@ func TestRefreshExactConstraintsNeverWiden(t *testing.T) {
 	before := readFixture(t, "catalog/pins.lock.yaml")
 	beforePlan := readFixture(t, ".github/nvkr-run/plan.json")
 	promote("1.1.0")
-	result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false)
+	result, err := Refresh(t.Context(), cfg, "test (deadbeef)", false, "")
 	if err != nil || result.Changed || !bytes.Equal(before, readFixture(t, "catalog/pins.lock.yaml")) || !bytes.Equal(beforePlan, readFixture(t, ".github/nvkr-run/plan.json")) || !bytes.Equal(registry, readFixture(t, "catalog/registry.yaml")) {
 		t.Fatalf("exact policy widened or rewrote inputs: %+v %v", result, err)
 	}
@@ -232,7 +232,7 @@ func TestRefreshFailureBoundaries(t *testing.T) {
 			promote("1.1.0")
 			before := readFixture(t, "catalog/pins.lock.yaml")
 			beforePlan := readFixture(t, ".github/nvkr-run/plan.json")
-			result, err := refresh(t.Context(), cfg, "test (deadbeef)", false, func(ctx context.Context, request catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
+			result, err := refresh(t.Context(), cfg, "test (deadbeef)", false, "", func(ctx context.Context, request catalog.SourcePinRequest) (catalog.SourcePinUpdate, error) {
 				if !request.RejectRepublishedVersions {
 					t.Fatal("maintenance omitted republished-version admission")
 				}

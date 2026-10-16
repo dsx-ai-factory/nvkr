@@ -11,6 +11,9 @@ inputs:
   action:
     description: Stable job selector
     required: true
+  nvkr-ci-storage-token:
+    description: Private CI storage credential, forwarded only to transfer steps
+    required: true
 outputs:
   data:
     description: Plan-derived operation parameters
@@ -22,6 +25,7 @@ runs:
       uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/prepare-runner
       with:
         runner-artifact: ${{ inputs.runner-artifact }}
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
     - name: Resolve job parameters from the admitted Plan
       id: describe
       env:
