@@ -69,6 +69,18 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 					if node.Component != "nico-sim-runtime-assets" && !cgo {
 						t.Fatal("SQLite simulator requires a CGO-capable build")
 					}
+					if node.Component != "nico-sim-runtime-assets" {
+						if len(node.Patches) != 1 || node.Patches[0].Content == "" || node.Patches[0].SHA256 != "sha256:b45c745b03f1661572f00ce658499a6b260940c36293e03dfff4300ba940e167" {
+							t.Fatal("NICoSim version interface must be a byte-bound source patch")
+						}
+						stamps := map[string]string{}
+						for _, variable := range node.Env {
+							stamps[variable.Name] = variable.Value
+						}
+						if stamps["NICO_SIM_VERSION"] != "v"+node.Version || stamps["NICO_SIM_COMMIT"] != node.SourceCommit || stamps["NICO_SIM_TREE"] != "patched" {
+							t.Fatal("NICoSim must report its exact base revision and declared patched state")
+						}
+					}
 					command := strings.Join(node.Command, " ")
 					if node.Component == "nico-sim" && !strings.Contains(command, "make -C controller/nico-sim build-static") {
 						t.Fatal("server must invoke the source-owned static Make target")

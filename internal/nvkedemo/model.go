@@ -46,6 +46,11 @@ type Config struct {
 // BuildConfig selects the existing local launcher, which bootstraps and invokes
 // nvkr. It does not introduce a second build engine or in-process SDK path.
 type BuildConfig struct {
+	// QualificationPolicy optionally admits the prepared Plan's complete M3
+	// scope before producers execute. It does not qualify completed artifacts.
+	QualificationPolicy string
+	Qualification       QualificationFile
+	Prepared            bool
 	// Network selects a closed authored artifact set for E2E. It does not
 	// substitute source pins or confer deployment/readiness authority.
 	Network       string

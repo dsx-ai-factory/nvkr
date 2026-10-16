@@ -289,9 +289,11 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 }
 func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 	flags := command.Flags()
+	flags.BoolVar(&cfg.Prepared, "prepared", false, "use an existing prepare-only bootstrap; requires a matching qualification policy and no existing Run")
 	flags.StringVar(&cfg.Repo, "repo", "", "native Linux repository path")
 	flags.StringVar(&cfg.NVKEClone, "nvke-clone", "", "optional local source Git clone")
 	flags.StringVar(&cfg.Attempt, "attempt", "", "fresh name for the combined artifact Run")
+	flags.StringVar(&cfg.QualificationPolicy, "qualification-policy", "", "admit the prepared Plan against a local M3 policy before building; does not sign or qualify outputs")
 	flags.IntVar(&cfg.Jobs, "jobs", 1, "maximum concurrent dependency-ready NVKR operations")
 }
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {
@@ -329,6 +331,9 @@ func validateTimeoutFlag(command *cobra.Command, seconds int) error {
 // search directory supplies configuration; unchanged flag defaults cannot
 // overwrite authored YAML values.
 func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile, actions demoActions) (nvkedemo.DemoFile, error) {
+	if command.Flags().Changed("qualification-policy") && flags.Build.QualificationPolicy == "" {
+		return nvkedemo.DemoFile{}, nvkrerr.New(nvkrerr.CodeUsage, "--qualification-policy requires a nonempty path")
+	}
 	if path == "" {
 		if command.Flag("config").Changed {
 			return nvkedemo.DemoFile{}, nvkrerr.New(nvkrerr.CodeUsage, "--config requires a nonempty path")
@@ -345,6 +350,7 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 		value       string
 	}{
 		{"repo", &selected.Build.Repo, flags.Build.Repo}, {"nvke-clone", &selected.Build.NVKEClone, flags.Build.NVKEClone}, {"attempt", &selected.Build.Attempt, flags.Build.Attempt},
+		{"qualification-policy", &selected.Build.QualificationPolicy, flags.Build.QualificationPolicy},
 		{"nvke-checkout", &selected.Run.NVKECheckout, flags.Run.NVKECheckout}, {"nvkr", &selected.Run.NVKR, flags.Run.NVKR}, {"out", &selected.Run.Out, flags.Run.Out}, {"network", &selected.Run.Network, flags.Run.Network},
 		{"os-run", &selected.Run.Runs.OS, flags.Run.Runs.OS}, {"components-run", &selected.Run.Runs.Components, flags.Run.Runs.Components}, {"provider-run", &selected.Run.Runs.Providers, flags.Run.Runs.Providers},
 		{"site-run", &selected.Run.Runs.Site, flags.Run.Runs.Site}, {"tools-run", &selected.Run.Runs.Tools, flags.Run.Runs.Tools}, {"profiles-run", &selected.Run.Runs.Profiles, flags.Run.Runs.Profiles},
@@ -356,6 +362,9 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 	}
 	if command.Flags().Changed("jobs") {
 		selected.Build.Jobs = flags.Build.Jobs
+	}
+	if command.Flags().Changed("prepared") {
+		selected.Build.Prepared = flags.Build.Prepared
 	}
 	if command.Flags().Changed("timeout") {
 		selected.Run.TimeoutSeconds = flags.Run.TimeoutSeconds

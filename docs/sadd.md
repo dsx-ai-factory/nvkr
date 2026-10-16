@@ -667,12 +667,32 @@ consume its held executable members in nonroot network-disabled containers and c
 frozen producer inputs. Their distinct signatures bind exact member observations, full policy and the current
 qualifier invocation. The final owner requires successful exact-attempt jobs, authenticates those signatures
 and certificate invocation claims, and recomputes complete native coverage before issuing a B receipt.
+For mixed executable bundles, independent policy may name an exact runtime-assets archive member.
+Shared admission requires its source-built tarball producer, a non-executable delivered mode and
+complete sibling tool coverage. The archive stays in A's authenticated artifact set; the rule does
+not assert that its internal contents contain no tools.
 The independently configured `run qualify --policy <path>` derives its source from the authenticated hosted
 event, consumes live A/B/invocation receipts and signs for every selected subject. The generator owns the
 same-commit worker pair and its secret/permission routing. These implementation contracts and local native
 execution do not establish hosted acceptance; reconciliation owns the remaining candidate and external gaps.
 Any failed verdict prevents all attestations; later signing/attachment failure marks qualification unsuccessful
 even if earlier attachments remain. Smoke execution has no qualification credentials.
+
+ADR-16 specifies a local NVKE qualification rehearsal using independently
+selected local signing keys and exact local Run/payload authentication. It must exercise the complete
+artifact, smoke, evidence-publication and consumer flow while retaining the local unqualified lane.
+Local origins and receipts cannot impersonate hosted workflows or authorize the hosted publisher.
+Execution-scope admission is shared, local preparation can retain compiler-read inputs, and a
+separate local-key signing adapter has real Linux interoperability coverage. The independent local policy
+binds exact input identities, native execution pins and three distinct normalized public keys; its
+validation supplies no receipt. `run qualify-local` now delegates the complete retained-attempt check,
+three-role signing, native smoke and registry read-back sequence to lifecycle and emits canonical local
+results. An explicitly configured demo requires that command to succeed on the built attempt before
+returning deployment inputs. Real-signature integration fixtures use simulated smoke; the separately
+recorded native ARM64 rehearsal has now checked all 29 actual outputs, executed all 10 delivered tools,
+signed through the three local roles and passed registry read-back. The demo handoff has process-fixture
+coverage; downstream cluster deployment is a separate scope. Reconciliation tracks independent consumer
+and negative-case evidence and the remaining hosted acceptance work.
 
 The MVP keeps disk evidence producer-only. Embedded declarations are optional; omission is not applicable,
 while authored declarations must match their referenced pinned upstream metadata. This supplies no effective

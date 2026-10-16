@@ -811,6 +811,11 @@ workflow. Missing required smoke or external-suite results fail closed; declared
 reported as not evaluated. Source/build authentication and all verdict collection precede signing. A signing
 or attachment failure can leave earlier attachments but never produces successful qualification. ADR-16 owns
 the evidence and publication contract; reconciliation separately records implementation and hosted acceptance.
+The fixed smoke environment disables clusterctl's optional post-command update check with
+`CLUSTERCTL_DISABLE_VERSIONCHECK=true`. This constant is owned by the executor, not caller input;
+network isolation, exact version/source checks and the command timeout remain unchanged.
+Both NICoSim profiles use the executor-owned `version --output=json` arguments. ADR-16 owns their
+source-patch and tree-state requirements; neither profile permits caller-supplied executable arguments.
 
 The v1 scheduler pairs only a terminal observation and its directly dependent SBOM for the same exact
 BuildTarget, with identical runner, container and platform and offline execution. Every external SBOM input

@@ -103,6 +103,12 @@ the exact successful GitHub attempt, applies the independent repository/workflow
 issues a closeable source receipt. It downloads only that attempt's bounded, provider-digest-bound archive,
 whose sole member is the generated `handoff.json`. An artifact name or decoded description grants no authority.
 
+For the in-progress local rehearsal, `lifecycle.PrepareCapturedFiles` delegates to factory's existing
+bounded compiler-read capture and retains the snapshot privately with the prepared Run. Real local
+execution commits `compile-inputs.json` before starting producers; dry-run and failed capability
+admission create no snapshot or attempt storage. Later edits to authored files cannot change that
+snapshot. The snapshot remains descriptive: it grants no completed-Run, payload or signing authority.
+
 The distinct `lifecycle.CheckQualificationReference` entrypoint discovers that exact source attempt from
 an authenticated selected publication's signed `InvocationID`, retaining the same independent policy and
 Run/handoff authentication. The receipt must bind the selected root (ADR-16 §5). `Client.Validate` delegates
@@ -144,6 +150,11 @@ workflow pair and manifest. `lifecycle.ValidateQualificationSmokePlan` owns the 
 join shared by generation and runtime; adapters cannot choose a different applicability rule. Generation
 selects exactly the executable native platforms, retaining the final AMD64 signer requirement. The CLI
 only selects the use case and presents its result.
+`run qualify-local` delegates to `lifecycle.QualifyLocalRun`. It selects a completed captured attempt,
+independent local policy, three explicit private-key files, native runtime, pinned cosign, registry
+namespace, scratch and new evidence destination. Lifecycle owns the complete check/sign/smoke/publish/
+read-back sequence and cleanup; the command emits only its descriptive canonical result. This separate
+local lane accepts no hosted invocation and supplies no hosted qualification or release authority.
 ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
 acceptance boundaries.
 
@@ -188,8 +199,8 @@ excludes a live owner. Inspection admits only currently producible lanes, not
 qualified lifecycle records. It validates the existing output slot bindings, without opening payload
 locators, restoring execution authority or inferring current availability/health.
 The CLI may show these views as plain/JSON or an explicitly selected read-only
-terminal explorer. Of the 26 public command leaves, 23 admit an explicitly selected result browser;
-`validate`, `run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics. The hidden native
+terminal explorer. Of the 27 public command leaves, 23 admit an explicitly selected result browser;
+`validate`, `run check-artifacts`, `run qualify` and `run qualify-local` retain canonical machine-readable diagnostics. The hidden native
 worker is not a public command.
 Owning operations, including maintenance transactions
 and verification, finish and release receipts before this read-only view opens.
@@ -202,7 +213,7 @@ JSON, are preserved. Interactive `run local` defaults to the dashboard and does
 not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
 terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
 
-Normal commands are `validate`, `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify`,
+Normal commands are `validate`, `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
 and `release verify|inspect|browse|export|pull`. Producer operations select authored inputs with `--definition` and
 `--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility

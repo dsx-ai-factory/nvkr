@@ -83,6 +83,136 @@ are not source compilations. Ordinary local SBOMs are composition evidence,
 not full-disk scan/qualification. AMD64, FDE, hosted signing and publication are
 not selected by this example.
 
+The launcher retains the compiler-read input closure as `compile-inputs.json`
+inside the immutable attempt, before producer execution. Generated local toolchain
+references remain relative to the repository so the saved inputs can be replayed.
+For disk outputs, it also retains `disk-materials.json` from the original live
+producer-consumption observations before finalizing the Run. This records staged
+material handoffs, with explicit limits for source vendoring and network/guest
+acquisitions. Both records are descriptive; they do not authenticate the Run or
+qualify its outputs. Material-retention failure prevents a complete captured Run.
+Direct `nvkr run local` callers can request the same capture with
+`--capture-inputs-root .` and repository-relative Definition and Environment paths.
+Dry runs retain no attempt or input snapshot.
+
+## Rehearse local M3 qualification
+
+On native Linux, `run qualify-local` checks a completed captured attempt, authenticates it with a local
+builder key, executes the complete selected native tool-smoke scope, signs smoke and qualification under
+two distinct keys, publishes payloads and evidence, then independently verifies registry read-back.
+Its result remains `unqualified-local-execution`. The native ARM64 29-output rehearsal has passed this
+command, including all 10 delivered tool members. Exact artifact references and remaining checks are tracked in
+[reconciliation](adr/reconciliation.md#local-m3-demo-rehearsal).
+
+Supply an independently authored `nvkr.dev/local-qualification-policy/v1` JSON policy with the exact
+Definition, Environment and Plan digests, native Linux platform, pinned cosign executable digest, three
+distinct P-256 public keys, pinned smoke image and complete supported tool profiles. The command accepts
+explicit passwordless private-key files for those roles. It rejects unsupported or omitted smoke members;
+reducing the policy scope cannot make the complete demo qualify.
+
+Prepare the exact attempt first so the policy can bind the selected Plan, including its local
+toolchain substitution. On the native Linux host, from the repository root:
+
+```sh
+bash scripts/nvke-full-arm64-local.sh --prepare-only first-all 2 all
+```
+
+Review `.nvkr/laptop-bootstrap/first-all/selected-plan.json` and author the policy with its exact
+identities and complete smoke scope. Then set `build.prepared: true` in the demo YAML, or pass
+`--prepared` to `nvke-demo build` or `e2e`, keeping the same repository, attempt, jobs, source clone
+and network selection. This mode requires a qualification policy and an existing bootstrap with no
+existing producer Run. It recompiles the current inputs through the prepared executable and checks
+the policy again before producers start; the saved Plan is not a reusable verification receipt.
+It does not resume a failed or completed Run. The final qualification independently checks the
+captured inputs and delivered bytes. Native full-demo validation of this two-stage flow remains open.
+
+For `nvke-demo build` or `e2e`, `--qualification-policy /absolute/path/policy.json`
+(YAML `build.qualificationPolicy`) checks the prepared Plan and complete smoke scope before the
+producer Run starts. Bootstrap and toolchain preparation still occur before this check. This option
+only admits the intended build. To also require signing, smoke and registry read-back before deployment,
+add the following fields under `build` in the demo YAML (all filesystem paths must be absolute):
+
+```yaml
+  qualificationPolicy: /trust/local-qualification.json
+  qualification:
+    builderKey: /trust/builder.key
+    smokeKey: /trust/smoke.key
+    qualifierKey: /trust/qualifier.key
+    cosign: /opt/pinned/cosign
+    repository: localhost:5000/local-m3
+    scratch: /native/qualification-scratch
+    evidenceOut: /native/qualification-scratch/first-all-evidence.json
+    plainHTTP: true
+    anonymous: true
+```
+
+With this configuration, both `build` and `e2e` invoke `run qualify-local` on the newly built complete
+attempt. Before producers start, lifecycle preflight also checks the three private keys against their
+policy roles using the pinned cosign executable, registry settings, the new evidence destination and
+at least 1 GiB of preliminary disk-backed scratch headroom. Final payload-dependent capacity and all
+signing checks run again after the build; preflight does not reserve capacity or verify registry access.
+`e2e` reaches deployment only after the child exits successfully and reports `passed` for that
+attempt in the local lane. The demo retains the child result in
+`.nvkr/laptop-bootstrap/<attempt>/qualification-result.json`; it reserves that transcript before
+starting qualification and refuses to reuse it. An interruption may leave an empty transcript;
+choose a fresh attempt rather than treating it as successful evidence.
+Private child diagnostics, including stderr, are retained in
+`.nvkr/laptop-bootstrap/<attempt>/qualification-diagnostics/qualify-local.log`.
+Compiler replay still authenticates upstream Git pin sets, so qualification needs the same
+source access as build preparation. The demo preserves the supported credential-helper home,
+SSH agent, proxy, certificate and explicit local redirect settings for that controller;
+the delivered-tool smoke environment remains isolated from those credentials.
+The signed evidence remains at `evidenceOut`. A failed qualification preserves the completed build for
+diagnosis but prevents deployment. This adapter has process-fixture coverage. The complete qualification
+command has passed against the real demo outputs; downstream cluster deployment remains a separate exercise.
+
+Use an already running development registry and existing disk-backed scratch. Replace these example
+paths with the completed attempt, approved policy, key files and pinned executable. The evidence file
+must be new, and its parent directory must exist. Run from the repository root and pass the
+completed workspace as a clean relative path under `.nvkr/`, as required by factory observation:
+
+```sh
+mkdir -p .nvkr/qualification
+bin/nvkr run qualify-local \
+  --workspace .nvkr/runs/first-all \
+  --policy local-qualification.json \
+  --builder-key /secure/local-builder.key \
+  --smoke-key /secure/local-smoke.key \
+  --qualifier-key /secure/local-qualifier.key \
+  --cosign /opt/pinned/cosign \
+  --repository localhost:5000/local-m3 \
+  --scratch .nvkr/qualification \
+  --evidence-out .nvkr/qualification/first-all-evidence.json \
+  --plain-http --anonymous
+```
+
+Authenticated registries use `NVKR_REGISTRY_USER` and `NVKR_REGISTRY_PASSWORD`; explicit anonymous
+access rejects those credentials when present. The command emits one canonical JSON result on stdout.
+`passed` requires signing, smoke, complete registry read-back and cleanup. A failure may leave signed
+evidence or remote artifacts; the result lists attempted references without claiming their acceptance.
+Use a new evidence destination for a retry. This command does not provision a tenant; the configured
+demo invokes it before proceeding to deployment.
+
+For a separate consumer exercise of the complete 29-output demo, retain the successful command's
+JSON stdout as a result file. On native Linux, the opt-in test below downloads its digest-addressed
+publication into fresh scratch and verifies it using the independently selected public policy.
+It needs no producer workspace or private signing keys. Compiler pin authentication still requires
+source access. This test explicitly uses the anonymous HTTP development registry and requires
+disk-backed `TMPDIR` capacity for downloads and captured payloads:
+
+```sh
+NVKR_TEST_M3_RESULT=/native/qualification-result.json \
+NVKR_TEST_M3_POLICY=/trust/local-qualification.json \
+NVKR_TEST_COSIGN_BINARY=/opt/pinned/cosign \
+TMPDIR=/native/qualification-scratch \
+go test ./pkg/nvkr/lifecycle -run '^TestExternalLocalM3Consumer$' -count=1 -timeout=2h -v
+```
+
+The exercise checks the complete positive case, invalid signatures for each role, missing signatures
+or provenance, changed compiler inputs or source pins, mismatched Run evidence, a wrong policy Plan, missing or extra
+transport members, and altered or removed downloaded disk bytes.
+Negative cases alter only the consumer's downloaded data. A skipped test is not external evidence.
+
 ## Build the complete selection, including the OS
 
 ```sh

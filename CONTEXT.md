@@ -224,6 +224,16 @@ Native workers exercise every selected delivered tool with fixed version checks 
 sign exact member observations. The final qualifier authenticates complete native coverage under the same
 independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
 they are not caller-authored pass records or release authorization.
+An exact runtime-assets archive member may be outside version smoke only when the Plan declares a
+source-built tarball and the delivered member is non-executable. Its artifact checks remain required;
+the rule does not exempt sibling tools or classify the archive's internal contents.
+The local qualification rehearsal specified in ADR-16 exercises the same
+build/evidence checks with explicit local origins and distinct local signing roles. Its results retain
+the unqualified local lane and cannot replace authenticated hosted acceptance or grant release authority.
+`run qualify-local` owns the retained-attempt rehearsal through independent registry read-back; its
+canonical result describes that local check only. An explicitly configured demo gates deployment inputs
+on successful qualification of its built attempt. Reconciliation records actual demo-tool execution,
+consumer verification, negative cases and the scope of deployment-gate testing separately.
 External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success

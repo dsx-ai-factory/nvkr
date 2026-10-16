@@ -552,8 +552,9 @@ The independent policy extends the artifact-check policy with these decisions:
 | `cosign.version` and `cosign.platformDigests` | An exact release locator and independently approved executable bytes for every worker platform plus the AMD64 final signer |
 | `smoke.workflow` | A separate same-repository worker identity, distinct from both builder and final signer |
 | `smoke.images` | Exact native execution-image references, pinned by digest |
-| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm or kubectl version-check profiles |
+| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm, kubectl, Kind, clusterctl or ORAS version-check profiles |
 | `smoke.nonToolOutputs` | Exact OCI/APT output names, kinds and components explicitly outside loose-tool smoke |
+| `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
 The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-qualification.yaml)
@@ -576,15 +577,27 @@ are `kind: oci` with `reason: deployment-image`, and `kind: apt-repository` with
 candidate policy contains all 25 OCI records, alongside three profiles covering its four native
 tool invocations. It contains no Helm/disk exemptions because those formats have a fixed non-tool rule.
 
+For a mixed bundle, `smoke.nonToolMembers` accepts records with `output`, `member` and
+`reason: runtime-assets-archive`. Each must select a source-built `tarball` producer in that exact
+output; the delivered member must have no executable mode bits. Sibling tools still require their
+fixed profiles, and each executable output must contain at least one tool. The archive remains
+subject to artifact and provenance checks. This does not assert that its contents contain no tools.
+Missing, extra, duplicate and tool-overlapping member rules fail closed.
+
 Use independently approved native images containing `/bin/sh`, `cat`, `wc`, `sha256sum`, `chmod` and
 `/usr/bin/env`. They must have no declared volumes or extra inherited environment. The payload environment
-is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C` and `TZ=UTC`; image configuration
+is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C`, `TZ=UTC` and
+`CLUSTERCTL_DISABLE_VERSIONCHECK=true`. The last setting disables clusterctl's optional network update
+check after its version command; version/source checks and network isolation remain required. Image configuration
 must not add or conflict with it. Builder images and pins are not automatically trusted smoke images.
 The generated route also requires a GitHub-signing producer, its generated source workflow, and GHCR
 publication under the same repository owner with the existing `github:GITHUB_TOKEN` credential reference.
 
-The fixed profiles are `nvkectl-version-json`, `helm-version` and `kubectl-client-version-json`. Expected
-versions and the nvkectl commit come from the authenticated frozen Plan. The policy cannot supply a
+The fixed profiles include `nvkectl-version-json`, `helm-version`, `kubectl-client-version-json`,
+`kind-version`, `clusterctl-version-json`, `oras-version`, `nicosim-version-json` and
+`nicosim-patched-version-json`. NICoSim profiles require exact version, source commit and platform,
+with `clean` for unpatched inputs or `patched` for declared authenticated patch inputs. Dirty or unknown
+tree stamps fail. Expected versions and source commits come from the authenticated frozen Plan. The policy cannot supply a
 replacement expected version or arbitrary executable arguments. Every member of every executable bundle
 must be covered. OCI deployment-image and APT package-repository exemptions require exact membership;
 there is no wildcard exemption for an artifact format. Disk and Helm outputs use their explicit non-tool

@@ -225,6 +225,9 @@ func freezeToolSmokePolicy(policy QualificationPolicy) (QualificationPolicy, err
 	}
 	sort.Strings(frozen.OutsideMVPSuites)
 	sort.Strings(frozen.RequiredSuites)
+	sort.Slice(frozen.Smoke.NonToolMembers, func(i, j int) bool {
+		return frozen.Smoke.NonToolMembers[i].key() < frozen.Smoke.NonToolMembers[j].key()
+	})
 	sort.Slice(frozen.Smoke.NonToolOutputs, func(i, j int) bool {
 		return frozen.Smoke.NonToolOutputs[i].Output < frozen.Smoke.NonToolOutputs[j].Output
 	})

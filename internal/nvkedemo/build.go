@@ -22,6 +22,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"golang.org/x/sys/unix"
 )
 
@@ -45,6 +47,12 @@ func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if err := requireContext(ctx); err != nil {
 		return BuiltInputs{}, err
+	}
+	if err := cfg.Qualification.validate(cfg.QualificationPolicy); err != nil {
+		return BuiltInputs{}, err
+	}
+	if cfg.Prepared && !configString(cfg.QualificationPolicy) {
+		return BuiltInputs{}, configUsage("prepared builds require an explicit qualification policy")
 	}
 	launcherFlags, err := buildNetworkFlags(cfg.Network)
 	if err != nil {
@@ -83,6 +91,13 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	// script remains authoritative for exact runtime/toolchain admission.
 	for _, root := range []string{"runs", "laptop-bootstrap"} {
 		owned := filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)
+		if cfg.Prepared && root == "laptop-bootstrap" {
+			info, readErr := os.Lstat(owned)
+			if readErr != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return BuiltInputs{}, fmt.Errorf("prepared bootstrap %q must be an existing directory", owned)
+			}
+			continue
+		}
 		if _, readErr := os.Lstat(owned); readErr == nil {
 			return BuiltInputs{}, fmt.Errorf("attempt destination %q already exists; choose a fresh --attempt", owned)
 		} else if !errors.Is(readErr, os.ErrNotExist) {
@@ -95,6 +110,9 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	cfg.Repository = repo
 	if err = buildLocalArtifacts(ctx, runner, script, cfg); err != nil {
+		return BuiltInputs{}, err
+	}
+	if err = qualifyBuiltArtifacts(ctx, cfg); err != nil {
 		return BuiltInputs{}, err
 	}
 	return builtInputs(repo, cfg.AttemptPrefix), nil
@@ -140,8 +158,34 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	// Bootstrap gets no activity pipe. Its selected Plan, previews and source
 	// preparation remain at the existing owner before the final direct child.
 	prepare := append([]string{"bash", script, "--prepare-only"}, launcherFlags...)
-	if err := runner.Run(ctx, append(prepare, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour); err != nil {
-		return err
+	if !cfg.Prepared {
+		if err := runner.Run(ctx, append(prepare, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour); err != nil {
+			return err
+		}
+	}
+	if cfg.QualificationPolicy != "" {
+		policy, err := lifecycle.LoadLocalQualificationPolicy(ctx, cfg.QualificationPolicy)
+		if err != nil {
+			return err
+		}
+		if policy.Platform != "linux/arm64" {
+			return nvkrerr.New(nvkrerr.CodeEngineCapability, "demo qualification policy requires linux/arm64")
+		}
+		plan, err := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
+		if err != nil {
+			return err
+		}
+		if err := policy.RequirePlan(plan); err != nil {
+			return err
+		}
+		if cfg.Prepared {
+			if err := recheckPreparedQualificationPlan(ctx, runner, cfg, policy); err != nil {
+				return err
+			}
+		}
+		if err := preflightDemoQualification(ctx, cfg, plan); err != nil {
+			return err
+		}
 	}
 	args, err := preparedBuildInvocation(cfg)
 	if err != nil {
@@ -190,7 +234,7 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 	}
 	var args []string
 	decoder := json.NewDecoder(bytes.NewReader(raw))
-	if err := decoder.Decode(&args); err != nil || len(args) != 18 {
+	if err := decoder.Decode(&args); err != nil || len(args) != 19 {
 		return nil, errors.New("invalid private build invocation")
 	}
 	definition := args[4]
@@ -203,7 +247,7 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 	}
 	want := []string{bootstrap + "/nvkr", "run", "local", "--definition", definition,
 		"--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix,
-		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker", "--ui=plain"}
+		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
 	if !slices.Equal(args, want) {
 		return nil, errors.New("private build invocation differs from the supported local command")
 	}
