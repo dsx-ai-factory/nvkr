@@ -1033,7 +1033,30 @@ integrated at `2026-10-16T02:59:31Z`, before Cosign failed at `03:00:01Z`. The p
 does not recover that conflict into a bundle. SBOM creation now has ADR-04's bounded fresh-invocation recovery;
 the exact predicate, subject and full verification remain mandatory. Regression cases were added but not run
 at the operator's request; package compilation, static analysis and review passed. Hosted recovery remains
-unproved until a corrected Run completes.
+unproved. The subsequent
+[development Run 38844396801](https://github.com/dsx-ai-factory/nvkr/actions/runs/38844396801), commit
+`01eafd737bf25f6da2a98d70e471a2851a7cf6c6`, reached source and build work but failed private-package admission
+before SBOM signing. In
+[source job 116792702215](https://github.com/dsx-ai-factory/nvkr/actions/runs/38844396801/job/116792702215)
+and [ARM64 build job 116792950777](https://github.com/dsx-ai-factory/nvkr/actions/runs/38844396801/job/116792950777),
+execution and carrier packaging succeeded; upload then returned `NVKR-E-TRUST-POLICY-MISSING` because package
+access could not be authenticated. Concurrent operator requests using the same personal account received
+HTTP 403 with primary quota `5000`, remaining `0`, and reset `2026-10-16T03:39:23Z`.
+The generated full-success route requires approximately 5,183 package metadata requests before conditional
+revalidation or unrelated account activity: 2,022 for 1,011 uploads, 2,327 for carrier/helper downloads, and
+834 for fresh development publication. A reset alone does not provide reliable headroom for that route.
+The storage owner now uses ADR-18's operation-local authenticated ETag revalidation while retaining every
+network policy check. One download batch shares a backend; its in-memory response cache is bounded to 128
+entries and 8 MiB, with exact URL/credential isolation and no stale-on-error fallback. Regression cases
+were added but not executed at the operator's request. Compilation, vet, lint and independent static review
+passed; hosted quota savings and a complete Run remain to be demonstrated.
+
+Six sampled attachments in that Run (IDs `12022647313`, `12022133262`, `12023070943`, `12022991328`,
+`12022558957`, and `12023125384`) covered helper, tool, artifact, result, source and package carriers. Each
+ZIP contained exactly one 440–542-byte v2 locator bound to the exact repository, Run, attempt and artifact
+name, with a digest reference to the CI package; no payload files were present. GHCR reported internal
+visibility and no linked repository. These samples do not establish the complete final attachment inventory
+or effective access grants.
 
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage

@@ -187,6 +187,10 @@ func requireGitHubLocatorDirectory(path string, expected os.FileInfo) error {
 // provider download. Provider-created artifact directories retain the original
 // download action's merge policy. The owning store authenticates every request.
 func DownloadGitHub(ctx context.Context, request Request, index, destination string, options Options) error {
+	return newBackend().downloadGitHub(ctx, request, index, destination, options)
+}
+
+func (b *backend) downloadGitHub(ctx context.Context, request Request, index, destination string, options Options) error {
 	if ctx == nil || index == "" || destination == "" {
 		return e.New(e.CodeUsage, "private CI download requires context, index and destination")
 	}
@@ -238,7 +242,7 @@ func DownloadGitHub(ctx context.Context, request Request, index, destination str
 		if err != nil || !filepath.IsLocal(parent) {
 			return e.New(e.CodeVerifyFailed, "CI locator parent escapes its provider index")
 		}
-		if err := Download(ctx, selected, locator, filepath.Join(destination, parent), options); err != nil {
+		if err := b.download(ctx, selected, locator, filepath.Join(destination, parent), options); err != nil {
 			return err
 		}
 		count++

@@ -310,6 +310,8 @@ The source repository metadata lookup uses the job's automatic repository token,
 GHCR publication jobs. Package-scoped development credentials therefore need no source-repository scope
 for this admission check. The repository token does not replace the publication credential for package
 metadata or registry operations and is not added to producer execution.
+Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
+admission check is skipped, and errors cannot reuse an earlier successful policy response.
 Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
 seed before admission. The existing metadata inspector derives sibling references without opening product
 payloads; the actual push must retain that inspected root digest. Hosted GHCR layouts outside this metadata

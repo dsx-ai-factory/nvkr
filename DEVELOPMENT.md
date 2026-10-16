@@ -126,6 +126,13 @@ have access before consumer jobs start. Use separate read/write token scopes and
 permissions; a token name or package prefix does not restrict its authority. See
 [private CI transport](docs/generate-pipeline.md) for privacy and retention requirements.
 
+Allow API quota headroom for the full build. Package privacy checks use the token owner's
+[GitHub REST quota](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api);
+separate PATs from one account share that quota. Conditional metadata revalidation reduces usage
+only when GitHub returns an unchanged response. Avoid back-to-back full Runs on a temporary personal
+account, and honor the `x-ratelimit-reset` time after exhaustion. Use distinct CI-storage and development
+publishing service accounts for sustained operation; never disable privacy checks to bypass a quota failure.
+
 Configure these **separate development environments**, retaining the existing production environments:
 
 | Environment | Configuration |

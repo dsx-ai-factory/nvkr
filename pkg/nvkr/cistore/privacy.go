@@ -26,6 +26,7 @@ type backend struct {
 	api       string
 	client    *http.Client
 	transport http.RoundTripper
+	responses admissionResponses
 }
 
 func newBackend() *backend {
@@ -163,18 +164,43 @@ func privateRepositoryVisibility(raw json.RawMessage) bool {
 func (b *backend) get(ctx context.Context, endpoint, token string, result any) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.api+endpoint, nil)
+	key := admissionResponseKey{url: b.api + endpoint, token: token}
+	held, conditional := b.responses.lookup(key)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, key.url, nil)
 	if err != nil {
+		b.responses.forget(key)
 		return 0, e.New(e.CodeFetchFailed, "constructing CI storage admission request")
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if conditional {
+		req.Header.Set("If-None-Match", held.etag)
+	}
 	response, err := b.client.Do(req)
 	if err != nil {
+		b.responses.forget(key)
 		return 0, safeIOError(ctx, e.CodeFetchFailed, "CI storage admission request failed")
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotModified {
+		// A fresh authenticated response must validate the exact representation
+		// sent in this request. The cache alone never grants access.
+		etags := response.Header.Values("ETag")
+		if !conditional || req.Header.Get("If-None-Match") != held.etag ||
+			len(etags) > 1 || (len(etags) == 1 && etags[0] != held.etag) ||
+			json.Unmarshal(held.raw, result) != nil {
+			b.responses.forget(key)
+			return 0, e.New(e.CodeTrustPolicyMissing, "CI storage admission received an invalid conditional response")
+		}
+		if ctx.Err() != nil {
+			b.responses.forget(key)
+			return 0, safeIOError(ctx, e.CodeTimeout, "CI storage admission canceled")
+		}
+		return http.StatusOK, nil
+	}
+	// Every replacement or failure invalidates the previous representation.
+	b.responses.forget(key)
 	if response.StatusCode != http.StatusOK {
 		return response.StatusCode, nil
 	}
@@ -185,6 +211,13 @@ func (b *backend) get(ctx context.Context, endpoint, token string, result any) (
 	}
 	if len(raw) > bodyLimit || canonical.ValidateJSONDocument(raw) != nil || json.Unmarshal(raw, result) != nil {
 		return 0, e.New(e.CodeTrustPolicyMissing, "CI storage admission response is malformed or oversized")
+	}
+	if ctx.Err() != nil {
+		return 0, safeIOError(ctx, e.CodeTimeout, "CI storage admission canceled")
+	}
+	etags := response.Header.Values("ETag")
+	if len(etags) == 1 && validAdmissionETag(etags[0]) {
+		b.responses.remember(key, admissionResponse{etag: etags[0], raw: raw})
 	}
 	return response.StatusCode, nil
 }

@@ -142,6 +142,16 @@ GitHub [warns that granting a public repository private-package access can also 
 Separate secrets avoid granting that public-repository token access to the CI package. Moving execution
 to a private build repository could use that repository's automatic token instead, but requires separate
 source, invocation and signing-policy admission and is not implemented by this transport change.
+Repeated metadata checks within one transfer or publication operation may use authenticated HTTP ETag
+revalidation. Every existing admission boundary still contacts GitHub. A `304 Not Modified` response may
+reuse only the exact successful response bytes retained in memory for the same endpoint and credential;
+changed responses undergo the full policy check. No disk, cross-job or stale-on-error cache is admitted.
+The bounded operation-local cache is an optimization, not authority: a missing validator uses an ordinary
+request, and inaccessible or malformed policy still fails closed. GitHub documents that authenticated
+[`304` responses do not consume the primary API quota](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#use-conditional-requests).
+Savings depend on the provider returning unchanged metadata; concurrent package updates can require full
+responses. Separate tokens owned by one account still share its quota, so repeated full Runs require quota
+headroom or separate service-account identities.
 The v2 transport splits the held archive into ordered raw chunks of at most 1 GiB (at most 64), binds
 their digests in the OCI manifest/config, and verifies each chunk plus the complete archive before restoration.
 This avoids GHCR's per-layer size bound without a second transport runtime or gzip expansion. It increases
