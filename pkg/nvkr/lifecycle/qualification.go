@@ -236,7 +236,19 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if err := canonical.UnmarshalExact(raw, &plan); err != nil {
 		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "freezing qualification Plan")
 	}
-	if err := factory.AdmitQualificationHandoff(&plan); err != nil {
+	if origin.Branch != "" {
+		if err := factory.AdmitDevelopmentQualification(&plan); err != nil {
+			return nil, nil, err
+		}
+		if err := admitDevelopmentQualificationReference(request.Reference, origin); err != nil {
+			return nil, nil, err
+		}
+		for _, predicate := range request.Predicates {
+			if err := admitDevelopmentQualificationReference(predicate.Reference, origin); err != nil {
+				return nil, nil, err
+			}
+		}
+	} else if err := factory.AdmitQualificationHandoff(&plan); err != nil {
 		return nil, nil, err
 	}
 	expectation, err := PrepareExactInputs(request.Definition, request.Environment, &plan)

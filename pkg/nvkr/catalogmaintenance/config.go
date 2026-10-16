@@ -36,8 +36,9 @@ type Config struct {
 	// inputs for the existing owners, not authority: each is checked, regenerated
 	// and transported with the production Run, and a committed bundle the policy
 	// does not name is refused.
-	DevelopmentEnvironment string `json:"developmentEnvironment,omitempty"`
-	QualificationPolicy    string `json:"qualificationPolicy,omitempty"`
+	DevelopmentEnvironment         string `json:"developmentEnvironment,omitempty"`
+	QualificationPolicy            string `json:"qualificationPolicy,omitempty"`
+	DevelopmentQualificationPolicy string `json:"developmentQualificationPolicy,omitempty"`
 	// AdditionalRuns names further committed Run bundles, each compiled from its
 	// own Definition and Environment, that also consume this catalog's pins, such
 	// as named nightly bundles. They join the same closure under the same rules.
@@ -101,10 +102,13 @@ func (config Config) Validate() error {
 			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q", value)
 		}
 	}
-	for _, value := range []string{config.DevelopmentEnvironment, config.QualificationPolicy} {
+	for _, value := range []string{config.DevelopmentEnvironment, config.QualificationPolicy, config.DevelopmentQualificationPolicy} {
 		if value != "" && !safeRelative(value) {
 			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q", value)
 		}
+	}
+	if config.DevelopmentQualificationPolicy != "" && config.DevelopmentEnvironment == "" {
+		return e.New(e.CodeUsage, "development qualification requires developmentEnvironment")
 	}
 	if config.DevelopmentEnvironment != "" && config.DevelopmentEnvironment == config.Environment {
 		return e.New(e.CodeUsage, "developmentEnvironment must differ from the production environment")
