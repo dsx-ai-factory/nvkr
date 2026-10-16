@@ -303,6 +303,16 @@ NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI r
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
 one release index from named outputs; normal authors do not wire payload → root → route.
 
+GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
+package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
+null or nonpublic repository linkage, using the publication credential independently of CI carrier storage.
+Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
+seed before admission. The existing metadata inspector derives sibling references without opening product
+payloads; the actual push must retain that inspected root digest. Hosted GHCR layouts outside this metadata
+contract are rejected rather than falling back to unchecked publication. Local and other-registry transport
+contracts remain unchanged. These checks cannot lock future provider visibility or establish independent
+package grants; public-source access configuration and hosted execution remain separate operational evidence.
+
 The signed metadata references each deliverable manifest once in its own sibling repository: binary bundle,
 unchanged native container image, Helm artifact or exact-QCOW2 wrapper. The OCI index directly references only its metadata manifest. Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
 standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NVKR-specific

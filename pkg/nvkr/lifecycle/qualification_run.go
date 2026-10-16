@@ -32,10 +32,11 @@ type QualificationHandoff struct {
 // QualificationRuntimeOptions contains process configuration, not per-Run trust
 // decisions. Verifier selection and its byte pin come from the trusted policy.
 type QualificationRuntimeOptions struct {
-	GitHubToken   string
-	WorkspaceRoot string
-	Credential    sign.Credential
-	Registry      delivery.RegistryOptions
+	GitHubToken    string
+	CIStorageToken string
+	WorkspaceRoot  string
+	Credential     sign.Credential
+	Registry       delivery.RegistryOptions
 }
 
 // CheckQualificationRun selects a complete saved Run using two authored inputs:
@@ -57,7 +58,7 @@ func CheckQualificationRun(ctx context.Context, runURL, policyPath string, optio
 }
 
 func checkQualificationRunWithPolicyAndReference(ctx context.Context, locator qualificationorigin.RunLocator, policy QualificationPolicy, options QualificationRuntimeOptions, reference string) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
-	provider := qualificationorigin.NewGitHub(options.GitHubToken)
+	provider := qualificationorigin.NewGitHubWithCIStorage(options.GitHubToken, options.CIStorageToken)
 	source, err := provider.AuthenticateRun(ctx, locator, policy.Source)
 	if err != nil {
 		return nil, nil, err

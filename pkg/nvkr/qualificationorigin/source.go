@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -83,9 +84,11 @@ func (s *SourceRun) Close() error {
 // GitHub authenticates provider facts from the fixed GitHub API origin. Its HTTP
 // transport is deliberately not a public receipt-minting injection point.
 type GitHub struct {
-	token  string
-	client *http.Client
-	api    string
+	token           string
+	client          *http.Client
+	api             string
+	storageToken    string
+	downloadPrivate privateArtifactDownload
 }
 
 // NewGitHub uses an explicit read credential; empty permits public repository
@@ -94,7 +97,17 @@ type GitHub struct {
 // storage destinations; environment proxy settings are not used. Archive reads
 // never receive the API credential. An approved proxy route is not supported.
 func NewGitHub(token string) *GitHub {
-	return &GitHub{token: token, api: "https://api.github.com", client: &http.Client{
+	return NewGitHubWithCIStorage(token, token)
+}
+
+// NewGitHubWithCIStorage separates provider API reads from private CI payload
+// access. An empty storage token retains the API-token fallback. Credentials are
+// explicit and never selected from the environment.
+func NewGitHubWithCIStorage(apiToken, storageToken string) *GitHub {
+	if storageToken == "" {
+		storageToken = apiToken
+	}
+	return &GitHub{token: apiToken, storageToken: storageToken, downloadPrivate: cistore.Download, api: "https://api.github.com", client: &http.Client{
 		Timeout:       30 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		Transport: &http.Transport{

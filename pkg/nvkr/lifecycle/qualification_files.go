@@ -32,6 +32,7 @@ type QualificationFilesOptions struct {
 	CandidatePath   string
 	Source          qualificationorigin.SourceRequest
 	GitHubToken     string
+	CIStorageToken  string
 	Consumer        ConsumerOptions
 }
 
@@ -103,7 +104,7 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	if got != want {
 		return nil, nil, e.New(e.CodePipelineDrift, "qualification Plan differs from the exact recompiled inputs")
 	}
-	origin, err := qualificationorigin.NewGitHub(options.GitHubToken).AuthenticateSource(ctx, options.Source)
+	origin, err := qualificationorigin.NewGitHubWithCIStorage(options.GitHubToken, options.CIStorageToken).AuthenticateSource(ctx, options.Source)
 	if err != nil {
 		return nil, nil, err
 	}

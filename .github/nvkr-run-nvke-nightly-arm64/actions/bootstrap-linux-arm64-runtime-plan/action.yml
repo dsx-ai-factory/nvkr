@@ -11,6 +11,9 @@ inputs:
   runner-artifact:
     description: Same-Run helper artifact name
     required: true
+  nvkr-ci-storage-token:
+    description: Private CI storage credential, forwarded only to transfer steps
+    required: true
 runs:
   using: composite
   steps:
@@ -44,7 +47,7 @@ runs:
         ./nvkr-exec run generate --engine github --definition inputs/definitions/demo/arm64-nvidia-kvm.json --environment inputs/environments/github-nightly-nvidia.json --root . --runtime
       shell: bash -e {0}
     - name: Upload NVKR runtime inputs
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/ci-upload
       with:
         name: nvkr-runtime-inputs
         path: |
@@ -54,8 +57,9 @@ runs:
         include-hidden-files: 'true'
         if-no-files-found: error
         retention-days: 7
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
     - name: 'Upload NVKR runner'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/ci-upload
       with:
         name: ${{ inputs.runner-artifact }}
         path: |
@@ -66,3 +70,4 @@ runs:
         include-hidden-files: 'true'
         if-no-files-found: error
         retention-days: 7
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}

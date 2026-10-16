@@ -54,6 +54,9 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	if err != nil {
 		return "", err
 	}
+	if request.ExpectedRootDigest != "" && inspection.RootDigest != request.ExpectedRootDigest {
+		return "", e.New(e.CodeVerifyFailed, "publication root changed after metadata admission")
+	}
 	parseOptions := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
 		parseOptions = append(parseOptions, name.Insecure)

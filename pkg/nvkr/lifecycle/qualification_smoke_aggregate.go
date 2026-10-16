@@ -77,6 +77,12 @@ func (receipt *ToolSmokeReceipt) Require(checks ArtifactCheckDescription, invoca
 // AuthenticateHostedToolSmoke owns provider job/result admission and signature
 // verification. Caller-authored JSON, flags and booleans cannot issue a receipt.
 func AuthenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, policy QualificationPolicy, githubToken string) (*ToolSmokeReceipt, error) {
+	return AuthenticateHostedToolSmokeWithCIStorage(ctx, checks, invocation, policy, githubToken, "")
+}
+
+// AuthenticateHostedToolSmokeWithCIStorage additionally accepts an independent
+// private-payload read credential. Empty retains the provider-token fallback.
+func AuthenticateHostedToolSmokeWithCIStorage(ctx context.Context, checks *ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, policy QualificationPolicy, githubToken, storageToken string) (*ToolSmokeReceipt, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "hosted smoke requires context")
 	}
@@ -94,7 +100,7 @@ func AuthenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckRecei
 	if err != nil {
 		return nil, err
 	}
-	provider := qualificationorigin.NewGitHub(githubToken)
+	provider := qualificationorigin.NewGitHubWithCIStorage(githubToken, storageToken)
 	return authenticateHostedToolSmoke(ctx, checks, invocation, policy, verifier, func(ctx context.Context, platforms []string) ([]qualificationorigin.NativeSmokeArtifact, error) {
 		return provider.DownloadNativeSmoke(ctx, invocation, platforms)
 	})

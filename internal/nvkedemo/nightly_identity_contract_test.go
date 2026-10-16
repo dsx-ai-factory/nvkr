@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -275,6 +277,86 @@ func nightlyZIPFixture(t *testing.T, headers []zip.FileHeader, raw []byte) []byt
 		t.Fatal(err)
 	}
 	return archive.Bytes()
+}
+
+func TestNightlyPrivateLocatorPreservesProviderPinsAndCleanup(t *testing.T) {
+	for _, scenario := range []string{"success", "wrong attempt", "provider digest", "no token", "storage failure", "unexpected file", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			_, build := nightlyIdentityFixture()
+			artifact := nightlyAPIArtifact("nvkr-lifecycle-run", build)
+			request := cistore.Request{Repository: "example/nvkr", RunID: "200", Attempt: "1", Name: artifact.Name}
+			locator := cistore.Locator{SchemaVersion: cistore.SchemaVersion, Request: request,
+				Reference:     "ghcr.io/example/nvkr/ci-artifacts@sha256:" + strings.Repeat("a", 64),
+				ArchiveDigest: "sha256:" + strings.Repeat("b", 64), ArchiveSize: 10240, Paths: []string{"run.json"}}
+			if scenario == "wrong attempt" {
+				locator.Request.Attempt = "2"
+			}
+			raw, err := canonical.Marshal(locator)
+			if err != nil {
+				t.Fatal(err)
+			}
+			archive := nightlyZIPFixture(t, []zip.FileHeader{{Name: artifact.Name + ".ci-locator.json", Method: zip.Deflate}}, raw)
+			artifact.Size, artifact.Digest = int64(len(archive)), pipeline.FileDigest(archive)
+			if scenario == "provider digest" {
+				artifact.Digest = "sha256:" + strings.Repeat("c", 64)
+			}
+			options := cistore.Options{Token: "private-storage-read"}
+			if scenario == "no token" {
+				options.Token = ""
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			called, staged := false, ""
+			download := func(_ context.Context, got cistore.Request, gotLocator cistore.Locator, destination string, gotOptions cistore.Options) error {
+				called, staged = true, destination
+				if got != request || gotLocator.Request != request || gotOptions.Token != "private-storage-read" {
+					t.Fatal("nightly private storage lost exact request or explicit token")
+				}
+				if scenario == "storage failure" {
+					return e.New(e.CodeFetchFailed, "private storage denied")
+				}
+				if err := os.Mkdir(destination, 0o700); err != nil {
+					return err
+				}
+				name := "run.json"
+				if scenario == "unexpected file" {
+					name = "other.json"
+				}
+				if scenario == "canceled" {
+					cancel()
+				}
+				return os.WriteFile(filepath.Join(destination, name), []byte(`{"private":true}`), 0o600)
+			}
+			members, err := nightlyTransportMembers(ctx, archive, artifact, map[string]int64{"run.json": 32 << 20}, t.TempDir(), request, options, download)
+			if scenario == "success" {
+				if err != nil || !called || string(members["run.json"]) != `{"private":true}` {
+					t.Fatalf("private nightly input = %v, %v", members, err)
+				}
+			} else {
+				code := e.CodeVerifyFailed
+				switch scenario {
+				case "no token":
+					code = e.CodeEngineCapability
+				case "storage failure":
+					code = e.CodeFetchFailed
+				case "canceled":
+					code = e.CodeTimeout
+				}
+				assertNightlyCode(t, err, code)
+				if members != nil {
+					t.Fatal("private nightly failure returned fallback payload")
+				}
+				if (scenario == "wrong attempt" || scenario == "provider digest" || scenario == "no token") && called {
+					t.Fatal("inadmissible locator reached private storage")
+				}
+			}
+			if staged != "" {
+				if _, err := os.Stat(filepath.Dir(staged)); !os.IsNotExist(err) {
+					t.Fatal("nightly private payload staging survived completion")
+				}
+			}
+		})
+	}
 }
 
 func nightlyDownloadFixture(t *testing.T, plan *factory.Plan, run lifecycle.Run, scenario string) [][]byte {

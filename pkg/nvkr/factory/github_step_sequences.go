@@ -75,7 +75,7 @@ func githubStepSequenceName(plan *Plan, job *yamlv3.Node, actions githubActionRe
 	shared := "./" + githubActionsDirectoryFor(plan) + "shared/"
 	if githubYAMLLength(prepare) != 8 || githubYAMLValue(prepare, "name") != "Prepare NVKR runner and job parameters" ||
 		githubYAMLValue(prepare, "id") != githubContextStepID || githubYAMLValue(prepare, "uses") != shared+"prepare-stage" ||
-		githubYAMLLength(prepareWith) != 4 || githubYAMLValue(prepareWith, "action") != "${{ github.job }}" ||
+		githubCISequenceArgumentLength(prepareWith) != 4 || githubYAMLValue(prepareWith, "action") != "${{ github.job }}" ||
 		githubYAMLValue(prepareWith, "runner-artifact") != "nvkr-exec-"+shortStableName(runner) {
 		return ""
 	}
@@ -83,7 +83,7 @@ func githubStepSequenceName(plan *Plan, job *yamlv3.Node, actions githubActionRe
 		with := githubYAMLField(call, "with")
 		part := fmt.Sprintf("part-%d", index+1)
 		if githubYAMLLength(call) != 6 || githubYAMLValue(call, "name") != "execute node "+part ||
-			githubYAMLValue(call, "uses") != shared+"execute-node" || githubYAMLLength(with) != 2 ||
+			githubYAMLValue(call, "uses") != shared+"execute-node" || githubCISequenceArgumentLength(with) != 2 ||
 			githubYAMLValue(with, "parameters") != githubParametersExpression(part) {
 			return ""
 		}

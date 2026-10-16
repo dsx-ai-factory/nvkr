@@ -19,8 +19,9 @@ import (
 func qualificationRuntimeOptions(c *cli.Context) lifecycle.QualificationRuntimeOptions {
 	return lifecycle.QualificationRuntimeOptions{
 		GitHubToken: os.Getenv("NVKR_GITHUB_TOKEN"), WorkspaceRoot: c.String("workspace"),
-		Credential: sign.Credential{Registry: os.Getenv("NVKR_REGISTRY"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
-		Registry:   delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
+		CIStorageToken: os.Getenv("NVKR_CI_STORAGE_TOKEN"),
+		Credential:     sign.Credential{Registry: os.Getenv("NVKR_REGISTRY"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
+		Registry:       delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
 	}
 }
 

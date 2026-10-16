@@ -8,14 +8,18 @@ runs:
   using: composite
   steps:
     - name: 'Download NVKR runner'
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      uses: ./.github/nvkr-dev/actions/ci-bootstrap-download
       with:
         name: ${{ inputs.runner-artifact }}
         path: '.'
+        nvkr-ci-storage-token: ${{ inputs.nvkr-ci-storage-token }}
     - name: Prepare helper
       run: chmod +x ./nvkr-exec
       shell: bash -e {0}
 inputs:
   runner-artifact:
     description: Same-Run helper artifact name
+    required: true
+  nvkr-ci-storage-token:
+    description: Private CI storage credential, forwarded only to transfer steps
     required: true

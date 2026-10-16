@@ -164,7 +164,7 @@ func TestGitHubDevelopmentPublicationRejectsScopeTampering(t *testing.T) {
 		{"writer on reader", NodeVerifyPublication, func(job *githubJob) { job.Env["NVKR_CREDENTIAL"] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}" }},
 		{"production token", NodePublish, func(job *githubJob) { job.Env["NVKR_CREDENTIAL"] = "${{ secrets.GITHUB_TOKEN }}" }},
 		{"actor username", NodeSign, func(job *githubJob) { job.Env["NVKR_REGISTRY_USER"] = "${{ github.actor }}" }},
-		{"production write scope", NodeSign, func(job *githubJob) { job.Permissions["packages"] = "write" }},
+		{"source write scope", NodeSign, func(job *githubJob) { job.Permissions["contents"] = "write" }},
 		{"OIDC on reader", NodeAssembleRelease, func(job *githubJob) { job.Permissions["id-token"] = "write" }},
 		{"production protection", NodePublish, func(job *githubJob) { job.Environment = githubReleaseEnvironment }},
 		{"registry on SBOM attestation", NodeAttestEvidence, func(job *githubJob) {
