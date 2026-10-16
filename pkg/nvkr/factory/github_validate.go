@@ -429,7 +429,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub signing job %q omits its credential reference", jobID)
 			}
 		}
-		for _, output := range node.Outputs {
+		for _, output := range githubCarrierOutputs(plan, node, artifacts, nodeJobs) {
 			if !hasExactGitHubRun(job.Steps, githubRunnerCommand(plan, "pack-outputs", "node", node.ID)) ||
 				!actions.stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
@@ -623,6 +623,9 @@ func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, s
 				carriers = append(carriers, artifact)
 			}
 			if _, raw := diskPublicationRequirement(plan, artifact); raw {
+				continue
+			}
+			if !githubArtifactNeedsCarrier(plan, artifact, nodeJobs) {
 				continue
 			}
 			if err := require(artifact.ID); err != nil {

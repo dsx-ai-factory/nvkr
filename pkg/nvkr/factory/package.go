@@ -16,7 +16,10 @@ import (
 
 // executePackage admits every declared input before dispatching format-specific I/O.
 func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
-	output := artifacts[node.Outputs[0]]
+	output, err := signNodeOutput(node, artifacts, node.PackageKind)
+	if err != nil {
+		return err
+	}
 	inputs, err := packageInputs(plan, node, artifacts)
 	if err != nil {
 		return err

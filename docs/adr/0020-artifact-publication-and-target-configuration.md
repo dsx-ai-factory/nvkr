@@ -325,7 +325,7 @@ standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras p
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
-SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
+Full-layout SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
 exclusive ownership with no concurrent users or writers; source and destination must share a filesystem.
 Admission rejects overlapping paths, unexpected layout entries, symlinks within the source tree and
 hardlinked files before signing. The inventory has the existing bounded OCI blob count.
@@ -360,6 +360,28 @@ assembly/finalization; it does not relax qualified execution or live disk owners
 Output-local chart reproduction transports its bound image packages and their producer/evidence
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.
+
+Per-output GitHub handoffs move only the bytes required by each role. The preparation producer retains
+complete-byte inspection and exports a bounded control/evidence layout with the same root digest. Its
+payload carrier goes directly to the publisher; the isolated OIDC SBOM job receives only those controls
+and canonical documents, and returns only attested controls and bundles. Before any publication side
+effect, the publisher re-inspects the original complete preparation and requires the returned metadata to
+preserve every output descriptor, repository, payload digest/size, Build Subject and release identity.
+Only raw CycloneDX evidence may become a verified bundle containing the identical decoded document.
+The publisher verifies those bundles under the admitted signer policy, consumes unchanged prepared blobs
+through the exclusive rename mechanism, and inspects the complete final layout before committing it.
+There is no payload download or re-upload in the SBOM job, no hardlinked retained preparation, and no
+caller-supplied verification flag.
+
+After the existing full-byte/privacy/push gate, the publisher exports separate bounded signing metadata
+whose root must equal the digest-pinned publication reference before the metadata is committed. This is a
+pre-sign description, distinct from the remote verifier's authenticated output handoff. The signer checks
+its exact route, named output, Plan, Definition, Environment and invocation bindings, re-derives all signing
+subjects, and verifies required SBOM bundles before signing. The subsequent independent remote verifier
+still retrieves and authenticates the complete served payload closure. Signing metadata cannot issue a
+full-payload receipt, bypass remote readback, or authorize finalization by itself. Legacy and aggregate
+routes retain their existing contracts. This reduces repeated transport within the pipeline-attested lane;
+it does not establish qualified execution or a stronger SLSA level.
 
 Release assembly authenticates every output-local root and its exact production predicate under the configured
 workflow identity/issuer, verifies its SBOM bundles, and joins its named output to the independently frozen

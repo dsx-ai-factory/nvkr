@@ -52,9 +52,88 @@ runs:
       env:
         GOTOOLCHAIN: local
       run: |-
+        set +x +v
         set -eu
-        mkdir -p .nvkr/ci-bootstrap
-        CGO_ENABLED=0 go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o .nvkr/ci-bootstrap/nvkr-exec ./cmd/nvkr
+        if ! command -v python3 >/dev/null 2>&1; then
+          printf 'NVKR-E-ENGINE-CAPABILITY: private bootstrap requires Python 3\n' >&2
+          exit 29
+        fi
+        exec python3 -I - '-X main.version=dev -X main.commit=unknown' <<'PY'
+        import os
+        import shutil
+        import signal
+        import subprocess
+        import sys
+        import tempfile
+        import time
+
+        canceled = False
+
+        def stop(_signal, _frame):
+            global canceled
+            canceled = True
+
+        signal.signal(signal.SIGINT, stop)
+        signal.signal(signal.SIGTERM, stop)
+
+        def build(cache):
+            # Do not pass repository, registry or OIDC credentials to the compiler.
+            env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
+            env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off",
+                       GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
+            if canceled:
+                print("NVKR-E-TIMEOUT: private bootstrap compilation canceled", file=sys.stderr)
+                return 31
+            os.makedirs(".nvkr/ci-bootstrap", exist_ok=True)
+            child = subprocess.Popen(["go", "build", "-trimpath", "-ldflags", sys.argv[1],
+                                      "-o", ".nvkr/ci-bootstrap/nvkr-exec", "./cmd/nvkr"],
+                                     env=env, stdin=subprocess.DEVNULL, start_new_session=True)
+            result = None
+            deadline = time.monotonic() + 900
+            try:
+                while not canceled and time.monotonic() < deadline:
+                    try:
+                        result = child.wait(timeout=0.2)
+                        break
+                    except subprocess.TimeoutExpired:
+                        pass
+            finally:
+                try:
+                    os.killpg(child.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                except OSError:
+                    print("NVKR-E-TIMEOUT: private bootstrap compiler could not be stopped", file=sys.stderr, flush=True)
+                    os._exit(31)
+                try:
+                    child.wait(timeout=5)
+                except (OSError, subprocess.TimeoutExpired):
+                    # Retain caches if the child cannot be joined; never delete beneath it.
+                    print("NVKR-E-TIMEOUT: private bootstrap compiler did not stop", file=sys.stderr, flush=True)
+                    os._exit(31)
+            if canceled or result is None:
+                print("NVKR-E-TIMEOUT: private bootstrap compilation canceled or timed out", file=sys.stderr)
+                return 31
+            if result != 0:
+                print("NVKR-E-BUILD-FAILED: private bootstrap compilation failed", file=sys.stderr)
+                return 21
+            return 0
+
+        runner_temp = os.environ.get("RUNNER_TEMP", "")
+        if not os.path.isabs(runner_temp) or not os.path.isdir(runner_temp) or shutil.which("go") is None:
+            print("NVKR-E-ENGINE-CAPABILITY: private bootstrap requires a runner temporary directory and Go", file=sys.stderr)
+            sys.exit(29)
+        try:
+            with tempfile.TemporaryDirectory(prefix="nvkr-ci-bootstrap-", dir=runner_temp) as cache:
+                result = build(cache)
+        except OSError:
+            print("NVKR-E-BUILD-FAILED: private bootstrap setup or cache cleanup failed", file=sys.stderr)
+            result = 21
+        if canceled and result != 31:
+            print("NVKR-E-TIMEOUT: private bootstrap compilation canceled", file=sys.stderr)
+            result = 31
+        sys.exit(result)
+        PY
     - name: Create a fresh locator directory
       id: directory
       shell: bash

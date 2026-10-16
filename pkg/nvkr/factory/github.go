@@ -299,7 +299,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 					yamlSingle(diagnostic.With["name"]), yamlSingle(diagnostic.With["path"]), diagnostic.With["include-hidden-files"], diagnostic.With["if-no-files-found"], diagnostic.With["retention-days"])
 			}
 			for _, member := range stage.Nodes {
-				writeGitHubOutputSteps(&body, plan, member, artifacts, actions)
+				writeGitHubOutputSteps(&body, plan, member, artifacts, nodeJobs, actions)
 			}
 			continue
 		}
@@ -317,7 +317,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for _, line := range githubNodeCommands(node, plan) {
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
-			writeGitHubOutputSteps(&body, plan, node, artifacts, actions)
+			writeGitHubOutputSteps(&body, plan, node, artifacts, nodeJobs, actions)
 		}
 	}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {

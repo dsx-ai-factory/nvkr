@@ -155,6 +155,99 @@ func githubCITransferMode(plan *Plan, uses string) string {
 	return ""
 }
 
+// The source bootstrap owns only its disposable Go caches. Join the compiler
+// before removing them so private carrier restoration starts with that space
+// available, without touching the installed toolchain or ambient runner caches.
+func githubCIBootstrapBuildCommand(linker string) string {
+	return fmt.Sprintf(`set +x +v
+set -eu
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '%s: private bootstrap requires Python 3\n' >&2
+  exit %d
+fi
+exec python3 -I - %s <<'PY'
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+canceled = False
+
+def stop(_signal, _frame):
+    global canceled
+    canceled = True
+
+signal.signal(signal.SIGINT, stop)
+signal.signal(signal.SIGTERM, stop)
+
+def build(cache):
+    # Do not pass repository, registry or OIDC credentials to the compiler.
+    env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
+    env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off",
+               GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
+    if canceled:
+        print("%s: private bootstrap compilation canceled", file=sys.stderr)
+        return %d
+    os.makedirs(".nvkr/ci-bootstrap", exist_ok=True)
+    child = subprocess.Popen(["go", "build", "-trimpath", "-ldflags", sys.argv[1],
+                              "-o", ".nvkr/ci-bootstrap/nvkr-exec", "./cmd/nvkr"],
+                             env=env, stdin=subprocess.DEVNULL, start_new_session=True)
+    result = None
+    deadline = time.monotonic() + 900
+    try:
+        while not canceled and time.monotonic() < deadline:
+            try:
+                result = child.wait(timeout=0.2)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+    finally:
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except OSError:
+            print("%s: private bootstrap compiler could not be stopped", file=sys.stderr, flush=True)
+            os._exit(%d)
+        try:
+            child.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            # Retain caches if the child cannot be joined; never delete beneath it.
+            print("%s: private bootstrap compiler did not stop", file=sys.stderr, flush=True)
+            os._exit(%d)
+    if canceled or result is None:
+        print("%s: private bootstrap compilation canceled or timed out", file=sys.stderr)
+        return %d
+    if result != 0:
+        print("%s: private bootstrap compilation failed", file=sys.stderr)
+        return %d
+    return 0
+
+runner_temp = os.environ.get("RUNNER_TEMP", "")
+if not os.path.isabs(runner_temp) or not os.path.isdir(runner_temp) or shutil.which("go") is None:
+    print("%s: private bootstrap requires a runner temporary directory and Go", file=sys.stderr)
+    sys.exit(%d)
+try:
+    with tempfile.TemporaryDirectory(prefix="nvkr-ci-bootstrap-", dir=runner_temp) as cache:
+        result = build(cache)
+except OSError:
+    print("%s: private bootstrap setup or cache cleanup failed", file=sys.stderr)
+    result = %d
+if canceled and result != %d:
+    print("%s: private bootstrap compilation canceled", file=sys.stderr)
+    result = %d
+sys.exit(result)
+PY`, e.CodeEngineCapability, e.ExitCode(e.New(e.CodeEngineCapability, "")), shellQuote(linker),
+		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")),
+		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")),
+		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeBuildFailed, e.ExitCode(e.New(e.CodeBuildFailed, "")),
+		e.CodeEngineCapability, e.ExitCode(e.New(e.CodeEngineCapability, "")), e.CodeBuildFailed, e.ExitCode(e.New(e.CodeBuildFailed, "")),
+		e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")))
+}
+
 func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string][]byte, error) {
 	linker, err := generatorLinkerFlags(plan.GeneratorVersion)
 	if err != nil {
@@ -178,7 +271,7 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 		if mode == "bootstrap-download" {
 			steps.Content = append(steps.Content,
 				githubYAMLMap("name", githubYAMLString("Provision the pinned Go bootstrap"), "uses", githubYAMLString(actions.SetupGo), "with", githubYAMLMap("go-version-file", githubYAMLString(".go-version"), "cache", githubYAMLString("false"))),
-				githubYAMLMap("name", githubYAMLString("Build private transport helper from this checkout"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString("set -eu\nmkdir -p .nvkr/ci-bootstrap\nCGO_ENABLED=0 go build -trimpath -ldflags "+shellQuote(linker)+" -o .nvkr/ci-bootstrap/nvkr-exec ./cmd/nvkr")))
+				githubYAMLMap("name", githubYAMLString("Build private transport helper from this checkout"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString(githubCIBootstrapBuildCommand(linker))))
 		}
 		steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Create a fresh locator directory"), "id", githubYAMLString("directory"), "shell", githubYAMLString("bash"), "run", githubYAMLString("set -eu\ndirectory=$(mktemp -d \"$RUNNER_TEMP/nvkr-ci-index.XXXXXX\")\nprintf 'path=%s\\n' \"$directory\" >> \"$GITHUB_OUTPUT\"")))
 		username := "${{ env.NVKR_CI_STORAGE_READ_USER }}"

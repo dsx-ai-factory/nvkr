@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/releaseasset"
@@ -338,8 +339,30 @@ func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[st
 func executePublishWithAdmission(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer,
 	admit func(context.Context, string, []string, cistore.Options) error,
 ) error {
-	if len(node.Inputs) != 1 || len(node.Outputs) != 1 {
-		return e.New(e.CodePipelineDrift, "publish node %q is not unary", node.ID)
+	metadataOnlySigner := PerOutputPublication(plan) && node.Target != "release"
+	expectedOutputs := 1
+	if metadataOnlySigner {
+		expectedOutputs = 2
+	}
+	expectedInputs := 1
+	if _, prepared := preparedEvidenceRoute(plan, node); prepared {
+		expectedInputs = 3
+	}
+	if len(node.Inputs) != expectedInputs || len(node.Outputs) != expectedOutputs {
+		return e.New(e.CodePipelineDrift, "publish node %q has unexpected inputs or outputs", node.ID)
+	}
+	referenceOutput := artifacts[node.Outputs[0]]
+	var metadataOutput Artifact
+	if metadataOnlySigner {
+		var err error
+		referenceOutput, err = signNodeOutput(node, artifacts, "published-reference")
+		if err != nil {
+			return err
+		}
+		metadataOutput, err = signNodeOutput(node, artifacts, ArtifactSigningMetadata)
+		if err != nil {
+			return err
+		}
 	}
 	target, err := runtimeTarget(plan, node.Target)
 	if err != nil {
@@ -353,7 +376,36 @@ func executePublishWithAdmission(ctx context.Context, plan *Plan, node Node, art
 		return e.New(e.CodeTrustPolicyMissing,
 			"factory publication target %q requires its configured username and credential", node.Target)
 	}
-	expectedRoot, err := admitGitHubPublication(ctx, target, artifacts[node.Inputs[0]].Path, admit)
+	admissionSource := artifacts[node.Inputs[0]].Path
+	admittedControlsRoot := ""
+	if route, prepared := preparedEvidenceRoute(plan, node); prepared {
+		controls, err := signNodeInput(node, artifacts, ArtifactAttestedEvidenceMetadata)
+		if err != nil {
+			return err
+		}
+		inspection, err := delivery.InspectMetadata(ctx, controls.Path)
+		if err != nil {
+			return err
+		}
+		if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
+			return err
+		}
+		admissionSource = controls.Path
+		admittedControlsRoot = inspection.RootDigest
+	}
+	// Admit credentials and every metadata-derived destination before consuming
+	// the original preparation. Completion and Push both bind this exact root.
+	expectedRoot, err := admitGitHubPublication(ctx, target, admissionSource, admit)
+	if err != nil {
+		return err
+	}
+	if admittedControlsRoot != "" {
+		if expectedRoot != "" && expectedRoot != admittedControlsRoot {
+			return e.New(e.CodeVerifyFailed, "attested controls changed between scope and publication privacy admission")
+		}
+		expectedRoot = admittedControlsRoot
+	}
+	source, err := completePublicationInput(ctx, plan, node, artifacts, productionOCISigner, expectedRoot)
 	if err != nil {
 		return err
 	}
@@ -362,7 +414,7 @@ func executePublishWithAdmission(ctx context.Context, plan *Plan, node Node, art
 		if PerOutputPublication(plan) && node.Target == "release" {
 			inspect = delivery.InspectMetadata
 		}
-		inspection, err := inspect(ctx, artifacts[node.Inputs[0]].Path)
+		inspection, err := inspect(ctx, source)
 		if err != nil {
 			return err
 		}
@@ -381,13 +433,22 @@ func executePublishWithAdmission(ctx context.Context, plan *Plan, node Node, art
 			return delivery.PushMetadataWithOptions(ctx, source, ref, delivery.PushOptions{Registry: options, ExpectedRootDigest: expectedRoot})
 		}
 	}
-	ref, err := push(ctx, artifacts[node.Inputs[0]].Path, target.Ref, delivery.RegistryOptions{
+	ref, err := push(ctx, source, target.Ref, delivery.RegistryOptions{
 		PlainHTTP: target.PlainHTTP, Anonymous: target.Anonymous, Username: username, Password: password,
 	})
 	if err != nil {
 		return err
 	}
-	if err := writeFactoryFile(ctx, artifacts[node.Outputs[0]].Path, []byte(ref+"\n"), 0o644); err != nil {
+	if metadataOnlySigner {
+		at := strings.LastIndexByte(ref, '@')
+		if at < 0 || ref[:at] != target.Ref {
+			return e.New(e.CodeVerifyFailed, "published reference differs from planned metadata handoff")
+		}
+		if _, err := delivery.ExportMetadataWithExpectedRoot(ctx, source, metadataOutput.Path, ref[at+1:]); err != nil {
+			return err
+		}
+	}
+	if err := writeFactoryFile(ctx, referenceOutput.Path, []byte(ref+"\n"), 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "Published immutable reference: %s\n", ref)

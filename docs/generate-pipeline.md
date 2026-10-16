@@ -108,8 +108,10 @@ There is no repository-token or public Actions payload fallback. The repository 
 repository metadata; storage credentials belong only to transfer operations and do not add package permissions
 to build jobs. Producer commands do not receive them.
 
-The Go transport stores ordered chunks no larger than 1 GiB and verifies their digests and the assembled
-archive before restoring files. The v2 locator format replaces the unshipped single-layer draft; old v1
+The Go transport stores ordered chunks no larger than 1 GiB. Single-file uploads stream deterministic archive
+framing around the held carrier, without another full archive on disk. Downloads extract directly from the
+ordered chunks into private staging and verify each chunk, the complete archive, exact size and source EOF
+before exposing restored files. The v2 locator format replaces the unshipped single-layer draft; old v1
 locators require a new run. Final hosted GHCR publication separately checks every destination package with
 its publication credential and binds the push to the inspected metadata root. Provider locator retention
 does not expire private carrier blobs; configure registry retention separately.
@@ -124,7 +126,31 @@ The nightly coordinator attaches its constructed cycle summary; raw suite report
 The generator rejects workflows above 500,000 bytes or 50,000 expanded YAML parsing events. YAML aliases
 reduce file size but do not reduce the parser's expanded count. Maintained rendering tests reserve five
 percent headroom. Compatible offline observation, SBOM and packaging steps share their producer job;
-signing, publication and remote verification keep separate jobs and permissions.
+signing, publication and remote verification keep separate jobs and permissions. Payloads consumed only
+inside their producing job are not packed or uploaded unless finalization needs them. This avoids shipping
+an intermediate disk package as well as its prepared publication layout.
+
+The per-output pipeline gives each remaining payload transfer a specific purpose:
+
+| Handoff | Bytes moved | Purpose |
+|---|---|---|
+| Preparation producer → private CI storage → publisher | Original prepared payload and its metadata | Cross the producer/publication credential boundary; validate and publish the native output closure |
+| Preparation producer → SBOM attester → publisher | Bounded metadata, canonical SBOM documents and signed bundles | Keep OIDC outside the producer while binding evidence to unchanged subjects |
+| Publisher → product registry | Complete validated output closure | Publish the independently consumable native artifact |
+| Publisher → artifact signer | Exact-root-bound metadata and reference | Derive signing subjects and verify evidence without another payload download |
+| Product registry → independent verifier | Complete served payload closure | Verify the bytes actually published, plus signatures, provenance and SBOMs |
+| Verifier → release assembly/finalization | Metadata, references and evidence records | Authenticate membership and completeness without retrieving payloads |
+
+The publisher authenticates the attested metadata against the original preparation, verifies each bundle
+and its exact decoded SBOM, and moves unchanged blobs into the final layout before full-byte publication
+checks. The SBOM and signing jobs do not download or re-upload output payloads. Metadata inspection alone
+is not payload verification; the independent remote readback remains required. This is the existing
+`pipeline-attested` claim, not qualification or a new SLSA level.
+
+Local factory restoration still retains its carrier while extracting into a private tree, then rehashes
+the held source before atomic publication. That copy supports the current mutation and incomplete-stream
+checks. It is distinct from the removed outer GHCR archive staging. A future direct registry-to-factory
+restore would need to preserve both transport authentication and the exact Plan-selected extraction gate.
 
 The generated producer emits a manual `workflow_dispatch` pipeline, with no cron
 or callable producer trigger. A separately authored downstream CI coordinator can

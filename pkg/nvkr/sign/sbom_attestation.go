@@ -19,7 +19,10 @@ import (
 )
 
 // SBOMAttester creates and authenticates standard CycloneDX attestation bundles.
-// The digest is supplied only after the caller has inspected its payload closure.
+// The caller binds the digest and exact document to its admitted preparation.
+// Per-output GitHub attestation checks exported controls; preparation and
+// publication own complete payload inspection. This interface issues no payload
+// verification capability.
 type SBOMAttester interface {
 	AttestSBOM(context.Context, string, []byte) ([]byte, error)
 	VerifySBOM(context.Context, string, []byte) error

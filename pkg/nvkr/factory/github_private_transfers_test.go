@@ -5,13 +5,140 @@ package factory
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
 	"maps"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
+
+func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
+	}
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("Bash is required to exercise the hosted bootstrap owner")
+	}
+	for _, test := range []struct {
+		name string
+		code e.Code
+	}{
+		{name: "success"},
+		{name: "build failure", code: e.CodeBuildFailed},
+		{name: "cancellation", code: e.CodeTimeout},
+		{name: "missing runner temporary directory", code: e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root, runnerTemp, ambient := t.TempDir(), t.TempDir(), t.TempDir()
+			marker := filepath.Join(ambient, "keep")
+			if err := os.WriteFile(marker, []byte("ambient cache"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			// Isolated Python must not import workspace or PYTHONPATH modules.
+			if err := os.WriteFile(filepath.Join(root, "tempfile.py"), []byte("raise RuntimeError('workspace import')\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, signal, sys, time
+for key in ("NVKR_CREDENTIAL", "NVKR_CI_STORAGE_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GOPROXY"):
+    assert key not in os.environ
+assert os.environ["GOTOOLCHAIN"] == "local" and os.environ["GOENV"] == "off"
+assert os.environ["CGO_ENABLED"] == "0"
+build, modules = pathlib.Path(os.environ["GOCACHE"]), pathlib.Path(os.environ["GOMODCACHE"])
+assert build.parent == modules.parent
+assert build.parent.stat().st_mode & 0o077 == 0
+for directory in (build, modules / "read-only-module"):
+    directory.mkdir(parents=True)
+    (directory / "cached").write_text("disposable")
+    directory.chmod(0o500)
+pathlib.Path("bootstrap-observation.json").write_text(json.dumps({"pid": os.getpid(), "cache": str(build.parent), "args": sys.argv[1:]}))
+pathlib.Path(".nvkr/ci-bootstrap/nvkr-exec").write_text("compiled helper")
+mode = ` + strconv.Quote(test.name) + `
+if mode == "cancellation":
+    os.kill(os.getppid(), signal.SIGTERM)
+    time.sleep(30)
+sys.exit(7 if mode == "build failure" else 0)
+PY
+`
+			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fakeGo), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			selectedTemp := runnerTemp
+			if test.code == e.CodeEngineCapability {
+				selectedTemp = ""
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture"))
+			command.Dir = root
+			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"),
+				"RUNNER_TEMP="+selectedTemp, "GOCACHE="+ambient, "GOMODCACHE="+ambient,
+				"PYTHONPATH="+root, "NVKR_CREDENTIAL=must-not-inherit", "NVKR_CI_STORAGE_TOKEN=must-not-inherit",
+				"ACTIONS_ID_TOKEN_REQUEST_TOKEN=must-not-inherit", "GOPROXY=must-not-inherit")
+			output, runErr := command.CombinedOutput()
+			if test.code == "" {
+				if runErr != nil {
+					t.Fatalf("bootstrap failed: %v\n%s", runErr, output)
+				}
+			} else {
+				var exit *exec.ExitError
+				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(test.code, "")) || !bytes.Contains(output, []byte(test.code)) {
+					t.Fatalf("bootstrap failure lost its code %s: %v\n%s", test.code, runErr, output)
+				}
+			}
+			if bytes.Contains(output, []byte("must-not-inherit")) {
+				t.Fatal("bootstrap diagnostic exposed an inherited credential")
+			}
+			entries, err := os.ReadDir(runnerTemp)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("bootstrap left disposable caches behind: %v / %v", entries, err)
+			}
+			if contents, err := os.ReadFile(marker); err != nil || string(contents) != "ambient cache" {
+				t.Fatal("bootstrap changed an ambient cache")
+			}
+			if test.code == e.CodeEngineCapability {
+				if _, err := os.Stat(filepath.Join(root, ".nvkr")); !os.IsNotExist(err) {
+					t.Fatal("missing capability reached workspace setup")
+				}
+				return
+			}
+			var observed struct {
+				PID   int      `json:"pid"`
+				Cache string   `json:"cache"`
+				Args  []string `json:"args"`
+			}
+			raw, err := os.ReadFile(filepath.Join(root, "bootstrap-observation.json"))
+			if err != nil || json.Unmarshal(raw, &observed) != nil {
+				t.Fatalf("missing bootstrap process observation: %v", err)
+			}
+			if filepath.Dir(observed.Cache) != runnerTemp || !strings.HasPrefix(filepath.Base(observed.Cache), "nvkr-ci-bootstrap-") ||
+				strings.Join(observed.Args, "|") != "build|-trimpath|-ldflags|-X main.version=fixture|-o|.nvkr/ci-bootstrap/nvkr-exec|./cmd/nvkr" {
+				t.Fatal("bootstrap escaped its owned caches or fixed build arguments")
+			}
+			process, err := os.FindProcess(observed.PID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := process.Signal(syscall.Signal(0)); err == nil {
+				t.Fatal("bootstrap compiler survived cache cleanup")
+			}
+			if contents, err := os.ReadFile(filepath.Join(root, ".nvkr/ci-bootstrap/nvkr-exec")); err != nil || string(contents) != "compiled helper" {
+				t.Fatal("cache cleanup removed the compiled helper")
+			}
+		})
+	}
+}
 
 func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 	for _, fixture := range []struct {

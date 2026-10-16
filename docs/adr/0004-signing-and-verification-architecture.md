@@ -132,12 +132,20 @@ Independent cosign consumption authenticates that artifact; release membership a
 still require the signed release index (ADR-20). No extra payload publication is introduced.
 
 SBOMs use a distinct standard CycloneDX predicate. Before publication the pinned signer creates a Sigstore
-v0.3 attestation bundle using `attest-blob --hash` for the exact already-inspected subject, then verifies it
+v0.3 attestation bundle using `attest-blob --hash` for the exact preparation-bound subject, then verifies it
 with `verify-blob-attestation` under the expected identity, issuer and normal transparency checks. The bundle
 must contain the exact canonical SBOM and one matching statement subject. Registry discovery uses an OCI
 referrer manifest beside the associated deliverable; source evidence retains its original source subject.
 Hosted pull-back verification independently checks every bundle. Keyless creation/verification remains
 Linux-only and raw preparation layouts cannot satisfy authenticated release consumption.
+
+In GitHub `per-output-v1`, the preparation producer inspects the complete payload. The separate SBOM job
+receives only its bounded metadata and canonical documents, with exact subject, membership, Plan and Run
+bindings; it does not independently inspect payload bytes. The publisher combines the resulting bundles
+with the original preparation only after verifying the bundles, unchanged subjects and metadata, and exact
+decoded document equality. It then checks the complete final payload before publication. Metadata alone
+grants no payload-integrity capability. The full-layout attestation path retains its existing complete-byte
+checks. This separation removes the unchanged payload's SBOM round trip while preserving OIDC isolation.
 
 SBOM bundle creation permits at most three fresh keyless invocations within one three-minute deadline,
 with cancellation-aware one- and two-second delays, only when Rekor v1 reports its explicit HTTP 409
@@ -149,7 +157,13 @@ gap in the pinned Cosign dependency, addressed upstream in
 [sigstore-go PR 647](https://github.com/sigstore/sigstore-go/pull/647). Fresh signatures can leave unused
 transparency entries. This policy does not add retries to OCI release signing or qualification attestation.
 
-The signer re-derives the subject from held artifact bytes and requires equality with the Run's observed subject.
+The signer re-derives each subject and requires equality with the Run's publication binding. In GitHub
+`per-output-v1`, the publisher exports bounded metadata bound to the exact root it pushed. The signer
+re-derives the root and sibling subjects from that metadata, checks the exact output/Plan/Run bindings and
+cryptographically verifies required SBOM bundles before signing. It does not download or independently
+check payload bytes; complete-byte checks remain in preparation, publication and independent remote
+verification. Legacy signing retains its full-layout inspection. No caller-supplied digest or successful
+job-status description substitutes for these checks.
 The subsequent verifier re-resolves the registry reference, recomputes the served manifest digest, and verifies
 both signature and subject-bound production provenance (ADR-09). A mismatch fails the Run and returns no
 successful signing or verification record. Registry credentials use a private restrictive-mode `DOCKER_CONFIG`,

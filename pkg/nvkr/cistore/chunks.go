@@ -90,39 +90,3 @@ func validateChunkManifest(manifest *v1.Manifest, archiveSize int64) error {
 	}
 	return nil
 }
-
-// assembleChunks writes only to private staging. No filesystem publication is
-// permitted until every ordered chunk and the entire archive pass verification.
-func assembleChunks(ctx context.Context, destination io.Writer, layers []v1.Layer, descriptors []v1.Descriptor, archiveDigest string) error {
-	if len(layers) != len(descriptors) {
-		return e.New(e.CodeVerifyFailed, "CI carrier chunk count mismatch")
-	}
-	whole := sha256.New()
-	buffer := make([]byte, 128<<10)
-	for i, layer := range layers {
-		descriptor := descriptors[i]
-		digest, digestErr := layer.Digest()
-		size, sizeErr := layer.Size()
-		mediaType, mediaErr := layer.MediaType()
-		if digestErr != nil || sizeErr != nil || mediaErr != nil || digest != descriptor.Digest || size != descriptor.Size || mediaType != chunkMediaType {
-			return safeIOError(ctx, e.CodeVerifyFailed, "CI carrier layer differs from its ordered descriptor")
-		}
-		reader, err := layer.Compressed()
-		if err != nil {
-			return safeIOError(ctx, e.CodeFetchFailed, "opening private CI chunk")
-		}
-		hash := sha256.New()
-		n, copyErr := io.CopyBuffer(io.MultiWriter(destination, whole, hash), contextReader{ctx, io.LimitReader(reader, descriptor.Size+1)}, buffer)
-		closeErr := reader.Close()
-		if copyErr != nil || closeErr != nil {
-			return safeIOError(ctx, e.CodeFetchFailed, "reading private CI chunk")
-		}
-		if n != descriptor.Size || hex.EncodeToString(hash.Sum(nil)) != descriptor.Digest.Hex {
-			return e.New(e.CodeVerifyFailed, "private CI chunk size or digest mismatch")
-		}
-	}
-	if "sha256:"+hex.EncodeToString(whole.Sum(nil)) != archiveDigest {
-		return e.New(e.CodeVerifyFailed, "private CI archive digest mismatch")
-	}
-	return nil
-}

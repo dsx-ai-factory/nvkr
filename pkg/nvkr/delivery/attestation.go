@@ -82,37 +82,10 @@ func AttestPreparedEvidence(ctx context.Context, source, out string, attest func
 			}
 			continue
 		}
-		if object.ArtifactType != "application/vnd.cyclonedx+json" {
-			return Result{}, e.New(e.CodeVerifyFailed, "prepared evidence must be a CycloneDX document")
-		}
-		document, err := preparedEvidenceDocument(ctx, source, object)
+		root.Objects[i], err = attestPreparedObject(ctx, writer, source, root, object, attest)
 		if err != nil {
 			return Result{}, err
 		}
-		bundle, err := attest(ctx, object.Evidence.SubjectDigest, document)
-		if err != nil {
-			return Result{}, err
-		}
-		decoded, err := sbom.AttestedDocument(bundle, object.Evidence.SubjectDigest)
-		if err != nil {
-			return Result{}, err
-		}
-		if !bytes.Equal(decoded, document) {
-			return Result{}, e.New(e.CodeVerifyFailed, "attestation changed the SBOM document")
-		}
-		owner, err := evidenceOwner(root.Objects, object.Evidence)
-		if err != nil {
-			return Result{}, err
-		}
-		descriptor, blob, err := writer.addBytesObject(ctx, ObjectInput{Name: object.Name, Kind: object.Kind, ArtifactType: sbom.BundleMediaType, LayerMediaType: sbom.BundleMediaType,
-			SemanticDigest: object.SemanticDigest, Bytes: bundle, annotations: map[string]string{"dev.sigstore.bundle.predicateType": sbom.CycloneDXPredicateType}, subject: &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}})
-		if err != nil {
-			return Result{}, err
-		}
-		root.Objects[i].DescriptorDigest = descriptor.Digest
-		root.Objects[i].BlobDigest = blob
-		root.Objects[i].Size = descriptor.Size
-		root.Objects[i].ArtifactType = sbom.BundleMediaType
 	}
 	digest, semantic, err := writer.writePublicationMetadata(root, direct)
 	if err != nil {
@@ -132,6 +105,40 @@ func AttestPreparedEvidence(ctx context.Context, source, out string, attest func
 		return Result{}, err
 	}
 	return Result{LayoutPath: requestedOutput, RootDigest: digest, SemanticDigest: semantic}, nil
+}
+
+func attestPreparedObject(ctx context.Context, writer layoutWriter, source string, root PublicationRoot, object PublishedObject, attest func(context.Context, string, []byte) ([]byte, error)) (PublishedObject, error) {
+	if object.ArtifactType != "application/vnd.cyclonedx+json" {
+		return PublishedObject{}, e.New(e.CodeVerifyFailed, "prepared evidence must be a CycloneDX document")
+	}
+	document, err := preparedEvidenceDocument(ctx, source, object)
+	if err != nil {
+		return PublishedObject{}, err
+	}
+	// Keep the authenticated predicate independent of callback-owned memory.
+	bundle, err := attest(ctx, object.Evidence.SubjectDigest, append([]byte(nil), document...))
+	if err != nil {
+		return PublishedObject{}, err
+	}
+	decoded, err := sbom.AttestedDocument(bundle, object.Evidence.SubjectDigest)
+	if err != nil {
+		return PublishedObject{}, err
+	}
+	if !bytes.Equal(decoded, document) {
+		return PublishedObject{}, e.New(e.CodeVerifyFailed, "attestation changed the SBOM document")
+	}
+	owner, err := evidenceOwner(root.Objects, object.Evidence)
+	if err != nil {
+		return PublishedObject{}, err
+	}
+	descriptor, blob, err := writer.addBytesObject(ctx, ObjectInput{Name: object.Name, Kind: object.Kind, ArtifactType: sbom.BundleMediaType, LayerMediaType: sbom.BundleMediaType,
+		SemanticDigest: object.SemanticDigest, Bytes: bundle, annotations: map[string]string{"dev.sigstore.bundle.predicateType": sbom.CycloneDXPredicateType}, subject: &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}})
+	if err != nil {
+		return PublishedObject{}, err
+	}
+	object.DescriptorDigest, object.BlobDigest = descriptor.Digest, blob
+	object.Size, object.ArtifactType = descriptor.Size, sbom.BundleMediaType
+	return object, nil
 }
 
 func preparedEvidenceDocument(ctx context.Context, source string, object PublishedObject) ([]byte, error) {

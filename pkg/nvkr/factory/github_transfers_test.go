@@ -7,12 +7,115 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"sigs.k8s.io/yaml"
 )
+
+func TestGitHubCarrierOutputsRetainOnlyNeededPayloadTransfers(t *testing.T) {
+	for _, test := range []struct {
+		name, kind, id, producerStage, consumerStage string
+		legacy, want                                 bool
+	}{
+		{name: "internal disk wrapper", kind: PackageDiskImage, producerStage: "stage", consumerStage: "stage"},
+		{name: "internal image", kind: "oci-image", producerStage: "stage", consumerStage: "stage"},
+		{name: "internal prepared layout", kind: PackageOCI, producerStage: "stage", consumerStage: "stage"},
+		{name: "unused payload", kind: "raw", producerStage: "stage"},
+		{name: "external consumer", kind: PackageDiskImage, producerStage: "producer", consumerStage: "consumer", want: true},
+		{name: "unknown producer stage", kind: PackageDiskImage, consumerStage: "consumer", want: true},
+		{name: "finalizer payload", kind: PackageDiskImage, id: "metadata/release", producerStage: "stage", consumerStage: "stage", want: true},
+		{name: "producer result", kind: "producer-result", producerStage: "stage", consumerStage: "stage", want: true},
+		{name: "terminal observation", kind: string(TierTerminalObservation), producerStage: "stage", consumerStage: "stage", want: true},
+		{name: "SBOM metadata", kind: "sbom-set", producerStage: "stage", consumerStage: "stage", want: true},
+		{name: "source receipt", kind: "source-receipt", producerStage: "stage", consumerStage: "stage", want: true},
+		{name: "unknown kind", kind: "future-metadata", producerStage: "stage", consumerStage: "stage", want: true},
+		{name: "legacy finalizer", kind: PackageDiskImage, producerStage: "stage", consumerStage: "stage", legacy: true, want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			id := test.id
+			if id == "" {
+				id = "payload"
+			}
+			plan := &Plan{}
+			if !test.legacy {
+				plan.Environment.Publication = &definition.Publication{Mode: "per-output-v1"}
+			}
+			producer := Node{ID: "producer", Outputs: []string{id}}
+			plan.Graph.Nodes = []Node{producer}
+			if test.consumerStage != "" {
+				plan.Graph.Nodes = append(plan.Graph.Nodes, Node{ID: "consumer", Inputs: []string{id}})
+			}
+			artifact := Artifact{ID: id, Kind: test.kind, Producer: producer.ID}
+			artifacts := map[string]Artifact{id: artifact}
+			jobs := map[string]string{producer.ID: test.producerStage, "consumer": test.consumerStage}
+			outputs := githubCarrierOutputs(plan, producer, artifacts, jobs)
+			wantCount := 0
+			if test.want {
+				wantCount = 1
+			}
+			if len(outputs) != wantCount || test.want && outputs[0] != id {
+				t.Fatalf("selected carriers %v, want retained=%t", outputs, test.want)
+			}
+		})
+	}
+}
+
+func TestGitHubInternalDiskWrapperHasNoArchiveOrUpload(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			plan := developmentPublicationPlan(t, arcTestPlan(t, platform), "ghcr.io/example/nvkr/development")
+			_, jobs, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes, artifacts := planIndex(plan)
+			output := plan.LifecycleOutputs[0].Name
+			wrapper := "package/" + output
+			preparation := "package/" + outputPublicationPackage(output)
+			if jobs[wrapper] != jobs[preparation] || len(nodes[wrapper].Outputs) != 1 {
+				t.Fatal("fixture lost its internally consumed disk wrapper")
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateGitHubBundle(t.Context(), plan, bundle); err != nil {
+				t.Fatal(err)
+			}
+			actions, err := resolveGitHubActions(plan.Actions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			steps := document.Jobs[jobs[wrapper]].Steps
+			if actions.stepUploads(steps, githubArtifactName(wrapper), carrierPath(wrapper)) ||
+				hasExactGitHubRun(steps, githubRunnerCommand(plan, "pack-outputs", "node", wrapper)) {
+				t.Fatal("internally consumed disk wrapper still has an archive or upload")
+			}
+			prepared := "package/" + outputPublicationPackage(output)
+			if !actions.stepUploads(steps, githubArtifactName(prepared), carrierPath(prepared)) ||
+				!actions.stepUploads(steps, githubArtifactName("sbom/"+output), carrierPath("sbom/"+output)) {
+				t.Fatal("external preparation or retained metadata carrier was omitted")
+			}
+			if artifacts[wrapper].Producer != wrapper || len(nodes[wrapper].Outputs) != 1 {
+				t.Fatal("carrier suppression changed the complete logical graph")
+			}
+			// No wrapper exists on disk: an unnecessary packaging copy would fail.
+			t.Chdir(t.TempDir())
+			if err := PackGitHubOutputs(t.Context(), plan, wrapper, GitHubStepOptions{Stdout: io.Discard, Stderr: io.Discard}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(".nvkr/carriers"); !os.IsNotExist(err) {
+				t.Fatalf("internal wrapper created a carrier directory: %v", err)
+			}
+		})
+	}
+}
 
 func TestGitHubTransfersUsePlanDerivedCommandsAndExactActions(t *testing.T) {
 	for _, direction := range []string{"restore", "archive"} {
@@ -50,7 +153,7 @@ func TestGitHubTransfersUsePlanDerivedCommandsAndExactActions(t *testing.T) {
 				}
 			} else {
 				node := Node{ID: "package/test", Kind: NodePackage, Outputs: ids}
-				writeGitHubOutputSteps(&rendered, plan, node, artifacts, actions)
+				writeGitHubOutputSteps(&rendered, plan, node, artifacts, jobs, actions)
 				steps := decodeGitHubSteps(t, rendered.Bytes())
 				if len(steps) != 4 {
 					t.Fatalf("want one archive + three independent uploads, got %d", len(steps))

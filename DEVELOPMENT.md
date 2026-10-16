@@ -96,6 +96,8 @@ verification and finalization. Its generator and helper come from the dispatched
 signer policy and disposable registry destinations. Its Plan and manifest live beneath `.github/nvkr-dev/`.
 The production bundle remains independently owned and checked.
 
+Private-helper compilation uses disposable Go caches that are removed before carrier restoration.
+
 ```sh
 # After editing generator code or authored inputs, regenerate and inspect both bundles.
 make workflows-generate

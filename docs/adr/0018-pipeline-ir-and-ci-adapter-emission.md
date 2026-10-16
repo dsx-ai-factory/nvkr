@@ -129,7 +129,22 @@ outputs are stored in a separately checked private or internal GHCR package. The
 locator to its repository, Run, attempt and artifact name, an exact image/config, and the archive digest and
 size before existing carrier restoration. It confers no release or qualification authority. A helper is
 built from the exact checkout with the pinned Go toolchain before private downloads, so bootstrap needs no
-public binary delivery. This remains separate from qualified exact-helper-byte verification.
+public binary delivery. The source bootstrap owns fresh Go build and module caches beneath the runner's
+temporary directory. A fixed Python 3 supervisor bounds compilation, stops and joins its child before
+removing those caches on success, failure or cancellation, and completes cleanup before private downloads.
+The installed Go toolchain and produced helper remain available; ambient runner caches are not cleanup
+targets. Missing supervisor/toolchain capabilities or failed cleanup fail closed. This remains separate
+from qualified exact-helper-byte verification.
+
+Artifact movement must serve a required stage boundary or an explicit byte-verification operation.
+Payloads used only inside one generated stage are neither packed nor uploaded unless finalization needs
+them; the renderer, runtime packer and validator share that selection. Metadata records remain available
+for diagnostics and finalization. For a single-file carrier, the GHCR uploader presents deterministic TAR
+framing around the held file without writing another archive. Chunk hashing and a final held-source rehash
+bind the uploaded bytes, including when registry deduplication skips a body. Download authenticates ordered
+chunks while extracting into private staging, then checks exact size, source EOF and the complete archive
+digest before publishing any restored root. These paths preserve the v2 wire format and remove the outer
+archive's full-size disk copy; generic directory/multiple-root uploads retain their bounded packing path.
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;
@@ -924,13 +939,15 @@ rebuilding and repinning its complete inspection image before claiming hosted op
 Retention uses a separate ten-second cleanup context with cancellation checks between filesystem operations;
 an already-entered regular-file syscall cannot be interrupted, so this is not a hard filesystem deadline.
 
-The compiler creates a private release preparation, a production SBOM-attestation stage producing the
-final release package, and one publish/sign/verify route. The attestation stage binds and verifies each
-CycloneDX document before final release identity is derived. The private preparation is disposable: delivery
-consumes its unchanged payload files into the final layout after preparing the signed evidence, with the
-ownership and retry contract in ADR-20 §6. It adds one internal handoff. GitHub handoff artifacts remain
-internal job transfers, not additional deliverables. Product names do not cause duplicate copies of the full
-closure to be uploaded or published.
+The compiler creates a private release preparation, a production SBOM-attestation stage, and a
+publish/sign/verify route. The attestation stage binds and verifies each CycloneDX document before final
+release identity is derived. In `per-output-v1`, that job receives and returns only bounded controls and
+evidence. The original payload preparation goes directly to the publisher, which verifies and combines
+the signed evidence with its unchanged payload files under ADR-20 §6's exclusive ownership contract.
+The publisher retains full-byte checks and exports exact-root-bound metadata for the independent signer;
+the signer re-derives subjects and verifies SBOMs without downloading payloads. The independent remote
+verifier still reads the complete published payload. Legacy full-layout attestation retains its existing
+ownership and retry contract. These handoffs are internal transfers, not additional deliverables.
 
 Generated steps invoke `factory github run-node`, `restore-inputs`, `pack-outputs`, or `recover` against
 the complete canonical Plan and an exact node or derived stage selector. The factory module admits the
@@ -952,8 +969,8 @@ no-follow access and atomic no-replace publication remain mandatory. Carrier con
 validation, not artifact or release authority; consumers still authenticate their own exact closures.
 After a successful restore, the helper deletes that exact regular carrier file to
 avoid retaining both the archive and its unpacked contents. Failed and unrequested carriers remain untouched.
-Each operation prepares its outputs in one step and retains an independent upload
-for each exact carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
+Each operation prepares only outputs needed outside its stage or by finalization, with an independent upload
+for each selected carrier. Carrier-name/path collisions fail before rendering; no wildcard imports unrelated
 artifacts. Logical commands, transport authentication and isolation remain unchanged.
 
 The legacy finalizer batches downloads with the exact set of all planned carrier names. One recovery helper visits

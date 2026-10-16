@@ -1100,12 +1100,6 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - &operation-collect-node-outputs-part-17
-        name: collect node outputs part-17
-        uses: ./.github/nvkr-run/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1235,7 +1229,6 @@ jobs:
       - *operation-collect-node-outputs-part-14
       - *operation-collect-node-outputs-part-15
       - *operation-collect-node-outputs-part-16
-      - *operation-collect-node-outputs-part-17
   nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1359,7 +1352,6 @@ jobs:
       - *operation-collect-node-outputs-part-14
       - *operation-collect-node-outputs-part-15
       - *operation-collect-node-outputs-part-16
-      - *operation-collect-node-outputs-part-17
   nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1483,7 +1475,6 @@ jobs:
       - *operation-collect-node-outputs-part-14
       - *operation-collect-node-outputs-part-15
       - *operation-collect-node-outputs-part-16
-      - *operation-collect-node-outputs-part-17
   nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'

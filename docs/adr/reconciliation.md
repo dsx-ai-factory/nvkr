@@ -1006,7 +1006,7 @@ token separately for the source metadata lookup; development publisher tokens re
 contracts cover this credential separation and its generated projection; the development publication job
 recorded below also exercised these separate bindings.
 The v2 carrier uses at most 64 ordered raw chunks of at most
-1 GiB, checking each digest, config binding and complete archive before extraction. Earlier draft v1 locators
+1 GiB, checking each digest, config binding and complete archive before publishing extracted roots. Earlier draft v1 locators
 require a new producing Run. Controlled local-registry contracts cover multiple chunks, corrupt/reordered or
 truncated bytes, bounds, no-overwrite extraction and joined cancellation; they do not prove GHCR service
 acceptance. Raw chunks trade compression for predictable layer bounds. Registry retention, effective hidden
@@ -1066,17 +1066,53 @@ visibility and no linked repository. These samples do not establish the complete
 or effective access grants.
 
 [Development Run 38847118548](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548), commit
-`8c3a8dbb6af538650d6751c86c1a5bb319541b6d`, passed all bootstrap jobs and, by
-`2026-10-16T04:00Z`, 59 SBOM attestations, 58 output publications and 36 signature-verification jobs.
-These successes exercise the new signing implementation but do not prove that a conflict retry occurred.
-All four native disk builds were still executing. One
+`8c3a8dbb6af538650d6751c86c1a5bb319541b6d`, finished with 561 successful, four failed and 15 skipped jobs.
+All bootstrap jobs and all four native disk producer jobs passed. SBOM attestation, publication, signing
+and signature verification succeeded for 64 nondisk outputs and both plain disks.
+These successes exercise the new signing implementation but do not prove that a conflict retry occurred. One
 [packaging job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548/job/116801143181)
 failed while pulling its pinned AMD64 BusyBox utility image; its daemon admission and input restoration had
 succeeded. The discarded child-process diagnostic prevents attribution to registry, network or runner
 failure. Platform admission now retains bounded stderr solely for fixed diagnostic classification, with
 cancellation precedence and no raw-response logging or pull-behavior change. Regression cases were added
-but not run at the operator's request; compilation, vet and static review are separate from external
-exercise. This incomplete Run does not establish all-output completion or release acceptance.
+but not run at the operator's request; compilation, vet, lint, license, shell and vulnerability checks passed.
+These checks are separate from external exercise and do not constitute the complete test gate.
+
+The successful [ARM64 plain-disk producer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548/job/116801591683)
+uploaded a 3,350,328,832-byte prepared carrier; Actions artifact `12024935662` was a 558-byte ZIP containing
+one 519-byte locator. The ARM64 FDE prepared carrier was 6,450,705,408 bytes; Actions artifact `12023954928`
+was a 553-byte ZIP containing one 515-byte locator. Both ZIP digests matched provider metadata, and the
+locators matched the exact repository, Run, attempt, artifact name and CI registry reference. Successful
+uploads at that commit exercised four and seven raw chunks respectively, inferred from the fixed 1 GiB
+chunk bound. Only locator metadata was independently inspected; payloads were not downloaded for this audit.
+
+The [ARM64 FDE SBOM job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548/job/116809539638)
+failed before signing while restoring its prepared layout: the hosted filesystem ran out of space.
+The runner reported 19 MB free during private download. The [AMD64 FDE SBOM job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548/job/116812945991)
+also exhausted storage, while extracting the private carrier during download. At that commit, transport held about two payload-sized
+copies during download/restoration and three during subsequent upload, approximately 12.015 GiB and
+18.023 GiB for this FDE carrier before tools and workspace overhead. Those peak estimates derive from the
+implementation and measured locator size, not a complete filesystem trace. Native production succeeded;
+this consumer-capacity failure and the BusyBox pull failure prevent all-output completion and release acceptance.
+The [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38847118548/job/116818167805)
+rejected the failed provider-job closure with `NVKR-E-PROVENANCE-MISSING`; it did not report a complete Run.
+
+The next implementation removes intermediate payload carriers whose consumers share the producing stage.
+Per-output SBOM jobs now receive only prepared control documents and evidence. The publisher joins their
+verified attested controls to the original preparation, moves unchanged blobs without copying, performs full
+inspection and publishes the exact privacy-admitted root. Its separate signing handoff contains only bounded
+metadata bound to that published digest. Signers retain exact Plan, output, Run and cryptographic SBOM checks;
+independent remote verification still checks the complete served payload. This removes two full payload
+uploads and two downloads from each affected per-output route without moving OIDC into producers or publishers.
+Single-file CI uploads expose the existing TAR format as a virtual reader; downloads authenticate and extract
+ordered chunks directly into private staging. Neither direction writes an extra full outer TAR. Factory restore
+retains its inner carrier alongside extraction for held-source mutation detection and atomic publication.
+Bootstrap compilation also releases its own disposable caches after joining the compiler. Repository build,
+vet, lint, format, license, shell and vulnerability checks, four-bundle regeneration/drift, Actionlint, YAML
+lint and independent source review passed. Regression contracts were added but not executed at the operator's
+request; the complete test gate was not run. The generated production and development workflows have
+47,399 and 46,956 expanded YAML parsing events respectively, below the 47,500 maintained headroom threshold.
+These changes still require a fresh hosted Run and do not establish a measured storage bound.
 
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage

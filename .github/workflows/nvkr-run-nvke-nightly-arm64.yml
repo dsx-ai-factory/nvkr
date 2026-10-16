@@ -628,11 +628,6 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-17
-        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'

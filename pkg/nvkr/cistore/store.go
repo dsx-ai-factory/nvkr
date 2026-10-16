@@ -50,25 +50,19 @@ func (b *backend) upload(ctx context.Context, request Request, root string, path
 	if err != nil {
 		return Locator{}, err
 	}
-	temporary, err := os.MkdirTemp(root, ".nvkr-ci-upload-*")
-	if err != nil {
-		return Locator{}, e.Wrap(e.CodeBuildFailed, err, "creating private CI carrier staging")
-	}
-	defer os.RemoveAll(temporary)
-	archive := filepath.Join(temporary, "payload.tar")
-	if err := transportarchive.Pack(ctx, archive, root, clean); err != nil {
-		return Locator{}, err
-	}
-	file, info, err := securepath.OpenRegular(archive)
-	if err != nil {
-		return Locator{}, e.Wrap(e.CodeVerifyFailed, err, "holding packed CI carrier")
-	}
-	defer file.Close()
-	layers, digest, err := chunkArchive(ctx, file, info.Size(), maxChunkBytes)
+	archive, err := openUploadArchive(ctx, root, clean)
 	if err != nil {
 		return Locator{}, err
 	}
-	l := Locator{SchemaVersion: SchemaVersion, Request: request, ArchiveDigest: digest, ArchiveSize: info.Size(), Paths: clean, StripPrefix: prefix}
+	defer archive.close()
+	layers, digest, err := chunkArchive(ctx, archive.reader, archive.size, maxChunkBytes)
+	if err != nil {
+		return Locator{}, err
+	}
+	if err := archive.unchanged(ctx); err != nil {
+		return Locator{}, err
+	}
+	l := Locator{SchemaVersion: SchemaVersion, Request: request, ArchiveDigest: digest, ArchiveSize: archive.size, Paths: clean, StripPrefix: prefix}
 	image, err := carrierImage(layers, l)
 	if err != nil {
 		return Locator{}, err
@@ -81,20 +75,22 @@ func (b *backend) upload(ctx context.Context, request Request, root string, path
 	if err := l.Validate(request); err != nil {
 		return Locator{}, err
 	}
-	// Recheck after packing and immediately before the first payload network
+	// Recheck after hashing and immediately before the first payload network
 	// write. This cannot lock an external package's future visibility settings.
 	if ok, err := b.checkPrivacy(ctx, request, source, opts); err != nil {
 		return Locator{}, err
 	} else if !ok {
 		return Locator{}, e.New(e.CodeTrustPolicyMissing, "CI storage package disappeared before payload upload")
 	}
+	if err := archive.unchanged(ctx); err != nil {
+		return Locator{}, err
+	}
 	ref, _ := name.NewDigest(l.Reference, name.StrictValidation)
 	if err := remote.Write(ref, image, b.registryOptions(ctx, opts)...); err != nil {
 		return Locator{}, safeIOError(ctx, e.CodeFetchFailed, "uploading private CI carrier")
 	}
-	current, err := file.Stat()
-	if err != nil || !securepath.SameMetadata(info, current) {
-		return Locator{}, e.New(e.CodeVerifyFailed, "held CI archive changed during upload")
+	if err := archive.verify(ctx, digest); err != nil {
+		return Locator{}, err
 	}
 	return l, nil
 }
@@ -278,16 +274,15 @@ func restoreLayers(ctx context.Context, layers []v1.Layer, manifest *v1.Manifest
 		return e.Wrap(e.CodeBuildFailed, err, "creating private CI download staging")
 	}
 	defer os.RemoveAll(temporary)
-	file, err := os.OpenFile(filepath.Join(temporary, "payload.tar"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
-		return e.Wrap(e.CodeBuildFailed, err, "creating CI download archive")
-	}
-	defer file.Close()
-	if err := assembleChunks(ctx, file, layers, manifest.Layers, l.ArchiveDigest); err != nil {
-		return err
-	}
+	stream := newChunkReader(ctx, layers, manifest.Layers)
+	// Successful consumption checks every response close at EOF. On early
+	// rejection, retain the original failure while releasing the active response.
+	defer func() { _ = stream.Close() }()
 	restored := filepath.Join(temporary, "restored")
-	if err := transportarchive.UnpackOpen(ctx, file, restored, l.Paths); err != nil {
+	if err := transportarchive.UnpackStream(ctx, stream, l.ArchiveSize, l.ArchiveDigest, restored, l.Paths); err != nil {
+		if stream.err != nil {
+			return stream.err
+		}
 		return err
 	}
 	if _, actualPrefix, err := uploadPaths(ctx, restored, l.Paths); err != nil {

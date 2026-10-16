@@ -31,8 +31,20 @@ func executePublicationPackage(ctx context.Context, plan *Plan, node Node, outpu
 	if err != nil {
 		return err
 	}
-	_, err = delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
-	return err
+	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
+	if err != nil {
+		return err
+	}
+	for _, id := range node.Outputs {
+		controls := artifacts[id]
+		if controls.Kind != ArtifactPreparedEvidenceMetadata {
+			continue
+		}
+		if _, err := delivery.ExportMetadataWithExpectedRoot(ctx, output.Path, controls.Path, result.RootDigest); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func publicationEvidenceObjects(ctx context.Context, plan *Plan, node Node, inputs []Artifact, artifacts map[string]Artifact) ([]delivery.ObjectInput, error) {
