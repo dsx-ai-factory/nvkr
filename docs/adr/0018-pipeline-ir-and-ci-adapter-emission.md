@@ -127,7 +127,11 @@ The maintained pipeline-attested workflow trusts the bootstrap job and same-Run 
 Actions uploads contain only bounded JSON locators; workspace carriers, source archives, tools and binary
 outputs are stored in a separately checked private or internal GHCR package. The CI transport binds each
 locator to its repository, Run, attempt and artifact name, an exact image/config, and the archive digest and
-size before existing carrier restoration. It confers no release or qualification authority. A helper is
+size before existing carrier restoration. It confers no release or qualification authority. The generated
+workflow admits at most 2,000 locator uploads per generated attempt, counting helper, diagnostic and finalization uploads even
+when conditional. Both locator-download templates set the pinned action's matching 2,000-artifact listing
+bound; its default 1,000-entry pagination limit is insufficient for the maintained selection. Missing
+required inputs still fail closed during restoration and completeness checking. A helper is
 built from the exact checkout with the pinned Go toolchain before private downloads, so bootstrap needs no
 public binary delivery. The source bootstrap owns fresh Go build and module caches beneath the runner's
 temporary directory. A fixed Python 3 supervisor bounds compilation, stops and joins its child before

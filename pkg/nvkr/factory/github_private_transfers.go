@@ -17,6 +17,11 @@ const githubCIStorageInput = "nvkr-ci-storage-write-token"
 const githubCIReadInput = "nvkr-ci-storage-read-token"
 const githubCIAlwaysInput = "nvkr-ci-always"
 
+// The pinned artifact action defaults to listing only 1,000 artifacts before
+// filtering names. Bound its pagination above the admitted generated inventory;
+// validateGitHubLocatorBudget rejects workflows that would exceed this ceiling.
+const maxGitHubLocatorArtifacts = 2000
+
 const githubCIUploadCondition = "${{ always() && (inputs.nvkr-ci-always == 'true' || success()) }}"
 const githubCIStoreCondition = "${{ always() && steps.directory.outcome == 'success' && (inputs.nvkr-ci-always == 'true' || success()) }}"
 const githubCIIndexCondition = "${{ always() && steps.store.outcome == 'success' && steps.store.outputs.locator_path != '' && (inputs.nvkr-ci-always == 'true' || success()) }}"
@@ -292,7 +297,7 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				githubYAMLSet(outputs, field, githubYAMLMap("description", githubYAMLString("Locator index "+field), "value", githubYAMLString("${{ steps.index.outputs."+field+" }}")))
 			}
 		} else {
-			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download only private locators"), "uses", githubYAMLString(actions.Download), "with", githubYAMLMap("name", githubYAMLString("${{ inputs.name }}"), "pattern", githubYAMLString("${{ inputs.pattern }}"), "path", githubYAMLString("${{ steps.directory.outputs.path }}"), "merge-multiple", githubYAMLString("${{ inputs.merge-multiple || 'false' }}"), "run-id", githubYAMLString("${{ inputs.run-id || github.run_id }}"), "github-token", githubYAMLString("${{ github.token }}"))))
+			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download only private locators"), "uses", githubYAMLString(actions.Download), "env", githubYAMLMap("ACTIONS_ARTIFACT_MAX_ARTIFACT_COUNT", githubYAMLString(fmt.Sprint(maxGitHubLocatorArtifacts))), "with", githubYAMLMap("name", githubYAMLString("${{ inputs.name }}"), "pattern", githubYAMLString("${{ inputs.pattern }}"), "path", githubYAMLString("${{ steps.directory.outputs.path }}"), "merge-multiple", githubYAMLString("${{ inputs.merge-multiple || 'false' }}"), "run-id", githubYAMLString("${{ inputs.run-id || github.run_id }}"), "github-token", githubYAMLString("${{ github.token }}"))))
 			githubYAMLSet(env, "NVKR_CI_INDEX", githubYAMLString("${{ steps.directory.outputs.path }}"))
 			githubYAMLSet(env, "NVKR_CI_DESTINATION", githubYAMLString("${{ inputs.path }}"))
 			githubYAMLSet(env, "NVKR_CI_RUN", githubYAMLString("${{ inputs.run-id }}"))

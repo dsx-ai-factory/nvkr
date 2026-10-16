@@ -123,6 +123,12 @@ Compiled-output caches and CodeQL database uploads are disabled. Candidate OS bu
 only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
 The nightly coordinator attaches its constructed cycle summary; raw suite report files are not public artifacts.
 
+Generated workflows admit at most 2,000 locator uploads per attempt, including conditional diagnostic and finalization
+uploads. The pinned download action lists up to the same bound before selecting names; its default limit
+of 1,000 otherwise omits older locators in the maintained full build. The generator rejects larger bundles
+before writing them. This is not an unlimited inventory bound for accumulated reruns; use a fresh Run for a
+complete build. This setting changes locator discovery only, not private payload storage.
+
 The generator rejects workflows above 500,000 bytes or 50,000 expanded YAML parsing events. YAML aliases
 reduce file size but do not reduce the parser's expanded count. Maintained rendering tests reserve five
 percent headroom. Compatible offline observation, SBOM and packaging steps share their producer job;

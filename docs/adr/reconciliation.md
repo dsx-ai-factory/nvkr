@@ -1102,8 +1102,10 @@ Per-output SBOM jobs now receive only prepared control documents and evidence. T
 verified attested controls to the original preparation, moves unchanged blobs without copying, performs full
 inspection and publishes the exact privacy-admitted root. Its separate signing handoff contains only bounded
 metadata bound to that published digest. Signers retain exact Plan, output, Run and cryptographic SBOM checks;
-independent remote verification still checks the complete served payload. This removes two full payload
-uploads and two downloads from each affected per-output route without moving OIDC into producers or publishers.
+independent remote verification still checks the complete served payload. Each of the 69 publication/signing
+chains removes one full-layout upload and two downloads; each disk route also removes an unused full disk
+package upload. Native disk jobs additionally omit ten unused intermediate payload uploads each. These
+changes do not move OIDC into producers or publishers.
 Single-file CI uploads expose the existing TAR format as a virtual reader; downloads authenticate and extract
 ordered chunks directly into private staging. Neither direction writes an extra full outer TAR. Factory restore
 retains its inner carrier alongside extraction for held-source mutation detection and atomic publication.
@@ -1112,7 +1114,40 @@ vet, lint, format, license, shell and vulnerability checks, four-bundle regenera
 lint and independent source review passed. Regression contracts were added but not executed at the operator's
 request; the complete test gate was not run. The generated production and development workflows have
 47,399 and 46,956 expanded YAML parsing events respectively, below the 47,500 maintained headroom threshold.
-These changes still require a fresh hosted Run and do not establish a measured storage bound.
+Complete hosted acceptance remains unproved; these checks do not establish a measured storage bound.
+
+[Development Run 38855058706](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706), commit
+`d88af16e361c269dc27b1a21fc65f34f50fb9e97`, exercised the revised transport and metadata handoffs and
+finished with 563 successful, five failed and 12 skipped jobs.
+All 65 nondisk outputs completed attestation, publication, signing and independent remote verification.
+All four native disk producers passed; both ARM64 disk publications passed, including the
+[FDE publisher](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706/job/116833935272).
+The FDE payload locator (`12028250187`) declared 6,433,993,728 archive bytes; its prepared and attested
+control locators (`12028075621`, `12027758133`) declared 61,952 and 193,024 bytes. Plain ARM64 prepared
+controls (`12028021304`) also declared 61,952 bytes. Their ZIP digests and exact repository, Run, head,
+attempt and carrier-path bindings were checked. No private payload was downloaded for this sample,
+and this is not a complete attachment-inventory audit or filesystem peak measurement.
+
+Four late jobs failed before execution because the pinned download action listed only its default first
+1,000 artifacts before filtering. At 1,055 and then 1,072 artifacts, it omitted the older Cosign locator;
+restoration failed closed with `NVKR-E-VERIFY-FAILED`. The affected jobs were
+[ARM64 plain signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706/job/116834769009),
+[AMD64 plain SBOM](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706/job/116835093678),
+[ARM64 FDE signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706/job/116836891914) and
+[AMD64 FDE SBOM](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706/job/116836964138).
+The [finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38855058706/job/116837362168) also received
+an incomplete locator selection, then correctly rejected the failed provider closure with
+`NVKR-E-PROVENANCE-MISSING`. These were locator-discovery failures, not storage or cryptographic verification failures. The pinned
+[download action](https://github.com/actions/download-artifact/blob/3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c/dist/index.js)
+supports a finite listing override. Generated download templates now set 2,000, and expanded workflow
+validation rejects more than 2,000 possible uploads per attempt, including helper, conditional diagnostic
+and finalization uploads. Missing or changed overrides fail exact-template validation. This bounds a fresh
+generated attempt, not accumulated artifacts across arbitrary reruns. A read-only probe using the exact
+pinned action library listed all 1,073 artifacts across 11 pages with the new bound and found the Cosign
+locator (`12026349075`) on page 11; an exact-name lookup matched it. This exercises the library's real API
+path, not hosted action execution. Four-bundle generation and drift checks, build, vet, lint, formatting,
+license checks, workflow/YAML lint and diff checks passed. The complete hosted path still requires a fresh
+successful Run; unit tests remain unexecuted at the operator's request.
 
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage

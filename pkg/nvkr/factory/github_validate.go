@@ -86,6 +86,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := yaml.UnmarshalStrict(expanded, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
 	}
+	if err := validateGitHubLocatorBudget(document, actions); err != nil {
+		return err
+	}
 	if err := admitGitHubNeeds(ctx, plan, &document); err != nil {
 		return err
 	}

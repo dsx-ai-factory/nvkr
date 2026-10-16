@@ -183,6 +183,9 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 						if githubYAMLValue(with, "path") != "${{ steps.directory.outputs.path }}" {
 							t.Fatal("locator download does not use a fresh directory")
 						}
+						if !githubInterfaceEnvironmentEqual(githubYAMLField(step, "env"), map[string]string{"ACTIONS_ARTIFACT_MAX_ARTIFACT_COUNT": strconv.Itoa(maxGitHubLocatorArtifacts)}) {
+							t.Fatal("locator discovery does not cover the admitted workflow artifact budget")
+						}
 					case actions.SetupGo:
 						if name == githubCITransferPath(plan, "bootstrap-download")+"/action.yml" {
 							builds++
@@ -357,6 +360,14 @@ func TestGitHubPrivateTransfersRejectPayloadFallbackAndCredentialTampering(t *te
 		{"cache bootstrap", githubCITransferPath(plan, "bootstrap-download") + "/action.yml", func(root *yamlv3.Node) {
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "uses", plan.Actions["setup-go"].Uses())
 			githubTestYAMLField(t, step, "with", "cache").Value = "true"
+		}},
+		{"truncated locator discovery", githubCITransferPath(plan, "download") + "/action.yml", func(root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Download only private locators")
+			githubYAMLRemove(step, "env")
+		}},
+		{"unbounded bootstrap locator discovery", githubCITransferPath(plan, "bootstrap-download") + "/action.yml", func(root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Download only private locators")
+			githubTestYAMLField(t, step, "env", "ACTIONS_ARTIFACT_MAX_ARTIFACT_COUNT").Value = "1000000"
 		}},
 		{"credential scope", bundle.WorkflowPath, func(root *yamlv3.Node) {
 			job := githubTestYAMLField(t, root, "jobs", bootstrap)
