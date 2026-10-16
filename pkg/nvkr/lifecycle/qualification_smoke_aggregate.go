@@ -170,7 +170,7 @@ func authenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckRecei
 	if len(artifacts) != len(platforms) {
 		return nil, e.New(e.CodeReleaseIncomplete, "native smoke results omit or add a platform")
 	}
-	workerIdentity := "https://github.com/" + frozen.Source.Repository + "/" + frozen.Smoke.Workflow + "@refs/heads/" + frozen.Source.DefaultBranch
+	workerIdentity := "https://github.com/" + frozen.Source.Repository + "/" + frozen.Smoke.Workflow + "@refs/heads/" + current.SourceBranch()
 	role, err := trust.NewRolePolicy(trust.RoleToolSmokeWorker, trust.Store{OperatorIdentities: []string{workerIdentity}}, "https://token.actions.githubusercontent.com")
 	if err != nil {
 		return nil, err

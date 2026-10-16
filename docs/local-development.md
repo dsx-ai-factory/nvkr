@@ -167,7 +167,13 @@ read-back; its storage is separate from the base demo's small deployment registr
 "$NVKE_DEMO" qualification-registry-stop --out .nvkr/qualification/first-all
 ```
 
-Stop verifies the container ID, owner labels, pinned image, storage mount and loopback binding, then
+The registry runs with the Linux caller's UID and GID so it can use its private storage without
+adding capabilities or widening directory permissions. To exercise setup and actual OCI write/read-back
+as a non-root Linux user with Docker, run
+`NVKR_TEST_LOCAL_REGISTRY=1 go test ./internal/nvkedemo -run '^TestExternalQualificationRegistryStorage$' -count=1 -timeout=10m`.
+Use disk-backed `TMPDIR`; the test stops its own registry and does not touch demo registries.
+
+Stop verifies the container ID, owner labels, pinned image, user, storage mount and loopback binding, then
 stops only that container. It retains the container, keys, data and evidence. Stopping makes registry
 references unavailable until the retained container is started again. Failed setup retains diagnostic
 files and stops any registry it has started when cleanup can complete; an interrupted setup must not be

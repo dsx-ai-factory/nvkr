@@ -216,7 +216,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DevelopmentEnvironment == "" || cfg.QualificationPolicy == "" {
+	if cfg.DevelopmentEnvironment == "" || cfg.QualificationPolicy == "" || cfg.DevelopmentQualificationPolicy == "" {
 		t.Fatal("the maintained policy does not name its dependent bundles")
 	}
 	plan, err := lifecycle.CompileFiles(t.Context(), cfg.Definition, cfg.Environment, "dev (unknown)")
@@ -232,12 +232,12 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		t.Fatal(err)
 	}
 	directories, files := members.paths()
-	for _, want := range []string{".github/nvkr-dev", ".github/nvkr-qualification", ".github/nvkr-run", ".github/nvkr-run-nvke-nightly-arm64", ".github/nvkr-run-nvke-nightly-upstream-ovn-arm64"} {
+	for _, want := range []string{".github/nvkr-dev", ".github/nvkr-dev-qualification", ".github/nvkr-qualification", ".github/nvkr-run", ".github/nvkr-run-nvke-nightly-arm64", ".github/nvkr-run-nvke-nightly-upstream-ovn-arm64"} {
 		if !contains(directories, want) {
 			t.Fatalf("directories %v lack %s", directories, want)
 		}
 	}
-	for _, want := range []string{".github/workflows/nvkr-dev.yml", ".github/workflows/nvkr-qualify.yml", ".github/workflows/nvkr-run-nvke-nightly-arm64.yml", ".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml", ".github/workflows/nvkr-run.yml", ".github/workflows/nvkr-smoke.yml"} {
+	for _, want := range []string{".github/workflows/nvkr-dev.yml", ".github/workflows/nvkr-dev-qualify.yml", ".github/workflows/nvkr-dev-smoke.yml", ".github/workflows/nvkr-qualify.yml", ".github/workflows/nvkr-run-nvke-nightly-arm64.yml", ".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml", ".github/workflows/nvkr-run.yml", ".github/workflows/nvkr-smoke.yml"} {
 		if !contains(files, want) {
 			t.Fatalf("files %v lack %s", files, want)
 		}

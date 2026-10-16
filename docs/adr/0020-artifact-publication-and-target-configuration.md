@@ -641,6 +641,14 @@ token scope still differs by phase. Provider ACLs are external prerequisites, ne
 Only artifact signing and SBOM attestation receive OIDC. The distinct default-branch cleanup environment
 holds the cleanup token; branch execution receives no deletion credential.
 
+Development qualification may attach its distinct predicate to existing immutable output subjects in the
+selected successful source attempt's namespace. It never rebuilds or republishes their payloads, changes
+aliases, or writes production qualification predicates. The final qualifier uses the dedicated development
+writer; native smoke uses the reader. Original producer signatures and complete artifact verification are
+required before qualification signing. Attachments are disposable with their subject packages. Qualification
+does not reserve a namespace against cleanup: run while source packages and provider metadata remain
+available. Concurrent cleanup or expired inputs cause failure, not a bypass or a rebuild.
+
 The development cleanup owner supports read-only preview by default and explicit apply. It inventories
 private GHCR container packages under only the exact reserved namespace, authenticates account/package identity
 and the matching `nvkr-dev.yml` manual-dispatch attempt, and requires completion plus at least 24 hours
@@ -661,7 +669,7 @@ after an ambiguous outcome. Calls, response sizes and pagination are bounded and
 The 24-hour age is eligibility, not an exact expiry SLA. GitHub's deletion/restoration and physical garbage
 collection remain provider behavior; Sigstore transparency records remain external and are not erased.
 Production packages, old shared prefixes and arbitrary registries are outside this protocol. The protocol
-assumes completed attempt namespaces are never repopulated by an external writer; development retries
+assumes deleted attempt namespaces are never repopulated by an external writer; development retries
 always obtain a new attempt namespace. Provider ACL enforcement and successful real deletion require
 separate external evidence.
 

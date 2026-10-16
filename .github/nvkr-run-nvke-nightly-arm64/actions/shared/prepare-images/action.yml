@@ -9,8 +9,9 @@ inputs:
     description: Plan-derived parameters for this operation; never shell source
     required: true
   nvkr-toolchain-read-token:
-    description: Independent private toolchain reader
-    required: true
+    description: Independent private toolchain reader when image preparation is present
+    required: false
+    default: ""
 runs:
   using: composite
   steps:

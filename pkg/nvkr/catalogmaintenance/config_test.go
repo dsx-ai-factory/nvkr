@@ -37,6 +37,15 @@ func TestMaintenanceConfigAdmission(t *testing.T) {
 		{"dependent bundles", func(c *Config) {
 			c.DevelopmentEnvironment, c.QualificationPolicy = "environment-dev.yaml", "qualification.yaml"
 		}, ""},
+		{"development qualification", func(c *Config) {
+			c.DevelopmentEnvironment = "dev.yaml"
+			c.DevelopmentQualificationPolicy = "dev-qualification.yaml"
+		}, ""},
+		{"development qualification missing environment", func(c *Config) { c.DevelopmentQualificationPolicy = "dev-qualification.yaml" }, e.CodeUsage},
+		{"development qualification escape", func(c *Config) {
+			c.DevelopmentEnvironment = "dev.yaml"
+			c.DevelopmentQualificationPolicy = "../dev-qualification.yaml"
+		}, e.CodeUsage},
 		{"development escape", func(c *Config) { c.DevelopmentEnvironment = "../dev.yaml" }, e.CodeUsage},
 		{"development shell path", func(c *Config) { c.DevelopmentEnvironment = "$(touch pwn)" }, e.CodeUsage},
 		{"development equals production", func(c *Config) { c.DevelopmentEnvironment = c.Environment }, e.CodeUsage},

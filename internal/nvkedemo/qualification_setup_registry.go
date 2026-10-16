@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -34,6 +35,7 @@ type qualificationRegistryInspect struct {
 	ID     string `json:"Id"`
 	Config struct {
 		Image  string
+		User   string
 		Labels map[string]string
 	}
 	State      struct{ Running bool }
@@ -70,13 +72,17 @@ func inspectQualificationRegistry(ctx context.Context, runner Runner, out string
 
 func validateQualificationRegistry(row qualificationRegistryInspect, out string, registry qualificationRegistry) error {
 	ports := row.HostConfig.PortBindings["5000/tcp"]
-	if row.ID != registry.ID || row.Config.Image != registryImage || row.Config.Labels[qualificationRegistryLabel] != registry.Owner ||
+	if row.ID != registry.ID || row.Config.Image != registryImage || row.Config.User != qualificationRegistryUser() || row.Config.Labels[qualificationRegistryLabel] != registry.Owner ||
 		row.Config.Labels[qualificationRegistryLabel+"-root"] != out || !row.HostConfig.ReadonlyRootfs || row.HostConfig.NetworkMode != "bridge" ||
 		len(row.HostConfig.PortBindings) != 1 || len(ports) != 1 || ports[0].HostIP != "127.0.0.1" ||
 		len(row.Mounts) != 1 || row.Mounts[0].Type != "bind" || row.Mounts[0].Source != filepath.Join(out, "registry-data") || row.Mounts[0].Destination != "/var/lib/registry" {
 		return configUsage("qualification registry ownership, image, storage or loopback binding changed")
 	}
 	return nil
+}
+
+func qualificationRegistryUser() string {
+	return strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 }
 
 func startQualificationRegistry(ctx context.Context, runner Runner, out string) (registry qualificationRegistry, result error) {
@@ -92,7 +98,9 @@ func startQualificationRegistry(ctx context.Context, runner Runner, out string) 
 	cidfile := filepath.Join(out, "registry.cid")
 	_, createErr := runner.Capture(ctx, []string{"docker", "create", "--cidfile", cidfile,
 		"--label", qualificationRegistryLabel + "=" + registry.Owner, "--label", qualificationRegistryLabel + "-root=" + out,
-		"--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--network", "bridge", "--publish", "127.0.0.1::5000",
+		// The private bind mount belongs to the caller. Root with all capabilities
+		// dropped cannot traverse its 0700 directory when the caller is non-root.
+		"--user", qualificationRegistryUser(), "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--network", "bridge", "--publish", "127.0.0.1::5000",
 		"--mount", "type=bind,src=" + filepath.Join(out, "registry-data") + ",dst=/var/lib/registry", registryImage}, "create-qualification-registry", time.Minute)
 	raw, readErr := boundedRegularRead(cidfile, 128)
 	if readErr != nil {

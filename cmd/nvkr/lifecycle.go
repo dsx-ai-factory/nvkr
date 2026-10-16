@@ -104,6 +104,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		cmdRunInspect(),
 		cmdRunCheckArtifacts(),
 		cmdRunQualify(),
+		cmdQualificationSource(),
 		cmdRunQualifyLocal(),
 		cmdRunSmokeWorker(),
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,

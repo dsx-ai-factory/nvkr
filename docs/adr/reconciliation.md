@@ -292,6 +292,27 @@ that remains outstanding after merge.
 
 ### Local M3 demo rehearsal
 
+On 2026-10-16, the automatic `m3-video-04` rehearsal completed its 29-output build and
+signing/smoke stages but failed publication: the capability-dropped root registry could not traverse
+its non-root caller's mode-0700 storage. Setup now runs the registry with the caller's UID/GID,
+retaining private permissions and container restrictions. The non-root Linux ARM64
+`TestExternalQualificationRegistryStorage` passed actual OCI upload, read-back and owned shutdown.
+Reusing that completed build with fresh registry/scratch/evidence destinations then passed
+`run qualify-local`, including all 10 native tool members, three-role signing and complete registry
+read-back. Its content subject was
+`sha256:c811839c5fe210cb9a355ced62973cd8d38c263e9c9ca7da9acabbfb0d1063bf`, ordinary publication
+`localhost:32772/local-m3/ordinary@sha256:53e1e27794954c788712c12dbbb7270ddec4886723af783dd7e095d9799f3bde`, disk
+`localhost:32772/local-m3/disk-nvke-node-image-arm64@sha256:5e26a285f90cc56e9ff1530541304659eb77cb046717ce534a3c38199f287fcf`, and evidence
+`localhost:32772/local-m3/evidence@sha256:d592c4236557f8c2b91ada36b83c0e87960e94ca81be44621c8acf1194c20a1c`.
+These loopback locators belong to the retained laptop VM and remain `unqualified-local-execution`;
+the retry did not rebuild producers, exercise hosted OIDC, or deploy a cluster.
+The separate `TestExternalLocalM3Consumer` passed its positive case and all 14 negative cases against
+this publication in 283 seconds, with only public policy, pinned cosign and registry locators:
+invalid role signatures, omitted signatures/provenance, changed compiler inputs/source pins/Run,
+wrong policy, missing/extra transport members and altered/missing downloaded disk bytes.
+The repository gate passed with uncached tests, as did the affected demo package, Linux ARM64
+targeted signing/qualification race tests, generated-workflow drift and documentation checks.
+
 `build` and `e2e` now accept `--qualify-local` (or `build.qualifyLocal: true`) for a fresh attempt.
 The adapter prepares once, invokes the same setup, then uses the existing prepared build and local
 qualification gate. Its registry is stopped after read-back or failure using a cancellation-independent
@@ -770,6 +791,27 @@ cosign signing, verification, metadata assembly and finalization. It retains the
 and source limitations; development execution cannot approve those production exceptions. Development
 finalization retains its Run record without emitting the production qualification handoff; explicit handoff
 admission returns a capability error before qualification evidence collection. Production handoffs retain seven days.
+
+The separate development qualification path now recovers original public metadata controls from an
+API-authenticated successful manual development attempt, replays its exact source inputs and delegates to
+the existing artifact checks and native smoke owners. Generated `nvkr-dev-qualify.yml` accepts an exact
+attempt URL on a reviewed nondefault branch; its source branch may differ. The fixed reusable worker and
+final qualifier use development-only credentials and distinct evidence schema/predicate. Production evidence
+admission is unchanged. The development pair has independent manifest ownership and runtime drift checks.
+Local contracts cover source/qualifier selection, metadata integrity and restoration, production rejection,
+namespace binding and generated credential/owner separation. Catalog maintenance names and regenerates the
+development pair with its producer, so pin updates cannot leave its manifest stale.
+For [development Run 38951964907, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/38951964907/attempts/1),
+current code reproduced the original Plan digest
+`sha256:c6373e0b96f182b596ca89eeb6d7f66ee17b9126e4da236a0c5d583a0d1d12b6`.
+On 2026-10-16, the stock pinned Linux ARM64 cosign adapter independently downloaded and verified
+both signature and exact original SLSA provenance for all 70 subjects (69 outputs plus release),
+using the exact `nvkr-dev.yml@refs/heads/codex/private-ghcr-combined` identity and GitHub issuer.
+The immutable release subject was
+`ghcr.io/dsx-ai-factory/nvkr/development/runs/38951964907/attempts/1/releases@sha256:d49148699674c485d24ef0de89c2450a2632d42681b031d421bf5c3102e92d0f`.
+This read-only laptop/Colima exercise did not execute those hosted outputs or publish new evidence.
+No hosted development qualification success, qualifier OIDC identity, hosted native smoke,
+qualification attachment/read-back or independent-consumer acceptance is claimed.
 
 Unsigned development remains hosted build-only, static-unqualified, automatically cancelling older
 same-branch Runs and retaining transfers for one day. Signed development requires the prescribed

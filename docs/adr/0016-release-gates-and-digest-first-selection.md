@@ -269,7 +269,7 @@ The owner recomputes complete disjoint native member coverage, exact payload siz
 observed versions, image selections and the full policy identity before issuing a B receipt. B borrows
 A and the invocation; closure revokes copies. Caller-authored reports and booleans cannot restore it.
 
-Hosted qualification takes one independently selected policy; its source is derived only from the trusted
+Production hosted qualification takes one independently selected policy; its source is derived only from the trusted
 `workflow_run` event and provider API. Native cosign byte pins are independent of producer tool selection.
 The pinned release version is a bootstrap download locator, never authority in place of those byte pins.
 
@@ -334,6 +334,21 @@ gated on reproduction. Unattended merge requires separate security authorization
 rerun behavior and revocation; ADR-04 owns explicit consumer scopes. An artifact-publication verification result
 does not establish full-release acceptance. Reconciliation owns implementation and external-acceptance status;
 the approved scope and these contracts do not establish milestone completion or organizational ratification.
+
+### Development qualification
+
+An explicit development policy admits a manual qualifier on a reviewed nondefault branch. It authenticates
+one successful manual development producer attempt through GitHub, replays that attempt's exact committed
+inputs and recovers its original public metadata controls. A production handoff is not required in this
+separate path. Recovery supplies descriptions only: the same artifact verification, native tool smoke,
+complete-set receipts, signing and attachment read-back remain mandatory. Source and qualifier branches
+may differ; both exact commits and invocations are retained without relabeling the original build.
+
+Development evidence uses `nvkr.dev/development-qualification-evidence/v1`, gate
+`nvkr.dev/development-qualification-gate/v1` and the separate predicate registered in ADR-01. Every subject
+must remain inside the original source Run/attempt namespace. The production decoder and publisher reject
+development evidence and receipts. Development success grants no production acceptance, reproduction,
+full disk inspection or external-suite acceptance. Hosted execution remains separately evidenced.
 
 ### Local qualification rehearsal — implementation in progress
 

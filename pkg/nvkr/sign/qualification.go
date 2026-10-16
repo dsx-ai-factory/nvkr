@@ -15,6 +15,9 @@ import (
 // QualificationPredicateType cannot substitute for production SLSA evidence.
 const QualificationPredicateType = "https://nvkr.dev/qualification-evidence/v2"
 
+// DevelopmentQualificationPredicateType is never a production qualification claim.
+const DevelopmentQualificationPredicateType = "https://nvkr.dev/development-qualification-evidence/v1"
+
 // MaxQualificationPredicateBytes is the shared publication and verification bound.
 // Callers admit the complete canonical predicate before constructing a signer.
 const MaxQualificationPredicateBytes = maxOCIPredicateBytes
@@ -25,6 +28,15 @@ const MaxQualificationPredicateBytes = maxOCIPredicateBytes
 // provenance. The owning qualification module admits all verdicts before calling
 // this adapter. Failure may leave an attachment and never returns success.
 func (s *CosignOCISigner) AttestQualification(ctx context.Context, subject Subject, predicate []byte) error {
+	return s.attestQualification(ctx, subject, predicate, QualificationPredicateType)
+}
+
+// AttestDevelopmentQualification signs and independently reads back development-only evidence.
+func (s *CosignOCISigner) AttestDevelopmentQualification(ctx context.Context, subject Subject, predicate []byte) error {
+	return s.attestQualification(ctx, subject, predicate, DevelopmentQualificationPredicateType)
+}
+
+func (s *CosignOCISigner) attestQualification(ctx context.Context, subject Subject, predicate []byte, predicateType string) error {
 	if s == nil || s.runner == nil {
 		return e.New(e.CodeInternal, "qualification signer is unavailable")
 	}
@@ -62,13 +74,14 @@ func (s *CosignOCISigner) AttestQualification(ctx context.Context, subject Subje
 	}
 	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
 	args := qualificationAttestArgs(subject.Ref, path)
+	args[4] = predicateType
 	if _, err := s.capture(ctx, args, environment); err != nil {
 		return err
 	}
 	if err := assertPrivateFileUnchanged(path, exact); err != nil {
 		return err
 	}
-	_, _, _, err = s.verifyOCIBundles(ctx, subject, QualificationPredicateType, policy, workspace, environment)
+	_, _, _, err = s.verifyOCIBundles(ctx, subject, predicateType, policy, workspace, environment)
 	return err
 }
 

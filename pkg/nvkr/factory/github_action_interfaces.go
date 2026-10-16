@@ -304,7 +304,7 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 		if present && !githubInterfaceEnvironmentEqual(originalEnv, expected) {
 			return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its read credential")
 		}
-		githubYAMLSet(inputs, "nvkr-toolchain-read-token", githubActionInput("Independent private toolchain reader"))
+		githubYAMLSet(inputs, "nvkr-toolchain-read-token", githubYAMLMap("description", githubYAMLString("Independent private toolchain reader when image preparation is present"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}, "default", githubYAMLString("")))
 		token := ""
 		if present {
 			token = githubYAMLValue(githubYAMLField(call, "with"), "nvkr-toolchain-read-token")
@@ -312,7 +312,9 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 				return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its caller credential")
 			}
 		}
-		githubYAMLSet(invocation.Arguments, "nvkr-toolchain-read-token", githubYAMLString(token))
+		if present {
+			githubYAMLSet(invocation.Arguments, "nvkr-toolchain-read-token", githubYAMLString(token))
+		}
 		for _, key := range sortedKeys(expected) {
 			githubYAMLSet(env, key, githubYAMLString(expected[key]))
 		}
