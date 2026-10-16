@@ -369,7 +369,7 @@ jobs:
             echo "::error::Missing /dev/kvm for ${{ matrix.arch }}"
             exit 1
           fi
-          stat -c '%U:%G %a' /dev/kvm
+          stat -c 'uid=%u gid=%g mode=%a owner=%U group=%G' /dev/kvm
           # The scale set must provide access through its KVM group or device
           # configuration. A build job must not change host device permissions.
           if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
