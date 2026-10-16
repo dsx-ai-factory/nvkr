@@ -272,10 +272,6 @@ func TestCommandRecoveryLocatorUsesSelectedConfiguration(t *testing.T) {
 			called := false
 			actions := demoActions{
 				load: func(context.Context, string) (nvkedemo.DemoFile, error) { return file, nil },
-				prepare: func(ctx context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-					check(ctx)
-					return cfg, nil
-				},
 				build: func(ctx context.Context, _ nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 					check(ctx)
 					return nvkedemo.BuiltInputs{NVKR: "fresh"}, nil

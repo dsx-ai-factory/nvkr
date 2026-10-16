@@ -46,7 +46,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 		count int
 		disk  bool
 	}{
-		{"inputs/definitions/demo/arm64-nvidia-tcg.json", 29, true},
+		{"inputs/definitions/demo/arm64-nvidia-tcg.json", 32, true},
 		{"inputs/definitions/diagnostics/demo-arm64/components.json", 22, false},
 		{"inputs/definitions/diagnostics/demo-arm64/os.json", 1, true},
 		{"inputs/definitions/diagnostics/demo-arm64/simulator.json", 1, false},
@@ -131,8 +131,33 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	if _, ok := parts["ovn-chart-arm64"]; !ok {
 		t.Fatal("standalone fork chart omitted")
 	}
+	runtimePath := filepath.Join(root, "inputs/definitions/demo/native-mac/definition-runtime-images.json")
+	runtimeInputs, err := authored.LoadDefinition(t.Context(), runtimePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addedRuntime := 0
+	for _, output := range runtimeInputs.Outputs {
+		output = normalize(output, runtimeInputs.Catalog, filepath.Dir(runtimePath))
+		if existing, found := parts[output.Name]; found {
+			if !reflect.DeepEqual(existing, output) {
+				t.Fatalf("runtime dependency differs from the shared owner: %s", output.Name)
+			}
+			continue
+		}
+		switch output.Name {
+		case "capi-exec-init-image-arm64", "capi-exec-plugin-image-arm64", "workload-image-arm64":
+			parts[output.Name] = output
+			addedRuntime++
+		default:
+			t.Fatalf("unexpected additional runtime output %s", output.Name)
+		}
+	}
+	if addedRuntime != 3 {
+		t.Fatal("combined selection omitted the exact native runtime additions")
+	}
 	if !reflect.DeepEqual(all, parts) {
-		t.Fatal("combined selection differs from the exact six-group union plus standalone fork outputs")
+		t.Fatal("combined selection differs from split inputs, standalone fork outputs and shared runtime dependencies")
 	}
 	providers, err := authored.LoadDefinition(t.Context(), filepath.Join(root, "inputs/definitions/diagnostics/demo-arm64/providers.json"))
 	if err != nil {

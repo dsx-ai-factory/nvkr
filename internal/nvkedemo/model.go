@@ -16,6 +16,8 @@ import (
 // extract the selected bytes before installation. Every view may reference the
 // same combined Run; separate completed Runs remain usable for diagnostics.
 type RunInputs struct {
+	HostTools  string
+	Runtime    string
 	OS         string
 	Components string
 	Providers  string
@@ -29,6 +31,7 @@ type RunInputs struct {
 // Out must be a new private directory outside sources and accepted attempts.
 // Timeout bounds tenant provisioning; cleanup has separate bounded contexts.
 type Config struct {
+	Accelerator  string
 	Cleanup      bool
 	Walkthrough  bool
 	Network      string

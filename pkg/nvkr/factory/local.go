@@ -64,6 +64,7 @@ type LocalRunOptions struct {
 	vmDrivers     vmDriverExecutor
 	vmAdmissions  map[string]vmAdmission
 	materialOwner *LocalRunResult
+	nativeGo      map[string]*pipeline.NativeGoToolchain
 }
 
 // LocalNodeResult is a deterministic, unqualified execution observation.
@@ -150,10 +151,29 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if err := admitLocalDiskPublication(plan); err != nil {
 		return err
 	}
+	toolchains, err := admitLocalNativeGo(ctx, plan)
+	if err != nil {
+		return err
+	}
+	defer closeLocalNativeGo(toolchains)
 	vmBuild := hasLocalVMBuild(plan)
-	if vmBuild && runtime.GOOS != "linux" {
-		return e.New(e.CodeEngineCapability,
-			"local VM execution requires Linux; host is %s/%s", runtime.GOOS, runtime.GOARCH)
+	if vmBuild {
+		for _, selected := range plan.Graph.Nodes {
+			if selected.Kind != NodeBuild || selected.IRNode == "" {
+				continue
+			}
+			_, instruction, err := plan.producerInstruction(selected)
+			if err != nil {
+				return err
+			}
+			if instruction.BuilderType != ir.BuilderVMImage {
+				continue
+			}
+			_, native := plan.Environment.Runtime.NativeToolchains[instruction.Toolchain]
+			if err := validateLocalPackerHost(instruction, native); err != nil {
+				return err
+			}
+		}
 	}
 	platforms := localRunnerPlatforms(topologicalFactoryNodes(plan.Graph))
 	if vmBuild && len(platforms) == 0 {
@@ -209,6 +229,14 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	}
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return nil, err
+	}
+	if !options.DryRun {
+		var err error
+		options.nativeGo, err = admitLocalNativeGo(ctx, plan)
+		if err != nil {
+			return nil, err
+		}
+		defer closeLocalNativeGo(options.nativeGo)
 	}
 	if !options.DryRun {
 		if err := admitLocalDiskPublication(plan); err != nil {
@@ -291,7 +319,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 			return nil, relocateErr
 		}
 		options.vmDrivers, err = options.vmResolver.Admit(ctx, relocated, options.producers, vmDriverRunConfig{
-			Runtime: options.Runtime, Stdout: options.Stdout, Stderr: options.Stderr,
+			Runtime: options.Runtime, Workspace: options.Workspace, Stdout: options.Stdout, Stderr: options.Stderr,
 			Diagnostics: options.Diagnostics, Activity: options.Activity,
 		})
 		if err != nil {
@@ -865,7 +893,13 @@ func executeLocalProducer(ctx context.Context, plan *Plan, node Node, options Lo
 			owner = options.materialOwner
 		}
 	}
-	return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, run, owner)
+	invoke := func(instruction ir.Node, settings pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
+		if instruction.BuilderType == ir.BuilderNativeGo {
+			settings.NativeGo = options.nativeGo[instruction.Toolchain]
+		}
+		return run(instruction, settings)
+	}
+	return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, invoke, owner)
 }
 
 func hasLocalVMBuild(plan *Plan) bool {

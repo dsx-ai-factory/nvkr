@@ -111,12 +111,14 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 	}
 	components := append([]string(nil), expected.Components...)
 	buildName := ""
+	buildPlatform := ""
 	for _, build := range plan.Builds {
 		if build.Name == expected.Name && build.BuildDigest == expected.BuildDigest {
 			if buildName != "" {
 				return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q has an ambiguous build identity", expected.Name)
 			}
 			buildName = build.Name
+			buildPlatform = build.Platform
 		}
 	}
 	if buildName == "" {
@@ -177,6 +179,9 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		bundle, inspection, err := delivery.InspectBinaryBundle(ctx, artifact.Path)
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
+		}
+		if bundle.OS+"/"+bundle.Arch != buildPlatform {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q bundle platform differs from its exact build target", expected.Name)
 		}
 		components = components[:0]
 		for _, entry := range bundle.Entries {

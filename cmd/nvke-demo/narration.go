@@ -25,12 +25,15 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "walkthrough introduction requires a context and writer")
 	}
-	selected := "arm64-nvidia-tcg.json"
+	definitionName, environmentName, err := nvkedemo.LocalArtifactInputs(cfg.Network)
+	if err != nil {
+		return err
+	}
+	selected := filepath.Base(definitionName)
 	network := "NVIDIA OVN (default)"
 	switch cfg.Network {
 	case "", "ovn":
 	case "upstream-ovn":
-		selected = "arm64-upstream-tcg.json"
 		network = "upstream OVN diagnostic; does not validate the NVIDIA fork"
 	case "kind-calico":
 		network = "Kind/Calico diagnostic; does not validate NVIDIA OVN"
@@ -40,7 +43,7 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	visibleRoot := filepath.Join("inputs", "definitions", "demo")
 	root := filepath.Join(cfg.Repository, visibleRoot)
 	definitionPath := filepath.Join(root, selected)
-	environmentPath := filepath.Join(cfg.Repository, "inputs/environments/local-arm64-tcg.json")
+	environmentPath := filepath.Join(cfg.Repository, environmentName)
 	authored, err := definition.LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		return err
@@ -79,7 +82,7 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	for _, path := range paths {
 		fmt.Fprintf(&text, "   %q\n", path)
 	}
-	fmt.Fprintf(&text, "3. Environment selects execution settings: %q\n", "inputs/environments/local-arm64-tcg.json")
+	fmt.Fprintf(&text, "3. Environment selects execution settings: %q\n", environmentName)
 	fmt.Fprintln(&text, "4. NVKR compiles the selection into a generated Plan, then records each required output's result.")
 	fmt.Fprintf(&text, "   Attempt Plan, created during preparation: %q\n", filepath.Join(".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
 	fmt.Fprintf(&text, "   Run record, written by execution: %q\n", filepath.Join(".nvkr", "runs", cfg.AttemptPrefix, "lifecycle.json"))

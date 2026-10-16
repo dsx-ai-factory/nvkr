@@ -105,6 +105,7 @@ const (
 	KindQualifiedReport        = "nvkr.pipeline.qualified-report/v1"
 	KindTerminalVerification   = "nvkr.pipeline.terminal-verification/v1"
 	KindTerminalTree           = "nvkr.pipeline.terminal-tree/v1"
+	KindNativeGoToolchain      = "nvkr.native-go-toolchain/v1"
 	KindStatusCheckpointPolicy = "nvkr.status-checkpoint-policy/v1"
 	KindHostObservation        = "nvkr.profile.host-observation/v1"
 	KindExecutionSelection     = "nvkr.profile.execution-selection/v1"
@@ -127,7 +128,7 @@ var registeredKinds = [...]string{
 	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput, KindAICRBundle,
 	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindExecutionSettings, KindCompileSpec, KindRunPlan, KindFactoryObservation,
 	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindQualificationPolicy, KindToolSmokeWorker, KindClusterRealization, KindLifecycleBinding,
-	KindQualifiedReport, KindTerminalVerification, KindTerminalTree,
+	KindQualifiedReport, KindTerminalVerification, KindTerminalTree, KindNativeGoToolchain,
 	KindStatusCheckpointPolicy, KindQualifiedObservation, KindQualifiedPublication,
 	KindHostObservation, KindExecutionSelection, KindExecutionObservation, KindRuntimeIdentity,
 }

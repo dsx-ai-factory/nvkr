@@ -1,16 +1,164 @@
-# Build and run NVKE on Ubuntu ARM64
+# Build and run NVKE locally
+
+## Native Linux and Mac path
+
+The shared native path runs the Go CLIs on the execution host and provisions
+three real QEMU guests: one Kubernetes site, one tenant control plane and one
+tenant worker. NICoSim is a host service that creates and manages those guests
+from the selected local QCOW2. The permanent site stack runs in the site guest.
+
+```mermaid
+flowchart TD
+  CLI["Host: nvkr / nvke-demo / nvkectl"]
+  BUILD["Docker artifact builds"]
+  FILES["Verified local artifacts and QCOW2"]
+  KIND["Temporary Kind bootstrap cluster in containerd"]
+  SIM["Host NICoSim service"]
+  SITE["QEMU site: Kubernetes, NVKE, CAPI, CAPNICo,<br/>PostgreSQL, Temporal and SPIRE"]
+  CP["QEMU tenant control plane"]
+  WORKER["QEMU tenant worker"]
+  CLI --> BUILD --> FILES
+  CLI -->|"start site guest"| SIM
+  CLI -->|"nvkectl bootstrap site"| KIND
+  KIND -->|"bootstrap site Kubernetes"| SITE
+  CLI -->|"nvkectl create cluster"| SITE
+  SITE -->|"provisioning API"| SIM
+  SIM --> SITE
+  SIM --> CP
+  SIM --> WORKER
+  FILES -.->|"local disk / image delivery"| SITE
+  FILES -.-> CP
+  FILES -.-> WORKER
+```
+
+| Host | CLI and simulator | Guest runtime | Docker's role |
+| --- | --- | --- | --- |
+| Ubuntu ARM64 | Native Linux executables | QEMU/KVM through session libvirt | Build containers; native nerdctl/containerd supplies temporary Kind |
+| Apple Silicon Mac | Native Darwin executables | Host QEMU/HVF | Build containers; private temporary Lima containerd supplies Kind |
+
+On Mac, the operator runs the CLIs directly in macOS. This path does not require
+SSH into a Linux execution VM or a Colima execution host. Docker remains a build
+prerequisite. Temporary bootstrap uses installed Lima 2.2.1 and its upstream
+`nerdctl.lima` wrapper, with a private instance, four CPUs and 6 GiB RAM. The
+native Mac CLI owns startup, readiness, stop and join. Only bootstrap container
+commands use Lima; `nvkectl`, Kind and demo orchestration run on the Mac. The
+three Kubernetes guests are separate from that temporary container runtime.
+
+BUILD and DEPLOY are separate stages. `nvke-demo build` invokes NVKR for the
+artifact Run and native tool Run; `nvke-demo run` consumes those completed
+outputs. `nvke-demo e2e` calls those same stages in order. Both deployment entry
+points select one shared three-VM owner, with HVF on Mac and KVM on Linux.
+
+Ubuntu's artifact build also requires KVM before bootstrap or material acquisition.
+Its local Definition extends the existing selected catalog stack with a disk-only
+KVM overlay; source pins, named outputs and the selected NVIDIA or upstream OVN
+artifacts remain unchanged. The image uses the host CPU model and the pinned
+NVKE source's 60-minute SSH budget. A missing KVM device fails admission; it does
+not select software emulation. The walkthrough reports the selected KVM inputs.
+The old TCG Definitions remain available as explicit slow build diagnostics
+through `nvkr run local` or the legacy launcher with `--build-accelerator tcg`.
+An SSH budget bounds waiting; it does not provide immediate notification of an
+Ubuntu installer crash that appears only on the guest console.
+
+```sh
+bin/nvke-demo run --artifacts-run /absolute/path/to/artifact-run \
+  --tools-run /absolute/path/to/native-tool-run --nvkr /absolute/path/to/nvkr \
+  --out /absolute/path/to/fresh-demo --network upstream-ovn
+```
+
+Full native host build/runtime acceptance remains pending. The existing Linux
+artifact bootstrap still requires Linux; this command wiring does not establish
+a fresh Mac QCOW build. Without `--cleanup`, keep the foreground demo running;
+Ctrl-C requests owned cleanup. Detached retention is not provided by this path.
+
+The shared native owner performs these steps:
+
+1. The BUILD stage reuses `nvke-demo tools` preparation to ask NVKR to build
+   source-selected CLIs, acquire pinned executables, verify completed outputs and
+   extract the tool bundles. Docker,
+   host Go and virtualization prerequisites must already be installed.
+   Mac CGO producers use NVKR's local installed-SDK preparation: it measures the existing Go SDK and
+   Clang, generates a private output-scoped catalog selection, and independently checks those inputs
+   when the Run starts. It downloads no compiler. Linux retains the static simulator build in the same
+   producer; source pins and deployment orchestration remain shared.
+2. NVKR owns the complete QCOW2 build as a `disk-image` output, including
+   its material closure. The existing [demo Definitions](../inputs/README.md#primary-entry-points)
+   select that output. The native deploy command currently requires an existing
+   local QCOW; its connection to a fresh complete Mac build remains unverified.
+3. NICoSim boots and prepares the site QEMU guest. The host runs
+   `nvkectl generate sitespec`, then `nvkectl bootstrap site` using temporary
+   Kind to bootstrap Kubernetes on that guest.
+4. Host commands install the source-selected CAPI providers and site stack into
+   the site guest. The controller, CAPNICo, PostgreSQL, Temporal and SPIRE run
+   there. The owner removes Kind after site deployment; on Mac it also stops and
+   removes the private Lima instance before provisioning tenant guests.
+5. Host `nvkectl create cluster` asks the site to provision the tenant. CAPNICo
+   calls NICoSim, which starts two additional QEMU guests. The demo checks real
+   nodes, pods and the zero-retry workload/DNS result.
+6. With explicit `--cleanup`, natural tenant deletion and joined owned cleanup
+   must finish before success. Without it, the native path currently stays in
+   the foreground; Ctrl-C requests cleanup. The shared `run`, `e2e` and `native`
+   commands do not provide detached retention.
+
+Runtime images come from verified local OCI outputs. The adapter loads bootstrap
+images through nerdctl into the same containerd used by Kind and delivers/imports the guest images through owned local
+HTTP and containerd. Each tenant first installs its baked packages, then imports
+the verified local workload archive and checks that CRI recognizes its pinned
+image before starting the NVKE agent. A local image alias is not another registry download.
+Initial artifact acquisition, Kind's node image and provider acquisition still
+have their declared network dependencies.
+
+The temporary Mac backend shares only a writable bootstrap staging directory and
+the read-only parent directories of the selected bootstrap image archives. Its
+SPIRE port 30081 is forwarded to the observed demo gateway; other automatic
+forwards retain Lima's loopback defaults. It does not mount the simulator state or
+QCOW directory, adopt existing Lima instances, or alter global security settings.
+The actual Go-owned backend start, nerdctl readiness and joined deletion have
+passed on Mac. That dependency test does not establish complete NVKE deployment.
+
+On Mac, the verified upstream vmnet helper reports Apple's shared subnet. The demo holds its native
+Unix datagram connection until guest and service cleanup joins, keeping the gateway available before
+the first VM boots. API, disk HTTP, startup callbacks and Lima forwarding use that observed gateway;
+the demo does not rewrite Apple's shared-network configuration or bind its API to every host interface.
+A real native HVF guest has passed cloud-init readiness, local HTTP delivery and natural deletion with
+the NVKR-built upstream simulator. This is a guest check, not complete Kubernetes acceptance.
+
+The current shared sizing allocates **12 GiB to the site and 8 GiB to each tenant
+guest: 28 GiB before Kind, Docker and other host overhead**. The older workflow's
+24-GiB host recommendation below does not cover this topology. The selected
+network must match the image, site and tenant; NVIDIA OVN is the default and
+upstream OVN requires an explicit selection.
+
+Full native Linux runtime parity and a fresh complete Mac build remain unverified.
+Tool preparation and a standalone guest check do not establish acceptance of the
+complete site-and-tenant topology. Fresh host-tool
+bundles must include the reviewed CAPI source-version file. The native runtime
+accepts an existing standalone QCOW. There is no separate demo-owned image builder. Inspect the selected binary's command help before attempting a new run:
+
+```sh
+bin/nvke-demo tools --help
+bin/nvke-demo native --help
+```
+
+## Existing Linux Kind-site workflow
+
+The commands and evidence in this historical section describe the superseded
+Kind-site workflow. The current `run` and `e2e` commands use the shared native
+site-plus-two-tenant VM owner. These historical commands are not current replay
+instructions; a previous Kind-site pass does not validate the three-VM workflow.
 
 This guide builds the selected artifacts with NVKR, deploys their exact outputs
 using NVKE's installer, and provisions a real QCOW2 control-plane and worker
 through CAPNICo/NICoSim. Kind hosts management services, not tenant nodes.
 
-**Known NVIDIA OVN startup blocker:** the selected NVIDIA OVN image lacks `firewall-cmd`,
-which its startup code requires even with firewalld disabled. Artifact builds
-can succeed while OVN startup fails. The demo selects NVIDIA OVN for both the
-Kind site cluster and the QCOW2 tenant. See [OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1).
-Wait for the source-owner fix and a reviewed pin update before expecting a
-successful complete E2E with this selection. No local catalog workaround is
-applied. The build-only development loops remain separate from tenant acceptance.
+**NVIDIA OVN validation:** an earlier image lacked `firewall-cmd`, which its
+startup code required even with firewalld disabled. The current selected
+source's [NVIDIA Dockerfile](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/12ca20e67b516f1a023da85a22deeaf8d2d70d0b/dist/images/Dockerfile.ubuntu.nv)
+explicitly installs `firewalld`. This source-level change is not a current
+site/tenant startup or workload result. See
+[OVN issue #1](https://github.com/dsx-ai-factory/ovn-kubernetes/issues/1) for the
+earlier report. The demo selects NVIDIA OVN for both the Kind site cluster and
+the QCOW2 tenant. The build-only development loops remain separate from tenant acceptance.
 An explicit `--network upstream-ovn` alternative selects upstream OVN for both
 site and tenant; it does not fix or validate the NVIDIA fork. A fresh E2E at
 `71b356f5899efb759571f0ea51781ead3f7c466a` passed on 2026-10-11; see the
@@ -458,7 +606,7 @@ not NVIDIA-fork validation or proof of a supported NVKE release combination.
 
 This chooses the authored [upstream Definition](../inputs/definitions/demo/arm64-upstream-tcg.json),
 not a replacement of the NVIDIA catalog's pins. Image, chart, disk and profiles
-have distinct upstream output names. The complete selection still contains 29
+have distinct upstream output names. The complete selection now contains 32
 outputs in one fresh Run. The disk embeds the matching upstream image/chart
 packages; its profiles image installs stream `1.4.0`, and the tenant requests
 that same stream. Deployment replay with `nvke-demo run --network upstream-ovn`
@@ -1035,7 +1183,7 @@ one tagged NVKE release.
 | Installer, site CLI/controller/charts and diagnostic profiles | [`8fb2d533`](https://github.com/dsx-ai-factory/nvke/commit/8fb2d53368823bd386b4fbd55b4ab6d3c0931345) | [Site lock](../inputs/catalogs/nvke/local-site-arm64/pins.lock.yaml), [profiles lock](../inputs/catalogs/controller-profiles/nvidia-arm64/pins.lock.yaml) and the demo's [installer pin](../internal/nvkedemo/model.go) |
 | OS assembly, agent and most NVKE-owned OS material producers | [`ff21ba8c`](https://github.com/dsx-ai-factory/nvke/commit/ff21ba8c07cafff74b68e238a8876af11e5beded) | [OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) and [local OS overlay](../inputs/catalogs/node-images/variants/nvidia-tcg.json) |
 | Temporary SPIRE package selection | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Same OS lock; the prior plugin-free producer is retained temporarily. DSX remains a required missing product input, tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641), not full source/content parity. |
-| NICoSim | [`6ffc2e5c`](https://github.com/dsx-ai-factory/nvke/commit/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4) | [Simulator lock](../inputs/catalogs/nicosim/pins.lock.yaml) |
+| NICoSim and native host tools | [`b6154b29`](https://github.com/dsx-ai-factory/nvke/commit/b6154b292a934dbdff7aa17596cbf2d7ef5f0f85) | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
 | Provisioned provider (built, not used by this NICoSim tenant) | [`33fb71b2`](https://github.com/dsx-ai-factory/nvke/commit/33fb71b2f4224b470ebc628a9165fc4b92870406) | [Provider lock](../inputs/catalogs/nvke/release/pins.lock.yaml), selecting `v0.21.0` |
 
 The OS commit added APT archive capture; the installer commit includes the staged

@@ -1,0 +1,112 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package nvkedemo
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
+
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+)
+
+// AdmitNativeDeployment rejects an unusable guest accelerator before an
+// expensive BUILD or any deployment workspace, process or VM is created.
+func AdmitNativeDeployment(ctx context.Context, accelerator string) error {
+	if err := requireContext(ctx); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "native deployment admission")
+	}
+	if _, err := nativeAccelerator(runtime.GOOS+"/"+runtime.GOARCH, accelerator); err != nil {
+		return err
+	}
+	if runtime.GOOS == "linux" {
+		device, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
+		if err != nil {
+			return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "native deployment requires usable KVM; software-emulated tenant fallback is unavailable")
+		}
+		if err := device.Close(); err != nil {
+			return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "close native deployment KVM admission")
+		}
+	}
+	return nil
+}
+
+func nativeAccelerator(platform, requested string) (string, error) {
+	if requested == "" {
+		switch platform {
+		case "darwin/arm64":
+			requested = "hvf"
+		case "linux/arm64":
+			requested = "kvm"
+		}
+	}
+	return requested, admitNativeHost(platform, requested)
+}
+
+// DeployArtifacts is the BUILD-to-DEPLOY handoff used by both run and e2e.
+// NVKR owns the disk and tool outputs; one native workflow owns all three VMs.
+func DeployArtifacts(ctx context.Context, cfg Config) error {
+	selected, err := nativeDeploymentConfig(ctx, cfg, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
+		var coded *nvkrerr.Error
+		if errors.As(err, &coded) && coded.Code == nvkrerr.CodeEngineCapability {
+			return err
+		}
+		code := nvkrerr.CodePreflightFailed
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			code = nvkrerr.CodeTimeout
+		}
+		return nvkrerr.Wrap(code, err, "select native deployment from NVKR outputs")
+	}
+	return RunNative(ctx, selected)
+}
+
+func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (NativeConfig, error) {
+	if err := requireContext(ctx); err != nil {
+		return NativeConfig{}, err
+	}
+	accelerator, err := nativeAccelerator(platform, cfg.Accelerator)
+	if err != nil {
+		return NativeConfig{}, err
+	}
+	if cfg.Runs.OS == "" {
+		return NativeConfig{}, nvkrerr.New(nvkrerr.CodeUsage, "deployment requires a completed OS Run")
+	}
+	name, err := selectedDiskOutput(cfg.Network)
+	if err != nil {
+		return NativeConfig{}, err
+	}
+	root, err := filepath.Abs(cfg.Runs.OS)
+	if err != nil {
+		return NativeConfig{}, err
+	}
+	image, err := CompleteOutput(ctx, root, name, "disk-image")
+	if err != nil {
+		return NativeConfig{}, err
+	}
+	if image.Disk == nil || image.Disk.Format != "qcow2" || image.Disk.Encryption != "none" || image.Disk.Outcome != "succeeded" || image.Disk.PayloadDigest != image.Digest || image.Disk.Size <= 0 {
+		return NativeConfig{}, nvkrerr.New(nvkrerr.CodeVerifyFailed, "deployment requires the successful observed plain QCOW2 output")
+	}
+	disk := filepath.Join(root, "outputs", name+".qcow2")
+	if err := verifyDiskBytes(ctx, disk, image); err != nil {
+		return NativeConfig{}, err
+	}
+	runtimeRun := cfg.Runs.Runtime
+	if runtimeRun == "" {
+		runtimeRun = cfg.Runs.Components
+	}
+	return NativeConfig{
+		Image: disk, Out: cfg.Out, Accelerator: accelerator,
+		Network: cfg.Network, DemoExecutable: cfg.DemoExecutable,
+		Cleanup: cfg.Cleanup, Progress: cfg.Progress, TenantTimeout: cfg.Timeout,
+		Assets: NativeAssetConfig{
+			NVKR: cfg.NVKR, ToolsRun: cfg.Runs.Tools, HostToolsRun: cfg.Runs.HostTools,
+			BootstrapRun: cfg.Runs.Components, ControllerRun: cfg.Runs.Site,
+			DeploymentRun: cfg.Runs.Profiles, ProvidersRun: cfg.Runs.Providers,
+			RuntimeRun: runtimeRun,
+		},
+	}, nil
+}

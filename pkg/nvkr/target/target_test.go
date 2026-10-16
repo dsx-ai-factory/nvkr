@@ -51,3 +51,28 @@ func TestArchitectureDomainIsOwned(t *testing.T) {
 		t.Fatal("caller mutated the architecture domain")
 	}
 }
+
+func TestExecutablePlatformsDoNotAdmitMacSourceExecution(t *testing.T) {
+	for _, tc := range []struct{ platform, arch string }{
+		{"linux/amd64", "amd64"}, {"linux/arm64", "arm64"}, {"darwin/arm64", "arm64"},
+		{"darwin/amd64", ""}, {"windows/arm64", ""}, {"", ""},
+	} {
+		t.Run(tc.platform, func(t *testing.T) {
+			err := ValidateExecutablePlatform(tc.platform)
+			if tc.arch == "" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeInvalidCatalog {
+					t.Fatalf("executable admission = %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if ExecutableArch(tc.platform) != tc.arch {
+				t.Fatal("wrong executable architecture")
+			}
+			if tc.platform == "darwin/arm64" && ValidatePlatform(tc.platform) == nil {
+				t.Fatal("tool acquisition admitted Mac execution platform")
+			}
+		})
+	}
+}

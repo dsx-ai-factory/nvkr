@@ -8,6 +8,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // matchOptionsForBuildNode is the single owner for compiler-derived hard
@@ -24,6 +25,9 @@ func matchOptionsForVM(builderType, guestPlatform string, requirements *executio
 	for _, capability := range requirements.Capabilities {
 		if capability.Name == execution.CapabilityKVM && capability.Policy == execution.CapabilityRequired {
 			return execution.MatchOptions{RequiredHostPlatform: execution.HostPlatform(guestPlatform)}
+		}
+		if capability.Name == execution.CapabilityHVF && capability.Policy == execution.CapabilityRequired {
+			return execution.MatchOptions{RequiredHostPlatform: execution.HostPlatform("darwin/" + target.Arch(guestPlatform))}
 		}
 	}
 	return execution.MatchOptions{}

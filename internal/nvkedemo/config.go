@@ -49,6 +49,7 @@ type BuildFile struct {
 }
 
 type RunFile struct {
+	Accelerator    string        `yaml:"accelerator" mapstructure:"accelerator"`
 	Cleanup        bool          `yaml:"cleanup" mapstructure:"cleanup"`
 	Walkthrough    bool          `yaml:"walkthrough" mapstructure:"walkthrough"`
 	Network        string        `yaml:"network" mapstructure:"network"`
@@ -60,6 +61,9 @@ type RunFile struct {
 }
 
 type RunFileInputs struct {
+	Artifacts  string `yaml:"artifacts" mapstructure:"artifacts"`
+	HostTools  string `yaml:"hostTools" mapstructure:"hostTools"`
+	Runtime    string `yaml:"runtime" mapstructure:"runtime"`
 	OS         string `yaml:"os" mapstructure:"os"`
 	Components string `yaml:"components" mapstructure:"components"`
 	Providers  string `yaml:"providers" mapstructure:"providers"`
@@ -197,6 +201,21 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	run := file.Run
+	if run.Runs.Artifacts != "" {
+		if !configString(run.Runs.Artifacts) {
+			return Config{}, configUsage("artifacts Run path must be explicit")
+		}
+		for _, root := range []*string{&run.Runs.OS, &run.Runs.Components, &run.Runs.Providers, &run.Runs.Site, &run.Runs.Profiles} {
+			if *root == "" {
+				*root = run.Runs.Artifacts
+			}
+		}
+	}
+	switch run.Accelerator {
+	case "", "hvf", "kvm", "tcg":
+	default:
+		return Config{}, configUsage("accelerator must be hvf, kvm or tcg")
+	}
 	network, err := normalizeNetwork(run.Network)
 	if err != nil {
 		return Config{}, err
@@ -204,8 +223,8 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if file.Version != 1 || (run.NVKECheckout != "" && !configString(run.NVKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
 		return Config{}, nvkrerr.New(nvkrerr.CodeUsage, "run requires version 1, out, valid optional nvkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	return Config{Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
-		Runs: RunInputs{OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
+	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+		Runs: RunInputs{HostTools: run.Runs.HostTools, Runtime: run.Runs.Runtime, OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 
 // normalizeNetwork keeps NVIDIA OVN as the default. Alternatives are explicit
@@ -226,12 +245,14 @@ func (file DemoFile) RunConfig(progress io.Writer) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if !configString(result.NVKECheckout) {
-		return Config{}, configUsage("replay run requires an explicit nvkeCheckout")
+	for _, optional := range []string{result.Runs.HostTools, result.Runs.Runtime} {
+		if optional != "" && !configString(optional) {
+			return Config{}, configUsage("optional Run paths must be explicit")
+		}
 	}
-	for _, value := range []string{result.NVKR, result.Runs.OS, result.Runs.Components, result.Runs.Providers, result.Runs.Site, result.Runs.Tools, result.Runs.Profiles, result.Runs.Simulator} {
+	for _, value := range []string{result.NVKR, result.Runs.OS, result.Runs.Components, result.Runs.Providers, result.Runs.Site, result.Runs.Tools, result.Runs.Profiles} {
 		if !configString(value) {
-			return Config{}, configUsage("run requires nvkr and every completed Run path")
+			return Config{}, configUsage("run requires nvkr, artifact Runs and a native tools Run")
 		}
 	}
 	return result, nil

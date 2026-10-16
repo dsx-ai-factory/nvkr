@@ -88,7 +88,11 @@ func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner,
 	fmt.Fprintf(&text, "\nLive Kubernetes checks · %s\nActual bundled kubectl; read-only observations, not a Release or a continuous health guarantee.\n", time.Now().UTC().Format(time.RFC3339))
 	failed, unjoined := false, false
 	var cancellation error
-	for _, cluster := range []struct{ name, config string }{{"Site / Kind management", access.site}, {"Tenant / QCOW2", access.tenant}} {
+	siteName := "Site / Kind management"
+	if access.siteQCOW {
+		siteName = "Site / native QCOW2"
+	}
+	for _, cluster := range []struct{ name, config string }{{siteName, access.site}, {"Tenant / QCOW2", access.tenant}} {
 		fmt.Fprintf(&text, "\n%s\n$ kubectl --kubeconfig <selected private config> get --raw=/readyz\n", cluster.name)
 		raw, probeErr := runner.Capture(bounded, []string{access.kubectl, "--kubeconfig", cluster.config, "--request-timeout=10s", "get", "--raw=/readyz"}, clusterPhase(cluster.config == access.site, "api"), 15*time.Second)
 		if probeErr != nil || strings.TrimSpace(string(raw)) != "ok" {

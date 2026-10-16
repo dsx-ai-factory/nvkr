@@ -121,8 +121,8 @@ func validateNetworkState(s networkState, work string) error {
 	if err := validateNetworkKind(s.KindCIDR); err != nil {
 		return err
 	}
-	allowed := networkRules(s.Owner, s.KindCIDR)
-	maxRules := 14
+	allowed := append(networkRules(s.Owner, s.KindCIDR), nativeBootstrapRules(s.Owner, s.KindCIDR)...)
+	maxRules := 14 + len(nativeBootstrapRules(s.Owner, s.KindCIDR))
 	if s.KindGateway != "" {
 		if err := admittedKindGateway(s.KindCIDR, s.KindGateway); err != nil {
 			return err

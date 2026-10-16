@@ -25,6 +25,7 @@ const (
 	BuilderNix         = "nix"
 	BuilderBuildKit    = "buildkit-rootless"
 	BuilderVMImage     = "vm-image"
+	BuilderNativeGo    = "native-go"
 )
 
 // DiskSpec describes the disk payload emitted by a component. It is required
@@ -245,15 +246,18 @@ type Component struct {
 	Flake *FlakePin `json:"flake,omitempty"`
 
 	// from-source pins (populated by the loader from the source + lock)
-	Repo           string  `json:"repo,omitempty"`
-	Tag            string  `json:"tag,omitempty"`
-	Commit         string  `json:"commit,omitempty"`   // authoritative full SHA
-	TreeHash       string  `json:"treeHash,omitempty"` // expected source tree hash
-	Patches        []Patch `json:"patches,omitempty"`
-	ToolchainImage string  `json:"toolchainImage,omitempty"` // must be @sha256: digest
+	Repo     string  `json:"repo,omitempty"`
+	Tag      string  `json:"tag,omitempty"`
+	Commit   string  `json:"commit,omitempty"`   // authoritative full SHA
+	TreeHash string  `json:"treeHash,omitempty"` // expected source tree hash
+	Patches  []Patch `json:"patches,omitempty"`
+	// ToolchainImage is the pinned compiler. Native Go and Darwin Packer use a
+	// local semantic digest here and retain Linux vendoring images in the map.
+	ToolchainImage string `json:"toolchainImage,omitempty"`
 	// ToolchainImages is the resolved per-execution-arch toolchain set. Ordinary
-	// compilation selects the target arch. VM compilation requires and selects one
-	// exact eligible host-platform entry independently from the guest/output arch.
+	// compilation selects the target arch. Linux VM compilation selects the host
+	// architecture independently from the guest. Native Darwin VM preparation
+	// retains this Linux vendoring image and binds ToolchainImage separately.
 	ToolchainImages map[string]string `json:"toolchainImages,omitempty"`
 	CGO             bool              `json:"cgo,omitempty"`
 	OutputType      string            `json:"outputType,omitempty"`
@@ -262,6 +266,9 @@ type Component struct {
 	// BuildCommand route remains authoritative. The two forms are mutually exclusive.
 	Packer       *PackerConfig `json:"packer,omitempty"`
 	BuildCommand []string      `json:"buildCommand,omitempty"`
+	// BuildCommandByPlatform supplies explicit host compiler/linker differences
+	// without duplicating a producer, its source, or its material declarations.
+	BuildCommandByPlatform map[string][]string `json:"buildCommandByPlatform,omitempty"`
 	// Materials binds source-owned input names to other component outputs in the
 	// same output's selected producer set. Each component may be bound exactly once.
 	// VM lowering turns these declarations into build-graph edges and stages

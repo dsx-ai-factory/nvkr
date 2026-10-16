@@ -561,11 +561,11 @@ func generateAndVerifyPackerSSHKey(ctx context.Context, runtime packerContainerR
 		if err := startPackerContainer(ctx, runtime, name, &output, io.Discard); err != nil {
 			return e.Wrap(e.CodeEngineCapability, err, "verifying attempt-local SSH key with pinned toolchain")
 		}
-		fields := strings.Fields(output.String())
-		if len(fields) < 2 || !strings.HasPrefix(fields[1], "SHA256:") {
-			return e.New(e.CodeEngineCapability, "pinned ssh-keygen returned no canonical fingerprint")
+		fingerprint, err := packerSSHKeyFingerprint(output.Bytes())
+		if err != nil {
+			return err
 		}
-		fingerprints[index] = fields[1]
+		fingerprints[index] = fingerprint
 		if err := resources.removeContainer(ctx, name); err != nil {
 			return err
 		}

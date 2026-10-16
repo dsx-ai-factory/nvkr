@@ -33,7 +33,7 @@ Former paths below were relative to `definitions/` at upstream commit
 | `nvke-local-dev-arm64/operator-catalog` | [`tools/operator-arm64`](tools/operator-arm64/registry.yaml) | Acquired ARM64 operator tools |
 | `nvke-local-dev-arm64/tools-catalog` | [`tools/installer-local-arm64`](tools/installer-local-arm64/registry.yaml) | Local source-built installer tools |
 | `nvke-nightly-arm64/installer-tools-catalog` | [`tools/installer-hosted-arm64`](tools/installer-hosted-arm64/registry.yaml) | Hosted installer-tool packaging and acquired Helm |
-| `nvke-local-dev-arm64/simulator-catalog` | [`nicosim`](nicosim/registry.yaml) | Simulator tools and runtime assets |
+| `nvke-local-dev-arm64/simulator-catalog` | [`tools/native`](tools/native/registry.yaml) | Shared simulator tools and runtime assets |
 
 ## Remaining consolidation
 
@@ -62,3 +62,13 @@ validation for those changes, then regenerate dependent bundles.
 
 See the [full migration map](../../docs/input-layout-migration.md) for Definition/Environment
 dispositions, parity gaps, and acceptance checks.
+
+## Native diagnostic additions
+
+The native demo adds `tools/native` for shared host tools. Disk builds continue
+using the existing node-image catalogs rather than a separate native image
+material catalog. The simulator producers formerly owned by `nicosim` are consolidated into this catalog.
+Their selected NVKE source moves from `6ffc2e5c` to the existing shared `b6154b29` pin; this
+changes build identities and requires fresh runtime validation. The host Definitions share one registry and lock; Mac and Linux
+platform assets retain independent exact pins. No release membership or runtime
+acceptance follows from these additional diagnostic selections.

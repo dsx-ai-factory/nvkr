@@ -62,10 +62,9 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 	charts := map[string]string{"controller-chart": "nvke-controller-chart", "nktp": "nktp-chart", "ovn-chart-arm64": "ovn-kubernetes-chart", "postgresql": "postgresql-chart", "spire": "spire-chart", "spire-crds": "spire-crds-chart", "temporal": "temporal-chart"}
 	disk := "nvke-node-image-arm64"
 	if mode == "upstream-ovn" {
-		delete(images, "controller-profiles")
 		delete(images, "ovn-image-arm64")
 		delete(charts, "ovn-chart-arm64")
-		images["controller-profiles-upstream-ovn"], images["upstream-ovn-image-arm64"] = "nvke-local-profiles", "ovn-kube-ubuntu"
+		images["upstream-ovn-image-arm64"] = "ovn-kube-ubuntu"
 		charts["upstream-ovn-chart-arm64"], disk = "ovn-kubernetes-chart", "nvke-node-image-upstream-ovn-arm64"
 	}
 	expected := map[string]factory.LifecycleOutputPlan{}

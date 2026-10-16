@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -320,6 +321,11 @@ type reconciledDiskCapture struct {
 }
 
 func (capture *reconciledDiskCapture) Write(raw []byte) (int, error) {
+	// Darwin's local VM capacity observer does not admit hosted/reconciled
+	// publication. Keep that platform boundary explicit before filesystem work.
+	if runtime.GOOS != "linux" {
+		return 0, e.New(e.CodeEngineCapability, "hosted reconciled disk packaging requires Linux")
+	}
 	if err := capture.ctx.Err(); err != nil {
 		return 0, e.Wrap(e.CodeTimeout, err, "reconciled disk export canceled")
 	}

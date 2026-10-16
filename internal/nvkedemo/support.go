@@ -71,7 +71,8 @@ type Runner struct {
 	// Opted in only for the directly executed final nvkr local Run. Bootstrap
 	// shells and every source/utility command receive no inherited activity FD.
 	buildActivity bool
-	directory     string // Command cwd, independent of private diagnostic storage.
+	directory     string     // Command cwd, independent of private diagnostic storage.
+	extraFiles    []*os.File // Explicitly owned local helper descriptors; never ambient FDs.
 }
 
 // SudoAuthorizer is an optional terminal bridge on a downstream progress writer.
@@ -485,6 +486,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	}
 	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
+	cmd.ExtraFiles = append([]*os.File(nil), r.extraFiles...)
 	localGitFetch := false
 	if args[0] == "git" {
 		// Admit the same effective directory Git will execute in. Diagnostic

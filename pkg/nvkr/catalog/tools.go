@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/releaseasset"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // ToolSource declares an upstream release executable, without byte identities.
@@ -46,11 +47,11 @@ func toolArchiveLimits() releaseasset.Limits {
 }
 
 func validateToolSource(tool ToolSource) error {
-	if tool.Format != "raw" && tool.Format != "tar-gzip" {
+	if tool.Format != "raw" && tool.Format != "tar-gzip" && tool.Format != "zip" {
 		return e.New(e.CodeInvalidCatalog, "unsupported tool format %q", tool.Format)
 	}
-	if tool.Platform != "linux/amd64" && tool.Platform != "linux/arm64" {
-		return e.New(e.CodeInvalidCatalog, "tool requires an explicit supported platform")
+	if err := target.ValidateExecutablePlatform(tool.Platform); err != nil {
+		return err
 	}
 	if !safeToolPath(tool.ExecutablePath) {
 		return e.New(e.CodeInvalidCatalog, "unsafe tool executable path %q", tool.ExecutablePath)
@@ -150,8 +151,8 @@ func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, clie
 	}
 	archiveDigest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
 	executableDigest := archiveDigest
-	if source.Format == "tar-gzip" {
-		member, err := releaseasset.SelectTarGzip(ctx, bytes.NewReader(raw), source.ExecutablePath, toolArchiveLimits())
+	if source.Format != "raw" {
+		member, err := releaseasset.Select(ctx, bytes.NewReader(raw), int64(len(raw)), source.Format, source.ExecutablePath, toolArchiveLimits())
 		if err != nil {
 			return ToolPin{}, err
 		}

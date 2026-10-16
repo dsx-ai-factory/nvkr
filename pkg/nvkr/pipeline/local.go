@@ -113,6 +113,9 @@ func (l Local) Run(g *ir.Graph, buildDigest string, opts RunOptions) (*Report, e
 	var selectedBuildNodes []ir.Node
 	for _, node := range g.Nodes {
 		if included[node.ID] && node.Kind == ir.KindBuild {
+			if err := admitNativeGo(node, opts); err != nil {
+				return rep, err
+			}
 			if err := admitBuildKit(node, opts); err != nil {
 				return rep, err
 			}

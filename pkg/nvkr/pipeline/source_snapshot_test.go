@@ -22,7 +22,16 @@ import (
 )
 
 func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "work", "src")
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Local Runs use a repository-relative source workspace. Its authenticated
+	// snapshot must still be usable by the native Packer directory boundary.
+	root, err := filepath.Rel(cwd, filepath.Join(t.TempDir(), "work", "src"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	dest := "repo-70d3cc986aa8"
 	source := filepath.Join(root, dest)
 	if err := os.MkdirAll(source, 0o755); err != nil {
@@ -67,6 +76,13 @@ func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer snapshot.cleanup()
+	_, project, err := openPackerProjectDirectory(snapshot.Dir, ".")
+	if err != nil {
+		t.Fatalf("authenticated snapshot is unusable by Packer: %v", err)
+	}
+	if err := project.Close(); err != nil {
+		t.Fatal(err)
+	}
 	got, err := os.ReadFile(filepath.Join(snapshot.Dir, "a.txt"))
 	if err != nil {
 		t.Fatal(err)

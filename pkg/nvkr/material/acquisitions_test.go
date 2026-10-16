@@ -234,6 +234,7 @@ func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 		message  string
 	}{
 		{name: "canonical complete capture", document: document, valid: true},
+		{name: "original upstream capture", document: strings.Replace(document, AcquisitionSchemaVersion, upstreamAcquisitionSchemaVersion, 1), valid: true},
 		{name: "unsupported producer schema", document: strings.Replace(document, AcquisitionSchemaVersion, "unsupported.dev/package-acquisitions/v1", 1), message: "unsupported package acquisition schema"},
 		{name: "duplicate field", document: strings.Replace(document, `"schemaVersion":`, `"schemaVersion":"`+AcquisitionSchemaVersion+`","schemaVersion":`, 1), message: "decoding package acquisition manifest"},
 		{name: "unknown field", document: strings.TrimSuffix(document, "}") + `,"unknown":true}`, message: "decoding package acquisition manifest"},
@@ -246,6 +247,13 @@ func TestObserveAcquisitionArchiveCancellationAndStrictJSON(t *testing.T) {
 			if test.valid {
 				if observation == nil || err != nil {
 					t.Fatalf("canonical complete capture rejected: observation=%v error=%v", observation, err)
+				}
+				var expected AcquisitionManifest
+				if err := canonical.UnmarshalExact([]byte(test.document), &expected); err != nil {
+					t.Fatal(err)
+				}
+				if observation.Description().SchemaVersion != expected.SchemaVersion {
+					t.Fatal("capture observation rewrote the source envelope")
 				}
 			} else {
 				assertAcquisitionFailure(t, observation, err, test.message)

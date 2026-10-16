@@ -152,7 +152,7 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(d.Outputs) != 29 || len(baseline.Outputs) != 29 {
+	if len(d.Outputs) != 32 || len(baseline.Outputs) != 32 {
 		t.Fatal("alternative changed required output count")
 	}
 	old := map[string]definition.DefinitionOutput{}
@@ -254,7 +254,7 @@ func TestNVKEUpstreamOVNFullPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Builds) != 29 {
+	if len(plan.Builds) != 32 {
 		t.Fatal("full alternative Plan lost frozen membership")
 	}
 }

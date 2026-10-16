@@ -22,6 +22,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
@@ -38,6 +39,7 @@ type diskService struct {
 	handlers sync.WaitGroup
 	mu       sync.Mutex
 	closing  bool
+	requests atomic.Int64
 }
 
 const retainedRuntimeCleanupTimeout = 8 * time.Minute
@@ -87,6 +89,7 @@ func startDiskService(ctx context.Context, path, address string) (*diskService, 
 			http.NotFound(writer, request)
 			return
 		}
+		service.requests.Add(1)
 		http.ServeContent(writer, request, name, info.ModTime(), io.NewSectionReader(file, 0, info.Size()))
 	})
 	service.server = &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second, WriteTimeout: 180 * time.Second, BaseContext: func(net.Listener) context.Context { return serveContext }}

@@ -352,7 +352,10 @@ func materializeSourceUncached(n ir.Node, opts RunOptions) (*materializedSource,
 	opts.progress.printf("[source] build %s — checkout closure re-hash verified in %s\n",
 		n.Component, time.Since(phaseStarted).Round(time.Millisecond))
 
-	root := filepath.Join(filepath.Dir(opts.SourceRoot), "snapshots")
+	root, err := filepath.Abs(filepath.Join(filepath.Dir(opts.SourceRoot), "snapshots"))
+	if err != nil {
+		return nil, e.Wrap(e.CodeBuildFailed, err, "resolving source snapshot root")
+	}
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "creating source snapshot root")
 	}

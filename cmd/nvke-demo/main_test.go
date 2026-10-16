@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -168,13 +169,6 @@ func TestDeploymentNetworkConfigAndFlagSelection(t *testing.T) {
 						}
 						return file, nil
 					},
-					prepare: func(_ context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-						calls++
-						if cfg.Network != tc.expected {
-							t.Fatalf("prepare network=%q want=%q", cfg.Network, tc.expected)
-						}
-						return cfg, nil
-					},
 					build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 						calls++
 						return nvkedemo.BuiltInputs{NVKR: "fresh"}, nil
@@ -203,7 +197,7 @@ func TestDeploymentNetworkConfigAndFlagSelection(t *testing.T) {
 				assertCode(t, err, "")
 				expectedCalls := 1
 				if operation == "e2e" {
-					expectedCalls = 3
+					expectedCalls = 2
 				}
 				if calls != expectedCalls {
 					t.Fatalf("calls=%d want=%d", calls, expectedCalls)
@@ -306,10 +300,10 @@ func TestExplicitConfigOnlyChangedFlagsOverrideIt(t *testing.T) {
 
 func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 	t.Setenv("TMPDIR", t.TempDir())
-	for _, name := range []string{"exact", "omittedInstaller", "retainedRun", "retainedTool", "prepareFailure", "buildFailure", "runFailure"} {
+	for _, name := range []string{"exact", "omittedInstaller", "retainedRun", "retainedTool", "buildFailure", "runFailure"} {
 		t.Run(name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
-			prepares, builds, runs := 0, 0, 0
+			builds, runs := 0, 0
 			var workContext context.Context
 			fresh := nvkedemo.BuiltInputs{NVKR: "fresh-nvkr", Runs: nvkedemo.RunInputs{OS: "fresh-os", Components: "fresh-components", Providers: "fresh-components", Site: "fresh-site", Tools: "fresh-tools", Profiles: "fresh-profiles", Simulator: "fresh-simulator"}}
 			actions := demoActions{
@@ -328,28 +322,11 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 					}
 					return file, nil
 				},
-				prepare: func(ctx context.Context, build nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-					prepares++
-					assertE2EBudget(t, ctx)
-					if builds != 0 || runs != 0 || build.AttemptPrefix != "fresh-prefix" || build.Jobs != 3 {
-						t.Fatal("installer preparation must precede the build")
-					}
-					if name == "prepareFailure" {
-						return nvkedemo.Config{}, nvkrerr.New(nvkrerr.CodePreflightFailed, "installer failed")
-					}
-					if name == "omittedInstaller" {
-						if cfg.NVKECheckout != "" {
-							t.Fatal("omitted checkout was fabricated by configuration")
-						}
-						cfg.NVKECheckout = "prepared-installer"
-					}
-					return cfg, nil
-				},
 				build: func(ctx context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 					builds++
 					workContext = ctx
 					assertE2EBudget(t, ctx)
-					if prepares != 1 || cfg.AttemptPrefix != "fresh-prefix" || cfg.Jobs != 3 {
+					if cfg.AttemptPrefix != "fresh-prefix" || cfg.Jobs != 3 {
 						t.Fatal("wrong build intent")
 					}
 					if name == "buildFailure" {
@@ -362,7 +339,7 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 					assertE2EBudget(t, ctx)
 					expectedInstaller := "configured-installer"
 					if name == "omittedInstaller" {
-						expectedInstaller = "prepared-installer"
+						expectedInstaller = ""
 					}
 					if builds != 1 || ctx != workContext || cfg.Runs != fresh.Runs || cfg.NVKR != fresh.NVKR || cfg.NVKECheckout != expectedInstaller || cfg.Timeout != 600*time.Second {
 						t.Fatalf("deployment not bound to fresh build: %+v", cfg)
@@ -377,13 +354,8 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 			switch name {
 			case "retainedRun", "retainedTool":
 				assertCode(t, err, nvkrerr.CodeUsage)
-				if prepares != 0 || builds != 0 || runs != 0 {
+				if builds != 0 || runs != 0 {
 					t.Fatal("conflicting references started work")
-				}
-			case "prepareFailure":
-				assertCode(t, err, nvkrerr.CodePreflightFailed)
-				if prepares != 1 || builds != 0 || runs != 0 {
-					t.Fatal("build followed failed installer preparation")
 				}
 			case "buildFailure":
 				assertCode(t, err, nvkrerr.CodeBuildFailed)
@@ -429,14 +401,6 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 			t.Fatal("searched for implicit configuration")
 			return nvkedemo.DemoFile{}, nil
 		},
-		prepare: func(_ context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-			order = append(order, "prepare")
-			if cfg.NVKECheckout != "" {
-				t.Fatal("no explicit installer was provided")
-			}
-			cfg.NVKECheckout = "installer"
-			return cfg, nil
-		},
 		build: func(_ context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 			order = append(order, "build")
 			if cfg.Repository != "repo" || cfg.AttemptPrefix != "fresh" || cfg.Jobs != 1 {
@@ -446,7 +410,7 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 		},
 		run: func(_ context.Context, cfg nvkedemo.Config) error {
 			order = append(order, "run")
-			if cfg.Timeout != time.Hour || cfg.NVKECheckout != "installer" || cfg.Out != "new-out" || cfg.NVKR != fresh.NVKR || cfg.Runs != fresh.Runs {
+			if cfg.Timeout != time.Hour || cfg.NVKECheckout != "" || cfg.Out != "new-out" || cfg.NVKR != fresh.NVKR || cfg.Runs != fresh.Runs {
 				t.Fatalf("not fresh derived inputs: %+v", cfg)
 			}
 			return nil
@@ -454,7 +418,7 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 	}
 	err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), []string{"e2e", "--repo", "repo", "--attempt", "fresh", "--out", "new-out"})
 	assertCode(t, err, "")
-	if strings.Join(order, ",") != "prepare,build,run" {
+	if strings.Join(order, ",") != "build,run" {
 		t.Fatalf("wrong operation order: %v", order)
 	}
 }
@@ -539,14 +503,6 @@ func TestTenantBudgetConfigAndFlagSelection(t *testing.T) {
 						}
 						return file, nil
 					},
-					prepare: func(ctx context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-						calls++
-						assertE2EBudget(t, ctx)
-						if cfg.Timeout != tc.want {
-							t.Fatalf("prepare timeout=%s want=%s", cfg.Timeout, tc.want)
-						}
-						return cfg, nil
-					},
 					build: func(ctx context.Context, _ nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 						calls++
 						assertE2EBudget(t, ctx)
@@ -579,7 +535,7 @@ func TestTenantBudgetConfigAndFlagSelection(t *testing.T) {
 				assertCode(t, err, "")
 				wantCalls := 1
 				if operation == "e2e" {
-					wantCalls = 3
+					wantCalls = 2
 				}
 				if calls != wantCalls {
 					t.Fatalf("calls=%d want=%d", calls, wantCalls)
@@ -641,5 +597,60 @@ func TestBuildAndRestoreDelegateTypedInputs(t *testing.T) {
 				t.Fatal("library not called")
 			}
 		})
+	}
+}
+
+func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
+	root := t.TempDir()
+	var out, diagnostics bytes.Buffer
+	err := execute(t.Context(), []string{"run", "--plain", "--artifacts-run", filepath.Join(root, "missing-artifacts"), "--tools-run", filepath.Join(root, "missing-tools"), "--nvkr", filepath.Join(root, "nvkr"), "--out", filepath.Join(root, "demo")}, &out, &diagnostics)
+	if err == nil {
+		t.Fatal("missing artifacts unexpectedly started deployment")
+	}
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	if platform != "darwin/arm64" && platform != "linux/arm64" {
+		assertCode(t, err, nvkrerr.CodeEngineCapability)
+		if !strings.Contains(err.Error(), "native demo does not support host") {
+			t.Fatalf("unsupported host selected another deployment owner: %v", err)
+		}
+	} else if strings.Contains(err.Error(), "native deployment requires usable KVM") {
+		assertCode(t, err, nvkrerr.CodeEngineCapability)
+	} else {
+		assertCode(t, err, nvkrerr.CodePreflightFailed)
+		if !strings.Contains(err.Error(), "select native deployment from NVKR outputs") {
+			t.Fatalf("standard run selected another deployment owner: %v", err)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(root, "demo")); !os.IsNotExist(err) {
+		t.Fatal("missing native artifacts reached deployment work", err)
+	}
+}
+
+func TestE2EAdmitsNativeVMRuntimeBeforeBuild(t *testing.T) {
+	calls := 0
+	actions := demoActions{
+		load: func(context.Context, string) (nvkedemo.DemoFile, error) {
+			file := configuredFixture()
+			file.Run.NVKR = ""
+			file.Run.Runs = nvkedemo.RunFileInputs{}
+			return file, nil
+		},
+		admit: func(context.Context, nvkedemo.Config) error {
+			calls++
+			return nvkrerr.New(nvkrerr.CodeEngineCapability, "native runtime unavailable")
+		},
+		build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+			t.Fatal("unsupported runtime reached BUILD")
+			return nvkedemo.BuiltInputs{}, nil
+		},
+		run: func(context.Context, nvkedemo.Config) error {
+			t.Fatal("unsupported runtime reached DEPLOY")
+			return nil
+		},
+	}
+	err := executeRoot(t.Context(), newCommand(io.Discard, io.Discard, actions), []string{"e2e", "--config", "explicit.yaml"})
+	assertCode(t, err, nvkrerr.CodeEngineCapability)
+	if calls != 1 {
+		t.Fatal("native admission was not performed once")
 	}
 }

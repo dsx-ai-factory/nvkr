@@ -92,7 +92,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	runner := Runner{Env: env, Progress: cfg.Progress, output: cfg.Progress}
 	// All host checks and fresh-path checks precede the first bootstrap. The
 	// script remains authoritative for exact runtime/toolchain admission.
-	for _, root := range []string{"runs", "laptop-bootstrap"} {
+	for _, root := range []string{"runs", "laptop-bootstrap", "native-tools/runs"} {
 		owned := filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)
 		if cfg.Prepared && root == "laptop-bootstrap" {
 			info, readErr := os.Lstat(owned)
@@ -107,15 +107,32 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 			return BuiltInputs{}, fmt.Errorf("cannot inspect attempt destination %q: %w", owned, readErr)
 		}
 	}
+	// The selected disk now requires KVM. Reuse native admission before any
+	// bootstrap, material acquisition or producer subprocess is started.
+	if err := AdmitNativeDeployment(ctx, "kvm"); err != nil {
+		return BuiltInputs{}, err
+	}
 	preflight := append([]string{"bash", script}, launcherFlags...)
 	if err = runner.Run(ctx, append(preflight, "--check", "all"), "preflight-all", 120*time.Second); err != nil {
 		return BuiltInputs{}, err
 	}
 	cfg.Repository = repo
-	return executeBuildQualification(ctx, runner, script, cfg, buildQualificationSteps{
+	built, err := executeBuildQualification(ctx, runner, script, cfg, buildQualificationSteps{
 		prepare: prepareLocalArtifacts, setup: SetupQualification,
 		build: buildLocalArtifacts, qualify: qualifyBuiltArtifacts, stop: StopQualificationRegistry,
 	})
+	if err != nil {
+		return BuiltInputs{}, err
+	}
+	if _, err := PrepareTools(ctx, ToolConfig{
+		Repository: repo, NVKR: built.NVKR, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs,
+		Out:      filepath.Join(repo, ".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "native-tools"),
+		Progress: cfg.Progress,
+	}); err != nil {
+		return BuiltInputs{}, err
+	}
+	built.Runs.Tools = filepath.Join(repo, ".nvkr", "native-tools", "runs", cfg.AttemptPrefix)
+	return built, nil
 }
 
 // The private seam joins admitted operations without replacing their authority
@@ -257,6 +274,21 @@ func buildNetworkFlags(network string) ([]string, error) {
 	return nil, nil
 }
 
+// LocalArtifactInputs selects the Linux image-build inputs for the existing
+// artifact workflow. Guest deployment keeps its shared native KVM/HVF owner.
+// The TCG inputs remain explicit diagnostics; KVM never falls back to them.
+func LocalArtifactInputs(network string) (definition, environment string, err error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return "", "", err
+	}
+	definition = "inputs/definitions/demo/arm64-nvidia-local-kvm.json"
+	if mode == "upstream-ovn" {
+		definition = "inputs/definitions/demo/arm64-upstream-local-kvm.json"
+	}
+	return definition, "inputs/environments/local-arm64-kvm.json", nil
+}
+
 func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 	bootstrap := filepath.ToSlash(filepath.Join(".nvkr/laptop-bootstrap", cfg.AttemptPrefix))
 	held, info, err := securepath.OpenRegular(filepath.Join(cfg.Repository, bootstrap, "build-invocation.json"))
@@ -281,15 +313,15 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 		return nil, errors.New("invalid private build invocation")
 	}
 	definition := args[4]
-	authored := "inputs/definitions/demo/arm64-nvidia-tcg.json"
-	if cfg.Network == "upstream-ovn" {
-		authored = "inputs/definitions/demo/arm64-upstream-tcg.json"
+	authored, environment, err := LocalArtifactInputs(cfg.Network)
+	if err != nil {
+		return nil, err
 	}
 	if definition != authored && definition != bootstrap+"/definition.json" {
 		return nil, errors.New("private build invocation selected an unsupported definition path")
 	}
 	want := []string{bootstrap + "/nvkr", "run", "local", "--definition", definition,
-		"--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix,
+		"--environment", environment, "--attempt", cfg.AttemptPrefix,
 		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
 	if !slices.Equal(args, want) {
 		return nil, errors.New("private build invocation differs from the supported local command")

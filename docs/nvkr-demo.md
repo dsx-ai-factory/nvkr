@@ -1,8 +1,11 @@
 # Use the Go CLI to demonstrate NVKR and NVKE
 
-Run **`nvkr`** for catalog, input, Plan, artifact and release operations. Run **`nvke-demo e2e`** for the
-complete Linux ARM64 build and tenant demonstration. These are the existing Go entry points; no new
-shell wrapper is required. The [presenter script](nvkr-presenter.md) is spoken narration, not a program.
+Run **`nvkr`** for catalog, input, Plan, artifact and release operations. The Go demo CLI has two
+deployment paths: `nvke-demo e2e` uses a Linux Kind site with two tenant guests; the shared
+`tools` → `image` → `native` path provisions a QEMU site and two tenant guests on Linux or Mac.
+The [operational guide](local-nvke-demo.md#native-linux-and-mac-path) explains the native topology,
+current validation limits and host prerequisites. The 29-output walkthrough below describes `e2e`;
+the native path selects separate material Runs and must not be presented as that same Run.
 
 ## Prepare the Go binaries
 

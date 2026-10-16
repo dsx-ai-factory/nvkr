@@ -602,12 +602,56 @@ already-open workspace-directory capability. The helper duplicates that descript
 protected by the runtime, checks effective write and traversal access, observes host platform, process CPU
 affinity capped by the complete cgroup-v2 quota ancestry, host-available memory capped by complete cgroup-v2
 headroom, available workspace capacity and KVM API exposure, then closes every retained
-workspace and KVM handle before returning. It never resolves a replaceable workspace pathname. Non-Linux hosts
-reject the observation.
+workspace and KVM handle before returning. It never resolves a replaceable workspace pathname.
+
+The diagnostic host-platform domain additionally admits Darwin ARM64 with an explicit `hvf` capability.
+Darwin classes cannot advertise KVM, and Linux classes cannot advertise HVF. The Darwin observer retains the
+workspace descriptor and reads effective access and available filesystem space through that handle. It reads
+logical CPU count and kernel hypervisor availability through native sysctls. Bounded, locale-fixed `vm_stat`
+output supplies free, inactive and speculative page counts; their sum is a reclaimable-memory estimate,
+checked against physical RAM, not a reservation or pressure policy. Purgeable pages are not added because
+those pages overlap other queues. Native command cancellation and join use the existing process owner.
+HVF observation establishes kernel availability; it does not establish a selected QEMU executable's
+Hypervisor entitlement or a successful VM launch. Other host platforms reject observation. This diagnostic
+extension does not by itself admit source compilation, hosted execution or signing.
 
 This helper accepts neither an execution request nor a selected binding. It does not authenticate Environment
 membership or deterministic selection, own or enforce an execution deadline, reserve observed resources, prove a
 provider allocation, or authorize execution.
+
+The existing direct-Packer driver separates host mechanics through one private execution-class interface.
+Validation/build arguments, authenticated material staging, plugin closure, exact output collection and
+toolchain lifetime stay shared. Linux retains its sealed executable descriptors and held-directory procfs
+paths. The Mac implementation uses digest-pinned, read-only private Mach-O executable snapshots, a private
+PATH/plugin closure and the existing owned-process cancellation/join helper. It validates the native executable
+architecture and rejects KVM or cross-architecture HVF. TCG remains explicit. Snapshot verification before and
+after commands detects substitution between operations; pathname execution on Mac does not provide Linux's
+sealed-descriptor guarantee against a hostile same-UID process. Dynamic-loader/library realization remains an
+outer toolchain responsibility. This implementation is restricted to local unqualified execution; qualified
+subprocess and signing boundaries are unchanged. Shared driver contracts and a pinned native Packer version
+probe exercise this primitive. The local factory resolver can instead authenticate an existing local binary
+bundle by its exact semantic digest, host platform and `packer-toolchain` purpose. The independently selected
+Environment supplies only the local layout and bundle name in `runtime.nativeToolchains`; the map key must
+be the exact toolchain digest frozen in the Plan. Bundle roles identify Packer, declared host tools and the
+private plugin closure. Source/material admission, runtime deadline, output observation and cleanup use the
+existing Run/session path. The native driver retains a declared acquisition carrier from the same build's
+private output tree before cleanup, using the shared resource limit and material archive validator. Missing,
+malformed, symlinked or over-budget carriers reject the disk output; closing that output revokes its carrier.
+Native execution requires explicit producer-declared host networking; it does not
+claim network isolation. A session cannot mix native and container toolchains. Hosted rendering rejects this
+local configuration before output. A controlled native session test covers exact-node binding, host admission,
+source/material handoff and output collection, but is not evidence of a fresh Mac QCOW Run, deployment or
+conformance. Local `native-go` source compilation is separately admitted under ADR-10 with an independently
+measured installed SDK/compiler, private source/caches, and explicit host-network semantics. It cannot
+render hosted jobs, sign, publish, or claim qualified execution. Full demo dependency and runtime acceptance
+remain unverified.
+
+Apple's platform-signed `/usr/bin/ssh-keygen` cannot be relocated into a private executable snapshot. The Mac
+adapter admits only this exact root-owned system path with root-owned, non-writable parent directories and
+bytes matching the selected bundle pin. It rechecks that condition before and after commands. Other tools
+retain private snapshots. This explicitly trusts the installed system owner and changes no SIP, signing or
+global security setting. The pinned tool generates and validates private attempt-local SSH keys when the
+producer declares those bindings; keys are removed with the owned execution tree.
 
 The local VM admission primitive builds on the same observer without promoting diagnostic values into durable
 evidence. The factory owner validates the complete Plan and identifies one exact `vm-image` build. An opaque,

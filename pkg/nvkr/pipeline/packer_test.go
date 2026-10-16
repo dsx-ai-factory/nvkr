@@ -68,6 +68,7 @@ func main() {
 		}
 		return
 	}
+ if len(os.Args) == 2 && os.Args[1] == "version" { fmt.Println("Packer v1.15.4"); return }
 	if len(os.Args) < 2 || (os.Args[1] != "validate" && os.Args[1] != "build") {
 		os.Exit(96)
 	}
@@ -279,6 +280,16 @@ func run(args []string) int {
 			return 93
 		}
 	}
+	if raw, err := os.ReadFile("capture.tar"); err == nil {
+		capture := filepath.Join(outputDirectory, "capture.tar")
+		if marker("symlink-acquisitions") {
+			if os.Symlink(filepath.Join(cwd, "capture.tar"), capture) != nil {
+				return 93
+			}
+		} else if os.WriteFile(capture, raw, 0o600) != nil {
+			return 93
+		}
+	}
 	return 0
 }
 
@@ -320,10 +331,10 @@ func packerErrorCode(err error) nvkrerr.Code {
 	return ""
 }
 
-func requireLinuxPackerExecution(t *testing.T) {
+func requireNativePackerExecution(t *testing.T) {
 	t.Helper()
-	if runtime.GOOS != "linux" {
-		t.Skip("held executable authority is Linux-only")
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("native Packer execution requires Linux or macOS")
 	}
 }
 
@@ -353,7 +364,7 @@ func copyTestExecutable(t *testing.T, name string) (string, string) {
 
 func testPackerToolchain(t *testing.T) (*PackerToolchain, string) {
 	t.Helper()
-	requireLinuxPackerExecution(t)
+	requireNativePackerExecution(t)
 	path, digest := writeFakePacker(t)
 	toolchain, err := OpenPackerToolchain(t.Context(), path, digest, nil, "", nil)
 	if err != nil {
@@ -719,10 +730,7 @@ func TestPackerRequestValidationRejectsUnsafeTransport(t *testing.T) {
 		{name: "accelerator absent", edit: func(request *PackerBuildRequest) { request.Accelerator = "" }, code: nvkrerr.CodeInvalidCatalog},
 		{name: "accelerator unadmitted", edit: func(request *PackerBuildRequest) { request.Accelerator = "host" }, code: nvkrerr.CodeInvalidCatalog},
 		{name: "partial SSH mapping", edit: func(request *PackerBuildRequest) { request.SSHPrivateKeyVariable = "ssh_private_key_file" }, code: nvkrerr.CodeInvalidCatalog},
-		{name: "host SSH mapping unsupported", edit: func(request *PackerBuildRequest) {
-			request.SSHPrivateKeyVariable = "ssh_private_key_file"
-			request.SSHPublicKeyVariable = "ssh_public_key_file"
-		}, code: nvkrerr.CodeEngineCapability},
+
 		{name: "artifact traversal", edit: func(request *PackerBuildRequest) { request.ArtifactPath = "../node.qcow2" }, code: nvkrerr.CodeInvalidCatalog},
 		{name: "manifest unpinned", edit: func(request *PackerBuildRequest) { request.MaterialManifestSHA256 = "latest" }, code: nvkrerr.CodeUnpinnedInput},
 		{name: "material traversal", edit: func(request *PackerBuildRequest) { request.Materials[0].Path = "../component.deb" }, code: nvkrerr.CodeInvalidCatalog},
@@ -996,7 +1004,7 @@ func TestPackerDriverRequiresPreparedSourceAndRejectsPathSymlinks(t *testing.T) 
 }
 
 func TestPackerToolchainPinsPluginClosureAndFailsClosed(t *testing.T) {
-	requireLinuxPackerExecution(t)
+	requireNativePackerExecution(t)
 	packerPath, packerDigest := writeFakePacker(t)
 	pluginRoot := t.TempDir()
 	pluginPath := filepath.Join("github.com", "hashicorp", "qemu", "packer-plugin-qemu")
@@ -1041,7 +1049,7 @@ func TestPackerToolchainPinsPluginClosureAndFailsClosed(t *testing.T) {
 }
 
 func TestPackerToolchainPinsHostToolClosureForPrivatePATH(t *testing.T) {
-	requireLinuxPackerExecution(t)
+	requireNativePackerExecution(t)
 	packerPath, packerDigest := writeFakePacker(t)
 	hostToolPath, hostToolDigest := writeFakePackerHostTool(t)
 	toolchain, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, []PackerHostTool{{
@@ -1074,7 +1082,7 @@ func TestPackerToolchainPinsHostToolClosureForPrivatePATH(t *testing.T) {
 }
 
 func TestPackerHostToolDescriptorSurvivesGoSubprocessExec(t *testing.T) {
-	requireLinuxPackerExecution(t)
+	requireNativePackerExecution(t)
 	executablePath, executableDigest := writeFakePacker(t)
 	hostToolPath, hostToolDigest := writeFakePackerHostTool(t)
 	toolchain, err := OpenPackerToolchain(t.Context(), executablePath, executableDigest, []PackerHostTool{{
@@ -1089,7 +1097,7 @@ func TestPackerHostToolDescriptorSurvivesGoSubprocessExec(t *testing.T) {
 		t.Fatal(err)
 	}
 	restoreOwnerWriteForCleanup(t, hostPath)
-	if err := materializePackerHostPath(hostPath, toolchain.hostTools); err != nil {
+	if err := materializePackerHostPath(hostPath, toolchain.hostTools, toolchain.execution); err != nil {
 		t.Fatal(err)
 	}
 	if err := runPackerCommand(t.Context(), toolchain, t.TempDir(), []string{
@@ -1101,7 +1109,7 @@ func TestPackerHostToolDescriptorSurvivesGoSubprocessExec(t *testing.T) {
 }
 
 func TestPackerHostPathTamperingFailsClosed(t *testing.T) {
-	requireLinuxPackerExecution(t)
+	requireNativePackerExecution(t)
 	packerPath, packerDigest := writeFakePacker(t)
 	hostToolPath, hostToolDigest := writeFakePackerHostTool(t)
 	toolchain, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, []PackerHostTool{{
@@ -1158,13 +1166,13 @@ func TestPackerHostPathTamperingFailsClosed(t *testing.T) {
 				t.Fatal(err)
 			}
 			restoreOwnerWriteForCleanup(t, hostPath)
-			if err := materializePackerHostPath(hostPath, toolchain.hostTools); err != nil {
+			if err := materializePackerHostPath(hostPath, toolchain.hostTools, toolchain.execution); err != nil {
 				t.Fatal(err)
 			}
 			if err := test.tamper(hostPath); err != nil {
 				t.Fatal(err)
 			}
-			if code := packerErrorCode(verifyPackerHostPath(hostPath, toolchain.hostTools)); code != nvkrerr.CodeUnverifiedRef {
+			if code := packerErrorCode(verifyPackerHostPath(hostPath, toolchain.hostTools, toolchain.execution)); code != nvkrerr.CodeUnverifiedRef {
 				t.Fatalf("tampered PATH code = %q", code)
 			}
 		})
@@ -1250,7 +1258,7 @@ func TestPackerClosureCountAndSizeBoundsFailClosed(t *testing.T) {
 }
 
 func TestPackerToolchainRejectsNonELFExecutableFormats(t *testing.T) {
-	requireLinuxPackerExecution(t)
+	requireNativePackerExecution(t)
 	packerPath, packerDigest := writeFakePacker(t)
 	nonELFRoot := t.TempDir()
 	nonELFBytes := []byte("MZ-not-an-elf-executable\n")
@@ -1305,7 +1313,7 @@ func TestPackerToolchainRejectsInvalidPinsAndPluginSymlinks(t *testing.T) {
 	}); packerErrorCode(err) != nvkrerr.CodeInvalidCatalog {
 		t.Fatalf("plugin parent-file conflict error = %v", err)
 	}
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		if _, err := OpenPackerToolchain(t.Context(), packerPath, packerDigest, nil, "", nil); packerErrorCode(err) != nvkrerr.CodeEngineCapability {
 			t.Fatalf("unsupported host error = %v", err)
 		}
@@ -1352,7 +1360,9 @@ func TestPackerToolchainRejectsInvalidPinsAndPluginSymlinks(t *testing.T) {
 }
 
 func TestPackerProjectDescriptorSurvivesPathReplacement(t *testing.T) {
-	requireLinuxPackerExecution(t)
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux held-directory execution contract")
+	}
 	root := t.TempDir()
 	project := filepath.Join(root, "project")
 	if err := os.Mkdir(project, 0o700); err != nil {

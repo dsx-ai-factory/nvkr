@@ -43,6 +43,9 @@ func TestBuildNetworkSelectionFailsBeforeProducerWork(t *testing.T) {
 		{"upstream subset", []string{"--network", "upstream-ovn", "--check", "profiles"}, "requires the complete all selection"},
 		{"upstream implicit subset", []string{"--network", "upstream-ovn", "fresh"}, "requires the complete all selection"},
 		{"private upstream subset", []string{"--prepare-only", "--network", "upstream-ovn", "fresh", "1", "os"}, "requires the complete all selection"},
+		{"missing accelerator", []string{"--build-accelerator"}, "Usage:"},
+		{"unknown accelerator", []string{"--build-accelerator", "guessed", "--check", "all"}, "Build accelerator must"},
+		{"foreign accelerator", []string{"--build-accelerator", "hvf", "--check", "all"}, "Build accelerator must"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -134,7 +137,7 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			if err := os.MkdirAll(inputs, 0700); err != nil {
 				t.Fatal(err)
 			}
-			env, err := os.ReadFile(filepath.Join("..", "inputs/environments/local-arm64-tcg.json"))
+			env, err := os.ReadFile(filepath.Join("..", "inputs/environments/local-arm64-kvm.json"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +147,7 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			case "foreign bootstrap platform rejected":
 				env = []byte(strings.ReplaceAll(string(env), "linux/arm64", "linux/amd64"))
 			}
-			if err := os.WriteFile(filepath.Join(inputs, "local-arm64-tcg.json"), env, 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(inputs, "local-arm64-kvm.json"), env, 0600); err != nil {
 				t.Fatal(err)
 			}
 			linkLauncherTestTimeout(t, tools)
@@ -423,7 +426,7 @@ func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 			}
 			for _, path := range []string{
 				"scripts/nvke-full-arm64-local.sh", "scripts/nvke-os-plan.jq",
-				"inputs/environments/local-arm64-tcg.json",
+				"inputs/environments/local-arm64-kvm.json",
 			} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
@@ -520,14 +523,14 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 				}
 			}
 			for _, path := range []string{"scripts/nvke-full-arm64-local.sh", "scripts/nvke-os-plan.jq",
-				"inputs/environments/local-arm64-tcg.json"} {
+				"inputs/environments/local-arm64-kvm.json"} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
 					t.Fatal(err)
 				}
 				write(path, data, 0600)
 			}
-			write("inputs/definitions/diagnostics/demo-arm64/simulator.json", []byte(`{"catalog":{"base":"../../../catalogs/nicosim"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
+			write("inputs/definitions/diagnostics/demo-arm64/simulator.json", []byte(`{"catalog":{"base":"../../../catalogs/tools/native"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
 			write("toolchains/nvkr-packer/build.sh", []byte(`#!/bin/sh
 printf 'toolchain-build %s\n' "$*" >>"$TEST_CALLS"
 case " $* " in *' --print-validated-image-id '*) ;; *) exit 99;; esac
@@ -540,7 +543,7 @@ case "$1 $2" in
   'run plan')
     if [ "$4" = .nvkr/laptop-bootstrap/id-probe/definition.json ]; then
       jq -e '.outputs[0].catalog.overlays[-1] == "./toolchain-attempt.json" and
-        .catalog.base == "../../../inputs/definitions/diagnostics/demo-arm64/../../../catalogs/nicosim" and
+        .catalog.base == "../../../inputs/definitions/diagnostics/demo-arm64/../../../catalogs/tools/native" and
         .outputs[0].catalog.base == .catalog.base' "$4" >/dev/null || exit 99
       printf '%s\n' "$TEST_PLAN" | jq '. + {selected: true}'
     else printf '%s\n' "$TEST_PLAN"; fi;;
@@ -747,7 +750,7 @@ esac
 				if err != nil {
 					t.Fatal(err)
 				}
-				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/nicosim")
+				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/tools/native")
 				definitionDir := filepath.Join(physicalDir, ".nvkr/laptop-bootstrap/id-probe")
 				if filepath.IsAbs(authored.Catalog.Base) || filepath.Join(definitionDir, authored.Catalog.Base) != wantCatalog || len(authored.Outputs) != 1 ||
 					filepath.IsAbs(authored.Outputs[0].Catalog.Base) || filepath.Join(definitionDir, authored.Outputs[0].Catalog.Base) != wantCatalog {

@@ -1,0 +1,174 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package nvkedemo
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+)
+
+func TestNativeHostToolViewPreservesOriginalBundleAndBytes(t *testing.T) {
+	for _, tc := range []struct {
+		name, platform string
+		aliases        bool
+	}{
+		{"Mac", "darwin/arm64", false},
+		{"Linux shared catalog", "linux/arm64", true},
+		{"retained Linux bundle", "linux/arm64", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source, publication, originalNames := hostToolViewFixture(t, tc.platform, tc.aliases)
+			out := filepath.Join(privateTestDir(t), "tools")
+			if err := extractNativeHostTools(t.Context(), source, publication, out, tc.platform); err != nil {
+				t.Fatal(err)
+			}
+			_, _, _, members, err := nativeToolSelection(tc.platform)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := verifyToolMembers(out, members); err != nil {
+				t.Fatal(err)
+			}
+			for member, original := range originalNames {
+				from, err := DigestFile(t.Context(), filepath.Join(out+"-original", original))
+				if err != nil {
+					t.Fatal(err)
+				}
+				to, err := DigestFile(t.Context(), filepath.Join(out, member))
+				if err != nil || from != to {
+					t.Fatalf("%s changed bytes: %v", member, err)
+				}
+			}
+			if _, _, err := delivery.InspectBinaryBundle(t.Context(), source); err != nil {
+				t.Fatal("original bundle changed", err)
+			}
+			if err := extractNativeHostTools(t.Context(), source, publication, out, tc.platform); err == nil {
+				t.Fatal("existing tool view was overwritten")
+			}
+		})
+	}
+}
+
+func TestNativeHostToolViewRejectsBeforeExtraction(t *testing.T) {
+	for _, scenario := range []string{"wrong platform", "existing view", "existing original", "canceled", "unsupported"} {
+		t.Run(scenario, func(t *testing.T) {
+			source, publication, _ := hostToolViewFixture(t, "darwin/arm64", false)
+			out := filepath.Join(privateTestDir(t), "tools")
+			platform := "darwin/arm64"
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var existing string
+			switch scenario {
+			case "wrong platform":
+				platform = "linux/arm64"
+			case "existing view":
+				existing = out
+			case "existing original":
+				existing = out + "-original"
+			case "canceled":
+				cancel()
+			case "unsupported":
+				platform = "windows/arm64"
+			}
+			if existing != "" {
+				if err := os.Mkdir(existing, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(existing, "sentinel"), []byte("unchanged"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := extractNativeHostTools(ctx, source, publication, out, platform)
+			var coded *nvkrerr.Error
+			if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeVerifyFailed {
+				t.Fatalf("uncoded rejection: %v", err)
+			}
+			if scenario == "canceled" && !errors.Is(err, context.Canceled) {
+				t.Fatal("cancellation lost")
+			}
+			for _, path := range []string{out, out + "-original"} {
+				if path == existing {
+					continue
+				}
+				if _, err := os.Stat(path); !os.IsNotExist(err) {
+					t.Fatal("rejected tools produced an extraction", path)
+				}
+			}
+			if existing != "" {
+				raw, err := os.ReadFile(filepath.Join(existing, "sentinel"))
+				if err != nil || string(raw) != "unchanged" {
+					t.Fatal("existing tools changed")
+				}
+			}
+		})
+	}
+}
+
+func TestNativeHostToolAliasesRejectUnexpectedAndCollidingMembers(t *testing.T) {
+	for _, scenario := range []string{"missing", "extra", "collision", "Mac with Linux alias"} {
+		t.Run(scenario, func(t *testing.T) {
+			platform := "linux/arm64"
+			members := []string{"helm", "kind"}
+			bundle := delivery.BinaryBundle{OS: "linux", Arch: "arm64", Entries: []delivery.BinaryEntry{{Name: "helm-linux"}, {Name: "kind-linux"}}}
+			switch scenario {
+			case "missing":
+				bundle.Entries = bundle.Entries[:1]
+			case "extra":
+				bundle.Entries[1].Name = "unexpected"
+			case "collision":
+				bundle.Entries[1].Name = "helm"
+			case "Mac with Linux alias":
+				platform = "darwin/arm64"
+				bundle.OS = "darwin"
+			}
+			if _, err := nativeHostToolBindings(bundle, platform, members); err == nil {
+				t.Fatal("unexpected tool mapping admitted")
+			}
+		})
+	}
+}
+
+func hostToolViewFixture(t *testing.T, platform string, aliases bool) (string, string, map[string]string) {
+	t.Helper()
+	root := privateTestDir(t)
+	_, _, bundleName, members, err := nativeToolSelection(platform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindings := map[string]string{}
+	var files []delivery.BinaryFileInput
+	for _, member := range members {
+		name := member
+		if aliases {
+			switch member {
+			case "clusterctl", "helm", "kind", "kubectl", "oras":
+				name += "-linux"
+			}
+		}
+		path := filepath.Join(root, name)
+		if err := os.WriteFile(path, []byte("exact "+member), 0700); err != nil {
+			t.Fatal(err)
+		}
+		bindings[member] = name
+		files = append(files, delivery.BinaryFileInput{Name: name, Path: path, InstallPath: "/usr/local/bin/" + name, Mode: 0755})
+	}
+	osName, arch, _ := strings.Cut(platform, "/")
+	source, publication := filepath.Join(root, "bundle"), filepath.Join(root, "publication")
+	built, err := delivery.BuildBinaryBundle(t.Context(), source, delivery.BinaryBundleRequest{OS: osName, Arch: arch, Purpose: bundleName, Epoch: 1, Files: files})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = delivery.BuildPublicationRoot(t.Context(), publication, delivery.PublicationRequest{Objects: []delivery.ObjectInput{{Name: bundleName, Kind: "binary-bundle", Path: source, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: built.SemanticDigest, OS: osName, Arch: arch, Layout: true}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return source, publication, bindings
+}

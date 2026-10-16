@@ -27,9 +27,9 @@ func TestQualificationSetupScopeMatchesMaintainedDefinitions(t *testing.T) {
 	for _, network := range []string{"ovn", "upstream-ovn", "kind-calico"} {
 		for _, change := range []string{"exact", "missing", "extra", "duplicate", "member", "kind", "unknown network"} {
 			t.Run(network+"/"+change, func(t *testing.T) {
-				name := "arm64-nvidia-tcg.json"
+				name := "arm64-nvidia-kvm.json"
 				if network == "upstream-ovn" {
-					name = "arm64-upstream-tcg.json"
+					name = "arm64-upstream-kvm.json"
 				}
 				d, err := definition.LoadDefinition(t.Context(), filepath.Join("../../inputs/definitions/demo", name))
 				if err != nil {

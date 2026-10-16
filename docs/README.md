@@ -14,6 +14,7 @@ each concept to a worked example.
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md), [presenter narration](nvkr-presenter.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
 | Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
+| Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |

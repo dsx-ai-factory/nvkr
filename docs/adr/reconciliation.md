@@ -98,6 +98,36 @@ The [pinned-source audit](../../inputs/definitions/diagnostics/fde-audit.md) rec
 files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
 requires no GitHub secret; private passphrases remain unsupported.
 
+Local host observation and request/class matching additionally support Darwin ARM64 with an explicit HVF
+kernel capability. Live Mac observation, descriptor-retention and single-use admission contracts are tested;
+the existing direct-Packer driver additionally has a private execution-class interface with Linux sealed
+descriptors and Mac private native executable snapshots. The shared driver contracts execute on Mac and
+Linux ARM64; a catalog-pinned Mac Packer 1.15.4 version probe exercises the real native executable through
+that abstraction. The Mac path is local and unqualified, without Linux's same-UID sealed-executable guarantee.
+The local factory resolver additionally authenticates a selected native `packer-toolchain` binary bundle
+against its exact Plan digest, actual host platform and purpose, then connects it to the shared Run/session
+executor. Native mode requires explicit producer-declared host networking. Controlled tests cover exact-node
+binding, prepared source/materials, actual host admission, output observation, SSH dependency execution and
+cleanup; they do not establish a fresh Mac QCOW Run, VM deployment or conformance. Native output
+collection retains each declared same-invocation acquisition carrier through the existing material validator
+and bounded collection policy; malformed, missing, symlinked or over-budget carriers fail the disk build.
+Controlled native tests establish retention after workspace cleanup and revocation on artifact close.
+The existing acquisition reader accepts both its renamed envelope and the exact original
+`nkd.dev/package-acquisitions/v1` envelope emitted by upstream NVKE. Contract tests preserve the source
+schema and byte bindings and reject unknown versions; this does not establish a fresh captured Mac image.
+Local native preparation captures dependency bundles through the existing delivery owner and validates them
+through the Run's Packer resolver. Go and Packer preparations share output-scoped overlay generation and
+complete-graph validation. Darwin Packer binds its native bundle digest separately from the Linux vendoring
+image. Native firmware uses the same captured file owner and stable logical names rather than installed host
+paths; source-location independence, byte binding and joined cleanup are tested. The real 32-output demo
+selection compiles with required HVF and host CPU while preserving its source and material selections.
+Its legacy OS pin still needs alignment with the native startup's agent namespace; that attempted Run was
+canceled before QCOW assembly. A completed Mac QCOW Run and full demo remain unproved.
+Installed-SDK CGO tools and a real HVF guest have run separately. Apple system utilities execute only at their
+root-owned protected paths with matching bundle bytes; other Mac tools use private snapshots. Actual native
+utility execution and incorrect-digest rejection are tested. No system security setting changes. Hosted
+rendering rejects native bundle locators, and qualified authority boundaries remain unchanged.
+
 ## External test output and local diagnostic boundary
 
 `testresults` implements bounded JUnit/CTRF descriptions and deterministic serialization in lane
@@ -748,7 +778,7 @@ Passing repository checks does not establish complete local qualification.
 | 07–08 Reproduction | Linux stage-two helper/runtime/image and terminal-byte receipts, deterministic comparisons and profile matching | Provider receipts, other-platform authority, qualified helper images, independent two-machine bake-off and profile graduation |
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
 | 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected plain/public-bootstrap execution; exact component/material bindings and acquisition-carrier retention; M3-A pinned embedded-declaration checker and contract fixtures | Optional upstream metadata integration is not an MVP prerequisite. Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation and fused general wrapped-job phase isolation remain closed |
-| 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
+| 11–12 Resolution | Exact output-selected producers and concrete platforms, including local Darwin ARM64 executable acquisition and explicit Linux-toolchain cross-builds; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
 | 13 Evidence | Exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; separately scoped archive member/hash inventories for source tarball assets in executable bundles; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Archive inventories describe files, not package dependencies; their hosted producer path remains unexercised. Factory callers retain ordinary hint-free binary inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed plain/public-bootstrap FDE OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; private-passphrase FDE, strict FDE and object-store delivery are unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
@@ -903,7 +933,40 @@ hosted finalization or independent consumer acceptance.
 
 ## Local ARM64 development inputs
 
-The `inputs/definitions/demo/arm64-nvidia-tcg.json` combined example selects 29 outputs in one
+The shared native downstream path uses host Go CLIs/TUI, one QEMU site and two tenant guests. NVKR owns
+tool acquisition/builds and payload verification; the source-owned NVKE CLI owns bootstrap, deployment
+and tenant operations. Both host selections and the older Linux simulator output use one dependency
+catalog and one simulator producer. The simulator server declares CGO; its API-only CLI does not.
+Platform-specific acquired assets have distinct producer IDs and a verified private command-name view.
+The Darwin simulator uses an explicit local `native-go` toolchain selection prepared by NVKR from the
+installed Go SDK and Clang. SDK/compiler byte admission, private compilation, receipt lifetime and rejection
+of hosted/signing/publication paths have contract coverage. A local Run at NVKE revision
+`69ef9924c4bf0487beba8c3613ae6e0a0260d8f3` built the three Mac CLI executables and completed terminal
+observation and packaging: Run `sha256:2ecfb84092206f23acbae658f7575216c00337feb3ab3d10ce8aed701e7f5ae6`.
+This local record is not published release evidence. A separate native startup probe opened SQLite, seeded
+two sites, served health and authenticated site reads, and joined server shutdown with exit 0, using NVKE's
+mock VM backend. It establishes SQLite execution, not guest readiness or full demo acceptance. Linux retains
+its source-owned static Make build in the same catalog producer.
+The standard `run` and `e2e`
+entry points now select that same three-VM deployment owner; the old Kind-site path is no longer their
+production action. Build prepares native tools through NVKR and selects the complete local runtime image
+closure. The former detached retention behavior is not provided by this foreground path.
+
+The Mac network owner now consumes the verified upstream vmnet helper's JSON report and holds its Unix
+datagram connection through joined guest/service cleanup. Gateway binding is observed before services
+start; API, local disk delivery, callbacks and temporary Lima forwarding share that address. Contract and
+race tests cover network bounds and ownership, and an actual helper start/stop/join passed. One real
+2-GiB HVF guest using the newly built simulator completed cloud-init, checked the local disk HTTP endpoint and was
+naturally deleted in 24 seconds. This local guest probe is not a fresh NVKE OS bake, site deployment,
+tenant Kubernetes, conformance, or full Mac/Linux parity result.
+
+Full native Linux runtime parity, complete fresh-machine host dependencies,
+a single fresh build-and-run wrapper, NVIDIA OVN acceptance and qualified release claims remain unproved.
+QCOW construction remains owned by NVKR's disk-image Run path. The demo-owned direct Packer builder
+has been removed. The native Mac runtime can consume an existing local QCOW; a fresh complete Mac
+build through NVKR remains unverified.
+
+The `inputs/definitions/demo/arm64-nvidia-tcg.json` combined example selects 32 outputs in one
 Run without publication/signing: OS, components, installer-aligned site, tools,
 profiles and simulator. Focused selections remain available; the historical
 22-output component subset is not the complete demo. This is not a complete

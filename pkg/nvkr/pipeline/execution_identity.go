@@ -440,7 +440,7 @@ func observeContainerImageWith(ctx context.Context, node ir.Node, output func(..
 
 // A VM toolchain runs on its selected host, not the guest/output platform.
 func localToolchainPlatform(node ir.Node) string {
-	if node.BuilderType == ir.BuilderVMImage {
+	if node.BuilderType == ir.BuilderVMImage || node.Platform == "darwin/arm64" {
 		return node.ToolchainPlatform
 	}
 	return node.Platform

@@ -22,6 +22,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/packertransport"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
@@ -64,7 +65,8 @@ type PackerPluginFile struct {
 
 // PackerHostTool pins one PATH-resolved executable in the pre-realized VM
 // toolchain closure. Name is the exact basename Packer or its plugins invoke;
-// Path is an absolute resolver-owned source path and is never placed on PATH.
+// Path is an absolute resolver-owned source path. Linux uses held descriptors;
+// Mac uses private copies or pinned protected system paths behind private aliases.
 type PackerHostTool struct {
 	Name   string
 	Path   string
@@ -73,7 +75,7 @@ type PackerHostTool struct {
 
 type packerHostTool struct {
 	name string
-	file *heldfile.File
+	file packerExecutable
 }
 
 // stagedPackerInputs adds the deterministic transport-archive observation used
@@ -88,16 +90,19 @@ type stagedPackerInputs struct {
 // so a pathname or digest string alone cannot authorize execution.
 type PackerToolchain struct {
 	mu         sync.RWMutex
-	executable *heldfile.File
+	executable packerExecutable
 	hostTools  []packerHostTool
 	pluginsDir string
 	plugins    []privateFileSnapshot
 	closed     bool
+	execution  packerExecutionClass
 }
 
 // OpenPackerToolchain snapshots the digest-pinned Packer executable, every
 // PATH-resolved host tool, and every digest-pinned plugin file into private
-// storage. Executable inputs must be Linux ELF files; authenticating their
+// storage. Executables match the host format and architecture. Linux uses sealed
+// descriptors; Mac uses private snapshots for local unqualified execution only.
+// Authenticating their
 // dynamic loader and shared-library closure remains an outer realized-runtime
 // responsibility. executablePath and host-tool paths must be exact absolute
 // paths supplied by the authenticated toolchain resolver; this boundary never
@@ -131,10 +136,11 @@ func OpenPackerToolchain(ctx context.Context, executablePath, executableDigest s
 	if err != nil {
 		return nil, err
 	}
-	if err := heldfile.RequireExecutableSupport(); err != nil {
-		return nil, e.Wrap(e.CodeEngineCapability, err, "holding Packer executable by descriptor")
+	execution, err := platformPackerExecutionClass()
+	if err != nil {
+		return nil, err
 	}
-	executable, err := heldfile.OpenContext(ctx, executablePath, heldfile.Options{
+	executable, err := execution.open(ctx, executablePath, heldfile.Options{
 		Label:          "packer",
 		Executable:     true,
 		MaxBytes:       maxPackerExecutableBytes,
@@ -144,28 +150,32 @@ func OpenPackerToolchain(ctx context.Context, executablePath, executableDigest s
 		if ctx.Err() != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "capturing pinned Packer executable")
 		}
+		var coded *e.Error
+		if errors.As(err, &coded) {
+			return nil, err
+		}
 		if errors.Is(err, heldfile.ErrUnsupported) {
 			return nil, e.Wrap(e.CodeEngineCapability, err, "holding Packer executable by descriptor")
 		}
 		return nil, e.Wrap(e.CodeUnverifiedRef, err, "capturing pinned Packer executable %q", executablePath)
 	}
-	if err := requireELFExecutable(executable, "Packer executable"); err != nil {
+	if err := execution.format(executable, "Packer executable"); err != nil {
 		_ = executable.Close()
 		return nil, err
 	}
-	heldHostTools, err := holdPackerHostTools(ctx, hostToolPins)
+	heldHostTools, err := holdPackerHostTools(ctx, hostToolPins, execution)
 	if err != nil {
 		_ = executable.Close()
 		return nil, err
 	}
-	pluginsDir, snapshots, err := snapshotPackerPlugins(ctx, pluginSourceRoot, pluginPins)
+	pluginsDir, snapshots, err := snapshotPackerPlugins(ctx, pluginSourceRoot, pluginPins, execution)
 	if err != nil {
 		_ = executable.Close()
 		_ = closePackerHostTools(heldHostTools)
 		return nil, err
 	}
 	return &PackerToolchain{
-		executable: executable,
+		executable: executable, execution: execution,
 		hostTools:  heldHostTools,
 		pluginsDir: pluginsDir,
 		plugins:    snapshots,
@@ -214,8 +224,9 @@ type PackerMaterialInput = BuildMaterialInput
 // owners lower their typed declarations into this boundary; the driver does not
 // import catalog types or interpret HCL.
 type PackerBuildRequest struct {
-	ProjectPath string
-	BuildName   string
+	ProjectPath   string
+	BuildName     string
+	PackerVersion string
 
 	ArchitectureVariable string
 	Architecture         string
@@ -239,6 +250,10 @@ type PackerBuildRequest struct {
 	Timeout      time.Duration
 	Stdout       io.Writer
 	Stderr       io.Writer
+
+	// Only the admitted native node adapter supplies the same-invocation
+	// acquisition declaration and its borrowed workspace capability.
+	acquisitions *nativePackerAcquisitionRequest
 }
 
 // packerBuildContract is the driver-independent invocation shape shared by
@@ -390,7 +405,7 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 		return nil, err
 	}
 	defer toolchain.mu.RUnlock()
-	if toolchain.closed || toolchain.executable == nil || toolchain.pluginsDir == "" {
+	if toolchain.closed || toolchain.executable == nil || toolchain.pluginsDir == "" || toolchain.execution == nil {
 		return nil, e.New(e.CodeEngineCapability, "the admitted Packer toolchain is closed or incomplete")
 	}
 	if source == nil || source.Dir == "" || !canonical.IsDigest(source.InputDigest) {
@@ -405,16 +420,22 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	if err := validatePackerBuildRequest(request); err != nil {
 		return nil, err
 	}
-	_, projectHandle, err := openPackerProjectDirectory(source.Dir, request.ProjectPath)
+	if err := toolchain.execution.accelerator(request.Architecture, request.Accelerator); err != nil {
+		return nil, err
+	}
+	projectPath, projectHandle, err := openPackerProjectDirectory(source.Dir, request.ProjectPath)
 	if err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "resolving Packer project in authenticated source")
 	}
 	defer func() { _ = projectHandle.Close() }()
-	// Execute from the held directory inode rather than resolving the source
-	// pathname again in os/exec. The Linux held-executable boundary already
-	// requires procfs; naming our own descriptor through the parent PID keeps the
-	// cwd stable even if a mutable ancestor is renamed before child start.
-	projectDir := fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), projectHandle.Fd())
+	projectDir, err := toolchain.execution.projectDirectory(projectPath, projectHandle)
+	if err != nil {
+		var coded *e.Error
+		if errors.As(err, &coded) {
+			return nil, err
+		}
+		return nil, e.Wrap(e.CodeEngineCapability, err, "selecting Packer project directory")
+	}
 
 	manifest, err := heldfile.OpenContext(runCtx, request.MaterialManifestPath, heldfile.Options{
 		Label:          "packer-material-manifest",
@@ -467,7 +488,7 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 		}
 	}
 	hostPath := filepath.Join(runRoot, "bin")
-	if err := materializePackerHostPath(hostPath, toolchain.hostTools); err != nil {
+	if err := materializePackerHostPath(hostPath, toolchain.hostTools, toolchain.execution); err != nil {
 		return nil, err
 	}
 	if err := materializeBuildMaterialManifest(runCtx, manifest, manifestPath); err != nil {
@@ -481,7 +502,25 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	if err := os.WriteFile(configPath, []byte("{}\n"), 0o400); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "creating empty private Packer configuration")
 	}
+	environment := packerEnvironment(runRoot, hostPath, toolchain.pluginsDir, configPath)
+	if request.PackerVersion != "" {
+		stdout, stderr := newPackerValidationOutput(io.Discard), newPackerValidationOutput(io.Discard)
+		if err := runPackerCommand(runCtx, toolchain, projectDir, environment, []string{"version"}, stdout, stderr, "checking native Packer version"); err != nil {
+			return nil, err
+		}
+		if !stdout.exact("Packer v"+request.PackerVersion) || !stderr.empty() {
+			return nil, e.New(e.CodeEngineCapability, "native Packer version differs from the Plan")
+		}
+	}
 	bindings := append([]PackerVariable(nil), request.Variables...)
+
+	if request.SSHPrivateKeyVariable != "" {
+		private, public, err := prepareNativePackerSSH(runCtx, toolchain, runRoot, environment)
+		if err != nil {
+			return nil, err
+		}
+		bindings = append(bindings, PackerVariable{Name: request.SSHPrivateKeyVariable, Value: private}, PackerVariable{Name: request.SSHPublicKeyVariable, Value: public})
+	}
 	bindings = append(bindings,
 		PackerVariable{Name: request.MaterialManifestVariable, Value: manifestPath},
 		PackerVariable{Name: request.OutputDirectoryVariable, Value: outputDir},
@@ -513,7 +552,6 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	baseArgs := []string{"-only=" + request.BuildName}
 	baseArgs = append(baseArgs, variableArgs...)
 	baseArgs = append(baseArgs, ".")
-	environment := packerEnvironment(runRoot, hostPath, toolchain.pluginsDir, configPath)
 	stdout := request.Stdout
 	if stdout == nil {
 		stdout = io.Discard
@@ -544,7 +582,7 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	if err := verifyPackerToolchain(runCtx, toolchain); err != nil {
 		return nil, err
 	}
-	if err := verifyPackerHostPath(hostPath, toolchain.hostTools); err != nil {
+	if err := verifyPackerHostPath(hostPath, toolchain.hostTools, toolchain.execution); err != nil {
 		return nil, err
 	}
 	if err := stagedInputs.verify(runCtx); err != nil {
@@ -557,7 +595,7 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 	if err := verifyPackerToolchain(runCtx, toolchain); err != nil {
 		return nil, err
 	}
-	if err := verifyPackerHostPath(hostPath, toolchain.hostTools); err != nil {
+	if err := verifyPackerHostPath(hostPath, toolchain.hostTools, toolchain.execution); err != nil {
 		return nil, err
 	}
 	if err := stagedInputs.verify(runCtx); err != nil {
@@ -594,7 +632,15 @@ func runPacker(ctx context.Context, toolchain *PackerToolchain, source *material
 		_ = artifactFile.Close()
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "rewinding declared Packer artifact")
 	}
-	return &PackerArtifact{file: artifactFile, digest: digest, size: size}, nil
+	artifact := &PackerArtifact{file: artifactFile, digest: digest, size: size}
+	if request.acquisitions != nil {
+		capture, err := collectNativePackerAcquisitions(runCtx, outputDir, request.acquisitions, size)
+		if err != nil {
+			return nil, errors.Join(err, artifact.Close())
+		}
+		artifact.acquisitions = capture
+	}
+	return artifact, nil
 }
 
 func validatePackerHostToolManifest(tools []PackerHostTool) ([]PackerHostTool, error) {
@@ -625,7 +671,7 @@ func validatePackerHostToolManifest(tools []PackerHostTool) ([]PackerHostTool, e
 	return pins, nil
 }
 
-func holdPackerHostTools(ctx context.Context, pins []PackerHostTool) ([]packerHostTool, error) {
+func holdPackerHostTools(ctx context.Context, pins []PackerHostTool, execution packerExecutionClass) ([]packerHostTool, error) {
 	tools := make([]packerHostTool, 0, len(pins))
 	cleanup := func(cause error) ([]packerHostTool, error) {
 		_ = closePackerHostTools(tools)
@@ -633,7 +679,7 @@ func holdPackerHostTools(ctx context.Context, pins []PackerHostTool) ([]packerHo
 	}
 	var total int64
 	for _, pin := range pins {
-		tool, err := heldfile.OpenContext(ctx, pin.Path, heldfile.Options{
+		tool, err := execution.open(ctx, pin.Path, heldfile.Options{
 			Label:          "packer-host-" + pin.Name,
 			Executable:     true,
 			MaxBytes:       maxPackerHostToolBytes,
@@ -643,12 +689,16 @@ func holdPackerHostTools(ctx context.Context, pins []PackerHostTool) ([]packerHo
 			if ctx.Err() != nil {
 				return cleanup(e.Wrap(e.CodeTimeout, ctx.Err(), "capturing pinned Packer host-tool %q", pin.Name))
 			}
+			var coded *e.Error
+			if errors.As(err, &coded) {
+				return cleanup(err)
+			}
 			if errors.Is(err, heldfile.ErrUnsupported) {
 				return cleanup(e.Wrap(e.CodeEngineCapability, err, "holding Packer host-tool %q by descriptor", pin.Name))
 			}
 			return cleanup(e.Wrap(e.CodeUnverifiedRef, err, "capturing pinned Packer host-tool %q", pin.Name))
 		}
-		if err := requireELFExecutable(tool, "Packer host-tool "+pin.Name); err != nil {
+		if err := execution.format(tool, "Packer host-tool "+pin.Name); err != nil {
 			_ = tool.Close()
 			return cleanup(err)
 		}
@@ -674,18 +724,6 @@ func closePackerHostTools(tools []packerHostTool) error {
 	return errors.Join(errs...)
 }
 
-func requireELFExecutable(reader io.ReaderAt, label string) error {
-	var magic [4]byte
-	read, err := reader.ReadAt(magic[:], 0)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return e.Wrap(e.CodeUnverifiedRef, err, "inspecting %s executable format", label)
-	}
-	if read != len(magic) || !bytes.Equal(magic[:], []byte("\x7fELF")) {
-		return e.New(e.CodeEngineCapability, "%s is not an admitted Linux ELF executable", label)
-	}
-	return nil
-}
-
 func addPackerBoundedSize(total, size, maxFile, maxTotal int64) (int64, bool) {
 	return addBoundedSize(total, size, maxFile, maxTotal)
 }
@@ -695,13 +733,13 @@ func validPackerHostToolName(name string) bool {
 		filepath.Base(name) == name && !strings.ContainsAny(name, `/\\`)
 }
 
-func materializePackerHostPath(root string, tools []packerHostTool) error {
+func materializePackerHostPath(root string, tools []packerHostTool, execution packerExecutionClass) error {
 	for index, tool := range tools {
 		if tool.file == nil || tool.file.OSFile() == nil {
 			return e.New(e.CodeEngineCapability,
 				"Packer host-tool %q is closed or incomplete", tool.name)
 		}
-		target, err := heldfile.ChildPath(index + 1)
+		target, err := execution.hostToolPath(index, tool.file)
 		if err != nil {
 			return e.Wrap(e.CodeEngineCapability, err,
 				"addressing held Packer host-tool %q", tool.name)
@@ -714,10 +752,10 @@ func materializePackerHostPath(root string, tools []packerHostTool) error {
 	if err := os.Chmod(root, 0o500); err != nil {
 		return e.Wrap(e.CodeInternal, err, "sealing private Packer host-tool PATH")
 	}
-	return verifyPackerHostPath(root, tools)
+	return verifyPackerHostPath(root, tools, execution)
 }
 
-func verifyPackerHostPath(root string, tools []packerHostTool) error {
+func verifyPackerHostPath(root string, tools []packerHostTool, execution packerExecutionClass) error {
 	info, err := os.Lstat(root)
 	if err != nil {
 		return e.Wrap(e.CodeUnverifiedRef, err,
@@ -737,7 +775,7 @@ func verifyPackerHostPath(root string, tools []packerHostTool) error {
 	}
 	expected := make(map[string]string, len(tools))
 	for index, tool := range tools {
-		target, pathErr := heldfile.ChildPath(index + 1)
+		target, pathErr := execution.hostToolPath(index, tool.file)
 		if pathErr != nil {
 			return e.Wrap(e.CodeEngineCapability, pathErr,
 				"addressing held Packer host-tool %q", tool.name)
@@ -794,7 +832,7 @@ func validatePackerPluginManifest(plugins []PackerPluginFile) ([]PackerPluginFil
 	return pins, nil
 }
 
-func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []PackerPluginFile) (string, []privateFileSnapshot, error) {
+func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []PackerPluginFile, execution packerExecutionClass) (string, []privateFileSnapshot, error) {
 	if len(pins) > 0 {
 		if _, err := requireCleanAbsoluteDirectory(sourceRoot, "Packer plugin source root"); err != nil {
 			return "", nil, err
@@ -864,7 +902,7 @@ func snapshotPackerPlugins(ctx context.Context, sourceRoot string, pins []Packer
 				return cleanup(e.Wrap(e.CodeUnverifiedRef, openErr,
 					"opening captured Packer plugin executable %q", pin.Path))
 			}
-			formatErr := requireELFExecutable(captured, "Packer plugin "+pin.Path)
+			formatErr := execution.format(captured, "Packer plugin "+pin.Path)
 			closeErr := captured.Close()
 			if formatErr != nil {
 				return cleanup(formatErr)
@@ -911,13 +949,26 @@ func verifyPackerToolchain(ctx context.Context, toolchain *PackerToolchain) erro
 }
 
 func validatePackerBuildRequest(request PackerBuildRequest) error {
+	if capture := request.acquisitions; capture != nil {
+		if !validPackerRelativePath(capture.archivePath) || capture.archivePath == request.ArtifactPath {
+			return e.New(e.CodeInvalidCatalog, "native Packer acquisition carrier must be a distinct clean relative path")
+		}
+		if capture.workspace == nil {
+			return e.New(e.CodeEngineCapability, "native Packer acquisition collection requires its held workspace")
+		}
+		if _, err := packerAcquisitionCollectionLimit(capture.budget, execution.ResourceCapacity{
+			MemoryMiB: capture.budget.MemoryMiB, EphemeralStorageMiB: capture.budget.EphemeralStorageMiB,
+		}, 1); err != nil {
+			return err
+		}
+	}
 	if request.Timeout <= 0 {
 		return e.New(e.CodeInvalidCatalog, "Packer build requires a positive executor timeout")
 	}
 	if _, err := requireCleanAbsoluteDirectory(request.OutputParent, "Packer output parent"); err != nil {
 		return err
 	}
-	return validatePackerBuildContract(packerContractFromBuildRequest(request), false)
+	return validatePackerBuildContract(packerContractFromBuildRequest(request), true)
 }
 
 func validatePackerBuildContract(contract packerBuildContract, allowSSHKeyPaths bool) error {
@@ -939,7 +990,7 @@ func validatePackerBuildContract(contract packerBuildContract, allowSSHKeyPaths 
 		return e.New(e.CodeEngineCapability,
 			"host Packer cannot realize attempt-local SSH key path variables")
 	}
-	if contract.accelerator != "kvm" && contract.accelerator != "tcg" {
+	if contract.accelerator != "kvm" && contract.accelerator != "tcg" && contract.accelerator != "hvf" {
 		return e.New(e.CodeInvalidCatalog, "Packer accelerator must be selected by VM runtime admission")
 	}
 	if !canonical.IsDigest(contract.materialManifestSHA256) {
@@ -1135,16 +1186,12 @@ func (output *packerValidationOutput) empty() bool {
 }
 
 func runPackerCommand(ctx context.Context, toolchain *PackerToolchain, projectDir string, environment, args []string, stdout, stderr io.Writer, operation string) error {
-	hostToolDescriptors := make([]heldfile.Descriptor, 0, len(toolchain.hostTools))
-	for _, tool := range toolchain.hostTools {
-		hostToolDescriptors = append(hostToolDescriptors, tool.file)
+	if toolchain == nil || toolchain.execution == nil {
+		return closedPackerExecutable()
 	}
-	err := heldfile.RunContext(ctx, toolchain.executable, args, heldfile.RunOptions{
-		Stdout: stdout,
-		Stderr: stderr,
-		Env:    environment,
-		Dir:    projectDir,
-	}, hostToolDescriptors...)
+	err := toolchain.execution.run(ctx, toolchain.executable, toolchain.hostTools, args, heldfile.RunOptions{
+		Stdout: stdout, Stderr: stderr, Env: environment, Dir: projectDir,
+	})
 	if err != nil {
 		if ctx.Err() != nil {
 			return e.Wrap(e.CodeTimeout, ctx.Err(), "%s", operation)

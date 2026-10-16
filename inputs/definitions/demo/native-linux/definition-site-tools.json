@@ -1,0 +1,20 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/tools/native"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-native-linux-site-tools"
+  },
+  "outputs": [
+    {
+      "components": [
+        "nerdctl"
+      ],
+      "format": "executable",
+      "name": "site-startup-tools-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}
