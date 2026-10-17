@@ -80,9 +80,25 @@ bin/nvke-demo run --artifacts-run /absolute/path/to/artifact-run \
   --out /absolute/path/to/fresh-demo --network upstream-ovn
 ```
 
-Full native host build/runtime acceptance remains pending. The existing Linux
-artifact bootstrap still requires Linux; this command wiring does not establish
-a fresh Mac QCOW build. Without `--cleanup`, keep the foreground demo running;
+Full native host build/runtime acceptance remains pending. The default artifact
+bootstrap still requires Linux. On either supported host, BUILD can instead
+consume an explicitly selected NVKR Definition, local Environment and native
+NVKR executable:
+
+```sh
+nvke-demo build --repo /absolute/path/to/nvkr --attempt fresh-build --jobs 2 \
+  --definition .nvkr/prepared/definition.json \
+  --environment .nvkr/prepared/environment.json --nvkr /absolute/path/to/nvkr-bin
+```
+
+Definition and Environment paths must remain inside the selected repository.
+The selected inputs must already bind their native dependencies through NVKR's
+preparation owners. BUILD compiles their complete Plan, invokes `nvkr run local`
+and prepares the host tool Run through NVKR. It does not invoke Packer directly,
+change source pins, publish remotely or install a compiler. Inputs declaring
+publication or signing are refused; the existing default local qualification
+rehearsal remains separate. This interface does not establish fresh complete
+Mac build or runtime acceptance. Without `--cleanup`, keep the foreground demo running;
 Ctrl-C requests owned cleanup. Detached retention is not provided by this path.
 
 The shared native owner performs these steps:

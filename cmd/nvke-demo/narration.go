@@ -44,6 +44,17 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	root := filepath.Join(cfg.Repository, visibleRoot)
 	definitionPath := filepath.Join(root, selected)
 	environmentPath := filepath.Join(cfg.Repository, environmentName)
+	if cfg.Definition != "" {
+		definitionPath, environmentPath = cfg.Definition, cfg.Environment
+		if !filepath.IsAbs(definitionPath) {
+			definitionPath = filepath.Join(cfg.Repository, definitionPath)
+		}
+		if !filepath.IsAbs(environmentPath) {
+			environmentPath = filepath.Join(cfg.Repository, environmentPath)
+		}
+		visibleRoot, selected = filepath.Dir(definitionPath), filepath.Base(definitionPath)
+		environmentName = environmentPath
+	}
 	authored, err := definition.LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		return err
@@ -60,11 +71,17 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	}
 	catalogFiles := make(map[string]bool)
 	for _, stack := range stacks {
-		catalogRoot := filepath.Join(visibleRoot, stack.Base)
+		catalogRoot := stack.Base
+		if !filepath.IsAbs(catalogRoot) {
+			catalogRoot = filepath.Join(visibleRoot, catalogRoot)
+		}
 		catalogFiles[filepath.Join(catalogRoot, "registry.yaml")] = true
 		catalogFiles[filepath.Join(catalogRoot, "pins.lock.yaml")] = true
 		for _, overlay := range stack.Overlays {
-			catalogFiles[filepath.Join(visibleRoot, overlay)] = true
+			if !filepath.IsAbs(overlay) {
+				overlay = filepath.Join(visibleRoot, overlay)
+			}
+			catalogFiles[overlay] = true
 		}
 	}
 	paths := make([]string, 0, len(catalogFiles))
@@ -75,7 +92,7 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	var text bytes.Buffer
 	fmt.Fprintln(&text, "NVKR → NVKE walkthrough: catalog + Environment → build → local publication → cluster")
 	fmt.Fprintf(&text, "Networking: %s\n", network)
-	fmt.Fprintln(&text, "All paths below are relative to the checkout selected by --repo.")
+	fmt.Fprintln(&text, "Relative paths below use the checkout selected by --repo; absolute selections retain their location.")
 	fmt.Fprintf(&text, "1. Definition requests %d named outputs: %q\n", len(authored.Outputs), filepath.Join(visibleRoot, selected))
 	fmt.Fprintln(&text, "2. Reusable catalog producers describe how to build; pins select exact source, tool and artifact inputs.")
 	fmt.Fprintln(&text, "   Open these selected catalog-stack files (reading paths is not execution or pin verification):")

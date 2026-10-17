@@ -64,21 +64,32 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if err != nil {
 		return BuiltInputs{}, err
 	}
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "build inside native Ubuntu ARM64 execution host")
+	if err := validateSelectedBuild(cfg.Definition, cfg.Environment, cfg.NVKR, cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != ""); err != nil {
+		return BuiltInputs{}, err
+	}
+	if runtime.GOARCH != "arm64" || runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "artifact builds require native Mac or Linux ARM64")
+	}
+	if runtime.GOOS == "darwin" && cfg.Definition == "" {
+		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "Mac BUILD requires an explicit NVKR Definition, Environment and native nvkr executable")
 	}
 	repo, err := resolveExisting(cfg.Repository)
 	if err != nil {
 		return BuiltInputs{}, err
 	}
-	if cfg.AttemptPrefix == "" || strings.ContainsAny(cfg.AttemptPrefix, "/\\\x00\r\n\t ") || strings.HasPrefix(cfg.AttemptPrefix, "-") {
+	if !safePhase(cfg.AttemptPrefix) || strings.HasPrefix(cfg.AttemptPrefix, "-") {
 		return BuiltInputs{}, errors.New("require explicit fresh local attempt prefix")
 	}
 	if cfg.Jobs < 1 {
 		return BuiltInputs{}, errors.New("jobs must be positive")
 	}
-	script := filepath.Join(repo, "scripts/nvke-full-arm64-local.sh")
-	if _, err = boundedRegularRead(script, 1<<20); err != nil {
+	script := ""
+	if cfg.Definition == "" {
+		script = filepath.Join(repo, "scripts/nvke-full-arm64-local.sh")
+		if _, err = boundedRegularRead(script, 1<<20); err != nil {
+			return BuiltInputs{}, err
+		}
+	} else if err := resolveSelectedBuild(ctx, repo, &cfg); err != nil {
 		return BuiltInputs{}, err
 	}
 	env, err := localBuildEnvironment()
@@ -110,14 +121,16 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 			return BuiltInputs{}, fmt.Errorf("cannot inspect attempt destination %q: %w", owned, readErr)
 		}
 	}
-	// The selected disk now requires KVM. Reuse native admission before any
+	// Require the native host accelerator before any
 	// bootstrap, material acquisition or producer subprocess is started.
-	if err := AdmitNativeDeployment(ctx, "kvm"); err != nil {
+	if err := AdmitNativeDeployment(ctx, ""); err != nil {
 		return BuiltInputs{}, err
 	}
-	preflight := append([]string{"bash", script}, launcherFlags...)
-	if err = runner.Run(ctx, append(preflight, "--check", "all"), "preflight-all", 120*time.Second); err != nil {
-		return BuiltInputs{}, err
+	if script != "" {
+		preflight := append([]string{"bash", script}, launcherFlags...)
+		if err = runner.Run(ctx, append(preflight, "--check", "all"), "preflight-all", 120*time.Second); err != nil {
+			return BuiltInputs{}, err
+		}
 	}
 	cfg.Repository = repo
 	built, err := executeBuildQualification(ctx, runner, script, cfg, buildQualificationSteps{
@@ -128,7 +141,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		return BuiltInputs{}, err
 	}
 	if _, err := PrepareTools(ctx, ToolConfig{
-		Repository: repo, NVKR: built.NVKR, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs,
+		Repository: repo, NVKR: built.NVKR, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs,
 		Out:      filepath.Join(repo, ".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "native-tools"),
 		Progress: cfg.Progress,
 	}); err != nil {
@@ -183,7 +196,11 @@ func executeBuildQualification(ctx context.Context, runner Runner, script string
 	if err := steps.qualify(ctx, cfg); err != nil {
 		return BuiltInputs{}, err
 	}
-	return builtInputs(cfg.Repository, cfg.AttemptPrefix), nil
+	built := builtInputs(cfg.Repository, cfg.AttemptPrefix)
+	if cfg.NVKR != "" {
+		built.NVKR = cfg.NVKR
+	}
+	return built, nil
 }
 
 func builtInputs(repo, attempt string) BuiltInputs {
@@ -217,7 +234,7 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	boundary := beginProgress(runner.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
 	defer func() { boundary.finish(result) }()
 	if runner.Progress != nil {
-		fmt.Fprintln(runner.Progress, "Build all artifacts in one Definition/Run (existing launcher → nvkr run local)")
+		fmt.Fprintln(runner.Progress, "Build the selected Definition through nvkr run local")
 	}
 	// Bootstrap gets no activity pipe. Its selected Plan, previews and source
 	// preparation remain at the existing owner before the final direct child.
@@ -259,8 +276,10 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 		return err
 	}
 	runner.Env, runner.directory, runner.buildActivity = env, cfg.Repository, true
-	// Resolve only the known bootstrap executable against the admitted repo.
-	args[0] = filepath.Join(cfg.Repository, args[0])
+	// Resolve a relative bootstrap executable against the admitted repository.
+	if !filepath.IsAbs(args[0]) {
+		args[0] = filepath.Join(cfg.Repository, args[0])
+	}
 	return runner.Run(ctx, args, "build-all", 6*time.Hour)
 }
 
@@ -338,8 +357,15 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 	}
 	var args []string
 	decoder := json.NewDecoder(bytes.NewReader(raw))
-	if err := decoder.Decode(&args); err != nil || len(args) != 19 {
+	if err := decoder.Decode(&args); err != nil || len(args) < 5 {
 		return nil, errors.New("invalid private build invocation")
+	}
+	if cfg.Definition != "" {
+		want := selectedBuildInvocation(cfg)
+		if !slices.Equal(args, want) {
+			return nil, errors.New("private build invocation differs from the selected NVKR inputs")
+		}
+		return args, nil
 	}
 	definition := args[4]
 	authored, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
@@ -362,8 +388,16 @@ func preparedBuildEnvironment(environment []string, cfg BuildConfig) ([]string, 
 	// The preparation shell's only additional Git configuration is this exact
 	// NVKE redirect pair. Recreate it from the already-admitted clone rather than
 	// copying arbitrary shell-exported environment into the final process.
+	env, err := localBuildSourceEnvironment(environment, environmentValue(environment, "NVKE_LOCAL_CLONE"))
+	if err != nil {
+		return nil, err
+	}
+	return SetEnv(env, map[string]string{"TMPDIR": filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "tmp")}), nil
+}
+
+func localBuildSourceEnvironment(environment []string, clone string) ([]string, error) {
 	env := append([]string(nil), environment...)
-	if clone := environmentValue(env, "NVKE_LOCAL_CLONE"); clone != "" {
+	if clone != "" {
 		count := 0
 		if declared := environmentValue(env, "GIT_CONFIG_COUNT"); declared != "" {
 			var err error
@@ -382,10 +416,13 @@ func preparedBuildEnvironment(environment []string, cfg BuildConfig) ([]string, 
 	if _, err := sourcegit.LocalRedirectEnvironment(env); err != nil {
 		return nil, err
 	}
-	return SetEnv(env, map[string]string{"TMPDIR": filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "tmp")}), nil
+	return env, nil
 }
 
 func prepareLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) error {
+	if cfg.Definition != "" {
+		return prepareSelectedBuild(ctx, runner, cfg)
+	}
 	flags, err := buildSelectionFlags(cfg)
 	if err != nil {
 		return err

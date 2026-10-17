@@ -295,7 +295,10 @@ func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 	flags := command.Flags()
 	flags.BoolVar(&cfg.QualifyLocal, "qualify-local", false, "automatically prepare local M3 trust, qualify outputs and stop the owned registry")
 	flags.BoolVar(&cfg.Prepared, "prepared", false, "use an existing prepare-only bootstrap; requires a matching qualification policy and no existing Run")
-	flags.StringVar(&cfg.Repo, "repo", "", "native Linux repository path")
+	flags.StringVar(&cfg.Repo, "repo", "", "native host repository path")
+	flags.StringVar(&cfg.Definition, "definition", "", "NVKR Definition inside repo; requires environment and nvkr")
+	flags.StringVar(&cfg.Environment, "environment", "", "local NVKR Environment inside repo")
+	flags.StringVar(&cfg.NVKR, "nvkr", "", "native NVKR executable for explicitly selected build inputs")
 	flags.StringVar(&cfg.NVKEClone, "nvke-clone", "", "optional local source Git clone")
 	flags.StringVar(&cfg.Attempt, "attempt", "", "fresh name for the combined artifact Run")
 	flags.StringVar(&cfg.QualificationPolicy, "qualification-policy", "", "admit the prepared Plan against a local M3 policy before building; does not sign or qualify outputs")
@@ -364,17 +367,24 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 	}{
 		{"repo", &selected.Build.Repo, flags.Build.Repo}, {"nvke-clone", &selected.Build.NVKEClone, flags.Build.NVKEClone}, {"attempt", &selected.Build.Attempt, flags.Build.Attempt},
 		{"qualification-policy", &selected.Build.QualificationPolicy, flags.Build.QualificationPolicy},
+		{"definition", &selected.Build.Definition, flags.Build.Definition}, {"environment", &selected.Build.Environment, flags.Build.Environment},
 		{"accelerator", &selected.Run.Accelerator, flags.Run.Accelerator}, {"nvke-checkout", &selected.Run.NVKECheckout, flags.Run.NVKECheckout}, {"nvkr", &selected.Run.NVKR, flags.Run.NVKR}, {"out", &selected.Run.Out, flags.Run.Out}, {"network", &selected.Run.Network, flags.Run.Network},
 		{"artifacts-run", &selected.Run.Runs.Artifacts, flags.Run.Runs.Artifacts}, {"host-tools-run", &selected.Run.Runs.HostTools, flags.Run.Runs.HostTools}, {"runtime-run", &selected.Run.Runs.Runtime, flags.Run.Runs.Runtime}, {"os-run", &selected.Run.Runs.OS, flags.Run.Runs.OS}, {"components-run", &selected.Run.Runs.Components, flags.Run.Runs.Components}, {"provider-run", &selected.Run.Runs.Providers, flags.Run.Runs.Providers},
 		{"site-run", &selected.Run.Runs.Site, flags.Run.Runs.Site}, {"tools-run", &selected.Run.Runs.Tools, flags.Run.Runs.Tools}, {"profiles-run", &selected.Run.Runs.Profiles, flags.Run.Runs.Profiles},
 		{"simulator-run", &selected.Run.Runs.Simulator, flags.Run.Runs.Simulator}, {"work", &selected.Restore.Work, flags.Restore.Work},
 	} {
+		if field.name == "nvkr" && (command.Name() == "build" || command.Name() == "e2e") {
+			continue
+		}
 		if field.name == "repo" && command.Name() == "run" {
 			continue
 		}
 		if command.Flags().Changed(field.name) {
 			*field.destination = field.value
 		}
+	}
+	if command.Flags().Changed("nvkr") && (command.Name() == "build" || command.Name() == "e2e") {
+		selected.Build.NVKR = flags.Build.NVKR
 	}
 	if command.Flags().Changed("repo") && command.Name() == "run" {
 		selected.Run.Repo = flags.Run.Repo

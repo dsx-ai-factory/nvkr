@@ -64,6 +64,9 @@ type BuildConfig struct {
 	Network       string
 	Repository    string
 	NVKEClone     string
+	Definition    string
+	Environment   string
+	NVKR          string
 	AttemptPrefix string
 	Jobs          int
 	Progress      io.Writer

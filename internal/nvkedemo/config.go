@@ -44,6 +44,9 @@ type BuildFile struct {
 	QualificationPolicy string            `yaml:"qualificationPolicy" mapstructure:"qualificationPolicy"`
 	Repo                string            `yaml:"repo" mapstructure:"repo"`
 	NVKEClone           string            `yaml:"nvkeClone" mapstructure:"nvkeClone"`
+	Definition          string            `yaml:"definition" mapstructure:"definition"`
+	Environment         string            `yaml:"environment" mapstructure:"environment"`
+	NVKR                string            `yaml:"nvkr" mapstructure:"nvkr"`
 	Attempt             string            `yaml:"attempt" mapstructure:"attempt"`
 	Jobs                int               `yaml:"jobs" mapstructure:"jobs"`
 }
@@ -198,7 +201,10 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 	if file.Version != 1 || !configString(build.Repo) || !configString(build.Attempt) || build.Jobs < 1 || (build.NVKEClone != "" && !configString(build.NVKEClone)) {
 		return BuildConfig{}, configUsage("build requires version 1, repo, attempt and positive jobs")
 	}
-	return BuildConfig{QualifyLocal: build.QualifyLocal, Repository: build.Repo, NVKEClone: build.NVKEClone, AttemptPrefix: build.Attempt, Jobs: build.Jobs, Progress: progress, QualificationPolicy: build.QualificationPolicy, Qualification: build.Qualification, Prepared: build.Prepared, Network: network, Conformance: file.Run.Conformance}, nil
+	if err := validateSelectedBuild(build.Definition, build.Environment, build.NVKR, build.Prepared || build.QualifyLocal || build.QualificationPolicy != ""); err != nil {
+		return BuildConfig{}, err
+	}
+	return BuildConfig{Definition: build.Definition, Environment: build.Environment, NVKR: build.NVKR, QualifyLocal: build.QualifyLocal, Repository: build.Repo, NVKEClone: build.NVKEClone, AttemptPrefix: build.Attempt, Jobs: build.Jobs, Progress: progress, QualificationPolicy: build.QualificationPolicy, Qualification: build.Qualification, Prepared: build.Prepared, Network: network, Conformance: file.Run.Conformance}, nil
 }
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {

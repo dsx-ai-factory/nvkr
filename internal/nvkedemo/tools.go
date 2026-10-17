@@ -23,9 +23,9 @@ import (
 // The catalog owns producers and pins; this consumer implements no downloader,
 // package manager, source builder or system installation.
 type ToolConfig struct {
-	Repository, NVKR, Go, Attempt, Out string
-	Jobs                               int
-	Progress                           io.Writer
+	Repository, NVKR, NVKEClone, Go, Attempt, Out string
+	Jobs                                          int
+	Progress                                      io.Writer
 }
 
 // PrepareTools asks NVKR to execute, verify and extract the selected native tool
@@ -96,6 +96,16 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	env, err := localBuildEnvironment()
 	if err != nil {
 		return "", err
+	}
+	if cfg.NVKEClone != "" {
+		clone, err := resolveExisting(cfg.NVKEClone)
+		if err != nil {
+			return "", err
+		}
+		env, err = localBuildSourceEnvironment(env, clone)
+		if err != nil {
+			return "", err
+		}
 	}
 	if cfg.Go == "" {
 		cfg.Go = "go"

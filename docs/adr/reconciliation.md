@@ -128,7 +128,15 @@ image. Native firmware uses the same captured file owner and stable logical name
 paths; source-location independence, byte binding and joined cleanup are tested. The real 32-output demo
 selection compiles with required HVF and host CPU while preserving its source and material selections.
 Its legacy OS pin still needs alignment with the native startup's agent namespace; that attempted Run was
-canceled before QCOW assembly. A completed Mac QCOW Run and full demo remain unproved.
+canceled before QCOW assembly. A fresh complete maintained Mac artifact Run and full demo remain unproved.
+The demo BUILD executor additionally accepts explicit Definition, Environment and native NVKR selections
+on either host. It compiles through NVKR's Plan owner and uses the same local Run invocation and native
+tool preparation. Repository-contained input paths and local-only Environments are checked before
+preparation; controlled tests reject changed invocations, escaped paths and publication requests.
+Default Linux bootstrap and qualification remain separate from explicit input preparation. This interface
+and its real native Plan preparation check do not establish a complete Mac BUILD-to-DEPLOY result.
+A separate local execution completed a selected installer archive Run and its native CLI tool Run through
+this BUILD interface. That bounded check excluded OS-image assembly and deployment acceptance.
 Installed-SDK CGO tools and a real HVF guest have run separately. Apple system utilities execute only at their
 root-owned protected paths with matching bundle bytes; other Mac tools use private snapshots. Actual native
 utility execution and incorrect-digest rejection are tested. No system security setting changes. Hosted
