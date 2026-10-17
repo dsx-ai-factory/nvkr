@@ -5,11 +5,13 @@ package nvkedemo
 
 import (
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/testutil"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
@@ -150,6 +152,47 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		}
 		if len(expected) != 0 {
 			t.Fatalf("missing native outputs: %v", expected)
+		}
+	}
+}
+
+// Loading the selected native catalogs and overlay requires no derived private
+// source. Keep accelerator, material and unchanged-source checks in default CI.
+func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
+	root := filepath.Join("..", "..", "inputs", "catalogs")
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "node-images/native-arm64")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay, err := catalog.LoadOverlayContext(t.Context(), filepath.Join(root, "node-images/variants/native-nvidia.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(base, overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	disk := stack.Catalog.Components["nvke-node-image"]
+	if disk.BuilderType != catalog.BuilderVMImage || disk.Packer == nil || disk.BuildRequirements == nil {
+		t.Fatal("native disk lost its VM/Packer execution contract")
+	}
+	if !reflect.DeepEqual(disk.BuildRequirements.Capabilities, []execution.CapabilityRequirement{{Name: execution.CapabilityKVM, Policy: execution.CapabilityRequired}}) ||
+		!reflect.DeepEqual(disk.BuildRequirements.AllowedHostPlatforms, []execution.HostPlatform{execution.HostPlatformLinuxARM64}) {
+		t.Fatal("native Linux disk no longer requires ARM64 KVM")
+	}
+	if disk.Packer.BuildName != "nvke-node-non-fde.qemu.nvke-non-fde" || disk.Packer.Variables["cpu_model"] != "host" || disk.Packer.Variables["ssh_timeout"] != "60m" || disk.ArtifactPath != "non-fde/nvke-node.qcow2" {
+		t.Fatal("native disk lost its selected Packer build, native CPU or artifact path")
+	}
+	if !reflect.DeepEqual(disk.Materials, map[string]string{"image-inputs": "nvke-image-inputs", "installer-iso": "nvke-patched-installer-iso"}) {
+		t.Fatal("native disk material selection changed")
+	}
+	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "controller-profiles/native-nvidia-arm64")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, component := range []catalog.Component{disk, profiles.Components["nvke-local-profiles"]} {
+		if len(component.Patches) != 0 {
+			t.Fatal("native source producer must not apply source patches")
 		}
 	}
 }
