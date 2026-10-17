@@ -72,7 +72,7 @@ The local NVIDIA KVM Definitions additionally select three explicit native varia
 |---|---|
 | [`node-images/native-arm64`](node-images/native-arm64/registry.yaml) | ARM64 disk and material producers using the renamed NVKE packages and Packer interface; explicit SPIRE packaging exception |
 | [`nvke/native-site-arm64`](nvke/native-site-arm64/registry.yaml) | Source-aligned CLI, controller, provisioned provider and chart producers |
-| [`controller-profiles/native-nvidia-arm64`](controller-profiles/native-nvidia-arm64/registry.yaml) | Additive local profile requesting the modern NVKE packages and services with NVIDIA OVN 2.4.2 |
+| [`controller-profiles/native-nvidia-arm64`](controller-profiles/native-nvidia-arm64/registry.yaml) | Unchanged upstream config profiles and runbooks; releases are registered by the consumer |
 
 [`node-images/variants/native-nvidia.json`](node-images/variants/native-nvidia.json)
 binds its complete producer replacements to the native catalog's exact predecessor.

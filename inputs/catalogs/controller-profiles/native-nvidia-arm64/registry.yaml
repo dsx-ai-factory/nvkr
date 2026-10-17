@@ -17,9 +17,6 @@ components:
     source: nvke-profiles
     builderType: buildkit-rootless
     toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
-    patches:
-    - name: patches/local-profile.patch
-      sha256: sha256:1a6f74e715acce4a6c85a49da5fcc68a8d8b98996c26853ca79d1019b8ce6c27
     artifactPath: bin/nvke-local-profiles-{{.Arch}}.oci.tar
     writeDir: bin
     outputType: oci-image
@@ -37,7 +34,6 @@ components:
       printf '%s\n' '789f7ad1e406b82f0f55a52152eff7b08846b4122582145fade588c7d931cc3e  controller/profiles/example/Dockerfile' \
         | sha256sum -c -
       mkdir -p bin/profiles-context/profiles/configProfiles
-      cp -R nvkr-local-profiles/osProfiles bin/profiles-context/profiles/
       cp -R controller/test/fixtures/runbooks bin/profiles-context/
       cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml \
         controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles-context/profiles/configProfiles/

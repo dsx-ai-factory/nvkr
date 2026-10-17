@@ -30,8 +30,32 @@ func TestLocalKVMInputsPreserveSelectedOutputsAndSources(t *testing.T) {
 			if len(before.Outputs) != len(after.Outputs) || !reflect.DeepEqual(before.Catalog, after.Catalog) {
 				t.Fatal("KVM selection changed the selected output set or default catalog")
 			}
+			// The native NVIDIA selection deliberately moves the NVKE closure
+			// together. Historical TCG inputs retain their original source scope.
+			modern := map[string]definition.Catalog{
+				"cluster-api-provider-provisioned-arm64": {Base: "../../catalogs/nvke/native-site-arm64"},
+				"controller-chart":                       {Base: "../../catalogs/nvke/native-site-arm64"},
+				"controller-profiles":                    {Base: "../../catalogs/controller-profiles/native-nvidia-arm64"},
+				"cwe":                                    {Base: "../../catalogs/nvke/native-site-arm64"},
+				"nktp":                                   {Base: "../../catalogs/nvke/native-site-arm64"},
+				"nvkectl":                                {Base: "../../catalogs/nvke/native-site-arm64"},
+				"nvke-node-image-arm64":                  {Base: "../../catalogs/node-images/native-arm64", Overlays: []string{"../../catalogs/node-images/variants/native-nvidia.json"}},
+			}
 			for i, original := range before.Outputs {
 				selected := after.Outputs[i]
+				if network == "nvidia" {
+					if expected, changed := modern[original.Name]; changed {
+						if selected.Catalog == nil || !reflect.DeepEqual(*selected.Catalog, expected) {
+							t.Fatalf("%s lost its selected native catalog", original.Name)
+						}
+						delete(modern, original.Name)
+						selected.Catalog = original.Catalog
+					}
+					if !reflect.DeepEqual(original, selected) {
+						t.Fatalf("changed named output contract %s", original.Name)
+					}
+					continue
+				}
 				if original.Format != "disk-image" {
 					if !reflect.DeepEqual(original, selected) {
 						t.Fatalf("changed non-disk output %s", original.Name)
@@ -88,6 +112,9 @@ func TestLocalKVMInputsPreserveSelectedOutputsAndSources(t *testing.T) {
 				if !reflect.DeepEqual(original, selected) {
 					t.Fatal("KVM changed the named disk output contract")
 				}
+			}
+			if network == "nvidia" && len(modern) != 0 {
+				t.Fatalf("missing native outputs: %v", modern)
 			}
 		})
 	}

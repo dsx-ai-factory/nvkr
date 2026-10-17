@@ -1241,7 +1241,7 @@ For developers following the guide, use an NVKR revision containing the
 desired maintained selection; do not replace a SHA with `main` or `latest`.
 For maintainers updating it, resolve the intended release/commit through
 `nvkr catalog pin` ([catalog maintenance](catalog-maintenance.md)), update the
-matching installer/interface checks, profile patch and OS overlay bindings, then
+matching installer/interface checks, profile catalog and OS overlay bindings, then
 review the resulting Plan. The OS overlay contains its own resolved source pins
 and predecessor catalog digest: updating the base lock alone does not update it.
 Run `make check` and the complete fresh E2E before

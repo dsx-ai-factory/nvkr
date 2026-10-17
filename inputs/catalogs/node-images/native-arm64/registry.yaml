@@ -314,9 +314,6 @@ components:
     - linux/arm64
     fromSource: true
     source: nvke-os
-    patches:
-    - name: patches/capture-schema.patch
-      sha256: sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image
