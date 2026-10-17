@@ -22,15 +22,27 @@ func TestPrivateImageCallerContextsAcrossPublicationPolicies(t *testing.T) {
 		t.Run(credential, func(t *testing.T) {
 			environment := base.Environment.Clone()
 			environment.Publication.CredentialRef = credential
-			stack, err := catalog.ApplyStack(base.CatalogSnapshot)
+			stack := &catalog.Stack{Catalog: base.CatalogSnapshot, Digest: base.CatalogDigest, Applied: base.AppliedOverlays}
+			stacks := map[string]*catalog.Stack{}
+			for _, output := range base.Definition.Outputs {
+				if output.Catalog == nil {
+					continue
+				}
+				for _, build := range base.Builds {
+					if build.Name == nativeOutputSelections(output)[0].Name {
+						stacks[output.Name] = &catalog.Stack{Catalog: build.CatalogSnapshot, Digest: build.CatalogDigest, Applied: build.AppliedOverlays}
+						break
+					}
+				}
+				if stacks[output.Name] == nil {
+					t.Fatalf("missing catalog snapshot for %s", output.Name)
+				}
+			}
+			plan, err := compileWithTargetStacks(t.Context(), base.Definition, environment, stack, stacks,
+				base.GeneratorVersion, base.DefinitionPath, base.EnvironmentPath)
 			if err != nil {
 				t.Fatal(err)
 			}
-			plan, err := Compile(t.Context(), base.Definition, environment, stack, base.GeneratorVersion)
-			if err != nil {
-				t.Fatal(err)
-			}
-			plan.DefinitionPath, plan.EnvironmentPath = base.DefinitionPath, base.EnvironmentPath
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)

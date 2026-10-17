@@ -244,8 +244,8 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	}
 	member, part := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
 	for _, input := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
-		for _, missing := range []bool{true, false} {
-			t.Run(input+map[bool]string{true: "/missing", false: "/empty"}[missing], func(t *testing.T) {
+		for _, change := range []string{"missing", "empty", "substituted"} {
+			t.Run(input+"/"+change, func(t *testing.T) {
 				changed := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
 					steps := githubTestYAMLField(t, root, "jobs", jobID, "steps")
 					found := false
@@ -253,10 +253,17 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 						with := githubYAMLField(step, "with")
 						if githubYAMLValue(with, "parameters") == githubParametersExpression(part) {
 							found = true
-							if missing {
+							if change == "missing" {
 								githubYAMLRemove(with, input)
 							} else {
-								githubYAMLSet(with, input, githubYAMLString(""))
+								value := ""
+								if change == "substituted" {
+									value = "${{ vars.OTHER_READER }}"
+									if input == "nvkr-toolchain-read-token" {
+										value = "${{ secrets.OTHER_TOKEN }}"
+									}
+								}
+								githubYAMLSet(with, input, githubYAMLString(value))
 							}
 						}
 					}
