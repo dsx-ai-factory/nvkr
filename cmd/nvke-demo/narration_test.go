@@ -40,11 +40,11 @@ func narrationRepository(t *testing.T) string {
 
 func TestDemoNarrationSelectedInputsAndPrivacy(t *testing.T) {
 	repo := narrationRepository(t)
-	for _, row := range []struct{ network, selected, label string }{
-		{"", "arm64-nvidia-local-kvm.json", "NVIDIA OVN (default)"},
-		{"ovn", "arm64-nvidia-local-kvm.json", "NVIDIA OVN (default)"},
-		{"upstream-ovn", "arm64-upstream-local-kvm.json", "upstream OVN diagnostic"},
-		{"kind-calico", "arm64-nvidia-local-kvm.json", "Kind/Calico diagnostic"},
+	for _, row := range []struct{ network, selected, label, overlay string }{
+		{"", "arm64-nvidia-local-kvm.json", "NVIDIA OVN (default)", "native-nvidia.json"},
+		{"ovn", "arm64-nvidia-local-kvm.json", "NVIDIA OVN (default)", "native-nvidia.json"},
+		{"upstream-ovn", "arm64-upstream-local-kvm.json", "upstream OVN diagnostic", "nvidia-tcg.json"},
+		{"kind-calico", "arm64-nvidia-local-kvm.json", "Kind/Calico diagnostic", "native-nvidia.json"},
 	} {
 		t.Run(row.network, func(t *testing.T) {
 			var out bytes.Buffer
@@ -52,12 +52,12 @@ func TestDemoNarrationSelectedInputsAndPrivacy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range []string{row.label, "32 named outputs", "inputs/definitions/demo/" + row.selected, "inputs/catalogs/nvke/module-cli-arm64/registry.yaml", "inputs/catalogs/nvke/module-cli-arm64/pins.lock.yaml", "inputs/catalogs/node-images/variants/nvidia-tcg.json", "inputs/environments/local-arm64-kvm.json", ".nvkr/laptop-bootstrap/fresh-01/selected-plan.json", ".nvkr/runs/fresh-01/lifecycle.json", demoDocsURL + "user-concepts.md", demoDocsURL + "catalogs-and-components.md", demoDocsURL + "README.md", demoDocsURL + "local-nvke-demo.md"} {
+			for _, want := range []string{row.label, "32 named outputs", "inputs/definitions/demo/" + row.selected, "inputs/catalogs/nvke/module-cli-arm64/registry.yaml", "inputs/catalogs/nvke/module-cli-arm64/pins.lock.yaml", "inputs/catalogs/node-images/variants/" + row.overlay, "inputs/environments/local-arm64-kvm.json", ".nvkr/laptop-bootstrap/fresh-01/selected-plan.json", ".nvkr/runs/fresh-01/lifecycle.json", demoDocsURL + "user-concepts.md", demoDocsURL + "catalogs-and-components.md", demoDocsURL + "README.md", demoDocsURL + "local-nvke-demo.md"} {
 				if !strings.Contains(out.String(), want) {
 					t.Fatalf("missing %q", want)
 				}
 			}
-			for _, forbidden := range []string{repo, "nvke-v1", "nvidia-tcg.json/registry.yaml", "nvidia-tcg.json/pins.lock.yaml"} {
+			for _, forbidden := range []string{repo, "nvke-v1", row.overlay + "/registry.yaml", row.overlay + "/pins.lock.yaml"} {
 				if strings.Contains(out.String(), forbidden) {
 					t.Fatalf("unexpected %q", forbidden)
 				}

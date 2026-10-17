@@ -1,9 +1,9 @@
 # Catalog ownership
 
-Nine shared owner directories contain the existing 19 maintained catalog variants. The experimental
+The shared owner directories contain the maintained catalogs and explicit diagnostic variants. The experimental
 public OS catalog is isolated under [`../experiments/public-os-sources`](../experiments/public-os-sources/README.md).
 This is an ownership relocation, preserving registry, lock and patch contents. It does not yet reduce
-19 distinct registries to nine or reconcile their differing producer baselines.
+the distinct registries to one per producer owner or reconcile their differing producer baselines.
 
 Each leaf catalog contains `registry.yaml` and `pins.lock.yaml`. `node-images/variants/` contains
 predecessor-bound producer replacements and toolchain substitutions, not additional catalogs.
@@ -65,10 +65,17 @@ dispositions, parity gaps, and acceptance checks.
 
 ## Native diagnostic additions
 
-The native demo adds `tools/native` for shared host tools. Disk builds continue
-using the existing node-image catalogs rather than a separate native image
-material catalog. The simulator producers formerly owned by `nicosim` are consolidated into this catalog.
-Their selected NVKE source moves from `6ffc2e5c` to the existing shared `b6154b29` pin; this
-changes build identities and requires fresh runtime validation. The host Definitions share one registry and lock; Mac and Linux
-platform assets retain independent exact pins. No release membership or runtime
-acceptance follows from these additional diagnostic selections.
+The native demo uses `tools/native` for shared Darwin and Linux host tools.
+The local NVIDIA KVM Definitions additionally select three explicit native variants:
+
+| Catalog | Contract |
+|---|---|
+| [`node-images/native-arm64`](node-images/native-arm64/registry.yaml) | ARM64 disk and material producers using the renamed NVKE packages and Packer interface; explicit SPIRE packaging exception |
+| [`nvke/native-site-arm64`](nvke/native-site-arm64/registry.yaml) | Source-aligned CLI, controller, provisioned provider and chart producers |
+| [`controller-profiles/native-nvidia-arm64`](controller-profiles/native-nvidia-arm64/registry.yaml) | Additive local profile requesting the modern NVKE packages and services with NVIDIA OVN 2.4.2 |
+
+[`node-images/variants/native-nvidia.json`](node-images/variants/native-nvidia.json)
+binds its complete producer replacements to the native catalog's exact predecessor.
+The separately selected release, upstream, TCG and hosted nightly inputs retain their
+existing baselines. Package metadata checks and Plan compilation establish input
+alignment; a fresh package/disk build and full native runtime acceptance remain required.

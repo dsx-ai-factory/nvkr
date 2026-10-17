@@ -3,7 +3,7 @@
   "kind": "Definition",
   "metadata": {
     "name": "nvke-local-dev-arm64-kvm",
-    "description": "Native Linux ARM64 KVM build of the local demo; retains the selected source pins, materials and network artifacts."
+    "description": "Native ARM64 KVM demo with the renamed NVKE package, CLI and controller contracts; NVIDIA OVN 2.4.2. Local diagnostic build and deployment inputs."
   },
   "catalog": {
     "base": "../../catalogs/nvke/module-cli-arm64"
@@ -46,7 +46,7 @@
       "name": "cluster-api-provider-provisioned-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -57,7 +57,7 @@
       "name": "controller-chart",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "nvke-controller-chart"
@@ -73,7 +73,7 @@
       "name": "controller-profiles",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/controller-profiles/nvidia-arm64"
+        "base": "../../catalogs/controller-profiles/native-nvidia-arm64"
       },
       "components": [
         "nvke-local-profiles"
@@ -95,7 +95,7 @@
       "name": "cwe",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "nvke-controller"
@@ -134,7 +134,7 @@
       "name": "nktp",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "nktp-chart"
@@ -145,10 +145,9 @@
       "name": "nvke-node-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/node-images/release",
+        "base": "../../catalogs/node-images/native-arm64",
         "overlays": [
-          "../../catalogs/node-images/variants/nvidia-tcg.json",
-          "../../catalogs/node-images/variants/nvidia-local-kvm.json"
+          "../../catalogs/node-images/variants/native-nvidia.json"
         ]
       },
       "components": [
@@ -170,7 +169,7 @@
       "name": "nvkectl",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "nvkectl"

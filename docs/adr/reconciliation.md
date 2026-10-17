@@ -1327,6 +1327,21 @@ validation remain unexercised. Simulation screenshots establish presentation onl
 
 ## Local ARM64 demo presentation
 
+The local NVIDIA native KVM Definitions now select a coherent renamed NVKE source
+contract for agent, kubeadm, OS assembly, CLI, controller, provisioned provider and
+profiles at `69ef9924`. SPIRE packaging retains its explicit `726f7694` source;
+NVIDIA OVN image/chart producers retain `8af51273` / 2.4.2. The custom OVN Debian
+producer changes its actual package metadata and payload paths to `nvke-*` while
+retaining source-compatible virtual package aliases and bounded image import.
+Diagnostic commit version stamps do not claim a tagged agent release; the selected
+controller can still choose its source-owned legacy per-node compatibility form.
+The owning catalogs inspect Debian package names and architectures before accepting
+outputs. The disk uses the renamed Packer build, artifact path and material schema.
+The 32-output demo and 36-output local conformance selections share the same deployment
+closure. These are native diagnostic input changes, with no release/nightly pin change
+or new Release authority. A fresh package/QCOW build, site/tenant runtime, conformance
+and joined cleanup still require external evidence; prior failed Runs remain failed.
+
 The demo CLI automatically selects a terminal dashboard for interactive standard
 input/output. Its phase map, observed state and bounded public activity use typed
 owner events, not log-derived authority; narrow terminals stack the panes. `--plain`,

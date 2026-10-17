@@ -49,14 +49,28 @@ artifact Run and native tool Run; `nvke-demo run` consumes those completed
 outputs. `nvke-demo e2e` calls those same stages in order. Both deployment entry
 points select one shared three-VM owner, with HVF on Mac and KVM on Linux.
 
-Ubuntu's artifact build also requires KVM before bootstrap or material acquisition.
-Its local Definition extends the existing selected catalog stack with a disk-only
-KVM overlay; source pins, named outputs and the selected NVIDIA or upstream OVN
-artifacts remain unchanged. The image uses the host CPU model and the pinned
-NVKE source's 60-minute SSH budget. A missing KVM device fails admission; it does
-not select software emulation. The walkthrough reports the selected KVM inputs.
-The old TCG Definitions remain available as explicit slow build diagnostics
-through `nvkr run local` or the legacy launcher with `--build-accelerator tcg`.
+Ubuntu's artifact build requires KVM before bootstrap or material acquisition.
+The local NVIDIA Definitions select the [native node catalog](../inputs/catalogs/node-images/native-arm64/registry.yaml),
+[site catalog](../inputs/catalogs/nvke/native-site-arm64/registry.yaml) and
+[profiles](../inputs/catalogs/controller-profiles/native-nvidia-arm64/registry.yaml).
+Their agent, kubeadm, OS, CLI, controller and provisioned-provider producers align
+with NVKE `69ef9924`; the explicitly selected SPIRE packaging source remains
+`726f7694`. The NVIDIA overlay retains OVN `8af51273` / 2.4.2 and builds actual
+`nvke-cni-ovn-*` Debian packages. Package producers inspect the Debian `Package`
+and `Architecture` fields before accepting their outputs. Artifact filenames alone
+do not establish those package names.
+
+The disk producer uses the renamed Packer build, material schema and QCOW2 output,
+the host CPU model and the source's 60-minute SSH budget. A missing KVM device
+fails admission. The ordinary 32-output selection and the 36-output conformance
+selection share this same deployment closure. Changed packages require a fresh
+QCOW2 build; an older completed Run cannot be relabelled as the corrected build.
+These catalog checks do not establish a successful fresh deployment or conformance run.
+
+The separately selected upstream, TCG and hosted nightly inputs retain their own
+catalog baselines and runtime evidence. The old TCG Definitions remain available
+as explicit slow build diagnostics through `nvkr run local` or the legacy launcher
+with `--build-accelerator tcg`.
 An SSH budget bounds waiting; it does not provide immediate notification of an
 Ubuntu installer crash that appears only on the guest console.
 
