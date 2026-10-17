@@ -242,7 +242,32 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if jobID == "" {
 		t.Fatal("fixture lacks a native private-image preparation job")
 	}
-	member, _ := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
+	member, part := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
+	for _, input := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
+		for _, missing := range []bool{true, false} {
+			t.Run(input+map[bool]string{true: "/missing", false: "/empty"}[missing], func(t *testing.T) {
+				changed := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+					steps := githubTestYAMLField(t, root, "jobs", jobID, "steps")
+					found := false
+					for _, step := range steps.Content {
+						with := githubYAMLField(step, "with")
+						if githubYAMLValue(with, "parameters") == githubParametersExpression(part) {
+							found = true
+							if missing {
+								githubYAMLRemove(with, input)
+							} else {
+								githubYAMLSet(with, input, githubYAMLString(""))
+							}
+						}
+					}
+					if !found {
+						t.Fatal("private image caller missing")
+					}
+				})
+				assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
+			})
+		}
+	}
 	for _, test := range []struct {
 		name, member string
 		mutate       func(*testing.T, *yamlv3.Node)

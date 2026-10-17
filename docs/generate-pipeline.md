@@ -136,6 +136,12 @@ qualification. Use separate accounts and tokens with read-only versus write pack
 write-capable PAT into the reader secret does not narrow its authority. The existing CI storage secrets
 remain unchanged. Native image preparation consumes its reader only in the preparation step.
 
+The repository-level `NVKR_REGISTRY_READ` secret and `NVKR_REGISTRY_READ_USER` variable are also
+required for private native toolchain and smoke-image pulls in development and legacy
+`github:GITHUB_TOKEN` output-publication profiles. Development output credentials do not replace this
+shared image reader. A missing reader refuses the pull; there is no workflow-token fallback.
+The entry workflow passes both reader values explicitly into composite actions, scoped to preparation.
+
 For each existing storage, release, toolchain and smoke-image package, an administrator must:
 1. Keep visibility private (or internal only when enterprise-wide access is intended).
 2. Disable repository permission inheritance and remove the source-repository connection.

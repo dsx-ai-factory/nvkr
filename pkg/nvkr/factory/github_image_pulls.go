@@ -21,6 +21,7 @@ import (
 )
 
 const githubImageToken = "NVKR_TOOLCHAIN_READ_TOKEN"
+const githubImageUser = "NVKR_TOOLCHAIN_READ_USER"
 
 func githubPrivateToolchain(plan *Plan, image string) bool {
 	if plan.Environment.GitHubARC != "native-kvm-v1" || !strings.Contains(image, "@sha256:") {
@@ -73,7 +74,7 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 }
 
 func githubImageEnvironment() map[string]string {
-	return map[string]string{githubImageToken: "${{ secrets.NVKR_REGISTRY_READ }}", "NVKR_TOOLCHAIN_READ_USER": "${{ vars.NVKR_REGISTRY_READ_USER }}"}
+	return map[string]string{githubImageToken: "${{ secrets.NVKR_REGISTRY_READ }}", githubImageUser: "${{ vars.NVKR_REGISTRY_READ_USER }}"}
 }
 
 // PrepareGitHubImages is a separate credential-bearing step. Its temporary Docker

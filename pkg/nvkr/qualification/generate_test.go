@@ -119,7 +119,8 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
 	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
-		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || len(call.Secrets) != 3 {
+		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
+		call.Secrets["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || len(call.Secrets) != 3 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
 	}
 	contract, ok := worker.On["workflow_call"].(map[string]any)
@@ -133,6 +134,27 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	readSecret, ok := secrets["NVKR_CI_STORAGE_READ_TOKEN"].(map[string]any)
 	if !ok || readSecret["required"] != true {
 		t.Fatal("private carrier read credential must be required")
+	}
+	registryRead, ok := secrets["NVKR_REGISTRY_READ"].(map[string]any)
+	if !ok || registryRead["required"] != true {
+		t.Fatal("registry reader must be required by the reusable worker")
+	}
+	for _, tc := range []struct{ name, user, token string }{
+		{"Acquire pinned native smoke image", "GHCR_USER", "GHCR_TOKEN"},
+		{"Authenticate and smoke exact delivered tool bytes", "NVKR_PULL_REGISTRY_USER", "NVKR_PULL_REGISTRY_PASSWORD"},
+	} {
+		found := 0
+		for _, step := range native.Steps {
+			if step.Name == tc.name {
+				found++
+				if step.Env[tc.user] != "${{ vars.NVKR_REGISTRY_READ_USER }}" || step.Env[tc.token] != "${{ secrets.NVKR_REGISTRY_READ }}" {
+					t.Fatalf("%s lost its exact registry reader binding", tc.name)
+				}
+			}
+		}
+		if found != 1 {
+			t.Fatalf("missing or repeated registry consumer %s", tc.name)
+		}
 	}
 	for _, job := range []qualificationWorkflowJob{native, final} {
 		if len(job.Env) != 0 || job.Timeout != 30 {

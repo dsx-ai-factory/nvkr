@@ -300,22 +300,23 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 	}
 	if role.kind == "prepare-images" {
 		expected := githubImageEnvironment()
-		expected[githubImageToken] = "${{ inputs.nvkr-toolchain-read-token }}"
+		for key := range expected {
+			input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+			expected[key] = "${{ inputs." + input + " }}"
+		}
 		if present && !githubInterfaceEnvironmentEqual(originalEnv, expected) {
 			return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its read credential")
 		}
-		githubYAMLSet(inputs, "nvkr-toolchain-read-token", githubYAMLMap("description", githubYAMLString("Independent private toolchain reader when image preparation is present"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}, "default", githubYAMLString("")))
-		token := ""
-		if present {
-			token = githubYAMLValue(githubYAMLField(call, "with"), "nvkr-toolchain-read-token")
-			if token != githubImageEnvironment()[githubImageToken] {
-				return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its caller credential")
-			}
-		}
-		if present {
-			githubYAMLSet(invocation.Arguments, "nvkr-toolchain-read-token", githubYAMLString(token))
-		}
 		for _, key := range sortedKeys(expected) {
+			input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+			githubYAMLSet(inputs, input, githubYAMLMap("description", githubYAMLString("Independent private toolchain reader when image preparation is present"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}, "default", githubYAMLString("")))
+			if present {
+				value := githubYAMLValue(githubYAMLField(call, "with"), input)
+				if value != githubImageEnvironment()[key] {
+					return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its caller credential")
+				}
+				githubYAMLSet(invocation.Arguments, input, githubYAMLString(value))
+			}
 			githubYAMLSet(env, key, githubYAMLString(expected[key]))
 		}
 	} else if originalEnv != nil {

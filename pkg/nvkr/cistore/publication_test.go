@@ -140,10 +140,12 @@ func TestPrivatePublicationSeedsOnlyMetadataAndRechecksPrivacy(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		visibility string
+		linked     bool
 		wantError  bool
 	}{
-		{"private seed", "private", false},
-		{"public seed", "public", true},
+		{"private seed", "private", false, false},
+		{"public seed", "public", false, true},
+		{"private linked seed", "private", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f, _ := publicationBackend(t, func(packageName string, count int) (int, any) {
@@ -152,6 +154,9 @@ func TestPrivatePublicationSeedsOnlyMetadataAndRechecksPrivacy(t *testing.T) {
 				}
 				p := publicationPackage(packageName)
 				p["visibility"] = tc.visibility
+				if tc.linked {
+					p["repository"] = map[string]any{"id": 3, "full_name": "Example/Private", "private": true}
+				}
 				return http.StatusOK, p
 			})
 			err := f.b.admitPrivatePublication(t.Context(), "Example/Source", []string{"ghcr.io/example/source/releases"}, publisherOptions)
@@ -195,4 +200,19 @@ func TestPrivatePublicationRechecksWholeSetAndContext(t *testing.T) {
 	assertCode(t, f.b.admitPrivatePublication(ctx, "Example/Source", []string{"ghcr.io/example/source/releases"}, publisherOptions), e.CodeTimeout)
 	assertCode(t, f.b.admitPrivatePublication(t.Context(), "../invalid", []string{"ghcr.io/example/source/releases"}, publisherOptions), e.CodeUsage)
 	assertCode(t, f.b.admitPrivatePublication(t.Context(), "Example/Source", []string{"ghcr.io/example/source/releases"}, Options{}), e.CodeTrustPolicyMissing)
+}
+
+func TestPrivatePublicationRefusesPrivateLinkageAtFinalWholeSetCheck(t *testing.T) {
+	f, calls := publicationBackend(t, func(packageName string, count int) (int, any) {
+		p := publicationPackage(packageName)
+		if packageName == "source/z-output" && count > 1 {
+			p["repository"] = map[string]any{"id": 3, "full_name": "Example/Private", "private": true}
+		}
+		return http.StatusOK, p
+	})
+	err := f.b.admitPrivatePublication(t.Context(), "Example/Source", []string{"ghcr.io/example/source/releases", "ghcr.io/example/source/z-output"}, publisherOptions)
+	assertCode(t, err, e.CodeTrustPolicyMissing)
+	if calls.Load() != 5 || f.transport.calls.Load() != 0 {
+		t.Fatal("final whole-set linkage refusal must perform both rechecks without registry writes")
+	}
 }

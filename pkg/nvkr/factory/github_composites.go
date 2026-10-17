@@ -305,7 +305,7 @@ func githubComposite(files map[string][]byte, path, name string, steps []*yamlv3
 		if env := githubYAMLField(step, "env"); env != nil {
 			for index := 0; index < len(env.Content); index += 2 {
 				key, value := env.Content[index].Value, env.Content[index+1]
-				if !strings.Contains(value.Value, "secrets.") && value.Value != "${{ toJSON(needs) }}" {
+				if !strings.Contains(value.Value, "secrets.") && !strings.Contains(value.Value, "vars.") && value.Value != "${{ toJSON(needs) }}" {
 					continue
 				}
 				input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))

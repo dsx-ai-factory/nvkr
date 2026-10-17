@@ -154,12 +154,13 @@ func materializeGitHubInterfaceSteps(steps *yamlv3.Node, values map[string]strin
 				return e.New(e.CodeEngineCapability, "shared action disables required operation %q", role)
 			}
 			if role == "images" {
-				const name = "nvkr-toolchain-read-token"
-				input := githubYAMLField(inputs, name)
-				if githubYAMLValue(input, "required") != "false" || githubYAMLField(input, "default") == nil || githubYAMLValue(input, "default") != "" || githubYAMLField(arguments, name) != nil {
-					return e.New(e.CodeEngineCapability, "absent image preparation changes its empty reader default")
+				for _, name := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
+					input := githubYAMLField(inputs, name)
+					if githubYAMLValue(input, "required") != "false" || githubYAMLField(input, "default") == nil || githubYAMLValue(input, "default") != "" || githubYAMLField(arguments, name) != nil {
+						return e.New(e.CodeEngineCapability, "absent image preparation changes its empty reader default")
+					}
+					githubYAMLRemove(inputs, name)
 				}
-				githubYAMLRemove(inputs, name)
 			}
 			continue
 		}

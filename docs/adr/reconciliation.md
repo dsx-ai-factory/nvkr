@@ -1449,8 +1449,12 @@ and dry-run signing reject this mode.
 Maintained production/nightly generation selects fixed independent
 registry reader/writer credentials, including native toolchain preparation, qualification/smoke and nightly
 runtime consumers. Hosted publication now rejects repository-linked packages even while their repository is
-private. Code and regression coverage are prepared; local unit execution is intentionally deferred and no
-hosted execution of this change is claimed. Provider package ACL migration, explicit Actions-grant removal,
+private. Image-reader account and token bindings use explicit caller inputs, with empty defaults only
+for absent image preparation; composite metadata contains no caller-only variable/secret references.
+Code and regression coverage are prepared; local unit execution is intentionally deferred.
+[PR CI at 6f8afe62](https://github.com/dsx-ai-factory/nvkr/actions/runs/38983931671) passed before
+the composite account-binding correction; it does not prove action loading or registry access.
+No hosted production execution of this change is claimed. Provider package ACL migration, explicit Actions-grant removal,
 credential provisioning and denial tests remain operator work before public visibility.
 
 The root reader rejects extra blobs and bounds control/evidence to 512 MiB per root. Full and metadata-only

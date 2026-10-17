@@ -12,6 +12,10 @@ inputs:
     description: Independent private toolchain reader when image preparation is present
     required: false
     default: ""
+  nvkr-toolchain-read-user:
+    description: Independent private toolchain reader when image preparation is present
+    required: false
+    default: ""
   nvkr-source-token:
     description: Caller value for step environment NVKR_SOURCE_TOKEN
     required: true
@@ -41,7 +45,7 @@ runs:
       shell: bash -e {0}
       env:
         NVKR_TOOLCHAIN_READ_TOKEN: ${{ inputs.nvkr-toolchain-read-token }}
-        NVKR_TOOLCHAIN_READ_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
+        NVKR_TOOLCHAIN_READ_USER: ${{ inputs.nvkr-toolchain-read-user }}
         NVKR_ACTION_SELECTOR: ${{ fromJSON(inputs.parameters).images_selector }}
     - name: ${{ fromJSON(inputs.parameters).execute_name }}
       id: operation_execute

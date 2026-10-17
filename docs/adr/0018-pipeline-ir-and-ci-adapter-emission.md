@@ -323,7 +323,10 @@ The maintained M2 and two NVKE nightly publication prefixes also reuse the alrea
 `ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` pins. Reusing these
 toolchain subjects does not relocate them into the nightly output namespace or admit unrelated
 publication owners or toolchain repositories.
-Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account. The helper admits the complete Plan,
+Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account.
+The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
+caller-only `vars` or `secrets` contexts. Calls without image preparation omit both inputs, whose empty
+defaults are admitted only with the absent image role. The helper admits the complete Plan,
 native platform and disk host requirements before pulling; it uses a private temporary Docker
 configuration and deletes it on success or failure before source or producer execution.
 Held runtime observation accepts an already-local exact repository digest, rejects a present
