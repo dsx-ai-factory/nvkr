@@ -103,7 +103,7 @@ func TestPrivateCIDownloadCommandRequiresExactCrossRunAttempt(t *testing.T) {
 	t.Setenv("GITHUB_RUN_ATTEMPT", "2")
 	t.Setenv("NVKR_CI_STORAGE_TOKEN", "private-read")
 	t.Setenv("NVKR_CI_STORAGE_USER", "storage-reader")
-	for _, flags := range [][]string{{"--run-id", "456"}, {"--attempt", "3"}, {"--run-id", "00", "--attempt", "3"}} {
+	for _, flags := range [][]string{{"--run-id", "456"}, {"--attempt", "3"}, {"--run-id", "00", "--attempt", "3"}, {"--run-id", "456", "--attempt", "1", "--allow-earlier-attempts"}, {"--run-id", "123", "--attempt", "1", "--allow-earlier-attempts"}} {
 		_, err := invokeLifecycleCLI(t, append([]string{"factory", "github", "ci-download", "--index-dir", "/missing", "--destination", "/must-not-create"}, flags...)...)
 		var coded *e.Error
 		if !errors.As(err, &coded) || coded.Code != e.CodeUsage {
@@ -121,6 +121,8 @@ func TestPrivateCILocatorCommandAdmitsBeforeFilesystemOrNetwork(t *testing.T) {
 		{"wrong server", "https://example.com", "repository-reader", nil, e.CodeEngineCapability},
 		{"unpaired run", "https://github.com", "repository-reader", []string{"--run-id", "456"}, e.CodeUsage},
 		{"unpaired attempt", "https://github.com", "repository-reader", []string{"--attempt", "2"}, e.CodeUsage},
+		{"cross run retry", "https://github.com", "repository-reader", []string{"--run-id", "456", "--attempt", "1", "--allow-earlier-attempts"}, e.CodeUsage},
+		{"explicit source retry", "https://github.com", "repository-reader", []string{"--run-id", "123", "--attempt", "1", "--allow-earlier-attempts"}, e.CodeUsage},
 		{"wildcard", "https://github.com", "repository-reader", []string{"--pattern", "*"}, e.CodeUsage},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {

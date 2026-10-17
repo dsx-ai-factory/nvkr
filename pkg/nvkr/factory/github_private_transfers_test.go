@@ -406,6 +406,15 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 					if node == nil {
 						return
 					}
+					if run := githubYAMLValue(node, "run"); strings.Contains(run, " factory github ci-fetch-locators ") || strings.Contains(run, " factory github ci-download ") {
+						want := "--allow-earlier-attempts=true"
+						if plan.Environment.GitHubDevelopment {
+							want = "--allow-earlier-attempts=false"
+						}
+						if !strings.Contains(run, want) {
+							t.Fatalf("transport retry policy differs for %s", fixture.name)
+						}
+					}
 					if strings.Contains(githubYAMLValue(node, "run"), " factory github ci-fetch-locators ") {
 						downloads++
 						if name != githubCITransferPath(plan, "download")+"/action.yml" && name != githubCITransferPath(plan, "bootstrap-download")+"/action.yml" {

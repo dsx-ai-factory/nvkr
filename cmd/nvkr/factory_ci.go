@@ -81,6 +81,7 @@ func cmdFactoryCIFetchLocators() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "index-dir"}, &cli.StringFlag{Name: "name"}, &cli.StringFlag{Name: "pattern"},
 			&cli.BoolFlag{Name: "merge-multiple"}, &cli.StringFlag{Name: "run-id"}, &cli.StringFlag{Name: "attempt"},
+			&cli.BoolFlag{Name: "allow-earlier-attempts"},
 		},
 		Action: func(c *cli.Context) error {
 			if c.Args().Present() || c.String("index-dir") == "" {
@@ -92,12 +93,16 @@ func cmdFactoryCIFetchLocators() *cli.Command {
 			if (c.String("run-id") == "") != (c.String("attempt") == "") {
 				return e.New(e.CodeUsage, "cross-Run CI locator acquisition requires both --run-id and --attempt")
 			}
+			if c.Bool("allow-earlier-attempts") && c.String("run-id") != "" {
+				return e.New(e.CodeUsage, "earlier-attempt CI reuse requires the current Run context")
+			}
 			request := cistore.Request{Repository: os.Getenv("GITHUB_REPOSITORY"), RunID: os.Getenv("GITHUB_RUN_ID"), Attempt: os.Getenv("GITHUB_RUN_ATTEMPT")}
 			if c.String("run-id") != "" {
 				request.RunID, request.Attempt = c.String("run-id"), c.String("attempt")
 			}
 			return cistore.FetchGitHubLocators(c.Context, request, c.String("index-dir"), cistore.GitHubLocatorSelection{
 				Name: c.String("name"), Pattern: c.String("pattern"), MergeMultiple: c.Bool("merge-multiple"),
+				AllowEarlierAttempts: c.Bool("allow-earlier-attempts"),
 			}, os.Getenv("NVKR_CI_REPOSITORY_TOKEN"))
 		},
 	}
@@ -110,6 +115,7 @@ func cmdFactoryCIDownload() *cli.Command {
 			&cli.StringFlag{Name: "index-dir"}, &cli.StringFlag{Name: "destination"},
 			&cli.StringFlag{Name: "run-id"}, &cli.StringFlag{Name: "attempt"},
 			&cli.StringFlag{Name: "plan"}, &cli.StringFlag{Name: "stage"},
+			&cli.BoolFlag{Name: "allow-earlier-attempts"},
 		},
 		Action: func(c *cli.Context) error {
 			if c.Args().Present() || c.String("index-dir") == "" || c.String("destination") == "" {
@@ -128,6 +134,10 @@ func cmdFactoryCIDownload() *cli.Command {
 			if (c.String("run-id") == "") != (c.String("attempt") == "") {
 				return e.New(e.CodeUsage, "cross-Run CI downloads require both --run-id and --attempt")
 			}
+			if c.Bool("allow-earlier-attempts") && c.String("run-id") != "" {
+				return e.New(e.CodeUsage, "earlier-attempt CI reuse requires the current Run context")
+			}
+			options.AllowEarlierAttempts = c.Bool("allow-earlier-attempts")
 			if c.String("run-id") != "" {
 				request.RunID, request.Attempt = c.String("run-id"), c.String("attempt")
 			}

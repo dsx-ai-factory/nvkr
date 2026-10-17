@@ -419,8 +419,13 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				"NVKR_CI_MERGE", githubYAMLString("${{ inputs.merge-multiple || 'false' }}"),
 				"NVKR_CI_RUN", githubYAMLString("${{ inputs.run-id }}"), "NVKR_CI_ATTEMPT", githubYAMLString("${{ inputs.attempt }}"))
 			locatorCommand := "set -eu\nexec " + helper + " factory github ci-fetch-locators --index-dir \"$NVKR_CI_INDEX\" --name \"$NVKR_CI_NAME\" --pattern \"$NVKR_CI_PATTERN\" --merge-multiple=\"$NVKR_CI_MERGE\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
+			// This is fixed by the admitted Environment, never an action input.
+			// Development namespaces and explicit cross-Run consumers stay exact.
+			retryPolicy := fmt.Sprintf(" --allow-earlier-attempts=%t", !plan.Environment.GitHubDevelopment)
+			locatorCommand += retryPolicy
 			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download metadata and private locators"), "shell", githubYAMLString("bash"), "env", locatorEnv, "run", githubYAMLString(locatorCommand)))
 			download := helper + " factory github ci-download --index-dir \"$NVKR_CI_INDEX\" --destination \"${NVKR_CI_DESTINATION:-.}\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
+			download += retryPolicy
 			command := "set -eu\n"
 			if mode == "download" {
 				githubYAMLSet(env, "NVKR_CI_STAGE", githubYAMLString("${{ inputs."+githubCIRestoreStageInput+" }}"))

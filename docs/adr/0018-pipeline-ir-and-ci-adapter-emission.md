@@ -152,7 +152,14 @@ finalization uploads even when conditional. The Go transport owner acquires sele
 looking up each fixed name through the authenticated same-Run API. Exact-name queries avoid listing cutoffs
 and page-position races. The Run-attempt response binds repository IDs and head; each lookup must return
 zero or one matching artifact. Each ZIP must match its provider SHA-256 and contain one canonical record
-bound to repository, Run, attempt and selected name. Private locators retain their 32 KiB decoded limit;
+bound to repository, Run, source attempt and selected name. Production transfer templates explicitly admit
+retained records from earlier canonical positive attempts of that same Run, no later than the consuming
+attempt. Provider repository/head and ZIP authentication still precede index publication; restoration
+preserves each original source request and private image/config binding. Different repositories, Runs,
+names and future attempts fail closed. Development templates and explicitly selected cross-Run downloads
+remain exact-attempt; the exact store and qualification APIs do not inherit this transport opt-in.
+Consumer Plan, invocation, signature and completeness checks still own acceptance under ADR-20.
+Private locators retain their 32 KiB decoded limit;
 public metadata uses the bounds above. ZIPs are bounded to 33 MiB and the complete decoded index to 128 MiB.
 Provider digests and all selected records are checked before publishing the fresh index. Actions acquisition
 uses the repository workflow token; metadata-only restoration needs no registry credential or package API
@@ -923,7 +930,10 @@ Development and production have separate generated layouts and concurrency group
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
 like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
 Final Run records and production qualification handoffs retain seven days and disk diagnostics one day. Provider cancellation or runner loss can
-prevent finalization. Expired carriers require a complete new Run. Signed development uses per-attempt
+prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
+carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
+utility-job budget does not apply. This bound is not evidence of successful hosted completion.
+Expired carriers require a complete new Run. Signed development uses per-attempt
 registry namespaces and full-attempt retries; production's authenticated earlier-attempt reuse is unchanged.
 These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.

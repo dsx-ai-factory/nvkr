@@ -1403,6 +1403,28 @@ registry read access, not OIDC or package-write
 permission. Production rejects arbitrary static credentials; the explicit development mode uses its admitted
 scoped read/write credentials. Local execution and dry-run signing reject this mode.
 
+[Production Run 38977394488](https://github.com/dsx-ai-factory/nvkr/actions/runs/38977394488),
+head `d996200b77848293b18d3861b9f1db1e8b41b423`, attempt 1 completed 579 jobs but its
+[finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38977394488/job/117265197726)
+exceeded the provider's fifteen-minute job limit. No final Run record or qualification handoff was uploaded.
+The [attempt-2 finalizer retry](https://github.com/dsx-ai-factory/nvkr/actions/runs/38977394488/job/117304226181)
+failed before finalization because its helper locator retained source attempt 1. A read-only inspection of
+artifact `12079866182` verified the 489-byte ZIP against provider SHA-256
+`5a63fb9bb456f97a467d9a31a4978a0cf92b0bc1df7a3eafae0a46ec121a4126` and its exact repository,
+Run, helper name and attempt-1 request; it did not download the private helper payload.
+Release finalizers now have a dedicated 120-minute budget. Production transport explicitly admits retained
+same-Run source attempts no later than the consumer, preserving original locator/config bindings through
+ordinary and nested restoration. Development, explicit cross-Run and direct store APIs stay exact-attempt.
+Focused contracts reproduce the old rejection and cover private payloads, public metadata, mixed source
+attempt acquisition, unchanged bindings, future/foreign/malformed source refusal and generated policy
+separation. These local checks do not establish hosted retry completion, qualification acceptance or a
+measured sufficient runtime for this release closure.
+A read-only probe with the updated CLI against this Run's attempt 2 reproduced exit 22 with exact-attempt
+selection, then acquired the same helper locator with earlier-attempt reuse enabled. The original JSON
+bytes were unchanged (SHA-256 `7ded2ea93203be141c5ac67cea182658b3674a8441b3ea6f4df32fa5446c0853`).
+This exercises provider-authenticated locator acquisition only, not private payload restoration or hosted
+finalization with the fix.
+
 The root reader rejects extra blobs and bounds control/evidence to 512 MiB per root. Full and metadata-only
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
 config-declared platforms and derived sibling locators, without reading payload layers or verifying policy.

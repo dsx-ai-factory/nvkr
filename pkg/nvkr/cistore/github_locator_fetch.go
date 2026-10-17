@@ -30,6 +30,9 @@ type GitHubLocatorSelection struct {
 	Name          string
 	Pattern       string
 	MergeMultiple bool
+	// AllowEarlierAttempts admits retained same-Run records up to the requested
+	// attempt, after provider source and ZIP authentication. Default is exact.
+	AllowEarlierAttempts bool
 }
 
 type githubLocatorRun struct {
@@ -145,7 +148,7 @@ func (g *githubLocatorClient) fetch(ctx context.Context, request Request, index 
 	locators := make([]githubLocatorBytes, 0, len(artifacts))
 	totalBytes := 0
 	for _, artifact := range artifacts {
-		raw, err := g.downloadLocator(ctx, request, artifact)
+		raw, err := g.downloadLocator(ctx, request, artifact, selection.AllowEarlierAttempts)
 		if err != nil {
 			return err
 		}

@@ -16,7 +16,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Request, artifact githubLocatorArtifact) ([]byte, error) {
+func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Request, artifact githubLocatorArtifact, allowEarlier bool) ([]byte, error) {
 	location, err := g.apiGET(ctx, "/repos/"+request.Repository+"/actions/artifacts/"+string(artifact.ID)+"/zip")
 	if err != nil {
 		return nil, err
@@ -49,10 +49,10 @@ func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Reque
 		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP differs from its provider digest or size")
 	}
 	request.Name = artifact.Name
-	return unpackGitHubLocator(ctx, response.body, request)
+	return unpackGitHubLocator(ctx, response.body, request, allowEarlier)
 }
 
-func unpackGitHubLocator(ctx context.Context, raw []byte, request Request) ([]byte, error) {
+func unpackGitHubLocator(ctx context.Context, raw []byte, request Request, allowEarlier bool) ([]byte, error) {
 	if ctx.Err() != nil {
 		return nil, safeIOError(ctx, e.CodeTimeout, "CI locator ZIP decoding canceled")
 	}
@@ -85,7 +85,7 @@ func unpackGitHubLocator(ctx context.Context, raw []byte, request Request) ([]by
 	if err != nil {
 		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP member is not a canonical locator")
 	}
-	if err := description.Validate(request); err != nil {
+	if _, err := githubSourceRequest(request, description, allowEarlier); err != nil {
 		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP member differs from the exact source request")
 	}
 	return locator, nil

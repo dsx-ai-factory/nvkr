@@ -597,6 +597,10 @@ retain their JSON locators plus separately admitted metadata records. The factor
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
 digests and downstream artifact authentication remain required. Metadata-only transfers use workflow
 identity without package API calls. Dedicated read/write credentials do not elevate repository-token permissions.
+Production partial retries admit earlier source attempts only within the same Run and preserve original
+transport bindings through restoration. Development and explicit cross-Run transfers remain exact-attempt;
+release and qualification owners retain their separate invocation/evidence checks. Release finalizers use
+a bounded two-hour budget for setup, transport, authentication and final record uploads.
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
 from the credential that accesses package metadata and registry bytes. Producers receive neither through
 these admission paths.

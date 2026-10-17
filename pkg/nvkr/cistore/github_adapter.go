@@ -186,7 +186,8 @@ func requireGitHubLocatorDirectory(path string, expected os.FileInfo) error {
 
 // DownloadGitHub resolves only uniquely named locator records from a fresh
 // provider download. Provider-created artifact directories retain the original
-// download action's merge policy. The owning store authenticates every request.
+// download action's merge policy. Optional same-Run retry selection preserves
+// each original request; the owning store authenticates that exact binding.
 func DownloadGitHub(ctx context.Context, request Request, index, destination string, options Options) error {
 	return newBackend().downloadGitHub(ctx, request, index, destination, options)
 }
@@ -197,7 +198,7 @@ func (b *backend) downloadGitHub(ctx context.Context, request Request, index, de
 	}
 	// The index may select several artifact names. Admit its actual repository
 	// and attempt before opening it; each filename is independently validated
-	// against its locator and the same request before Download.
+	// against its locator and the admitted source-attempt scope before Download.
 	admission := request
 	if admission.Name == "" {
 		admission.Name = "private-ci-index"
@@ -249,6 +250,10 @@ func (b *backend) downloadGitHub(ctx context.Context, request Request, index, de
 			return e.New(e.CodeVerifyFailed, "CI index repeats a selected artifact")
 		}
 		seen[selected.Name] = true
+		selected, err = githubSourceRequest(selected, locator, options.AllowEarlierAttempts)
+		if err != nil {
+			return err
+		}
 		if locator.Metadata == nil {
 			if err := ValidateGitHubTransfer(ctx, selected, options); err != nil {
 				return err

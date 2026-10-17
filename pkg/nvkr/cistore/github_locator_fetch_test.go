@@ -57,12 +57,13 @@ func TestGitHubLocatorSelectionAdmission(t *testing.T) {
 }
 
 func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
-	for _, scenario := range []string{"success flat", "success subdirectories", "singleton subdirectory", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
+	for _, scenario := range []string{"success flat", "success subdirectories", "singleton subdirectory", "earlier attempt", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
 		t.Run(scenario, func(t *testing.T) {
 			index := t.TempDir()
 			request := testRequest
 			request.Name = ""
 			selection := GitHubLocatorSelection{Pattern: "{nvkr-a,nvkr-b}", MergeMultiple: scenario != "success subdirectories" && scenario != "singleton subdirectory" && scenario != "partial nonmerged" && scenario != "empty nonmerged"}
+			selection.AllowEarlierAttempts = scenario == "earlier attempt" || scenario == "wrong attempt"
 			if scenario == "singleton subdirectory" {
 				selection.Pattern = "nvkr-a"
 			}
@@ -79,6 +80,9 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			for i, name := range []string{"nvkr-a", "nvkr-b"} {
 				selected := request
 				selected.Name = name
+				if scenario == "earlier attempt" && i == 1 {
+					selected.Attempt = "1"
+				}
 				if scenario == "wrong attempt" && i == 1 {
 					selected.Attempt = "999"
 				}
@@ -204,7 +208,7 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				return
 			}
 			switch scenario {
-			case "success flat", "success subdirectories", "singleton subdirectory", "missing pattern":
+			case "success flat", "success subdirectories", "singleton subdirectory", "missing pattern", "earlier attempt":
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -218,6 +222,16 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 					}
 					if _, err := os.ReadFile(path); err != nil {
 						t.Fatal(err)
+					}
+					if scenario == "earlier attempt" && name == "nvkr-b" {
+						raw, err := os.ReadFile(path)
+						if err != nil {
+							t.Fatal(err)
+						}
+						locator, err := DecodeLocator(raw)
+						if err != nil || locator.Request.Attempt != "1" {
+							t.Fatalf("source attempt rewritten: %v", err)
+						}
 					}
 				}
 				return
@@ -296,7 +310,7 @@ func TestGitHubLocatorZIPRejectsUnexpectedMembersAndBounds(t *testing.T) {
 		{"noncanonical", githubLocatorZIPFixture(t, testRequest.Name+locatorSuffix, append(raw, '\n'), false)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := unpackGitHubLocator(t.Context(), tc.archive, testRequest)
+			_, err := unpackGitHubLocator(t.Context(), tc.archive, testRequest, false)
 			assertCode(t, err, e.CodeVerifyFailed)
 		})
 	}
