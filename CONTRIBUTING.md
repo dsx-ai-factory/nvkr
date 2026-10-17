@@ -91,6 +91,12 @@ requirement. Worker binaries belong to the NVKE OS-image build; add product outp
 
 ## Pull request process
 
+For a substantial feature, behavior change, or architectural change, open or find a GitHub issue and discuss
+the approach with maintainers before starting implementation. Link that issue in the PR so reviewers can
+follow the problem and agreed scope. Small bug fixes, typo corrections, and documentation clarifications
+may go directly to a focused PR. Report security vulnerabilities privately through
+[SECURITY.md](SECURITY.md), rather than opening a public issue or PR.
+
 1. **Branch** off `main`; keep the change focused.
 2. **`make check` is green** and new behavior has a test (pure-logic where possible).
 3. **Use Conventional Commits** as described below, cryptographically sign every commit, and sign off with the [Developer Certificate of Origin](https://developercertificate.org):
