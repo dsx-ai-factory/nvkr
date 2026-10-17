@@ -576,12 +576,43 @@ func (s *nativeSiteAttempt) tenant(ctx context.Context, runner Runner, cli, tool
 	return result
 }
 
-func (s *nativeSiteAttempt) runTenant(ctx context.Context, runner Runner, cli, tools, out, siteConfig string) error {
+// NVKE owns request validation. Select its reviewed wire fields from the same
+// source contract used for bootstrap and deployment on both native hosts.
+func (s *nativeSiteAttempt) tenantRequest(ctx context.Context) (TenantRequest, error) {
 	request, err := newTenantRequest("native-demo-tenant", s.network)
+	if err != nil {
+		return TenantRequest{}, err
+	}
+	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
+	if err != nil {
+		return TenantRequest{}, err
+	}
+	request.VIP = ""
+	if modern {
+		request.ControlPlane.NICo.Release, request.ControlPlane.NICo.OS = request.ControlPlane.NICo.OS, ""
+		for i := range request.NodePools {
+			request.NodePools[i].NICo.Release, request.NodePools[i].NICo.OS = request.NodePools[i].NICo.OS, ""
+		}
+		// The source default pod range contains the Mac vmnet underlay. Keep both
+		// tenant ranges separate from that underlay and the site Kubernetes ranges.
+		request.Network = &TenantNetwork{PodCIDR: "10.245.0.0/16", ServiceCIDR: "10.97.0.0/16"}
+		if !s.bridge.prefix.IsValid() {
+			return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "tenant requires an observed guest subnet")
+		}
+		for _, network := range []string{request.Network.PodCIDR, request.Network.ServiceCIDR} {
+			if s.bridge.prefix.Overlaps(netip.MustParsePrefix(network)) {
+				return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "tenant Kubernetes range %s overlaps guest subnet %s", network, s.bridge.prefix)
+			}
+		}
+	}
+	return request, nil
+}
+
+func (s *nativeSiteAttempt) runTenant(ctx context.Context, runner Runner, cli, tools, out, siteConfig string) error {
+	request, err := s.tenantRequest(ctx)
 	if err != nil {
 		return err
 	}
-	request.VIP = ""
 	path := filepath.Join(out, "tenant-request.json")
 	if err := privateJSON(path, request); err != nil {
 		return err

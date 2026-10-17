@@ -47,12 +47,18 @@ type TenantRequest struct {
 	CNI           string             `json:"cniPlugin"`
 	CNIVersion    string             `json:"cniVersion"`
 	EtcdEncrypted bool               `json:"etcdEncrypted"`
-	VIP           string             `json:"controlPlaneVIP"`
+	VIP           string             `json:"controlPlaneVIP,omitempty"`
 	Teleport      bool               `json:"teleportEnabled"`
 	NICo          TenantProvider     `json:"nico"`
 	ControlPlane  ControlPlaneIntent `json:"controlPlaneConfig"`
 	NodePools     []NodePoolIntent   `json:"nodePools"`
+	Network       *TenantNetwork     `json:"network,omitempty"`
 }
+type TenantNetwork struct {
+	PodCIDR     string `json:"podCIDR"`
+	ServiceCIDR string `json:"serviceCIDR"`
+}
+
 type TenantProvider struct {
 	Org  string `json:"orgID"`
 	Site string `json:"siteID"`
@@ -65,7 +71,8 @@ type ControlPlaneIntent struct {
 	DisableMonitor bool   `json:"provisioningMonitorDisabled"`
 	NICo           struct {
 		Profile  string   `json:"configProfile"`
-		OS       string   `json:"osProfile"`
+		OS       string   `json:"osProfile,omitempty"`
+		Release  string   `json:"release,omitempty"`
 		Types    []string `json:"instanceTypePreference"`
 		Prefixes []string `json:"vpcPrefixIDs"`
 	} `json:"nico"`
@@ -84,7 +91,8 @@ type NodePoolIntent struct {
 	Recycle          int    `json:"recycleBudget"`
 	NICo             struct {
 		Profile  string   `json:"configProfile"`
-		OS       string   `json:"osProfile"`
+		OS       string   `json:"osProfile,omitempty"`
+		Release  string   `json:"release,omitempty"`
 		Type     string   `json:"instanceTypeID"`
 		Prefixes []string `json:"vpcPrefixIDs"`
 	} `json:"nico"`
