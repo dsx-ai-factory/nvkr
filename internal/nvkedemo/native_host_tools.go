@@ -73,7 +73,7 @@ func extractNativeHostTools(ctx context.Context, source, publication, out, platf
 	for _, member := range members {
 		entry := bindings[member]
 		destination := filepath.Join(out, member)
-		if err := copyPrivate(ctx, filepath.Join(original, entry.Name), destination, 0755); err != nil {
+		if err := copyPrivate(ctx, filepath.Join(original, entry.Name), destination, os.FileMode(entry.Mode)); err != nil {
 			return err
 		}
 		digest, err := DigestFile(ctx, destination)
@@ -100,7 +100,19 @@ func nativeHostToolBindings(bundle delivery.BinaryBundle, platform string, membe
 		if !slices.Contains(members, member) || bindings[member].Name != "" {
 			return nil, errors.New("native tool aliases contain an unexpected or colliding member")
 		}
+		if os.FileMode(entry.Mode) != nativeToolMemberMode(member) {
+			return nil, errors.New("native tool bundle member has an unexpected delivered mode: " + member)
+		}
 		bindings[member] = entry
 	}
 	return bindings, nil
+}
+
+// The installer source archive is data consumed by the archive owner, never a
+// host command. Keep its delivered mode in both the original and alias view.
+func nativeToolMemberMode(member string) os.FileMode {
+	if member == "nvke-installer-sources" {
+		return 0644
+	}
+	return 0755
 }

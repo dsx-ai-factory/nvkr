@@ -47,14 +47,29 @@ func TestNativeToolMembershipIncludesInstallerArchive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"complete", "missing installer", "unexpected file"} {
+	for _, name := range []string{"complete", "missing installer", "unexpected file", "executable installer", "nonexecutable command", "symlink installer"} {
 		t.Run(name, func(t *testing.T) {
 			directory := privateTestDir(t)
 			for _, member := range members {
 				if name == "missing installer" && member == "nvke-installer-sources" {
 					continue
 				}
-				if err := os.WriteFile(filepath.Join(directory, member), []byte("fixture"), 0o700); err != nil {
+				mode := os.FileMode(0700)
+				if member == "nvke-installer-sources" {
+					mode = 0644
+					if name == "executable installer" {
+						mode = 0755
+					}
+					if name == "symlink installer" {
+						if err := os.Symlink("nvkectl", filepath.Join(directory, member)); err != nil {
+							t.Fatal(err)
+						}
+						continue
+					}
+				} else if name == "nonexecutable command" && member == "nvkectl" {
+					mode = 0644
+				}
+				if err := os.WriteFile(filepath.Join(directory, member), []byte("fixture"), mode); err != nil {
 					t.Fatal(err)
 				}
 			}

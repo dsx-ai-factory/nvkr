@@ -38,6 +38,16 @@ func TestNativeHostToolViewPreservesOriginalBundleAndBytes(t *testing.T) {
 				t.Fatal(err)
 			}
 			for member, original := range originalNames {
+				mode := os.FileMode(0755)
+				if member == "nvke-installer-sources" {
+					mode = 0644
+				}
+				for _, path := range []string{filepath.Join(out+"-original", original), filepath.Join(out, member)} {
+					info, err := os.Lstat(path)
+					if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != mode {
+						t.Fatalf("%s changed delivered mode: %v, %v", path, info, err)
+					}
+				}
 				from, err := DigestFile(t.Context(), filepath.Join(out+"-original", original))
 				if err != nil {
 					t.Fatal(err)
@@ -158,7 +168,11 @@ func hostToolViewFixture(t *testing.T, platform string, aliases bool) (string, s
 			t.Fatal(err)
 		}
 		bindings[member] = name
-		files = append(files, delivery.BinaryFileInput{Name: name, Path: path, InstallPath: "/usr/local/bin/" + name, Mode: 0755})
+		mode := uint32(0755)
+		if member == "nvke-installer-sources" {
+			mode = 0644
+		}
+		files = append(files, delivery.BinaryFileInput{Name: name, Path: path, InstallPath: "/usr/local/bin/" + name, Mode: mode})
 	}
 	osName, arch, _ := strings.Cut(platform, "/")
 	source, publication := filepath.Join(root, "bundle"), filepath.Join(root, "publication")
@@ -171,4 +185,38 @@ func hostToolViewFixture(t *testing.T, platform string, aliases bool) (string, s
 		t.Fatal(err)
 	}
 	return source, publication, bindings
+}
+
+func TestNativeHostToolBindingsRequireDeclaredMemberModes(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "darwin/arm64"} {
+		for _, scenario := range []string{"correct", "executable archive", "nonexecutable command", "writable archive"} {
+			t.Run(platform+"/"+scenario, func(t *testing.T) {
+				_, _, _, members, err := nativeToolSelection(platform)
+				if err != nil {
+					t.Fatal(err)
+				}
+				osName, arch, _ := strings.Cut(platform, "/")
+				bundle := delivery.BinaryBundle{OS: osName, Arch: arch}
+				for _, member := range members {
+					mode := uint32(0755)
+					if member == "nvke-installer-sources" {
+						mode = 0644
+						switch scenario {
+						case "executable archive":
+							mode = 0755
+						case "writable archive":
+							mode = 0666
+						}
+					} else if member == "nvkectl" && scenario == "nonexecutable command" {
+						mode = 0644
+					}
+					bundle.Entries = append(bundle.Entries, delivery.BinaryEntry{Name: member, Mode: mode})
+				}
+				_, err = nativeHostToolBindings(bundle, platform, members)
+				if (err == nil) != (scenario == "correct") {
+					t.Fatalf("member mode admission: %v", err)
+				}
+			})
+		}
+	}
 }

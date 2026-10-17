@@ -566,8 +566,15 @@ func verifyToolMembers(tools string, members []string) error {
 		if statErr != nil {
 			return statErr
 		}
-		if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-			return errors.New("require regular executable tool members")
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("require regular tool member: %s", row.Name())
+		}
+		if row.Name() == "nvke-installer-sources" {
+			if info.Mode().Perm() != nativeToolMemberMode(row.Name()) {
+				return errors.New("require regular nonexecutable installer source archive")
+			}
+		} else if info.Mode().Perm()&0o111 == 0 {
+			return fmt.Errorf("require executable tool member: %s", row.Name())
 		}
 		names = append(names, row.Name())
 	}
