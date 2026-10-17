@@ -91,6 +91,13 @@ fi
 				body += "printf '%s\\n' '" + event + "' >> \"$EVENTS\"\n"
 				writeTenantFixture(t, filepath.Join(installer, name), []byte(body), 0700)
 			}
+			writeTenantFixture(t, filepath.Join(tools, "kubectl"), []byte(`#!/bin/sh
+set -eu
+printf 'kubectl\n' >> "$EVENTS"
+case "$*" in
+ *"get deployments"*) printf '%s\n' '{"items":[{"metadata":{"namespace":"nke-controller"},"spec":{"selector":{"matchLabels":{"app.kubernetes.io/instance":"nke-controller","app.kubernetes.io/name":"cloud-workflow-engine"}}}}]}' ;;
+esac
+`), 0700)
 			handoff := &nativeHandoff{result: make(chan error, 1)}
 			handoff.result <- nil
 			attempt := nativeSiteAttempt{bridge: linuxNativeBridge(), bootstrap: &hostBootstrap{}, network: "upstream-ovn", handoff: handoff, files: filepath.Join(root, "files"), assets: NativeAssets{CLI: cli, HostTools: tools, Installer: installer, Images: map[string]NativeImageAsset{
@@ -116,6 +123,10 @@ fi
 			}
 			got := strings.Split(strings.TrimSpace(string(raw)), "\n")
 			want := []string{"generate", "nerdctl", "nerdctl", "kind", "bootstrap", "capi", "kubectl", "validate", "deploy", "spiffe", "kind", "configure", "providers", "kubectl", "kubectl", "kubectl"}
+			if tc.modern {
+				// The observed selector and narrow API policy precede the first host API call.
+				want = append(want[:11], append([]string{"kubectl", "kubectl"}, want[11:]...)...)
+			}
 			if ordinary {
 				want = append(want, "tenant-inventory")
 			}

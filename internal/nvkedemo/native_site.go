@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -285,6 +286,15 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 		return Runner{}, err
 	}
 	kubeconfig := filepath.Join(out, "site.kubeconfig")
+	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
+	if err != nil {
+		return Runner{}, err
+	}
+	if modern {
+		if err := s.admitAPIClient(ctx, runner, tools, out, kubeconfig); err != nil {
+			return Runner{}, err
+		}
+	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"XDG_CONFIG_HOME": filepath.Join(out, "config")})
 	cli := s.assets.CLI
 	if _, err := s.capture(ctx, runner, "configure", cli, "config", "set-site", "--name", "nvke-native-site", "--url", "http://"+ip+":30080", "--kubeconfig", kubeconfig); err != nil {
@@ -655,5 +665,61 @@ func (s *nativeSiteAttempt) runTenant(ctx context.Context, runner Runner, cli, t
 		s.sequence++
 		return runner.Capture(ctx, args, fmt.Sprintf("native-site-%03d-%s", s.sequence, phase), timeout)
 	})
+	return err
+}
+
+// The source-owned controller chart admits API ingress from cluster pods.
+// Add the documented operator rule for this demo's observed gateway only.
+func (s *nativeSiteAttempt) admitAPIClient(ctx context.Context, runner Runner, tools, out, kubeconfig string) error {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	gateway := s.bridge.gateway
+	if !gateway.Is4() || !gateway.IsPrivate() || !s.bridge.prefix.Contains(gateway) {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires the observed private IPv4 demo gateway")
+	}
+	raw, err := s.capture(ctx, runner, "api-client-controller", filepath.Join(tools, "kubectl"), "--kubeconfig", kubeconfig,
+		"-n", "nke-controller", "get", "deployments", "-l", "app.kubernetes.io/instance=nke-controller", "-o", "json")
+	if err != nil {
+		return err
+	}
+	var observed struct {
+		Items []struct {
+			Metadata struct {
+				Namespace string `json:"namespace"`
+			} `json:"metadata"`
+			Spec struct {
+				Selector json.RawMessage `json:"selector"`
+			} `json:"spec"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &observed); err != nil {
+		return err
+	}
+	if len(observed.Items) != 1 || observed.Items[0].Metadata.Namespace != "nke-controller" {
+		return errors.New("API client admission requires exactly one controller Deployment in its namespace")
+	}
+	selector := observed.Items[0].Spec.Selector
+	var selected struct {
+		MatchLabels map[string]string `json:"matchLabels"`
+	}
+	if err := json.Unmarshal(selector, &selected); err != nil {
+		return err
+	}
+	if selected.MatchLabels["app.kubernetes.io/instance"] != "nke-controller" {
+		return errors.New("API client admission requires the exact controller release selector")
+	}
+	// Preserve the server's complete selector. Kubernetes, through kubectl apply,
+	// owns LabelSelector validation; this consumer does not parse its grammar.
+	policy := map[string]any{"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+		"metadata": map[string]string{"name": "nvke-demo-api-client", "namespace": "nke-controller"},
+		"spec": map[string]any{"podSelector": selector, "policyTypes": []string{"Ingress"},
+			"ingress": []any{map[string]any{"from": []any{map[string]any{"ipBlock": map[string]string{"cidr": netip.PrefixFrom(gateway, 32).String()}}},
+				"ports": []any{map[string]any{"protocol": "TCP", "port": 8080}}}}}}
+	path := filepath.Join(out, "nvke-api-client.json")
+	if err := privateJSON(path, policy); err != nil {
+		return err
+	}
+	_, err = s.capture(ctx, runner, "api-client-admission", filepath.Join(tools, "kubectl"), "--kubeconfig", kubeconfig, "apply", "--server-side", "-f", path)
 	return err
 }
