@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-native-arm64-nvidia",
-  "requiresCatalogDigest": "sha256:8ad8d9a29490afc1fce09f23c8cd03b8e2f89c715713d3dc80f037ba1ec058bb",
+  "requiresCatalogDigest": "sha256:eedaf6c3ac3cb67375b89b5f2145a33676c45b32e4a0345e28c3082be7b72969",
   "components": {
     "nvke-cni-ovn": {
       "component": {

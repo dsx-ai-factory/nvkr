@@ -183,6 +183,9 @@ func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
 	if disk.Packer.BuildName != "nvke-node-non-fde.qemu.nvke-non-fde" || disk.Packer.Variables["cpu_model"] != "host" || disk.Packer.Variables["ssh_timeout"] != "60m" || disk.ArtifactPath != "non-fde/nvke-node.qcow2" {
 		t.Fatal("native disk lost its selected Packer build, native CPU or artifact path")
 	}
+	if disk.Packer.Variables["ubuntu_series"] != "26.04" {
+		t.Fatal("native disk must select Ubuntu 26.04 to match its installer ISO")
+	}
 	if !reflect.DeepEqual(disk.Materials, map[string]string{"image-inputs": "nvke-image-inputs", "installer-iso": "nvke-patched-installer-iso"}) {
 		t.Fatal("native disk material selection changed")
 	}
