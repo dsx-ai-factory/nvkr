@@ -19,13 +19,14 @@ import (
 
 // closure is the complete set of committed generated bundles that depend on the
 // maintained catalog pins: the production Run, the other named Runs (development
-// and additional) and an optional qualification pair. Each member keeps its
+// and additional) and optional production/development qualification pairs. Each member keeps its
 // existing generation owner; this type only admits, checks and lists them, it
 // renders nothing itself.
 type closure struct {
-	production    *factory.GeneratedBundle
-	runs          []closureRun
-	qualification *qualification.GeneratedWorkflows
+	production               *factory.GeneratedBundle
+	runs                     []closureRun
+	qualification            *qualification.GeneratedWorkflows
+	developmentQualification *qualification.GeneratedWorkflows
 }
 
 // closureRun is one non-production Run member with the fresh Plan it renders.
@@ -87,6 +88,23 @@ func buildClosure(ctx context.Context, config Config, generatorVersion string, p
 		}
 		allowed[directory], workflows[bundle.WorkflowPath] = true, true
 		members.runs = append(members.runs, closureRun{bundle: bundle, plan: runPlan})
+		if run.Environment == config.DevelopmentEnvironment && config.DevelopmentQualificationPolicy != "" {
+			if err := admitPath(config.DevelopmentQualificationPolicy); err != nil {
+				return nil, err
+			}
+			policy, err := lifecycle.LoadQualificationPolicy(ctx, config.DevelopmentQualificationPolicy)
+			if err != nil {
+				return nil, err
+			}
+			if !policy.Source.Development {
+				return nil, e.New(e.CodeEngineCapability, "development qualification maintenance requires a development policy")
+			}
+			members.developmentQualification, err = qualification.RenderWorkflows(ctx, runPlan, policy, config.DevelopmentQualificationPolicy)
+			if err != nil {
+				return nil, err
+			}
+			allowed[path.Dir(qualification.DevelopmentQualificationManifestPath)] = true
+		}
 	}
 	if config.QualificationPolicy != "" {
 		if err := admitPath(config.QualificationPolicy); err != nil {
@@ -140,8 +158,12 @@ func (members *closure) check(ctx context.Context) error {
 			return err
 		}
 	}
-	if members.qualification != nil {
-		return qualification.CheckWorkflows(ctx, ".", members.qualification)
+	for _, pair := range []*qualification.GeneratedWorkflows{members.qualification, members.developmentQualification} {
+		if pair != nil {
+			if err := qualification.CheckWorkflows(ctx, ".", pair); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -168,6 +190,12 @@ func (members *closure) paths() (directories, files []string) {
 	if members.qualification != nil {
 		directories = append(directories, qualificationDirectory)
 		for name := range members.qualification.Files() {
+			files = append(files, name)
+		}
+	}
+	if members.developmentQualification != nil {
+		directories = append(directories, path.Dir(qualification.DevelopmentQualificationManifestPath))
+		for name := range members.developmentQualification.Files() {
 			files = append(files, name)
 		}
 	}
@@ -254,6 +282,12 @@ func generateClosure(ctx context.Context, config Config, generatorVersion string
 		return "", err
 	}
 	for _, run := range otherRuns(config) {
+		if run.Environment == config.DevelopmentEnvironment && config.DevelopmentQualificationPolicy != "" {
+			if _, err := qualification.GenerateFiles(ctx, run.Definition, run.Environment, config.DevelopmentQualificationPolicy, generatorVersion, factory.EngineGitHub, ".", check); err != nil {
+				return "", err
+			}
+			continue
+		}
 		environment, err := lifecycle.LoadEnvironment(ctx, run.Environment)
 		if err != nil {
 			return "", err

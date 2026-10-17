@@ -164,6 +164,7 @@ pipeline-attested build/evidence qualification; it does not reuse a reserved qua
 | Object | Canonical schema | Frozen family kind | Attestation predicate type |
 |---|---|---|---|
 | Qualification evidence | `nvkr.dev/qualification-evidence/v2` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v2` |
+| Development qualification evidence | `nvkr.dev/development-qualification-evidence/v1` | `nvkr.qualification-evidence` | `https://nvkr.dev/development-qualification-evidence/v1` |
 | Qualification policy | `nvkr.dev/qualification-policy/v1` | `nvkr.qualification-policy` | Independently selected configuration; no evidence predicate |
 | Native smoke worker | `nvkr.dev/tool-smoke-worker/v1` | `nvkr.tool-smoke-worker` | Detached signed document; no qualification attachment |
 

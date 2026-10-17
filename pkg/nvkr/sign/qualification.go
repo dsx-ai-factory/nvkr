@@ -15,6 +15,9 @@ import (
 // QualificationPredicateType cannot substitute for production SLSA evidence.
 const QualificationPredicateType = "https://nvkr.dev/qualification-evidence/v2"
 
+// DevelopmentQualificationPredicateType is never a production qualification claim.
+const DevelopmentQualificationPredicateType = "https://nvkr.dev/development-qualification-evidence/v1"
+
 // MaxQualificationPredicateBytes is the shared publication and verification bound.
 // Callers admit the complete canonical predicate before constructing a signer.
 const MaxQualificationPredicateBytes = maxOCIPredicateBytes
@@ -32,6 +35,11 @@ func (s *CosignOCISigner) AttestQualification(ctx context.Context, subject Subje
 // subject, keyless certificate identity and issuer without signing permissions.
 func (s *CosignOCISigner) VerifyQualification(ctx context.Context, subject Subject, predicate []byte) error {
 	return s.verifyExact(ctx, subject, QualificationPredicateType, predicate, "qualification")
+}
+
+// AttestDevelopmentQualification signs and independently reads back development-only evidence.
+func (s *CosignOCISigner) AttestDevelopmentQualification(ctx context.Context, subject Subject, predicate []byte) error {
+	return s.attestExact(ctx, subject, DevelopmentQualificationPredicateType, predicate, "development qualification")
 }
 
 // attestExact attaches one bounded exact predicate of a non-build evidence type

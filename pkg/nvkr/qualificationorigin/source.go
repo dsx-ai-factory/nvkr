@@ -32,6 +32,7 @@ var (
 
 // SourceRequest is an externally selected expectation, never evidence.
 type SourceRequest struct {
+	Branch        string `json:"branch,omitempty"`
 	Repository    string `json:"repository"`
 	RunID         string `json:"runId"`
 	Attempt       string `json:"attempt"`
@@ -42,6 +43,7 @@ type SourceRequest struct {
 
 // Description is a copy of authenticated facts, with no signing authority.
 type Description struct {
+	Branch        string `json:"branch,omitempty"`
 	Repository    string `json:"repository"`
 	RunID         string `json:"runId"`
 	Attempt       string `json:"attempt"`
@@ -155,6 +157,14 @@ func (r SourceRequest) Validate() error {
 	if err := (SourcePolicy{Repository: r.Repository, Workflow: r.Workflow, DefaultBranch: r.DefaultBranch}).Validate(); err != nil {
 		return err
 	}
+	if r.Branch != "" {
+		if r.Branch == r.DefaultBranch {
+			return e.New(e.CodeTrustPolicyMissing, "development source must use a nondefault branch")
+		}
+		if err := (SourcePolicy{Repository: r.Repository, Workflow: r.Workflow, DefaultBranch: r.Branch}).Validate(); err != nil {
+			return err
+		}
+	}
 	if !numberPattern.MatchString(r.RunID) || !numberPattern.MatchString(r.Attempt) || !commitPattern.MatchString(r.Commit) {
 		return e.New(e.CodeTrustPolicyMissing, "qualification source requires an exact Run, attempt and commit")
 	}
@@ -170,6 +180,9 @@ func (g *GitHub) AuthenticateSource(ctx context.Context, request SourceRequest) 
 	}
 	if err := request.Validate(); err != nil {
 		return nil, err
+	}
+	if request.Branch != "" {
+		return nil, e.New(e.CodeEngineCapability, "production source authentication rejects development branches")
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
@@ -193,11 +206,27 @@ func authenticateSourceResponse(ctx context.Context, request SourceRequest, repo
 	return &SourceRun{description: describe(request), closed: new(atomic.Bool)}, nil
 }
 
+func (r SourceRequest) branch() string {
+	if r.Branch != "" {
+		return r.Branch
+	}
+	return r.DefaultBranch
+}
+
+// SourceBranch is the exact authenticated producing branch; Branch is present
+// only for explicitly admitted development executions.
+func (d Description) SourceBranch() string {
+	if d.Branch != "" {
+		return d.Branch
+	}
+	return d.DefaultBranch
+}
+
 func describe(r SourceRequest) Description {
-	return Description{Repository: r.Repository, RunID: r.RunID, Attempt: r.Attempt, Commit: r.Commit, Workflow: r.Workflow,
-		DefaultBranch: r.DefaultBranch, Ref: "refs/heads/" + r.DefaultBranch,
+	return Description{Branch: r.Branch, Repository: r.Repository, RunID: r.RunID, Attempt: r.Attempt, Commit: r.Commit, Workflow: r.Workflow,
+		DefaultBranch: r.DefaultBranch, Ref: "refs/heads/" + r.branch(),
 		InvocationID: "https://github.com/" + r.Repository + "/actions/runs/" + r.RunID + "/attempts/" + r.Attempt,
-		BuilderID:    "https://github.com/" + r.Repository + "/" + r.Workflow + "@refs/heads/" + r.DefaultBranch}
+		BuilderID:    "https://github.com/" + r.Repository + "/" + r.Workflow + "@refs/heads/" + r.branch()}
 }
 
 func (g *GitHub) lookup(ctx context.Context, request SourceRequest) (repositoryResponse, runResponse, error) {
@@ -217,7 +246,7 @@ func matchRun(request SourceRequest, repository repositoryResponse, run runRespo
 		repository.DefaultBranch != request.DefaultBranch || run.Repository.ID != repository.ID || run.HeadRepository.ID != repository.ID ||
 		run.Repository.FullName != request.Repository || run.HeadRepository.FullName != request.Repository ||
 		string(run.ID) != request.RunID || string(run.Attempt) != request.Attempt || run.HeadSHA != request.Commit ||
-		run.HeadBranch != request.DefaultBranch || run.Path != request.Workflow {
+		run.HeadBranch != request.branch() || run.Path != request.Workflow {
 		return e.New(e.CodeVerifyFailed, "GitHub Run does not match the exact approved repository, attempt, commit, workflow and default branch")
 	}
 	return nil

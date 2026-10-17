@@ -26,6 +26,9 @@ func (g *GitHub) AuthenticateTriggeredSource(ctx context.Context, policy SourceP
 	if err := policy.Validate(); err != nil {
 		return nil, err
 	}
+	if policy.Development {
+		return g.authenticateDispatchedDevelopmentSource(ctx, policy)
+	}
 	if os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("GITHUB_SERVER_URL") != "https://github.com" ||
 		os.Getenv("GITHUB_EVENT_NAME") != "workflow_run" || os.Getenv("GITHUB_REPOSITORY") != policy.Repository ||
 		os.Getenv("GITHUB_REF") != "refs/heads/"+policy.DefaultBranch {
