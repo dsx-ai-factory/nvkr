@@ -232,3 +232,32 @@ esac
 		})
 	}
 }
+
+func TestNativeSiteNetworksExcludeObservedGuestSubnet(t *testing.T) {
+	for _, tc := range []struct {
+		name, subnet string
+		valid        bool
+	}{
+		{"Mac vmnet", "192.168.64.0/24", true},
+		{"Linux bridge", linuxNativeBridge().prefix.String(), true},
+		{"pod overlap", "10.244.1.0/24", false},
+		{"service overlap", "10.96.1.0/24", false},
+		{"enclosing range", "10.0.0.0/8", false},
+		{"missing observation", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prefix, _ := netip.ParsePrefix(tc.subnet)
+			err := admitNativeSiteNetworks(nativeBridgeConfig{prefix: prefix})
+			if tc.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			var coded *nvkrerr.Error
+			if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
+				t.Fatalf("range rejection lost capability code: %v", err)
+			}
+		})
+	}
+}

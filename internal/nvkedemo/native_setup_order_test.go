@@ -49,6 +49,7 @@ set -eu
 umask 077
 case "$1:$2" in
  generate:sitespec)
+  case "$*" in *"cluster.podCidr=10.244.0.0/16"*"cluster.serviceCidr=10.96.0.0/16"*) ;; *) exit 54;; esac
   if test "$EXPECT_MODERN" = yes; then
    test -f "$NVKECTL_SPIRE_CA_CERT_FILE"
    test -f "$NVKECTL_SPIRE_CA_KEY_FILE"

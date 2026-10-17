@@ -10,12 +10,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -57,7 +59,25 @@ curl --fail --silent --show-error --connect-timeout 10 --max-time 60 \
   --header 'X-NVKE-Startup-Status: prepared' --data-binary @site-prepared.json {{quote .HandoffURL}}
 `
 
+func admitNativeSiteNetworks(bridge nativeBridgeConfig) error {
+	if !bridge.prefix.IsValid() {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "site bootstrap requires an observed guest subnet")
+	}
+	for _, network := range []string{managementPodCIDR, managementServiceCIDR} {
+		if bridge.prefix.Overlaps(netip.MustParsePrefix(network)) {
+			return nvkrerr.New(nvkrerr.CodeEngineCapability, "site Kubernetes range %s overlaps guest subnet %s", network, bridge.prefix)
+		}
+	}
+	return nil
+}
+
 func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, ip, tools, out string) error {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	if err := admitNativeSiteNetworks(s.bridge); err != nil {
+		return err
+	}
 	home := filepath.Join(out, "home")
 	if err := os.Mkdir(home, 0700); err != nil {
 		return err
@@ -112,6 +132,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	}
 	args := []string{cli, "generate", "sitespec", "nvke-native-site", "--nodes", filepath.Join(out, "hosts.csv"),
 		"--set", "cluster.k8sVersion=1.34.2", "--set", "cluster.cniName=ovn-kubernetes", "--set", "cluster.cniVersion=" + version,
+		"--set", "cluster.podCidr=" + managementPodCIDR, "--set", "cluster.serviceCidr=" + managementServiceCIDR,
 		"--set", "cluster.kubeletConfig.systemReservedMemory=1Gi", "--set", "spire.trustDomain=nvke-native-site.nke.local",
 		"--set", "spire.upstreamCA=true"}
 	if modern {

@@ -741,3 +741,28 @@ func TestStopRequestedSignalPresentation(t *testing.T) {
 		}
 	}
 }
+
+func TestReapedGroupPermissionErrorRequiresIndependentAbsence(t *testing.T) {
+	for _, tc := range []struct {
+		name                      string
+		signalErr, probeErr, want error
+		alive                     bool
+	}{
+		{name: "gone after denied signal", signalErr: unix.EPERM},
+		{name: "denied live group", signalErr: unix.EPERM, alive: true, want: unix.EPERM},
+		{name: "unobservable group", signalErr: unix.EPERM, probeErr: unix.EACCES, want: unix.EACCES},
+		{name: "other signal failure", signalErr: unix.EINVAL, want: unix.EINVAL},
+		{name: "already reaped", signalErr: os.ErrProcessDone},
+		{name: "successful signal"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &OwnedProcess{cmd: &exec.Cmd{Process: &os.Process{Pid: 123}}, groupProbe: func(int) (bool, error) { return tc.alive, tc.probeErr }}
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			err := p.confirmGroupJoin(ctx, tc.signalErr)
+			if tc.want == nil && err != nil || tc.want != nil && !errors.Is(err, tc.want) {
+				t.Fatalf("join=%v, want %v", err, tc.want)
+			}
+		})
+	}
+}

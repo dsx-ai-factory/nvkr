@@ -215,14 +215,6 @@ func (p *OwnedProcess) observeProcessExit() {
 	}
 }
 
-func groupAlive(pid int) (bool, error) {
-	err := unix.Kill(-pid, 0)
-	if errors.Is(err, unix.ESRCH) {
-		return false, nil
-	}
-	return err == nil, err
-}
-
 func signalGroup(pid int, signal unix.Signal) error {
 	err := unix.Kill(-pid, signal)
 	if errors.Is(err, unix.ESRCH) {
@@ -250,19 +242,27 @@ func (p *OwnedProcess) awaitGroup(ctx context.Context) error {
 	}
 }
 
+// A failed signal never proves disappearance. Only an independent, successful
+// group observation may supersede EPERM after the direct child has been reaped.
+func (p *OwnedProcess) confirmGroupJoin(ctx context.Context, signalErr error) error {
+	if errors.Is(signalErr, unix.EPERM) {
+		alive, err := p.groupProbe(p.PID())
+		if err != nil || alive {
+			return errors.Join(signalErr, err)
+		}
+	} else if signalErr != nil && !errors.Is(signalErr, os.ErrProcessDone) {
+		return signalErr
+	}
+	return p.awaitGroup(ctx)
+}
+
 func (p *OwnedProcess) finish() {
 	waitErr := p.cmd.Wait()
 	// Join descendants even if the direct leader exited first. Reuse the shared
 	// signaling owner, but add explicit bounded disappearance verification.
-	joinErr := ownedcmd.KillDescendants(p.cmd)
-	if errors.Is(joinErr, os.ErrProcessDone) {
-		joinErr = nil
-	}
-	if joinErr == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		joinErr = p.awaitGroup(ctx)
-		cancel()
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	joinErr := p.confirmGroupJoin(ctx, ownedcmd.KillDescendants(p.cmd))
+	cancel()
 	if joinErr != nil {
 		joinErr = fmt.Errorf("%w: %s: %w", ErrUnjoined, p.phase, joinErr)
 	}
