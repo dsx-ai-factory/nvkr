@@ -77,6 +77,10 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	if err != nil || len(thumbprint) != 32 {
 		return errors.New("site preparation did not return a valid TPM identity")
 	}
+	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
+	if err != nil {
+		return err
+	}
 	cli := s.assets.CLI
 	shared := filepath.Join(out, "bootstrap-shared")
 	caRoot := filepath.Join(shared, "ca")
@@ -106,10 +110,16 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	if err != nil {
 		return err
 	}
-	spec, err := s.capture(ctx, runner, "generate-sitespec", cli, "generate", "sitespec", "nvke-native-site", "--nodes", filepath.Join(out, "hosts.csv"),
-		"--set", "cluster.k8sVersion=1.34.2", "--set", "cluster.cniName=ovn-kubernetes", "--set", "cluster.cniVersion="+version,
+	args := []string{cli, "generate", "sitespec", "nvke-native-site", "--nodes", filepath.Join(out, "hosts.csv"),
+		"--set", "cluster.k8sVersion=1.34.2", "--set", "cluster.cniName=ovn-kubernetes", "--set", "cluster.cniVersion=" + version,
 		"--set", "cluster.kubeletConfig.systemReservedMemory=1Gi", "--set", "spire.trustDomain=nvke-native-site.nke.local",
-		"--set", "spire.caCertFile="+filepath.Join(caRoot, "ca.crt"), "--set", "spire.caKeyFile="+filepath.Join(caRoot, "ca.key"))
+		"--set", "spire.upstreamCA=true"}
+	if modern {
+		runner = bindNativeSpireCA(runner, caRoot)
+	} else {
+		args = append(args[:len(args)-2], "--set", "spire.caCertFile="+filepath.Join(caRoot, "ca.crt"), "--set", "spire.caKeyFile="+filepath.Join(caRoot, "ca.key"))
+	}
+	spec, err := s.capture(ctx, runner, "generate-sitespec", args...)
 	if err != nil {
 		return err
 	}
@@ -176,32 +186,17 @@ volumeBindingMode: Immediate
 	if err := runner.Run(ctx, []string{filepath.Join(tools, "kubectl"), "apply", "-f", storagePath}, "host-site-storage", time.Minute); err != nil {
 		return err
 	}
-	raw, err := os.ReadFile(specPath)
+	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
 	if err != nil {
 		return err
 	}
-	var doc map[string]any
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
-		return err
-	}
-	password, err := randomScalar()
-	if err != nil {
-		return err
-	}
-	for name, value := range map[string]string{"nico-token": "nico-simctl-token", "unused-pull-token": "local-image-import-only", "tenant-password": password} {
-		if err := os.WriteFile(filepath.Join(out, name), []byte(value), 0600); err != nil {
+	stackConfig := ""
+	if modern {
+		runner, stackConfig, err = s.prepareNativeStack(ctx, runner, out)
+		if err != nil {
 			return err
 		}
-	}
-	doc["controllerStack"] = map[string]any{"arch": "arm64", "nico": map[string]any{"endpoint": "http://" + net.JoinHostPort(s.bridge.gateway.String(), "18080"), "orgID": "novxwn552ssc", "apiName": "forge", "tokenFile": filepath.Join(out, "nico-token")},
-		"pullSecret": map[string]any{"server": "ghcr.io", "username": "native-demo-local-import", "tokenFile": filepath.Join(out, "unused-pull-token")},
-		"tenant":     map[string]any{"user": "nvke-demo", "passwordFile": filepath.Join(out, "tenant-password")}, "database": map[string]any{"passwordFile": filepath.Join(out, "postgres-password")},
-		"images": map[string]any{"controller": s.assets.Images["controller"].Reference, "profiles": s.assets.Images["profiles"].Reference}}
-	raw, err = yaml.Marshal(doc)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(specPath, raw, 0600); err != nil {
+	} else if err := s.prepareLegacyNativeStack(ctx, out, specPath); err != nil {
 		return err
 	}
 	if _, err := s.capture(ctx, runner, "validate-sitespec", cli, "validate", "sitespec", "--sitespec", specPath); err != nil {
@@ -216,6 +211,9 @@ volumeBindingMode: Immediate
 		return err
 	}
 	args := []string{"bash", filepath.Join(s.assets.Installer, "deploy", "nvke-deploy.sh"), "install", "--deploy-path", filepath.Join(s.assets.Installer, "deploy", "nico"), "--sitespec", specPath, "--kubeconfig", filepath.Join(out, "site.kubeconfig"), "--values-for", "nktp=" + telemetryPath}
+	if stackConfig != "" {
+		args = append(args, "--stack-config", stackConfig)
+	}
 	if len(s.assets.RuntimeOutputs) != 0 {
 		values := runtimeValues("docker.io", s.assets.RuntimeOutputs)
 		for _, item := range []string{"postgresql", "spire", "temporal"} {
@@ -284,4 +282,91 @@ func demoTelemetryValues() ([]byte, error) {
 		values[role] = map[string]any{"kubernetes": settings}
 	}
 	return yaml.Marshal(values)
+}
+
+func (s *nativeSiteAttempt) prepareLegacyNativeStack(ctx context.Context, out, specPath string) error {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	raw, err := os.ReadFile(specPath)
+	if err != nil {
+		return err
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return err
+	}
+	password, err := randomScalar()
+	if err != nil {
+		return err
+	}
+	for name, value := range map[string]string{"nico-token": "nico-simctl-token", "unused-pull-token": "local-image-import-only", "tenant-password": password} {
+		if err := os.WriteFile(filepath.Join(out, name), []byte(value), 0600); err != nil {
+			return err
+		}
+	}
+	doc["controllerStack"] = map[string]any{"arch": "arm64", "nico": map[string]any{"endpoint": "http://" + net.JoinHostPort(s.bridge.gateway.String(), "18080"), "orgID": "novxwn552ssc", "apiName": "forge", "tokenFile": filepath.Join(out, "nico-token")},
+		"pullSecret": map[string]any{"server": "ghcr.io", "username": "native-demo-local-import", "tokenFile": filepath.Join(out, "unused-pull-token")},
+		"tenant":     map[string]any{"user": "nvke-demo", "passwordFile": filepath.Join(out, "tenant-password")}, "database": map[string]any{"passwordFile": filepath.Join(out, "postgres-password")},
+		"images": map[string]any{"controller": s.assets.Images["controller"].Reference, "profiles": s.assets.Images["profiles"].Reference}}
+	raw, err = yaml.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(specPath, raw, 0600); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Source selection, rather than the execution OS, determines the CLI contract.
+func modernNativeSiteContract(ctx context.Context, installer string) (bool, error) {
+	commit, err := readRunFile(ctx, installer, "SOURCE_COMMIT", 41)
+	if err != nil {
+		return false, err
+	}
+	switch string(commit) {
+	case "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n":
+		return true, nil
+	case "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n":
+		return false, nil
+	default:
+		return false, errors.New("native site CLI contract differs from reviewed source")
+	}
+}
+
+func bindNativeSpireCA(runner Runner, caRoot string) Runner {
+	runner.Env = SetEnv(runner.Env, map[string]string{
+		"NVKECTL_SPIRE_CA_CERT_FILE": filepath.Join(caRoot, "ca.crt"),
+		"NVKECTL_SPIRE_CA_KEY_FILE":  filepath.Join(caRoot, "ca.key"),
+	})
+	return runner
+}
+
+func (s *nativeSiteAttempt) prepareNativeStack(ctx context.Context, runner Runner, out string) (Runner, string, error) {
+	if err := requireContext(ctx); err != nil {
+		return runner, "", err
+	}
+	nodePassword, err := randomScalar()
+	if err != nil {
+		return runner, "", err
+	}
+	databasePassword, err := randomScalar()
+	if err != nil {
+		return runner, "", err
+	}
+	runner = bindNativeSpireCA(runner, filepath.Join(out, "bootstrap-shared", "ca"))
+	runner.Env = SetEnv(runner.Env, map[string]string{
+		"NVKECTL_NICO_TOKEN": "nico-simctl-token", "NVKECTL_NODE_USER": "nvke-demo",
+		"NVKECTL_NODE_PASSWORD": nodePassword, "NVKECTL_DATABASE_PASSWORD": databasePassword,
+	})
+	path := filepath.Join(out, "stack-config.json")
+	config := map[string]any{
+		"nico":   map[string]string{"endpoint": "http://" + net.JoinHostPort(s.bridge.gateway.String(), "18080"), "orgID": "novxwn552ssc", "apiName": "forge"},
+		"images": map[string]string{"controller": s.assets.Images["controller"].Reference, "profiles": s.assets.Images["profiles"].Reference},
+	}
+	if err := privateJSON(path, config); err != nil {
+		return runner, "", err
+	}
+	return runner, path, nil
 }
