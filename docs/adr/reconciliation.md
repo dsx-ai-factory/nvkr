@@ -147,8 +147,12 @@ Local/disposable acknowledgements are operator declarations, not proof of locali
 Contract and process-fixture tests cover guards, capture, cleanup and dispatch. They do not establish
 successful external execution of the corrected published-source route. Report parsing, original JUnit
 validity, continuous installed-byte proof, AI/user adapters, Definition applicability detection,
-qualification signing and promotion from these outputs remain unimplemented. Local unsigned sources
-remain unsupported. Existing validation-vector v3 and qualification-evidence v2 are unchanged.
+qualification signing and promotion from these outputs remain unimplemented. Explicit complete local diagnostic Runs are now captured through a lifecycle-owned capability,
+including original Plan/compiler inputs and held payloads. Product and tools may share one capture;
+local reports omit hosted qualification inputs. The shared native demo has an opt-in Linux ARM64
+conformance hook using matching suite/tool outputs from the same fresh artifact Run. Focused owner,
+adapter and dispatch tests establish those contracts; the full native demo plus conformance remains
+externally unverified. Existing validation-vector v3 and qualification-evidence v2 are unchanged.
 [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
 owns diagnostic execution and passive external qualification; [ADR-18 §3](0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks)
 owns the host isolation posture. The [operator reference](../external-test-output-contract.md)

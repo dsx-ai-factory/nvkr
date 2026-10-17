@@ -51,13 +51,16 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if err := requireContext(ctx); err != nil {
 		return BuiltInputs{}, err
 	}
+	if cfg.Conformance && (cfg.QualifyLocal || cfg.Prepared || cfg.QualificationPolicy != "") {
+		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "demo conformance selects a fresh unsigned diagnostic Run; prepared or local-signing combinations are not admitted")
+	}
 	if err := cfg.Qualification.validate(cfg.QualificationPolicy); err != nil {
 		return BuiltInputs{}, err
 	}
 	if cfg.Prepared && !configString(cfg.QualificationPolicy) {
 		return BuiltInputs{}, configUsage("prepared builds require an explicit qualification policy")
 	}
-	launcherFlags, err := buildNetworkFlags(cfg.Network)
+	launcherFlags, err := buildSelectionFlags(cfg)
 	if err != nil {
 		return BuiltInputs{}, err
 	}
@@ -261,6 +264,20 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	return runner.Run(ctx, args, "build-all", 6*time.Hour)
 }
 
+func buildSelectionFlags(cfg BuildConfig) ([]string, error) {
+	flags, err := buildNetworkFlags(cfg.Network)
+	if err != nil {
+		return nil, err
+	}
+	if _, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance); err != nil {
+		return nil, err
+	}
+	if cfg.Conformance {
+		flags = append(flags, "--conformance")
+	}
+	return flags, nil
+}
+
 func buildNetworkFlags(network string) ([]string, error) {
 	mode, err := normalizeNetwork(network)
 	if err != nil {
@@ -278,6 +295,12 @@ func buildNetworkFlags(network string) ([]string, error) {
 // artifact workflow. Guest deployment keeps its shared native KVM/HVF owner.
 // The TCG inputs remain explicit diagnostics; KVM never falls back to them.
 func LocalArtifactInputs(network string) (definition, environment string, err error) {
+	return LocalArtifactInputsFor(network, false)
+}
+
+// LocalArtifactInputsFor adds version-matched diagnostic tools to the SAME Run
+// only when explicitly requested; ordinary demo selections stay unchanged.
+func LocalArtifactInputsFor(network string, conformance bool) (definition, environment string, err error) {
 	mode, err := normalizeNetwork(network)
 	if err != nil {
 		return "", "", err
@@ -285,6 +308,12 @@ func LocalArtifactInputs(network string) (definition, environment string, err er
 	definition = "inputs/definitions/demo/arm64-nvidia-local-kvm.json"
 	if mode == "upstream-ovn" {
 		definition = "inputs/definitions/demo/arm64-upstream-local-kvm.json"
+	}
+	if conformance {
+		if mode == "kind-calico" {
+			return "", "", configUsage("conformance requires the selected OVN demo")
+		}
+		definition = strings.TrimSuffix(definition, ".json") + "-conformance.json"
 	}
 	return definition, "inputs/environments/local-arm64-kvm.json", nil
 }
@@ -313,7 +342,7 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 		return nil, errors.New("invalid private build invocation")
 	}
 	definition := args[4]
-	authored, environment, err := LocalArtifactInputs(cfg.Network)
+	authored, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +386,7 @@ func preparedBuildEnvironment(environment []string, cfg BuildConfig) ([]string, 
 }
 
 func prepareLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) error {
-	flags, err := buildNetworkFlags(cfg.Network)
+	flags, err := buildSelectionFlags(cfg)
 	if err != nil {
 		return err
 	}

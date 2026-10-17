@@ -33,7 +33,7 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer) err
 	return executeRoot(ctx, newCommand(out, diagnostics, demoActions{
 		run: withOwnDemoExecutable(nvkedemo.DeployArtifacts),
 		admit: func(ctx context.Context, cfg nvkedemo.Config) error {
-			return nvkedemo.AdmitNativeDeployment(ctx, cfg.Accelerator)
+			return nvkedemo.AdmitDemoDeployment(ctx, cfg)
 		},
 		build: nvkedemo.BuildArtifacts, tools: nvkedemo.PrepareTools,
 		guest: nvkedemo.RunNativeGuest, native: nvkedemo.RunNative,
@@ -264,7 +264,11 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			budget, cancel := context.WithTimeout(recoveryCtx, 8*time.Hour)
+			ceiling := 8 * time.Hour
+			if run.Conformance {
+				ceiling += 4 * time.Hour
+			}
+			budget, cancel := context.WithTimeout(recoveryCtx, ceiling)
 			defer cancel()
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			plain, _ := cmd.Flags().GetBool("plain")
@@ -300,6 +304,7 @@ func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {
 	flags := command.Flags()
 	flags.StringVar(&cfg.Accelerator, "accelerator", "", "native guest accelerator: defaults to Mac hvf or Linux kvm for every VM")
+	flags.BoolVar(&cfg.Conformance, "conformance", false, "run Kubernetes conformance against this disposable tenant before cleanup (Linux ARM64)")
 	flags.BoolVar(&cfg.Walkthrough, "walkthrough", false, "show bounded read-only site, tenant and existing workload observations before cleanup")
 	flags.BoolVar(&cfg.Cleanup, "cleanup", false, "delete owned VMs after acceptance; otherwise keep the foreground demo until Ctrl-C")
 	checkoutHelp := "legacy source locator; deployment uses the NVKR installer archive"
@@ -313,6 +318,7 @@ func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {
 	if !existing {
 		return
 	}
+	flags.StringVar(&cfg.Repo, "repo", "", "repository containing the captured local artifact Run; required with --conformance")
 	flags.StringVar(&cfg.NVKR, "nvkr", "", "native nvkr executable")
 	flags.StringVar(&cfg.Runs.Artifacts, "artifacts-run", "", "completed artifact Run supplying disk, components, providers, site and profiles")
 	flags.StringVar(&cfg.Runs.HostTools, "host-tools-run", "", "completed native host tool Run; defaults to tools-run")
@@ -363,9 +369,18 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 		{"site-run", &selected.Run.Runs.Site, flags.Run.Runs.Site}, {"tools-run", &selected.Run.Runs.Tools, flags.Run.Runs.Tools}, {"profiles-run", &selected.Run.Runs.Profiles, flags.Run.Runs.Profiles},
 		{"simulator-run", &selected.Run.Runs.Simulator, flags.Run.Runs.Simulator}, {"work", &selected.Restore.Work, flags.Restore.Work},
 	} {
+		if field.name == "repo" && command.Name() == "run" {
+			continue
+		}
 		if command.Flags().Changed(field.name) {
 			*field.destination = field.value
 		}
+	}
+	if command.Flags().Changed("repo") && command.Name() == "run" {
+		selected.Run.Repo = flags.Run.Repo
+	}
+	if command.Flags().Changed("conformance") {
+		selected.Run.Conformance = flags.Run.Conformance
 	}
 	if command.Flags().Changed("jobs") {
 		selected.Build.Jobs = flags.Build.Jobs

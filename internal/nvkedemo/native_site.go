@@ -25,6 +25,7 @@ type NativeConfig struct {
 	TenantTimeout           time.Duration
 	Image, Out, Accelerator string
 	Network, DemoExecutable string
+	conformance             *nativeConformanceConfig
 	Assets                  NativeAssetConfig
 	Cleanup                 bool
 	Progress                io.Writer
@@ -32,6 +33,7 @@ type NativeConfig struct {
 
 type nativeSiteAttempt struct {
 	tenantTimeout             time.Duration
+	conformance               *nativeConformanceConfig
 	assets                    NativeAssets
 	handoff                   *nativeHandoff
 	files                     string
@@ -62,6 +64,9 @@ func RunNative(ctx context.Context, cfg NativeConfig) (result error) {
 	}
 	if err := admitNativeHost(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator); err != nil {
 		return err
+	}
+	if cfg.conformance != nil && runtime.GOOS != "linux" {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local conformance requires Linux")
 	}
 	if err := admitBootstrapHost(runtime.GOOS, NativeEnvironment()); err != nil {
 		return err
@@ -98,7 +103,7 @@ func RunNative(ctx context.Context, cfg NativeConfig) (result error) {
 	if err != nil {
 		return err
 	}
-	attempt := &nativeSiteAttempt{assets: assets, cleanup: cfg.Cleanup, network: mode, tenantTimeout: cfg.TenantTimeout}
+	attempt := &nativeSiteAttempt{assets: assets, cleanup: cfg.Cleanup, network: mode, tenantTimeout: cfg.TenantTimeout, conformance: cfg.conformance}
 	result = RunNativeGuest(ctx, NativeGuestConfig{
 		Image: cfg.Image, Tools: assets.HostTools, Out: filepath.Join(out, "runtime"),
 		Accelerator: cfg.Accelerator, Timeout: 30 * time.Minute, Progress: cfg.Progress, site: attempt, DemoExecutable: cfg.DemoExecutable,
@@ -313,6 +318,11 @@ func (s *nativeSiteAttempt) ready(ctx context.Context, runner Runner, row native
 	access := OperatorAccess{kubectl: filepath.Join(tools, "kubectl"), site: kubeconfig, tenant: filepath.Join(out, "tenant.kubeconfig"), siteQCOW: true}
 	if err := s.presentStatus(ctx, runner, access); err != nil {
 		return err
+	}
+	if s.conformance != nil {
+		if err := s.runConformance(ctx, runner, tools, out); err != nil {
+			return err
+		}
 	}
 	var domains []domainEvidence
 	if s.guard != nil {

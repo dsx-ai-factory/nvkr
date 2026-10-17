@@ -654,3 +654,66 @@ func TestE2EAdmitsNativeVMRuntimeBeforeBuild(t *testing.T) {
 		t.Fatal("native admission was not performed once")
 	}
 }
+
+func TestConformanceOptionKeepsFreshE2EHandoffAndExplicitFalse(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	for _, row := range []struct {
+		name       string
+		configured bool
+		flag       string
+		want       bool
+	}{
+		{"explicit on", false, "true", true}, {"configured on", true, "", true}, {"explicit off", true, "false", false}, {"ordinary", false, "", false},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			var out bytes.Buffer
+			calls := 0
+			fresh := nvkedemo.BuiltInputs{NVKR: "fresh-nvkr", Runs: nvkedemo.RunInputs{OS: "fresh-artifacts", Components: "fresh-artifacts", Providers: "fresh-artifacts", Site: "fresh-artifacts", Profiles: "fresh-artifacts", Tools: "fresh-native-tools"}}
+			actions := demoActions{
+				load: func(context.Context, string) (nvkedemo.DemoFile, error) {
+					file := configuredFixture()
+					file.Run.NVKR = ""
+					file.Run.Runs = nvkedemo.RunFileInputs{}
+					file.Run.Conformance = row.configured
+					return file, nil
+				},
+				admit: func(_ context.Context, cfg nvkedemo.Config) error {
+					if cfg.Conformance != row.want || cfg.Repository != "configured-repo" {
+						t.Fatalf("wrong prebuild admission: %+v", cfg)
+					}
+					return nil
+				},
+				build: func(ctx context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+					calls++
+					if cfg.Conformance != row.want {
+						t.Fatal("build lost explicit selection")
+					}
+					deadline, ok := ctx.Deadline()
+					ceiling := 8 * time.Hour
+					if row.want {
+						ceiling = 12 * time.Hour
+					}
+					if !ok || time.Until(deadline) > ceiling {
+						t.Fatal("missing bounded e2e ceiling")
+					}
+					return fresh, nil
+				},
+				run: func(_ context.Context, cfg nvkedemo.Config) error {
+					calls++
+					if cfg.Conformance != row.want || cfg.Runs != fresh.Runs || cfg.NVKR != fresh.NVKR {
+						t.Fatalf("conformance lost SAMEfresh handoff: %+v", cfg)
+					}
+					return nil
+				},
+			}
+			args := []string{"e2e", "--config", "explicit.yaml"}
+			if row.flag != "" {
+				args = append(args, "--conformance="+row.flag)
+			}
+			err := executeRoot(t.Context(), newCommand(&out, io.Discard, actions), args)
+			if err != nil || calls != 2 {
+				t.Fatalf("calls=%d err=%v", calls, err)
+			}
+		})
+	}
+}

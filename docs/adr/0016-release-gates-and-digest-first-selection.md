@@ -565,6 +565,14 @@ Lifecycle authenticates each root and its exact producing Run, retains live rece
 executable members through the delivery owner. The adapter runs those held Linux executables with an
 embedded kubeconfig and bounded child-process lifetimes. Tools and suite images are ordinary catalog
 outputs; caller-authored binary paths, payload digests or raw image references cannot restore authority.
+An explicit diagnostic `source.kind: local` instead captures the original complete local Run,
+its recorded Plan and compiler inputs, and its exact payloads through lifecycle's concrete
+`LocalDiagnosticArtifacts` owner. Product and tools may share that one owner; separate local
+Runs require separate captures. No publication identity, hosted origin, policy receipt or qualification
+input is synthesized. Local image aliases are descriptions only: selected running manifests must match
+the held output before and after the suite. Local executable members use the same held delivery export.
+This capability is limited to `unqualified-local-execution`; partial, changed and dry-run attempts fail.
+
 The operator must explicitly declare an existing disposable local cluster. That declaration proves
 neither locality nor exclusive ownership. This host execution is not a sandbox (ADR-18 §3).
 

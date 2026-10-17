@@ -140,6 +140,38 @@ bin/nvke-demo tools --help
 bin/nvke-demo native --help
 ```
 
+## Conformance on the fresh Ubuntu tenant
+
+Add `--conformance` to `nvke-demo e2e` on native Ubuntu ARM64:
+
+```sh
+bin/nvke-demo e2e --repo /absolute/path/to/nvkr --attempt fresh-conformance-01 \
+  --out /absolute/path/to/fresh-demo --jobs 8 --network ovn --conformance --cleanup
+```
+
+This explicitly selects 36 outputs in the same fresh artifact Run: the ordinary 32 plus
+source-built Hydrophone and kubectl, a matching Kubernetes v1.34.2 conformance image and
+BusyBox. The kubectl source is v1.34.12 with declared dependency updates, built using Go1.27.2.
+No separate builder, retained product Run or hosted-publication substitute is selected.
+The native host-tool Run remains a separate platform-specific dependency of the same workflow.
+
+After the two tenant nodes and zero-retry workload/DNS checks, the demo calls `nvkr validate`
+against that invocation's exact tenant kubeconfig. It binds the selected tenant OVN runtime image
+to the held artifact output, captures before/after identities, and retains original JUnit under
+`runtime/conformance`, with `runtime/conformance-output.json` describing the capture.
+Harness failure, missing capture or changed deployment identity prevents demo success.
+The ordinary owned cleanup still runs after an error. Explicit `--cleanup` completes natural
+tenant deletion and joined owned cleanup after successful capture; otherwise the demo stays
+in the foreground. Allow up to four hours for the full serial conformance suite, independently
+of tenant provisioning. The full e2e ceiling becomes 12 hours only with this option.
+
+This local diagnostic option currently requires Linux ARM64; an explicit Mac request fails
+before a build or guest starts. The normal Mac/Linux demo remains unchanged without the option.
+Prepared/local-signing combinations are not admitted. The actual four-output Ubuntu tool build
+has passed; a complete fresh native demo plus conformance execution remains unverified.
+Original JUnit owns suite results. These diagnostics do not create a signed qualification verdict
+or upload results to TestGrid. See the [external test output contract](external-test-output-contract.md).
+
 ## Existing Linux Kind-site workflow
 
 The commands and evidence in this historical section describe the superseded

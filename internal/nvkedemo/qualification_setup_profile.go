@@ -52,7 +52,9 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 	}
 	images := map[string]string{
 		"capnico-controller-arm64": "capnico-controller", "cluster-api-provider-provisioned-arm64": "cluster-api-provider-provisioned",
-		"controller-profiles": "nvke-local-profiles", "csi-node-driver-registrar-image-arm64": "csi-node-driver-registrar-image",
+		"capi-exec-init-image-arm64": "native-capi-exec-init-image", "capi-exec-plugin-image-arm64": "native-capi-exec-plugin-image",
+		"workload-image-arm64": "native-workload-image",
+		"controller-profiles":  "nvke-local-profiles", "csi-node-driver-registrar-image-arm64": "csi-node-driver-registrar-image",
 		"cwe": "nvke-controller", "ovn-image-arm64": "ovn-kube-ubuntu", "postgresql-image-arm64": "postgresql-image",
 		"spiffe-csi-image-arm64": "spiffe-csi-image", "spire-agent-image-arm64": "spire-agent-image", "spire-bash-image-arm64": "spire-bash-image",
 		"spire-controller-manager-image-arm64": "spire-controller-manager-image", "spire-oidc-image-arm64": "spire-oidc-image",
@@ -63,7 +65,9 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 	disk := "nvke-node-image-arm64"
 	if mode == "upstream-ovn" {
 		delete(images, "ovn-image-arm64")
+		delete(images, "controller-profiles")
 		delete(charts, "ovn-chart-arm64")
+		images["controller-profiles-upstream-ovn"] = "nvke-local-profiles"
 		images["upstream-ovn-image-arm64"] = "ovn-kube-ubuntu"
 		charts["upstream-ovn-chart-arm64"], disk = "ovn-kubernetes-chart", "nvke-node-image-upstream-ovn-arm64"
 	}
@@ -84,7 +88,7 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 	}
 	expected[disk] = factory.LifecycleOutputPlan{Name: disk, Kind: lifecycle.OutputDiskImage, Components: []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro", "nvke-node-image", "nvke-patched-installer-iso", "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", "ubuntu-installer-iso"}}
 	if len(plan.LifecycleOutputs) != len(expected) {
-		return configUsage("qualification setup requires the complete maintained 29-output demo")
+		return configUsage("qualification setup requires the complete maintained 32-output local demo")
 	}
 	for _, output := range plan.LifecycleOutputs {
 		want, ok := expected[output.Name]

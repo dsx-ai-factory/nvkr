@@ -25,7 +25,7 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "walkthrough introduction requires a context and writer")
 	}
-	definitionName, environmentName, err := nvkedemo.LocalArtifactInputs(cfg.Network)
+	definitionName, environmentName, err := nvkedemo.LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
 	if err != nil {
 		return err
 	}
@@ -88,6 +88,9 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	fmt.Fprintf(&text, "   Run record, written by execution: %q\n", filepath.Join(".nvkr", "runs", cfg.AttemptPrefix, "lifecycle.json"))
 	fmt.Fprintln(&text, "5. Local publication distributes exact artifacts to NVKE; it is not a signed or qualified Release.")
 	fmt.Fprintln(&text, "6. NVKE installs management services, boots the tenant VMs, checks workload/DNS, then follows the selected lifetime policy.")
+	if cfg.Conformance {
+		fmt.Fprintln(&text, "   Conformance uses the same fresh tenant and the version-matched tools from this Run; original JUnit and API observations are retained before cleanup.")
+	}
 	fmt.Fprintln(&text, "   With --cleanup: natural tenant deletion and joined owned cleanup must finish before success.")
 	fmt.Fprintln(&text, "A Plan describes intent; observed artifact bytes, runtime checks and the natural exit establish the result.")
 	fmt.Fprintln(&text, "Reference documentation at the reviewed source baseline:")

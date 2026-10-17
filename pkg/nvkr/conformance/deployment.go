@@ -170,6 +170,10 @@ func exactRuntimeReference(value string) (string, error) {
 	return value, nil
 }
 func evaluateDeployments(targets []DeploymentTarget, outputs map[string]lifecycle.ArtifactCheckOutput, nodes []deploymentNode, pods [][]deploymentPod) ([]deploymentObservation, []testresults.SubjectBinding, error) {
+	return evaluateDeploymentsWithAliases(targets, outputs, nodes, pods, nil)
+}
+
+func evaluateDeploymentsWithAliases(targets []DeploymentTarget, outputs map[string]lifecycle.ArtifactCheckOutput, nodes []deploymentNode, pods [][]deploymentPod, aliases map[string]string) ([]deploymentObservation, []testresults.SubjectBinding, error) {
 	nodeMap := map[string]deploymentNode{}
 	for _, node := range nodes {
 		if !safetext.Valid(node.Metadata.Name, 256, false) || !safetext.Valid(node.Metadata.UID, 256, false) {
@@ -210,11 +214,15 @@ func evaluateDeployments(targets []DeploymentTarget, outputs map[string]lifecycl
 				return nil, nil, err
 			}
 			specCount, statusCount := 0, 0
+			expectedSpec := reference
+			if alias, ok := aliases[target.Output]; ok {
+				expectedSpec = alias
+			}
 			var observed deploymentObservation
 			for _, container := range pod.Spec.Containers {
 				if container.Name == target.Container {
 					specCount++
-					if container.Image != reference {
+					if container.Image != expectedSpec {
 						return nil, nil, failure("PodSpec image differs from authenticated native manifest")
 					}
 				}
@@ -294,7 +302,7 @@ func (a *admitted) observeDeployments(ctx context.Context, workspace string, out
 		}
 		pods[i] = list.Items
 	}
-	observations, subjects, err := evaluateDeployments(a.options.Targets, outputs, nodes.Items, pods)
+	observations, subjects, err := evaluateDeploymentsWithAliases(a.options.Targets, outputs, nodes.Items, pods, a.options.localImageAliases)
 	for i := range observations {
 		observations[i].KubeSystemNamespaceUID = cluster.Metadata.UID
 	}

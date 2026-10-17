@@ -13,6 +13,23 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
+// AdmitDemoDeployment rejects optional conformance on unsupported hosts before
+// build, sudo prompts, artifact capture, storage, or guest creation.
+func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
+	if cfg.Conformance {
+		if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
+			return nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo conformance requires native Linux ARM64")
+		}
+		if !configString(cfg.Repository) {
+			return configUsage("conformance requires the repository containing its captured artifact Run")
+		}
+		if _, err := resolveExisting(cfg.Repository); err != nil {
+			return nvkrerr.Wrap(nvkrerr.CodeUsage, err, "conformance repository")
+		}
+	}
+	return AdmitNativeDeployment(ctx, cfg.Accelerator)
+}
+
 // AdmitNativeDeployment rejects an unusable guest accelerator before an
 // expensive BUILD or any deployment workspace, process or VM is created.
 func AdmitNativeDeployment(ctx context.Context, accelerator string) error {
@@ -68,6 +85,13 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if err := requireContext(ctx); err != nil {
 		return NativeConfig{}, err
 	}
+	if cfg.Conformance && platform != "linux/arm64" {
+		return NativeConfig{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo conformance requires native Linux ARM64")
+	}
+	conformance, err := selectNativeConformance(cfg)
+	if err != nil {
+		return NativeConfig{}, err
+	}
 	accelerator, err := nativeAccelerator(platform, cfg.Accelerator)
 	if err != nil {
 		return NativeConfig{}, err
@@ -101,7 +125,8 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	return NativeConfig{
 		Image: disk, Out: cfg.Out, Accelerator: accelerator,
 		Network: cfg.Network, DemoExecutable: cfg.DemoExecutable,
-		Cleanup: cfg.Cleanup, Progress: cfg.Progress, TenantTimeout: cfg.Timeout,
+		conformance: conformance,
+		Cleanup:     cfg.Cleanup, Progress: cfg.Progress, TenantTimeout: cfg.Timeout,
 		Assets: NativeAssetConfig{
 			NVKR: cfg.NVKR, ToolsRun: cfg.Runs.Tools, HostToolsRun: cfg.Runs.HostTools,
 			BootstrapRun: cfg.Runs.Components, ControllerRun: cfg.Runs.Site,

@@ -19,6 +19,7 @@ usage() {
     'Explicit upstream alternative: add --network upstream-ovn before ATTEMPT (all selection only).' \
     'Linux image builds require KVM by default. Explicit slow diagnostic: --build-accelerator tcg.' \
     'NVIDIA OVN remains the default. This alternative does not validate the NVIDIA fork.' \
+    'Add --conformance for 36 outputs in one Run, including matching Kubernetes conformance tools (native Linux KVM all only).' \
     'all: one Run with 32 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
     'simulator bootstraps the same pinned Go/GCC Docker toolchain.' \
@@ -43,6 +44,7 @@ check_only=0
 prepare_only=0
 network=ovn
 build_accelerator=kvm
+conformance=0
 # Go-demo preparation handoff: no activity descriptor is inherited by this shell.
 # It prepares the same selected inputs, but the Go process launches the final
 # unchanged run-local vector directly so only that child receives telemetry.
@@ -50,7 +52,8 @@ if [[ "${1:-}" == --prepare-only ]]; then
   prepare_only=1
   shift
 fi
-while [[ "${1:-}" == --network || "${1:-}" == --build-accelerator ]]; do
+while [[ "${1:-}" == --network || "${1:-}" == --build-accelerator || "${1:-}" == --conformance ]]; do
+  if [[ "$1" == --conformance ]]; then conformance=1; shift; continue; fi
   [[ $# -ge 2 ]] || { usage >&2; exit 2; }
   case "$1" in
     --network)
@@ -83,6 +86,9 @@ fi
 case "${lane}" in all|components|os|providers|simulator|site|tools|profiles) ;; *) echo 'Select all, components, os, providers, simulator, site, tools or profiles.' >&2; exit 2 ;; esac
 if [[ "${network}" == upstream-ovn && "${lane}" != all ]]; then
   echo 'Upstream OVN requires the complete all selection so chart, image and QCOW2 inputs stay aligned.' >&2; exit 2
+fi
+if [[ "${conformance}" == 1 && ( "${lane}" != all || "${build_accelerator}" != kvm || "$(uname -s)" != Linux ) ]]; then
+  echo "Conformance selection requires native Linux KVM and the complete all selection." >&2; exit 2
 fi
 # Keep invocation-local redirects when a second local repository is selected.
 # Bound the scalar before arithmetic, host diagnostics or any producer work.
@@ -253,6 +259,7 @@ if [[ "${build_accelerator}" == tcg ]]; then
 fi
 if [[ "${lane}" != all ]]; then definition="inputs/definitions/diagnostics/demo-arm64/${lane}.json"; fi
 if [[ "${lane}" == os && "${build_accelerator}" == kvm ]]; then definition="inputs/definitions/diagnostics/demo-arm64/os-kvm.json"; fi
+if [[ "${conformance}" == 1 ]]; then definition="${definition%.json}-conformance.json"; fi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.

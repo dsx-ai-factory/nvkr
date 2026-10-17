@@ -52,6 +52,8 @@ type RunFile struct {
 	Accelerator    string        `yaml:"accelerator" mapstructure:"accelerator"`
 	Cleanup        bool          `yaml:"cleanup" mapstructure:"cleanup"`
 	Walkthrough    bool          `yaml:"walkthrough" mapstructure:"walkthrough"`
+	Conformance    bool          `yaml:"conformance" mapstructure:"conformance"`
+	Repo           string        `yaml:"repo" mapstructure:"repo"`
 	Network        string        `yaml:"network" mapstructure:"network"`
 	NVKECheckout   string        `yaml:"nvkeCheckout" mapstructure:"nvkeCheckout"`
 	NVKR           string        `yaml:"nvkr" mapstructure:"nvkr"`
@@ -196,7 +198,7 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 	if file.Version != 1 || !configString(build.Repo) || !configString(build.Attempt) || build.Jobs < 1 || (build.NVKEClone != "" && !configString(build.NVKEClone)) {
 		return BuildConfig{}, configUsage("build requires version 1, repo, attempt and positive jobs")
 	}
-	return BuildConfig{QualifyLocal: build.QualifyLocal, Repository: build.Repo, NVKEClone: build.NVKEClone, AttemptPrefix: build.Attempt, Jobs: build.Jobs, Progress: progress, QualificationPolicy: build.QualificationPolicy, Qualification: build.Qualification, Prepared: build.Prepared, Network: network}, nil
+	return BuildConfig{QualifyLocal: build.QualifyLocal, Repository: build.Repo, NVKEClone: build.NVKEClone, AttemptPrefix: build.Attempt, Jobs: build.Jobs, Progress: progress, QualificationPolicy: build.QualificationPolicy, Qualification: build.Qualification, Prepared: build.Prepared, Network: network, Conformance: file.Run.Conformance}, nil
 }
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
@@ -223,7 +225,7 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if file.Version != 1 || (run.NVKECheckout != "" && !configString(run.NVKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
 		return Config{}, nvkrerr.New(nvkrerr.CodeUsage, "run requires version 1, out, valid optional nvkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Conformance: run.Conformance, Repository: run.Repo, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{HostTools: run.Runs.HostTools, Runtime: run.Runs.Runtime, OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 
@@ -277,5 +279,9 @@ func (file DemoFile) E2EConfig(progress io.Writer) (BuildConfig, Config, error) 
 		return BuildConfig{}, Config{}, configUsage("e2e cannot configure nvkr or existing Runs")
 	}
 	build.Network = run.Network
+	if run.Repository != "" && run.Repository != build.Repository {
+		return BuildConfig{}, Config{}, configUsage("e2e uses build.repo as the single source repository")
+	}
+	run.Repository = build.Repository
 	return build, run, nil
 }

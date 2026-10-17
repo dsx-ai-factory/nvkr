@@ -36,6 +36,7 @@ type Options struct {
 	Kubectl           ExecutableSelector              `json:"kubectl"`
 	Kubeconfig        Tool                            `json:"kubeconfig"`
 	Context           string                          `json:"context"`
+	CNINamespace      string                          `json:"cniNamespace,omitempty"`
 	CNISelector       string                          `json:"cniSelector"`
 	Image             string                          `json:"-"`
 	ConformanceImage  ImageSelector                   `json:"conformanceImage"`
@@ -54,6 +55,7 @@ type Options struct {
 	ToolArtifacts     *lifecycle.ArtifactCheckReceipt `json:"-"`
 	Artifacts         *lifecycle.ArtifactCheckReceipt `json:"-"`
 	Targets           []DeploymentTarget              `json:"targets"`
+	localImageAliases map[string]string
 }
 
 type admitted struct {
@@ -214,6 +216,12 @@ func validateOptions(o Options) (Options, error) {
 	}
 	if !safetext.Valid(o.SuiteName, 256, false) || strings.TrimSpace(o.SuiteName) != o.SuiteName || !safetext.Valid(o.WorkspaceRoot, 4096, false) {
 		return Options{}, e.New(e.CodeUsage, "conformance requires named suite and private workspace root")
+	}
+	if o.CNINamespace == "" {
+		o.CNINamespace = "kube-system"
+	}
+	if !safetext.Valid(o.CNINamespace, 256, false) || strings.ContainsAny(o.CNINamespace, "/ \t") {
+		return Options{}, e.New(e.CodeUsage, "conformance requires a valid explicit CNI namespace")
 	}
 	if o.Context == "" || len(o.Context) > 4096 || strings.ContainsAny(o.Context, "\x00\r\n") || o.CNISelector == "" || len(o.CNISelector) > 4096 || strings.ContainsAny(o.CNISelector, "\x00\r\n") {
 		return Options{}, e.New(e.CodeUsage, "conformance: explicit private context and CNI selector required")

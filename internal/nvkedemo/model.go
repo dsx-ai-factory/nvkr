@@ -34,6 +34,8 @@ type Config struct {
 	Accelerator  string
 	Cleanup      bool
 	Walkthrough  bool
+	Conformance  bool
+	Repository   string
 	Network      string
 	NVKECheckout string
 	NVKR         string
@@ -58,6 +60,7 @@ type BuildConfig struct {
 	Prepared            bool
 	// Network selects a closed authored artifact set for E2E. It does not
 	// substitute source pins or confer deployment/readiness authority.
+	Conformance   bool
 	Network       string
 	Repository    string
 	NVKEClone     string

@@ -33,6 +33,7 @@ const JUnitProfile = "kubernetes-e2e-ginkgo"
 type Producer struct {
 	options     Options
 	captureTool executableCapture
+	local       *localSources
 }
 
 var _ testresults.Producer = (*Producer)(nil)
@@ -78,6 +79,9 @@ func (p *Producer) Produce(ctx context.Context) (output testresults.Output, resu
 	if p == nil {
 		return testresults.Output{}, e.New(e.CodeUsage, "configured conformance producer required")
 	}
+	if p.local != nil {
+		return p.produceLocal(ctx)
+	}
 	err := p.options.ToolArtifacts.WithDiagnosticOperation(ctx, func(toolsContext context.Context, tools lifecycle.ArtifactCheckDescription) error {
 		if err := validateToolSelections(tools, p.options); err != nil {
 			return err
@@ -120,6 +124,9 @@ func (p *Producer) produce(ctx context.Context, description, tools lifecycle.Art
 	capture := p.captureTool
 	if capture == nil {
 		capture = func(ctx context.Context, selector ExecutableSelector) (*heldfile.File, error) {
+			if p.local != nil {
+				return captureExecutable(ctx, selector, p.local.tools.WriteExecutableMember)
+			}
 			return captureExecutable(ctx, selector, p.options.ToolArtifacts.WriteExecutableMember)
 		}
 	}
@@ -147,6 +154,9 @@ func (p *Producer) produce(ctx context.Context, description, tools lifecycle.Art
 		Harness:  &testresults.HarnessIdentity{Name: "hydrophone", Version: testresults.Metadata{Status: "unknown"}},
 	}
 	facts := append(publicationFacts("sourceRun", description), publicationFacts("toolsSource", tools)...)
+	if p.local != nil {
+		facts = append(localSourceFacts("sourceRun", p.local.productDescription), localSourceFacts("toolsSource", p.local.toolsDescription)...)
+	}
 	for _, tool := range []struct {
 		name     string
 		selector ExecutableSelector
@@ -176,6 +186,9 @@ func (p *Producer) produce(ctx context.Context, description, tools lifecycle.Art
 	}
 	inputs := description.Inputs
 	output.Binding = &testresults.Binding{Inputs: &inputs, Subjects: subjects}
+	if p.local != nil {
+		output.Binding.Inputs = nil
+	}
 	if err = appendProjection(&output, deploymentFacts(baseline, "before")); err != nil {
 		return output, err
 	}
