@@ -230,7 +230,7 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
   the stale PR and branch of an unchanged one. Only a closed, unmerged PR whose head commit carries the current
   candidate keeps a PR from being recreated, even after its branch is deleted, and every PR lookup ignores PRs
   from fork branches with the same name. The policy names the dependent generated bundles (a development Run, a
-  qualification pair and additional named Runs). Each is checked before any pin update, regenerated through its
+  production and development qualification pairs and additional named Runs). Each is checked before any pin update, regenerated through its
   own owner (the runtime-Plan owner for a `githubRuntimePlan` Run, which admits only Plan and action-data
   changes) with that owner's coded failure preserved, and transported on an exact path allowlist; a committed
   generated bundle the policy does not name is refused with `CodeEngineCapability` before pin mutation or
@@ -306,6 +306,13 @@ The `nvkr.dev/generated-qualification/v1` manifest records the trusted Plan and 
 producer/qualifier/worker paths and both workflow byte hashes and modes. Worker and final qualifier admission
 verify this manifest, policy binding and exact finite owner directory before candidate or signing work. This
 read-only runtime check does not recompile source inputs or repair drift.
+
+The explicit development policy generates a separate fixed manual-dispatch/call pair,
+`nvkr-dev-qualify.yml` and `nvkr-dev-smoke.yml`, with ownership under
+`.github/nvkr-dev-qualification/`. Production and development owners have independent locks, stages and
+manifests. A prior manifest naming the other producer cannot authorize replacement or retirement. The same
+exact-byte runtime policy check applies to both pairs. The development source checkout is untrusted input
+data and does not replace the qualifier's generated policy or executable owner.
 
 The reviewed policy and generated pair may merge before real hosted acceptance. The fresh producer run and
 positive/negative hosted and independent-consumer exercises follow merge; their evidence remains required

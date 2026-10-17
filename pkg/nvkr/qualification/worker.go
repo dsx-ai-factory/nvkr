@@ -74,11 +74,15 @@ func RunTriggeredSmokeWorker(ctx context.Context, policyPath string, options lif
 		return nil, err
 	}
 	defer func() { _ = invocation.Close() }()
-	raw, err := provider.DownloadQualificationHandoff(ctx, source)
-	if err != nil {
-		return nil, err
+	if policy.Source.Development {
+		current, err := invocation.Description()
+		if err != nil {
+			return nil, err
+		}
+		identity = "https://github.com/" + current.Repository + "/" + policy.Smoke.Workflow + "@" + current.Ref
 	}
-	checks, report, err := lifecycle.CheckQualificationHandoff(ctx, raw, source, policy, options)
+
+	checks, report, err := checkTriggeredArtifacts(ctx, provider, source, policy, options)
 	result := &SmokeWorkerResult{ArtifactChecks: report}
 	if err != nil {
 		return result, err

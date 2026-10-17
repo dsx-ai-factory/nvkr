@@ -332,6 +332,27 @@ that remains outstanding after merge.
 
 ### Local M3 demo rehearsal
 
+On 2026-10-16, the automatic `m3-video-04` rehearsal completed its 29-output build and
+signing/smoke stages but failed publication: the capability-dropped root registry could not traverse
+its non-root caller's mode-0700 storage. Setup now runs the registry with the caller's UID/GID,
+retaining private permissions and container restrictions. The non-root Linux ARM64
+`TestExternalQualificationRegistryStorage` passed actual OCI upload, read-back and owned shutdown.
+Reusing that completed build with fresh registry/scratch/evidence destinations then passed
+`run qualify-local`, including all 10 native tool members, three-role signing and complete registry
+read-back. Its content subject was
+`sha256:c811839c5fe210cb9a355ced62973cd8d38c263e9c9ca7da9acabbfb0d1063bf`, ordinary publication
+`localhost:32772/local-m3/ordinary@sha256:53e1e27794954c788712c12dbbb7270ddec4886723af783dd7e095d9799f3bde`, disk
+`localhost:32772/local-m3/disk-nvke-node-image-arm64@sha256:5e26a285f90cc56e9ff1530541304659eb77cb046717ce534a3c38199f287fcf`, and evidence
+`localhost:32772/local-m3/evidence@sha256:d592c4236557f8c2b91ada36b83c0e87960e94ca81be44621c8acf1194c20a1c`.
+These loopback locators belong to the retained laptop VM and remain `unqualified-local-execution`;
+the retry did not rebuild producers, exercise hosted OIDC, or deploy a cluster.
+The separate `TestExternalLocalM3Consumer` passed its positive case and all 14 negative cases against
+this publication in 283 seconds, with only public policy, pinned cosign and registry locators:
+invalid role signatures, omitted signatures/provenance, changed compiler inputs/source pins/Run,
+wrong policy, missing/extra transport members and altered/missing downloaded disk bytes.
+The repository gate passed with uncached tests, as did the affected demo package, Linux ARM64
+targeted signing/qualification race tests, generated-workflow drift and documentation checks.
+
 `build` and `e2e` now accept `--qualify-local` (or `build.qualifyLocal: true`) for a fresh attempt.
 The adapter prepares once, invokes the same setup, then uses the existing prepared build and local
 qualification gate. Its registry is stopped after read-back or failure using a cancellation-independent
@@ -777,6 +798,31 @@ The demo now supplies a repository-relative workspace from the
 repository working directory, matching ordinary-output observation's existing path contract.
 Passing repository checks does not establish complete local qualification.
 
+## M4 release manifest issuance
+
+[M4-C](https://nvidia.atlassian.net/browse/NKX-18049) adds the `pkg/nvkr/releasemanifest` owner and the
+registered `nvkr.dev/release-manifest/v1` schema and `nvkr.release-manifest` family (ADR-01). Issuance takes
+the live M3-A artifact-check receipt, the exact canonical v2 qualification evidence and an independently
+selected qualification identity and policy digest. It refuses failed, incomplete, noncanonical, mismatched,
+wrong-identity or wrong-policy evidence before signer construction, then authenticates the exact evidence on
+every member subject before attesting the manifest to the publication root under the qualification identity
+and verifying the exact attached bytes. The artifact-check receipt now also projects each output's source lane
+and exact predicate digest from its already verified production provenance. `pkg/nvkr/sign` adds the distinct
+`https://nvkr.dev/release-manifest/v1` attestation type over the same exact-predicate attach and verify path
+used by qualification evidence.
+
+`pkg/nvkr/releasemanifest/manifest_test.go`, `pkg/nvkr/releasemanifest/issue_test.go`,
+`pkg/nvkr/lifecycle/qualification_release_members_test.go` and `pkg/nvkr/sign/release_manifest_test.go` cover
+the strict schema and deterministic identity, exact provenance coverage and closed source lanes, pre-signer
+refusals, a later member's missing or wrong-signer evidence despite earlier surviving attachments, manifest
+attachment and verification failures, receipt revocation and cancellation between steps, and type, subject,
+identity and issuer substitution in the cosign adapter. These are contract tests with fakes and a stubbed
+cosign runner. No CLI command or generated workflow invokes issuance yet;
+[M4-B](https://nvidia.atlassian.net/browse/NKX-18048) owns that connection. No hosted Run, OIDC manifest
+attestation, registry read-back or independent consumer verification is recorded. The tag rule, tag
+creation, publisher exclusion, consumer verification instructions and interruption demonstrations remain
+[M4-D](https://nvidia.atlassian.net/browse/NKX-18050).
+
 ## Support by owner
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
@@ -792,7 +838,7 @@ Passing repository checks does not establish complete local qualification.
 | 13 Evidence | Exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; separately scoped archive member/hash inventories for source tarball assets in executable bundles; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Archive inventories describe files, not package dependencies; their hosted producer path remains unexercised. Factory callers retain ordinary hint-free binary inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed plain/public-bootstrap FDE OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; private-passphrase FDE, strict FDE and object-store delivery are unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
-| 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. Qualified clearance, release-specific trusted time and M4 manifests/revocation remain unimplemented |
+| 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics; M4-C release-manifest schema and receipt-gated issuance | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. M4 manifest issuance is contract-tested only and not yet invoked by a CLI or workflow. Qualified clearance, release-specific trusted time, M4 tags and revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, diagnostic output pulling, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Maintained candidate qualification is configured for post-merge acceptance; a fresh complete exact-attempt handoff and hosted/independent-consumer evidence remain unproved. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its first scheduled attempt failed before runtime and no successful combined cycle is recorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
@@ -810,6 +856,27 @@ cosign signing, verification, metadata assembly and finalization. It retains the
 and source limitations; development execution cannot approve those production exceptions. Development
 finalization retains its Run record without emitting the production qualification handoff; explicit handoff
 admission returns a capability error before qualification evidence collection. Production handoffs retain seven days.
+
+The separate development qualification path now recovers original public metadata controls from an
+API-authenticated successful manual development attempt, replays its exact source inputs and delegates to
+the existing artifact checks and native smoke owners. Generated `nvkr-dev-qualify.yml` accepts an exact
+attempt URL on a reviewed nondefault branch; its source branch may differ. The fixed reusable worker and
+final qualifier use development-only credentials and distinct evidence schema/predicate. Production evidence
+admission is unchanged. The development pair has independent manifest ownership and runtime drift checks.
+Local contracts cover source/qualifier selection, metadata integrity and restoration, production rejection,
+namespace binding and generated credential/owner separation. Catalog maintenance names and regenerates the
+development pair with its producer, so pin updates cannot leave its manifest stale.
+For [development Run 38951964907, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/38951964907/attempts/1),
+current code reproduced the original Plan digest
+`sha256:c6373e0b96f182b596ca89eeb6d7f66ee17b9126e4da236a0c5d583a0d1d12b6`.
+On 2026-10-16, the stock pinned Linux ARM64 cosign adapter independently downloaded and verified
+both signature and exact original SLSA provenance for all 70 subjects (69 outputs plus release),
+using the exact `nvkr-dev.yml@refs/heads/codex/private-ghcr-combined` identity and GitHub issuer.
+The immutable release subject was
+`ghcr.io/dsx-ai-factory/nvkr/development/runs/38951964907/attempts/1/releases@sha256:d49148699674c485d24ef0de89c2450a2632d42681b031d421bf5c3102e92d0f`.
+This read-only laptop/Colima exercise did not execute those hosted outputs or publish new evidence.
+No hosted development qualification success, qualifier OIDC identity, hosted native smoke,
+qualification attachment/read-back or independent-consumer acceptance is claimed.
 
 Unsigned development remains hosted build-only, static-unqualified, automatically cancelling older
 same-branch Runs and retaining transfers for one day. Signed development requires the prescribed
@@ -2277,7 +2344,7 @@ execution. Owners must supply registry retention, release-tag concurrency/collis
 protocols, source access and protected-environment policy, native runner-pool isolation, transparency approval,
 main-only execution and independent consumer evidence. The M3 MVP needs the separate qualification identity,
 complete authenticated pass/fail verdicts, delivered-tool smoke and external signing/consumer evidence.
-M4's manifest/tag, channel and revocation protocols remain separate deliverables; waivers are deferred
+M4's tag, channel and revocation protocols remain separate deliverables, and manifest issuance has only contract coverage; waivers are deferred
 hardening outside the M3 MVP.
 
 Qualified owners must supply authenticated runtime/provider observations, discovery/trusted time, measured

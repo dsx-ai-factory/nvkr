@@ -15,6 +15,7 @@ environment: inputs/environments/github-release.yaml
 # transported with the production Run; a committed bundle not named here is refused.
 developmentEnvironment: inputs/environments/github-development.yaml
 qualificationPolicy: inputs/policies/nvke-qualification.yaml
+developmentQualificationPolicy: inputs/policies/nvke-development-qualification.yaml
 additionalRuns:
   - definition: inputs/definitions/demo/arm64-nvidia-kvm.json
     environment: inputs/environments/github-nightly-nvidia.json

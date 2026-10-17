@@ -115,7 +115,7 @@ dispatch, use `python3 scripts/pipeline-dev.py --repo dsx-ai-factory/nvkr --chec
 
 ### One-time operator setup
 
-Merge the development and cleanup workflows onto the default branch before dispatching them. GitHub's
+Merge the development producer, qualifier, smoke worker and cleanup workflows onto the default branch before dispatching them. GitHub's
 [manual-dispatch registration](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
 requires that default-branch presence. Keep the generated development bundle on each tested branch.
 
@@ -199,6 +199,32 @@ Run can leave partial publications and may have no final record; cleanup discove
 of successful finalization. Actions locators for CI helpers/carriers and final Run records retain seven
 days; disk diagnostic locators retain one day. GHCR carrier blobs require separate retention management.
 After locator transfers expire, start a complete new Run.
+
+### Qualify an existing development Run
+
+`make pipeline-dev-generate` also generates the development qualifier and native smoke worker from
+`inputs/policies/nvke-development-qualification.yaml`. Install those workflows on the default branch once,
+then dispatch a reviewed nondefault branch that contains the generated pair:
+
+```sh
+gh workflow run nvkr-dev-qualify.yml --repo dsx-ai-factory/nvkr \
+  --ref YOUR_QUALIFIER_BRANCH \
+  -f source_run_url=https://github.com/dsx-ai-factory/nvkr/actions/runs/RUN_ID/attempts/ATTEMPT
+```
+
+The source must be a successful manual `nvkr-dev.yml` attempt from this repository on a nondefault
+branch. It may come from a different branch or an older commit. The qualifier authenticates the original
+attempt, restores its retained metadata, reproduces its Plan from the exact source inputs, verifies all
+artifacts, runs the native tool smoke profiles, signs development qualification evidence and reads each
+attachment back. It does not rebuild the artifacts. Runs with the public metadata transport can be selected
+even when their finalizer emitted no production qualification handoff.
+
+Use the existing `nvkr-dev-release` environment and dedicated development reader/writer credentials.
+The native worker receives the reader; only the final qualifier receives the writer. Run before provider
+metadata expires or development cleanup deletes the source packages. Qualification does not suspend cleanup.
+Missing inputs or failed checks fail the run. Evidence uses a separate development predicate and cannot
+satisfy production qualification. Disks retain producer-only scope and external suites remain outside MVP.
+The full hosted flow still requires a recorded acceptance run; rendering and local tests alone do not prove it.
 
 ### Disposable registry cleanup
 

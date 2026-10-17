@@ -980,12 +980,28 @@ with vendored inputs. The renderer must reject guards it cannot express, includi
 family or credentials in build phases. These are testable contracts; current rendering is not proof that a
 provider or protected environment has exercised them.
 
-The M3 qualification contract admits only the exact successful originating build from the intended repository
+The production M3 qualification contract admits only the exact successful originating build from the intended repository
 and default branch. Source Run, attempt, commit, workflow identity, Definition, Environment and Plan bindings
 are authenticated separately from the qualification invocation. A manually dispatched qualification workflow
 does not itself prove that its source build succeeded or came from the approved branch. The M2 validation-branch
 exception cannot authorize qualification. Any later workflow adapter must reject unrelated or unsuccessful
 Runs before downloading executable subjects or requesting qualification signing credentials.
+
+The separately selected development policy fixes the producer to `nvkr-dev.yml`, qualifier to
+`nvkr-dev-qualify.yml` and same-commit reusable worker to `nvkr-dev-smoke.yml`. Its manual dispatch selects
+an exact `source_run_url` including `/attempts/N`; GitHub authenticates a successful manual source Run
+on a nondefault branch and an independent active qualifier Run on a nondefault branch. The branches may
+differ. The source commit is checked out as data only, after provider authentication; current reviewed
+qualifier code replays the original inputs and verifies the original Plan digest. Provider-authenticated,
+digest-checked bounded ZIPs restore only the Plan-selected public metadata controls through the existing
+metadata transport owner. Missing, expired, ambiguous or private-only controls fail closed before smoke.
+
+Both development qualification jobs use `nvkr-dev-release`. Workers receive the dedicated development
+reader and OIDC for their own reports; only the final qualifier receives the development writer and OIDC
+for qualification attachments. Repository-token package permissions remain read-only. All worker certificate,
+caller commit/attempt, exact artifact, source and complete-set checks remain mandatory. The development
+workflow must be registered on the default branch before a feature-branch dispatch; registration grants no
+production identity and the workflow refuses execution on the default branch.
 
 Delivered-tool smoke execution receives the exact authenticated payloads, has networking disabled and has no
 qualification OIDC or attachment authority. The qualification publisher consumes authenticated results only

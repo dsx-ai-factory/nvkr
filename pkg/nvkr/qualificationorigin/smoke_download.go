@@ -94,7 +94,7 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 		_, err := invocation.Description()
 		return err
 	}
-	request := SourceRequest{Repository: origin.Repository, RunID: origin.RunID, Attempt: origin.Attempt,
+	request := SourceRequest{Branch: origin.Branch, Repository: origin.Repository, RunID: origin.RunID, Attempt: origin.Attempt,
 		Commit: origin.Commit, Workflow: origin.Workflow, DefaultBranch: origin.DefaultBranch}
 	repository, run, err := g.lookup(ctx, request)
 	if admission := require(); admission != nil {
@@ -106,7 +106,11 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 	if err := matchRun(request, repository, run); err != nil {
 		return nil, err
 	}
-	if run.Event != "workflow_run" || run.Status != "in_progress" || run.Conclusion != "" {
+	event := "workflow_run"
+	if origin.Branch != "" {
+		event = "workflow_dispatch"
+	}
+	if run.Event != event || run.Status != "in_progress" || run.Conclusion != "" {
 		return nil, e.New(e.CodeVerifyFailed, "native smoke transport requires the active qualification workflow attempt")
 	}
 	if err := g.requireNativeSmokeJobs(ctx, require, origin, selected); err != nil {

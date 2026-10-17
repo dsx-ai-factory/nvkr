@@ -125,14 +125,14 @@ func TestQualificationSetupScopeRejectsConformanceDefinitions(t *testing.T) {
 }
 
 func TestQualificationRegistryOwnership(t *testing.T) {
-	for _, change := range []string{"exact", "id", "owner", "root", "image", "mount", "extra mount", "public port", "extra port", "network", "writable"} {
+	for _, change := range []string{"exact", "id", "owner", "root", "image", "user", "mount", "extra mount", "public port", "extra port", "network", "writable"} {
 		t.Run(change, func(t *testing.T) {
 			id, owner, out := strings.Repeat("a", 64), rand.Text(), "/private/qualification"
 			if !qualificationOwner.MatchString(owner) {
 				t.Fatal("generated owner outside admission")
 			}
 			var row qualificationRegistryInspect
-			raw := `{"Id":"` + id + `","Config":{"Image":"` + registryImage + `","Labels":{"` + qualificationRegistryLabel + `":"` + owner + `","` + qualificationRegistryLabel + `-root":"` + out + `"}},"Mounts":[{"Type":"bind","Source":"` + out + `/registry-data","Destination":"/var/lib/registry"}],"HostConfig":{"NetworkMode":"bridge","ReadonlyRootfs":true,"PortBindings":{"5000/tcp":[{"HostIP":"127.0.0.1","HostPort":""}]}}}`
+			raw := `{"Id":"` + id + `","Config":{"Image":"` + registryImage + `","User":"` + qualificationRegistryUser() + `","Labels":{"` + qualificationRegistryLabel + `":"` + owner + `","` + qualificationRegistryLabel + `-root":"` + out + `"}},"Mounts":[{"Type":"bind","Source":"` + out + `/registry-data","Destination":"/var/lib/registry"}],"HostConfig":{"NetworkMode":"bridge","ReadonlyRootfs":true,"PortBindings":{"5000/tcp":[{"HostIP":"127.0.0.1","HostPort":""}]}}}`
 			if err := json.Unmarshal([]byte(raw), &row); err != nil {
 				t.Fatal(err)
 			}
@@ -145,6 +145,8 @@ func TestQualificationRegistryOwnership(t *testing.T) {
 				row.Config.Labels[qualificationRegistryLabel+"-root"] = "/foreign"
 			case "image":
 				row.Config.Image = "registry:latest"
+			case "user":
+				row.Config.User = "foreign"
 			case "mount":
 				row.Mounts[0].Source = "/foreign"
 			case "extra mount":

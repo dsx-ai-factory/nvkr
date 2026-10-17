@@ -645,7 +645,7 @@ flowchart TB
   Publish --> Sign["Sign and attest"]
   Sign --> Verify["Pull back and verify"]
   Verify -.-> Qualify["M3 qualification: proposed"]
-  Qualify -.-> Release["M4 release manifest: proposed"]
+  Qualify -.-> Release["M4 release manifest: contract-tested"]
 ```
 
 Each component declares one source lane. A hermetic build uses pinned source/toolchain inputs with build network
@@ -718,9 +718,11 @@ while authored declarations must match their referenced pinned upstream metadata
 customized or installed composition claim and does not replace exact build-input/material evidence.
 External suites outside scope are explicitly not evaluated. Future required suites must supply authenticated
 subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
-conformance or cluster qualification. M4 lists
-artifacts with passing qualification in a canonical release manifest, under an immutable definition/commit tag
-and one mutable channel tag. A failing verdict prevents manifest issuance. These gates remain proposed.
+conformance or cluster qualification. M4 issues a canonical release manifest listing every artifact only after
+its exact passing qualification evidence is authenticated on every member, and attests it to the publication root
+under the qualification identity; issuance has contract coverage only. A failing, incomplete or wrong-signer
+verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
+deferred beyond the MVP.
 
 #### Qualified reproduction and release
 

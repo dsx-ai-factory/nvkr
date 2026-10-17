@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -27,7 +28,7 @@ const qualificationOwnerDirectory = ".github/nvkr-qualification"
 var qualificationWorkflowPath = regexp.MustCompile(`^\.github/workflows/[A-Za-z0-9][A-Za-z0-9_.-]*\.ya?ml$`)
 
 func (manifest qualificationManifest) validate() error {
-	if manifest.SchemaVersion != qualificationGeneratedSchema || !canonical.IsDigest(manifest.PlanDigest) || !canonical.IsDigest(manifest.PolicyDigest) || manifest.ProducerWorkflow != factory.GitHubWorkflowPath || len(manifest.Members) != 2 {
+	if manifest.SchemaVersion != qualificationGeneratedSchema || !canonical.IsDigest(manifest.PlanDigest) || !canonical.IsDigest(manifest.PolicyDigest) || (manifest.ProducerWorkflow != factory.GitHubWorkflowPath && manifest.ProducerWorkflow != development.ProducerWorkflow) || len(manifest.Members) != 2 {
 		return e.New(e.CodePipelineDrift, "invalid qualification ownership manifest")
 	}
 	if !qualificationWorkflowPath.MatchString(manifest.QualificationWorkflow) || !qualificationWorkflowPath.MatchString(manifest.SmokeWorkflow) || manifest.QualificationWorkflow == manifest.SmokeWorkflow || manifest.QualificationWorkflow == manifest.ProducerWorkflow || manifest.SmokeWorkflow == manifest.ProducerWorkflow {
@@ -35,6 +36,13 @@ func (manifest qualificationManifest) validate() error {
 	}
 	if factory.IsLegacyGeneratedGitHubChildWorkflowPath(manifest.QualificationWorkflow) || factory.IsLegacyGeneratedGitHubChildWorkflowPath(manifest.SmokeWorkflow) {
 		return e.New(e.CodePipelineDrift, "qualification ownership overlaps a retired producer workflow namespace")
+	}
+	if manifest.ProducerWorkflow == development.ProducerWorkflow {
+		if manifest.QualificationWorkflow != development.QualificationWorkflow || manifest.SmokeWorkflow != development.SmokeWorkflow {
+			return e.New(e.CodePipelineDrift, "development qualification ownership requires its fixed workflow pair")
+		}
+	} else if manifest.QualificationWorkflow == development.QualificationWorkflow || manifest.SmokeWorkflow == development.SmokeWorkflow || manifest.QualificationWorkflow == development.SmokeWorkflow || manifest.SmokeWorkflow == development.QualificationWorkflow {
+		return e.New(e.CodePipelineDrift, "production ownership overlaps development qualification")
 	}
 	expected := map[string]bool{manifest.QualificationWorkflow: true, manifest.SmokeWorkflow: true}
 	previous := ""
@@ -66,7 +74,7 @@ func CheckWorkflows(ctx context.Context, root string, bundle *GeneratedWorkflows
 		return err
 	}
 	files := bundle.Files()
-	files[QualificationManifestPath] = manifest
+	files[bundle.manifest.manifestPath()] = manifest
 	for _, name := range qualificationNames(files) {
 		raw, present, err := readQualificationFile(ctx, fs, name, 0o644)
 		if err != nil {
@@ -98,7 +106,7 @@ func CheckGeneratedPolicy(ctx context.Context, root string, policy lifecycle.Qua
 		return err
 	}
 	defer func() { _ = fs.Close() }()
-	raw, present, err := readQualificationFile(ctx, fs, QualificationManifestPath, 0o644)
+	raw, present, err := readQualificationFile(ctx, fs, qualificationManifest{ProducerWorkflow: policy.Source.Workflow}.manifestPath(), 0o644)
 	if err != nil {
 		return err
 	}
@@ -151,10 +159,10 @@ func WriteWorkflows(ctx context.Context, root string, bundle *GeneratedWorkflows
 		return err
 	}
 	defer func() { _ = fs.Close() }()
-	if err := ensureQualificationDirectory(fs, qualificationOwnerDirectory); err != nil {
+	if err := ensureQualificationDirectory(fs, bundle.manifest.ownerDirectory()); err != nil {
 		return err
 	}
-	release, err := acquireQualificationLock(ctx, fs, QualificationManifestPath+".lease")
+	release, err := acquireQualificationLock(ctx, fs, bundle.manifest.manifestPath()+".lease")
 	if err != nil {
 		return err
 	}
@@ -167,15 +175,15 @@ func WriteWorkflows(ctx context.Context, root string, bundle *GeneratedWorkflows
 		return err
 	}
 	files := bundle.Files()
-	files[QualificationManifestPath] = manifest
+	files[bundle.manifest.manifestPath()] = manifest
 	names := qualificationNames(bundle.files)
-	names = append(names, QualificationManifestPath)
+	names = append(names, bundle.manifest.manifestPath())
 	for _, name := range names {
 		if err := stageQualificationFile(ctx, fs, qualificationStage(name, bundle), files[name]); err != nil {
 			return err
 		}
 	}
-	if err := syncQualificationDirectory(fs, qualificationOwnerDirectory); err != nil {
+	if err := syncQualificationDirectory(fs, bundle.manifest.ownerDirectory()); err != nil {
 		return err
 	}
 	// Recheck the byte-CAS immediately before publication while holding the owner
@@ -204,10 +212,10 @@ func WriteWorkflows(ctx context.Context, root string, bundle *GeneratedWorkflows
 	if err := syncQualificationDirectory(fs, ".github/workflows"); err != nil {
 		return err
 	}
-	if err := fs.Rename(qualificationStage(QualificationManifestPath, bundle), QualificationManifestPath); err != nil {
+	if err := fs.Rename(qualificationStage(bundle.manifest.manifestPath(), bundle), bundle.manifest.manifestPath()); err != nil {
 		return e.Wrap(e.CodeWriteConflict, err, "committing qualification ownership manifest")
 	}
-	for _, directory := range []string{qualificationOwnerDirectory, ".github", "."} {
+	for _, directory := range []string{bundle.manifest.ownerDirectory(), ".github", "."} {
 		if err := syncQualificationDirectory(fs, directory); err != nil {
 			return err
 		}
@@ -235,7 +243,7 @@ func qualificationPreflight(ctx context.Context, fs *os.Root, bundle *GeneratedW
 	if err := qualificationDirectorySet(ctx, fs, bundle, true); err != nil {
 		return prior, err
 	}
-	raw, present, err := readQualificationFile(ctx, fs, QualificationManifestPath, 0o644)
+	raw, present, err := readQualificationFile(ctx, fs, bundle.manifest.manifestPath(), 0o644)
 	if err != nil {
 		return prior, err
 	}
@@ -248,6 +256,9 @@ func qualificationPreflight(ctx context.Context, fs *os.Root, bundle *GeneratedW
 		}
 		if err := prior.validate(); err != nil {
 			return prior, err
+		}
+		if prior.ProducerWorkflow != bundle.manifest.ProducerWorkflow {
+			return prior, e.New(e.CodePipelineDrift, "qualification manifest belongs to a different producer owner")
 		}
 	}
 	old := map[string]factory.GeneratedMember{}
@@ -300,7 +311,7 @@ func qualificationStage(name string, bundle *GeneratedWorkflows) string {
 	if name == bundle.manifest.SmokeWorkflow {
 		suffix = "smoke.stage"
 	}
-	return qualificationOwnerDirectory + "/" + suffix
+	return bundle.manifest.ownerDirectory() + "/" + suffix
 }
 func openQualificationRoot(root string) (*os.Root, error) {
 	if err := qualificationFileSupport(); err != nil {
@@ -392,10 +403,10 @@ func readQualificationFile(ctx context.Context, fs *os.Root, name string, mode o
 	return raw, true, nil
 }
 func qualificationDirectorySet(ctx context.Context, fs *os.Root, bundle *GeneratedWorkflows, allowStages bool) error {
-	if err := qualificationParents(fs, QualificationManifestPath); err != nil {
+	if err := qualificationParents(fs, bundle.manifest.manifestPath()); err != nil {
 		return err
 	}
-	directory, err := fs.Open(qualificationOwnerDirectory)
+	directory, err := fs.Open(bundle.manifest.ownerDirectory())
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
@@ -428,7 +439,7 @@ func qualificationDirectorySet(ctx context.Context, fs *os.Root, bundle *Generat
 			case "manifest.stage":
 				expected, _ = bundle.manifestBytes()
 			}
-			raw, _, err := readQualificationFile(ctx, fs, qualificationOwnerDirectory+"/"+entry.Name(), 0o644)
+			raw, _, err := readQualificationFile(ctx, fs, bundle.manifest.ownerDirectory()+"/"+entry.Name(), 0o644)
 			if err != nil {
 				return err
 			}
@@ -481,4 +492,14 @@ func syncQualificationDirectory(fs *os.Root, name string) error {
 		return e.Wrap(e.CodeWriteConflict, err, "syncing qualification directory")
 	}
 	return nil
+}
+
+func (manifest qualificationManifest) ownerDirectory() string {
+	if manifest.ProducerWorkflow == development.ProducerWorkflow {
+		return path.Dir(DevelopmentQualificationManifestPath)
+	}
+	return qualificationOwnerDirectory
+}
+func (manifest qualificationManifest) manifestPath() string {
+	return manifest.ownerDirectory() + "/manifest.json"
 }

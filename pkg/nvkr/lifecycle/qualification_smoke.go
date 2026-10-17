@@ -311,7 +311,7 @@ func nativeSmokeAlive(ctx context.Context, checks *ArtifactCheckReceipt, invocat
 
 func matchNativeSmokeOrigins(source, current qualificationorigin.Description, policy QualificationPolicy) error {
 	if source.Repository != policy.Source.Repository || source.Workflow != policy.Source.Workflow || source.DefaultBranch != policy.Source.DefaultBranch ||
-		current.Repository != source.Repository || current.DefaultBranch != source.DefaultBranch || current.Ref != "refs/heads/"+source.DefaultBranch || current.Workflow != policy.QualificationWorkflow || current.RunID == source.RunID {
+		current.Repository != source.Repository || current.DefaultBranch != source.DefaultBranch || current.Ref != "refs/heads/"+current.SourceBranch() || policy.Source.Development != (source.Branch != "") || policy.Source.Development != (current.Branch != "") || current.Workflow != policy.QualificationWorkflow || current.RunID == source.RunID {
 		return e.New(e.CodeUntrustedSigner, "native smoke source or qualification invocation differs from independent policy")
 	}
 	return nil

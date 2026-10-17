@@ -140,7 +140,7 @@ func (g *GitHub) DownloadQualificationHandoff(ctx context.Context, source *Sourc
 func (artifact qualificationArtifact) validate(name string, origin Description) error {
 	run := artifact.WorkflowRun
 	if !numberPattern.MatchString(string(artifact.ID)) || artifact.Name != name || artifact.Expired == nil || *artifact.Expired ||
-		string(run.ID) != origin.RunID || run.HeadSHA != origin.Commit || run.HeadBranch != origin.DefaultBranch ||
+		string(run.ID) != origin.RunID || run.HeadSHA != origin.Commit || run.HeadBranch != origin.SourceBranch() ||
 		!numberPattern.MatchString(string(run.RepositoryID)) || run.RepositoryID != run.HeadRepositoryID {
 		return e.New(e.CodeVerifyFailed, "qualification artifact does not belong to the exact non-expired source handoff")
 	}
