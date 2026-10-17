@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -34,6 +35,25 @@ const (
 	tenantWithdrawalTimeout   = 2 * time.Minute
 	tenantCleanupTimeout      = time.Hour
 )
+
+// tenantKubeconfigPublished observes publication only. NVKE owns kubeconfig
+// extraction and validation; the Secret may exist with only its breakglass key
+// while certificate issuance is still pending.
+func tenantKubeconfigPublished(raw []byte) (bool, error) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return false, nil
+	}
+	var secret struct {
+		Data struct {
+			Value []byte `json:"value"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &secret); err != nil {
+		// Keep private Secret contents out of diagnostics.
+		return false, errors.New("invalid tenant admin kubeconfig Secret JSON")
+	}
+	return len(secret.Data.Value) > 0, nil
+}
 
 func tenantCleanupContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(ctx), tenantCleanupTimeout)
@@ -382,13 +402,11 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 		if readErr != nil {
 			return readErr
 		}
-		var secret json.RawMessage
-		if len(raw) > 0 {
-			if err = json.Unmarshal(raw, &secret); err != nil {
-				return err
-			}
+		published, err := tenantKubeconfigPublished(raw)
+		if err != nil {
+			return err
 		}
-		if len(secret) > 0 && string(secret) != "null" {
+		if published {
 			if _, err = t.capture(provision, []string{t.cli(), "get", "kubeconfig", t.name, "--output-file", kubeconfig}, "kubeconfig", 30*time.Second); err != nil {
 				return err
 			}

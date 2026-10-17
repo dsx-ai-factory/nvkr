@@ -655,7 +655,11 @@ func (s *nativeSiteAttempt) runTenant(ctx context.Context, runner Runner, cli, t
 		if err != nil {
 			return err
 		}
-		if value := strings.TrimSpace(string(raw)); value != "" && value != "null" {
+		published, err := tenantKubeconfigPublished(raw)
+		if err != nil {
+			return err
+		}
+		if published {
 			if _, err := s.capture(budget, runner, "tenant-config", cli, "get", "kubeconfig", request.Name, "--output-file", tenantConfig); err != nil {
 				return err
 			}
