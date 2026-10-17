@@ -174,12 +174,16 @@ func OpenPackerToolchain(ctx context.Context, executablePath, executableDigest s
 		_ = closePackerHostTools(heldHostTools)
 		return nil, err
 	}
-	return &PackerToolchain{
+	toolchain := &PackerToolchain{
 		executable: executable, execution: execution,
 		hostTools:  heldHostTools,
 		pluginsDir: pluginsDir,
 		plugins:    snapshots,
-	}, nil
+	}
+	if err := execution.bindHostData(ctx, heldHostTools, pluginsDir, snapshots); err != nil {
+		return nil, errors.Join(err, toolchain.Close())
+	}
+	return toolchain, nil
 }
 
 // Close releases the held executable and host-tool closure and removes the

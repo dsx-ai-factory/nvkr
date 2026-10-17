@@ -31,6 +31,7 @@ type packerExecutionClass interface {
 	hostToolPath(int, packerExecutable) (string, error)
 	projectDirectory(string, *os.File) (string, error)
 	accelerator(string, string) error
+	bindHostData(context.Context, []packerHostTool, string, []privateFileSnapshot) error
 	run(context.Context, packerExecutable, []packerHostTool, []string, heldfile.RunOptions) error
 }
 

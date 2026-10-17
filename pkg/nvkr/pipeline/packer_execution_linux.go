@@ -19,6 +19,10 @@ import (
 
 type sealedPackerExecution struct{}
 
+func (sealedPackerExecution) bindHostData(context.Context, []packerHostTool, string, []privateFileSnapshot) error {
+	return nil
+}
+
 func platformPackerExecutionClass() (packerExecutionClass, error) {
 	return sealedPackerExecution{}, nil
 }

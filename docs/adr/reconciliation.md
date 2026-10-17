@@ -107,6 +107,9 @@ that abstraction. The Mac path is local and unqualified, without Linux's same-UI
 Mac child execution owns a short private temporary directory through process-group cleanup because
 Packer plugin Unix sockets cannot use arbitrary-length Run workspace paths. A real plugin validation
 reproduced the long-path bind failure; socket lifecycle tests cover success, failure and cancellation.
+Captured QEMU tools additionally retain their declared ROM/keymap data in the executable's private
+prefix. Those files use the existing native data manifest and byte checks, with mutation rejection and
+joined cleanup. Installed-host fallback is not used for data absent from the captured closure.
 The local factory resolver additionally authenticates a selected native `packer-toolchain` binary bundle
 against its exact Plan digest, actual host platform and purpose, then connects it to the shared Run/session
 executor. Native mode requires explicit producer-declared host networking. Controlled tests cover exact-node

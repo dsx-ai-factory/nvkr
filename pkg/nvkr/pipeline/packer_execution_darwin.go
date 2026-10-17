@@ -79,7 +79,7 @@ func (darwinPackerExecution) open(ctx context.Context, path string, options held
 		return nil, err
 	}
 	value := &darwinPackerExecutable{File: held, root: root,
-		files: []privateFileSnapshot{{Path: "executable", SHA256: held.Digest(), Mode: 0o500}}}
+		files: []privateFileSnapshot{{Path: "bin/executable", SHA256: held.Digest(), Mode: 0o500}}}
 	fail := func(cause error) (packerExecutable, error) {
 		return nil, errors.Join(cause, value.Close())
 	}
@@ -87,10 +87,10 @@ func (darwinPackerExecution) open(ctx context.Context, path string, options held
 		return fail(err)
 	}
 	// Reuse the existing held-input staging owner, including no-replace publish.
-	if err := materializeHeldInput(ctx, root, "executable", held); err != nil {
+	if err := materializeHeldInput(ctx, root, "bin/executable", held); err != nil {
 		return fail(err)
 	}
-	if err := os.Chmod(filepath.Join(root, "executable"), 0o500); err != nil {
+	if err := os.Chmod(filepath.Join(root, "bin", "executable"), 0o500); err != nil {
 		return fail(err)
 	}
 	if err := sealPrivateInputDirectories(root); err != nil {
@@ -171,7 +171,56 @@ func (darwinPackerExecution) hostToolPath(_ int, executable packerExecutable) (s
 	if native.systemPath != "" {
 		return native.systemPath, nil
 	}
-	return filepath.Join(native.root, "executable"), nil
+	return filepath.Join(native.root, "bin", "executable"), nil
+}
+
+// QEMU locates ROMs and VNC keymaps relative to its real executable prefix.
+// Reuse the authenticated native data closure, retaining private copies in
+// the corresponding share/qemu layout through executable close.
+func (darwinPackerExecution) bindHostData(ctx context.Context, tools []packerHostTool, source string, files []privateFileSnapshot) error {
+	const prefix = "nvkr/toolchain/qemu-data/"
+	for _, tool := range tools {
+		if !strings.HasPrefix(tool.name, "qemu-system-") {
+			continue
+		}
+		native, ok := tool.file.(*darwinPackerExecutable)
+		if !ok || native.root == "" {
+			return closedPackerExecutable()
+		}
+		for _, file := range files {
+			if !strings.HasPrefix(file.Path, prefix) {
+				continue
+			}
+			if file.Mode&0o111 != 0 {
+				return e.New(e.CodeInvalidCatalog, "QEMU runtime data must not be executable")
+			}
+			captured, err := heldfile.OpenContext(ctx, filepath.Join(source, file.Path), heldfile.Options{
+				Label: "native-qemu-data", ExpectedDigest: file.SHA256, MaxBytes: maxPackerPluginBytes,
+			})
+			if err != nil {
+				return e.Wrap(e.CodeUnverifiedRef, err, "opening captured QEMU runtime data")
+			}
+			relative := filepath.Join("share", "qemu", strings.TrimPrefix(file.Path, prefix))
+			stageErr := os.Chmod(native.root, 0o700)
+			if stageErr == nil {
+				stageErr = materializeHeldInput(ctx, native.root, relative, captured)
+			}
+			if stageErr == nil {
+				stageErr = os.Chmod(filepath.Join(native.root, relative), 0o400)
+			}
+			if err := errors.Join(stageErr, captured.Close()); err != nil {
+				return e.Wrap(e.CodeUnverifiedRef, err, "staging captured QEMU runtime data")
+			}
+			native.files = append(native.files, privateFileSnapshot{Path: relative, SHA256: file.SHA256, Mode: 0o400})
+		}
+		if err := sealPrivateInputDirectories(native.root); err != nil {
+			return e.Wrap(e.CodeUnverifiedRef, err, "sealing private QEMU runtime data")
+		}
+		if err := native.AssertUnchangedContext(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (darwinPackerExecution) projectDirectory(path string, directory *os.File) (string, error) {
 	before, err := directory.Stat()

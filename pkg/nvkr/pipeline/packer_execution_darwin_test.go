@@ -72,6 +72,75 @@ func TestDarwinPackerPrivateTemporarySocketLifecycle(t *testing.T) {
 	}
 }
 
+func TestDarwinPackerQEMUDataSnapshotAndCleanup(t *testing.T) {
+	program, programDigest := writeFakePacker(t)
+	qemu, qemuDigest := writeFakePackerHostTool(t)
+	for _, outcome := range []string{"source changes isolated", "private changes rejected", "executable data rejected"} {
+		t.Run(outcome, func(t *testing.T) {
+			source := t.TempDir()
+			relative := "nvkr/toolchain/qemu-data/keymaps/en-us"
+			path := filepath.Join(source, relative)
+			if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			raw := []byte("pinned keymap bytes\n")
+			executableData := outcome == "executable data rejected"
+			if executableData {
+				var err error
+				raw, err = os.ReadFile(program)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			chain, err := OpenPackerToolchain(t.Context(), program, programDigest,
+				[]PackerHostTool{{Name: "qemu-system-aarch64", Path: qemu, SHA256: qemuDigest}}, source,
+				[]PackerPluginFile{{Path: relative, SHA256: FileDigest(raw), Executable: executableData}})
+			if executableData {
+				if code(err) != e.CodeInvalidCatalog || chain != nil {
+					t.Fatalf("executable runtime data accepted: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer chain.Close()
+			native := chain.hostTools[0].file.(*darwinPackerExecutable)
+			root := native.root
+			data := filepath.Join(root, "share/qemu/keymaps/en-us")
+			if actual, err := os.ReadFile(data); err != nil || !bytes.Equal(actual, raw) {
+				t.Fatalf("private QEMU data differs: %v", err)
+			}
+			if err := os.WriteFile(path, []byte("source changed"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := verifyPackerToolchain(t.Context(), chain); err != nil {
+				t.Fatalf("source change affected captured QEMU data: %v", err)
+			}
+			if outcome == "private changes rejected" {
+				if err := os.Chmod(data, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(data, []byte("tampered"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if code(verifyPackerToolchain(t.Context(), chain)) != e.CodeUnverifiedRef {
+					t.Fatal("modified private QEMU data accepted")
+				}
+			}
+			if err := chain.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Lstat(root); !os.IsNotExist(err) {
+				t.Fatalf("private QEMU prefix remains after close: %v", err)
+			}
+		})
+	}
+}
+
 func TestDarwinPackerAcceleratorAdmission(t *testing.T) {
 	other := "amd64"
 	if runtime.GOARCH == "amd64" {
