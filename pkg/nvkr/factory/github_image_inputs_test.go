@@ -5,6 +5,7 @@ package factory
 
 import (
 	"bytes"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -42,6 +43,16 @@ func TestPrivateImageCallerContextsAcrossPublicationPolicies(t *testing.T) {
 				base.GeneratorVersion, base.DefinitionPath, base.EnvironmentPath)
 			if err != nil {
 				t.Fatal(err)
+			}
+			wantCatalogs, gotCatalogs := map[string]string{}, map[string]string{}
+			for _, build := range base.Builds {
+				wantCatalogs[build.Name] = build.CatalogDigest
+			}
+			for _, build := range plan.Builds {
+				gotCatalogs[build.Name] = build.CatalogDigest
+			}
+			if len(plan.Builds) != len(base.Builds) || len(gotCatalogs) != len(plan.Builds) || len(wantCatalogs) != len(base.Builds) || !reflect.DeepEqual(gotCatalogs, wantCatalogs) {
+				t.Fatal("publication policy changed retained producer catalog identities or membership")
 			}
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
@@ -102,6 +113,40 @@ func TestAbsentImageReaderDefaultsFailClosed(t *testing.T) {
 				}
 				if len(steps.Content) != 0 || len(inputs.Content) != 0 {
 					t.Fatal("absent image role retained credential surface")
+				}
+			})
+		}
+	}
+}
+
+func TestPrivateImageProjectionRejectsCallerCredentialSubstitution(t *testing.T) {
+	for _, input := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
+		for _, change := range []string{"valid", "missing", "empty", "substituted"} {
+			t.Run(input+"/"+change, func(t *testing.T) {
+				plan := &Plan{}
+				env := githubYAMLMap(githubImageToken, githubYAMLString("${{ inputs.nvkr-toolchain-read-token }}"), githubImageUser, githubYAMLString("${{ inputs.nvkr-toolchain-read-user }}"))
+				step := githubYAMLMap("name", githubYAMLString("Prepare images"), "run", githubYAMLString(githubRunnerCommand(plan, "prepare-images", "stage", "private-stage")), "env", env)
+				arguments := githubYAMLMap("nvkr-toolchain-read-token", githubYAMLString("${{ secrets.NVKR_REGISTRY_READ }}"), "nvkr-toolchain-read-user", githubYAMLString("${{ vars.NVKR_REGISTRY_READ_USER }}"))
+				switch change {
+				case "missing":
+					githubYAMLRemove(arguments, input)
+				case "empty":
+					githubYAMLSet(arguments, input, githubYAMLString(""))
+				case "substituted":
+					githubYAMLSet(arguments, input, githubYAMLString("different-nonempty-binding"))
+				}
+				call := githubYAMLMap("with", arguments)
+				invocation := githubActionInvocation{Values: map[string]string{}, Arguments: githubYAMLMap()}
+				_, err := githubProjectInterfaceRole(plan, nil, call, githubActionRefs{}, &invocation, githubYAMLMap(), githubInterfaceRole{name: "images", step: step, kind: "prepare-images"}, "bash -e {0}")
+				if change == "valid" {
+					if err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "semantic image preparation changes its caller credential") {
+					t.Fatalf("wrong refusal boundary: %v", err)
 				}
 			})
 		}

@@ -716,6 +716,7 @@ func TestGitHubCompositeLiftsNonImageVariableOnExactStep(t *testing.T) {
 	const expression = "${{ vars.CATALOG_PROFILE }}"
 	original := []*yamlv3.Node{
 		githubYAMLMap("name", githubYAMLString("Consume profile"), "run", githubYAMLString("echo profile"), "env", githubYAMLMap("PROFILE", githubYAMLString(expression))),
+		githubYAMLMap("name", githubYAMLString("Reuse profile"), "run", githubYAMLString("echo same profile"), "env", githubYAMLMap("PROFILE", githubYAMLString(expression))),
 		githubYAMLMap("name", githubYAMLString("Unrelated operation"), "run", githubYAMLString("echo unrelated")),
 	}
 	steps := make([]*yamlv3.Node, len(original))
@@ -741,7 +742,7 @@ func TestGitHubCompositeLiftsNonImageVariableOnExactStep(t *testing.T) {
 		t.Fatal("unexpected composite input set")
 	}
 	inner := githubYAMLField(githubYAMLField(body, "runs"), "steps")
-	if githubYAMLValue(githubYAMLField(inner.Content[0], "env"), "PROFILE") != "${{ inputs.profile }}" || githubYAMLField(inner.Content[1], "env") != nil {
+	if githubYAMLValue(githubYAMLField(inner.Content[0], "env"), "PROFILE") != "${{ inputs.profile }}" || githubYAMLValue(githubYAMLField(inner.Content[1], "env"), "PROFILE") != "${{ inputs.profile }}" || githubYAMLField(inner.Content[2], "env") != nil {
 		t.Fatal("variable escaped its original step")
 	}
 	expanded, err := expandGitHubSteps(&Plan{}, []*yamlv3.Node{call}, files, "bash -e {0}", 0)
