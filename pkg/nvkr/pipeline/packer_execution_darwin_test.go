@@ -8,9 +8,12 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +21,56 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
+
+func TestDarwinPackerPrivateTemporarySocketLifecycle(t *testing.T) {
+	path, digest := writeFakePacker(t)
+	class := darwinPackerExecution{}
+	executable, err := class.open(t.Context(), path, heldfile.Options{
+		Label: "socket-test", ExpectedDigest: digest, MaxBytes: maxPackerExecutableBytes,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer executable.Close()
+	for _, outcome := range []string{"success", "failure", "cancellation"} {
+		t.Run(outcome, func(t *testing.T) {
+			workspace := t.TempDir()
+			longTemporary := filepath.Join(workspace, strings.Repeat("nested-", 20))
+			if err := os.Mkdir(longTemporary, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			// Reproduce the real plugin's socket operation at the caller's path.
+			if listener, err := net.Listen("unix", filepath.Join(longTemporary, "packer-plugin1234567890")); err == nil {
+				_ = listener.Close()
+				t.Fatal("fixture path does not exceed the host socket limit")
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+			var stdout, stderr bytes.Buffer
+			err := class.run(ctx, executable, nil, []string{outcome}, heldfile.RunOptions{
+				Dir: workspace, Env: []string{"PATH=/nonexistent", "NVKR_PACKER_SOCKET_PROBE=1", "TMPDIR=" + longTemporary},
+				Stdout: &stdout, Stderr: &stderr,
+			})
+			if (err == nil) != (outcome == "success") || stderr.Len() != 0 {
+				t.Fatalf("socket child outcome: %v; stderr: %s", err, stderr.String())
+			}
+			if outcome == "cancellation" && !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("canceled child returned %v", err)
+			}
+			temporary, permissions, found := strings.Cut(strings.TrimSpace(stdout.String()), "\t")
+			mode, modeErr := strconv.ParseUint(permissions, 8, 32)
+			if !found || modeErr != nil || mode != 0o700 || !strings.HasPrefix(temporary, "/private/tmp/nvkr-pkr-") {
+				t.Fatalf("child did not use a short private directory: %q", stdout.String())
+			}
+			if _, err := os.Lstat(temporary); !os.IsNotExist(err) {
+				t.Fatalf("child temporary directory remains after join: %v", err)
+			}
+			if _, err := os.Stat(longTemporary); err != nil {
+				t.Fatalf("caller workspace was changed: %v", err)
+			}
+		})
+	}
+}
 
 func TestDarwinPackerAcceleratorAdmission(t *testing.T) {
 	other := "amd64"

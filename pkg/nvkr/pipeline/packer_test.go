@@ -43,6 +43,7 @@ const packerTestHelperSource = `package main
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,6 +55,17 @@ import (
 const manifestBytes = "{\"materials\":[{\"path\":\"materials/component\",\"sha256\":\"sha256:c2aaf954104b212a6339d4f99a1f156e153868345a25a03e3d264ef2a533c1d9\"}],\"schema\":\"test\"}"
 
 func main() {
+	if os.Getenv("NVKR_PACKER_SOCKET_PROBE") == "1" {
+		listener, err := net.Listen("unix", filepath.Join(os.TempDir(), "packer-plugin1234567890"))
+		if err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(98) }
+		defer listener.Close()
+		info, err := os.Stat(os.TempDir())
+		if err != nil { os.Exit(98) }
+		fmt.Printf("%s\t%o\n", os.TempDir(), info.Mode().Perm())
+		if len(os.Args) > 1 && os.Args[1] == "failure" { os.Exit(85) }
+		if len(os.Args) > 1 && os.Args[1] == "cancellation" { time.Sleep(30*time.Second) }
+		return
+	}
 	if root := os.Getenv("NVKR_DISK_INSPECTION_FIXTURE_ROOT"); root != "" {
 		os.Exit(runDiskInspectionFixture(root, os.Args[1:]))
 	}

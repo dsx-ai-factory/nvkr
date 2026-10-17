@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
@@ -195,7 +196,7 @@ func (darwinPackerExecution) accelerator(architecture, value string) error {
 	}
 	return nil
 }
-func (class darwinPackerExecution) run(ctx context.Context, executable packerExecutable, tools []packerHostTool, args []string, options heldfile.RunOptions) error {
+func (class darwinPackerExecution) run(ctx context.Context, executable packerExecutable, tools []packerHostTool, args []string, options heldfile.RunOptions) (returnedErr error) {
 	path, err := class.hostToolPath(0, executable)
 	if err != nil {
 		return err
@@ -218,8 +219,25 @@ func (class darwinPackerExecution) run(ctx context.Context, executable packerExe
 	if err := verify(); err != nil {
 		return err
 	}
+	// Packer plugins bind Unix sockets beneath TMPDIR. A Run workspace can
+	// exceed Darwin's socket pathname limit; use one private short directory
+	// through child/group join instead of inheriting that workspace path.
+	temporary, err := os.MkdirTemp("/private/tmp", "nvkr-pkr-")
+	if err != nil {
+		return e.Wrap(e.CodeInternal, err, "creating private native Packer temporary directory")
+	}
+	defer func() {
+		returnedErr = errors.Join(returnedErr, removePrivateTree(temporary))
+	}()
+	environment := make([]string, 0, len(options.Env)+1)
+	for _, value := range options.Env {
+		if !strings.HasPrefix(value, "TMPDIR=") {
+			environment = append(environment, value)
+		}
+	}
+	environment = append(environment, "TMPDIR="+temporary)
 	command := exec.CommandContext(ctx, path, args...)
-	command.Dir, command.Env = options.Dir, options.Env
+	command.Dir, command.Env = options.Dir, environment
 	command.Stdin, command.Stdout, command.Stderr = options.Stdin, options.Stdout, options.Stderr
 	runErr := ownedcmd.Run(ctx, command)
 	return errors.Join(runErr, verify())

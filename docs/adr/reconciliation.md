@@ -104,6 +104,9 @@ the existing direct-Packer driver additionally has a private execution-class int
 descriptors and Mac private native executable snapshots. The shared driver contracts execute on Mac and
 Linux ARM64; a catalog-pinned Mac Packer 1.15.4 version probe exercises the real native executable through
 that abstraction. The Mac path is local and unqualified, without Linux's same-UID sealed-executable guarantee.
+Mac child execution owns a short private temporary directory through process-group cleanup because
+Packer plugin Unix sockets cannot use arbitrary-length Run workspace paths. A real plugin validation
+reproduced the long-path bind failure; socket lifecycle tests cover success, failure and cancellation.
 The local factory resolver additionally authenticates a selected native `packer-toolchain` binary bundle
 against its exact Plan digest, actual host platform and purpose, then connects it to the shared Run/session
 executor. Native mode requires explicit producer-declared host networking. Controlled tests cover exact-node
