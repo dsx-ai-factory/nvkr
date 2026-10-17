@@ -266,12 +266,32 @@ components:
     - bash
     - -ec
     - |
-      exec python3 /src/os-image/packer/scripts/compose-image-inputs.py \
+      python3 /src/os-image/packer/scripts/compose-image-inputs.py \
         --architecture {{.Arch}} \
         --materials-dir /nvkr/inputs/materials \
         --source-files-dir /src/os-image/files \
         --output /src/nvkr-output/image-inputs.tar \
         --source-date-epoch "$SOURCE_DATE_EPOCH"
+      # The pinned provisioner requires these files; its composer omits them.
+      # Use a stable MAC-based DHCP identity on both native QEMU backends.
+      configuration=/src/nvkr-output/network-defaults
+      install -d -m 0755 "$configuration"
+      cat > "$configuration/00-dhcp-all.yaml" <<'NETPLAN'
+      network:
+        version: 2
+        renderer: networkd
+        ethernets:
+          all-en:
+            match:
+              name: "e*"
+            dhcp4: true
+            dhcp-identifier: mac
+            optional: true
+      NETPLAN
+      tar --append --file /src/nvkr-output/image-inputs.tar \
+        --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner --mode=0644 \
+        -C "$configuration" 00-dhcp-all.yaml \
+        -C /src/os-image/files 99-disable-network-config.cfg
     writeDir: nvkr-output
     artifactPath: nvkr-output/image-inputs.tar
   nvke-kubeadm-distro:
