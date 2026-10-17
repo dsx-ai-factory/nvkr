@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,6 +72,14 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
+	started := time.Now()
+	phase := func(label string) {
+		deadline, _ := ctx.Deadline()
+		opts.progress.printf("[transport] build %s — %s; elapsed=%s remaining=%s\n", n.Component, label,
+			time.Since(started).Round(time.Millisecond), max(time.Duration(0), time.Until(deadline)).Round(time.Millisecond))
+	}
+	defer phase("finished")
+	phase("admit private BuildKit transport")
 	base, err := filepath.Abs(filepath.Dir(source))
 	if err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "resolving BuildKit transport root")
@@ -85,8 +94,20 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	}
 	transport = &buildKitTransport{root: root, resources: &packerContainerResources{runtime: runtime}}
 	owner := transport
+	var prep string
+	prepCreated, diagnosticsAttempted := false, false
 	defer func() {
 		if returnErr != nil {
+			// Failure observation is bounded independently of the expired operation,
+			// just like owned teardown. Preserve helper output before removing it.
+			if prepCreated && !diagnosticsAttempted {
+				diagnosticCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+				logErr := runtime.Run(diagnosticCtx, nil, opts.Stdout, opts.Stderr, "logs", prep)
+				stop()
+				if logErr != nil {
+					returnErr = errors.Join(returnErr, e.Wrap(e.CodeBuildFailed, logErr, "retaining private BuildKit preparation diagnostics"))
+				}
+			}
 			var coded *e.Error
 			if !errors.As(returnErr, &coded) {
 				returnErr = runtimeCommandError(ctx, returnErr, "", e.CodeBuildFailed, "preparing BuildKit transport")
@@ -107,19 +128,23 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 		return nil, e.Wrap(e.CodeEngineCapability, err, "BuildKit export requires disk-backed transport headroom")
 	}
 	transport.limit = int64(min(available/3, uint64(transportarchive.MaxArchiveBytes)))
+	phase("pack source archive")
 	innerPath := filepath.Join(root, "input.tar")
 	if err = transportarchive.Pack(ctx, innerPath, base, []string{member}); err != nil {
 		return nil, err
 	}
+	phase("verify source archive")
 	inner, err := heldfile.OpenContext(ctx, innerPath, heldfile.Options{Label: "buildkit-input", MaxBytes: transportarchive.MaxArchiveBytes})
 	if err != nil {
 		return nil, err
 	}
 	transport.resources.held = append(transport.resources.held, inner)
+	phase("pack transport carrier")
 	outerPath := filepath.Join(root, "carrier.tar")
 	if err = transportarchive.Pack(ctx, outerPath, root, []string{"input.tar"}); err != nil {
 		return nil, err
 	}
+	phase("verify transport carrier")
 	outer, err := heldfile.OpenContext(ctx, outerPath, heldfile.Options{Label: "buildkit-carrier", MaxBytes: transportarchive.MaxArchiveBytes})
 	if err != nil {
 		return nil, err
@@ -131,28 +156,58 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	}
 	name := "nvkr-buildkit-" + attempt
 	transport.source, transport.output = name+"-source", name+"-output"
+	phase("create private volumes")
 	for _, volume := range []string{transport.source, transport.output} {
 		transport.resources.volumes = append(transport.resources.volumes, volume)
 		if err = createPackerVolume(ctx, runtime, volume, []string{"nvkr.dev/role=buildkit-transport"}); err != nil {
 			return nil, err
 		}
 	}
-	prep := name + "-prepare"
+	prep = name + "-prepare"
 	transport.resources.containers = append(transport.resources.containers, prep)
 	args := []string{"create", "--name", prep, "--platform", n.Platform, "--network=none", "--read-only", "--user=0:0", "--cap-drop=ALL", "--cap-add=CHOWN", "--cap-add=DAC_OVERRIDE", "--security-opt=no-new-privileges", "--no-healthcheck", "--entrypoint=sh"}
 	for _, mount := range []struct{ volume, destination string }{{transport.source, "/nvkr/source"}, {transport.output, "/nvkr/output"}} {
 		args = append(args, buildKitVolumeArgs(runtime.RuntimeName(), mount.volume, mount.destination, false)...)
 	}
 	args = append(args, n.Toolchain, "-ec", buildKitExtractScript, "nvkr-buildkit-input", strings.TrimPrefix(inner.Digest(), "sha256:"), member)
+	phase("create preparation container")
 	if err = runtime.Run(ctx, nil, io.Discard, opts.Stderr, args...); err != nil {
 		return nil, runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "creating offline BuildKit input stage")
 	}
+	prepCreated = true
+	phase("copy authenticated carrier")
 	if err = copyArchiveToContainer(ctx, runtime, outer, prep, "/nvkr/output"); err != nil {
 		return nil, err
 	}
-	if err = runtime.Run(ctx, nil, opts.Stdout, opts.Stderr, "start", "--attach", prep); err != nil {
-		return nil, runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "preparing private BuildKit volumes")
+	// The preparation script emits no progress. Observe its explicit exit instead
+	// of coupling completion to Docker's attached output stream.
+	phase("start preparation container")
+	if err = runtime.Run(ctx, nil, io.Discard, opts.Stderr, "start", prep); err != nil {
+		return nil, runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "starting private BuildKit volume preparation")
 	}
+	phase("wait for preparation exit")
+	var status bytes.Buffer
+	statusOutput := &packerContainerLimitWriter{writer: &status, remaining: 32}
+	if err = runtime.Run(ctx, nil, statusOutput, opts.Stderr, "wait", prep); err != nil {
+		return nil, runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "waiting for private BuildKit volume preparation")
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "observing private BuildKit volume preparation")
+	}
+	exit, parseErr := strconv.Atoi(strings.TrimSpace(status.String()))
+	if parseErr != nil || exit < 0 || exit > 255 {
+		return nil, e.New(e.CodeBuildFailed, "private BuildKit volume preparation returned no valid exit code")
+	}
+	phase("collect preparation diagnostics")
+	diagnosticsAttempted = true
+	logErr := runtime.Run(ctx, nil, opts.Stdout, opts.Stderr, "logs", prep)
+	if exit != 0 {
+		return nil, e.Wrap(e.CodeBuildFailed, logErr, "private BuildKit volume preparation exited %d", exit)
+	}
+	if logErr != nil {
+		return nil, runtimeCommandError(ctx, logErr, "", e.CodeBuildFailed, "collecting private BuildKit volume preparation diagnostics")
+	}
+	phase("remove completed preparation container")
 	if err = transport.resources.removeContainer(ctx, prep); err != nil {
 		return nil, err
 	}

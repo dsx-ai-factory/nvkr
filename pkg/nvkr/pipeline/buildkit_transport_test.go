@@ -51,6 +51,10 @@ func TestBuildKitPrivateTransport(t *testing.T) {
 			}
 			var inner []byte
 			runtime := &recordingPackerRuntime{name: runtimeName, run: func(in io.Reader, out, _ io.Writer, args []string) error {
+				if args[0] == "wait" {
+					_, err := io.WriteString(out, "0\n")
+					return err
+				}
 				if args[0] == "volume" {
 					_, err := io.WriteString(out, args[len(args)-1]+"\n")
 					return err
@@ -137,6 +141,10 @@ func TestBuildKitTransportFailureCleanup(t *testing.T) {
 				}
 				if args[0] == phase {
 					return errors.New("injected failure")
+				}
+				if args[0] == "wait" {
+					_, err := io.WriteString(out, "0\n")
+					return err
 				}
 				if args[0] == "start" && phase == "cancel" {
 					cancel()
@@ -281,4 +289,140 @@ func TestBuildKitPrivateTransportLive(t *testing.T) {
 		t.Fatalf("missing export: %v", err)
 	}
 	t.Logf("non-root BuildKit exported %d bytes from private host source uid=%d", info.Size(), os.Getuid())
+}
+
+// Preparation must authenticate the container exit, not just the start command.
+// In particular, Docker start without attachment returns success for failed jobs.
+func TestBuildKitPreparationObservedExit(t *testing.T) {
+	for _, tc := range []struct {
+		name, status string
+		failPhase    string
+		want         e.Code
+	}{
+		{name: "success", status: "0\n"},
+		{name: "container failure", status: "42\n", want: e.CodeBuildFailed},
+		{name: "empty status", want: e.CodeBuildFailed},
+		{name: "multiple statuses", status: "0\n0\n", want: e.CodeBuildFailed},
+		{name: "non numeric status", status: "success\n", want: e.CodeBuildFailed},
+		{name: "negative status", status: "-1\n", want: e.CodeBuildFailed},
+		{name: "out of range status", status: "256\n", want: e.CodeBuildFailed},
+		{name: "oversized status", status: strings.Repeat("0", 64), want: e.CodeBuildFailed},
+		{name: "wait command failure", failPhase: "wait", want: e.CodeBuildFailed},
+		{name: "logs command failure", status: "0\n", failPhase: "logs", want: e.CodeBuildFailed},
+		{name: "canceled wait", failPhase: "cancel", want: e.CodeTimeout},
+		{name: "canceled logs", status: "0\n", failPhase: "cancel-logs", want: e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source, n, opts := buildKitPrivateFixture(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			waited, logs := false, false
+			runtime := &recordingPackerRuntime{runContext: func(ctx context.Context, in io.Reader, out, stderr io.Writer, args []string) error {
+				if args[0] == "volume" {
+					_, err := io.WriteString(out, args[len(args)-1]+"\n")
+					return err
+				}
+				if args[0] == "start" && len(args) != 2 {
+					return errors.New("preparation must not attach to process output")
+				}
+				if args[0] == tc.failPhase {
+					return errors.New("injected command failure")
+				}
+				if args[0] == "wait" {
+					waited = true
+					if tc.failPhase == "cancel" {
+						cancel()
+						return ctx.Err()
+					}
+					_, err := io.WriteString(out, tc.status)
+					return err
+				}
+				if args[0] == "logs" {
+					if tc.failPhase == "cancel-logs" {
+						cancel()
+						return ctx.Err()
+					}
+					logs = true
+					_, err := io.WriteString(stderr, "retained helper diagnostic\n")
+					return err
+				}
+				if in != nil {
+					_, err := io.Copy(io.Discard, in)
+					return err
+				}
+				return nil
+			}}
+			var diagnostic bytes.Buffer
+			opts.Stderr = &diagnostic
+			transport, err := prepareBuildKitTransport(ctx, n, opts, source, runtime)
+			if code(err) != tc.want {
+				t.Fatalf("error=%v want %s", err, tc.want)
+			}
+			if (tc.status == "42\n" || tc.failPhase == "wait" || tc.failPhase == "cancel") && !strings.Contains(diagnostic.String(), "retained helper diagnostic") {
+				t.Fatal("failed helper diagnostics lost before cleanup")
+			}
+			if tc.want == "" {
+				if !waited || !logs || !strings.Contains(diagnostic.String(), "retained helper diagnostic") {
+					t.Fatal("missing exit observation or helper log")
+				}
+				if err := transport.close(); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if transport != nil {
+					t.Fatal("failed preparation exposed transport")
+				}
+				if len(runtime.cleanups) != 3 {
+					t.Fatalf("unjoined cleanup: %v", runtime.cleanups)
+				}
+			}
+		})
+	}
+}
+
+// Exercise transport alone with a real source tree on its actual execution host.
+// The source is copied through the production snapshot owner into test-owned
+// scratch; this never writes beside, or otherwise modifies, the supplied tree.
+func TestBuildKitPrivatePreparationLive(t *testing.T) {
+	image, input := os.Getenv("NVKR_BUILDKIT_TEST_IMAGE"), os.Getenv("NVKR_BUILDKIT_TEST_SOURCE")
+	if image == "" || input == "" {
+		t.Skip("set pinned NVKR_BUILDKIT_TEST_IMAGE and NVKR_BUILDKIT_TEST_SOURCE")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+	defer cancel()
+	_, n, opts := buildKitPrivateFixture(t)
+	source := filepath.Join(t.TempDir(), "source")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := copySourceTreeContext(ctx, input, source, 0); err != nil {
+		t.Fatal(err)
+	}
+	before, err := sourceTreeDigestContext(ctx, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.Toolchain = image
+	opts.Ctx = ctx
+	if value := os.Getenv("NVKR_BUILDKIT_TEST_RUNTIME"); value != "" {
+		opts.Runtime = value
+	}
+	if value := os.Getenv("NVKR_BUILDKIT_TEST_PLATFORM"); value != "" {
+		n.Platform = value
+	}
+	opts.Stdout, opts.Stderr = os.Stdout, os.Stderr
+	opts.progress = &progressSink{w: os.Stdout}
+	runtime := buildKitCommandRuntime{opts: opts}
+	transport, err := prepareBuildKitTransport(ctx, n, opts, source, runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transport.close(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := sourceTreeDigestContext(ctx, source)
+	if err != nil || after != before {
+		t.Fatalf("source changed: %v", err)
+	}
+	t.Log("private preparation exited zero, source unchanged, owned transport cleanup joined")
 }
