@@ -6,6 +6,7 @@
 package ownedcmd
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -17,6 +18,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestCommandStartFailurePreservesPathError(t *testing.T) {
@@ -91,5 +94,63 @@ func TestOutputRejectsNilContextBeforeStart(t *testing.T) {
 	//nolint:staticcheck // The exported boundary must reject a nil context before starting work.
 	if _, err := Output(nil, "must-not-run"); err == nil {
 		t.Fatal("nil context unexpectedly started a command")
+	}
+}
+
+func TestRunOwnsDetachedSessionAndCancellation(t *testing.T) {
+	for _, detached := range []bool{false, true} {
+		t.Run(strconv.FormatBool(detached), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			reader, writer, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer reader.Close()
+			defer writer.Close()
+			if err := reader.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			command := exec.CommandContext(ctx, "/bin/sh", "-c", "trap '' TERM; printf '%s\\n' \"$$\"; sleep 30 & wait")
+			command.SysProcAttr = &syscall.SysProcAttr{Setsid: detached}
+			command.Stdout = writer
+			joined := make(chan error, 1)
+			go func() { joined <- Run(ctx, command) }()
+			defer func() {
+				cancel()
+				if joined != nil {
+					<-joined
+				}
+			}()
+			line, err := bufio.NewReader(reader).ReadString('\n')
+			if err != nil {
+				t.Fatal(err)
+			}
+			pid, err := strconv.Atoi(strings.TrimSpace(line))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if group, err := syscall.Getpgid(pid); err != nil || group != pid {
+				t.Fatalf("child group = %d, %v; want PID %d", group, err, pid)
+			}
+			session, err := unix.Getsid(pid)
+			if err != nil || (session == pid) != detached {
+				t.Fatalf("child session = %d, %v; detached = %t", session, err, detached)
+			}
+			cancel()
+			err = <-joined
+			joined = nil
+			if !errors.Is(err, context.Canceled) {
+				t.Fatalf("canceled command = %v", err)
+			}
+			deadline := time.Now().Add(time.Second)
+			for time.Now().Before(deadline) {
+				if errors.Is(syscall.Kill(-pid, 0), syscall.ESRCH) {
+					return
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			t.Fatalf("canceled command left process group %d", pid)
+		})
 	}
 }

@@ -286,6 +286,11 @@ func (class darwinPackerExecution) run(ctx context.Context, executable packerExe
 	}
 	environment = append(environment, "TMPDIR="+temporary)
 	command := exec.CommandContext(ctx, path, args...)
+	// Packer opens /dev/tty even with piped output when its restricted PATH
+	// prevents background detection. A background terminal ioctl then stops
+	// the group with SIGTTOU. Keep this noninteractive tool off the caller
+	// terminal; setsid still gives the owner a private cancellation group.
+	command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	command.Dir, command.Env = options.Dir, environment
 	command.Stdin, command.Stdout, command.Stderr = options.Stdin, options.Stdout, options.Stderr
 	runErr := ownedcmd.Run(ctx, command)

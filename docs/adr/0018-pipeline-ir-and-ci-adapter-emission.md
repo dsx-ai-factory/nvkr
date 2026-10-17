@@ -623,7 +623,9 @@ The existing direct-Packer driver separates host mechanics through one private e
 Validation/build arguments, authenticated material staging, plugin closure, exact output collection and
 toolchain lifetime stay shared. Linux retains its sealed executable descriptors and held-directory procfs
 paths. The Mac implementation uses digest-pinned, read-only private Mach-O executable snapshots, a private
-PATH/plugin closure and the existing owned-process cancellation/join helper. It validates the native executable
+PATH/plugin closure and the existing owned-process cancellation/join helper. Noninteractive Mac Packer
+commands run in a private session without the caller's controlling terminal, retaining their private group
+for cancellation and join. It validates the native executable
 architecture and rejects KVM or cross-architecture HVF. TCG remains explicit. Snapshot verification before and
 after commands detects substitution between operations; pathname execution on Mac does not provide Linux's
 sealed-descriptor guarantee against a hostile same-UID process. Dynamic-loader/library realization remains an

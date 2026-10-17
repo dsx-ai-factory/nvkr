@@ -104,6 +104,9 @@ the existing direct-Packer driver additionally has a private execution-class int
 descriptors and Mac private native executable snapshots. The shared driver contracts execute on Mac and
 Linux ARM64; a catalog-pinned Mac Packer 1.15.4 version probe exercises the real native executable through
 that abstraction. The Mac path is local and unqualified, without Linux's same-UID sealed-executable guarantee.
+Mac Packer commands use a private session and cancellation group: a restricted-PATH terminal reproduction
+stopped the original process-group-only version probe with SIGTTOU, while detached execution returned the
+pinned version. This is launcher evidence, not a completed fresh artifact/deployment E2E.
 Mac child execution owns a short private temporary directory through process-group cleanup because
 Packer plugin Unix sockets cannot use arbitrary-length Run workspace paths. A real plugin validation
 reproduced the long-path bind failure; socket lifecycle tests cover success, failure and cancellation.
