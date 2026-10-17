@@ -1235,23 +1235,24 @@ after the eight-hour work context expires.
 
 ## Where the NVKE versions come from
 
-These are exact source selections recorded by this example, not a command to
-build whichever NVKE release is newest. A Git SHA identifies a commit; NVKR also
-checks its pinned tree. The guide does not establish that these candidates are
-one tagged NVKE release.
+The shared native NVIDIA selection uses the exact sources below. A Git SHA
+identifies a commit; NVKR also checks its pinned tree. These inputs are not
+claimed to be one tagged NVKE release.
 
-| Part | Selected NVKE commit | Owning input |
+| Part | Selected source | Owning input |
 | --- | --- | --- |
-| Installer, site CLI/controller/charts and diagnostic profiles | [`8fb2d533`](https://github.com/dsx-ai-factory/nvke/commit/8fb2d53368823bd386b4fbd55b4ab6d3c0931345) | [Site lock](../inputs/catalogs/nvke/local-site-arm64/pins.lock.yaml), [profiles lock](../inputs/catalogs/controller-profiles/nvidia-arm64/pins.lock.yaml) and the demo's [installer pin](../internal/nvkedemo/model.go) |
-| OS assembly, agent and most NVKE-owned OS material producers | [`ff21ba8c`](https://github.com/dsx-ai-factory/nvke/commit/ff21ba8c07cafff74b68e238a8876af11e5beded) | [OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) and [local OS overlay](../inputs/catalogs/node-images/variants/nvidia-tcg.json) |
-| Temporary SPIRE package selection | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Same OS lock; the prior plugin-free producer is retained temporarily. DSX remains a required missing product input, tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641), not full source/content parity. |
-| NICoSim and native host tools | [`b6154b29`](https://github.com/dsx-ai-factory/nvke/commit/b6154b292a934dbdff7aa17596cbf2d7ef5f0f85) | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
-| Provisioned provider (built, not used by this NICoSim tenant) | [`33fb71b2`](https://github.com/dsx-ai-factory/nvke/commit/33fb71b2f4224b470ebc628a9165fc4b92870406) | [Provider lock](../inputs/catalogs/nvke/release/pins.lock.yaml), selecting `v0.21.0` |
+| Native host CLI, installer sources and NICoSim | [`69ef9924`](https://github.com/dsx-ai-factory/nvke/commit/69ef9924c4bf0487beba8c3613ae6e0a0260d8f3) | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
+| Site CLI/controller/charts and provisioned provider | `69ef9924` | [Native site lock](../inputs/catalogs/nvke/native-site-arm64/pins.lock.yaml) |
+| OS assembly, agent and kubeadm materials | `69ef9924` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
+| Config profiles and runbooks | `69ef9924` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia-arm64/pins.lock.yaml) |
+| Explicit SPIRE packaging exception | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Native OS lock; DSX remains a missing product input tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) |
+| NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
-The OS commit added APT archive capture; the installer commit includes the staged
-deployment interface this adapter checks. The NVIDIA OVN fork, CAPNICo, NICoSim
-and upstream tools have their own source pins in the selected catalogs. A new
-NVKE release does **not** automatically move any of these selections.
+The separate release, upstream and historical TCG Definitions retain their own
+selected catalog stacks. They are not moved by the native selection. Exact
+source and output identities for a particular build come from that Run's Plan
+and records; earlier recordings retain their original scope. A new NVKE release
+does **not** automatically update these pins or establish compatibility.
 
 For developers following the guide, use an NVKR revision containing the
 desired maintained selection; do not replace a SHA with `main` or `latest`.
