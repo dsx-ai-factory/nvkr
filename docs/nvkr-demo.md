@@ -123,8 +123,11 @@ prints the selected inputs, concepts, generated-record locators and source-pinne
 after typed configuration admission, before the dashboard. This introduction is read-only presentation;
 it does not establish platform support, execute producers or grant runtime admission. The unchanged
 runtime checks still decide whether work can proceed. After the original workload/DNS check, bounded
-read-only site/tenant observations show nodes, pods, rollouts and the existing Job's zero-retry result
-before cleanup. The Job is never rerun to create success. No input pauses are added and TUI remains the default.
+read-only native site/tenant observations show API readiness, node roles and anonymous pod status/restarts
+before cleanup. The legacy Kind management walkthrough additionally presents workload inventory,
+selected rollouts and the existing Job's zero-retry result. The native path still enforces the preceding
+zero-retry workload/DNS acceptance. The Job is never rerun to create success. No input pauses are added
+and TUI remains the default.
 
 The inner NVKR command uses `--ui=plain` so its progress can feed the outer demo dashboard.
 That child setting does not disable the outer TUI. Explicit build inputs also capture compiler inputs

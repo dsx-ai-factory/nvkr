@@ -113,12 +113,12 @@ func checkBootstrapOwnedLifecycle(t *testing.T, platform string) {
 set -eu
 case "$1" in
  --version) printf 'limactl version %s\n' "$VERSION";;
- start) trap 'exit 0' TERM INT; while :; do sleep 1; done;;
+ start) trap 'exit 0' TERM INT; : > "$LIMA_HOME.fixture-ready"; while :; do sleep 1; done;;
  stop) exit 0;;
  *) exit 42;;
 esac
 `), 0700)
-	writeTenantFixture(t, filepath.Join(bin, "nerdctl.lima"), []byte("#!/bin/sh\nexit 0\n"), 0700)
+	writeTenantFixture(t, filepath.Join(bin, "nerdctl.lima"), []byte("#!/bin/sh\nset -eu\ntest -f \"$LIMA_HOME.fixture-ready\"\n"), 0700)
 	version, _, err := bootstrapLimaPlatform(platform)
 	if err != nil {
 		t.Fatal(err)

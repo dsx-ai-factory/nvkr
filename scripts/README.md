@@ -39,8 +39,8 @@ acceptance against the selected source remains pending.
 
 Follow the [native build-and-deploy guide](../docs/local-nvke-demo.md#native-linux-and-mac-path).
 The standard `e2e` command builds through NVKR, then invokes the same three-VM
-deployment owner as `run`. Fresh artifact builds still require Linux; the native
-Mac path accepts existing local outputs. No Colima execution host is substituted.
+deployment owner as `run`. The default Mac BUILD prepares native inputs from the
+documented installed prerequisites before invoking NVKR. No Colima execution host is substituted.
 
 `nvke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
 [focused selections](../inputs/definitions/demo/README.md);
