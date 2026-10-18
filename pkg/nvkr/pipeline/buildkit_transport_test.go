@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
@@ -39,6 +40,105 @@ func buildKitPrivateFixture(t *testing.T) (string, ir.Node, RunOptions) {
 	n := ir.Node{ID: "private-buildkit", Component: "private", Platform: "linux/arm64", Toolchain: "moby/buildkit@sha256:" + repeatHex("1"), Workdir: "/src", WriteDir: "out", ArtifactPath: "out/image.tar", SourceReadOnly: true, BuilderType: ir.BuilderBuildKit}
 	opts := RunOptions{Ctx: t.Context(), Runtime: "docker", Stdout: io.Discard, Stderr: io.Discard, SourceRoot: filepath.Join(t.TempDir(), "src")}
 	return source, n, opts
+}
+
+func TestBuildKitPreparationBudgets(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		parent      time.Duration
+		copyDelay   time.Duration
+		waitDelay   time.Duration
+		logsDelay   time.Duration
+		removeDelay time.Duration
+		cancelWait  bool
+		want        e.Code
+	}{
+		{name: "observed staging and completion latency"},
+		{name: "caller deadline during staging", parent: 4 * time.Minute, want: e.CodeTimeout},
+		{name: "caller deadline during completion", parent: 5 * time.Minute, want: e.CodeTimeout},
+		{name: "staging remains bounded", copyDelay: 160 * time.Second, want: e.CodeTimeout},
+		{name: "completion remains bounded", waitDelay: 121 * time.Second, want: e.CodeTimeout},
+		{name: "logs share completion budget", logsDelay: 40 * time.Second, want: e.CodeTimeout},
+		{name: "removal shares completion budget", removeDelay: 40 * time.Second, want: e.CodeInternal},
+		{name: "caller cancellation during completion", cancelWait: true, want: e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				source, n, opts := buildKitPrivateFixture(t)
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				if tc.parent != 0 {
+					var stop context.CancelFunc
+					ctx, stop = context.WithTimeout(ctx, tc.parent)
+					defer stop()
+				}
+				copyDelay, waitDelay := tc.copyDelay, tc.waitDelay
+				if copyDelay == 0 {
+					copyDelay = 139 * time.Second
+				}
+				if waitDelay == 0 {
+					waitDelay = 85 * time.Second
+				}
+				calls := map[string]int{}
+				runtime := &recordingPackerRuntime{runContext: func(operation context.Context, in io.Reader, out, _ io.Writer, args []string) error {
+					phase := args[0]
+					calls[phase]++
+					deadline, ok := operation.Deadline()
+					if !ok {
+						t.Fatal("unbounded preparation operation")
+					}
+					if phase == "start" && time.Until(deadline) > 2*time.Minute {
+						t.Fatal("completion exceeded its allowance")
+					}
+					if phase == "wait" && tc.cancelWait {
+						cancel()
+						return operation.Err()
+					}
+					delay := map[string]time.Duration{
+						"volume": 7500 * time.Millisecond, "create": 128 * time.Second,
+						"cp": copyDelay, "wait": waitDelay, "logs": tc.logsDelay, "rm": tc.removeDelay,
+					}[phase]
+					select {
+					case <-operation.Done():
+						return operation.Err()
+					case <-time.After(delay):
+					}
+					if phase == "volume" {
+						_, err := io.WriteString(out, args[len(args)-1]+"\n")
+						return err
+					}
+					if phase == "wait" {
+						_, err := io.WriteString(out, "0\n")
+						return err
+					}
+					if in != nil {
+						_, err := io.Copy(io.Discard, in)
+						return err
+					}
+					return nil
+				}}
+				transport, err := prepareBuildKitTransport(ctx, n, opts, source, runtime)
+				if code(err) != tc.want {
+					t.Fatalf("preparation error=%v want %s", err, tc.want)
+				}
+				if tc.want == "" {
+					if transport == nil || calls["wait"] != 1 || calls["logs"] != 1 {
+						t.Fatal("slow successful preparation was not observed")
+					}
+					if err := transport.close(); err != nil {
+						t.Fatal(err)
+					}
+				} else if transport != nil || len(runtime.cleanups) != 3 {
+					t.Fatalf("failed preparation exposed transport or lost cleanup: %v", err)
+				}
+				for _, phase := range []string{"create", "cp", "start", "wait", "logs", "rm"} {
+					if calls[phase] > 1 {
+						t.Fatalf("preparation retried phase %s", phase)
+					}
+				}
+			})
+		})
+	}
 }
 
 func TestBuildKitPrivateTransport(t *testing.T) {

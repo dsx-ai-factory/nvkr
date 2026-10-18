@@ -40,6 +40,15 @@ mount for the non-root producer. The declared export returns through the bounded
 collection. Controlled tests and a targeted native probe are distinct from the complete fresh NVKE acceptance
 run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
+Preparation staging and helper completion now have separate five-minute and two-minute budgets, both
+bounded by the original caller. Controlled-clock regression tests cover slow staging followed by delayed
+successful completion, earlier caller deadlines/cancellation, finite staging/completion, delayed logs/removal
+and joined failure cleanup without retries. In the failed Linux ARM64 attempt at `b205340c`, the helper
+exited zero but Docker reported completion about 85 seconds later; staging had left only 17 seconds of the
+former shared budget. Historical host telemetry recorded substantial I/O pressure during that interval.
+This correction addresses completion-budget starvation; it does not establish the particular writer or
+daemon lock, remove storage contention, or prove a complete fresh NVIDIA OVN demo or conformance run.
+
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
 ARC hosted route is separately admitted under ADR-18. The

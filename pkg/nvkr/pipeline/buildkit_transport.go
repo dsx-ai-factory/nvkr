@@ -70,6 +70,7 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "BuildKit transport canceled")
 	}
+	callerCtx := ctx
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	started := time.Now()
@@ -179,6 +180,13 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	if err = copyArchiveToContainer(ctx, runtime, outer, prep, "/nvkr/output"); err != nil {
 		return nil, err
 	}
+	// Staging may use most of its allowance under storage pressure. Completion
+	// has a separate finite budget, still bounded by the original caller: slow
+	// create/copy responses must not consume the time for observing helper exit.
+	cancel()
+	completionCtx, finishCompletion := context.WithTimeout(callerCtx, 2*time.Minute)
+	defer finishCompletion()
+	ctx = completionCtx
 	// The preparation script emits no progress. Observe its explicit exit instead
 	// of coupling completion to Docker's attached output stream.
 	phase("start preparation container")

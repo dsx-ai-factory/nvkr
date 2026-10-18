@@ -534,8 +534,12 @@ Isolation and the fixed environment/mount contract are identical across all engi
   happens to match UID 1000. A fixed, offline preparation stage preserves source modes and changes ownership
   only inside those volumes. It runs no producer command, mounts no host source or runtime socket, and grants
   the build no root privilege. The producer mounts source read-only; declared output is returned through bounded
-  archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup. Run
-  scheduler records reference the exact embedded producer instruction; network, container and platform are
+  archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup.
+  Authenticated preparation staging has a five-minute budget. Once carrier copying succeeds, helper start,
+  explicit exit observation, diagnostics and removal share a separate two-minute completion budget derived
+  from the original caller context. Earlier caller deadlines and cancellation bound both phases; staging
+  cannot consume the completion allowance. Neither phase retries producer or runtime work. Run scheduler
+  records reference the exact embedded producer instruction; network, container and platform are
   resolved from that instruction at execution or rendering, never serialized a second time. A future qualified
   pipeline emitter must reject this mode rather than silently render it as a network-denied build.
 - `prebuilt` nodes lower to acquire-and-digest-verify.
