@@ -125,9 +125,20 @@ is a convenience snapshot.
 | [@njhensley](https://github.com/njhensley) | Nathan Hensley — **lead maintainer** | <img src="https://avatars.githubusercontent.com/u/229213852?s=48&v=4" width="48" height="48" alt="njhensley"/> |
 | [@xdu31](https://github.com/xdu31) | Jayson Du | <img src="https://avatars.githubusercontent.com/u/66693539?s=48&v=4" width="48" height="48" alt="xdu31"/> |
 
-> **Note on vote thresholds.** Majority and supermajority counts round up to
-> whole maintainers. If the roster becomes small enough that a two-thirds
-> supermajority equals unanimity, the maintainers revisit these thresholds.
+> **Worked example: applying the thresholds.** Every threshold counts
+> non-emeritus maintainers and rounds up to a whole maintainer.
+>
+> | Decision | Rule | With 3 maintainers | With 5 maintainers |
+> |---|---|---|---|
+> | Quorum for any vote | Simple majority | 2 | 3 |
+> | Ordinary vote passes | Simple majority | 2 | 3 |
+> | Override a veto | Two-thirds supermajority | 2 | 4 |
+> | Add or remove a maintainer, or amend this document | Two-thirds supermajority | 2 | 4 |
+>
+> With the three maintainers listed above, every decision needs two votes, so
+> no single maintainer can pass or block a decision alone. If the roster shrinks
+> to two, every threshold becomes unanimity, and the maintainers revisit these
+> rules. Update this example when [MAINTAINERS.md](MAINTAINERS.md) changes.
 
 Service accounts are not maintainers. `svcsectool` is authorized to approve fork
 CI runs through the copy-pr-bot fork-CI mirror but holds no governance role: it

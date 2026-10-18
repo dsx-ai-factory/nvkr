@@ -51,7 +51,7 @@ Source-build completeness and offline-install completeness are separate requirem
 inventory was inspected on 2026-10-10 against NVKE commit
 [`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nvke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e).
 It describes that consumer's dependencies, not an NVKR export schema or a completed installation.
-The pinned source links point to that NVKE commit.
+The pinned NVKE source links require repository access.
 
 The [M2 image catalog](../inputs/catalogs/runtime-dependencies/registry.yaml) selects twelve non-test runtime
 images per architecture: PostgreSQL, eight SPIRE images and three Temporal images. Their pins reflect the

@@ -133,6 +133,20 @@ referenced pinned upstream metadata. That check supplies no effective customized
 Source, patch, configuration and material bindings remain required. Full inspection and material reconciliation
 remain deferred hardening.
 
+This ledger uses the following work-package labels. A label names a unit of work; it does not mean that work
+is approved, complete or operationally accepted. Each entry states its own implementation status and the
+acceptance that remains.
+
+| Label | Scope | Ledger entry | Acceptance criteria |
+|---|---|---|---|
+| M3-A | Complete-publication artifact authentication | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M3-B | Native delivered-tool smoke | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M3-C | Qualification verdict and evidence publication | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M3-D | Positive and negative external acceptance and independent review | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M4-B | Connecting manifest issuance to the CLI and generated workflow | [M4 release manifest issuance](#m4-release-manifest-issuance) | [Epic M4](../epics-v1-spec.md#epic-m4--automated-releases) |
+| M4-C | Release manifest schema and issuance | [M4 release manifest issuance](#m4-release-manifest-issuance) | [Epic M4](../epics-v1-spec.md#epic-m4--automated-releases) |
+| M4-D | Tags, publisher exclusion, consumer verification instructions and interruption demonstrations | [M4 release manifest issuance](#m4-release-manifest-issuance) | [Epic M4](../epics-v1-spec.md#epic-m4--automated-releases) |
+
 M3-A authenticates the complete selected publication against
 its exact producing Run, attempt, commit and input identities, and returns subject-bound results without
 qualification signing authority. The Linux `run check-artifacts` command now takes `--run` with an exact
