@@ -127,13 +127,15 @@ func TestSiteStartupToolsAreSeparateFromHostExecutables(t *testing.T) {
 	}
 }
 
-// Split selections describe the same outputs as the complete tools selection;
-// they do not introduce another CLI or rebuild unused Linux installer tools.
-func TestNativeToolDefinitionsShareOutputOwners(t *testing.T) {
-	for _, host := range []string{"native-linux", "native-mac"} {
-		t.Run(host, func(t *testing.T) {
-			base := filepath.Join("..", "..", "inputs", "definitions", "demo", host)
-			complete, err := definition.LoadDefinition(t.Context(), filepath.Join(base, "definition-tools.json"))
+// The complete selection is the authored owner of both tool bundles.
+func TestNativeToolDefinitionsMatchHostAndSiteSelections(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "darwin/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			path, _, hostBundle, members, err := nativeToolSelection(platform)
+			if err != nil {
+				t.Fatal(err)
+			}
+			complete, err := definition.LoadDefinition(t.Context(), filepath.Join("..", "..", path))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -143,29 +145,25 @@ func TestNativeToolDefinitionsShareOutputOwners(t *testing.T) {
 			if complete.Catalog.Base != "../../../catalogs/tools/native" {
 				t.Fatal("tools lost their shared catalog owner")
 			}
-			outputs := make(map[string]definition.DefinitionOutput)
+			expected := map[string]definition.DefinitionOutput{
+				hostBundle:                 {Name: hostBundle, Platform: platform, Format: definition.OutputExecutable, Components: slices.Clone(members)},
+				"site-startup-tools-arm64": {Name: "site-startup-tools-arm64", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{"nerdctl"}},
+			}
+			if platform == "linux/arm64" {
+				for i, member := range expected[hostBundle].Components {
+					if slices.Contains([]string{"clusterctl", "helm", "kind", "kubectl", "oras"}, member) {
+						expected[hostBundle].Components[i] += "-linux"
+					}
+				}
+			}
 			for _, output := range complete.Outputs {
-				if _, exists := outputs[output.Name]; exists {
-					t.Fatal("duplicate tool bundle", output.Name)
+				if !reflect.DeepEqual(output, expected[output.Name]) {
+					t.Fatal("tool bundle differs from selected host or site members", output.Name)
 				}
-				outputs[output.Name] = output
+				delete(expected, output.Name)
 			}
-			for _, file := range []string{"definition-host-tools.json", "definition-site-tools.json"} {
-				selected, err := definition.LoadDefinition(t.Context(), filepath.Join(base, file))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(selected.Catalog, complete.Catalog) || len(selected.Outputs) != 1 {
-					t.Fatal("split selection introduced a different owner or extra bundle")
-				}
-				output := selected.Outputs[0]
-				if !reflect.DeepEqual(output, outputs[output.Name]) {
-					t.Fatal("split selection differs from complete selection", output.Name)
-				}
-				delete(outputs, output.Name)
-			}
-			if len(outputs) != 0 {
-				t.Fatal("complete selection has unused bundles", outputs)
+			if len(expected) != 0 {
+				t.Fatal("complete selection omitted required bundles", expected)
 			}
 		})
 	}

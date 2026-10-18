@@ -61,7 +61,7 @@ records source availability and remaining gaps.
 | Build artifacts, install a local site, and validate a real QCOW2-backed tenant plus workload | [Integrated Ubuntu ARM64 guide](local-nvke-demo.md) |
 | Review exact-revision evidence from the successful fresh upstream OVN diagnostic | [2026-10-11 runtime evidence](evidence/local-upstream-ovn-2026-10-11.md) |
 | Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
-| Understand the NVKR-to-installer artifact handoff | [Staged-installer handoff](nvkr-to-nvke-demo.md) |
+| Inspect older staged-installer sessions and recovery controls | [Legacy handoff and recovery](nvkr-to-nvke-demo.md) |
 | Determine what remains for a full source-built local NVKE distribution | [Full-source gap map](full-nvke-source-build.md) |
 
 ## Engineering and maintenance

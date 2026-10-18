@@ -30,10 +30,12 @@ the pinned objects; checkout and status receive no developer helper or HOME.
 
 ### Explicit legacy Colima build route
 
-For this legacy Linux launcher, follow [the historical macOS setup](local-nvke-demo.md#additional-macos-setup)
-and enter its native ext4 source export. Invoke its OS/build commands inside
-Linux, not on the Mac shared mount. Inspect physical Mac capacity separately;
-a 150-GiB sparse guest disk does not reserve that much host space.
+An existing Colima ARM64 Linux profile can host the legacy artifact launcher.
+Keep the checkout and build workspace on its native Linux filesystem, rather
+than the Mac shared mount, and run OS/build commands inside that Linux guest.
+Inspect guest and physical Mac capacity separately; sparse guest storage does
+not reserve host space. The [native Mac demo](local-nvke-demo.md#additional-macos-setup)
+uses the Mac CLI directly.
 
 For component-only builds the launcher also supports an explicitly selected
 `COLIMA_PROFILE=NAME` route. The forwarded Mac route

@@ -97,8 +97,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	if err != nil || len(thumbprint) != 32 {
 		return errors.New("site preparation did not return a valid TPM identity")
 	}
-	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
-	if err != nil {
+	if err := admitNativeSiteContract(ctx, s.assets.Installer); err != nil {
 		return err
 	}
 	cli := s.assets.CLI
@@ -135,11 +134,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 		"--set", "cluster.podCidr=" + managementPodCIDR, "--set", "cluster.serviceCidr=" + managementServiceCIDR,
 		"--set", "cluster.kubeletConfig.systemReservedMemory=1Gi", "--set", "spire.trustDomain=nvke-native-site.nke.local",
 		"--set", "spire.upstreamCA=true"}
-	if modern {
-		runner = bindNativeSpireCA(runner, caRoot)
-	} else {
-		args = append(args[:len(args)-2], "--set", "spire.caCertFile="+filepath.Join(caRoot, "ca.crt"), "--set", "spire.caKeyFile="+filepath.Join(caRoot, "ca.key"))
-	}
+	runner = bindNativeSpireCA(runner, caRoot)
 	spec, err := s.capture(ctx, runner, "generate-sitespec", args...)
 	if err != nil {
 		return err
@@ -207,17 +202,8 @@ volumeBindingMode: Immediate
 	if err := runner.Run(ctx, []string{filepath.Join(tools, "kubectl"), "apply", "-f", storagePath}, "host-site-storage", time.Minute); err != nil {
 		return err
 	}
-	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
+	runner, stackConfig, err := s.prepareNativeStack(ctx, runner, out)
 	if err != nil {
-		return err
-	}
-	stackConfig := ""
-	if modern {
-		runner, stackConfig, err = s.prepareNativeStack(ctx, runner, out)
-		if err != nil {
-			return err
-		}
-	} else if err := s.prepareLegacyNativeStack(ctx, out, specPath); err != nil {
 		return err
 	}
 	if _, err := s.capture(ctx, runner, "validate-sitespec", cli, "validate", "sitespec", "--sitespec", specPath); err != nil {
@@ -269,11 +255,10 @@ func nativeCAPIProviderVersion(ctx context.Context, installer string) (string, e
 }
 
 func reviewedNativeCAPIProvider(commit, versionsDigest string) (string, error) {
-	// Both reviewed revisions' cli/Makefile inject CAPI_VERSION from this exact file;
+	// The reviewed revision's cli/Makefile injects CAPI_VERSION from this exact file;
 	// cli/internal/bootstrap/controllerdeploy/capi.go uses it for all three
 	// upstream providers. Keep the permanent site aligned with that bootstrap.
-	reviewed := commit == "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n" || commit == "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n"
-	if !reviewed || versionsDigest != "ae8980d7b31d9f2f9c355dd7d873854eaba8cfe94f5075ec61dfa9bdbdb5a0f9" {
+	if commit != nativeSiteSourceCommit || versionsDigest != "ae8980d7b31d9f2f9c355dd7d873854eaba8cfe94f5075ec61dfa9bdbdb5a0f9" {
 		return "", errors.New("native CAPI provider selection differs from reviewed source")
 	}
 	return "v1.13.6", nil
@@ -305,55 +290,19 @@ func demoTelemetryValues() ([]byte, error) {
 	return yaml.Marshal(values)
 }
 
-func (s *nativeSiteAttempt) prepareLegacyNativeStack(ctx context.Context, out, specPath string) error {
-	if err := requireContext(ctx); err != nil {
-		return err
-	}
-	raw, err := os.ReadFile(specPath)
-	if err != nil {
-		return err
-	}
-	var doc map[string]any
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
-		return err
-	}
-	password, err := randomScalar()
-	if err != nil {
-		return err
-	}
-	for name, value := range map[string]string{"nico-token": "nico-simctl-token", "unused-pull-token": "local-image-import-only", "tenant-password": password} {
-		if err := os.WriteFile(filepath.Join(out, name), []byte(value), 0600); err != nil {
-			return err
-		}
-	}
-	doc["controllerStack"] = map[string]any{"arch": "arm64", "nico": map[string]any{"endpoint": "http://" + net.JoinHostPort(s.bridge.gateway.String(), "18080"), "orgID": "novxwn552ssc", "apiName": "forge", "tokenFile": filepath.Join(out, "nico-token")},
-		"pullSecret": map[string]any{"server": "ghcr.io", "username": "native-demo-local-import", "tokenFile": filepath.Join(out, "unused-pull-token")},
-		"tenant":     map[string]any{"user": "nvke-demo", "passwordFile": filepath.Join(out, "tenant-password")}, "database": map[string]any{"passwordFile": filepath.Join(out, "postgres-password")},
-		"images": map[string]any{"controller": s.assets.Images["controller"].Reference, "profiles": s.assets.Images["profiles"].Reference}}
-	raw, err = yaml.Marshal(doc)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(specPath, raw, 0600); err != nil {
-		return err
-	}
-	return nil
-}
+// Both native hosts consume this maintained source contract. Historical
+// installer interfaces are rejected rather than kept as another deployment path.
+const nativeSiteSourceCommit = "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n"
 
-// Source selection, rather than the execution OS, determines the CLI contract.
-func modernNativeSiteContract(ctx context.Context, installer string) (bool, error) {
+func admitNativeSiteContract(ctx context.Context, installer string) error {
 	commit, err := readRunFile(ctx, installer, "SOURCE_COMMIT", 41)
 	if err != nil {
-		return false, err
+		return err
 	}
-	switch string(commit) {
-	case "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n":
-		return true, nil
-	case "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n":
-		return false, nil
-	default:
-		return false, errors.New("native site CLI contract differs from reviewed source")
+	if string(commit) != nativeSiteSourceCommit {
+		return errors.New("native site CLI contract differs from reviewed source")
 	}
+	return nil
 }
 
 func bindNativeSpireCA(runner Runner, caRoot string) Runner {

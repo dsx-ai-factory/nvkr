@@ -203,7 +203,7 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				{"controller/nico-sim/ui/index.html", tar.TypeReg, "index", 0},
 			}
 			if scenario != "missing source marker" {
-				commit := "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n"
+				commit := "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n"
 				if scenario == "changed source marker" {
 					commit = strings.Repeat("a", 40) + "\n"
 				}

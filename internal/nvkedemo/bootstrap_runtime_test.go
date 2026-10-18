@@ -144,8 +144,13 @@ esac
 	if err := backend.close(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if exited, err := backend.process.Exited(); !exited || err != nil {
-		t.Fatalf("backend did not join: exited=%v err=%v", exited, err)
+	// Exited preserves the original child status after a requested stop;
+	// cleanup succeeds only when the owned process and its group have joined.
+	if exited, _ := backend.process.Exited(); !exited {
+		t.Fatal("backend did not join")
+	}
+	if alive, err := groupAlive(backend.process.PID()); err != nil || alive {
+		t.Fatalf("backend process group survives: alive=%v err=%v", alive, err)
 	}
 	if _, err := os.Stat(owned); !os.IsNotExist(err) {
 		t.Fatalf("owned backend staging remains: %v", err)

@@ -283,14 +283,11 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 		return Runner{}, err
 	}
 	kubeconfig := filepath.Join(out, "site.kubeconfig")
-	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
-	if err != nil {
+	if err := admitNativeSiteContract(ctx, s.assets.Installer); err != nil {
 		return Runner{}, err
 	}
-	if modern {
-		if err := s.admitAPIClient(ctx, runner, tools, out, kubeconfig); err != nil {
-			return Runner{}, err
-		}
+	if err := s.admitAPIClient(ctx, runner, tools, out, kubeconfig); err != nil {
+		return Runner{}, err
 	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"XDG_CONFIG_HOME": filepath.Join(out, "config")})
 	cli := s.assets.CLI
@@ -580,26 +577,23 @@ func (s *nativeSiteAttempt) tenantRequest(ctx context.Context) (TenantRequest, e
 	if err != nil {
 		return TenantRequest{}, err
 	}
-	modern, err := modernNativeSiteContract(ctx, s.assets.Installer)
-	if err != nil {
+	if err := admitNativeSiteContract(ctx, s.assets.Installer); err != nil {
 		return TenantRequest{}, err
 	}
 	request.VIP = ""
-	if modern {
-		request.ControlPlane.NICo.Release, request.ControlPlane.NICo.OS = request.ControlPlane.NICo.OS, ""
-		for i := range request.NodePools {
-			request.NodePools[i].NICo.Release, request.NodePools[i].NICo.OS = request.NodePools[i].NICo.OS, ""
-		}
-		// The source default pod range contains the Mac vmnet underlay. Keep both
-		// tenant ranges separate from that underlay and the site Kubernetes ranges.
-		request.Network = &TenantNetwork{PodCIDR: "10.245.0.0/16", ServiceCIDR: "10.97.0.0/16"}
-		if !s.bridge.prefix.IsValid() {
-			return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "tenant requires an observed guest subnet")
-		}
-		for _, network := range []string{request.Network.PodCIDR, request.Network.ServiceCIDR} {
-			if s.bridge.prefix.Overlaps(netip.MustParsePrefix(network)) {
-				return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "tenant Kubernetes range %s overlaps guest subnet %s", network, s.bridge.prefix)
-			}
+	request.ControlPlane.NICo.Release, request.ControlPlane.NICo.OS = request.ControlPlane.NICo.OS, ""
+	for i := range request.NodePools {
+		request.NodePools[i].NICo.Release, request.NodePools[i].NICo.OS = request.NodePools[i].NICo.OS, ""
+	}
+	// The source default pod range contains the Mac vmnet underlay. Keep both
+	// tenant ranges separate from that underlay and the site Kubernetes ranges.
+	request.Network = &TenantNetwork{PodCIDR: "10.245.0.0/16", ServiceCIDR: "10.97.0.0/16"}
+	if !s.bridge.prefix.IsValid() {
+		return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "tenant requires an observed guest subnet")
+	}
+	for _, network := range []string{request.Network.PodCIDR, request.Network.ServiceCIDR} {
+		if s.bridge.prefix.Overlaps(netip.MustParsePrefix(network)) {
+			return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "tenant Kubernetes range %s overlaps guest subnet %s", network, s.bridge.prefix)
 		}
 	}
 	return request, nil

@@ -4,11 +4,7 @@ These Definitions select Apple Silicon host tools, the Linux site runtime compan
 
 | Definition | Purpose |
 | --- | --- |
-| `definition.json` | Source-built native NVKE CLI and NICo tools |
-| `definition-host-tools.json` | Native host bundle |
 | `definition-tools.json` | Host bundle and site runtime companion |
-| `definition-site-tools.json` | Site runtime companion bundle |
-| `definition-installer.json` | Source-owned installer archive |
 | `definition-runtime-images.json` | Existing pinned runtime and CAPI authentication images for local import |
 
 ```sh
