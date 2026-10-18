@@ -71,16 +71,47 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 		return nil, e.Wrap(e.CodeTimeout, err, "BuildKit transport canceled")
 	}
 	callerCtx := ctx
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
 	started := time.Now()
-	phase := func(label string) {
-		deadline, _ := ctx.Deadline()
-		opts.progress.printf("[transport] build %s — %s; elapsed=%s remaining=%s\n", n.Component, label,
-			time.Since(started).Round(time.Millisecond), max(time.Duration(0), time.Until(deadline)).Round(time.Millisecond))
+	step := 0
+	defer func() {
+		opts.progress.printf("[transport] build %s — finished; steps=%d elapsed=%s failed=%t\n", n.Component,
+			step, time.Since(started).Round(time.Millisecond), returnErr != nil)
+	}()
+	// Each finite operation derives from the original caller. In particular,
+	// container creation cannot spend authenticated copying's allowance. The
+	// caller may impose an earlier deadline; absence of one never removes these
+	// operation bounds. No operation retries runtime or producer work.
+	operation := func(label string, allowance time.Duration, failureCode e.Code, run func(context.Context) error) error {
+		operationCtx, stop := context.WithTimeout(callerCtx, allowance)
+		defer stop()
+		step++
+		deadline, _ := operationCtx.Deadline()
+		opts.progress.printf("[transport] build %s — %s; step=%d budget=%s elapsed=%s remaining=%s\n", n.Component, label,
+			step, allowance, time.Since(started).Round(time.Millisecond), max(time.Duration(0), time.Until(deadline)).Round(time.Millisecond))
+		err := operationCtx.Err()
+		if err == nil {
+			err = run(operationCtx)
+		}
+		if operationCtx.Err() != nil {
+			err = runtimeCommandError(operationCtx, err, "", failureCode, "%s", label)
+		} else if err != nil {
+			// Preserve an owning module's coded failure. Classify and name the
+			// initiating operation before later diagnostics or cleanup can fail.
+			var coded *e.Error
+			if errors.As(err, &coded) {
+				failureCode = coded.Code
+			}
+			err = e.Wrap(failureCode, err, "%s", label)
+		}
+		if err != nil {
+			var coded *e.Error
+			if errors.As(err, &coded) {
+				opts.progress.printf("[transport] build %s — failed %s; step=%d code=%s elapsed=%s\n", n.Component, label,
+					step, coded.Code, time.Since(started).Round(time.Millisecond))
+			}
+		}
+		return err
 	}
-	defer phase("finished")
-	phase("admit private BuildKit transport")
 	base, err := filepath.Abs(filepath.Dir(source))
 	if err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "resolving BuildKit transport root")
@@ -119,48 +150,69 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 			transport = nil
 		}
 	}()
-	directory, _, err := securepath.OpenDirectory(root)
-	if err != nil {
-		return nil, e.Wrap(e.CodeBuildFailed, err, "opening private BuildKit transport")
+	if err = operation("admit private BuildKit transport", 5*time.Minute, e.CodeEngineCapability, func(ctx context.Context) error {
+		directory, _, err := securepath.OpenDirectory(root)
+		if err != nil {
+			return e.Wrap(e.CodeBuildFailed, err, "opening private BuildKit transport")
+		}
+		available, capacityErr := securepath.AvailableDiskBackedBytes(ctx, directory)
+		closeErr := directory.Close()
+		if err = errors.Join(capacityErr, closeErr); err != nil || available/3 == 0 {
+			return e.Wrap(e.CodeEngineCapability, err, "BuildKit export requires disk-backed transport headroom")
+		}
+		transport.limit = int64(min(available/3, uint64(transportarchive.MaxArchiveBytes)))
+		return nil
+	}); err != nil {
+		return nil, err
 	}
-	available, capacityErr := securepath.AvailableDiskBackedBytes(ctx, directory)
-	closeErr := directory.Close()
-	if err = errors.Join(capacityErr, closeErr); err != nil || available/3 == 0 {
-		return nil, e.Wrap(e.CodeEngineCapability, err, "BuildKit export requires disk-backed transport headroom")
-	}
-	transport.limit = int64(min(available/3, uint64(transportarchive.MaxArchiveBytes)))
-	phase("pack source archive")
 	innerPath := filepath.Join(root, "input.tar")
-	if err = transportarchive.Pack(ctx, innerPath, base, []string{member}); err != nil {
+	if err = operation("pack source archive", 5*time.Minute, e.CodeBuildFailed, func(ctx context.Context) error {
+		return transportarchive.Pack(ctx, innerPath, base, []string{member})
+	}); err != nil {
 		return nil, err
 	}
-	phase("verify source archive")
-	inner, err := heldfile.OpenContext(ctx, innerPath, heldfile.Options{Label: "buildkit-input", MaxBytes: transportarchive.MaxArchiveBytes})
-	if err != nil {
+	var inner *heldfile.File
+	if err = operation("verify source archive", 5*time.Minute, e.CodeBuildFailed, func(ctx context.Context) error {
+		inner, err = heldfile.OpenContext(ctx, innerPath, heldfile.Options{Label: "buildkit-input", MaxBytes: transportarchive.MaxArchiveBytes})
+		if inner != nil {
+			transport.resources.held = append(transport.resources.held, inner)
+		}
+		return err
+	}); err != nil {
 		return nil, err
 	}
-	transport.resources.held = append(transport.resources.held, inner)
-	phase("pack transport carrier")
 	outerPath := filepath.Join(root, "carrier.tar")
-	if err = transportarchive.Pack(ctx, outerPath, root, []string{"input.tar"}); err != nil {
+	if err = operation("pack transport carrier", 5*time.Minute, e.CodeBuildFailed, func(ctx context.Context) error {
+		return transportarchive.Pack(ctx, outerPath, root, []string{"input.tar"})
+	}); err != nil {
 		return nil, err
 	}
-	phase("verify transport carrier")
-	outer, err := heldfile.OpenContext(ctx, outerPath, heldfile.Options{Label: "buildkit-carrier", MaxBytes: transportarchive.MaxArchiveBytes})
-	if err != nil {
+	var outer *heldfile.File
+	if err = operation("verify transport carrier", 5*time.Minute, e.CodeBuildFailed, func(ctx context.Context) error {
+		outer, err = heldfile.OpenContext(ctx, outerPath, heldfile.Options{Label: "buildkit-carrier", MaxBytes: transportarchive.MaxArchiveBytes})
+		if outer != nil {
+			transport.resources.held = append(transport.resources.held, outer)
+		}
+		return err
+	}); err != nil {
 		return nil, err
 	}
-	transport.resources.held = append(transport.resources.held, outer)
+	opts.progress.printf("[transport] build %s — authenticated bytes; source_archive_bytes=%d carrier_bytes=%d carrier_members=1\n", n.Component, inner.Size(), outer.Size())
 	attempt, err := packerAttemptID()
 	if err != nil {
 		return nil, e.Wrap(e.CodeInternal, err, "allocating fresh BuildKit volume identity")
 	}
 	name := "nvkr-buildkit-" + attempt
 	transport.source, transport.output = name+"-source", name+"-output"
-	phase("create private volumes")
-	for _, volume := range []string{transport.source, transport.output} {
+	for i, volume := range []string{transport.source, transport.output} {
 		transport.resources.volumes = append(transport.resources.volumes, volume)
-		if err = createPackerVolume(ctx, runtime, volume, []string{"nvkr.dev/role=buildkit-transport"}); err != nil {
+		label := "create private source volume"
+		if i == 1 {
+			label = "create private output volume"
+		}
+		if err = operation(label, 5*time.Minute, e.CodeBuildFailed, func(ctx context.Context) error {
+			return createPackerVolume(ctx, runtime, volume, []string{"nvkr.dev/role=buildkit-transport"})
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -171,35 +223,30 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 		args = append(args, buildKitVolumeArgs(runtime.RuntimeName(), mount.volume, mount.destination, false)...)
 	}
 	args = append(args, n.Toolchain, "-ec", buildKitExtractScript, "nvkr-buildkit-input", strings.TrimPrefix(inner.Digest(), "sha256:"), member)
-	phase("create preparation container")
-	if err = runtime.Run(ctx, nil, io.Discard, opts.Stderr, args...); err != nil {
-		return nil, runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "creating offline BuildKit input stage")
+	if err = operation("create preparation container", 5*time.Minute, e.CodeBuildFailed, func(ctx context.Context) error {
+		err := runtime.Run(ctx, nil, io.Discard, opts.Stderr, args...)
+		prepCreated = err == nil
+		return err
+	}); err != nil {
+		return nil, err
 	}
-	prepCreated = true
-	phase("copy authenticated carrier")
-	if err = copyArchiveToContainer(ctx, runtime, outer, prep, "/nvkr/output"); err != nil {
+	if err = operation("copy authenticated carrier", 5*time.Minute, e.CodeBuildFailed, func(ctx context.Context) error {
+		return copyArchiveToContainer(ctx, runtime, outer, prep, "/nvkr/output")
+	}); err != nil {
 		return nil, err
 	}
 	// Each completion RPC has its own finite allowance. A slow start response
 	// must not spend wait's budget, nor may observation spend teardown's budget.
 	// Every phase remains bounded by the original caller, with no RPC retries.
-	cancel()
 	completion := func(label string, failureCode e.Code, run func(context.Context) error) error {
-		operation, stop := context.WithTimeout(callerCtx, 2*time.Minute)
-		defer stop()
-		ctx = operation
-		phase(label)
-		if err := operation.Err(); err != nil {
-			return runtimeCommandError(operation, err, "", failureCode, "%s", label)
-		}
-		err := run(operation)
-		if operation.Err() != nil {
-			return runtimeCommandError(operation, err, "", failureCode, "%s", label)
-		}
-		if err != nil {
-			return runtimeCommandError(operation, err, "", failureCode, "%s", label)
-		}
-		return nil
+		return operation(label, 2*time.Minute, failureCode, func(ctx context.Context) error {
+			if err := run(ctx); err != nil {
+				// Completion RPCs retain their existing public error mapping;
+				// staging alone preserves archive/transport owner codes.
+				return runtimeCommandError(ctx, err, "", failureCode, "%s", label)
+			}
+			return nil
+		})
 	}
 	// The preparation script emits no progress. Observe its explicit exit instead
 	// of coupling completion to Docker's attached output stream.

@@ -297,7 +297,7 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   fi
   # Freeze fresh local bytes through the existing overlay contract, not a tag
   # or a hand-edited maintained lock. Each output retains its own catalog scope.
-  jq --arg image "${image}" 'map(select(.pin != $image))' "${bootstrap}/toolchain-scopes.json" >"${bootstrap}/substitutions.json"
+  jq -L scripts --arg image "${image}" 'include "nvke-os-plan"; local_toolchain_substitutions($image)' "${bootstrap}/toolchain-scopes.json" >"${bootstrap}/substitutions.json"
   if [[ "$(jq length "${bootstrap}/substitutions.json")" != 0 ]]; then
   while IFS= read -r index; do
     file=toolchain-attempt.json
@@ -310,19 +310,10 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   # Keep its references relocatable so compilation can capture and replay the
   # original input closure without the producer checkout's absolute paths.
   definition_dir="${definition%/*}"
-  jq -e --arg definition_dir "${definition_dir}" \
-    --slurpfile scopes "${bootstrap}/substitutions.json" '
-    def relocate: if startswith("/") then error("local demo catalog references must be repository-relative")
-      else "../../../" + $definition_dir + "/" + . end;
-    def locate: .base |= relocate | if .overlays then .overlays |= map(relocate) else . end;
-    .catalog |= locate |
-    .catalog as $default |
-    .outputs |= map(.name as $name |
-      if .catalog then .catalog |= locate else .catalog = $default end |
-      .catalog.overlays = ((.catalog.overlays // []) +
-        [$scopes[0] | to_entries[] | select(.value.outputs | index($name)) |
-          "./toolchain-attempt" + (if .key == 0 then "" else "-" + (.key | tostring) end) + ".json"]))
-  ' "${definition}" >"${bootstrap}/definition.json"
+  jq -L scripts -e --arg definition_dir "${definition_dir}" \
+    --slurpfile scopes "${bootstrap}/substitutions.json" \
+    'include "nvke-os-plan"; local_toolchain_definition($definition_dir; "../../../"; $scopes[0])' \
+    "${definition}" >"${bootstrap}/definition.json"
   definition="${bootstrap}/definition.json"
   fi
 fi

@@ -40,16 +40,27 @@ mount for the non-root producer. The declared export returns through the bounded
 collection. Controlled tests and a targeted native probe are distinct from the complete fresh NVKE acceptance
 run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
-Preparation staging has a five-minute budget; helper start, explicit wait, diagnostics and removal each
-have their own two-minute RPC budget, all bounded by the original caller. Controlled-clock regression tests
-cover the observed staging/start/wait composition, independent RPC limits, earlier caller deadlines and
-cancellation, late nominal success, and joined failure cleanup without retries. In the failed Linux ARM64 attempt at `b205340c`, the helper
+Each preparation staging operation now has an independent five-minute allowance; helper start, explicit wait,
+diagnostics and removal each retain their two-minute RPC allowance, all bounded by any earlier original
+caller deadline or cancellation. This permits longer aggregate staging than the former five-minute clock;
+it does not manufacture an admitted node budget. Controlled-clock regressions cover create/copy and
+start/wait composition, operation limits, earlier caller deadlines and cancellation, late nominal success,
+strict helper exit status, no later execution after failure, and joined cleanup without retries. Measured
+held-archive sizes and operation allowances are descriptive transport diagnostics, not authority.
+In the failed Linux ARM64 attempt at `b205340c`, the helper
 exited zero but Docker reported completion about 85 seconds later; staging had left only 17 seconds of the
 former shared budget. Historical host telemetry recorded substantial I/O pressure during that interval.
 The subsequent `15a2accd` attempt also failed: a roughly forty-second start response left only eighty
 seconds for delayed wait observation in the shared two-minute completion budget. Independent RPC budgets
-address that accounting defect; they do not establish the particular writer or
-daemon lock, remove storage contention, or prove a complete fresh NVIDIA OVN demo or conformance run.
+address that completion-accounting defect. The original Ubuntu `faa6c0bf` invocation subsequently failed
+naturally before helper start: creation took about 128 seconds and authenticated copying began with only
+140.520 seconds left on the shared staging clock. Its carrier byte size and first propagated error were
+not retained and cannot be reconstructed from the cleaned snapshots. Independent staging allowances
+address that shared-clock starvation; the causal batch-error regression preserves an initiating timeout
+instead of choosing a lexically earlier canceled sibling with the same code. Neither change has been
+exercised in another full transport or demo run. The underlying creation/copy latency remains unverified;
+these changes do not establish a particular writer or daemon lock, remove storage contention, or prove a
+complete fresh NVIDIA OVN demo or conformance run.
 
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
@@ -150,6 +161,11 @@ tool preparation. Repository-contained input paths and local-only Environments a
 preparation; controlled tests reject changed invocations, escaped paths and publication requests.
 Default Linux bootstrap and qualification remain separate from explicit input preparation. This interface
 and its real native Plan preparation check do not establish a complete Mac BUILD-to-DEPLOY result.
+The normal Mac BUILD additionally selects the same committed product Definition and its Mac Environment,
+discovers the documented installed native dependencies, and delegates bundle/input preparation to those
+existing NVKR owners. It reuses the Linux utility-image builder and shared catalog-scope/relative-input
+projection before the captured local Run. Controlled tests cover invocation order, missing prerequisites,
+unchanged explicit selections and capture selection; they do not establish a fresh customer build or deploy.
 A separate local execution completed a selected installer archive Run and its native CLI tool Run through
 this BUILD interface. That bounded check excluded OS-image assembly and deployment acceptance.
 Installed-SDK CGO tools and a real HVF guest have run separately. Apple system utilities execute only at their

@@ -80,25 +80,55 @@ bin/nvke-demo run --artifacts-run /absolute/path/to/artifact-run \
   --out /absolute/path/to/fresh-demo --network upstream-ovn
 ```
 
-Full native host build/runtime acceptance remains pending. The default artifact
-bootstrap still requires Linux. On either supported host, BUILD can instead
-consume an explicitly selected NVKR Definition, local Environment and native
-NVKR executable:
+Full native host build/runtime acceptance remains pending. The default Mac
+BUILD selects the same maintained product Definition as Linux, uses the committed
+Mac Environment, and finds `nvkr` beside the running `nvke-demo` executable. Build
+both executables from the same checkout revision with the Go version in
+`.go-version`:
 
 ```sh
-nvke-demo build --repo /absolute/path/to/nvkr --attempt fresh-build --jobs 2 \
-  --definition .nvkr/prepared/definition.json \
-  --environment .nvkr/prepared/environment.json --nvkr /absolute/path/to/nvkr-bin
+GOTOOLCHAIN=local make build demo
+bin/nvke-demo e2e --repo "$PWD" --attempt first-mac-build --jobs 2 \
+  --out "$PWD/first-mac-demo" --network ovn --cleanup
 ```
 
-Definition and Environment paths must remain inside the selected repository.
-The selected inputs must already bind their native dependencies through NVKR's
-preparation owners. BUILD compiles their complete Plan, invokes `nvkr run local`
-and prepares the host tool Run through NVKR. It does not invoke Packer directly,
-change source pins, publish remotely or install a compiler. Inputs declaring
-publication or signing are refused; the existing default local qualification
-rehearsal remains separate. This interface does not establish fresh complete
-Mac build or runtime acceptance. Without `--cleanup`, keep the foreground demo running;
+Install these Mac prerequisites before that first invocation:
+
+- Apple Silicon macOS with HVF, the selected Go SDK and Clang/Apple SDK.
+- Docker and Buildx reachable through `/var/run/docker.sock`, plus `jq` and Git.
+- Packer **1.15.4** on `PATH`; `packer plugins installed` must report the installed
+  **1.1.6** `packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64` executable and its sibling
+  `_SHA256SUM` file must exist. BUILD queries this installation; it does not install it.
+  The [pinned prerequisite acquisition and installation steps](../inputs/definitions/demo/native-mac-tools/README.md#prepare-installed-packer-prerequisites)
+  use existing NVKR commands without prior demo outputs.
+- Homebrew Bash, Python 3, QEMU and GNU coreutils on `PATH`. Coreutils must expose
+  its `g`-prefixed command names. `qemu-img` and `qemu-system-aarch64` must resolve
+  to the same installation prefix. Its `share/qemu` must contain
+  `edk2-aarch64-code.fd`, `edk2-arm-vars.fd`, `efi-virtio.rom`,
+  `vgabios-virtio.bin` and `keymaps/en-us`.
+- Lima **2.2.1** and `nerdctl.lima`, source/registry access, and capacity for the
+  topology described below.
+
+BUILD discovers these installed locations, asks NVKR's existing owners to capture
+the native tool bundle and prepare the selected inputs, and freshly invokes the
+existing Linux ARM64 utility-image bootstrap through Docker Buildx. The OS,
+simulator and chart scopes receive that validated image's immutable ID through
+the same catalog-scoped overlay projection used by Linux. No prior `.nvkr`
+directory, local utility image or authored preparation manifest is required.
+Before creating attempt inputs, BUILD probes Docker/Buildx, compares the installed
+Go `GOVERSION` with `.go-version` under `GOTOOLCHAIN=local`, and queries Clang's
+version. The Clang probe establishes command usability only; it does not compile
+or link against Apple SDK headers or validate that SDK's complete installation.
+Darwin execution still trusts installed dynamic libraries and the Apple SDK;
+Mach-O and byte checks do not authenticate that complete host dependency closure.
+
+Explicit `--definition`, `--environment` and `--nvkr` selections remain available
+on either supported host. Those inputs must already bind their native dependencies;
+their paths must remain inside the selected repository. BUILD compiles their
+complete Plan and invokes `nvkr run local` with input capture. Publication/signing
+inputs are refused; the Linux local qualification rehearsal remains separate.
+The default Mac adapter has controlled flow and prerequisite tests; complete
+fresh Mac build/runtime acceptance remains unverified. Without `--cleanup`, keep the foreground demo running;
 Ctrl-C requests owned cleanup. Detached retention is not provided by this path.
 
 The shared native owner performs these steps:

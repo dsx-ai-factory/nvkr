@@ -402,13 +402,21 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}
 		batchCtx, cancel := context.WithCancel(ctx)
 		results := make([]LocalNodeResult, len(ready))
-		batchErrors := make([]error, len(ready))
+		var firstError error
+		var firstFailure sync.Once
 		var batch sync.WaitGroup
 		for index, node := range ready {
 			batch.Go(func() {
-				results[index], batchErrors[index] = runLocalNode(batchCtx, plan, node, options, runners, result, deps)
-				if batchErrors[index] != nil {
-					cancel()
+				var nodeErr error
+				results[index], nodeErr = runLocalNode(batchCtx, plan, node, options, runners, result, deps)
+				if nodeErr != nil {
+					// Record the initiating error before canceling siblings. A real
+					// operation timeout and the cancellations it triggers may carry
+					// the same code, so neither sort order nor code identifies cause.
+					firstFailure.Do(func() {
+						firstError = nodeErr
+						cancel()
+					})
 				}
 			})
 		}
@@ -417,18 +425,8 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "local Run canceled")
 		}
-		// A canceled sibling can sort before the operation that failed. Preserve
-		// the causal failure instead of reporting the cancellation it triggered.
-		for _, err := range batchErrors {
-			var coded *e.Error
-			if err != nil && (!errors.As(err, &coded) || coded.Code != e.CodeTimeout) {
-				return nil, err
-			}
-		}
-		for _, err := range batchErrors {
-			if err != nil {
-				return nil, err
-			}
+		if firstError != nil {
+			return nil, firstError
 		}
 		for _, completed := range results {
 			status[completed.ID] = completed.Status

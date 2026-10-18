@@ -86,13 +86,17 @@ func TestPrepareNativePackerBuildPreservesSelectedSourcesAndMaterials(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	definitionPath := filepath.Join(repo, "inputs/definitions/demo/arm64-upstream-tcg.json")
-	environmentPath := filepath.Join(repo, "inputs/environments/local-native-mac.json")
+	root := t.TempDir()
+	if err := os.CopyFS(filepath.Join(root, "inputs"), os.DirFS(filepath.Join(repo, "inputs"))); err != nil {
+		t.Fatal(err)
+	}
+	definitionPath := filepath.Join(root, "inputs/definitions/demo/arm64-upstream-tcg.json")
+	environmentPath := filepath.Join(root, "inputs/environments/local-native-mac.json")
 	original, err := authored.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(t.TempDir())
+	t.Chdir(root)
 	layout, digest := nativePackerBundleFixture(t, "packer-toolchain", runtime.GOOS, runtime.GOARCH)
 	prepared, err := PrepareNativePackerBuild(t.Context(), definitionPath, environmentPath, layout, "packer-tools", digest,
 		".nvkr/prepared", map[string]string{"cpu_model": "host"})

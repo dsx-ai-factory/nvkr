@@ -407,6 +407,58 @@ func TestAllLocalToolchainScopes(t *testing.T) {
 	}
 }
 
+func TestLocalToolchainDefinitionRetainsScopedRelativeInputs(t *testing.T) {
+	for _, tc := range []struct {
+		name, base string
+		fail       bool
+	}{
+		{"repository relative", "../../catalogs/os", false},
+		{"absolute rejected", "/private/catalog", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			input := `{"catalog":{"base":"` + tc.base + `"},"outputs":[{"name":"disk"},{"name":"other","catalog":{"base":"../../catalogs/site","overlays":["./original.json"]}}]}`
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; local_toolchain_definition("inputs/definitions/demo"; "../../../"; [{outputs:["disk"]}])`)
+			cmd.Stdin = strings.NewReader(input)
+			raw, err := cmd.CombinedOutput()
+			if (err != nil) != tc.fail {
+				t.Fatalf("projection: %v %s", err, raw)
+			}
+			if tc.fail {
+				return
+			}
+			var result struct {
+				Outputs []struct {
+					Catalog struct {
+						Base     string
+						Overlays []string
+					}
+				}
+			}
+			if err := json.Unmarshal(raw, &result); err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Outputs) != 2 || filepath.Clean(result.Outputs[0].Catalog.Base) != "../../../inputs/catalogs/os" ||
+				!slices.Equal(result.Outputs[0].Catalog.Overlays, []string{"./toolchain-attempt.json"}) ||
+				!slices.Equal(result.Outputs[1].Catalog.Overlays, []string{"../../../inputs/definitions/demo/./original.json"}) {
+				t.Fatalf("changed catalog scoping or relative inputs: %s", raw)
+			}
+		})
+	}
+}
+
+func TestLocalToolchainSubstitutionsKeepOnlyChangedPins(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-c", `include "nvke-os-plan"; local_toolchain_substitutions("same")`)
+	cmd.Stdin = strings.NewReader(`[{"pin":"same","outputs":["unchanged"]},{"pin":"old","outputs":["changed"]}]`)
+	raw, err := cmd.CombinedOutput()
+	if err != nil || string(raw) != "[{\"pin\":\"old\",\"outputs\":[\"changed\"]}]\n" {
+		t.Fatalf("unchanged image received an invalid self-substitution: %s %v", raw, err)
+	}
+}
+
 func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 	for _, tc := range []struct{ name, plan, want string }{
 		{"unsupported build", `{"builds":[]}`, "expected one simulator tools build"},

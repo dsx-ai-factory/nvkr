@@ -46,6 +46,8 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		parent      time.Duration
+		volumeDelay time.Duration
+		createDelay time.Duration
 		copyDelay   time.Duration
 		startDelay  time.Duration
 		waitDelay   time.Duration
@@ -55,30 +57,45 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 		latePhase   string
 		failPhase   string
 		want        e.Code
+		wantCalls   string
+		waitOutput  string
+		failLogs    bool
 	}{
 		{name: "observed staging and completion latency"},
 		{name: "actual 15a2 start and wait latency", copyDelay: 15174 * time.Millisecond, startDelay: 40413 * time.Millisecond, waitDelay: 95558483 * time.Microsecond},
 		{name: "each completion RPC owns its allowance", copyDelay: 15174 * time.Millisecond, startDelay: 40413 * time.Millisecond, waitDelay: 95558483 * time.Microsecond, logsDelay: 40 * time.Second, removeDelay: 40 * time.Second},
 		{name: "all RPCs near their own limit", startDelay: 119 * time.Second, waitDelay: 119 * time.Second, logsDelay: 119 * time.Second, removeDelay: 119 * time.Second},
-		{name: "caller deadline during staging", parent: 4 * time.Minute, want: e.CodeTimeout},
-		{name: "caller deadline during completion", parent: 5 * time.Minute, want: e.CodeTimeout},
-		{name: "caller deadline during start", parent: 300 * time.Second, startDelay: 40 * time.Second, want: e.CodeTimeout},
-		{name: "caller deadline during logs", parent: 380 * time.Second, logsDelay: 40 * time.Second, want: e.CodeTimeout},
-		{name: "caller deadline during removal", parent: 380 * time.Second, removeDelay: 40 * time.Second, want: e.CodeTimeout},
-		{name: "staging remains bounded", copyDelay: 160 * time.Second, want: e.CodeTimeout},
-		{name: "start remains bounded", startDelay: 121 * time.Second, want: e.CodeTimeout},
-		{name: "completion remains bounded", waitDelay: 121 * time.Second, want: e.CodeTimeout},
-		{name: "logs remain bounded", logsDelay: 121 * time.Second, want: e.CodeTimeout},
-		{name: "removal remains bounded", removeDelay: 121 * time.Second, want: e.CodeTimeout},
-		{name: "caller cancellation during start", cancelPhase: "start", want: e.CodeTimeout},
-		{name: "caller cancellation during wait", cancelPhase: "wait", want: e.CodeTimeout},
-		{name: "caller cancellation during logs", cancelPhase: "logs", want: e.CodeTimeout},
-		{name: "caller cancellation during removal", cancelPhase: "rm", want: e.CodeTimeout},
-		{name: "late nil start is rejected", latePhase: "start", want: e.CodeTimeout},
-		{name: "late nil wait is rejected", latePhase: "wait", want: e.CodeTimeout},
-		{name: "late nil logs is rejected", latePhase: "logs", want: e.CodeTimeout},
-		{name: "late nil removal preserves ownership", latePhase: "rm", want: e.CodeTimeout},
-		{name: "removal error preserves owning code", failPhase: "rm", want: e.CodeInternal},
+		{name: "caller deadline during staging", parent: 4 * time.Minute, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
+		{name: "caller deadline during completion", parent: 5 * time.Minute, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "caller deadline during start", parent: 300 * time.Second, startDelay: 40 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,logs"},
+		{name: "caller deadline during logs", parent: 380 * time.Second, logsDelay: 40 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "caller deadline during removal", parent: 380 * time.Second, removeDelay: 40 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs,rm"},
+		{name: "staging operations do not starve authenticated copy", copyDelay: 160 * time.Second},
+		{name: "each staging RPC owns its allowance", volumeDelay: 299 * time.Second, createDelay: 299 * time.Second, copyDelay: 299 * time.Second},
+		{name: "container creation remains bounded", createDelay: 301 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create"},
+		{name: "authenticated copy remains bounded", copyDelay: 301 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
+		{name: "caller cancellation during creation", cancelPhase: "create", want: e.CodeTimeout, wantCalls: "volume,volume,create"},
+		{name: "caller cancellation during copy", cancelPhase: "cp", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
+		{name: "late nil creation is rejected", latePhase: "create", want: e.CodeTimeout, wantCalls: "volume,volume,create,logs"},
+		{name: "late nil copy is rejected", latePhase: "cp", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
+		{name: "start remains bounded", startDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,logs"},
+		{name: "completion remains bounded", waitDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "logs remain bounded", logsDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "removal remains bounded", removeDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs,rm"},
+		{name: "caller cancellation during start", cancelPhase: "start", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,logs"},
+		{name: "caller cancellation during wait", cancelPhase: "wait", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "caller cancellation during logs", cancelPhase: "logs", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "caller cancellation during removal", cancelPhase: "rm", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs,rm"},
+		{name: "late nil start is rejected", latePhase: "start", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,logs"},
+		{name: "late nil wait is rejected", latePhase: "wait", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "late nil logs is rejected", latePhase: "logs", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "late nil removal preserves ownership", latePhase: "rm", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs,rm"},
+		{name: "removal error preserves owning code", failPhase: "rm", want: e.CodeInternal, wantCalls: "volume,volume,create,cp,start,wait,logs,rm"},
+		{name: "malformed helper exit rejected", waitOutput: "invalid\n", want: e.CodeBuildFailed, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "multiple helper exits rejected", waitOutput: "0\n1\n", want: e.CodeBuildFailed, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "out of range helper exit rejected", waitOutput: "256\n", want: e.CodeBuildFailed, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "nonzero helper exit rejected", waitOutput: "7\n", want: e.CodeBuildFailed, wantCalls: "volume,volume,create,cp,start,wait,logs"},
+		{name: "copy deadline survives diagnostic failure", copyDelay: 301 * time.Second, failLogs: true, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -90,7 +107,13 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 					ctx, stop = context.WithTimeout(ctx, tc.parent)
 					defer stop()
 				}
-				copyDelay, waitDelay := tc.copyDelay, tc.waitDelay
+				volumeDelay, createDelay, copyDelay, waitDelay := tc.volumeDelay, tc.createDelay, tc.copyDelay, tc.waitDelay
+				if volumeDelay == 0 {
+					volumeDelay = 7500 * time.Millisecond
+				}
+				if createDelay == 0 {
+					createDelay = 128 * time.Second
+				}
 				if copyDelay == 0 {
 					copyDelay = 139 * time.Second
 				}
@@ -98,15 +121,20 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 					waitDelay = 85 * time.Second
 				}
 				calls := map[string]int{}
+				var sequence []string
 				runtime := &recordingPackerRuntime{runContext: func(operation context.Context, in io.Reader, out, _ io.Writer, args []string) error {
 					phase := args[0]
 					calls[phase]++
+					sequence = append(sequence, phase)
 					deadline, ok := operation.Deadline()
 					if !ok {
 						t.Fatal("unbounded preparation operation")
 					}
 					if (phase == "start" || phase == "wait" || phase == "logs" || phase == "rm") && time.Until(deadline) > 2*time.Minute {
 						t.Fatal("completion exceeded its allowance")
+					}
+					if (phase == "volume" || phase == "create" || phase == "cp") && time.Until(deadline) > 5*time.Minute {
+						t.Fatal("staging operation exceeded its allowance")
 					}
 					if phase == tc.cancelPhase {
 						cancel()
@@ -119,8 +147,11 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 					if phase == tc.failPhase {
 						return errors.New("runtime command failed")
 					}
+					if phase == "logs" && tc.failLogs {
+						return e.New(e.CodeBuildFailed, "diagnostic failure must not replace copy deadline")
+					}
 					delay := map[string]time.Duration{
-						"volume": 7500 * time.Millisecond, "create": 128 * time.Second,
+						"volume": volumeDelay, "create": createDelay,
 						"cp": copyDelay, "start": tc.startDelay, "wait": waitDelay, "logs": tc.logsDelay, "rm": tc.removeDelay,
 					}[phase]
 					select {
@@ -133,7 +164,11 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 						return err
 					}
 					if phase == "wait" {
-						_, err := io.WriteString(out, "0\n")
+						status := tc.waitOutput
+						if status == "" {
+							status = "0\n"
+						}
+						_, err := io.WriteString(out, status)
 						return err
 					}
 					if in != nil {
@@ -146,7 +181,13 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 				if code(err) != tc.want {
 					t.Fatalf("preparation error=%v want %s", err, tc.want)
 				}
+				if tc.failLogs && !strings.Contains(err.Error(), "copy authenticated carrier") {
+					t.Fatalf("initiating copy phase was lost: %v", err)
+				}
 				if tc.want == "" {
+					if strings.Join(sequence, ",") != "volume,volume,create,cp,start,wait,logs,rm" {
+						t.Fatalf("incomplete or repeated successful operations: %v", sequence)
+					}
 					if transport == nil || calls["wait"] != 1 || calls["logs"] != 1 {
 						t.Fatal("slow successful preparation was not observed")
 					}
@@ -156,6 +197,9 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 				} else if transport != nil || len(runtime.cleanups) != 3 {
 					t.Fatalf("failed preparation exposed transport or lost cleanup: %v", err)
 				}
+				if tc.wantCalls != "" && strings.Join(sequence, ",") != tc.wantCalls {
+					t.Fatalf("operation continued past failure: calls=%v want %s", sequence, tc.wantCalls)
+				}
 				for _, phase := range []string{"create", "cp", "start", "wait", "logs", "rm"} {
 					if calls[phase] > 1 {
 						t.Fatalf("preparation retried phase %s", phase)
@@ -163,6 +207,53 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func TestBuildKitPreparationTelemetryUsesHeldCarrier(t *testing.T) {
+	source, n, opts := buildKitPrivateFixture(t)
+	var progress bytes.Buffer
+	opts.progress = &progressSink{w: &progress}
+	var sourceBytes, carrierBytes int64
+	runtime := &recordingPackerRuntime{run: func(in io.Reader, out, _ io.Writer, args []string) error {
+		switch args[0] {
+		case "volume":
+			_, err := io.WriteString(out, args[len(args)-1]+"\n")
+			return err
+		case "cp":
+			raw, err := io.ReadAll(in)
+			if err != nil {
+				return err
+			}
+			carrierBytes = int64(len(raw))
+			header, err := tar.NewReader(bytes.NewReader(raw)).Next()
+			if err != nil || header.Name != "input.tar" {
+				t.Fatalf("expected the authenticated one-member carrier: %v", err)
+			}
+			sourceBytes = header.Size
+		case "wait":
+			_, err := io.WriteString(out, "0\n")
+			return err
+		}
+		return nil
+	}}
+	transport, err := prepareBuildKitTransport(t.Context(), n, opts, source, runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transport.close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		fmt.Sprintf("source_archive_bytes=%d carrier_bytes=%d carrier_members=1", sourceBytes, carrierBytes),
+		"copy authenticated carrier; step=9 budget=5m0s", "start preparation container; step=10 budget=2m0s",
+	} {
+		if !strings.Contains(progress.String(), want) {
+			t.Fatalf("missing measured telemetry %q: %s", want, progress.String())
+		}
+	}
+	if sourceBytes <= 0 || carrierBytes <= sourceBytes || strings.Contains(progress.String(), source) || strings.Contains(progress.String(), "nvkr-buildkit-") {
+		t.Fatal("transport telemetry omitted measured sizes or exposed a private locator")
 	}
 }
 

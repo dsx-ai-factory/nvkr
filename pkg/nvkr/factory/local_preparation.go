@@ -49,23 +49,36 @@ func prepareLocalInputs(ctx context.Context, definitionPath, environmentPath, ou
 	if err := configure(&environment, absolute); err != nil {
 		return preparedLocalInputs{}, err
 	}
+	prepared := preparedLocalInputs{Definition: filepath.Join(out, "definition.json"), Environment: filepath.Join(out, "environment.json")}
 	stacks := make(map[string]*catalog.Stack)
-	rebase := func(selection authored.Catalog) authored.Catalog {
-		if !filepath.IsAbs(selection.Base) {
-			selection.Base = filepath.Join(filepath.Dir(definitionPath), selection.Base)
-		}
-		selection.Base, _ = filepath.Abs(selection.Base)
-		selection.Overlays = slices.Clone(selection.Overlays)
-		for i, location := range selection.Overlays {
+	rebase := func(selection authored.Catalog) (authored.Catalog, error) {
+		// Keep the same physical targets using locators the input-capture owner admits.
+		locations := append([]string{selection.Base}, selection.Overlays...)
+		for i, location := range locations {
 			if !filepath.IsAbs(location) {
 				location = filepath.Join(filepath.Dir(definitionPath), location)
 			}
-			selection.Overlays[i], _ = filepath.Abs(location)
+			location, err := filepath.Abs(location)
+			if err != nil {
+				return authored.Catalog{}, e.Wrap(e.CodeInvalidCatalog, err, "resolving local catalog reference")
+			}
+			relative, err := filepath.Rel(absolute, location)
+			if err != nil {
+				return authored.Catalog{}, e.Wrap(e.CodeInvalidCatalog, err, "relocating local catalog reference")
+			}
+			locations[i] = filepath.ToSlash(relative)
+			if _, err := resolveInputPath(prepared.Definition, locations[i], i == 0); err != nil {
+				return authored.Catalog{}, err
+			}
 		}
-		return selection
+		selection.Base, selection.Overlays = locations[0], locations[1:]
+		return selection, nil
 	}
 	baseSelection := definition.Catalog
-	definition.Catalog = rebase(baseSelection)
+	definition.Catalog, err = rebase(baseSelection)
+	if err != nil {
+		return preparedLocalInputs{}, err
+	}
 	changed := 0
 	for i := range definition.Outputs {
 		output := &definition.Outputs[i]
@@ -73,11 +86,15 @@ func prepareLocalInputs(ctx context.Context, definitionPath, environmentPath, ou
 		if output.Catalog != nil {
 			selection = *output.Catalog
 		}
+		rebased, err := rebase(selection)
+		if err != nil {
+			return preparedLocalInputs{}, err
+		}
 		stack, err := loadFactoryCatalogStack(ctx, definitionPath, selection)
 		if err != nil {
 			return preparedLocalInputs{}, err
 		}
-		selection = rebase(selection)
+		selection = rebased
 		overlay := catalog.Overlay{APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "local-native-" + output.Name, RequiresCatalogDigest: stack.Digest, Components: make(map[string]catalog.ComponentReplacement)}
 		for _, name := range output.Components {
 			component, ok := stack.Catalog.Components[name]
@@ -99,7 +116,7 @@ func prepareLocalInputs(ctx context.Context, definitionPath, environmentPath, ou
 			}
 			file := "catalog-" + output.Name + ".json"
 			files[file] = overlay
-			selection.Overlays = append(selection.Overlays, filepath.Join(absolute, file))
+			selection.Overlays = append(selection.Overlays, file)
 			changed++
 		}
 		output.Catalog = &selection
@@ -108,7 +125,6 @@ func prepareLocalInputs(ctx context.Context, definitionPath, environmentPath, ou
 	if changed == 0 {
 		return preparedLocalInputs{}, e.New(e.CodeUsage, "Definition selects no applicable local native producers")
 	}
-	prepared := preparedLocalInputs{Definition: filepath.Join(out, "definition.json"), Environment: filepath.Join(out, "environment.json")}
 	files["definition.json"], files["environment.json"] = definition, environment
 	// Validate the whole derived graph before creating any output.
 	_, err = compileDocumentsWithLoader(ctx, prepared.Definition, definition, prepared.Environment, environment, "local-native-preparation", func(ctx context.Context, selection authored.Catalog) (*catalog.Stack, error) {

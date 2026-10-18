@@ -535,12 +535,18 @@ Isolation and the fixed environment/mount contract are identical across all engi
   only inside those volumes. It runs no producer command, mounts no host source or runtime socket, and grants
   the build no root privilege. The producer mounts source read-only; declared output is returned through bounded
   archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup.
-  Authenticated preparation staging has a five-minute budget. Once carrier copying succeeds, helper start,
+  Each preparation staging operation (capacity admission, packing, holding/hashing, each volume creation,
+  helper creation and authenticated copying) has its own five-minute allowance. Helper start,
   explicit exit observation, diagnostics and removal each receive a separate two-minute RPC budget derived
   from the original caller context. Earlier caller deadlines and cancellation bound every phase; one RPC
-  cannot consume the next RPC's allowance. The operation allowances total thirteen minutes before existing
-  bounded failure diagnostics, child-process joining and owned cleanup. No RPC retries producer or runtime work. Run scheduler
-  records reference the exact embedded producer instruction; network, container and platform are
+  cannot consume the next operation's allowance. The nine staging and four completion allowances total
+  fifty-three minutes before existing bounded failure diagnostics, child-process joining and owned cleanup;
+  this is not a hard kernel-I/O
+  return deadline. Descriptive transport logs retain the operation count, allowance and measured held-archive
+  byte sizes, without private paths. No RPC retries producer or runtime work. The local scheduler records
+  the first worker error before canceling its batch and joins all workers before returning it; original caller
+  cancellation still takes precedence. Run scheduler records reference the exact embedded producer instruction;
+  network, container and platform are
   resolved from that instruction at execution or rendering, never serialized a second time. A future qualified
   pipeline emitter must reject this mode rather than silently render it as a network-denied build.
 - `prebuilt` nodes lower to acquire-and-digest-verify.

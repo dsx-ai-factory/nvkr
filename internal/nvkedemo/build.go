@@ -70,9 +70,6 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if runtime.GOARCH != "arm64" || runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "artifact builds require native Mac or Linux ARM64")
 	}
-	if runtime.GOOS == "darwin" && cfg.Definition == "" {
-		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "Mac BUILD requires an explicit NVKR Definition, Environment and native nvkr executable")
-	}
 	repo, err := resolveExisting(cfg.Repository)
 	if err != nil {
 		return BuiltInputs{}, err
@@ -82,6 +79,17 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	if cfg.Jobs < 1 {
 		return BuiltInputs{}, errors.New("jobs must be positive")
+	}
+	nativeDefault := false
+	if runtime.GOOS == "darwin" && cfg.Definition == "" {
+		executable, err := os.Executable()
+		if err != nil {
+			return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "select native NVKR distribution")
+		}
+		nativeDefault, err = defaultMacBuild(&cfg, runtime.GOOS+"/"+runtime.GOARCH, executable)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
 	}
 	script := ""
 	if cfg.Definition == "" {
@@ -133,6 +141,11 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		}
 	}
 	cfg.Repository = repo
+	if nativeDefault {
+		if err := prepareDefaultMacBuild(ctx, runner, &cfg); err != nil {
+			return BuiltInputs{}, err
+		}
+	}
 	built, err := executeBuildQualification(ctx, runner, script, cfg, buildQualificationSteps{
 		prepare: prepareLocalArtifacts, setup: SetupQualification,
 		build: buildLocalArtifacts, qualify: qualifyBuiltArtifacts, stop: StopQualificationRegistry,

@@ -81,10 +81,12 @@ through NVKR's shared catalog; host virtualization prerequisites remain separate
 record covers existing artifacts, upstream OVN and TCG on a pre-integration draft, not fresh-machine or Linux
 full runtime acceptance. Standard `run` and `e2e` now select that same three-VM deployment owner;
 they do not deploy the site into Kind. Kind is temporary bootstrap infrastructure. Fresh complete Mac
-artifact builds remain unverified. Native Packer preparation exists separately. Default demo BUILD
-bootstrap requires Linux; explicit Definition, Environment and native NVKR selections can run through
-that same BUILD executor on Mac or Linux. Their dependency preparation must already be bound in NVKR
-inputs; this interface does not establish full Mac E2E acceptance. Preserve an expressly requested native host; do not substitute a Linux
+customer first-invocation acceptance remains unverified. Default Mac BUILD selects the committed product
+Definition and Mac Environment, admits installed prerequisites and delegates native Packer preparation to
+NVKR's existing owners. Follow the guide's pinned Packer/plugin setup before BUILD; ordinary demo `tools`
+does not install them. Explicit Definition, Environment and native NVKR selections remain supported on
+Mac or Linux with their dependencies already bound. Controlled adapter tests do not establish full Mac E2E
+acceptance. Preserve an expressly requested native host; do not substitute a Linux
 execution VM or manual SSH workflow.
 
 Use configured credential references and existing authentication without printing keys, tokens, environments
