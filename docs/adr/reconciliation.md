@@ -120,13 +120,13 @@ owns prerequisites, selection and capture limits. These proposed contracts estab
 
 ## M3 MVP scope and acceptance boundary
 
-The October 12 scope decision retains
+The initial scope decision retains
 producer-only disk evidence and defers disk inspection, waivers, offline-PR and verify-only qualification.
 The accompanying implementation plan separates
 artifact authentication, native smoke, evidence publication and acceptance demonstrations. These are task
 scope and planning records, not organizational ADR ratification or operational qualification evidence.
 
-The current approved scope makes embedded-component declarations optional, as recorded in the
+The current scope makes embedded-component declarations optional, as recorded in the
 product specification and owning ADRs. Omission is not applicable; explicitly authored declarations still
 require strict consistency with their
 referenced pinned upstream metadata. That check supplies no effective customized or installed composition claim.
@@ -2124,7 +2124,7 @@ The user earlier moved deep disk/content inspection and dependent reconciliation
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
 The [inspection deferral record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
 The plain-image strict inspection path remains available. M2 retains its AMD64-only product acceptance floor and accepts
-producer provenance with its remaining delivery/consumer gates. The approved October 12 M3 MVP scope also
+producer provenance with its remaining delivery/consumer gates. The approved initial scope also
 retains producer-only disk evidence and defers inspection/material reconciliation to hardening. This task
 scope supersedes the earlier M3 assignment without changing any historical signed bytes or establishing
 organizational ADR ratification. The native ARM64 route and this candidate Definition's

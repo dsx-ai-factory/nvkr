@@ -20,7 +20,7 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
   or installed composition; the NVKE OS image build team owns embedded software correctness and runtime validation.
 - V1 production acceptance retains its AMD64-only product floor. M2 requires producer provenance; M3 adds
   authenticated build/evidence checks while retaining producer-only disk scope. The
-  approved October 12 M3 scope
+  approved initial scope
   defers strict inspection and material reconciliation; scope approval is not organizational ADR ratification.
   ARM64 is an implementation extension recorded in the
   [implementation record](adr/reconciliation.md#native-arc-disk-route). Any additional architecture explicitly selected
@@ -261,8 +261,8 @@ incomplete; a build failure cannot create an implicit deferral.
 Successful qualification produces independently verifiable evidence under an identity distinct from the
 builder. Release issuance requires successful qualification and evidence publication for the complete selected set.
 
-This specification records the current approved scope, including optional embedded-component
-metadata. The October 12 decision
+This specification records the current scope, including optional embedded-component
+metadata. The initial scope decision
 establishes producer-only disk evidence and the deferred capabilities described below. The
 implementation plan separates artifact
 authentication, delivered-tool smoke, independent evidence publication and acceptance demonstrations.

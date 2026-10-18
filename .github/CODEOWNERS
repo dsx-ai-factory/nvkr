@@ -20,9 +20,7 @@
 #
 # Every path currently resolves to @dsx-ai-factory/nvke-write. The path list below is
 # retained deliberately: it records which files are trust roots — anything that
-# determines WHAT GETS BUILT, WHAT IS TRUSTED, or WHAT RUNS IN CI — so that
-# assigning them a narrower owner later is a change of owner on known lines
-# rather than a fresh analysis.
+# determines WHAT GETS BUILT, WHAT IS TRUSTED, or WHAT RUNS IN CI.
 #
 # Roles are defined in GOVERNANCE.md. The team must hold write access to this
 # repository or GitHub silently ignores the entry.
@@ -34,8 +32,7 @@
 *                                       @dsx-ai-factory/nvke-write
 
 # ---------------------------------------------------------------------------
-# Trust roots — same owner as the default today; tighten here when a
-# repository-scoped team exists
+# Trust roots
 # ---------------------------------------------------------------------------
 
 # The lock contract (ADR-22). A lock entry is the exact content identity of
