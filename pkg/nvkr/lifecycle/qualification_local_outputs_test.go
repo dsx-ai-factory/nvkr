@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -77,13 +78,22 @@ func TestLocalQualificationPayloadsRejectChangedProducerOrRunSubject(t *testing.
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = checkLocalQualificationPayloads(t.Context(), workspace, inputs)
+			var events []qualificationprogress.Event
+			ctx, activity := withLocalQualificationProgress(t.Context(), func(event qualificationprogress.Event) { events = append(events, event) })
+			activity.start(qualificationprogress.StageInputs)
+			err = checkLocalQualificationPayloads(ctx, workspace, inputs)
 			if mode == "exact" {
 				if err != nil {
 					t.Fatal(err)
 				}
+				if len(events) != 3 || events[2].State != qualificationprogress.StateCompleted || events[2].Item != "cli" || events[2].Completed != 1 || events[2].Total != 1 {
+					t.Fatalf("missing actual output check progress: %+v", events)
+				}
 			} else {
 				assertCode(t, err, e.CodeVerifyFailed)
+				if len(events) != 2 || events[1].State != qualificationprogress.StateRunning || events[1].Completed != 0 {
+					t.Fatalf("failed output check emitted completion: %+v", events)
+				}
 			}
 		})
 	}

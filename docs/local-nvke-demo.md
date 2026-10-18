@@ -415,8 +415,8 @@ Tmpfs allocates memory as content is written; this ceiling is neither reserved
 RAM nor proof of available memory. The deployment host must still meet the
 complete-demo capacity checks above.
 
-To include local M3 signing, delivered-tool smoke and independent publication read-back before
-deployment, add `--qualify-local` to `e2e`; see [automatic qualification setup](local-development.md#rehearse-local-m3-qualification).
+To verify build outputs, check delivered tools, sign evidence and verify the published artifacts before
+deployment, add `--qualify-local` to `e2e`; see [automatic qualification setup](local-development.md#qualify-local-artifacts).
 It prepares fresh local trust and a separate disk-backed loopback registry, then stops that registry
 after qualification read-back, retaining data and evidence. The deployment registry described above remains managed separately.
 
@@ -557,6 +557,23 @@ queued operations. Rows show the producer/step, stage and running duration.
 The progress bar counts only dry-run-listed steps; it is not verified artifact
 completion, overall E2E progress or an ETA. Missing or truncated listings show
 an unknown total. Only the owning artifact operation completes the phase.
+
+With `--qualify-local`, the dashboard switches to qualification after the
+artifact build. It follows six stages: **Verify build outputs**, **Sign build evidence**,
+**Check delivered tools**, **Sign qualification**, **Publish artifacts**, and
+**Verify registry contents**. Each stage explains its input, action and result.
+Counts show observed outputs, tools, uploads or checks, according to the stage.
+Publication and download checks list ordinary artifacts, named disks and signed
+evidence separately. Independent consumer verification follows the downloads.
+
+Use Up/Down to inspect any stage and End to return to live work. The signature
+chain distinguishes builder, smoke and qualifier roles from registry transport
+and consumer verification. Completed stage reports do not authorize deployment:
+the qualification result becomes successful only after the child exits successfully and
+the adapter retains and validates its result. Failures keep the last reported
+item and refuse deployment handoff. Plain output prints the same stage and
+item observations. The final qualification outcome remains in scrollback after the TUI
+closes. These are local keys and the lane remains `unqualified-local-execution`.
 
 The ribbon separates the age of raw build output from the age of the last step
 change, even when concise mode hides compiler output. It also shows the last

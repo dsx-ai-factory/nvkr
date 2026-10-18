@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -35,7 +36,8 @@ func TestDemoQualificationGate(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := privateTestDir(t)
-			cfg := BuildConfig{Repository: root, AttemptPrefix: "fresh", QualificationPolicy: "/trust/policy.json", Qualification: QualificationFile{
+			presenter := &recordedProgress{}
+			cfg := BuildConfig{Repository: root, AttemptPrefix: "fresh", Progress: presenter, QualificationPolicy: "/trust/policy.json", Qualification: QualificationFile{
 				BuilderKey: "/trust/builder.key", SmokeKey: "/trust/smoke.key", QualifierKey: "/trust/qualifier.key", Cosign: "/tools/cosign", Repository: "localhost:5000/m3", Scratch: "/scratch", EvidenceOut: "/scratch/evidence.json", PlainHTTP: true, Anonymous: true,
 			}}
 			bootstrap := filepath.Dir(builtInputs(root, "fresh").NVKR)
@@ -59,6 +61,7 @@ func TestDemoQualificationGate(t *testing.T) {
 			body := "#!/bin/sh\nset -eu\n[ -z \"${GH_TOKEN:-}\" ]\n[ \"$1\" = run ]\n[ \"$2\" = qualify-local ]\n[ \"$3\" = --workspace ]\n[ \"$4\" = .nvkr/runs/fresh ]\n[ -d .nvkr/laptop-bootstrap/fresh ]\ncat \"$(dirname \"$0\")/response.json\"\nexit " + tc.exit + "\n"
 			body = strings.Replace(body, "set -eu\n", "set -eu\n: > \"$(dirname \"$0\")/child-started\"\n", 1)
 			body = strings.Replace(body, "set -eu\n", "set -eu\n[ \"$HOME\" = \"$(dirname \"$0\")\" ]\nprintf 'private qualification diagnostic\\n' >&2\n", 1)
+			body = strings.Replace(body, "set -eu\n", "set -eu\nprintf '%s\\n' '{\"kind\":\"stage\",\"stage\":\"readback\",\"state\":\"completed\"}' >&3\n", 1)
 			if err := os.WriteFile(filepath.Join(bootstrap, "nvkr"), []byte(body), 0700); err != nil {
 				t.Fatal(err)
 			}
@@ -71,6 +74,29 @@ func TestDemoQualificationGate(t *testing.T) {
 				}
 			}
 			err = qualifyBuiltArtifacts(t.Context(), cfg)
+			if len(presenter.events) < 2 || presenter.events[0].Kind != LaneStarted || presenter.events[0].Name != "qualification" {
+				t.Fatalf("missing qualification boundary: %+v", presenter.events)
+			}
+			last := presenter.events[len(presenter.events)-1]
+			wantKind := LaneFailed
+			if tc.pass {
+				wantKind = LaneFinished
+			}
+			if last.Kind != wantKind || last.Name != "qualification" {
+				t.Fatalf("result validation did not own qualification outcome: %+v", last)
+			}
+			if strings.Contains(presenter.String(), "private qualification diagnostic") {
+				t.Fatal("private diagnostics reached progress writer")
+			}
+			observedReadback := false
+			for _, event := range presenter.events {
+				if event.Kind == QualificationProgress && event.Qualification.Stage == qualificationprogress.StageReadback && event.Qualification.State == qualificationprogress.StateCompleted {
+					observedReadback = true
+				}
+			}
+			if observedReadback == tc.existing {
+				t.Fatalf("expected child telemetry without granting result authority: %+v", presenter.events)
+			}
 			_, startedErr := os.Stat(filepath.Join(bootstrap, "child-started"))
 			if tc.existing {
 				if !errors.Is(startedErr, os.ErrNotExist) {

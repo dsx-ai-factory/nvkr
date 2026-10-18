@@ -153,8 +153,11 @@ only selects the use case and presents its result.
 `run qualify-local` delegates to `lifecycle.QualifyLocalRun`. It selects a completed captured attempt,
 independent local policy, three explicit private-key files, native runtime, pinned cosign, registry
 namespace, scratch and new evidence destination. Lifecycle owns the complete check/sign/smoke/publish/
-read-back sequence and cleanup; the command emits only its descriptive canonical result. This separate
-local lane accepts no hosted invocation and supplies no hosted qualification or release authority.
+read-back sequence and cleanup; stdout retains only its descriptive canonical result. An explicitly
+selected private pipe can carry bounded stage and public output/tool observations to the local demo.
+These optional descriptions contain no private paths, keys or subprocess logs and cannot grant
+qualification or deployment authority. Lost progress does not replace the owned command's result.
+This separate local lane accepts no hosted invocation and supplies no hosted qualification or release authority.
 ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
 acceptance boundaries.
 

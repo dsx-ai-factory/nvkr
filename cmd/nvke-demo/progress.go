@@ -84,11 +84,12 @@ type checkedWriter struct {
 	sudoAuth    func(context.Context) error
 	// One bounded latest line per public result category, independent of the
 	// dashboard's activity ring. Success statements replay only after success.
-	results           [6]string
-	operatorStatus    string
-	walkthroughStatus string
-	guests            [2]nvkedemo.TenantGuestObservation
-	guestsReported    bool
+	results             [6]string
+	operatorStatus      string
+	walkthroughStatus   string
+	guests              [2]nvkedemo.TenantGuestObservation
+	guestsReported      bool
+	qualificationStatus string
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.
@@ -135,6 +136,9 @@ func (w *checkedWriter) retainResult(line string) {
 
 // Called with w.mu held, after the screen has restored scrolling output.
 func (w *checkedWriter) replayResults(success bool) {
+	if w.qualificationStatus != "" {
+		w.emit(w.qualificationStatus + "\n")
+	}
 	if w.walkthroughStatus != "" {
 		w.emit("\nRecorded walkthrough observed before cleanup; historical observations.\n" + w.walkthroughStatus)
 	}
@@ -307,6 +311,10 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
+	if event.Kind == nvkedemo.QualificationProgress {
+		w.qualificationProgress(event)
+		return
+	}
 	if event.Kind == nvkedemo.OSBuildLogs {
 		if event.BuildLogs.Validate() == nil && w.observer != nil {
 			w.observer.Report(event)
@@ -385,6 +393,11 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if event.Name == "qualification" && event.Kind == nvkedemo.LaneFinished {
+		w.qualificationStatus = "Qualification passed: artifact bytes verified, delivered tools checked, evidence signed and registry contents independently verified. Result saved.\nLocal signing keys; execution lane: unqualified-local-execution."
+	} else if event.Name == "qualification" && event.Kind == nvkedemo.LaneFailed {
+		w.qualificationStatus = "Qualification failed; deployment blocked. Inspect saved private diagnostics."
+	}
 	now := time.Now()
 	elapsed := now.Sub(w.started).Truncate(time.Second)
 	if status == "START" {

@@ -290,12 +290,12 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 }
 func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 	flags := command.Flags()
-	flags.BoolVar(&cfg.QualifyLocal, "qualify-local", false, "automatically prepare local M3 trust, qualify outputs and stop the owned registry")
+	flags.BoolVar(&cfg.QualifyLocal, "qualify-local", false, "verify outputs, check tools, sign evidence with local keys and verify registry read-back; stop the registry afterward")
 	flags.BoolVar(&cfg.Prepared, "prepared", false, "use an existing prepare-only bootstrap; requires a matching qualification policy and no existing Run")
 	flags.StringVar(&cfg.Repo, "repo", "", "native Linux repository path")
 	flags.StringVar(&cfg.NVKEClone, "nvke-clone", "", "optional local source Git clone")
 	flags.StringVar(&cfg.Attempt, "attempt", "", "fresh name for the combined artifact Run")
-	flags.StringVar(&cfg.QualificationPolicy, "qualification-policy", "", "admit the prepared Plan against a local M3 policy before building; does not sign or qualify outputs")
+	flags.StringVar(&cfg.QualificationPolicy, "qualification-policy", "", "check the prepared Plan against a local qualification policy before building; does not sign or qualify outputs")
 	flags.IntVar(&cfg.Jobs, "jobs", 1, "maximum concurrent dependency-ready NVKR operations")
 }
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {

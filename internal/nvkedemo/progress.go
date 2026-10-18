@@ -9,21 +9,23 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 )
 
 const (
-	LaneStarted        = "lane-started"
-	LaneFinished       = "lane-finished"
-	LaneFailed         = "lane-failed"
-	PhaseStarted       = "phase-started"
-	PhaseFinished      = "phase-finished"
-	PhaseFailed        = "phase-failed"
-	DeploymentStarted  = "deployment-started"
-	DeploymentFinished = "deployment-finished"
-	DeploymentFailed   = "deployment-failed"
-	TenantWaiting      = "tenant-waiting"
-	TenantGuests       = "tenant-guests"
-	OSBuildLogs        = "os-build-logs"
+	LaneStarted           = "lane-started"
+	LaneFinished          = "lane-finished"
+	LaneFailed            = "lane-failed"
+	PhaseStarted          = "phase-started"
+	PhaseFinished         = "phase-finished"
+	PhaseFailed           = "phase-failed"
+	DeploymentStarted     = "deployment-started"
+	DeploymentFinished    = "deployment-finished"
+	DeploymentFailed      = "deployment-failed"
+	TenantWaiting         = "tenant-waiting"
+	TenantGuests          = "tenant-guests"
+	OSBuildLogs           = "os-build-logs"
+	QualificationProgress = "qualification-progress"
 )
 
 // Guest observations describe infrastructure and console activity only. They
@@ -100,6 +102,7 @@ type ProgressEvent struct {
 	Remaining       time.Duration
 	Guests          [2]TenantGuestObservation
 	BuildLogs       buildactivity.Record
+	Qualification   qualificationprogress.Event
 }
 
 // Tenant polling reports interpreted observations, not successful subprocess

@@ -48,7 +48,7 @@ type Config struct {
 type BuildConfig struct {
 	// QualifyLocal provisions disposable trust and owns registry shutdown.
 	QualifyLocal bool
-	// QualificationPolicy optionally admits the prepared Plan's complete M3
+	// QualificationPolicy optionally admits the prepared Plan's complete qualification
 	// scope before producers execute. It does not qualify completed artifacts.
 	QualificationPolicy string
 	Qualification       QualificationFile
