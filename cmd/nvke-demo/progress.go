@@ -87,6 +87,7 @@ type checkedWriter struct {
 	results              [8]string
 	operatorStatus       string
 	walkthroughStatus    string
+	qualificationStatus  string
 	retainedInstructions string
 	guests               [3]nvkedemo.TenantGuestObservation
 	guestsReported       bool
@@ -140,6 +141,9 @@ func (w *checkedWriter) retainResult(line string) {
 
 // Called with w.mu held, after the screen has restored scrolling output.
 func (w *checkedWriter) replayResults(success bool) {
+	if w.qualificationStatus != "" {
+		w.emit(w.qualificationStatus + "\n")
+	}
 	if w.retainedInstructions != "" {
 		w.emit(w.retainedInstructions)
 	}
@@ -321,6 +325,10 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
+	if event.Kind == nvkedemo.QualificationProgress {
+		w.qualificationProgress(event)
+		return
+	}
 	if event.Kind == nvkedemo.BuildPlanSelected {
 		w.mu.Lock()
 		w.lineOutput()
@@ -415,6 +423,11 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if event.Name == "qualification" && event.Kind == nvkedemo.LaneFinished {
+		w.qualificationStatus = "Qualification passed: artifact bytes verified, delivered tools checked, evidence signed and registry contents independently verified. Result saved.\nLocal signing keys; execution lane: unqualified-local-execution."
+	} else if event.Name == "qualification" && event.Kind == nvkedemo.LaneFailed {
+		w.qualificationStatus = "Qualification failed; deployment blocked. Inspect saved private diagnostics."
+	}
 	now := time.Now()
 	elapsed := now.Sub(w.started).Truncate(time.Second)
 	if status == "START" {

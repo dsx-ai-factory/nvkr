@@ -97,14 +97,15 @@ Direct `nvkr run local` callers can request the same capture with
 `--capture-inputs-root .` and repository-relative Definition and Environment paths.
 Dry runs retain no attempt or input snapshot.
 
-## Rehearse local M3 qualification
+## Qualify local artifacts
 
-On native Linux, `run qualify-local` checks a completed captured attempt, authenticates it with a local
-builder key, executes the complete selected native tool-smoke scope, signs smoke and qualification under
-two distinct keys, publishes payloads and evidence, then independently verifies registry read-back.
-Its result remains `unqualified-local-execution`. The native ARM64 29-output rehearsal has passed this
-command, including all 10 delivered tool members. Exact artifact references and remaining checks are tracked in
-[reconciliation](adr/reconciliation.md#local-m3-demo-rehearsal).
+On native Linux, `run qualify-local` verifies every output of a completed captured Run, signs and verifies
+its build evidence, and checks each selected native tool's version in isolation. Separate keys sign the
+tool-check report and qualification statement. It then publishes artifacts and signed evidence, downloads
+the complete set again and independently verifies the bytes, saved inputs and signatures.
+Its result remains `unqualified-local-execution`. Qualification has passed for the native ARM64 demo's
+29 outputs and all 10 delivered tools. Exact artifact references and remaining checks are tracked in
+[reconciliation](adr/reconciliation.md#local-qualification-demo).
 
 For a new complete demo, add `--qualify-local` to the normal native Linux ARM64 command:
 
