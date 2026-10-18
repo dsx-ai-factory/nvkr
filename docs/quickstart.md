@@ -1,12 +1,14 @@
 # NVKR from your first artifact to the NVKE demo
 
+> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](overview/preview-status.md).
+
 NVKR takes a description of what you want to ship and turns it into a build you can inspect and run.
 It connects the resulting files, images, and charts to their exact inputs and evidence. NVKE consumes
 those artifacts to install and run the product.
 
 Start with one small executable on your laptop. See how its inputs become an artifact, change its
-version, then use the same workflow for NVKE. This follows the
-[team deck](https://github.com/dsx-ai-factory/nvkr/blob/main/demos/nvkr-team-tour.html), with commands you can run as you go.
+version, then use the same workflow for NVKE. Start with [how NVKR works](#how-nvkr-works), then run
+each command as you go.
 
 ## How NVKR works
 
@@ -156,17 +158,17 @@ each named output still needs its own successful result.
 
 The [three-output walkthrough](https://github.com/dsx-ai-factory/nvkr/blob/main/demos/m1-local.md)
 can build those artifacts and pull the CLI back from a local registry. Continue below to run the
-larger NVKE demo with a real tenant cluster.
+larger NVKE demo with a real workload cluster.
 
 ## Extend the workflow into the NVKE demo
 
 The NVKE demo adds a downstream step: **NVKR builds the artifacts → NVKE's installer consumes them →
 you use the running cluster**. It builds a larger selection including tools, images, charts, and an OS
-disk. Kind hosts the management services; the tenant control-plane and worker are real QCOW2 virtual machines.
+disk. Kind hosts the management services; the workload cluster's control-plane and worker are real QCOW2 virtual machines.
 
 This needs a dedicated **Ubuntu ARM64 host**, with eight CPUs, 24 GiB RAM, and about 90 GiB free on
 native ext4 storage. An Apple Silicon Mac can host that Linux environment through Colima; Docker
-Desktop alone does not provide the tenant runtime. Allow substantially more time and downloads than
+Desktop alone does not provide the workload cluster's virtual-machine runtime. Allow substantially more time and downloads than
 the greeting demo.
 
 First follow the
@@ -195,8 +197,9 @@ The command supplies the example's paths; no YAML edits are needed. For a rerun,
 for both `--attempt` and `--out`.
 
 Success returns `retained-ready` and prints live cluster checks plus commands for accessing the
-site and tenant. Copy the exact `DEMO`, `SESSION`, `KUBECTL`, and kubeconfig assignments it prints.
-Use the printed tenant commands to inspect nodes and pods, and check the retained session with:
+management cluster and the workload cluster, which the demo labels "Site" and "Tenant". Copy the exact
+`DEMO`, `SESSION`, `KUBECTL`, and kubeconfig assignments it prints. Use the printed workload cluster
+commands to inspect nodes and pods, and check the retained session with:
 
 ```sh
 "$DEMO" status --session "$SESSION"

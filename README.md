@@ -1,6 +1,12 @@
-# NVKR
+# NVIDIA Kubernetes® Recipes (NVKR)
 
-NVKR turns pinned NVKE components into traceable, signed software releases. Its goal is to bring
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.27%2B-00ADD8.svg)](https://go.dev/dl/)
+
+> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](docs/overview/preview-status.md).
+
+NVIDIA Kubernetes® Recipes (NVKR) turns pinned NVIDIA Kubernetes Engine (NVKE) components into traceable,
+signed software releases. Its goal is to bring
 NVKE's CLI, container images, Helm charts, operator tools, and node images into one declarative build and
 delivery workflow, connecting the delivered bytes to their inputs and evidence.
 
@@ -30,7 +36,7 @@ The public lifecycle is **Definition → Run → Release**:
 An **attestation** is a statement about a specific artifact, bound to its digest: a fingerprint of its
 content. For signed GitHub releases, NVKR signs production provenance recording the Run, selected inputs,
 and producing workflow. Signed SBOMs state their evidence scope: inspected composition where supported,
-or, for M2 disks, exact producer/material subjects with disk inspection explicitly marked `not-performed`.
+or, for node-image disks, exact producer/material subjects with disk inspection explicitly marked `not-performed`.
 Uninspected producer evidence does not establish installed disk contents. NVKR also signs
 the published artifacts and release root. These signatures let a verifier authenticate the signer and
 detect changes to the signed statements; the digest binds each claim to its intended artifact.
@@ -49,7 +55,7 @@ See the [release quickstart](docs/release-quickstart.md) to apply your policy.
 ## Start here
 
 Follow the [quickstart](docs/quickstart.md) from the core ideas to a tiny local build, then extend the
-workflow into the NVKE tenant demo. For the first artifact, you need Git, Make, Python 3, Docker,
+workflow into the NVKE demo with a workload cluster. For the first artifact, you need Git, Make, Python 3, Docker,
 and the Go version in [.go-version](.go-version). From the repository root:
 
 ```sh
@@ -69,7 +75,7 @@ The [documentation map](docs/README.md) connects the next steps:
 | Find outputs and verify a published claim | [Release quickstart](docs/release-quickstart.md) |
 | Look up terminology and features | [Concept reference](docs/user-concepts.md) |
 
-The [tutorial Definition](docs/examples/nvke-tutorial/README.md) selects the CLI, CWE image, and Helm bundle.
+The [tutorial Definition](docs/examples/nvke-tutorial/README.md) selects the CLI, NVKE management-plane image, and Helm bundle.
 The [combined NVKE candidate](inputs/definitions/nvke/README.md) selects 69 outputs, including AMD64 and ARM64
 container and node images, and supplies the repository's generated GitHub workflow.
 The [input index](inputs/README.md) separates distribution, demo, diagnostic, catalog and execution-policy inputs.
@@ -87,10 +93,9 @@ GitHub is the maintained hosted generator and signing/publication provider. Actu
 declared runtime, source access, and capabilities; the combined candidate's hosted disk jobs use explicit
 KVM routes. Consumer verification requires Linux, pinned tools, and an explicit identity and issuer policy.
 
-The [October 6 candidate Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963) completed all 34 outputs,
-publication, keyless signing, workflow verification, and Run finalization, including both disk images.
-The record covers that validation branch and does not establish independent full-payload consumer
-acceptance or general production readiness.
+Recorded hosted Runs and the limits of what each one establishes are listed in the
+[implementation and evidence record](docs/adr/reconciliation.md). A recorded Run does not establish
+independent full-payload consumer acceptance or general production readiness.
 
 Release browsing inspects metadata without downloading payloads or verifying signatures. The supported
 consumer claim is `pipeline-attested` / `artifact-publication`. It does not establish exact-byte reproduction,
@@ -119,3 +124,10 @@ security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
 NVKR is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Trademarks
+
+Kubernetes® is a registered trademark of The Linux Foundation in the United States and other countries.
+NVIDIA and the NVIDIA logo are trademarks and/or registered trademarks of NVIDIA Corporation in the U.S. and
+other countries. Other company and product names may be trademarks of the respective companies with which
+they are associated.

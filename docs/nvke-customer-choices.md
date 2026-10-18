@@ -1,6 +1,6 @@
-# NVKE M2 inputs and customer choices
+# NVKE inputs and customer choices
 
-The [M2 Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/definition.yaml) selects 69 named outputs, including independent
+The [maintained NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/definition.yaml) selects 69 named outputs, including independent
 `linux/amd64` and `linux/arm64` plain and public-bootstrap FDE disks. FDE publication carries build provenance
 without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#native-execution-and-publication).
 The catalog owns producer commands, material edges and
@@ -11,7 +11,7 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 
 | Field or choice | Owning source | Required check |
 |---|---|---|
-| Each disk's exact root and complete material set | M2 Definition and `inputs/catalogs/node-images/release/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
+| Each disk's exact root and complete material set | Maintained NVKE Definition and `inputs/catalogs/node-images/release/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
 | OS, Calico and kubeadm source | `inputs/catalogs/node-images/release/pins.lock.yaml`, NVKE `ff21ba8c07cafff74b68e238a8876af11e5beded` | Exact commit/tree/epoch; retain this separately from controller/CLI release selection. |
 | Temporary SPIRE packaging selection | Same lock selects `nvke-spire-agent-source` at `726f76944404e1106626b8333d3576bdf67b575b` | The older package omits DSX IMDS. Do not claim full current-NVKE parity; [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks restoration. OS assembly, agent and other sources are unchanged. |
 | Runtime image selection | `inputs/catalogs/runtime-dependencies` plus NVKE deploy values at `33fb71b2f4224b470ebc628a9165fc4b92870406` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
@@ -19,7 +19,7 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 | Reference-profile fixture | `inputs/catalogs/nvke/release-components`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only; not the demo's runnable `controller-profiles` or approved fleet configuration. |
 | Customer replacement | Ordered catalog overlay, bound to its exact predecessor snapshot | Preserve the logical component's output type and supported platforms; validate its new material closure. |
 
-The [M2 input guide](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) records the detailed source paths and remaining
+The [maintained NVKE input guide](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) records the detailed source paths and remaining
 acceptance gaps. Catalog/graph validation authenticates selections, not installed containment, build
 compatibility or publication acceptance.
 
@@ -49,7 +49,7 @@ Definitions, supplier overlays, per-output stacks and retained before/after Plan
 building `nvkr`; its supplier is explicitly a fixture, not a production NVKE package. It avoids inventing
 an unverified package URL or digest in this guide.
 
-The M2-specific `TestMaintainedM2CustomerMaterialReplacement` applies catalog stacks and compiles both
+The maintained-Definition test `TestMaintainedM2CustomerMaterialReplacement` applies catalog stacks and compiles both
 native disk graphs with fixture source and acquired Calico suppliers. It checks changed Build identity
 and exact material dependency edges. Its negative cases check Resolve selection errors for a missing
 material, an unknown component and a platform mismatch; they do not test supplier downloads, missing

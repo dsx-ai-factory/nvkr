@@ -1,4 +1,4 @@
-# Bind the controller chart to CWE
+# Bind the controller chart to the NVKE management-plane image
 
 The Definition says **which image the chart uses**:
 
@@ -31,7 +31,7 @@ helm:
         digest: image.digest
 ```
 
-NVKR writes the verified CWE image digest to `image.digest`. For root charts, upstream checksum files
+NVKR writes the verified management-plane image digest to `image.digest`. For root charts, upstream checksum files
 are preserved; nested wrappers refresh binder-owned checksums outside the chart. Templates, repository
 and tag defaults stay unchanged. Values are reserialized with the YAML library: formatting can change,
 and document-level comments separated from the root mapping may be omitted. Template bytes stay unchanged. Unknown or unbound slots and missing or ambiguous value paths fail.
@@ -70,7 +70,7 @@ Missing fields and ambiguous matches fail. Pin sets also reject unaccounted list
 ## Concrete NVKE example
 
 [Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/definition.yaml) and
-[catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/registry.yaml) select six outputs: CWE, its source controller chart,
+[catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/registry.yaml) select six outputs: the management-plane image (`cwe`), its source controller chart,
 SPIRE, SPIRE CRDs, Temporal and PostgreSQL. They share the pinned NVKE controller source; external charts
 remain acquired and byte-preserving. The controller source archive contains only its chart.
 
