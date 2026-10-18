@@ -259,13 +259,7 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 					if guard != nil {
 						consoleRoot = "var/instances"
 					}
-					retainNativeInstanceFiles(cleanup, simdir, consoleRoot, out, row.ID)
-					console, readErr := readRunFile(cleanup, simdir, consoleRoot+"/"+row.ID+"/console.log", 8<<20)
-					if readErr == nil {
-						cleanupResult = errors.Join(cleanupResult, os.WriteFile(filepath.Join(out, "native-console-"+row.ID+".log"), console, 0600))
-					} else if !os.IsNotExist(readErr) {
-						cleanupResult = errors.Join(cleanupResult, readErr)
-					}
+					cleanupResult = errors.Join(cleanupResult, retainNativeInstanceFiles(cleanup, simdir, consoleRoot, out, row.ID))
 				}
 				_, deleteErr := call(cleanup, "delete", "instance", "delete", "--instance-id", row.ID)
 				cleanupResult = errors.Join(cleanupResult, deleteErr)

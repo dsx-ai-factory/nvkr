@@ -188,3 +188,99 @@ func TestNativeOptionalInstanceEvidenceIsBoundedPrivateAndBestEffort(t *testing.
 		}
 	}
 }
+
+func TestNativeConsoleRetentionMatchesPinnedBackend(t *testing.T) {
+	for _, row := range []struct {
+		layout string
+		want   map[string]string
+	}{
+		{"instances", map[string]string{"native-console-owned-instance.log": "console.log"}},
+		{"var/instances", map[string]string{
+			"native-console-owned-instance-ttyS0.log": "disk.qcow2.ttyS0.log",
+			"native-console-owned-instance-ttyS1.log": "disk.qcow2.ttyS1.log",
+		}},
+	} {
+		t.Run(row.layout, func(t *testing.T) {
+			simdir, out := privateTestDir(t), privateTestDir(t)
+			if err := os.MkdirAll(filepath.Join(simdir, row.layout, "owned-instance"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"console.log", "disk.qcow2.ttyS0.log", "disk.qcow2.ttyS1.log"} {
+				writeTenantFixture(t, filepath.Join(simdir, row.layout, "owned-instance", name), []byte("private-"+name), 0o600)
+			}
+			if err := retainNativeInstanceFiles(t.Context(), simdir, row.layout, out, "owned-instance"); err != nil {
+				t.Fatal(err)
+			}
+			entries, err := os.ReadDir(out)
+			if err != nil || len(entries) != len(row.want) {
+				t.Fatalf("unexpected backend console membership: %v %v", entries, err)
+			}
+			for name, source := range row.want {
+				path := filepath.Join(out, name)
+				raw, err := os.ReadFile(path)
+				info, statErr := os.Stat(path)
+				if err != nil || statErr != nil || string(raw) != "private-"+source || info.Mode().Perm() != 0o600 {
+					t.Fatalf("backend serial evidence not private and exact: %q %v %v", name, err, statErr)
+				}
+			}
+		})
+	}
+}
+
+func TestNativeSerialRetentionFailurePreservesOtherConsole(t *testing.T) {
+	for _, mode := range []string{"missing", "symlink", "oversized", "already retained", "canceled"} {
+		t.Run(mode, func(t *testing.T) {
+			simdir, out := privateTestDir(t), privateTestDir(t)
+			first := filepath.Join(simdir, "var/instances/owned-instance/disk.qcow2.ttyS0.log")
+			second := filepath.Join(simdir, "var/instances/owned-instance/disk.qcow2.ttyS1.log")
+			firstOut := filepath.Join(out, "native-console-owned-instance-ttyS0.log")
+			if err := os.MkdirAll(filepath.Dir(first), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			writeTenantFixture(t, second, []byte("private-second-console"), 0o600)
+			if mode != "missing" {
+				writeTenantFixture(t, first, []byte("private-first-console"), 0o600)
+			}
+			switch mode {
+			case "symlink":
+				if err := os.Rename(first, first+".original"); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(first+".original", first); err != nil {
+					t.Fatal(err)
+				}
+			case "oversized":
+				if err := os.Truncate(first, 8<<20+1); err != nil {
+					t.Fatal(err)
+				}
+			case "already retained":
+				writeTenantFixture(t, firstOut, []byte("original evidence"), 0o600)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if mode == "canceled" {
+				cancel()
+			}
+			err := retainNativeInstanceFiles(ctx, simdir, "var/instances", out, "owned-instance")
+			if (err != nil) != (mode != "missing") {
+				t.Fatalf("serial capture failure lost: %v", err)
+			}
+			raw, err := os.ReadFile(firstOut)
+			if mode == "already retained" {
+				if err != nil || string(raw) != "original evidence" {
+					t.Fatal("original retained console replaced", err)
+				}
+			} else if !os.IsNotExist(err) {
+				t.Fatal("unsafe or unavailable first console was retained", err)
+			}
+			raw, err = os.ReadFile(filepath.Join(out, "native-console-owned-instance-ttyS1.log"))
+			if mode == "canceled" {
+				if !os.IsNotExist(err) {
+					t.Fatal("canceled console capture created output", err)
+				}
+			} else if err != nil || string(raw) != "private-second-console" {
+				t.Fatal("first console failure prevented second capture", err)
+			}
+		})
+	}
+}

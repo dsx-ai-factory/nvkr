@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 )
 
 // Native observations use the existing private subprocess owner. Neither raw
@@ -138,13 +140,14 @@ func (s *nativeSiteAttempt) preserveFailure(ctx context.Context, cause error) er
 	return retainNativeSiteFailure(ctx, *s.bootstrapRunner, s.assets.HostTools, kubeconfig, cause)
 }
 
-// Darwin instances may provide these optional runtime files
-// runtime.json and vmnet-client.log. Linux may omit them. Read through the same
-// bounded no-symlink owner as serial-console retention; never overwrite an old
-// diagnostic or turn optional evidence loss into a cleanup failure.
-func retainNativeInstanceFiles(ctx context.Context, simdir, instanceRoot, out, id string) {
+// Retain backend-owned serial logs before deletion through the bounded,
+// no-symlink reader. Darwin's runtime and vmnet files remain best-effort.
+func retainNativeInstanceFiles(ctx context.Context, simdir, instanceRoot, out, id string) (result error) {
 	if !safePhase(id) || instanceRoot != "instances" && instanceRoot != "var/instances" {
-		return
+		return nil
+	}
+	if err := requireContext(ctx); err != nil {
+		return err
 	}
 	for _, item := range []struct {
 		name, destination string
@@ -158,4 +161,35 @@ func retainNativeInstanceFiles(ctx context.Context, simdir, instanceRoot, out, i
 			_ = privateWrite(filepath.Join(out, item.destination), raw)
 		}
 	}
+	consoles := []struct{ name, suffix string }{{"console.log", ".log"}}
+	if instanceRoot == "var/instances" {
+		// The pinned libvirt renderer appends serial names to disk.qcow2;
+		// console.log belongs to the Darwin backend only.
+		consoles = []struct{ name, suffix string }{
+			{"disk.qcow2.ttyS0.log", "-ttyS0.log"},
+			{"disk.qcow2.ttyS1.log", "-ttyS1.log"},
+		}
+	}
+	for _, console := range consoles {
+		file, info, err := openRunFile(simdir, filepath.Join(instanceRoot, id, console.name))
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err == nil {
+			var raw bytes.Buffer
+			if !currentOwner(info) || info.Size() < 0 || info.Size() > 8<<20 {
+				err = errors.New("native console must be owned and within the diagnostic byte bound")
+			} else {
+				// Logs may append while the guest is alive. Capture only the
+				// observed prefix; this is not immutable artifact evidence.
+				_, err = transportarchive.CopyExact(ctx, &raw, file, info.Size())
+			}
+			err = errors.Join(err, file.Close())
+			if err == nil {
+				err = privateWrite(filepath.Join(out, "native-console-"+id+console.suffix), raw.Bytes())
+			}
+		}
+		result = errors.Join(result, err)
+	}
+	return result
 }

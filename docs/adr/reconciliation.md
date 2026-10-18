@@ -1414,6 +1414,14 @@ complete 32-output catalog smoke-policy fixture is explicitly deferred by a
 named skipped subtest. Full catalog compilation and production smoke admission
 remain required; no version stamps or smoke policy are weakened.
 
+Native cleanup retains the pinned backend's serial files before deleting its
+instance: Darwin's `console.log`, or Linux libvirt's `disk.qcow2.ttyS0.log` and
+`disk.qcow2.ttyS1.log`. Existing no-symlink file access and bounded context-aware
+copying retain the observed prefix even if a live log appends; this is descriptive
+diagnostic text, not immutable artifact evidence. Copies remain private and never
+replace original retained files. This corrects diagnostic loss, not a demonstrated
+guest-startup failure or runtime acceptance.
+
 The demo CLI automatically selects a terminal dashboard for interactive standard
 input/output. Its phase map, observed state and bounded public activity use typed
 owner events, not log-derived authority; narrow terminals stack the panes. `--plain`,
