@@ -246,7 +246,7 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 	var prepared factory.NativeBuildPreparation
 	if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer-inputs", "--definition", cfg.Definition, "--environment", cfg.Environment,
 		"--layout", bundle.Layout, "--bundle", bundle.Bundle, "--toolchain", bundle.Toolchain, "--out", filepath.Join(root, "packer-inputs"),
-		"--variable", "cpu_model=host", "--variable", "efi_firmware_code=/nvkr/toolchain/firmware/code.fd", "--variable", "efi_firmware_vars=/nvkr/toolchain/firmware/vars.fd"}, "native-packer-input-preparation", 3*time.Minute, &prepared); err != nil {
+		"--variable", "cpu_model=host", "--variable", "kernel_package=linux-generic", "--variable", "efi_firmware_code=/nvkr/toolchain/firmware/code.fd", "--variable", "efi_firmware_vars=/nvkr/toolchain/firmware/vars.fd"}, "native-packer-input-preparation", 3*time.Minute, &prepared); err != nil {
 		return err
 	}
 	// The Linux vendoring image and Darwin execution bundle retain separate pins.

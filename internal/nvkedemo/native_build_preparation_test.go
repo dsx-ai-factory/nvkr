@@ -128,6 +128,12 @@ esac
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, call := range strings.Split(string(observed), "\n") {
+		if strings.HasPrefix(call, "nvkr:factory prepare-native-packer-inputs ") &&
+			!strings.Contains(" "+call+" ", " --variable kernel_package=linux-generic ") {
+			t.Fatal("normal Mac preparation retained the source's unsupported 64KB kernel default")
+		}
+	}
 	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Version}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "local_toolchain_scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", "toolchain_overlay", "local_toolchain_definition", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
 	rest := string(observed)
 	for _, expected := range sequence {

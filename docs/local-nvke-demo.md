@@ -67,6 +67,11 @@ selection share this same deployment closure. Changed packages require a fresh
 QCOW2 build; an older completed Run cannot be relabelled as the corrected build.
 These catalog checks do not establish a successful fresh deployment or conformance run.
 
+Normal Mac builds explicitly select NVKE's supported `linux-generic` kernel
+override for Apple Silicon HVF. Linux KVM builds retain the source's ARM64
+`linux-nvidia-64k` default. The generated Plan records this platform-specific
+kernel selection; both use the same source pins and shared demo workflow.
+
 The separately selected upstream, TCG and hosted nightly inputs retain their own
 catalog baselines and runtime evidence. The old TCG Definitions remain available
 as explicit slow build diagnostics through `nvkr run local` or the legacy launcher
