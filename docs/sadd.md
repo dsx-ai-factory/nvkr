@@ -598,7 +598,8 @@ and inventories before exporting metadata; control layouts exclude output payloa
 digests and downstream artifact authentication remain required. Metadata-only transfers use workflow
 identity without package API calls. Dedicated read/write credentials do not elevate repository-token permissions.
 Production partial retries admit earlier source attempts only within the same Run and preserve original
-transport bindings through restoration. Development and explicit cross-Run transfers remain exact-attempt;
+transport bindings through restoration. Bounded same-name candidates all authenticate before selection
+of the newest source attempt; ties within an attempt fail closed. Development and explicit cross-Run transfers remain exact-attempt;
 release and qualification owners retain their separate invocation/evidence checks. Release finalizers use
 a bounded two-hour budget for setup, transport, authentication and final record uploads.
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately

@@ -263,7 +263,9 @@ runs:
         NVKR_CI_ATTEMPT: ${{ inputs.attempt }}
       run: |-
         set -eu
-        exec ./.nvkr/ci-bootstrap/nvkr-exec factory github ci-fetch-locators --index-dir "$NVKR_CI_INDEX" --name "$NVKR_CI_NAME" --pattern "$NVKR_CI_PATTERN" --merge-multiple="$NVKR_CI_MERGE" --run-id "$NVKR_CI_RUN" --attempt "$NVKR_CI_ATTEMPT" --allow-earlier-attempts=false
+        allow_earlier=false
+        if [ -n "$NVKR_CI_RUN" ]; then allow_earlier=false; fi
+        exec ./.nvkr/ci-bootstrap/nvkr-exec factory github ci-fetch-locators --index-dir "$NVKR_CI_INDEX" --name "$NVKR_CI_NAME" --pattern "$NVKR_CI_PATTERN" --merge-multiple="$NVKR_CI_MERGE" --run-id "$NVKR_CI_RUN" --attempt "$NVKR_CI_ATTEMPT" --allow-earlier-attempts="$allow_earlier"
     - name: Restore metadata and private payloads
       shell: bash
       env:
@@ -276,4 +278,6 @@ runs:
         NVKR_CI_ATTEMPT: ${{ inputs.attempt }}
       run: |-
         set -eu
-        exec ./.nvkr/ci-bootstrap/nvkr-exec factory github ci-download --index-dir "$NVKR_CI_INDEX" --destination "${NVKR_CI_DESTINATION:-.}" --run-id "$NVKR_CI_RUN" --attempt "$NVKR_CI_ATTEMPT" --allow-earlier-attempts=false
+        allow_earlier=false
+        if [ -n "$NVKR_CI_RUN" ]; then allow_earlier=false; fi
+        exec ./.nvkr/ci-bootstrap/nvkr-exec factory github ci-download --index-dir "$NVKR_CI_INDEX" --destination "${NVKR_CI_DESTINATION:-.}" --run-id "$NVKR_CI_RUN" --attempt "$NVKR_CI_ATTEMPT" --allow-earlier-attempts="$allow_earlier"

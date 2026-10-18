@@ -25,7 +25,7 @@ const MaxGitHubLocatorArtifacts = 2000
 // GitHubLocatorSelection retains the generated download projection. Pattern is
 // one exact name or a brace-delimited list of exact names; globs are unsupported.
 // Missing pattern members are left to the consumer's completeness check. Name
-// requires exactly one matching artifact. Exactly one selector must be present.
+// requires one selected artifact. Exactly one selector must be present.
 type GitHubLocatorSelection struct {
 	Name          string
 	Pattern       string
@@ -130,23 +130,32 @@ func (g *githubLocatorClient) fetch(ctx context.Context, request Request, index 
 		if list.TotalCount == "0" && len(list.Artifacts) == 0 {
 			return e.New(e.CodeReleaseIncomplete, "required CI locator artifact is missing")
 		}
-		if list.TotalCount != "1" || len(list.Artifacts) != 1 {
-			return e.New(e.CodeVerifyFailed, "CI locator discovery requires one exact provider match")
+		// One complete page bounds retry candidates; never select from a
+		// truncated listing. Exact-attempt consumers retain singleton admission.
+		count := len(list.Artifacts)
+		if count == 0 || count > 100 || string(list.TotalCount) != strconv.Itoa(count) ||
+			(!selection.AllowEarlierAttempts && count != 1) ||
+			len(artifacts)+count > MaxGitHubLocatorArtifacts {
+			return e.New(e.CodeVerifyFailed, "CI locator discovery requires a complete bounded provider selection")
 		}
-		artifact := list.Artifacts[0]
-		if err := artifact.validate(name, run); err != nil {
-			return err
+		for _, artifact := range list.Artifacts {
+			if err := artifact.validate(name, run); err != nil {
+				return err
+			}
+			if ids[artifact.ID] {
+				return e.New(e.CodeVerifyFailed, "CI locator provider artifact ID is repeated")
+			}
+			ids[artifact.ID] = true
+			artifacts = append(artifacts, artifact)
 		}
-		if ids[artifact.ID] {
-			return e.New(e.CodeVerifyFailed, "CI locator provider artifact ID is repeated")
-		}
-		ids[artifact.ID] = true
-		artifacts = append(artifacts, artifact)
 	}
 	// The complete selection has a shared 128 MiB bound. No member is written until
 	// every selected archive's provider digest and exact locator binding pass.
 	locators := make([]githubLocatorBytes, 0, len(artifacts))
 	totalBytes := 0
+	selected := make(map[string]int, len(names))
+	attempts := make(map[string]uint64, len(names))
+	seenAttempts := make(map[string]map[uint64]bool, len(names))
 	for _, artifact := range artifacts {
 		raw, err := g.downloadLocator(ctx, request, artifact, selection.AllowEarlierAttempts)
 		if err != nil {
@@ -156,7 +165,30 @@ func (g *githubLocatorClient) fetch(ctx context.Context, request Request, index 
 		if totalBytes > maxGitHubIndexBytes {
 			return e.New(e.CodeVerifyFailed, "CI metadata index exceeds its aggregate bound")
 		}
-		locators = append(locators, githubLocatorBytes{name: artifact.Name, raw: raw})
+		locator, err := DecodeLocator(raw)
+		if err != nil {
+			return err
+		}
+		// downloadLocator authenticated the canonical source attempt and the
+		// entire request. Provider order and artifact IDs confer no preference.
+		attempt, _ := strconv.ParseUint(locator.Request.Attempt, 10, 64)
+		if seenAttempts[artifact.Name] == nil {
+			seenAttempts[artifact.Name] = make(map[uint64]bool)
+		}
+		if seenAttempts[artifact.Name][attempt] {
+			return e.New(e.CodeVerifyFailed, "CI locator selection is ambiguous within a source attempt")
+		}
+		seenAttempts[artifact.Name][attempt] = true
+		if position, exists := selected[artifact.Name]; exists {
+			if attempt > attempts[artifact.Name] {
+				locators[position].raw = raw
+				attempts[artifact.Name] = attempt
+			}
+		} else {
+			selected[artifact.Name] = len(locators)
+			attempts[artifact.Name] = attempt
+			locators = append(locators, githubLocatorBytes{name: artifact.Name, raw: raw})
+		}
 	}
 	if err := requireGitHubLocatorDirectory(index, info); err != nil {
 		return e.New(e.CodeImmutableViolation, "CI locator index changed during acquisition")

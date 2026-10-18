@@ -1414,7 +1414,12 @@ artifact `12079866182` verified the 489-byte ZIP against provider SHA-256
 Run, helper name and attempt-1 request; it did not download the private helper payload.
 Release finalizers now have a dedicated 120-minute budget. Production transport explicitly admits retained
 same-Run source attempts no later than the consumer, preserving original locator/config bindings through
-ordinary and nested restoration. Development, explicit cross-Run and direct store APIs stay exact-attempt.
+ordinary and nested restoration. Same-name retry candidates are bounded and all authenticate before
+selecting the newest source attempt; tied source attempts and incomplete listings fail closed.
+Generated fetch and restore commands disable reuse whenever an explicit Run is supplied.
+Development, explicit cross-Run and direct store APIs stay exact-attempt.
+The review follow-up adds regression cases for candidate ordering, ties, future/corrupt candidates and
+truncated listings; local execution of these new tests is intentionally skipped pending hosted CI.
 Focused contracts reproduce the old rejection and cover private payloads, public metadata, mixed source
 attempt acquisition, unchanged bindings, future/foreign/malformed source refusal and generated policy
 separation. These local checks do not establish hosted retry completion, qualification acceptance or a

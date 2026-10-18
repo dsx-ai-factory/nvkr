@@ -151,7 +151,12 @@ The generated workflow admits at most 2,000 Actions uploads per attempt, countin
 finalization uploads even when conditional. The Go transport owner acquires selected records serially,
 looking up each fixed name through the authenticated same-Run API. Exact-name queries avoid listing cutoffs
 and page-position races. The Run-attempt response binds repository IDs and head; each lookup must return
-zero or one matching artifact. Each ZIP must match its provider SHA-256 and contain one canonical record
+zero or one matching artifact for exact-attempt consumers. Production retry selection admits at most
+100 same-name candidates in one complete response, with at most 2,000 candidates across the selection.
+Every candidate must authenticate before selecting the greatest source attempt; multiple records for
+one source attempt are ambiguous and fail closed, regardless of provider order or artifact ID.
+Truncated responses, invalid candidates and future attempts fail closed without index publication.
+Each ZIP must match its provider SHA-256 and contain one canonical record
 bound to repository, Run, source attempt and selected name. Production transfer templates explicitly admit
 retained records from earlier canonical positive attempts of that same Run, no later than the consuming
 attempt. Provider repository/head and ZIP authentication still precede index publication; restoration
@@ -160,7 +165,7 @@ names and future attempts fail closed. Development templates and explicitly sele
 remain exact-attempt; the exact store and qualification APIs do not inherit this transport opt-in.
 Consumer Plan, invocation, signature and completeness checks still own acceptance under ADR-20.
 Private locators retain their 32 KiB decoded limit;
-public metadata uses the bounds above. ZIPs are bounded to 33 MiB and the complete decoded index to 128 MiB.
+public metadata uses the bounds above. ZIPs are bounded to 33 MiB and the aggregate decoded candidate bytes to 128 MiB, including unselected candidates.
 Provider digests and all selected records are checked before publishing the fresh index. Actions acquisition
 uses the repository workflow token; metadata-only restoration needs no registry credential or package API
 request. Mixed stage batches admit their complete selection and private credentials before transfer. Private

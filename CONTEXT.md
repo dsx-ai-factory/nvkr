@@ -122,7 +122,8 @@ Large finalizers collect the exact original per-job results through fixed, bound
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
 Production partial retries may transport retained same-Run artifacts from earlier attempts while preserving
-their original source bindings. Transport admission does not replace consumer evidence or completeness checks;
+their original source bindings. Same-name candidates are bounded and authenticated before selecting the
+newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;
 development and explicitly selected qualification sources remain exact-attempt.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
