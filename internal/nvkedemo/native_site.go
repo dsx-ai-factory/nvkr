@@ -28,7 +28,7 @@ type NativeConfig struct {
 	Network, DemoExecutable string
 	conformance             *nativeConformanceConfig
 	Assets                  NativeAssetConfig
-	Cleanup                 bool
+	Cleanup, Walkthrough    bool
 	Progress                io.Writer
 }
 
@@ -38,7 +38,7 @@ type nativeSiteAttempt struct {
 	assets                    NativeAssets
 	handoff                   *nativeHandoff
 	files                     string
-	cleanup                   bool
+	cleanup, walkthrough      bool
 	sequence                  int
 	bootstrapName             string
 	bootstrapRunner           *Runner
@@ -101,7 +101,7 @@ func RunNative(ctx context.Context, cfg NativeConfig) (result error) {
 	if err != nil {
 		return err
 	}
-	attempt := &nativeSiteAttempt{assets: assets, cleanup: cfg.Cleanup, network: mode, tenantTimeout: cfg.TenantTimeout, conformance: cfg.conformance}
+	attempt := &nativeSiteAttempt{assets: assets, cleanup: cfg.Cleanup, walkthrough: cfg.Walkthrough, network: mode, tenantTimeout: cfg.TenantTimeout, conformance: cfg.conformance}
 	result = RunNativeGuest(ctx, NativeGuestConfig{
 		Image: cfg.Image, Tools: assets.HostTools, Out: filepath.Join(out, "runtime"),
 		Accelerator: cfg.Accelerator, Timeout: 30 * time.Minute, Progress: cfg.Progress, site: attempt, DemoExecutable: cfg.DemoExecutable,
@@ -323,7 +323,7 @@ func (s *nativeSiteAttempt) ready(ctx context.Context, runner Runner, row native
 		return err
 	}
 	access := OperatorAccess{kubectl: filepath.Join(tools, "kubectl"), site: kubeconfig, tenant: filepath.Join(out, "tenant.kubeconfig"), siteQCOW: true}
-	if err := s.presentStatus(ctx, runner, access); err != nil {
+	if err := s.presentStatus(ctx, runner, access, s.walkthrough); err != nil {
 		return err
 	}
 	if s.conformance != nil {
@@ -365,7 +365,7 @@ func (s *nativeSiteAttempt) ready(ctx context.Context, runner Runner, row native
 			_, err := server.Exited()
 			return errors.Join(errors.New("native NICo exited during the retained demo; inspect the private native-nico log"), err)
 		case <-refresh.C:
-			if err := s.presentStatus(ctx, runner, access); err != nil {
+			if err := s.presentStatus(ctx, runner, access, false); err != nil {
 				if ctx.Err() != nil && !errors.Is(err, ErrUnjoined) {
 					return nil
 				}

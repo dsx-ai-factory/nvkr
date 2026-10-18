@@ -49,13 +49,13 @@ func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(root, "lifecycle.json"), raw, 0600); err != nil {
 					t.Fatal(err)
 				}
-				cfg := Config{Network: network, NVKR: "nvkr", Out: filepath.Join(root, "deploy"), DemoExecutable: "demo", Cleanup: true, Runs: RunInputs{OS: root, Components: "components", Providers: "providers", Site: "site", Tools: "tools", Profiles: "profiles", Runtime: "runtime", HostTools: "host"}}
+				cfg := Config{Walkthrough: network == "ovn", Network: network, NVKR: "nvkr", Out: filepath.Join(root, "deploy"), DemoExecutable: "demo", Cleanup: true, Runs: RunInputs{OS: root, Components: "components", Providers: "providers", Site: "site", Tools: "tools", Profiles: "profiles", Runtime: "runtime", HostTools: "host"}}
 				selected, err := nativeDeploymentConfig(t.Context(), cfg, platform)
 				want := "hvf"
 				if platform == "linux/arm64" {
 					want = "kvm"
 				}
-				if err != nil || selected.Image != disk || selected.Accelerator != want || selected.Network != network || !selected.Cleanup || selected.DemoExecutable != cfg.DemoExecutable {
+				if err != nil || selected.Image != disk || selected.Accelerator != want || selected.Network != network || !selected.Cleanup || selected.DemoExecutable != cfg.DemoExecutable || selected.Walkthrough != cfg.Walkthrough {
 					t.Fatalf("native deployment selection: %+v %v", selected, err)
 				}
 				assets := selected.Assets

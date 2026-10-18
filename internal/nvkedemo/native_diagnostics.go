@@ -63,11 +63,14 @@ func observeNativeAPI(ctx context.Context, runner Runner, cli string) error {
 	return captureNativeObservation(bounded, private, []string{cli, "get", "clusters", "-o", "json"}, "nvke-api", 10*time.Second)
 }
 
-func (s *nativeSiteAttempt) presentStatus(ctx context.Context, runner Runner, access OperatorAccess) error {
+func (s *nativeSiteAttempt) presentStatus(ctx context.Context, runner Runner, access OperatorAccess, walkthrough bool) error {
 	// A failed observation is retained privately and does not replace the
 	// already completed workload result or tear down a retained environment.
 	if err := observeNativeAPI(ctx, runner, s.assets.CLI); errors.Is(err, ErrUnjoined) {
 		return err
+	}
+	if walkthrough && runner.Progress != nil {
+		return access.writeLiveStatus(ctx, runner, runner.Progress, true)
 	}
 	return presentNativeStatus(ctx, runner, access)
 }

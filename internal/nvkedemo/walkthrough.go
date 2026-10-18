@@ -17,6 +17,8 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
+const walkthroughTimeout = 3 * time.Minute
+
 // These projections deliberately omit node addresses, pod names, credentials,
 // provider messages and raw logs. Kubernetes owns response decoding through
 // encoding/json; this presentation is not a readiness or qualification receipt.
@@ -69,7 +71,7 @@ func (t *tenant) recordedWalkthrough(ctx context.Context, out io.Writer) (result
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "recorded walkthrough requires a context and output writer")
 	}
-	bounded, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	bounded, cancel := context.WithTimeout(ctx, walkthroughTimeout)
 	defer cancel()
 	var text strings.Builder
 	fmt.Fprintf(&text, "\nRecorded Kubernetes walkthrough · %s\nLive read-only observations of this invocation, not a signed Release or qualification.\nPrivate kubeconfig locators select each cluster explicitly; node/pod identities, addresses and raw responses remain in private diagnostics.\n", time.Now().UTC().Format(time.RFC3339))
@@ -132,30 +134,11 @@ func (t *tenant) recordedWalkthrough(ctx context.Context, out io.Writer) (result
 		if err != nil {
 			return err
 		}
-		var pods struct{ Items []walkthroughPod }
-		if err := json.Unmarshal(raw, &pods); err != nil || len(pods.Items) == 0 || len(pods.Items) > 128 {
-			return walkthroughInvalid()
+		podRows, err := walkthroughPodRows(raw)
+		if err != nil {
+			return err
 		}
-		slices.SortFunc(pods.Items, func(a, b walkthroughPod) int {
-			return strings.Compare(a.Metadata.Namespace+"/"+a.Metadata.Name, b.Metadata.Namespace+"/"+b.Metadata.Name)
-		})
-		text.WriteString("NAMESPACE  POD  PHASE  READY  RESTARTS\n")
-		for index, pod := range pods.Items {
-			if !walkthroughName(pod.Metadata.Namespace) || !slices.Contains([]string{"Pending", "Running", "Succeeded", "Failed", "Unknown"}, pod.Status.Phase) || len(pod.Status.Containers) > 32 {
-				return walkthroughInvalid()
-			}
-			ready, restarts := 0, 0
-			for _, container := range pod.Status.Containers {
-				if container.RestartCount < 0 {
-					return walkthroughInvalid()
-				}
-				if container.Ready {
-					ready++
-				}
-				restarts += container.RestartCount
-			}
-			fmt.Fprintf(&text, "%s  pod-%03d  %s  %d/%d  %d\n", pod.Metadata.Namespace, index+1, pod.Status.Phase, ready, len(pod.Status.Containers), restarts)
-		}
+		text.WriteString(podRows)
 		raw, err = capture("get", "deployments,daemonsets,statefulsets", "--all-namespaces", "-o", "json")
 		if err != nil {
 			return err
@@ -211,6 +194,7 @@ func (t *tenant) recordedWalkthrough(ctx context.Context, out io.Writer) (result
 			if err != nil {
 				return err
 			}
+			var pods struct{ Items []walkthroughPod }
 			if err := json.Unmarshal(raw, &pods); err != nil || !walkthroughJobPassed(job, pods.Items) {
 				return walkthroughInvalid()
 			}
@@ -226,6 +210,37 @@ func (t *tenant) recordedWalkthrough(ctx context.Context, out io.Writer) (result
 		}
 	}
 	return nil
+}
+
+// walkthroughPodRows reuses the bounded Kubernetes pod projection for recorded
+// legacy and native observations. Raw identities and addresses remain private.
+func walkthroughPodRows(raw []byte) (string, error) {
+	var pods struct{ Items []walkthroughPod }
+	if err := json.Unmarshal(raw, &pods); err != nil || len(pods.Items) == 0 || len(pods.Items) > 128 {
+		return "", walkthroughInvalid()
+	}
+	slices.SortFunc(pods.Items, func(a, b walkthroughPod) int {
+		return strings.Compare(a.Metadata.Namespace+"/"+a.Metadata.Name, b.Metadata.Namespace+"/"+b.Metadata.Name)
+	})
+	var text strings.Builder
+	text.WriteString("NAMESPACE  POD  PHASE  READY  RESTARTS\n")
+	for index, pod := range pods.Items {
+		if !walkthroughName(pod.Metadata.Namespace) || !slices.Contains([]string{"Pending", "Running", "Succeeded", "Failed", "Unknown"}, pod.Status.Phase) || len(pod.Status.Containers) > 32 {
+			return "", walkthroughInvalid()
+		}
+		ready, restarts := 0, 0
+		for _, container := range pod.Status.Containers {
+			if container.RestartCount < 0 {
+				return "", walkthroughInvalid()
+			}
+			if container.Ready {
+				ready++
+			}
+			restarts += container.RestartCount
+		}
+		fmt.Fprintf(&text, "%s  pod-%03d  %s  %d/%d  %d\n", pod.Metadata.Namespace, index+1, pod.Status.Phase, ready, len(pod.Status.Containers), restarts)
+	}
+	return text.String(), nil
 }
 
 func writeWalkthroughPages(ctx context.Context, out io.Writer, text string) error {
@@ -256,7 +271,7 @@ func writeWalkthroughPages(ctx context.Context, out io.Writer, text string) erro
 			fmt.Fprintln(&page, command)
 		}
 		for _, line := range lines[start:min(start+pageRows, len(lines))] {
-			if line == "Site / Kind management" || line == "Tenant / QCOW2" {
+			if line == "Site / Kind management" || line == "Site / native QCOW2" || line == "Tenant / QCOW2" {
 				cluster, command = line, ""
 			}
 			if strings.HasPrefix(line, "$ kubectl ") {

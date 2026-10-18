@@ -36,10 +36,16 @@ func TestWalkthroughFlagOverridesConfigurationAndHelpDoesNotExecute(t *testing.T
 			t.Fatal("flag absent from help", err)
 		}
 		selected, err := configuredFile(command, "/fixture", nvkedemo.DemoFile{Run: nvkedemo.RunFile{Walkthrough: enabled}}, demoActions{load: func(_ context.Context, _ string) (nvkedemo.DemoFile, error) {
-			return nvkedemo.DemoFile{Run: nvkedemo.RunFile{Walkthrough: !enabled}}, nil
+			return nvkedemo.DemoFile{Version: 1,
+				Build: nvkedemo.BuildFile{Repo: "/fixture/repo", Attempt: "fresh", Jobs: 1},
+				Run:   nvkedemo.RunFile{Walkthrough: !enabled, Out: "/fixture/out", TimeoutSeconds: nvkedemo.DefaultTenantTimeoutSeconds}}, nil
 		}})
 		if err != nil || selected.Run.Walkthrough != enabled {
 			t.Fatal("explicit flag did not override YAML", err)
+		}
+		_, run, err := selected.E2EConfig(io.Discard)
+		if err != nil || run.Walkthrough != enabled {
+			t.Fatal("explicit flag was lost before deployment selection", err)
 		}
 	}
 }

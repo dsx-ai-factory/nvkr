@@ -586,16 +586,19 @@ For a recording, add `--walkthrough` to that same `e2e --cleanup`
 invocation. TUI remains the default; `--plain` is optional scrolling output. The `e2e`
 introduction explains the selected authored inputs and links their source documentation before
 the dashboard; it is read-only presentation, not runtime admission. After the existing workload
-and DNS checks, the adapter runs bounded
-read-only kubectl observations against both explicit owned kubeconfigs before
-natural tenant deletion. The public view shows Ready node roles, all-namespace
-pod status and restarts, actual Deployment/DaemonSet/StatefulSet inventory,
-selected component rollouts, and the existing `nvkr-smoke` Job completion,
-zero-retry policy, container exit/restarts and bounded DNS success marker. It
-does not rerun the Job. Kubeconfig contents, node addresses, pod identities, raw
-DNS output and private diagnostics remain private. A failed walkthrough fails
-the recording and still runs the existing mandatory owned cleanup. The YAML
-equivalent is `run.walkthrough: true`; default workflows are unchanged.
+and DNS checks, the shared native Linux/Mac adapter runs bounded read-only
+`get --raw=/readyz`, `get nodes -o json` and `get pods -A -o json` observations
+against the explicit site and same tenant kubeconfigs before natural tenant
+deletion. The public view shows API readiness, node roles, and all-namespace pod
+status and restarts with anonymous pod labels. These snapshots are separate from
+the preceding zero-retry workload/DNS acceptance and do not rerun the Job.
+The legacy Kind management walkthrough additionally observes workload inventory,
+selected rollouts and the existing Job's completion, retry policy, container
+exit/restarts and bounded DNS success marker. Kubeconfig contents, node
+addresses, pod identities, raw DNS output and private diagnostics remain private.
+A failed walkthrough fails the recording and reaches the existing mandatory
+owned cleanup. The YAML equivalent is `run.walkthrough: true`; default workflows
+are unchanged.
 
 The new retained-owner CLI and live access presentation have focused contract
 tests and native process/control fixtures. Those fixtures do not prove a fresh

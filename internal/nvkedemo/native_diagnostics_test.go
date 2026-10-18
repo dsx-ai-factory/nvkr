@@ -223,7 +223,7 @@ exit 7
 	runner.Progress = &public
 	attempt := nativeSiteAttempt{assets: NativeAssets{CLI: cli}}
 	for range 2 {
-		if err := attempt.presentStatus(t.Context(), runner, access); err != nil {
+		if err := attempt.presentStatus(t.Context(), runner, access, false); err != nil {
 			t.Fatalf("diagnostic API failure changed retained status behavior: %v", err)
 		}
 	}
