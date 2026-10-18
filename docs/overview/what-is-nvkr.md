@@ -2,19 +2,19 @@
 
 > **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](preview-status.md).
 
-NVIDIA Kubernetes® Recipes (NVKR) is open-source software that turns pinned source into traceable software releases for NVIDIA Kubernetes Engine (NVKE). You declare the outputs you want to ship, and NVKR resolves their pinned inputs, builds or acquires each artifact, and connects the delivered bytes to their inputs and evidence. Its CLI is `nvkr`.
+NVIDIA Kubernetes® Recipes (NVKR) is open-source software that turns pinned source into traceable software releases for NVIDIA Kubernetes Engine (NVKE). You declare the outputs you want to ship, and NVKR resolves their pinned inputs, builds or acquires each artifact, and connects each delivered artifact to its inputs and evidence. Its CLI is `nvkr`.
 
-NVKR builds NVKE's CLI, container images, Helm charts, operator tools and node OS images. You run that work on your own host, or generate a GitHub Actions workflow that builds, signs and publishes a Release to registries you control. Only a Release from the hosted pipeline is signed and carries build provenance; a local Run is unsigned. NVKE and other downstream systems install and deploy the artifacts. NVKR is licensed under Apache 2.0.
+NVKR builds NVKE's CLI, container images, Helm charts, operator tools and node OS images. You can run the build on your own host, or generate a GitHub Actions workflow that builds, signs and publishes a Release to registries you control. Only a Release from the hosted pipeline is signed and carries build provenance; a local Run is unsigned. NVKE and other downstream systems install and deploy the artifacts. NVKR is licensed under Apache 2.0.
 
 ## Why NVKR
 
-To deliver software you can audit, you need to know which exact inputs produced each artifact and to check that claim yourself. NVKR provides these features:
+To deliver software you can audit, you need to know which inputs produced each artifact and to check that claim yourself. NVKR provides these features:
 
-- **Declarative outputs.** A Definition names each output and selects the catalog components, platform and format that produce it. You do not write the build graph or the pipeline: NVKR derives both.
-- **Pinned inputs.** Catalogs pin every source commit, acquired artifact and tool. Overlays replace a producer or substitute a toolchain for a chosen scope without editing the catalog.
+- **Declarative outputs.** A Definition names each output and selects the catalog components, platform and format that produce it. NVKR derives the build graph and the pipeline.
+- **Pinned inputs.** Catalogs pin every source commit, artifact and tool. Overlays replace a producer or substitute a toolchain for a chosen scope without editing the catalog.
 - **Reviewable plans.** Before anything runs, you inspect the generated Plan, visualize producer and artifact graphs, and compare two Plans.
-- **Evidence per output.** Each Run records its required outputs, observed artifacts, evidence and failures. One successful output never stands in for a missing sibling.
-- **Releases you verify under your own policy.** One digest-pinned OCI reference connects the published outputs to their SBOMs and provenance. You apply your Verification Policy, which names the workflow identity and issuer you accept.
+- **Evidence per output.** For each output the Definition requires, a Run records the artifact it observed, the evidence and any failure. One successful output never stands in for a missing sibling.
+- **Releases you verify under your own policy.** One digest-pinned OCI reference connects the published outputs to their SBOMs and provenance. `nvkr release verify` checks a Release against your Verification Policy: the signer identity, issuer and evidence you accept.
 
 ## Who NVKR is for
 
@@ -28,10 +28,10 @@ To deliver software you can audit, you need to know which exact inputs produced 
 
 - **Definition.** Your declaration of the named outputs to produce, their catalog producers, target platforms and packaging.
 - **Environment.** The execution settings, registry namespace, credential references and signing identity policy for a Run. You select it separately from the Definition.
-- **Run.** One execution attempt against frozen inputs and required outputs. It records progress, observed artifacts, evidence and failures.
-- **Artifact.** Immutable bytes produced or acquired for delivery, such as an executable, image, chart or node image.
+- **Run.** One execution attempt against pinned inputs, for the outputs the Definition requires. It records progress, observed artifacts, evidence and failures.
+- **Artifact.** An immutable file or image produced or acquired for delivery, such as an executable, container image, Helm chart or node image.
 - **Release.** An immutable selection of artifacts and evidence, accessible through one pinned reference, with an explicit evidence lane.
-- **Verification Policy.** Your requirements for accepting a Release: the identities, issuer and evidence you trust.
+- **Verification Policy.** Your requirements for accepting a Release: the identities, issuer and evidence you trust. You write it; NVKR checks a Release against it.
 - **Evidence lane.** The kind of claim a result supports. A dry-run is `static-unqualified`, a local Run is `unqualified-local-execution`, and a signed Release from the hosted pipeline is `pipeline-attested`. A fourth lane, `qualified`, is not available at preview.
 
 [Concepts](../user-concepts.md) defines every term NVKR uses.

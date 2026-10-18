@@ -9,6 +9,8 @@ instances:
 redirects:
   - source: /nvke/nvkr/index.html
     destination: /nvke/nvkr
+  - source: /nvke/nvkr/catalogs-and-components/m-2-inputs-and-customer-choices
+    destination: /nvke/nvkr/catalogs-and-components/nvke-inputs-and-customer-choices
 
 title: NVIDIA Kubernetes Recipes
 

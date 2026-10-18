@@ -1,7 +1,7 @@
 # NVIDIA Kubernetes® Recipes (NVKR)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.27%2B-00ADD8.svg)](https://go.dev/dl/)
+[![Go](https://img.shields.io/badge/Go-1.27.2-00ADD8.svg)](.go-version)
 
 > **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](docs/overview/preview-status.md).
 

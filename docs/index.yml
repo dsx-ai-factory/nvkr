@@ -13,7 +13,7 @@ navigation:
         path: overview/preview-status.md
         slug: preview-status
       - link: NVKE documentation
-        href: /nvke
+        href: https://nvidia-nvke.docs.buildwithfern.com/nvke
 
   - section: Get started
     contents:
