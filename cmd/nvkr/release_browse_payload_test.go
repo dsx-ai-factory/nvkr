@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -13,13 +14,16 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -96,6 +100,37 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 				}
 			})
 		}
+	}
+	for _, corrupt := range []bool{false, true} {
+		t.Run("TUI/corrupt="+strconv.FormatBool(corrupt), func(t *testing.T) {
+			corruptConfig.Store(corrupt)
+			defer corruptConfig.Store(false)
+			payloadGets.Store(0)
+			shows := 0
+			var snapshot progress.Snapshot
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
+				shows++
+				snapshot = source.Snapshot()
+				if work != nil {
+					t.Fatal("read-only browser retained inspection work")
+				}
+				return runpresenter.Result{}
+			}}
+			var out bytes.Buffer
+			app := releasePresentationTestApp(executeReleaseVerification, &out, services)
+			err := app.RunContext(t.Context(), []string{"nvkr", "release", "browse", "--reference", reference, "--output", "tools", "--ui=tui", "--anonymous", "--plain-http"})
+			if corrupt {
+				assertLifecycleCommandCode(t, err, e.CodeFetchFailed)
+				if len(snapshot.Items) != 0 || snapshot.Status != "failed" {
+					t.Fatal("TUI hid invalid sibling metadata behind output selection")
+				}
+			} else if err != nil || len(snapshot.Items) != 2 || snapshot.Status != "complete" {
+				t.Fatalf("metadata-only browser failed: %+v, %v", snapshot, err)
+			}
+			if payloadGets.Load() != 0 || shows != 1 || out.Len() != 0 {
+				t.Fatalf("TUI downloaded payloads or changed output: GETs=%d shows=%d stdout=%q", payloadGets.Load(), shows, out.String())
+			}
+		})
 	}
 	t.Run("reject corrupt unselected metadata", func(t *testing.T) {
 		corruptConfig.Store(true)

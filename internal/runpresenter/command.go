@@ -73,7 +73,26 @@ func fieldLines(fields []progress.Field) []string {
 	return lines
 }
 
-func (v *View) commandResults(_ int) []string {
+// commandMatches searches only the detached public projection, never transport
+// locations or private diagnostic data held by the owning operation.
+func commandMatches(item progress.Item, query string) bool {
+	if query == "" {
+		return true
+	}
+	for _, value := range []string{item.Name + " " + item.ID, item.Kind, item.Summary} {
+		if strings.Contains(strings.ToLower(value), query) {
+			return true
+		}
+	}
+	for _, field := range item.Fields {
+		if strings.Contains(strings.ToLower(field.Label), query) || strings.Contains(strings.ToLower(field.Value), query) {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *View) commandResults(width int) []string {
 	var lines []string
 	if v.filter != 0 {
 		lines = append(lines, "Filter: "+v.filterName())
@@ -126,7 +145,16 @@ func (v *View) commandResults(_ int) []string {
 		if mixedStates && item.State != "" {
 			line += safeText(item.State) + "  "
 		}
-		lines = append(lines, line+safeText(label))
+		line += safeText(label)
+		if item.Summary != "" {
+			withSummary := line + "  · " + safeText(item.Summary)
+			// Measure the escaped display string in terminal cells. A summary
+			// never displaces or truncates the full name, including wide Unicode.
+			if tview.TaggedStringWidth(tview.Escape(withSummary)) <= width {
+				line = withSummary
+			}
+		}
+		lines = append(lines, line)
 	}
 	if start > 0 || start+v.rows < len(v.visible) {
 		lines = append(lines, fmt.Sprintf("Showing %d-%d of %d; PgUp/PgDn", start+1, min(len(v.visible), start+v.rows), len(v.visible)))
