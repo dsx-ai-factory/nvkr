@@ -28,7 +28,7 @@ func TestReceiverOnlyAcceptsAllowlistedRecords(t *testing.T) {
 		{"pinned image literal", "NVKR_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", false},
 		{"unsupported protocol", "UNSUPPORTED_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", true},
 		{"warning", "scanner warning token=secret\n", true},
-		{"unknown phase", strings.Replace(valid, "root-scan", "password=secret", 1), true},
+		{"unknown phase", strings.Replace(valid, "root-scan", "password=fake-secret", 1), true},
 		{"unknown event", strings.Replace(valid, "start", "secret", 1), true},
 		{"unknown field", Prefix + `{"phase":"root-scan","event":"start","elapsedMillis":1,"secret":"token"}` + "\n", true},
 		{"duplicate field", Prefix + `{"phase":"root-scan","phase":"nested-scan","event":"start","elapsedMillis":1}` + "\n", true},

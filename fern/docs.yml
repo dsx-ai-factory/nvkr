@@ -9,8 +9,13 @@ instances:
 redirects:
   - source: /nvke/nvkr/index.html
     destination: /nvke/nvkr
+  - source: /nvke/nvkr/catalogs-and-components/m-2-inputs-and-customer-choices
+    destination: /nvke/nvkr/catalogs-and-components/nvke-inputs-and-customer-choices
 
-title: NVIDIA NVKR
+title: NVIDIA Kubernetes Recipes
+
+announcement:
+  message: "Preview: NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](/nvke/nvkr/overview/preview-status)."
 
 global-theme: nvidia
 
@@ -22,7 +27,11 @@ navbar-links:
   - type: github
     value: https://github.com/dsx-ai-factory/nvkr
 
+check:
+  rules:
+    broken-links: error
+
 products:
-  - display-name: NVKR
+  - display-name: NVIDIA Kubernetes Recipes
     path: ../docs/index.yml
     slug: /

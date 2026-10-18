@@ -87,6 +87,10 @@ retains its original scope; superseded requirements and plans are available only
 7. **Prefer file tools and `git mv` over destructive shell commands.** Do not use `rm`-style commands when a
    file tool or Git operation does the job.
 8. **3-strike rule.** After three failed fix attempts, stop, reassess, and explain the blocker.
+9. **Never commit secrets or credentials.** Keep real tokens, passwords, private keys, credential files,
+   and sensitive logs out of source, examples, fixtures, generated files, commits, and PR content. Use clearly
+   synthetic placeholders in tests and credential references in configuration. If you find an exposed secret,
+   stop reproducing it and follow [SECURITY.md](SECURITY.md) privately; do not copy it into a public report.
 
 ## Commands
 

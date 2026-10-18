@@ -128,7 +128,7 @@ policy-digest-bound. The historical validation run below predates these consumer
 and does not validate this updated head, current main execution, strict inspection or independent full-payload
 consumer acceptance.
 
-The [customer choices guide](../../../docs/nvke-m2-customer-choices.md) explains supplier replacement through
+The [customer choices guide](../../../docs/nvke-customer-choices.md) explains supplier replacement through
 the existing catalog interfaces and the precise scope of its graph tests. The
 [release transport evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
 failed candidate's storage exhaustion and why correcting carrier selection alone does not complete delivery.
@@ -259,7 +259,7 @@ private-source credentials. Pinning and graph tests establish their own contract
 
 ## Qualification readiness
 
-The simplified [artifact check](../../../docs/lifecycle.md#authenticate-an-m3-candidate) takes a Run URL and a
+The simplified [artifact check](../../../docs/lifecycle.md#authenticate-a-qualification-candidate) takes a Run URL and a
 reusable policy. Upstream embedded-component manifests are not a qualification prerequisite. The maintained
 catalogs omit the optional declarations, so their metadata checks are `not-applicable`. Any declaration added
 later must strictly match its referenced map at the pinned source revision, including exact membership,

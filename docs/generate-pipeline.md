@@ -226,7 +226,7 @@ or callable producer trigger. A separately authored downstream CI coordinator ca
 schedule dispatches; that scheduling and runtime-test ownership are separate
 from generated bundle ownership.
 
-Adding `--qualification-policy` also generates the admitted M3 qualifier and its
+Adding `--qualification-policy` also generates the admitted qualifier and its
 fixed native smoke worker. The qualifier uses `workflow_run`; the worker uses
 `workflow_call` from that same-repository qualifier at the same commit. Their
 independent policy, credentials and ownership are separate from the producer

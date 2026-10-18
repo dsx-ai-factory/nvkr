@@ -154,11 +154,11 @@ closure. These documents have no inspected dependency inventory and explicitly b
 to `build-provenance-v1` and `nvkr:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
-The [approved October 12 M3 MVP scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+The approved initial scope
 retains this producer-only disk evidence. Deep disk/content inspection and material-to-filesystem reconciliation
-are deferred hardening under [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052), outside MVP completion.
+are deferred hardening.
 
-Under the current scope directed by the user, embedded-component declarations are optional: omission is not
+Under the current scope, embedded-component declarations are optional: omission is not
 applicable, while any authored declaration must match its referenced upstream manifest at the pinned commit. This checks source-metadata consistency only;
 it does not account for effective build customizations or inspect installed disk contents. Source, patch,
 configuration and material bindings remain mandatory in the producer-evidence contract.

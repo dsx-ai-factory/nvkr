@@ -101,7 +101,7 @@ has not been demonstrated. Qualified release authorization, full v1 qualificatio
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
 The maintained M2 candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
-explicitly named reference-profile fixtures, the provisioned infrastructure provider, NKTP and native bootstrap/telemetry
+explicitly named reference-profile fixtures, the provisioned infrastructure provider, NVKE telemetry pipelines and native bootstrap/telemetry
 images. Both native architectures retain plain and public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
 `build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected
 output membership must agree. Strict inspection/publication, qualified reproduction and private-passphrase
@@ -199,20 +199,34 @@ owns prerequisites, selection and capture limits. These proposed contracts estab
 
 ## M3 MVP scope and acceptance boundary
 
-The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826) retains
+The initial scope decision retains
 producer-only disk evidence and defers disk inspection, waivers, offline-PR and verify-only qualification.
-The [implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930) separates
+The accompanying implementation plan separates
 artifact authentication, native smoke, evidence publication and acceptance demonstrations. These are task
 scope and planning records, not organizational ADR ratification or operational qualification evidence.
 
-The current scope directed by the user makes embedded-component declarations optional, as recorded in the
+The current scope makes embedded-component declarations optional, as recorded in the
 product specification and owning ADRs. Omission is not applicable; explicitly authored declarations still
 require strict consistency with their
 referenced pinned upstream metadata. That check supplies no effective customized or installed composition claim.
 Source, patch, configuration and material bindings remain required. Full inspection and material reconciliation
-remain [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052).
+remain deferred hardening.
 
-[M3-A](https://nvidia.atlassian.net/browse/NKX-18043) authenticates the complete selected publication against
+This ledger uses the following work-package labels. A label names a unit of work; it does not mean that work
+is approved, complete or operationally accepted. Each entry states its own implementation status and the
+acceptance that remains.
+
+| Label | Scope | Ledger entry | Acceptance criteria |
+|---|---|---|---|
+| M3-A | Complete-publication artifact authentication | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M3-B | Native delivered-tool smoke | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M3-C | Qualification verdict and evidence publication | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M3-D | Positive and negative external acceptance and independent review | This section | [Epic M3](../epics-v1-spec.md#epic-m3--qualification) |
+| M4-B | Connecting manifest issuance to the CLI and generated workflow | [M4 release manifest issuance](#m4-release-manifest-issuance) | [Epic M4](../epics-v1-spec.md#epic-m4--automated-releases) |
+| M4-C | Release manifest schema and issuance | [M4 release manifest issuance](#m4-release-manifest-issuance) | [Epic M4](../epics-v1-spec.md#epic-m4--automated-releases) |
+| M4-D | Tags, publisher exclusion, consumer verification instructions and interruption demonstrations | [M4 release manifest issuance](#m4-release-manifest-issuance) | [Epic M4](../epics-v1-spec.md#epic-m4--automated-releases) |
+
+M3-A authenticates the complete selected publication against
 its exact producing Run, attempt, commit and input identities, and returns subject-bound results without
 qualification signing authority. The Linux `run check-artifacts` command now takes `--run` with an exact
 attempt URL and `--policy`, with an optional workspace. `lifecycle.CheckQualificationRun` owns policy loading,
@@ -265,7 +279,7 @@ reuse under the existing publication retry protocol cannot satisfy this MVP gate
 is unchanged; the gate never relabels earlier bytes as current-attempt production. A qualifying M2 handoff
 therefore also needs one complete exact-attempt set and its original production predicates.
 
-[M3-B](https://nvidia.atlassian.net/browse/NKX-18044) now has a Linux native delivered-tool smoke owner
+M3-B now has a Linux native delivered-tool smoke owner
 and an authenticated complete-set receipt issuer. `lifecycle.RunNativeToolSmoke` selects exact held payloads
 from A's retained publication and frozen Plan, derives expected versions/commits from pinned inputs, and runs
 only fixed version profiles for nvkectl, Helm, kubectl, Kind, clusterctl and ORAS. The Docker owner verifies the pinned native image
@@ -293,7 +307,7 @@ preserving actual observations and distinguishing failed execution from checks n
 member checks remain pass when later cleanup or revocation fails the report. Failure-only rows are rejected
 by successful canonical report validation. Native diagnostic cases pass targeted Linux race tests.
 
-[M3-C](https://nvidia.atlassian.net/browse/NKX-18045) now exposes Linux `run qualify --policy` and an
+M3-C now exposes Linux `run qualify --policy` and an
 opaque-receipt publisher in `pkg/nvkr/qualification`. Its source comes only from the authenticated independent
 default-branch `workflow_run` invocation and exact successful source event. The command verifies the trusted
 checkout's generated workflow pair and full policy digest before signer/provider/candidate work, repeats A,
@@ -348,7 +362,7 @@ attempt and hosted/independent positive and negative acceptance runs. No artifac
 was dispatched for this implementation.
 
 No real hosted qualification Run, worker/qualifier OIDC signing transcript, subject-bound attachment/read-back
-or independent complete-set consumer verification is recorded here. [M3-D](https://nvidia.atlassian.net/browse/NKX-18046)
+or independent complete-set consumer verification is recorded here. M3-D
 retains positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy
 it. The real producer handoff and hosted/consumer exercises follow merge and remain required before claiming
 production readiness or closing operational acceptance. Acceptance must capture the actual reusable worker
@@ -839,7 +853,7 @@ Passing repository checks does not establish complete local qualification.
 
 ## M4 release manifest issuance
 
-[M4-C](https://nvidia.atlassian.net/browse/NKX-18049) adds the `pkg/nvkr/releasemanifest` owner and the
+M4-C adds the `pkg/nvkr/releasemanifest` owner and the
 registered `nvkr.dev/release-manifest/v1` schema and `nvkr.release-manifest` family (ADR-01). Issuance takes
 the live M3-A artifact-check receipt, the exact canonical v2 qualification evidence and an independently
 selected qualification identity and policy digest. It refuses failed, incomplete, noncanonical, mismatched,
@@ -857,10 +871,10 @@ refusals, a later member's missing or wrong-signer evidence despite earlier surv
 attachment and verification failures, receipt revocation and cancellation between steps, and type, subject,
 identity and issuer substitution in the cosign adapter. These are contract tests with fakes and a stubbed
 cosign runner. No CLI command or generated workflow invokes issuance yet;
-[M4-B](https://nvidia.atlassian.net/browse/NKX-18048) owns that connection. No hosted Run, OIDC manifest
+M4-B owns that connection. No hosted Run, OIDC manifest
 attestation, registry read-back or independent consumer verification is recorded. The tag rule, tag
 creation, publisher exclusion, consumer verification instructions and interruption demonstrations remain
-[M4-D](https://nvidia.atlassian.net/browse/NKX-18050).
+M4-D.
 
 ## Support by owner
 
@@ -1500,10 +1514,10 @@ continuous invocation at `bda67f0` subsequently
 observed both ARM64 tenant nodes Ready, both DNS rollouts and the unchanged
 workload/DNS smoke passing, but exited 17 at `tenant-deletion-wait`. Its original
 recording remains failed, not a successful E2E video. The downstream three-minute
-deletion wait is shorter than the selected NKE teardown's worker/control-plane
+deletion wait is shorter than the selected NVKE teardown's worker/control-plane
 waits; the last actual teardown phase was not retained, so a timeout-budget
 mismatch does not by itself establish the runtime cause. Complete fresh E2E
-acceptance, including successful NKE deletion and owned cleanup, remains open.
+acceptance, including successful NVKE deletion and owned cleanup, remains open.
 Cleanup now best-effort retains three bounded private command-output slots and
 the final command status in one exclusive private observation file. A canceled
 empty poll preserves the last useful inventory. Controlled tests show that
@@ -1515,7 +1529,7 @@ owned host-runtime cleanup retains its independent eight-minute bound. This fini
 downstream policy gives room for the pinned worker-then-control-plane teardown;
 it is not an upstream maximum because retries and other activities can extend it.
 Controlled deadline tests cover timeout/cancellation and exact ownership. The
-later deployment-only replay naturally completed NKE deletion and owned cleanup
+later deployment-only replay naturally completed NVKE deletion and owned cleanup
 with the longer budgets, while preserving its failed smoke result. This does
 not establish a fresh successful E2E; that acceptance remains unproven.
 
@@ -1657,27 +1671,27 @@ downstream consumer's acceptance of this wire schema. No complete offline instal
 Release acceptance is established by export.
 
 On 2026-10-10, bounded inspection of retained metadata from
-[Run 37736529644](https://github.com/dsx-ai-factory/nke-recipes/actions/runs/37736529644) reproduced 34 outputs
+[Run 37736529644](https://github.com/dsx-ai-factory/nvkr/actions/runs/37736529644) reproduced 34 outputs
 and five Helm chart versions: controller 0.1.1, PostgreSQL 18.5.15, SPIRE 0.30.1, SPIRE CRDs 0.6.1 and
 Temporal 0.74.0. The publication reference is
 `ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/releases@sha256:2fef87f426734a4427f7694aaf5ac181ba11352ea37522349bbb9cda7d84dc42`.
 This was metadata inspection only; an earlier independent full-payload attempt authenticated the root and
 then failed downloading the ARM64 disk with an HTTP/2 `PROTOCOL_ERROR`. There is no successful full-release
 verification result from that attempt. The controller uses `33fb71b2f4224b470ebc628a9165fc4b92870406` and the
-CLI uses `ed9fb09b04fd40bf331d25df2222206ffaca593e` from the same NKE repository; matching ARM64 controller/CLI
+CLI uses `ed9fb09b04fd40bf331d25df2222206ffaca593e` from the same NVKE repository; matching ARM64 controller/CLI
 artifacts are absent. These are inventory facts. A downstream installer decides whether those revisions and
 platforms satisfy its requirements; generic export neither reconciles them nor requires an unpublished Plan.
 The generic CLI export was exercised against that exact retained metadata cache on 2026-10-10. It emitted
 `nkd.dev/release-description/v1` with all 34 outputs, 60 evidence entries and 23 source records: 16 native
-AMD64 outputs, 13 native ARM64 outputs and five charts without platform labels. It preserved both NKE
+AMD64 outputs, 13 native ARM64 outputs and five charts without platform labels. It preserved both NVKE
 revisions above and five distinct repository-spelling/commit pairs. This was a local-cache metadata export,
 not a fresh registry read, payload or signature verification, or installer-compatibility check. These are
-historical NKD namespace records: current NVKR readers reject their old schemas and digest families. The
+historical pre-rebrand (`nkd.dev`) namespace records: current NVKR readers reject their old schemas and digest families. The
 record does not establish current-schema external acceptance or authorize converting signed metadata.
 Separate direct Docker builds of the pinned profiles carrier passed the chart's `/bin/sh` and
 `cp -a /profiles/. /profiles-out/` operation with container networking disabled on ARM64 and emulated
 AMD64, plus the ARM64 local diagnostic profile. These checks establish the runnable carrier only, not
-NKD wrapped execution, publication, native AMD64 runtime, fleet profile validity or offline installation.
+pre-rebrand wrapped execution, publication, native AMD64 runtime, fleet profile validity or offline installation.
 [Registry browsing of the recorded candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md#metadata-browsing-validation)
 retains the external scope and binary identity.
 
@@ -2286,7 +2300,7 @@ The user earlier moved deep disk/content inspection and dependent reconciliation
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
 The [inspection deferral record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
 The plain-image strict inspection path remains available. M2 retains its AMD64-only product acceptance floor and accepts
-producer provenance with its remaining delivery/consumer gates. The approved October 12 M3 MVP scope also
+producer provenance with its remaining delivery/consumer gates. The approved initial scope also
 retains producer-only disk evidence and defers inspection/material reconciliation to hardening. This task
 scope supersedes the earlier M3 assignment without changing any historical signed bytes or establishing
 organizational ADR ratification. The native ARM64 route and this candidate Definition's
@@ -2321,9 +2335,9 @@ execution remain external acceptance requirements.
 
 The [M2 Definition instructions](../../inputs/definitions/nvke/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
-CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NKTP,
+CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NVKE telemetry pipelines,
 and fourteen acquired runtime-image components delivered separately for both native architectures.
-The selected NVKE/CAPI sources and NKTP dependency charts own their versions; Helm test-only images are
+The selected NVKE/CAPI sources and NVKE telemetry pipelines dependency charts own their versions; Helm test-only images are
 excluded. `nico-reference-profiles-fixture` identifies reference test data in the release membership itself,
 not fleet configuration, the runnable demo's `controller-profiles`, or a complete legacy OSProfile set.
 Provider manifests, image-reference relocation and installation remain consumer work, not delivery proved here.
@@ -2339,11 +2353,11 @@ The blocked DSX producer, its material-only selections and unused source credent
 [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks supported DSX source admission,
 dependency-finding triage and confirmation of source/binary and distribution contracts. No source gate,
 submodule rejection or security requirement is weakened to admit that dependency. Standalone plugin
-compilation does not establish those contracts or native execution/boot acceptance. NKTP acquisition and
+compilation does not establish those contracts or native execution/boot acceptance. NVKE telemetry pipelines acquisition and
 offline Helm packaging were exercised locally; no successful combined hosted Run of these release additions is claimed.
 
 [Run `38809161348`](https://github.com/dsx-ai-factory/nvkr/actions/runs/38809161348) at
-`e3743a70b6e0bd19ccf53b7160ab0a5f276d0e66` failed during NKTP Helm extraction and the AMD64
+`e3743a70b6e0bd19ccf53b7160ab0a5f276d0e66` failed during NVKE telemetry pipelines Helm extraction and the AMD64
 reference-profile fixture build. Helm archive ownership restoration conflicted with the vendor container's
 dropped capabilities; the fixture's named Alpine context selected an ARM64-only manifest for both targets.
 The catalog now extracts Helm without restoring archive ownership and selects the existing pinned Alpine
@@ -2533,7 +2547,7 @@ the owning API emitted a validated `archive-content/v1` document with 13 regular
 file members and no scanner claim. This was a reconstructed input, not a downloaded
 CI artifact or proof of hosted publication. Its file hashes do not establish
 package versions or transitive dependencies.
-Forge/DSX/Redstone targets and the special TestGrid publisher remain deferred.
+Site-specific NICo provisioning targets and the special TestGrid publisher remain deferred.
 Unsigned runtime reports do not mint qualified conformance or promotion receipts.
 
 Consumer Verification Policy binds `minimumDiskEvidence` into its typed digest. Pipeline-attested policy

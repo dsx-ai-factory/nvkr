@@ -11,7 +11,7 @@ each concept to a worked example.
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
-| Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md), [presenter narration](nvkr-presenter.md) |
+| Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
 | Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
@@ -23,7 +23,7 @@ each concept to a worked example.
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
 | Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
-| Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-an-m3-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
+| Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-a-qualification-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
@@ -96,6 +96,6 @@ HTML walkthrough, offline graph explorer, facilitator guide, and self-guided scr
 includes a fast real local build and the v4 publication from Run 37736529644; the task guides above
 own current user instructions.
 
-[NVKE M2 customer choices](nvke-m2-customer-choices.md) explains supplier replacement and its current validation scope.
+[NVKE customer choices](nvke-customer-choices.md) explains supplier replacement and its current validation scope.
 
 [Multiarch CWE delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.
