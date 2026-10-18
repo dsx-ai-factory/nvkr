@@ -53,7 +53,7 @@ func readNetworkState(work string) (networkState, error) {
 
 func validNetworkID(id networkFileID) bool { return id.Inode > 0 && id.Mode <= 0o7777 }
 func validateNetworkState(s networkState, work string) error {
-	if s.Version != 3 || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
+	if (s.Version != 3 && s.Version != 4) || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
 		return fmt.Errorf("recovery journal version/work/owner differs")
 	}
 	owner := strings.TrimPrefix(s.Owner, "nvke-demo-")
@@ -118,7 +118,11 @@ func validateNetworkState(s networkState, work string) error {
 		seen[key] = true
 	}
 	// Reuse the constructor's IP admission, without opening work or generating IDs.
-	if err := validateNetworkKind(s.KindCIDR); err != nil {
+	if s.Version == 4 {
+		if s.KindCIDR != "" || s.KindGateway != "" || s.BGPIntent {
+			return fmt.Errorf("native host transport cannot carry Kind or BGP bindings")
+		}
+	} else if err := validateNetworkKind(s.KindCIDR); err != nil {
 		return err
 	}
 	allowed := append(networkRules(s.Owner, s.KindCIDR), nativeBootstrapRules(s.Owner, s.KindCIDR)...)
@@ -149,7 +153,7 @@ func validateNetworkState(s networkState, work string) error {
 		if exact {
 			continue
 		}
-		if row.Table != "raw" || row.Chain != "PREROUTING" || len(row.Args) != 16 {
+		if s.Version == 4 || row.Table != "raw" || row.Chain != "PREROUTING" || len(row.Args) != 16 {
 			return fmt.Errorf("unknown firewall intent")
 		}
 		port, err := strconv.Atoi(row.Args[13])

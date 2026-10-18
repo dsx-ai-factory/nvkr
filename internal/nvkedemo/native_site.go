@@ -75,12 +75,9 @@ func RunNative(ctx context.Context, cfg NativeConfig) (result error) {
 	if cfg.TenantTimeout != 0 && (cfg.TenantTimeout < MinTenantTimeoutSeconds*time.Second || cfg.TenantTimeout > MaxTenantTimeoutSeconds*time.Second) {
 		return nvkrerr.New(nvkrerr.CodeUsage, "native tenant budget must be 300..7200 seconds")
 	}
-	mode, err := normalizeNetwork(cfg.Network)
+	mode, err := nativeDeploymentNetwork(cfg.Network)
 	if err != nil {
 		return err
-	}
-	if mode == "kind-calico" {
-		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native site requires the selected OVN disk and profiles")
 	}
 	if cfg.Image == "" || cfg.Assets.RuntimeRun == "" {
 		return errors.New("require a local QCOW, explicit accelerator and completed runtime-image Run")
@@ -156,7 +153,7 @@ func nativeSiteSeed(ctx context.Context, source, out string) (string, error) {
 	// Change only runtime sizing after both selected source rows are admitted.
 	// Source artifacts remain untouched, and tenant CNI requests remain intact.
 	site["name"], site["cpu_count"], site["memory_gib"] = "native-site-cpu4-mem12gb-disk60gb", 4, 12
-	tenant["name"], tenant["memory_gib"] = fmt.Sprintf("cpu4-mem%dgb-disk60gb", tenantDemoMemoryGiB), tenantDemoMemoryGiB
+	tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = fmt.Sprintf("cpu%d-mem%dgb-disk60gb", tenantDemoVCPUs, tenantDemoMemoryGiB), tenantDemoVCPUs, tenantDemoMemoryGiB
 	raw, err = yaml.Marshal(doc)
 	if err != nil {
 		return "", err
@@ -694,12 +691,16 @@ func (s *nativeSiteAttempt) runTenant(ctx context.Context, runner Runner, cli, t
 			return err
 		}
 	}
-	progress.update(time.Now(), "tenant-workload", observed)
-	s.nodes = observed
-	s.workload, err = runTenantWorkload(budget, out, tenantConfig, kubectl, func(ctx context.Context, args []string, phase string, timeout time.Duration) ([]byte, error) {
+	capture := func(ctx context.Context, args []string, phase string, timeout time.Duration) ([]byte, error) {
 		s.sequence++
 		return runner.Capture(ctx, args, fmt.Sprintf("native-site-%03d-%s", s.sequence, phase), timeout)
-	})
+	}
+	if err := waitTenantDNS(budget, tenantConfig, kubectl, runner.Progress, capture); err != nil {
+		return err
+	}
+	progress.update(time.Now(), "tenant-workload", observed)
+	s.nodes = observed
+	s.workload, err = runTenantWorkload(budget, out, tenantConfig, kubectl, capture)
 	return err
 }
 

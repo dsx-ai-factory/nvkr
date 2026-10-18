@@ -18,56 +18,103 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-const bootstrapLimaVersion = "2.2.1"
+const (
+	bootstrapLimaVersion      = "2.2.1"
+	bootstrapLinuxLimaVersion = "f47461e"
+)
 
 // hostBootstrap owns only the temporary container backend. NVKE and Kind run
 // on the host; the upstream nerdctl.lima entry point supplies containerd access.
-// Linux uses its existing native nerdctl without a virtualization adapter.
+// Each platform uses a newly owned private container backend, independent of
+// the operator's host containerd socket and existing Lima instances.
 type hostBootstrap struct {
 	root, view, temporary, limactl string
 	runner                         Runner
 	process                        *OwnedProcess
+	probe                          *OwnedProcess
 	sequence                       int
 }
 
 func admitBootstrapHost(platform string, env []string) error {
-	if platform != "darwin" {
-		return nil
+	version, _, err := bootstrapLimaPlatform(platform)
+	if err != nil {
+		return err
 	}
 	for _, name := range []string{"limactl", "nerdctl.lima"} {
 		if _, err := commandPath(name, env); err != nil {
-			return e.Wrap(e.CodeEngineCapability, err, "Mac bootstrap requires installed Lima %s", bootstrapLimaVersion)
+			return e.Wrap(e.CodeEngineCapability, err, "%s bootstrap requires installed Lima %s", platform, version)
 		}
 	}
 	return nil
+}
+
+func bootstrapLimaPlatform(platform string) (string, []string, error) {
+	switch platform {
+	case "darwin":
+		return bootstrapLimaVersion, []string{"--vm-type=vz"}, nil
+	case "linux":
+		return bootstrapLinuxLimaVersion, []string{
+			"--vm-type=qemu", "--arch=aarch64", "--mount-type=9p",
+			"--set", `.images = [{"location":"https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-arm64.img","arch":"aarch64","digest":"sha256:63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7","variant":"server"}]`,
+			"--set", `.containerd.archives = [{"location":"https://github.com/containerd/nerdctl/releases/download/v2.4.1/nerdctl-full-2.4.1-linux-arm64.tar.gz","arch":"aarch64","digest":"sha256:2deffe14625f93866f90a8f265d0f59d6fa476c7dc54b98adb327b1b4613efd4"}]`,
+		}, nil
+	default:
+		return "", nil, e.New(e.CodeEngineCapability, "unsupported bootstrap host %q", platform)
+	}
+}
+
+func requireBootstrapLima(ctx context.Context, runner Runner, platform string) (string, string, error) {
+	if err := requireContext(ctx); err != nil {
+		return "", "", e.Wrap(e.CodeTimeout, err, "bootstrap tool admission")
+	}
+	if err := admitBootstrapHost(platform, runner.Env); err != nil {
+		return "", "", err
+	}
+	want, _, err := bootstrapLimaPlatform(platform)
+	if err != nil {
+		return "", "", err
+	}
+	limactl, _ := commandPath("limactl", runner.Env)
+	wrapper, _ := commandPath("nerdctl.lima", runner.Env)
+	// NativeEnvironment deliberately omits HOME. Lima needs it even for
+	// --version; bind it only to this prerequisite process without changing
+	// the caller or inheriting ambient Lima instance/target selection.
+	if environmentValue(runner.Env, "HOME") == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", "", e.Wrap(e.CodeEngineCapability, err, "resolve bootstrap tool home")
+		}
+		runner.Env = SetEnv(runner.Env, map[string]string{"HOME": home})
+	}
+	version, err := runner.Capture(ctx, []string{limactl, "--version"}, "bootstrap-lima-version", 15*time.Second)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", "", e.Wrap(e.CodeTimeout, err, "bootstrap version admission")
+		}
+		return "", "", e.Wrap(e.CodeEngineCapability, err, "verify bootstrap Lima version")
+	}
+	if strings.TrimSpace(string(version)) != "limactl version "+want {
+		return "", "", e.New(e.CodeEngineCapability, "%s bootstrap requires reviewed Lima %s", platform, want)
+	}
+	return limactl, wrapper, nil
 }
 
 func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, gateway string, images []string) (backend *hostBootstrap, result error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
-	backend = &hostBootstrap{}
-	if platform == "linux" {
-		return backend, nil
-	}
-	if platform != "darwin" {
-		return nil, e.New(e.CodeEngineCapability, "unsupported bootstrap host %q", platform)
-	}
-	address, err := netip.ParseAddr(gateway)
-	if err != nil || !address.Is4() || !address.IsPrivate() {
-		return nil, e.New(e.CodeEngineCapability, "Mac bootstrap requires the observed private IPv4 vmnet gateway")
-	}
-	if err := admitBootstrapHost(platform, runner.Env); err != nil {
-		return nil, err
-	}
-	limactl, _ := commandPath("limactl", runner.Env)
-	wrapper, _ := commandPath("nerdctl.lima", runner.Env)
-	version, err := runner.Capture(ctx, []string{limactl, "--version"}, "bootstrap-lima-version", 15*time.Second)
+	_, platformArgs, err := bootstrapLimaPlatform(platform)
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(string(version)) != "limactl version "+bootstrapLimaVersion {
-		return nil, e.New(e.CodeEngineCapability, "bootstrap requires reviewed Lima %s", bootstrapLimaVersion)
+	backend = &hostBootstrap{}
+	address, err := netip.ParseAddr(gateway)
+	if err != nil || !address.Is4() || !address.IsPrivate() && !(platform == "linux" && address.IsLoopback()) {
+		return nil, e.New(e.CodeEngineCapability, "bootstrap requires an observed private IPv4 gateway or Linux loopback")
+	}
+	limactl, wrapper, err := requireBootstrapLima(ctx, runner, platform)
+	if err != nil {
+		return nil, err
 	}
 	mounts, err := bootstrapLimaMounts(shared, images)
 	if err != nil {
@@ -75,7 +122,7 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 	}
 	// Keep Unix socket paths short. This directory is newly allocated, private
 	// and independent of the user's default Lima home and existing instances.
-	temporaryRoot := os.TempDir()
+	temporaryRoot := "/tmp"
 	if runtime.GOOS == "darwin" {
 		temporaryRoot = "/private/tmp"
 	}
@@ -115,9 +162,11 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 		return backend, err
 	}
 	backend.runner.Env = SetEnv(backend.runner.Env, map[string]string{"HOME": home, "XDG_CACHE_HOME": cache})
-	args := []string{limactl, "start", "--foreground", "--tty=false", "--name=bootstrap", "--vm-type=vz",
-		"--cpus=4", "--memory=6", "--disk=20", "--containerd=user", "--timeout=8m", "--mount-only=" + mounts,
-		"--set", fmt.Sprintf(`.portForwards = [{"guestPort":30081,"hostPort":30081,"hostIP":%q,"proto":"tcp"}]`, gateway), "template:default"}
+	args := []string{limactl, "start", "--foreground", "--tty=false", "--name=bootstrap"}
+	args = append(args, platformArgs...)
+	args = append(args,
+		"--cpus=4", "--memory=6", "--disk=20", "--containerd=user", "--timeout=8m", "--mount-only="+mounts,
+		"--set", fmt.Sprintf(`.portForwards = [{"guestPort":30081,"hostPort":30081,"hostIP":%q,"proto":"tcp"}]`, gateway), "template:default")
 	backend.process, err = backend.runner.Start(ctx, args, "bootstrap-lima-runtime")
 	if err != nil {
 		return backend, err
@@ -134,11 +183,15 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 		}
 		backend.sequence++
 		phase := fmt.Sprintf("bootstrap-lima-ready-%03d", backend.sequence)
-		if err := probe.Run(budget, []string{filepath.Join(backend.view, "nerdctl"), "info"}, phase, 10*time.Second); err == nil {
+		probeErr := backend.checkReady(budget, probe, phase)
+		if probeErr == nil {
 			if exited, err := backend.process.Exited(); exited {
 				return backend, errors.Join(errors.New("temporary Lima backend exited during readiness"), err)
 			}
 			return backend, nil
+		}
+		if errors.Is(probeErr, ErrUnjoined) {
+			return backend, probeErr
 		}
 		select {
 		case <-budget.Done():
@@ -146,6 +199,36 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 		case <-tick.C:
 		}
 	}
+}
+
+func (backend *hostBootstrap) checkReady(ctx context.Context, runner Runner, phase string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	process, err := runner.start(ctx, []string{filepath.Join(backend.view, "nerdctl"), "info"}, phase, false, false)
+	if err != nil {
+		return err
+	}
+	// Keep the actual owner if the join fails. No later probe or backend
+	// deletion may supersede an unresolved dependent process group.
+	backend.probe = process
+	waitErr := process.waitOwned(ctx)
+	return backend.finishProbe(ctx, waitErr)
+}
+
+func (backend *hostBootstrap) finishProbe(ctx context.Context, waitErr error) error {
+	exited, exitErr := backend.probe.Exited()
+	if !exited || errors.Is(errors.Join(waitErr, exitErr), ErrUnjoined) {
+		return errors.Join(ErrUnjoined, errors.New("bootstrap readiness probe did not join"), waitErr, exitErr)
+	}
+	process := backend.probe
+	backend.probe = nil
+	_, outErr := process.stdout.result()
+	_, stderrErr := process.stderr.result()
+	var logErr error
+	if process.diagnostic != nil {
+		_, logErr = process.diagnostic.result()
+	}
+	return errors.Join(waitErr, exitErr, ctx.Err(), outErr, stderrErr, logErr)
 }
 
 func bootstrapLimaMounts(shared string, images []string) (string, error) {
@@ -185,6 +268,12 @@ func (backend *hostBootstrap) bind(runner Runner) Runner {
 func (backend *hostBootstrap) close(ctx context.Context) error {
 	if backend == nil || backend.root == "" {
 		return nil
+	}
+	if backend.probe != nil {
+		if err := backend.probe.Stop(ctx); err != nil {
+			return err
+		}
+		backend.probe = nil
 	}
 	if backend.process != nil {
 		backend.sequence++

@@ -599,6 +599,9 @@ func (resources *packerContainerResources) removeContainer(ctx context.Context, 
 	if err := resources.runtime.Run(ctx, nil, io.Discard, io.Discard, "rm", "-fv", name); err != nil {
 		return e.Wrap(e.CodeInternal, err, "removing container %q", name)
 	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "observing removal of container %q", name)
+	}
 	resources.mu.Lock()
 	defer resources.mu.Unlock()
 	for index, current := range resources.containers {

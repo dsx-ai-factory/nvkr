@@ -536,9 +536,10 @@ Isolation and the fixed environment/mount contract are identical across all engi
   the build no root privilege. The producer mounts source read-only; declared output is returned through bounded
   archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup.
   Authenticated preparation staging has a five-minute budget. Once carrier copying succeeds, helper start,
-  explicit exit observation, diagnostics and removal share a separate two-minute completion budget derived
-  from the original caller context. Earlier caller deadlines and cancellation bound both phases; staging
-  cannot consume the completion allowance. Neither phase retries producer or runtime work. Run scheduler
+  explicit exit observation, diagnostics and removal each receive a separate two-minute RPC budget derived
+  from the original caller context. Earlier caller deadlines and cancellation bound every phase; one RPC
+  cannot consume the next RPC's allowance. The operation allowances total thirteen minutes before existing
+  bounded failure diagnostics, child-process joining and owned cleanup. No RPC retries producer or runtime work. Run scheduler
   records reference the exact embedded producer instruction; network, container and platform are
   resolved from that instruction at execution or rendering, never serialized a second time. A future qualified
   pipeline emitter must reject this mode rather than silently render it as a network-denied build.
@@ -826,6 +827,12 @@ through `pipeline.NodeSession`, and cancels and joins pending operations on fail
 `factory.ExecuteNode`; hosted source fetch delegates through a private factory source owner to the same producer primitive. Neither path converts a whole producer
 report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
+
+Authenticated source patches are checked, applied and reverse-checked by Git in the private build snapshot.
+Each Git child uses a fixed creation mask of `022`, without changing the parent process's mask, so newly
+created executable files, ordinary files and parent directories do not depend on the operator's mask.
+Unchanged admitted source modes remain intact. Exact patch bytes and the resulting filesystem closure,
+including its actual modes, remain part of source authentication; this is not a new patch parser or receipt lane.
 The generated Plan is the single executable input document; separate per-build graph files are retired.
 
 An unqualified local Plan may select both direct-Packer disks and ordinary outputs.

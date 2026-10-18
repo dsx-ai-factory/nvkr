@@ -40,13 +40,15 @@ mount for the non-root producer. The declared export returns through the bounded
 collection. Controlled tests and a targeted native probe are distinct from the complete fresh NVKE acceptance
 run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
-Preparation staging and helper completion now have separate five-minute and two-minute budgets, both
-bounded by the original caller. Controlled-clock regression tests cover slow staging followed by delayed
-successful completion, earlier caller deadlines/cancellation, finite staging/completion, delayed logs/removal
-and joined failure cleanup without retries. In the failed Linux ARM64 attempt at `b205340c`, the helper
+Preparation staging has a five-minute budget; helper start, explicit wait, diagnostics and removal each
+have their own two-minute RPC budget, all bounded by the original caller. Controlled-clock regression tests
+cover the observed staging/start/wait composition, independent RPC limits, earlier caller deadlines and
+cancellation, late nominal success, and joined failure cleanup without retries. In the failed Linux ARM64 attempt at `b205340c`, the helper
 exited zero but Docker reported completion about 85 seconds later; staging had left only 17 seconds of the
 former shared budget. Historical host telemetry recorded substantial I/O pressure during that interval.
-This correction addresses completion-budget starvation; it does not establish the particular writer or
+The subsequent `15a2accd` attempt also failed: a roughly forty-second start response left only eighty
+seconds for delayed wait observation in the shared two-minute completion budget. Independent RPC budgets
+address that accounting defect; they do not establish the particular writer or
 daemon lock, remove storage contention, or prove a complete fresh NVIDIA OVN demo or conformance run.
 
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
@@ -139,8 +141,9 @@ complete-graph validation. Darwin Packer binds its native bundle digest separate
 image. Native firmware uses the same captured file owner and stable logical names rather than installed host
 paths; source-location independence, byte binding and joined cleanup are tested. The real 32-output demo
 selection compiles with required HVF and host CPU while preserving its source and material selections.
-Its legacy OS pin still needs alignment with the native startup's agent namespace; that attempted Run was
-canceled before QCOW assembly. A fresh complete maintained Mac artifact Run and full demo remain unproved.
+An earlier legacy OS selection needed alignment with the native startup's agent namespace and was
+canceled before QCOW assembly. The later native selection's scoped build evidence is recorded below;
+it does not establish complete demo acceptance.
 The demo BUILD executor additionally accepts explicit Definition, Environment and native NVKR selections
 on either host. It compiles through NVKR's Plan owner and uses the same local Run invocation and native
 tool preparation. Repository-contained input paths and local-only Environments are checked before
@@ -1035,6 +1038,10 @@ tool acquisition/builds and payload verification; the source-owned NVKE CLI owns
 and tenant operations. Both host selections and the older Linux simulator output use one dependency
 catalog and one simulator producer. The simulator server declares CGO; its API-only CLI does not.
 Platform-specific acquired assets have distinct producer IDs and a verified private command-name view.
+The shared profile owner rejects Darwin diagnostic payloads for qualified execution and receipt issuance.
+Both local execution and terminal result verification apply that admission before fetch/runtime observation;
+Linux toolchain identity does not grant qualified authority to a Darwin payload. Unqualified Darwin diagnostics
+retain their separate platform admission.
 The Darwin simulator uses an explicit local `native-go` toolchain selection prepared by NVKR from the
 installed Go SDK and Clang. SDK/compiler byte admission, private compilation, receipt lifetime and rejection
 of hosted/signing/publication paths have contract coverage. A local Run at NVKE revision
@@ -1060,8 +1067,16 @@ tenant Kubernetes, conformance, or full Mac/Linux parity result.
 Full native Linux runtime parity, complete fresh-machine host dependencies,
 a single fresh build-and-run wrapper, NVIDIA OVN acceptance and qualified release claims remain unproved.
 QCOW construction remains owned by NVKR's disk-image Run path. The demo-owned direct Packer builder
-has been removed. The native Mac runtime can consume an existing local QCOW; a fresh complete Mac
-build through NVKR remains unverified.
+has been removed. The native Mac runtime can consume an existing local QCOW. An October 17 private
+diagnostic at source `15a2accd7d492c629abf63296ce6a701abf188c3` completed all 32
+artifact outputs and both native-tool outputs in fresh Runs. Its site started and
+both tenant guests joined Kubernetes, but neither became Ready: the observed
+OVN node-pod requests exceeded the selected nodes' available scheduling resources.
+The original command exited 17 after readiness timeout; three VM deletions,
+empty simulator instance records and joined processes were observed. Workload,
+DNS and conformance did not run. These retained private records establish that
+attempt's build and failure scope, not a public acceptance record, proof of the
+subsequent sizing fix, or a successful complete Mac/Linux demo.
 
 The `inputs/definitions/demo/arm64-nvidia-tcg.json` combined example selects 32 outputs in one
 Run without publication/signing: OS, components, installer-aligned site, tools,
@@ -1442,7 +1457,7 @@ credential: policy may allow other terminal-session processes to reuse it for
 their full sudoers command scope. The host policy is unchanged; this route
 requires a trusted execution host, not an untrusted launcher sandbox.
 
-The downstream tenant smoke now waits for the pinned CoreDNS Deployment and
+Both native and legacy tenant smoke paths use the same readiness gate for the pinned CoreDNS Deployment and
 node-local DNS DaemonSet rollouts, within four minutes and the remaining tenant
 deadline. Node Ready alone does not establish DNS rollout readiness. The
 unchanged zero-retry workload still has to prove real cluster DNS and ARM64
@@ -1506,9 +1521,25 @@ TCP/UDP 53 and UDP 67 collision rows additionally require native ARM64 root.
 Ordinary hosted tests do not establish those privileged socket observations.
 These tests do not prove real SIGINT during
 NVKE stages, privileged sudo/libvirt failure, runner/VM restart, or cancellation
-at every build/deployment phase. Network-only recovery uses version-3 journals
-and never kills serialized PIDs; restore legacy live controls before upgrading.
+at every build/deployment phase. Network-only recovery retains version-3 journals
+for the legacy host Kind bridge and version-4 journals for native host-originated
+bootstrap transport without a host Kind subnet. The latter rejects Kind/BGP bindings,
+Kind forwarding and raw Kind rules; it never infers host grants from a Docker subnet.
+Recovery never kills serialized PIDs; restore legacy live controls before upgrading.
 A full tenant crash/restart and recovery matrix remains unverified.
+
+The native Linux bootstrap adapter now reuses the private temporary Lima owner,
+with explicit QEMU/9p, reviewed source version and singleton image/archive pins;
+Mac retains its separate platform prerequisite. Version admission precedes BUILD.
+The owner retains each concrete readiness process until joined, stops polling on
+an unjoined group and preserves dependent controls when cleanup cannot join it.
+Contract tests cover both platform bindings, version refusal and retained-probe
+cleanup. The opt-in backend-only pilot checks restricted mounts and attempt-bound
+loopback forwarding, retaining rendered configuration and private diagnostics.
+One approved private pilot passed actual KVM, exact rendered material selection,
+mount and loopback forwarding checks, with natural exit 0 and joined removal of
+its VM/state/sockets. Native gateway traffic and complete demo/conformance
+acceptance remain separate runtime obligations; see [native Linux bootstrap](../native-linux-bootstrap.md).
 
 [TestEndToEnd](../../internal/nvkedemo/e2e_test.go) is explicitly opt-in; ordinary
 tests do not build images, deploy tenants or mutate host networking. No durable

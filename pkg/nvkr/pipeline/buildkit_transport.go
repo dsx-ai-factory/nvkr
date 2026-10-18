@@ -180,44 +180,62 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	if err = copyArchiveToContainer(ctx, runtime, outer, prep, "/nvkr/output"); err != nil {
 		return nil, err
 	}
-	// Staging may use most of its allowance under storage pressure. Completion
-	// has a separate finite budget, still bounded by the original caller: slow
-	// create/copy responses must not consume the time for observing helper exit.
+	// Each completion RPC has its own finite allowance. A slow start response
+	// must not spend wait's budget, nor may observation spend teardown's budget.
+	// Every phase remains bounded by the original caller, with no RPC retries.
 	cancel()
-	completionCtx, finishCompletion := context.WithTimeout(callerCtx, 2*time.Minute)
-	defer finishCompletion()
-	ctx = completionCtx
+	completion := func(label string, failureCode e.Code, run func(context.Context) error) error {
+		operation, stop := context.WithTimeout(callerCtx, 2*time.Minute)
+		defer stop()
+		ctx = operation
+		phase(label)
+		if err := operation.Err(); err != nil {
+			return runtimeCommandError(operation, err, "", failureCode, "%s", label)
+		}
+		err := run(operation)
+		if operation.Err() != nil {
+			return runtimeCommandError(operation, err, "", failureCode, "%s", label)
+		}
+		if err != nil {
+			return runtimeCommandError(operation, err, "", failureCode, "%s", label)
+		}
+		return nil
+	}
 	// The preparation script emits no progress. Observe its explicit exit instead
 	// of coupling completion to Docker's attached output stream.
-	phase("start preparation container")
-	if err = runtime.Run(ctx, nil, io.Discard, opts.Stderr, "start", prep); err != nil {
-		return nil, runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "starting private BuildKit volume preparation")
+	if err = completion("start preparation container", e.CodeBuildFailed, func(operation context.Context) error {
+		return runtime.Run(operation, nil, io.Discard, opts.Stderr, "start", prep)
+	}); err != nil {
+		return nil, err
 	}
-	phase("wait for preparation exit")
 	var status bytes.Buffer
 	statusOutput := &packerContainerLimitWriter{writer: &status, remaining: 32}
-	if err = runtime.Run(ctx, nil, statusOutput, opts.Stderr, "wait", prep); err != nil {
-		return nil, runtimeCommandError(ctx, err, "", e.CodeBuildFailed, "waiting for private BuildKit volume preparation")
-	}
-	if err = ctx.Err(); err != nil {
-		return nil, e.Wrap(e.CodeTimeout, err, "observing private BuildKit volume preparation")
+	if err = completion("wait for preparation exit", e.CodeBuildFailed, func(operation context.Context) error {
+		return runtime.Run(operation, nil, statusOutput, opts.Stderr, "wait", prep)
+	}); err != nil {
+		return nil, err
 	}
 	exit, parseErr := strconv.Atoi(strings.TrimSpace(status.String()))
 	if parseErr != nil || exit < 0 || exit > 255 {
 		return nil, e.New(e.CodeBuildFailed, "private BuildKit volume preparation returned no valid exit code")
 	}
-	phase("collect preparation diagnostics")
 	diagnosticsAttempted = true
-	logErr := runtime.Run(ctx, nil, opts.Stdout, opts.Stderr, "logs", prep)
+	logErr := completion("collect preparation diagnostics", e.CodeBuildFailed, func(operation context.Context) error {
+		return runtime.Run(operation, nil, opts.Stdout, opts.Stderr, "logs", prep)
+	})
 	if exit != 0 {
 		return nil, e.Wrap(e.CodeBuildFailed, logErr, "private BuildKit volume preparation exited %d", exit)
 	}
 	if logErr != nil {
-		return nil, runtimeCommandError(ctx, logErr, "", e.CodeBuildFailed, "collecting private BuildKit volume preparation diagnostics")
+		return nil, logErr
 	}
-	phase("remove completed preparation container")
-	if err = transport.resources.removeContainer(ctx, prep); err != nil {
+	if err = completion("remove completed preparation container", e.CodeInternal, func(operation context.Context) error {
+		return transport.resources.removeContainer(operation, prep)
+	}); err != nil {
 		return nil, err
+	}
+	if err = callerCtx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "completing private BuildKit transport")
 	}
 	return transport, nil
 }

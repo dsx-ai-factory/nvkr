@@ -74,7 +74,7 @@ func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 }
 
 func TestDeploymentRejectsUnsupportedHostBeforeArtifactIO(t *testing.T) {
-	for _, tc := range []struct{ platform, accelerator string }{{"linux/arm64", "tcg"}, {"darwin/arm64", "kvm"}, {"windows/arm64", ""}} {
+	for _, tc := range []struct{ platform, accelerator string }{{"linux/arm64", "tcg"}, {"darwin/arm64", "kvm"}, {"darwin/arm64", "tcg"}, {"windows/arm64", ""}} {
 		t.Run(tc.platform+tc.accelerator, func(t *testing.T) {
 			_, err := nativeDeploymentConfig(t.Context(), Config{Accelerator: tc.accelerator}, tc.platform)
 			var coded *nvkrerr.Error
@@ -87,5 +87,22 @@ func TestDeploymentRejectsUnsupportedHostBeforeArtifactIO(t *testing.T) {
 	cancel()
 	if err := DeployArtifacts(ctx, Config{}); !errors.Is(err, context.Canceled) {
 		t.Fatal("lost cancellation", err)
+	}
+}
+
+func TestNativeDeploymentRejectsRetiredNetworkBeforeBuildOrArtifactIO(t *testing.T) {
+	for _, platform := range []string{"darwin/arm64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			cfg := Config{Network: "kind-calico"}
+			for _, err := range []error{AdmitDemoDeployment(t.Context(), cfg), func() error {
+				_, err := nativeDeploymentConfig(t.Context(), cfg, platform)
+				return err
+			}()} {
+				var coded *nvkrerr.Error
+				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability || !strings.Contains(err.Error(), "selected OVN") {
+					t.Fatalf("retired network reached later admission: %v", err)
+				}
+			}
+		})
 	}
 }

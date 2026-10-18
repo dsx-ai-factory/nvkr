@@ -230,7 +230,7 @@ func TestLaptopARM64CatalogCompilation(t *testing.T) {
 	}{
 		{"inputs/definitions/diagnostics/demo-arm64/providers.json", 2},
 		{"inputs/definitions/diagnostics/demo-arm64/components.json", 22},
-		{"inputs/definitions/demo/arm64-nvidia-tcg.json", 29},
+		{"inputs/definitions/demo/arm64-nvidia-tcg.json", 32},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			path := tc.file

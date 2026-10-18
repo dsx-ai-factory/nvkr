@@ -602,6 +602,21 @@ func TestBuildAndRestoreDelegateTypedInputs(t *testing.T) {
 
 func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
 	root := t.TempDir()
+	// Supply only the platform's version prerequisite so this test still
+	// reaches real native artifact selection without starting a backend.
+	version := "2.2.1"
+	if runtime.GOOS == "linux" {
+		version = "f47461e"
+	}
+	for name, body := range map[string]string{
+		"limactl":      "#!/bin/sh\nset -eu\ntest \"$#\" = 1\ntest \"$1\" = --version\ntest -n \"$HOME\"\nprintf 'limactl version " + version + "\\n'\n",
+		"nerdctl.lima": "#!/bin/sh\nexit 89\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var out, diagnostics bytes.Buffer
 	err := execute(t.Context(), []string{"run", "--plain", "--artifacts-run", filepath.Join(root, "missing-artifacts"), "--tools-run", filepath.Join(root, "missing-tools"), "--nvkr", filepath.Join(root, "nvkr"), "--out", filepath.Join(root, "demo")}, &out, &diagnostics)
 	if err == nil {

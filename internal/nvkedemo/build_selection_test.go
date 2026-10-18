@@ -43,6 +43,51 @@ func TestSelectedBuildRequiresCompleteLocalSelection(t *testing.T) {
 	}
 }
 
+func TestSelectedBuildBindsCloneBeforePlanAndCapturesExecutionInputs(t *testing.T) {
+	profile, build := nightlyIdentityFixture()
+	plan, _ := nightlyCompiledFixture(t, profile, build)
+	raw, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := privateTestDir(t)
+	fixture, calls := filepath.Join(repo, "plan.json"), filepath.Join(repo, "calls")
+	if err := os.WriteFile(fixture, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	nvkr := filepath.Join(repo, "nvkr")
+	writeTenantFixture(t, nvkr, []byte(`#!/bin/sh
+set -eu
+test "$GIT_CONFIG_COUNT" = 3
+test "$GIT_CONFIG_KEY_0" = url./local/ovn.git.insteadOf
+test "$GIT_CONFIG_KEY_1" = url./local/nvke.git.insteadOf
+test "$GIT_CONFIG_VALUE_1" = https://github.com/dsx-ai-factory/nvke.git
+test "$GIT_CONFIG_KEY_2" = url./local/nvke.git.insteadOf
+test "$GIT_CONFIG_VALUE_2" = https://github.com/dsx-ai-factory/nvke
+printf '%s\n' "$2" >> "$CALLS"
+case "$1:$2" in
+ run:plan) cat "$PLAN_FIXTURE" ;;
+ run:local)
+   captured=false
+   for arg do if test "$arg" = --capture-inputs-root=.; then captured=true; fi; done
+   "$captured" ;;
+ *) exit 23 ;;
+esac
+`), 0700)
+	runner := Runner{Env: []string{"PATH=/usr/bin:/bin", "NVKE_LOCAL_CLONE=/local/nvke.git", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url./local/ovn.git.insteadOf", "GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/ovn-kubernetes.git", "PLAN_FIXTURE=" + fixture, "CALLS=" + calls}}
+	cfg := BuildConfig{Repository: repo, NVKR: nvkr, Definition: "definition.json", Environment: "environment.json", AttemptPrefix: "fresh", Jobs: 2, Conformance: true}
+	if err := buildLocalArtifacts(t.Context(), runner, "", cfg); err != nil {
+		t.Fatal(err)
+	}
+	observed, err := os.ReadFile(calls)
+	if err != nil || string(observed) != "plan\nlocal\n" {
+		t.Fatalf("planning/execution sequence: %q; %v", observed, err)
+	}
+	if environmentValue(runner.Env, "GIT_CONFIG_COUNT") != "1" {
+		t.Fatal("planning changed the caller's environment")
+	}
+}
+
 func TestSelectedBuildUsesPlanOwnerAndExactInvocation(t *testing.T) {
 	profile, build := nightlyIdentityFixture()
 	plan, _ := nightlyCompiledFixture(t, profile, build)

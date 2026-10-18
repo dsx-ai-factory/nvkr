@@ -23,7 +23,7 @@ import (
 func admitNativeHost(platform, accelerator string) error {
 	switch platform {
 	case "darwin/arm64":
-		if accelerator == "hvf" || accelerator == "tcg" {
+		if accelerator == "hvf" {
 			return nil
 		}
 	case "linux/arm64":
@@ -55,11 +55,7 @@ func prepareNativeLinux(ctx context.Context, runner *Runner, cfg NativeGuestConf
 		return nil, "", err
 	}
 	runner.Env = SetEnv(runner.Env, binding)
-	network, err := admitKindNetwork(ctx, *runner)
-	if err != nil {
-		return nil, "", nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "inspect Docker Kind network before native Linux guest setup")
-	}
-	guard, err := NewNetworkGuard(ctx, *runner, network.CIDR, cfg.DemoExecutable)
+	guard, err := admitNetworkGuard(ctx, *runner, "", cfg.DemoExecutable, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -112,8 +108,10 @@ func nativeBootstrapRules(owner, kind string) []networkRule {
 	for _, port := range []string{"18081", "18082", "30081"} {
 		rules = append(rules, networkRule{"filter", "INPUT", []string{"-m", "comment", "--comment", owner, "-i", BridgeName, "-s", GuestCIDR, "-d", GuestGateway + "/32", "-p", "tcp", "--dport", port, "-j", "ACCEPT"}})
 	}
-	for _, port := range []string{"15005", "6443"} {
-		rules = append(rules, networkRule{"filter", "FORWARD", []string{"-m", "comment", "--comment", owner, "-s", kind, "-d", GuestCIDR, "-p", "tcp", "--dport", port, "-j", "ACCEPT"}})
+	if kind != "" {
+		for _, port := range []string{"15005", "6443"} {
+			rules = append(rules, networkRule{"filter", "FORWARD", []string{"-m", "comment", "--comment", owner, "-s", kind, "-d", GuestCIDR, "-p", "tcp", "--dport", port, "-j", "ACCEPT"}})
+		}
 	}
 	return rules
 }

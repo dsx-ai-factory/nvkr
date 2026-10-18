@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -449,12 +450,21 @@ func applyPatches(n ir.Node, dir string, opts RunOptions) error {
 		if got != p.SHA256 {
 			return e.New(e.CodeBuildFailed, "build %q patch[%d] %q bytes do not match %s", n.Component, i, p.Name, p.SHA256)
 		}
+		git, err := exec.LookPath("git")
+		if err != nil {
+			return e.Wrap(e.CodeBuildFailed, err, "resolving Git for patch[%d] %q", i, p.Name)
+		}
 		for _, args := range [][]string{
 			{"apply", "--no-index", "--check", "--whitespace=nowarn", "-"},
 			{"apply", "--no-index", "--whitespace=nowarn", "-"},
 			{"apply", "--no-index", "--reverse", "--check", "--whitespace=nowarn", "-"},
 		} {
-			cmd := execCmd(opts, "git", args...)
+			// Git creates executable/ordinary files with 0777/0666 filtered
+			// by umask. Fix only this child's mask, never the concurrent Go
+			// process's mask. Positional arguments keep patch data out of the
+			// static shell program; exec preserves the owned process group.
+			shellArgs := append([]string{"-c", `umask 022 || exit 125; exec "$@"`, "nvkr-patch", git}, args...)
+			cmd := execCmd(opts, "/bin/sh", shellArgs...)
 			cmd.Dir = dir
 			// Run snapshots may live beneath the nvkr checkout. Prevent Git
 			// from discovering that enclosing repository, which would make apply

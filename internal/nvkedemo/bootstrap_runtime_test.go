@@ -6,6 +6,8 @@ package nvkedemo
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,18 +44,10 @@ func TestBootstrapLimaMounts(t *testing.T) {
 	}
 }
 
-func TestBootstrapRuntimeKeepsLinuxNativeAndBindsMacDependencies(t *testing.T) {
+func TestBootstrapRuntimeBindsPrivateDependencies(t *testing.T) {
 	base := Runner{Env: []string{"PATH=/private/tools:/usr/bin:/bin", "HOME=/private/home", "KIND_EXPERIMENTAL_PROVIDER=docker"}}
-	backend, err := prepareHostBootstrap(t.Context(), base, "linux", "", GuestGateway, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	backend := &hostBootstrap{root: "/private/runtime", view: "/private/runtime/bin", temporary: "/private/shared/tmp"}
 	bound := backend.bind(base)
-	if environmentValue(bound.Env, "PATH") != environmentValue(base.Env, "PATH") || environmentValue(bound.Env, "KIND_EXPERIMENTAL_PROVIDER") != "nerdctl" || environmentValue(bound.Env, "LIMA_HOME") != "" {
-		t.Fatal("Linux bootstrap changed its native dependency path")
-	}
-	backend = &hostBootstrap{root: "/private/runtime", view: "/private/runtime/bin", temporary: "/private/shared/tmp"}
-	bound = backend.bind(base)
 	if environmentValue(bound.Env, "LIMA_HOME") != "/private/runtime/state" || environmentValue(bound.Env, "LIMA_INSTANCE") != "bootstrap" || environmentValue(bound.Env, "HOME") != "/private/home" || bound.directory != "/private/shared" {
 		t.Fatal("Mac bootstrap lost its private dependency binding")
 	}
@@ -62,7 +56,52 @@ func TestBootstrapRuntimeKeepsLinuxNativeAndBindsMacDependencies(t *testing.T) {
 	}
 }
 
+func TestBootstrapVersionAdmissionBeforeRuntime(t *testing.T) {
+	for _, test := range []struct {
+		platform, observed string
+		accepted           bool
+	}{
+		{"darwin", "2.2.1", true},
+		{"linux", "f47461e", true},
+		{"linux", "2.2.1", false},
+		{"darwin", "f47461e", false},
+		{"windows", "f47461e", false},
+	} {
+		t.Run(test.platform+test.observed, func(t *testing.T) {
+			root := privateTestDir(t)
+			writeTenantFixture(t, filepath.Join(root, "limactl"), []byte("#!/bin/sh\nset -eu\ntest \"$1\" = --version\ntest -n \"$HOME\"\nprintf 'limactl version %s\\n' \"$VERSION\"\n"), 0700)
+			writeTenantFixture(t, filepath.Join(root, "nerdctl.lima"), []byte("#!/bin/sh\nexit 89\n"), 0700)
+			runner := Runner{Env: []string{"PATH=" + root + ":/usr/bin:/bin", "VERSION=" + test.observed}}
+			_, _, err := requireBootstrapLima(t.Context(), runner, test.platform)
+			if environmentValue(runner.Env, "HOME") != "" {
+				t.Fatal("version admission mutated the caller environment")
+			}
+			if test.accepted {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+					t.Fatalf("unsupported backend admitted: %v", err)
+				}
+			}
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 2 {
+				t.Fatal("version admission created runtime state", err)
+			}
+		})
+	}
+}
+
 func TestBootstrapLimaOwnsForegroundProcessThroughCleanup(t *testing.T) {
+	for _, platform := range []string{"darwin", "linux"} {
+		t.Run(platform, func(t *testing.T) { checkBootstrapOwnedLifecycle(t, platform) })
+	}
+}
+
+func checkBootstrapOwnedLifecycle(t *testing.T, platform string) {
+	t.Helper()
 	root := privateTestDir(t)
 	bin, shared, images := filepath.Join(root, "bin"), filepath.Join(root, "shared"), filepath.Join(root, "images")
 	for _, dir := range []string{bin, shared, filepath.Join(shared, "tmp"), images} {
@@ -73,17 +112,21 @@ func TestBootstrapLimaOwnsForegroundProcessThroughCleanup(t *testing.T) {
 	writeTenantFixture(t, filepath.Join(bin, "limactl"), []byte(`#!/bin/sh
 set -eu
 case "$1" in
- --version) printf 'limactl version 2.2.1\n';;
+ --version) printf 'limactl version %s\n' "$VERSION";;
  start) trap 'exit 0' TERM INT; while :; do sleep 1; done;;
  stop) exit 0;;
  *) exit 42;;
 esac
 `), 0700)
 	writeTenantFixture(t, filepath.Join(bin, "nerdctl.lima"), []byte("#!/bin/sh\nexit 0\n"), 0700)
-	runner := Runner{Work: root, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + root}}
+	version, _, err := bootstrapLimaPlatform(platform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := Runner{Work: root, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + root, "VERSION=" + version}}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	backend, err := prepareHostBootstrap(ctx, runner, "darwin", shared, GuestGateway, []string{filepath.Join(images, "controller.tar")})
+	backend, err := prepareHostBootstrap(ctx, runner, platform, shared, GuestGateway, []string{filepath.Join(images, "controller.tar")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,34 +153,40 @@ esac
 }
 
 func TestBootstrapLimaActualLifecycle(t *testing.T) {
-	if runtime.GOOS != "darwin" || os.Getenv("NVKR_TEST_LIMA_BOOTSTRAP") != "1" {
+	if (runtime.GOOS != "darwin" && runtime.GOOS != "linux") || runtime.GOARCH != "arm64" || os.Getenv("NVKR_TEST_LIMA_BOOTSTRAP") != "1" {
 		t.Skip("requires explicitly admitted local Lima VM execution")
 	}
-	root, err := os.MkdirTemp("/private/tmp", "nvkr-lima-check-")
+	if runtime.GOOS == "linux" {
+		if err := AdmitNativeDeployment(t.Context(), "kvm"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	temporary := os.TempDir()
+	gateway := "127.0.0.1"
+	if runtime.GOOS == "darwin" {
+		temporary, gateway = "/private/tmp", GuestGateway
+	}
+	root, err := os.MkdirTemp(temporary, "nvkr-lima-check-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("private Lima lifecycle diagnostics: %s", root)
-	t.Cleanup(func() {
-		if !t.Failed() {
-			if err := os.RemoveAll(root); err != nil {
-				t.Error(err)
-			}
-		}
-	})
+	// Keep original private logs on both success and failure. The backend owner
+	// separately removes only its own instance after stop and join.
 	shared, images := filepath.Join(root, "shared"), filepath.Join(root, "images")
 	for _, dir := range []string{shared, filepath.Join(shared, "tmp"), images} {
 		if err := os.Mkdir(dir, 0700); err != nil {
 			t.Fatal(err)
 		}
 	}
+	marker := []byte("owned-bootstrap-mount-and-forwarding-" + filepath.Base(root) + "\n")
+	image := filepath.Join(images, "controller.tar")
+	writeTenantFixture(t, filepath.Join(shared, "marker"), marker, 0600)
+	writeTenantFixture(t, image, marker, 0600)
 	runner := Runner{Work: root, Env: SetEnv(NativeEnvironment(), map[string]string{"HOME": root})}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 	defer cancel()
-	backend, err := prepareHostBootstrap(ctx, runner, "darwin", shared, GuestGateway, []string{filepath.Join(images, "controller.tar")})
-	if err != nil {
-		t.Fatal(err)
-	}
+	backend, err := prepareHostBootstrap(ctx, runner, runtime.GOOS, shared, gateway, []string{image})
 	t.Cleanup(func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
@@ -145,9 +194,76 @@ func TestBootstrapLimaActualLifecycle(t *testing.T) {
 			t.Error(err)
 		}
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered, err := os.ReadFile(filepath.Join(backend.root, "state", "bootstrap", "lima.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTenantFixture(t, filepath.Join(root, "rendered-lima.yaml"), rendered, 0600)
 	version, err := backend.bind(runner).Capture(ctx, []string{"nerdctl", "version"}, "bootstrap-actual-version", 30*time.Second)
 	if err != nil || !strings.Contains(string(version), "v2.4.1") {
 		t.Fatalf("selected containerd frontend is unavailable: %v", err)
+	}
+	if runtime.GOOS == "linux" {
+		probe := backend.bind(runner)
+		guest := []string{backend.limactl, "shell", "--tty=false", "bootstrap", "--"}
+		if err := probe.Run(ctx, append(append([]string{}, guest...), "sh", "-c", "command -v python3"), "bootstrap-actual-python", 30*time.Second); err != nil {
+			t.Fatal("selected pilot image lacks the standard Python HTTP fixture prerequisite", err)
+		}
+		raw, err := probe.Capture(ctx, append(append([]string{}, guest...), "cat", filepath.Join(shared, "marker")), "bootstrap-actual-read", 30*time.Second)
+		if err != nil || string(raw) != string(marker) {
+			t.Fatalf("backend could not read the selected shared mount: %v", err)
+		}
+		if err := probe.Run(ctx, append(append([]string{}, guest...), "sh", "-c", `test -r "$1" && ! test -w "$1" && printf returned > "$2"`, "nvkr-pilot", image, filepath.Join(shared, "returned")), "bootstrap-actual-write", 30*time.Second); err != nil {
+			t.Fatal("read-only image or writable staging contract failed", err)
+		}
+		if raw, err := os.ReadFile(filepath.Join(shared, "returned")); err != nil || string(raw) != "returned" {
+			t.Fatal("backend write did not reach its selected staging mount", err)
+		}
+		server, err := probe.Start(ctx, append(append([]string{}, guest...), "python3", "-u", "-m", "http.server", "30081", "--bind", "0.0.0.0", "--directory", shared), "bootstrap-actual-http")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			cleanup, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := server.Stop(cleanup); err != nil {
+				t.Error(err)
+			}
+		})
+		ready, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		client := &http.Client{Timeout: 2 * time.Second}
+		for {
+			if exited, err := server.Exited(); exited {
+				t.Fatal("owned HTTP fixture exited before forwarding observation", err)
+			}
+			request, err := http.NewRequestWithContext(ready, http.MethodGet, "http://127.0.0.1:30081/marker", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, err := client.Do(request)
+			if err == nil {
+				raw, readErr := io.ReadAll(io.LimitReader(response.Body, int64(len(marker)+1)))
+				closeErr := response.Body.Close()
+				if readErr == nil && closeErr == nil && response.StatusCode == http.StatusOK && string(raw) == string(marker) {
+					if exited, err := server.Exited(); exited {
+						t.Fatal("owned HTTP fixture exited during forwarding observation", err)
+					}
+					break
+				}
+			}
+			select {
+			case <-ready.Done():
+				t.Fatal("owned loopback forwarding did not deliver the exact shared marker", ready.Err())
+			case <-time.After(200 * time.Millisecond):
+			}
+		}
+		if err := server.Stop(ctx); err != nil {
+			t.Fatal(err)
+		}
 	}
 	owned := backend.root
 	if err := backend.close(ctx); err != nil {
@@ -155,6 +271,23 @@ func TestBootstrapLimaActualLifecycle(t *testing.T) {
 	}
 	if _, err := os.Stat(owned); !os.IsNotExist(err) {
 		t.Fatal("actual Lima runtime was not joined and removed")
+	}
+}
+
+func TestBootstrapUnjoinedProbePreservesDependentBackend(t *testing.T) {
+	root := privateTestDir(t)
+	done := make(chan struct{})
+	close(done)
+	probe := &OwnedProcess{done: done, joinErr: ErrUnjoined}
+	backend := &hostBootstrap{root: root, probe: probe}
+	if err := backend.finishProbe(t.Context(), nil); !errors.Is(err, ErrUnjoined) || backend.probe != probe {
+		t.Fatal("unjoined readiness probe was forgotten", err)
+	}
+	if err := backend.close(t.Context()); !errors.Is(err, ErrUnjoined) || backend.root != root {
+		t.Fatal("unjoined dependent probe did not protect backend", err)
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatal("dependent backend staging was removed", err)
 	}
 }
 

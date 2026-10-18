@@ -540,28 +540,8 @@ func (t *tenant) waitCNI(ctx context.Context, kubeconfig string) (result error) 
 // Node Ready does not mean the pinned NVKE DNS workloads have finished rolling
 // out. Wait for their owning controllers before running the unchanged DNS
 // smoke test; rollout completion alone is not functional DNS acceptance.
-func (t *tenant) waitDNS(ctx context.Context, kubeconfig string) (result error) {
-	if err := requireContext(ctx); err != nil {
-		return t.waitError(err, "waiting for tenant DNS readiness")
-	}
-	boundary := beginProgress(t.session.Runner.Progress, "tenant-dns-readiness", PhaseStarted, PhaseFinished, PhaseFailed)
-	stage := "waiting for tenant DNS readiness"
-	defer func() {
-		result = t.waitError(result, stage)
-		boundary.finish(result)
-	}()
-	ready, cancel := context.WithTimeout(ctx, 4*time.Minute)
-	defer cancel()
-	for _, resource := range []struct{ name, phase string }{
-		{"deployment/coredns", "dns-coredns-rollout"},
-		{"daemonset/node-local-dns", "dns-node-local-rollout"},
-	} {
-		stage = "waiting for tenant DNS " + resource.name + " rollout"
-		if _, err := t.capture(ready, t.kubectl(kubeconfig, "-n", "kube-system", "rollout", "status", resource.name, "--timeout=240s"), resource.phase, 4*time.Minute); err != nil {
-			return err
-		}
-	}
-	return nil
+func (t *tenant) waitDNS(ctx context.Context, kubeconfig string) error {
+	return t.waitError(waitTenantDNS(ctx, kubeconfig, filepath.Join(t.session.Tools, "kubectl"), t.session.Runner.Progress, t.capture), "waiting for tenant DNS readiness")
 }
 
 type workload struct {

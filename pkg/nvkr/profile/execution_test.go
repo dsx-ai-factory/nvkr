@@ -281,6 +281,28 @@ func TestValidateExecutionPlanRejectsMissingPinsWithoutIssuingAuthority(t *testi
 	}
 }
 
+func TestQualifiedExecutionRefusesDarwinPayloadBeforeReceipt(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "darwin/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			p, nodes := executionTestProfile(), executionTestNodes()
+			nodes[0].Platform = platform
+			host := hostReceiptFor(t, p)
+			declarationErr := ValidateExecutionPlan(t.Context(), p, nodes)
+			receipt, err := VerifyExecution(t.Context(), host, p, nodes, executionTestObservation())
+			if platform == "darwin/arm64" {
+				if code(declarationErr) != nvkrerr.CodeEngineCapability || code(err) != nvkrerr.CodeEngineCapability {
+					t.Fatalf("Darwin qualified admission: declaration=%v receipt=%v", declarationErr, err)
+				}
+				if receipt.RequireFor(t.Context(), p, nodes) == nil {
+					t.Fatal("rejected payload received usable authority")
+				}
+			} else if declarationErr != nil || err != nil || receipt.RequireFor(t.Context(), p, nodes) != nil {
+				t.Fatalf("Linux qualified control rejected: declaration=%v receipt=%v", declarationErr, err)
+			}
+		})
+	}
+}
+
 func TestExecutionFieldClassificationAndRepinAreFailClosed(t *testing.T) {
 	p := executionTestProfile()
 	for i := range p.Fields {

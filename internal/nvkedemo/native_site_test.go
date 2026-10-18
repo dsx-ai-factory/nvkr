@@ -231,19 +231,19 @@ instance_types:
 			site := items[0].(map[string]any)
 			site["name"], site["cpu_count"], site["memory_gib"] = "native-site-cpu4-mem12gb-disk60gb", 4, 12
 			tenant := items[1].(map[string]any)
-			tenant["name"], tenant["memory_gib"] = "cpu4-mem8gb-disk60gb", 8
+			tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = "cpu6-mem12gb-disk60gb", 6, 12
 			if !reflect.DeepEqual(actual, expected) {
 				t.Fatalf("runtime seed changed fields outside selected sizing: got=%v want=%v", actual, expected)
 			}
 			for _, network := range []string{"ovn", "upstream-ovn"} {
 				request, err := newTenantRequest("native-demo-tenant", network)
 				if err != nil || !reflect.DeepEqual(request.ControlPlane.NICo.Types, []string{tenant["id"].(string)}) || len(request.NodePools) != 1 || request.NodePools[0].NICo.Type != tenant["id"] {
-					t.Fatalf("control plane and worker must select the projected 8 GiB type: %+v; %v", request, err)
+					t.Fatalf("control plane and worker must select the projected 6 CPU / 12 GiB type: %+v; %v", request, err)
 				}
 			}
 			legacy := []byte(fmt.Sprintf("  - id: %q\n    name: \"cpu4-mem6gb-disk60gb\"\n    site_id: %q\n    gpu_count: 0\n    cpu_count: 4\n    memory_gib: 6\n    disk_gib: 60\n", TenantInstanceType, SiteID))
 			projected, err := projectSeedFixture(legacy, plainSHA(legacy))
-			if err != nil || !bytes.Contains(projected, []byte("memory_gib: 8")) {
+			if err != nil || !bytes.Contains(projected, []byte("cpu_count: 6")) || !bytes.Contains(projected, []byte("memory_gib: 12")) {
 				t.Fatalf("legacy and native tenant policy diverged: %s; %v", projected, err)
 			}
 		})

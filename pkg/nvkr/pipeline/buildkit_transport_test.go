@@ -47,20 +47,38 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 		name        string
 		parent      time.Duration
 		copyDelay   time.Duration
+		startDelay  time.Duration
 		waitDelay   time.Duration
 		logsDelay   time.Duration
 		removeDelay time.Duration
-		cancelWait  bool
+		cancelPhase string
+		latePhase   string
+		failPhase   string
 		want        e.Code
 	}{
 		{name: "observed staging and completion latency"},
+		{name: "actual 15a2 start and wait latency", copyDelay: 15174 * time.Millisecond, startDelay: 40413 * time.Millisecond, waitDelay: 95558483 * time.Microsecond},
+		{name: "each completion RPC owns its allowance", copyDelay: 15174 * time.Millisecond, startDelay: 40413 * time.Millisecond, waitDelay: 95558483 * time.Microsecond, logsDelay: 40 * time.Second, removeDelay: 40 * time.Second},
+		{name: "all RPCs near their own limit", startDelay: 119 * time.Second, waitDelay: 119 * time.Second, logsDelay: 119 * time.Second, removeDelay: 119 * time.Second},
 		{name: "caller deadline during staging", parent: 4 * time.Minute, want: e.CodeTimeout},
 		{name: "caller deadline during completion", parent: 5 * time.Minute, want: e.CodeTimeout},
+		{name: "caller deadline during start", parent: 300 * time.Second, startDelay: 40 * time.Second, want: e.CodeTimeout},
+		{name: "caller deadline during logs", parent: 380 * time.Second, logsDelay: 40 * time.Second, want: e.CodeTimeout},
+		{name: "caller deadline during removal", parent: 380 * time.Second, removeDelay: 40 * time.Second, want: e.CodeTimeout},
 		{name: "staging remains bounded", copyDelay: 160 * time.Second, want: e.CodeTimeout},
+		{name: "start remains bounded", startDelay: 121 * time.Second, want: e.CodeTimeout},
 		{name: "completion remains bounded", waitDelay: 121 * time.Second, want: e.CodeTimeout},
-		{name: "logs share completion budget", logsDelay: 40 * time.Second, want: e.CodeTimeout},
-		{name: "removal shares completion budget", removeDelay: 40 * time.Second, want: e.CodeInternal},
-		{name: "caller cancellation during completion", cancelWait: true, want: e.CodeTimeout},
+		{name: "logs remain bounded", logsDelay: 121 * time.Second, want: e.CodeTimeout},
+		{name: "removal remains bounded", removeDelay: 121 * time.Second, want: e.CodeTimeout},
+		{name: "caller cancellation during start", cancelPhase: "start", want: e.CodeTimeout},
+		{name: "caller cancellation during wait", cancelPhase: "wait", want: e.CodeTimeout},
+		{name: "caller cancellation during logs", cancelPhase: "logs", want: e.CodeTimeout},
+		{name: "caller cancellation during removal", cancelPhase: "rm", want: e.CodeTimeout},
+		{name: "late nil start is rejected", latePhase: "start", want: e.CodeTimeout},
+		{name: "late nil wait is rejected", latePhase: "wait", want: e.CodeTimeout},
+		{name: "late nil logs is rejected", latePhase: "logs", want: e.CodeTimeout},
+		{name: "late nil removal preserves ownership", latePhase: "rm", want: e.CodeTimeout},
+		{name: "removal error preserves owning code", failPhase: "rm", want: e.CodeInternal},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -87,16 +105,23 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 					if !ok {
 						t.Fatal("unbounded preparation operation")
 					}
-					if phase == "start" && time.Until(deadline) > 2*time.Minute {
+					if (phase == "start" || phase == "wait" || phase == "logs" || phase == "rm") && time.Until(deadline) > 2*time.Minute {
 						t.Fatal("completion exceeded its allowance")
 					}
-					if phase == "wait" && tc.cancelWait {
+					if phase == tc.cancelPhase {
 						cancel()
 						return operation.Err()
 					}
+					if phase == tc.latePhase {
+						<-operation.Done()
+						return nil
+					}
+					if phase == tc.failPhase {
+						return errors.New("runtime command failed")
+					}
 					delay := map[string]time.Duration{
 						"volume": 7500 * time.Millisecond, "create": 128 * time.Second,
-						"cp": copyDelay, "wait": waitDelay, "logs": tc.logsDelay, "rm": tc.removeDelay,
+						"cp": copyDelay, "start": tc.startDelay, "wait": waitDelay, "logs": tc.logsDelay, "rm": tc.removeDelay,
 					}[phase]
 					select {
 					case <-operation.Done():

@@ -12,13 +12,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"golang.org/x/sys/unix"
 )
 
 func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
@@ -108,6 +111,11 @@ func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
 }
 
 func TestMaterializeSourceAppliesAuthenticatedNewFilePatch(t *testing.T) {
+	checkAuthenticatedNewFilePatch(t)
+}
+
+func checkAuthenticatedNewFilePatch(t *testing.T) string {
+	t.Helper()
 	repository := t.TempDir()
 	if output, err := exec.Command("git", "-C", repository, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("initializing enclosing repository: %v: %s", err, output)
@@ -123,6 +131,9 @@ func TestMaterializeSourceAppliesAuthenticatedNewFilePatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(source, "existing.txt"), []byte("pinned\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(source, "existing.txt"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	fetch := ir.Node{ID: "fetch-r", Dest: dest, Commit: goodSourceCommit, TreeHash: "tree"}
@@ -152,7 +163,10 @@ func TestMaterializeSourceAppliesAuthenticatedNewFilePatch(t *testing.T) {
 		"+++ b/scripts/generated.sh\n" +
 		"@@ -0,0 +1,2 @@\n" +
 		"+#!/bin/sh\n" +
-		"+echo generated\n"
+		"+echo generated\n" +
+		"diff --git a/scripts/data.txt b/scripts/data.txt\n" +
+		"new file mode 100644\n" +
+		"--- /dev/null\n+++ b/scripts/data.txt\n@@ -0,0 +1 @@\n+data\n"
 	build := ir.Node{
 		ID: "build-r", Component: "r", SourceDest: dest,
 		SourceCommit: fetch.Commit, SourceTreeHash: fetch.TreeHash, VendorSpecDigest: vendorDigest,
@@ -173,8 +187,63 @@ func TestMaterializeSourceAppliesAuthenticatedNewFilePatch(t *testing.T) {
 	if info.Mode().Perm() != 0o755 {
 		t.Fatalf("new patched file mode = %04o, want 0755", info.Mode().Perm())
 	}
+	for path, mode := range map[string]os.FileMode{"scripts": 0o755, "scripts/data.txt": 0o644} {
+		info, err := os.Stat(filepath.Join(snapshot.Dir, path))
+		if err != nil || info.Mode().Perm() != mode {
+			t.Fatalf("patched member %s: info=%v, err=%v; want mode %04o", path, info, err, mode)
+		}
+	}
 	if _, err := os.Stat(filepath.Join(source, "scripts", "generated.sh")); !os.IsNotExist(err) {
 		t.Fatalf("new patched file reached fetched source: %v", err)
+	}
+	return snapshot.InputDigest
+}
+
+func TestAuthenticatedPatchModesIgnoreProcessUmask(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs := t.TempDir()
+	var want []byte
+	for _, mask := range []string{"002", "022", "077"} {
+		t.Run(mask, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			outputPath := filepath.Join(outputs, mask)
+			cmd := exec.CommandContext(ctx, executable, "-test.run=^TestAuthenticatedPatchUmaskHelper$", "-test.timeout=20s")
+			cmd.Env = append(os.Environ(), "NVKR_PATCH_UMASK="+mask, "NVKR_PATCH_DIGEST="+outputPath)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("isolated mask %s: %v\n%s", mask, err, out)
+			}
+			got, err := os.ReadFile(outputPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want == nil {
+				want = got
+			} else if !bytes.Equal(want, got) {
+				t.Fatal("ambient umask changed the authenticated patched-source digest")
+			}
+		})
+	}
+}
+
+func TestAuthenticatedPatchUmaskHelper(t *testing.T) {
+	text := os.Getenv("NVKR_PATCH_UMASK")
+	if text == "" {
+		t.Skip("isolated subprocess helper")
+	}
+	mask, err := strconv.ParseUint(text, 8, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This is the sole selected test in a dedicated child process.
+	previous := unix.Umask(int(mask))
+	defer unix.Umask(previous)
+	digest := checkAuthenticatedNewFilePatch(t)
+	if err := os.WriteFile(os.Getenv("NVKR_PATCH_DIGEST"), []byte(digest), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -73,11 +73,18 @@ func selectedBuildInvocation(cfg BuildConfig) []string {
 	return []string{cfg.NVKR, "run", "local", "--definition", cfg.Definition,
 		"--environment", cfg.Environment, "--attempt", cfg.AttemptPrefix,
 		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs),
-		"--runtime", "docker", "--ui=plain"}
+		"--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
 }
 
 func prepareSelectedBuild(ctx context.Context, runner Runner, cfg BuildConfig) error {
 	runner.directory = cfg.Repository
+	// Planning fetches sources too. Bind the same admitted clone as execution,
+	// on this runner copy only, so the final invocation adds no duplicate entries.
+	env, err := localBuildSourceEnvironment(runner.Env, environmentValue(runner.Env, "NVKE_LOCAL_CLONE"))
+	if err != nil {
+		return err
+	}
+	runner.Env = env
 	raw, err := runner.Capture(ctx, []string{cfg.NVKR, "run", "plan", "--definition", cfg.Definition,
 		"--environment", cfg.Environment, "--json"}, "selected-build-admission", 2*time.Minute)
 	if err != nil {

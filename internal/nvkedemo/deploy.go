@@ -16,6 +16,9 @@ import (
 // AdmitDemoDeployment rejects optional conformance on unsupported hosts before
 // build, sudo prompts, artifact capture, storage, or guest creation.
 func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
+	if _, err := nativeDeploymentNetwork(cfg.Network); err != nil {
+		return err
+	}
 	if cfg.Conformance {
 		if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
 			return nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo conformance requires native Linux ARM64")
@@ -27,7 +30,22 @@ func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 			return nvkrerr.Wrap(nvkrerr.CodeUsage, err, "conformance repository")
 		}
 	}
-	return AdmitNativeDeployment(ctx, cfg.Accelerator)
+	if err := AdmitNativeDeployment(ctx, cfg.Accelerator); err != nil {
+		return err
+	}
+	_, _, err := requireBootstrapLima(ctx, Runner{Env: NativeEnvironment()}, runtime.GOOS)
+	return err
+}
+
+func nativeDeploymentNetwork(network string) (string, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return "", err
+	}
+	if mode == "kind-calico" {
+		return "", nvkrerr.New(nvkrerr.CodeEngineCapability, "native site requires the selected OVN disk and profiles")
+	}
+	return mode, nil
 }
 
 // AdmitNativeDeployment rejects an unusable guest accelerator before an
@@ -83,6 +101,9 @@ func DeployArtifacts(ctx context.Context, cfg Config) error {
 
 func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (NativeConfig, error) {
 	if err := requireContext(ctx); err != nil {
+		return NativeConfig{}, err
+	}
+	if _, err := nativeDeploymentNetwork(cfg.Network); err != nil {
 		return NativeConfig{}, err
 	}
 	if cfg.Conformance && platform != "linux/arm64" {

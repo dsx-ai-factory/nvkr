@@ -530,6 +530,9 @@ func qualifySelectedExecution(ctx context.Context, request *QualifiedExecution, 
 	}
 	profileSnapshot := cloneProfile(request.Profile)
 	nodeSnapshot := cloneBuildNodes(nodes)
+	if err := profile.ValidateExecutionPlan(ctx, profileSnapshot, nodeSnapshot); err != nil {
+		return nil, runtimeBinary, err
+	}
 	runtimePath, err := resolveExecutionRuntime(runtimeBinary)
 	if err != nil {
 		return nil, runtimeBinary, err

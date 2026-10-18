@@ -33,7 +33,7 @@ flowchart TD
 
 | Host | CLI and simulator | Guest runtime | Docker's role |
 | --- | --- | --- | --- |
-| Ubuntu ARM64 | Native Linux executables | QEMU/KVM through session libvirt | Build containers; native nerdctl/containerd supplies temporary Kind |
+| Ubuntu ARM64 | Native Linux executables | QEMU/KVM through session libvirt | Build containers; private temporary Lima containerd supplies Kind |
 | Apple Silicon Mac | Native Darwin executables | Host QEMU/HVF | Build containers; private temporary Lima containerd supplies Kind |
 
 On Mac, the operator runs the CLIs directly in macOS. This path does not require
@@ -138,13 +138,21 @@ image before starting the NVKE agent. A local image alias is not another registr
 Initial artifact acquisition, Kind's node image and provider acquisition still
 have their declared network dependencies.
 
-The temporary Mac backend shares only a writable bootstrap staging directory and
+The temporary backend shares only a writable bootstrap staging directory and
 the read-only parent directories of the selected bootstrap image archives. Its
 SPIRE port 30081 is forwarded to the observed demo gateway; other automatic
 forwards retain Lima's loopback defaults. It does not mount the simulator state or
 QCOW directory, adopt existing Lima instances, or alter global security settings.
 The actual Go-owned backend start, nerdctl readiness and joined deletion have
 passed on Mac. That dependency test does not establish complete NVKE deployment.
+
+The Linux adapter reuses that owner with QEMU/KVM and 9p mounts, independently of
+host containerd sockets and existing instances. It requires the reviewed source-built
+Lima `f47461e` distribution and exact image/archive selections described in
+[native Linux bootstrap](native-linux-bootstrap.md). Its bounded backend pilot
+passed KVM, material selection, mount, loopback forwarding and cleanup checks.
+Real site traffic and complete Ubuntu deployment still require their own run;
+the pilot does not establish Kind-to-site or site-to-bootstrap connectivity.
 
 On Mac, the verified upstream vmnet helper reports Apple's shared subnet. The demo holds its native
 Unix datagram connection until guest and service cleanup joins, keeping the gateway available before
@@ -153,8 +161,12 @@ the demo does not rewrite Apple's shared-network configuration or bind its API t
 A real native HVF guest has passed cloud-init readiness, local HTTP delivery and natural deletion with
 the NVKR-built upstream simulator. This is a guest check, not complete Kubernetes acceptance.
 
-The current shared sizing allocates **12 GiB to the site and 8 GiB to each tenant
-guest: 28 GiB before Kind, Docker and other host overhead**. The older workflow's
+The shared sizing allocates **4 CPUs / 12 GiB to the site and 6 CPUs / 12 GiB to
+each tenant guest: 36 GiB before the temporary bootstrap backend and host overhead**.
+The earlier 4-CPU tenant profile exposed only 3 allocatable CPUs; the NVIDIA OVN
+node pod requests 3 CPUs itself and could not schedule alongside other pods.
+The larger profile retains the upstream workload requests and Kubernetes reservations;
+its complete runtime behavior still requires a fresh run. The older workflow's
 24-GiB host recommendation below does not cover this topology. The selected
 network must match the image, site and tenant; NVIDIA OVN is the default and
 upstream OVN requires an explicit selection.

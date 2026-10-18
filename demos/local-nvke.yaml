@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Edit the absolute paths for your dedicated Ubuntu ARM64 execution host.
-# On macOS, these paths refer to files INSIDE the Colima Linux VM.
+# Native macOS builds additionally require explicit prepared Definition,
+# Environment and native nvkr paths; see docs/local-nvke-demo.md.
 # This is a local diagnostic description, not an NVKR Definition or Release.
 version: 1
 build:
