@@ -93,31 +93,31 @@ pins:
       url: https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-arm64
     treeHash: be4d44635ebcab72f70760c8e04684cbd98d3969
   kubectl:
-    commit: ecf6decece6a6de25a57aad9ba90b6ce580f6f78
-    goVersion: 1.26.2
-    sourceDateEpoch: 1776865911
-    tag: v1.36.0
+    commit: 329000efd0b26bd78155e51e4df449130f0fca00
+    goVersion: 1.26.8
+    sourceDateEpoch: 1790183268
+    tag: v1.35.9
     tool:
-      archiveDigest: sha256:4bcf268eacdc1d2df74e37d86f639f27ca7dea3ae185b7b452b73b9fb5ddc14e
-      executableDigest: sha256:4bcf268eacdc1d2df74e37d86f639f27ca7dea3ae185b7b452b73b9fb5ddc14e
+      archiveDigest: sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b
+      executableDigest: sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b
       executablePath: kubectl
       format: raw
       platform: darwin/arm64
-      url: https://dl.k8s.io/release/v1.36.0/bin/darwin/arm64/kubectl
-    treeHash: 5cd415ea43f3b052c5d1b97bbfa8870a4fc5d144
+      url: https://dl.k8s.io/release/v1.35.9/bin/darwin/arm64/kubectl
+    treeHash: 125da0aec19fa2c7f9f8d834db1ba7fa70e952ed
   kubectl-linux:
-    commit: ecf6decece6a6de25a57aad9ba90b6ce580f6f78
-    goVersion: 1.26.2
-    sourceDateEpoch: 1776865911
-    tag: v1.36.0
+    commit: 329000efd0b26bd78155e51e4df449130f0fca00
+    goVersion: 1.26.8
+    sourceDateEpoch: 1790183268
+    tag: v1.35.9
     tool:
-      archiveDigest: sha256:9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
-      executableDigest: sha256:9f9d9c44a7b5264515ac9da5991584e2395bd50662e651132337e7b4d0c56f8f
+      archiveDigest: sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d
+      executableDigest: sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d
       executablePath: kubectl
       format: raw
       platform: linux/arm64
-      url: https://dl.k8s.io/release/v1.36.0/bin/linux/arm64/kubectl
-    treeHash: 5cd415ea43f3b052c5d1b97bbfa8870a4fc5d144
+      url: https://dl.k8s.io/release/v1.35.9/bin/linux/arm64/kubectl
+    treeHash: 125da0aec19fa2c7f9f8d834db1ba7fa70e952ed
   nerdctl-site:
     commit: 9039d5272eb8646d35322b9f4413bdf18ce7231a
     sourceDateEpoch: 1790975074

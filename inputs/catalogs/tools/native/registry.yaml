@@ -392,7 +392,7 @@ sources:
             platform: linux/arm64
             url: https://github.com/kubernetes-sigs/kind/releases/download/{{.Tag}}/kind-linux-arm64
     kubectl:
-        constraint: 1.36.0
+        constraint: 1.35.9
         repo: https://github.com/kubernetes/kubernetes
         tool:
             executablePath: kubectl
@@ -400,7 +400,7 @@ sources:
             platform: darwin/arm64
             url: https://dl.k8s.io/release/{{.Tag}}/bin/darwin/arm64/kubectl
     kubectl-linux:
-        constraint: 1.36.0
+        constraint: 1.35.9
         repo: https://github.com/kubernetes/kubernetes
         tool:
             executablePath: kubectl

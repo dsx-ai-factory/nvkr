@@ -1393,6 +1393,13 @@ closure. These are native diagnostic input changes, with no release/nightly pin 
 or new Release authority. A fresh package/QCOW build, site/tenant runtime, conformance
 and joined cleanup still require external evidence; prior failed Runs remain failed.
 
+The shared native host tools select kubectl 1.35.9 on both platforms. This is
+within one minor of the temporary Kind 1.36.1 bootstrap API and the permanent
+site/tenant 1.34.2 APIs; the separate conformance client remains 1.34.12. The
+complete 32-output catalog smoke-policy fixture is explicitly deferred by a
+named skipped subtest. Full catalog compilation and production smoke admission
+remain required; no version stamps or smoke policy are weakened.
+
 The demo CLI automatically selects a terminal dashboard for interactive standard
 input/output. Its phase map, observed state and bounded public activity use typed
 owner events, not log-derived authority; narrow terminals stack the panes. `--plain`,
