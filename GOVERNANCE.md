@@ -9,8 +9,7 @@ For the current roster and maintainer responsibilities, see
 ## Roles
 
 NVKR uses three roles. Code-owner review routing is declared in
-[`.github/CODEOWNERS`](.github/CODEOWNERS), which currently resolves every path to the
-org-wide `@dsx-ai-factory/nvke-write` team pending a repository-scoped one.
+[`.github/CODEOWNERS`](.github/CODEOWNERS).
 
 ### Contributors
 
@@ -21,7 +20,7 @@ contribute.
 
 ### Code Owners
 
-Trusted contributors (the `@dsx-ai-factory/nvke-write` team) who review and approve pull
+Trusted contributors (the team named in [`.github/CODEOWNERS`](.github/CODEOWNERS)) who review and approve pull
 requests for the paths they own. Code ownership is declared per path in
 [`.github/CODEOWNERS`](.github/CODEOWNERS), which GitHub uses to request reviews
 automatically. Code owners keep their areas healthy and mentor contributors.
@@ -32,9 +31,8 @@ Maintainers have merge rights, make and
 ratify project decisions, manage releases, and own this governance process —
 including adding and removing maintainers. Maintainers exercise this authority
 through merge rights and the governance vote below, not through a distinct
-[`.github/CODEOWNERS`](.github/CODEOWNERS) entry: code-owner review currently routes
-to the org-wide `@dsx-ai-factory/nvke-write` team, which is broader than the maintainer
-roster (see [MAINTAINERS.md](MAINTAINERS.md#current-maintainers)).
+[`.github/CODEOWNERS`](.github/CODEOWNERS) entry. Code-owner review and the maintainer
+roster in [MAINTAINERS.md](MAINTAINERS.md#current-maintainers) are separate lists.
 
 ## Areas of Ownership
 
@@ -127,14 +125,11 @@ is a convenience snapshot.
 | [@njhensley](https://github.com/njhensley) | Nathan Hensley — **lead maintainer** | <img src="https://avatars.githubusercontent.com/u/229213852?s=48&v=4" width="48" height="48" alt="njhensley"/> |
 | [@xdu31](https://github.com/xdu31) | Jayson Du | <img src="https://avatars.githubusercontent.com/u/66693539?s=48&v=4" width="48" height="48" alt="xdu31"/> |
 
-> **Note on a three-person roster.** A two-thirds supermajority of three is two,
-> so adding or removing a maintainer and amending this document require two of
-> three — a single maintainer cannot block either. A veto still requires a
-> two-thirds override, which is likewise two of three. Quorum for a vote is a
-> simple majority, also two. Revisit these thresholds if the roster shrinks
-> below three, where every one of them collapses to unanimity.
+> **Note on vote thresholds.** Majority and supermajority counts round up to
+> whole maintainers. If the roster becomes small enough that a two-thirds
+> supermajority equals unanimity, the maintainers revisit these thresholds.
 
 Service accounts are not maintainers. `svcsectool` is authorized to approve fork
 CI runs through the copy-pr-bot fork-CI mirror but holds no governance role: it
-cannot participate in lazy consensus, vote, or veto. (Fork-CI approval is not yet
-configured via a committed `.github/copy-pr-bot.yaml`.)
+cannot participate in lazy consensus, vote, or veto. Fork-CI mirroring is configured in
+[`.github/copy-pr-bot.yaml`](.github/copy-pr-bot.yaml).

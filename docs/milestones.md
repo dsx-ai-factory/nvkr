@@ -14,11 +14,11 @@ not complete a milestone.
 | M4 — Automated releases | Reviewed pin updates, signed immutable release manifests, safe channel/tag behavior and revocation | [M4 criteria](epics-v1-spec.md#epic-m4--automated-releases) |
 
 M2 disk delivery binds the exact produced disk and traced materials. The
-[October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+October 12 decision
 retains producer-only disk evidence and defers deep inventory, material reconciliation, waivers, offline
 pull-request qualification, a dedicated verify-only dispatch and incremental reuse.
 
-The current scope directed by the user makes embedded-component declarations optional. Omission is not
+The current approved scope makes embedded-component declarations optional. Omission is not
 applicable, while authored declarations must match their referenced
 pinned upstream metadata. This comparison does not establish customized or installed composition. Exact source,
 patch, configuration and material bindings remain required. A stronger input claim does not reproduce the

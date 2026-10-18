@@ -21,14 +21,8 @@
 # Every path currently resolves to @dsx-ai-factory/nvke-write. The path list below is
 # retained deliberately: it records which files are trust roots — anything that
 # determines WHAT GETS BUILT, WHAT IS TRUSTED, or WHAT RUNS IN CI — so that
-# tightening them later is a change of owner on known lines rather than a fresh
-# analysis.
-#
-# Why not @dsx-ai-factory/nvke-maintainer today: that team is org-wide (18 people, only
-# two of whom work on this repository), so routing trust roots there requests
-# review from people with no context while excluding contributors who have it.
-# An NVKR-scoped team does not exist at the org level. Revisit when one
-# does.
+# assigning them a narrower owner later is a change of owner on known lines
+# rather than a fresh analysis.
 #
 # Roles are defined in GOVERNANCE.md. The team must hold write access to this
 # repository or GitHub silently ignores the entry.

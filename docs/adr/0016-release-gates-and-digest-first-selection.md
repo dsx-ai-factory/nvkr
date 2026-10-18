@@ -178,12 +178,12 @@ evidence schemas, exact output membership, applicable pins/digests and source co
 verified build signatures and provenance are mandatory. Missing, duplicate, extra, substituted or mismatched
 members/evidence fail with stable coded errors. Acquired payload identity and OCI delivery-container identity
 are checked through their respective bindings; equality between those distinct digest domains is not required.
-The current scope directed by the user makes embedded-component declarations optional. Omission is
+The current approved scope makes embedded-component declarations optional. Omission is
 `not-applicable`; an explicitly authored declaration
 must agree with its referenced upstream manifest at the pinned commit, and missing or invalid referenced data
 fails. This raw-source metadata check establishes neither effective customized composition nor installed contents.
 Source, patch, configuration and material identity/provenance checks remain mandatory. Qualification requires
-no new upstream component manifest. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+no new upstream component manifest. The October 12 decision
 establishes producer-only disk evidence and defers disk inspection and material reconciliation.
 
 The manual artifact-check entrypoint takes an exact GitHub Run attempt URL and independently authored
@@ -292,7 +292,7 @@ policy. The source build's successful default-branch invocation is authenticated
 qualification invocation (ADR-18); a green build or the publisher's own identity alone is insufficient.
 Smoke execution receives no qualification signing authority.
 
-The current scope directed by the user permits merging the reviewed implementation and concrete candidate
+The current approved scope permits merging the reviewed implementation and concrete candidate
 policy/workflows before real acceptance runs. After merge, a fresh complete producer attempt with its original
 handoff and hosted positive/negative qualification and independent-consumer checks must establish acceptance.
 Until those results are recorded, production readiness remains unproved; merge is not operational acceptance.

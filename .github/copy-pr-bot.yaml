@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Configuration for NVIDIA's copy-pr-bot GitHub App.
-# https://docs.gha-runners.nvidia.com/platform/apps/copy-pr-bot/
 enabled: true
 auto_sync_draft: true
 auto_sync_ready: true
