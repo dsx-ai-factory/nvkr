@@ -267,13 +267,31 @@ jobs:
           go-version-file: .go-version
           cache: false
 
-      # Build the importer with setup-go's exact SDK. Older release
-      # binaries cannot read Go 1.27.2's version-5 export data.
+      # Verify the public tool archive before extraction. Keep the binary in
+      # runner-local temporary storage instead of rebuilding it on every PR.
+      - name: Install checksum-pinned golangci-lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          lint_version=2.14.0
+          lint_archive="golangci-lint-${lint_version}-linux-amd64.tar.gz"
+          lint_install_root=$(mktemp -d "$RUNNER_TEMP/golangci-lint.XXXXXX")
+          curl --fail --silent --show-error --location \
+            --connect-timeout 10 --max-time 60 --retry 2 --retry-max-time 90 \
+            "https://github.com/golangci/golangci-lint/releases/download/v${lint_version}/${lint_archive}" \
+            --output "$lint_install_root/$lint_archive"
+          printf '%s  %s\n' \
+            'ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab' \
+            "$lint_install_root/$lint_archive" | sha256sum --check --status
+          tar -xzf "$lint_install_root/$lint_archive" -C "$lint_install_root" \
+            "golangci-lint-${lint_version}-linux-amd64/golangci-lint"
+          echo "$lint_install_root/golangci-lint-${lint_version}-linux-amd64" >> "$GITHUB_PATH"
+
       - name: lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.14.0
-          install-mode: goinstall
+          install-mode: none
           skip-cache: true
 
   vulnerabilities:
