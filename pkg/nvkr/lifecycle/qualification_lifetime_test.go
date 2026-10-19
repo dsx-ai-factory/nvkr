@@ -12,7 +12,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func TestArtifactCheckRetainsFrozenPlanAndPublication(t *testing.T) {
+func TestArtifactCheckCloseCancelsAndJoinsBeforePayloadRelease(t *testing.T) {
 	request, consumer, verifier := newQualificationFixture(t)
 	receipt, _, err := consumer.checkQualification(t.Context(), request, verifier.source)
 	if err != nil {
@@ -31,15 +31,6 @@ func TestArtifactCheckRetainsFrozenPlanAndPublication(t *testing.T) {
 	if err != nil || got != want {
 		t.Fatalf("retained Plan changed with caller: %s != %s (%v)", got, want, err)
 	}
-}
-
-func TestArtifactCheckCloseCancelsAndJoinsBeforePayloadRelease(t *testing.T) {
-	request, consumer, verifier := newQualificationFixture(t)
-	receipt, _, err := consumer.checkQualification(t.Context(), request, verifier.source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = receipt.Close() }()
 	operation, finish, err := receipt.beginOperation(t.Context())
 	if err != nil {
 		t.Fatal(err)

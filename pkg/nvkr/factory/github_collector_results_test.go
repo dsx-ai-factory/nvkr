@@ -296,10 +296,15 @@ func TestGitHubCollectedRecoveryRejectsCollectorFailureWithoutPublication(t *tes
 
 func collectedRecoveryPlan(t *testing.T) (*Plan, *githubNeedsProjection, map[string]string) {
 	t.Helper()
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Six small outputs cross the collector threshold without importing the
+	// maintained product's unrelated images, charts, disks and source closure.
+	plan := recompileGitHubStabilityPlan(t, referenceTestPlan(t), func(inputs *githubStabilityInputs) {
+		for index := len(inputs.definition.Outputs); index < 6; index++ {
+			output := inputs.definition.Outputs[0]
+			output.Name = fmt.Sprintf("worker-z%02d", index)
+			inputs.definition.Outputs = append(inputs.definition.Outputs, output)
+		}
+	})
 	projection, err := githubNeedsForPlan(t.Context(), plan)
 	if err != nil || len(projection.Collectors) == 0 {
 		t.Fatalf("fixture requires result collectors: %v", err)

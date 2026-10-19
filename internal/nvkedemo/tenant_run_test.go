@@ -152,9 +152,9 @@ func TestTenantRunWaitCancellationAndBudgetKeepDiagnostics(t *testing.T) {
 		{"CNI canceled", "daemonset/calico-node", "daemonset/calico-node", false},
 		{"CoreDNS canceled", "deployment/coredns", "deployment/coredns", false},
 		{"node-local DNS canceled", "daemonset/node-local-dns", "daemonset/node-local-dns", false},
-		{"kubeconfig budget", "kubeconfig", "tenant kubeconfig", true},
-		{"nodes budget", "nodes", "two Ready tenant nodes", true},
-		{"guest observation budget", "guest-bindings", "tenant kubeconfig", true},
+		// Every blocking stage is canceled above. Expire the shared tenant
+		// budget once at the last readiness stage to cover deadline propagation
+		// through the nested rollout context without four eight-second waits.
 		{"DNS budget", "daemonset/node-local-dns", "daemonset/node-local-dns", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {

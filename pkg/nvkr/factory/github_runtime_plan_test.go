@@ -62,29 +62,17 @@ func writeGitHubRuntimeBaseline(t *testing.T, root string, plan *Plan) *Generate
 }
 
 func TestPrepareGitHubRuntimeBundleUpdatesPinsWithoutChangingStaticContract(t *testing.T) {
+	before := githubRuntimePlanFixture(t)
+	original := t.TempDir()
+	baseline := writeGitHubRuntimeBaseline(t, original, before)
+	after := freshGitHubRuntimePins(t, before)
+	fresh, err := RenderGitHub(t.Context(), after)
+	if err != nil || fresh.PlanDigest == baseline.PlanDigest {
+		t.Fatal("pin update did not create a distinct compiled Plan", err)
+	}
 	for _, check := range []bool{true, false} {
 		t.Run(map[bool]string{true: "check", false: "write"}[check], func(t *testing.T) {
-			root := t.TempDir()
-			before := githubRuntimePlanFixture(t)
-			baseline := writeGitHubRuntimeBaseline(t, root, before)
-			after := recompileGitHubStabilityPlan(t, before, func(inputs *githubStabilityInputs) {
-				for name, component := range inputs.catalog.Components {
-					if component.FromSource {
-						previous := component.Commit
-						component.Commit = nextGitHubStabilityPin(t, component.Commit)
-						component.TreeHash = nextGitHubStabilityPin(t, component.TreeHash)
-						component.SourceDate++
-						for key, value := range component.VersionStamp {
-							component.VersionStamp[key] = strings.ReplaceAll(value, previous, component.Commit)
-						}
-						inputs.catalog.Components[name] = component
-					}
-				}
-			})
-			fresh, err := RenderGitHub(t.Context(), after)
-			if err != nil || fresh.PlanDigest == baseline.PlanDigest {
-				t.Fatal("pin update did not create a distinct compiled Plan", err)
-			}
+			root := copyGitHubRuntimeRoot(t, original)
 			prior := githubRuntimeTree(t, root)
 			if err := PrepareGitHubRuntimeBundle(t.Context(), after, root, check); err != nil {
 				t.Fatal(err)
@@ -104,6 +92,9 @@ func TestPrepareGitHubRuntimeBundleUpdatesPinsWithoutChangingStaticContract(t *t
 }
 
 func TestPrepareGitHubRuntimeBundleRejectsChangedAuthorityWithoutWrites(t *testing.T) {
+	baseline := githubRuntimePlanFixture(t)
+	original := t.TempDir()
+	writeGitHubRuntimeBaseline(t, original, baseline)
 	for _, test := range []struct {
 		name   string
 		change func(*githubStabilityInputs)
@@ -129,8 +120,7 @@ func TestPrepareGitHubRuntimeBundleRejectsChangedAuthorityWithoutWrites(t *testi
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			root, baseline := t.TempDir(), githubRuntimePlanFixture(t)
-			writeGitHubRuntimeBaseline(t, root, baseline)
+			root := copyGitHubRuntimeRoot(t, original)
 			fresh := recompileGitHubStabilityPlan(t, baseline, test.change)
 			prior := githubRuntimeTree(t, root)
 			assertFactoryErrorCode(t, PrepareGitHubRuntimeBundle(t.Context(), fresh, root, false), e.CodePipelineDrift)
@@ -142,10 +132,12 @@ func TestPrepareGitHubRuntimeBundleRejectsChangedAuthorityWithoutWrites(t *testi
 }
 
 func TestPrepareGitHubRuntimeBundleRejectsBaselineDriftWithoutRepair(t *testing.T) {
+	before := githubRuntimePlanFixture(t)
+	original := t.TempDir()
+	baseline := writeGitHubRuntimeBaseline(t, original, before)
 	for _, kind := range []string{"workflow", "action", "data", "manifest", "extra member", "input path"} {
 		t.Run(kind, func(t *testing.T) {
-			root, plan := t.TempDir(), githubRuntimePlanFixture(t)
-			baseline := writeGitHubRuntimeBaseline(t, root, plan)
+			root, plan := copyGitHubRuntimeRoot(t, original), *before
 			member := baseline.WorkflowPath
 			switch kind {
 			case "action":
@@ -156,7 +148,7 @@ func TestPrepareGitHubRuntimeBundleRejectsBaselineDriftWithoutRepair(t *testing.
 					}
 				}
 			case "data":
-				member = githubActionDataPathFor(plan)
+				member = githubActionDataPathFor(&plan)
 			case "manifest":
 				member = baseline.ManifestPath
 			case "extra member":
@@ -170,7 +162,7 @@ func TestPrepareGitHubRuntimeBundleRejectsBaselineDriftWithoutRepair(t *testing.
 				}
 			}
 			prior := githubRuntimeTree(t, root)
-			assertFactoryErrorCode(t, PrepareGitHubRuntimeBundle(t.Context(), plan, root, false), e.CodePipelineDrift)
+			assertFactoryErrorCode(t, PrepareGitHubRuntimeBundle(t.Context(), &plan, root, false), e.CodePipelineDrift)
 			if !reflect.DeepEqual(prior, githubRuntimeTree(t, root)) {
 				t.Fatal("runtime admission repaired or overwrote rejected baseline drift")
 			}
@@ -179,6 +171,7 @@ func TestPrepareGitHubRuntimeBundleRejectsBaselineDriftWithoutRepair(t *testing.
 }
 
 func TestPrepareGitHubRuntimeBundleRequiresExplicitAdmissionBeforeIO(t *testing.T) {
+	baseline := githubRuntimePlanFixture(t)
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	for _, test := range []struct {
@@ -195,9 +188,9 @@ func TestPrepareGitHubRuntimeBundleRequiresExplicitAdmissionBeforeIO(t *testing.
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
-			plan := githubRuntimePlanFixture(t)
-			test.change(plan)
-			assertFactoryErrorCode(t, PrepareGitHubRuntimeBundle(test.ctx, plan, root, false), test.code)
+			plan := *baseline
+			test.change(&plan)
+			assertFactoryErrorCode(t, PrepareGitHubRuntimeBundle(test.ctx, &plan, root, false), test.code)
 			if len(githubRuntimeTree(t, root)) != 0 {
 				t.Fatal("unsupported runtime preparation performed output work")
 			}

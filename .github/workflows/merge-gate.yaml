@@ -101,10 +101,17 @@ jobs:
       pipeline: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.pipeline }}
       notices: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.notices }}
       docs: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.docs }}
+      test-matrix: ${{ steps.test-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Derive complete test matrix
+        id: test-matrix
+        run: |
+          matrix=$(python3 -B scripts/ci-test-shard.py --matrix)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
       # Pull requests only: the outputs above already force every category
       # true elsewhere, and on a push event this action diffs against
@@ -117,7 +124,7 @@ jobs:
         with:
           filters: |
             code:
-              # Everything the `check` job compiles, lints, or tests, plus the
+              # Everything the repository jobs compile, lint, or test, plus the
               # files that define the check itself: the Makefile recipes, the
               # pinned Go toolchain, the lint configuration, and this workflow.
               - 'client/**'
@@ -214,14 +221,13 @@ jobs:
     needs: [check-paths]
     if: needs.check-paths.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        id: go
         with:
           go-version-file: .go-version
           cache: false
@@ -235,30 +241,109 @@ jobs:
       - name: vet
         run: make vet
 
-      # golangci-lint-action v9 supports the golangci-lint v2 config schema
-      # (.golangci.yml `version: "2"`). SHA-pinned for supply-chain safety.
+      - name: shellcheck
+        run: make shellcheck
+
+      - name: CI sharding, report and adapter tests
+        run: make test-ci-tools
+
+      - name: build
+        run: make build
+
+  # Lint installation/analysis, vulnerability scanning and tests are independent
+  # checks. Serializing them added minutes before the first test could start.
+  lint:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      # Verify the public tool archive before extraction. Keep the binary in
+      # runner-local temporary storage instead of rebuilding it on every PR.
+      - name: Install checksum-pinned golangci-lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          lint_version=2.14.0
+          lint_archive="golangci-lint-${lint_version}-linux-amd64.tar.gz"
+          lint_install_root=$(mktemp -d "$RUNNER_TEMP/golangci-lint.XXXXXX")
+          curl --fail --silent --show-error --location \
+            --connect-timeout 10 --max-time 60 --retry 2 --retry-max-time 90 \
+            "https://github.com/golangci/golangci-lint/releases/download/v${lint_version}/${lint_archive}" \
+            --output "$lint_install_root/$lint_archive"
+          if ! printf '%s  %s\n' \
+            'ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab' \
+            "$lint_install_root/$lint_archive" | sha256sum --check --status; then
+            echo '::error::golangci-lint checksum verification failed'
+            exit 1
+          fi
+          tar -xzf "$lint_install_root/$lint_archive" -C "$lint_install_root" \
+            "golangci-lint-${lint_version}-linux-amd64/golangci-lint"
+          echo "$lint_install_root/golangci-lint-${lint_version}-linux-amd64" >> "$GITHUB_PATH"
+
       - name: lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.14.0
-          # Build the importer with setup-go's exact SDK. Older release
-          # binaries cannot read Go 1.27.2's version-5 export data.
-          install-mode: goinstall
+          install-mode: none
           skip-cache: true
 
-      - name: shellcheck
-        run: make shellcheck
+  vulnerabilities:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: CI report tests
-        run: make test-ci-tools
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
 
-      - name: test (fast default)
+      - name: Go vulnerability check
+        run: make vulncheck
+
+  tests:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      # Keep every shard's diagnostics when another fails. The aggregate gate
+      # requires the entire matrix to succeed.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check-paths.outputs.test-matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      - name: test (ordinary suite shard)
         id: tests
         shell: bash
         env:
           # Rendered workflow-step tests fail instead of skipping when bash, git, jq or yq is missing.
           NVKR_REQUIRE_SHELL_TOOLS: '1'
-        run: make test GO_TEST_FLAGS=-json | tee "$RUNNER_TEMP/go-test.jsonl"
+          TEST_SHARD_GROUP: ${{ matrix.group }}
+          TEST_SHARD_INDEX: ${{ matrix.index }}
+        run: make test-shard | tee "$RUNNER_TEMP/go-test.jsonl"
 
       - name: Summarize test timings
         if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')
@@ -268,17 +353,11 @@ jobs:
         if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: merge-gate-tests
+          name: merge-gate-tests-${{ matrix.group }}-${{ matrix.index }}
           path: |
             ${{ runner.temp }}/go-test.jsonl
           retention-days: 7
           if-no-files-found: error
-
-      - name: build
-        run: make build
-
-      - name: Go vulnerability check
-        run: make vulncheck
 
   check-skip:
     needs: [check-paths]
@@ -590,6 +669,9 @@ jobs:
     needs:
       - check-paths
       - check
+      - lint
+      - vulnerabilities
+      - tests
       - check-skip
       - actionlint
       - actionlint-skip
@@ -616,6 +698,19 @@ jobs:
           # skipped (not failed), which would silently pass the gate.
           if [ "${{ needs.check-paths.result }}" != "success" ]; then
             echo "::error::check-paths did not succeed (result: ${{ needs.check-paths.result }})"
+            exit 1
+          fi
+
+          # A successful matrix means every test shard passed. Never treat a
+          # skipped code job as success when the classifier required it.
+          if [ "${{ needs.check-paths.outputs.code }}" = 'true' ]; then
+            echo '${{ toJSON(needs) }}' | jq -e \
+              '[.check, .lint, .vulnerabilities, .tests] | all(.result == "success")' >/dev/null
+          elif [ "${{ needs.check-paths.outputs.code }}" = 'false' ]; then
+            echo '${{ toJSON(needs) }}' | jq -e \
+              '.["check-skip"].result == "success" and ([.check, .lint, .vulnerabilities, .tests] | all(.result == "skipped"))' >/dev/null
+          else
+            echo '::error::Code classification must be true or false'
             exit 1
           fi
 

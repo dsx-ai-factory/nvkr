@@ -351,61 +351,7 @@ func TestOvercomplexWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 	}
 }
 
-func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if plan.DefinitionPath != "inputs/definitions/nvke/definition.yaml" || plan.EnvironmentPath != "inputs/environments/github-release.yaml" {
-		t.Fatal("committed workflow must select the maintained combined M2 inputs")
-	}
-	raw, err := os.ReadFile("../../../" + GitHubWorkflowPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := validateGitHubWorkflowSize(raw); err != nil {
-		t.Fatal(err)
-	}
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(raw, bundle.Files[GitHubWorkflowPath]) {
-		t.Fatal("committed workflow differs from its complete regenerated Plan")
-	}
-	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(githubSerializedJobOrder(t, raw)))
-}
-
-// Render the maintained complete Plan as well as checking its committed bytes:
-// a newly required field on hundreds of steps can overflow provider admission
-// even when the previous generated workflow still fits.
-func TestMaintainedM2RenderingFitsGitHubFileLimit(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw := bundle.Files[bundle.WorkflowPath]
-	if err := validateGitHubWorkflowSize(raw); err != nil {
-		t.Fatal(err)
-	}
-	if len(raw) > maxGitHubWorkflowBytes*95/100 {
-		t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
-	}
-	nodes, err := countGitHubWorkflowYAMLNodes(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
-		t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
-	}
-	t.Logf("maintained M2 rendering: %d bytes (%d below GitHub limit), %d YAML events (%d below parser limit)", len(raw), maxGitHubWorkflowBytes-len(raw), nodes, maxGitHubWorkflowYAMLNodes-nodes)
-}
-
-func TestMaintainedGitHubBundlesKeepJobsInEntryWorkflow(t *testing.T) {
+func TestMaintainedGitHubBundles(t *testing.T) {
 	for _, planPath := range []string{
 		FactoryPlanPath,
 		GitHubDevelopmentPlanPath,
@@ -420,6 +366,31 @@ func TestMaintainedGitHubBundlesKeepJobsInEntryWorkflow(t *testing.T) {
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)
+			}
+			// One render per maintained bundle covers the real product's size,
+			// placement and credential contracts. Generic mutation tests use
+			// small fixtures; they do not need hundreds of unrelated jobs.
+			if planPath == FactoryPlanPath {
+				if plan.DefinitionPath != "inputs/definitions/nvke/definition.yaml" || plan.EnvironmentPath != "inputs/environments/github-release.yaml" || plan.Environment.GitHubBundle != "" {
+					t.Fatal("committed default workflow must select the maintained combined M2 inputs")
+				}
+				if err := CheckGeneratedBundle(t.Context(), "../../..", bundle); err != nil {
+					t.Fatalf("default namespace changed committed Plan/workflow/manifest bytes: %v", err)
+				}
+				raw := bundle.Files[bundle.WorkflowPath]
+				if len(raw) > maxGitHubWorkflowBytes*95/100 {
+					t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
+				}
+				nodes, err := countGitHubWorkflowYAMLNodes(raw)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
+					t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
+				}
+				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
+			} else if planPath != GitHubDevelopmentPlanPath {
+				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 1)
 			}
 			for name := range bundle.Files {
 				if strings.HasPrefix(name, ".github/workflows/") && name != bundle.WorkflowPath {

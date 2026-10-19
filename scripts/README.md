@@ -4,6 +4,17 @@ The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
 The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
+## Repository CI tests
+
+`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's eleven
+test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
+selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
+entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
+exceeding that limit fails the shard and stops its process group while preserving diagnostics already
+read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, completeness, parser and
+small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
+matrix entry without rebuilding the product suite.
+
 ## CLI artifact test baseline
 
 ```sh

@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
 
 func TestMetadataFetchErrorDistinguishesRequestRejectionFromOutage(t *testing.T) {
@@ -41,6 +42,11 @@ func TestMetadataFetchErrorDistinguishesRequestRejectionFromOutage(t *testing.T)
 		stream    bool
 		canceled  bool
 	}{
+		{name: "service unavailable", cause: &transport.Error{StatusCode: http.StatusServiceUnavailable}, code: e.CodeUnavailable, exit: 30, retryable: true},
+		{name: "request timeout", cause: &transport.Error{StatusCode: http.StatusRequestTimeout}, code: e.CodeUnavailable, exit: 30, retryable: true},
+		{name: "rate limited", cause: &transport.Error{StatusCode: http.StatusTooManyRequests}, code: e.CodeUnavailable, exit: 30, retryable: true},
+		{name: "forbidden", cause: &transport.Error{StatusCode: http.StatusForbidden}, code: e.CodeFetchFailed, exit: 20},
+		{name: "not found", cause: &transport.Error{StatusCode: http.StatusNotFound}, code: e.CodeFetchFailed, exit: 20},
 		{name: "TLS verification rejection", cause: verification, code: e.CodeFetchFailed, exit: 20},
 		{name: "expired certificate", cause: x509.CertificateInvalidError{Cert: certificate, Reason: x509.Expired}, code: e.CodeFetchFailed, exit: 20},
 		{name: "hostname mismatch", cause: x509.HostnameError{Certificate: certificate, Host: "other.example.test"}, code: e.CodeFetchFailed, exit: 20},

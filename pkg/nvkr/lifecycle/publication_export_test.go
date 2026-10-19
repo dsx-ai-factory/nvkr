@@ -15,6 +15,12 @@ import (
 
 func TestVerifiedReleaseExportRequiresOriginAndLiveCapability(t *testing.T) {
 	const invocation = "https://github.com/example/nvkr/actions/runs/123/attempts/2"
+	plan := newExactInputPlan(t)
+	fixture := exactInputFixtureForPlanAndInvocation(t, plan.Definition, plan.Environment, plan, invocation)
+	expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name       string
 		invocation string
@@ -35,13 +41,6 @@ func TestVerifiedReleaseExportRequiresOriginAndLiveCapability(t *testing.T) {
 		{"different inputs", invocation, false, false, "inputs", e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fixture := newExactInputFixture(t).withReleaseMetadata(t, func(metadata *delivery.ReleaseMetadata) {
-				metadata.InvocationID = invocation
-			})
-			expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
-			if err != nil {
-				t.Fatal(err)
-			}
 			verified, receipt, err := fixture.consumer(t, nil).VerifyExactInputs(t.Context(), fixture.reference, exactInputPolicy(), expectation)
 			if err != nil {
 				t.Fatal(err)

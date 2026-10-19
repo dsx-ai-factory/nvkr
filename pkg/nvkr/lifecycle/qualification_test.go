@@ -158,12 +158,12 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string, o
 	if err != nil {
 		t.Fatal(err)
 	}
-	base := newExactInputFixture(t)
-	definition, environment := base.definition, base.environment
+	base := newExactInputPlan(t)
+	definition, environment := base.Definition, base.Environment
 	definition.CosignTool = "cosign"
 	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: identity, Issuer: "https://token.actions.githubusercontent.com"}
 	environment.Publication.Mode = "per-output-v1"
-	snapshot := base.plan.CatalogSnapshot
+	snapshot := base.CatalogSnapshot
 	snapshot.Tools = map[string]catalog.ToolPin{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.invalid/cosign.tar.gz", Platform: "linux/amd64", ArchiveDigest: "sha256:" + strings.Repeat("1", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + strings.Repeat("2", 64)}}
 	stack, err := catalog.ApplyStack(snapshot)
 	if err != nil {
@@ -173,23 +173,22 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string, o
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture := exactInputFixtureForPlan(t, definition, environment, plan)
-	fixture.request.Release.InvocationID = description.InvocationID
-	for i := range fixture.request.Objects {
-		object := &fixture.request.Objects[i]
-		if object.Output != nil {
-			object.Output.Publication = &delivery.PublicationOrigin{
-				Ref:                  plan.Targets["output-"+object.Name].Ref + "@sha256:" + strings.Repeat("b", 64),
-				PreparedInvocationID: description.InvocationID, SignedInvocationID: description.InvocationID,
+	fixture := exactInputFixtureForPlanAndInvocation(t, definition, environment, plan, description.InvocationID, func(request *delivery.PublicationRequest) {
+		for i := range request.Objects {
+			object := &request.Objects[i]
+			if object.Output != nil {
+				object.Output.Publication = &delivery.PublicationOrigin{
+					Ref:                  plan.Targets["output-"+object.Name].Ref + "@sha256:" + strings.Repeat("b", 64),
+					PreparedInvocationID: description.InvocationID, SignedInvocationID: description.InvocationID,
+				}
 			}
 		}
-	}
-	for _, option := range options {
-		if option.publication != nil {
-			option.publication(&fixture.request)
+		for _, option := range options {
+			if option.publication != nil {
+				option.publication(request)
+			}
 		}
-	}
-	fixture = fixture.withReleaseMetadata(t, func(*delivery.ReleaseMetadata) {})
+	})
 	run, err := provenance.NewGitHubRunContext(func(key string) string {
 		return map[string]string{
 			"GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": description.Repository,

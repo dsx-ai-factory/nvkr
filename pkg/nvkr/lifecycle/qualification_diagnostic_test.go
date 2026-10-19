@@ -35,13 +35,6 @@ func TestArtifactDiagnosticAdmission(t *testing.T) {
 	}{
 		{"nil receipt", func(*testing.T) *ArtifactCheckReceipt { return nil }, t.Context(), false, e.CodeGateUnmet},
 		{"zero receipt", func(*testing.T) *ArtifactCheckReceipt { return &ArtifactCheckReceipt{} }, t.Context(), false, e.CodeGateUnmet},
-		{"closed receipt", func(t *testing.T) *ArtifactCheckReceipt {
-			r := diagnosticReceiptFixture(t)
-			if err := r.Close(); err != nil {
-				t.Fatal(err)
-			}
-			return r
-		}, t.Context(), false, e.CodeGateUnmet},
 		{"nil callback", func(*testing.T) *ArtifactCheckReceipt { return &ArtifactCheckReceipt{} }, t.Context(), true, e.CodeUsage},
 		{"nil context", func(*testing.T) *ArtifactCheckReceipt { return &ArtifactCheckReceipt{} }, nil, false, e.CodeUsage},
 		{"canceled context", func(*testing.T) *ArtifactCheckReceipt { return &ArtifactCheckReceipt{} }, canceled, false, e.CodeTimeout},
@@ -63,8 +56,17 @@ func TestArtifactDiagnosticAdmission(t *testing.T) {
 		})
 	}
 }
-func TestArtifactDiagnosticDescriptionAndCallbackError(t *testing.T) {
+func TestArtifactDiagnosticOperations(t *testing.T) {
 	receipt := diagnosticReceiptFixture(t)
+	// These operations only borrow the same authenticated bytes. Source revocation
+	// runs last; Close admission and joining have their own destructive test below.
+	t.Run("description and callback error", func(t *testing.T) { testArtifactDiagnosticDescriptionAndCallbackError(t, receipt) })
+	t.Run("uncoded callback error", func(t *testing.T) { testArtifactDiagnosticCodesUnclassifiedCallbackFailure(t, receipt) })
+	t.Run("request cancellation", func(t *testing.T) { testArtifactDiagnosticRequestCancellationCannotReturnSuccess(t, receipt) })
+	t.Run("borrowed source revocation", func(t *testing.T) { testArtifactDiagnosticSourceRevocation(t, receipt) })
+}
+
+func testArtifactDiagnosticDescriptionAndCallbackError(t *testing.T, receipt *ArtifactCheckReceipt) {
 	original, err := receipt.Description()
 	if err != nil {
 		t.Fatal(err)
@@ -159,8 +161,7 @@ func TestArtifactDiagnosticCloseCancelsAndJoins(t *testing.T) {
 		t.Fatal("revoked shallow receipt reached observation")
 	}
 }
-func TestArtifactDiagnosticRequestCancellationCannotReturnSuccess(t *testing.T) {
-	receipt := diagnosticReceiptFixture(t)
+func testArtifactDiagnosticRequestCancellationCannotReturnSuccess(t *testing.T, receipt *ArtifactCheckReceipt) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	err := receipt.WithDiagnosticOperation(ctx, func(context.Context, ArtifactCheckDescription) error { cancel(); return nil })
@@ -170,46 +171,31 @@ func TestArtifactDiagnosticRequestCancellationCannotReturnSuccess(t *testing.T) 
 	}
 }
 
-func TestArtifactDiagnosticSourceRevocationIsRecheckedWithoutAsyncCancellation(t *testing.T) {
-	request, consumer, _ := newQualificationFixture(t)
-	for _, during := range []bool{false, true} {
-		name := "before registration"
-		if during {
-			name = "during callback"
+func testArtifactDiagnosticSourceRevocation(t *testing.T, receipt *ArtifactCheckReceipt) {
+	source, ok := receipt.origin.(*qualificationFixtureSource)
+	if !ok {
+		t.Fatal("fixture did not retain its borrowed source")
+	}
+	calls := 0
+	observe := func(ctx context.Context, _ ArtifactCheckDescription) error {
+		calls++
+		source.closed = true
+		if ctx.Err() != nil {
+			t.Fatal("separate source revocation unexpectedly canceled operation context")
 		}
-		t.Run(name, func(t *testing.T) {
-			source := qualificationSourceFixture()
-			receipt, _, err := consumer.checkQualification(t.Context(), request, source)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer receipt.Close()
-			if !during {
-				source.closed = true
-			}
-			calls := 0
-			err = receipt.WithDiagnosticOperation(t.Context(), func(ctx context.Context, _ ArtifactCheckDescription) error {
-				calls++
-				source.closed = true
-				if ctx.Err() != nil {
-					t.Fatal("separate source revocation unexpectedly canceled operation context")
-				}
-				return nil
-			})
-			assertCode(t, err, e.CodeProvenanceMissing)
-			expected := 0
-			if during {
-				expected = 1
-			}
-			if calls != expected {
-				t.Fatalf("source admission/completion differed: calls%d want%d", calls, expected)
-			}
-		})
+		return nil
+	}
+	assertCode(t, receipt.WithDiagnosticOperation(t.Context(), observe), e.CodeProvenanceMissing)
+	if calls != 1 {
+		t.Fatalf("source revocation did not occur during callback: calls%d", calls)
+	}
+	assertCode(t, receipt.WithDiagnosticOperation(t.Context(), observe), e.CodeProvenanceMissing)
+	if calls != 1 {
+		t.Fatalf("revoked source admitted another callback: calls%d", calls)
 	}
 }
 
-func TestArtifactDiagnosticCodesUnclassifiedCallbackFailure(t *testing.T) {
-	receipt := diagnosticReceiptFixture(t)
+func testArtifactDiagnosticCodesUnclassifiedCallbackFailure(t *testing.T, receipt *ArtifactCheckReceipt) {
 	cause := errors.New("independent uncoded observer failure")
 	err := receipt.WithDiagnosticOperation(t.Context(), func(context.Context, ArtifactCheckDescription) error { return cause })
 	assertCode(t, err, e.CodeVerifyFailed)

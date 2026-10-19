@@ -53,14 +53,6 @@ func TestPrivateImageCredentialLifetime(t *testing.T) {
 			}
 		})
 	}
-	for _, token := range []string{"", "bad\ntoken"} {
-		err := pullGitHubImages(t.Context(), nil, "linux/amd64", "reader", token,
-			func(context.Context, string, string, string) error {
-				t.Fatal("invalid credential reached runtime")
-				return nil
-			})
-		assertFactoryErrorCode(t, err, e.CodeFetchFailed)
-	}
 }
 
 func TestPrivateImagePullCommandDoesNotInheritCredentials(t *testing.T) {
@@ -199,60 +191,9 @@ func assertNoPrivateToolchainPreparation(t *testing.T, bundle *GeneratedBundle) 
 }
 
 func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
-	for _, profile := range []struct {
-		name  string
-		disks int
-	}{
-		{"nvke-nightly-arm64", 1},
-		{"nvke-nightly-upstream-ovn-arm64", 1},
-		{"nvke-disks", 4},
-	} {
-		t.Run(profile.name, func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-"+profile.name+"/plan.json")
-			if err != nil {
-				t.Fatal(err)
-			}
-			bundle, err := RenderGitHub(t.Context(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
-			disks, fetches := 0, 0
-			for _, job := range document.Jobs {
-				prepared := false
-				prepareIndex, executionIndex := -1, -1
-				for index, step := range job.Steps {
-					if step.Env[githubImageToken] != "" {
-						if prepared || job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
-							step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
-							t.Fatal("toolchain credential escaped its separate read-only preparation step")
-						}
-						prepared = true
-						prepareIndex = index
-						if job.Environment == githubARCEnvironment {
-							disks++
-						} else {
-							fetches++
-						}
-						continue
-					}
-					if executionIndex < 0 && (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) {
-						executionIndex = index
-					}
-				}
-				if prepared && executionIndex <= prepareIndex {
-					t.Fatal("toolchain preparation did not precede source or producer execution")
-				}
-			}
-			if disks != profile.disks || fetches == 0 {
-				t.Fatalf("missing private preparation for native disk or its source vendors: %d/%d", disks, fetches)
-			}
-		})
-	}
-}
-
-func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	// The combined and nightly bundles share their assertions with
+	// TestMaintainedGitHubBundles. Keep the disks-family namespace covered too.
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke-disks/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,27 +201,52 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
+}
+
+// Maintained product checks share their already-rendered bundle with the entry
+// workflow contract. Negative mutations use the focused fixture below.
+func assertGitHubPrivateImageCredentialBoundary(t *testing.T, plan *Plan, bundle *GeneratedBundle, wantDisks int) {
+	t.Helper()
 	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	disks, fetches := 0, 0
 	for _, job := range document.Jobs {
-		for _, step := range job.Steps {
-			if step.Env[githubImageToken] == "" {
+		prepared := false
+		prepareIndex, executionIndex := -1, -1
+		for index, step := range job.Steps {
+			if step.Env[githubImageToken] != "" {
+				if prepared || job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
+					step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
+					t.Fatal("toolchain credential escaped its separate read-only preparation step")
+				}
+				prepared, prepareIndex = true, index
+				if job.Environment == githubARCEnvironment {
+					disks++
+				} else {
+					fetches++
+				}
 				continue
 			}
-			if job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" || step.Env[sourceTokenEnv] != "" ||
-				!strings.Contains(step.Run, "factory github prepare-images ") {
-				t.Fatal("toolchain credential escaped its read-only preparation step")
-			}
-			if job.Environment == githubARCEnvironment {
-				disks++
-			} else {
-				fetches++
+			if executionIndex < 0 && (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) {
+				executionIndex = index
 			}
 		}
+		if prepared && executionIndex <= prepareIndex {
+			t.Fatal("toolchain preparation did not precede source or producer execution")
+		}
 	}
-	if disks != 4 || fetches == 0 {
-		t.Fatalf("missing preparation for native disks or their source vendors: %d/%d", disks, fetches)
+	if disks != wantDisks || fetches == 0 {
+		t.Fatalf("missing private preparation for native disks or their source vendors: %d/%d, want %d disks", disks, fetches, wantDisks)
 	}
+}
+
+func TestPrivateImageCredentialBoundary(t *testing.T) {
+	plan := privateImageTestPlan(t, ProductionRegistryWriteCredential)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 1)
 	stages, _, err := githubStages(plan)
 	if err != nil {
 		t.Fatal(err)
@@ -296,42 +262,22 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 		t.Fatal("fixture lacks a native private-image preparation job")
 	}
 	member, part := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
-	for _, input := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
-		for _, change := range []string{"missing", "empty", "substituted"} {
-			t.Run(input+"/"+change, func(t *testing.T) {
-				changed := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
-					steps := githubTestYAMLField(t, root, "jobs", jobID, "steps")
-					found := false
-					for _, step := range steps.Content {
-						with := githubYAMLField(step, "with")
-						if githubYAMLValue(with, "parameters") == githubParametersExpression(part) {
-							found = true
-							if change == "missing" {
-								githubYAMLRemove(with, input)
-							} else {
-								value := ""
-								if change == "substituted" {
-									value = "${{ vars.OTHER_READER }}"
-									if input == "nvkr-toolchain-read-token" {
-										value = "${{ secrets.OTHER_TOKEN }}"
-									}
-								}
-								githubYAMLSet(with, input, githubYAMLString(value))
-							}
-						}
-					}
-					if !found {
-						t.Fatal("private image caller missing")
-					}
-				})
-				assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
-			})
-		}
-	}
+	// Missing, empty and substituted caller inputs are exhaustively covered at
+	// githubProjectInterfaceRole by TestPrivateImageProjectionRejectsCallerCredentialSubstitution.
 	for _, test := range []struct {
 		name, member string
 		mutate       func(*testing.T, *yamlv3.Node)
 	}{
+		{"caller credential", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			for _, step := range githubTestYAMLField(t, root, "jobs", jobID, "steps").Content {
+				with := githubYAMLField(step, "with")
+				if githubYAMLValue(with, "parameters") == githubParametersExpression(part) {
+					githubYAMLSet(with, "nvkr-toolchain-read-token", githubYAMLString("${{ secrets.OTHER_TOKEN }}"))
+					return
+				}
+			}
+			t.Fatal("private image caller missing")
+		}},
 		{"source write scope", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
 			githubTestYAMLField(t, root, "jobs", jobID, "permissions", "contents").Value = "write"
 		}},

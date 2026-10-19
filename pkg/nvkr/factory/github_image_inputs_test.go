@@ -5,55 +5,35 @@ package factory
 
 import (
 	"bytes"
-	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
 
+// One native disk and its vendor fetch expose both image-preparation call sites.
+// Publication membership and per-output catalog preservation have their own
+// compiler contracts; credential projection does not require the full product.
+func privateImageTestPlan(t *testing.T, credential string) *Plan {
+	t.Helper()
+	return recompileGitHubStabilityPlan(t, arcTestPlan(t, "linux/amd64"), func(inputs *githubStabilityInputs) {
+		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/example/nvkr"
+		inputs.environment.Publication.CredentialRef = credential
+		inputs.environment.Publication.Anonymous = false
+		root := inputs.catalog.Components["image"]
+		root.VendorCommand = []string{"make", "vendor"}
+		for arch, image := range root.ToolchainImages {
+			root.ToolchainImages[arch] = "ghcr.io/example/nvkr/toolchains/packer-" + arch + image[strings.Index(image, "@sha256:"):]
+		}
+		inputs.catalog.Components["image"] = root
+	})
+}
+
 func TestPrivateImageCallerContextsAcrossPublicationPolicies(t *testing.T) {
-	base, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, credential := range []string{ProductionRegistryWriteCredential, "github:GITHUB_TOKEN"} {
 		t.Run(credential, func(t *testing.T) {
-			environment := base.Environment.Clone()
-			environment.Publication.CredentialRef = credential
-			stack := &catalog.Stack{Catalog: base.CatalogSnapshot, Digest: base.CatalogDigest, Applied: base.AppliedOverlays}
-			stacks := map[string]*catalog.Stack{}
-			for _, output := range base.Definition.Outputs {
-				if output.Catalog == nil {
-					continue
-				}
-				for _, build := range base.Builds {
-					if build.Name == nativeOutputSelections(output)[0].Name {
-						stacks[output.Name] = &catalog.Stack{Catalog: build.CatalogSnapshot, Digest: build.CatalogDigest, Applied: build.AppliedOverlays}
-						break
-					}
-				}
-				if stacks[output.Name] == nil {
-					t.Fatalf("missing catalog snapshot for %s", output.Name)
-				}
-			}
-			plan, err := compileWithTargetStacks(t.Context(), base.Definition, environment, stack, stacks,
-				base.GeneratorVersion, base.DefinitionPath, base.EnvironmentPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			wantCatalogs, gotCatalogs := map[string]string{}, map[string]string{}
-			for _, build := range base.Builds {
-				wantCatalogs[build.Name] = build.CatalogDigest
-			}
-			for _, build := range plan.Builds {
-				gotCatalogs[build.Name] = build.CatalogDigest
-			}
-			if len(plan.Builds) != len(base.Builds) || len(gotCatalogs) != len(plan.Builds) || len(wantCatalogs) != len(base.Builds) || !reflect.DeepEqual(gotCatalogs, wantCatalogs) {
-				t.Fatal("publication policy changed retained producer catalog identities or membership")
-			}
+			plan := privateImageTestPlan(t, credential)
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)
