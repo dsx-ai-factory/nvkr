@@ -337,6 +337,10 @@ one release index from named outputs; normal authors do not wire payload → roo
 GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
 package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
 no repository linkage, using the publication credential independently of CI carrier storage.
+NVKR-produced Helm manifests retain source URLs in the chart archive and Helm config, but do not
+promote them to `org.opencontainers.image.source`: GHCR can use that annotation to create repository
+linkage after admission. This deterministic packaging rule applies across execution targets; publication
+never rewrites an already identified artifact to remove the annotation.
 The source repository metadata lookup uses the job's automatic repository token, passed separately only to
 GHCR publication jobs. Package-scoped publication credentials therefore need no source-repository scope
 for this admission check. The repository token does not replace the publication credential for package

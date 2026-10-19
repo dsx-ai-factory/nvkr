@@ -125,7 +125,7 @@ func TestBuildHelmChartArtifactSetsDeterministicManifestAnnotations(t *testing.T
 	ctx := context.Background()
 	chartData := helmChartArchiveFixture(t, map[string]string{
 		"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: 1.2.3\ndescription: A demo chart\n" +
-			"home: https://example.test/demo\nsources:\n  - https://example.test/demo.git\n" +
+			"home: https://example.test/demo\nsources:\n  - https://github.com/example/demo\n" +
 			"maintainers:\n  - name: someone\ndependencies:\n  - name: sub\n    repository: https://example.test\n    version: 1.0.0\n",
 	})
 	out := filepath.Join(t.TempDir(), "packaged")
@@ -157,7 +157,6 @@ func TestBuildHelmChartArtifactSetsDeterministicManifestAnnotations(t *testing.T
 		"org.opencontainers.image.version":     "1.2.3",
 		"org.opencontainers.image.description": "A demo chart",
 		"org.opencontainers.image.url":         "https://example.test/demo",
-		"org.opencontainers.image.source":      "https://example.test/demo.git",
 	}
 	for key, value := range want {
 		if manifest.Annotations[key] != value {
@@ -166,6 +165,9 @@ func TestBuildHelmChartArtifactSetsDeterministicManifestAnnotations(t *testing.T
 	}
 	if _, ok := manifest.Annotations["org.opencontainers.image.created"]; ok {
 		t.Fatalf("manifest carries a non-deterministic created annotation: %#v", manifest.Annotations)
+	}
+	if _, ok := manifest.Annotations["org.opencontainers.image.source"]; ok {
+		t.Fatalf("manifest source annotation can auto-link a private GHCR package: %#v", manifest.Annotations)
 	}
 
 	// The config blob widens to the full Chart.yaml schema: maintainers and
@@ -177,6 +179,9 @@ func TestBuildHelmChartArtifactSetsDeterministicManifestAnnotations(t *testing.T
 	var decoded helmChartConfig
 	if err := json.Unmarshal(config, &decoded); err != nil {
 		t.Fatal(err)
+	}
+	if len(decoded.Sources) != 1 || decoded.Sources[0] != "https://github.com/example/demo" {
+		t.Fatalf("source metadata did not round-trip: %#v", decoded.Sources)
 	}
 	if len(decoded.Maintainers) != 1 || decoded.Maintainers[0].Name != "someone" {
 		t.Fatalf("maintainers did not round-trip: %#v", decoded.Maintainers)

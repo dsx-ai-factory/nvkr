@@ -1039,7 +1039,18 @@ interruption demonstrations remain M4-D.
 
 ## Feature-branch pipeline development
 
-The main-source upgrade selects `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON; disk builds are still pending. A fresh complete attempt and independent development qualification are required. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the selected main source adds the two missing network configuration files to image-input composition. This source correction requires fresh external execution.
+At NVKR `92ce9fc65182a965f94ffa8a527828a971e9fc45`, [development Run 39327360895](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327360895)
+passed all four disk builds, output publication/signing/verification and aggregate assembly. Aggregate
+publication then rejected the Nktp package's repository association with `NVKR-E-TRUST-POLICY-MISSING`.
+Read-only GitHub package metadata identified `nvkr/development/runs/39327360895/attempts/1/nktp` as
+internal but linked to `dsx-ai-factory/nvke`; the other 138 packages in that run's inventory had no association.
+Helm packaging now omits the manifest-level source annotation that can cause GHCR auto-linking while
+preserving source URLs in the chart archive and Helm config. Regression coverage checks both properties;
+hosted validation of this packaging correction remains pending. Existing published bytes are not rewritten.
+The operator disconnected the existing Nktp package; API read-back confirmed internal visibility with no
+repository association. Failed jobs were rerun as attempt 2 of the same Run, retaining successful producers.
+
+The main-source upgrade selects `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON. All four disk outputs nevertheless passed build, publication, signing and verification in that Run. Complete same-run retry validation and independent development qualification remain required. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the selected main source adds the two missing network configuration files to image-input composition. The four successful disk outputs in the main-source Run exercise this source correction; they do not establish complete Run acceptance.
 
 Beta development [Run 39274459086](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086)
 reached admitted native disk builds and successful SBOM signing after the operator approved its exact branch
@@ -1096,8 +1107,7 @@ Plan bytes or Build identity. Development now uses production's same-run retry c
 subjects, controls and predicates keep their original attempt bindings; new publication work uses the
 current attempt. Other runs, future attempts and changed Plans remain rejected. Development qualification
 selects bounded provider-authenticated metadata candidates and rechecks the full original closure.
-These retry changes have regression coverage authored; local test execution is skipped at the user's
-request and hosted validation remains pending. Signed-development helpers/carriers and all final Run records retain
+The retry regression suite and complete repository gate passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735) at `92ce9fc65182a965f94ffa8a527828a971e9fc45`. Local test execution was skipped at the user's request. Live partial retry and independent qualification remain pending. Signed-development helpers/carriers and all final Run records retain
 seven days; disk diagnostics retain one day. Full signed development is non-canceling.
 
 The development cleanup module inventories only private packages in that reserved attempt namespace.
@@ -1900,7 +1910,7 @@ selecting the newest source attempt; tied source attempts and incomplete listing
 Generated fetch and restore commands disable reuse whenever an explicit Run is supplied.
 Development transfers now use the same retry selection. Explicit cross-Run and direct store APIs stay exact-attempt.
 The review follow-up adds regression cases for candidate ordering, ties, future/corrupt candidates and
-truncated listings; local execution of these new tests is intentionally skipped pending hosted CI.
+truncated listings; these tests passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735), with local execution intentionally skipped.
 Focused contracts reproduce the old rejection and cover private payloads, public metadata, mixed source
 attempt acquisition, unchanged bindings, future/foreign/malformed source refusal and generated policy
 separation. These local checks do not establish hosted retry completion, qualification acceptance or a
