@@ -30,7 +30,7 @@ func TestHostedRuntimeBudgetBoundsCompleteOperation(t *testing.T) {
 					defer cancel()
 				}
 				start := time.Now()
-				ctx, cancel := hostedRuntimeContext(parent)
+				ctx, cancel := WithHostedRuntimeBudget(parent)
 				defer cancel()
 				if deadline, ok := ctx.Deadline(); !ok || !deadline.Equal(start.Add(tc.wantTimeout)) {
 					t.Fatalf("deadline = %v, present = %t; want %v", deadline, ok, start.Add(tc.wantTimeout))
@@ -79,7 +79,7 @@ func TestHostedRuntimeBudgetPreservesCancellation(t *testing.T) {
 				if tc.before {
 					cancelParent()
 				}
-				ctx, cancel := hostedRuntimeContext(parent)
+				ctx, cancel := WithHostedRuntimeBudget(parent)
 				defer cancel()
 				finished := make(chan error, 1)
 				go func() {

@@ -126,15 +126,28 @@ provenance and CycloneDX SBOMs all use standard Sigstore v0.3 DSSE bundles publi
 The signature predicate is `https://sigstore.dev/cosign/sign/v1`; SLSA and CycloneDX retain their distinct
 standard predicate types. One evidence class cannot satisfy another.
 
-Verification downloads only the required signature/provenance bundles using cosign's predicate-filtered
-`download attestation`, then verifies their exact bytes with `verify-blob-attestation`, the expected digest,
-identity and issuer. It reads observed identity/issuer from the embedded certificate in those same verified
-bytes, never from cosign's presentation output or statement annotations. Legacy reports and public-key
-bundles cannot satisfy this keyless policy. Registry order is normalized; bounded candidates are checked
-against the externally selected policy, and success requires an authenticated bundle for each required type.
-The adapter bounds download output, candidate count and verification duration, uses private temporary bundle
-files, checks them for mutation and removes them on success or failure. It does not download artifact payloads
-or use a local-image snapshot. Missing evidence fails without a partial successful record or legacy fallback.
+Verification discovers standard OCI bundle referrers once per operation and fetches candidates lazily,
+reusing their exact bytes while checking the separately required signature and provenance. Descriptor
+digests normalize registry ordering; predicate annotations only prioritize candidates and cannot authorize
+or exclude evidence. Each fetched manifest and bundle must match its declared size, digest, subject and
+standard profile. Candidate bytes then pass the existing exact statement, predicate and certificate checks
+and pinned `verify-blob-attestation` with the independently selected digest, identity and issuer. Observed
+identity/issuer comes from the embedded certificate in those same verified bytes, never from cosign's
+presentation output or statement annotations. Legacy reports and public-key bundles cannot satisfy this
+keyless policy. Failed candidates cannot establish success; each required evidence type must authenticate.
+
+Discovery admits at most 256 descriptors in a 4 MiB index, with a 1 MiB manifest bound and a 64 MiB total
+HTTP response-body budget that includes failed candidates. Each required predicate has a separate search
+budget of 32 candidates and 8 MiB; an individual bundle is also bounded to 8 MiB. Standard OCI referrers
+tag-schema fallback is supported; legacy `.sig` and `.att` attachment lookup is not.
+Paginated discovery is refused until the adapter can read all pages within its bounds. Explicit
+credentials are confined to the selected registry, and an empty credential uses anonymous access rather
+than an ambient keychain. The existing operation deadline covers transport and cryptographic verification.
+Private temporary bundle files are checked for mutation and removed on success or failure. Unfetched
+historical or unrelated candidates are not claimed to be valid: this discovery requires an authenticated
+bundle for each required type, not validation of every registry referrer. Complete release payload and
+required SBOM membership checks remain separate and mandatory. The adapter does not download artifact
+payloads or use a local-image snapshot. Missing evidence fails without a partial successful record.
 Previously published legacy signature/provenance attachments must be reissued as bundles.
 
 The adapter is keyless only; the keyed/KMS fallback in §1 applies solely to detached qualified documents.
@@ -300,9 +313,18 @@ no-replace publication, subprocess-crash recovery from a partial signed set, and
 rename-and-restore. The qualified signer returns an opaque receipt bound to the exact signed subject; retained
 legacy signer/verifier surfaces are explicitly unqualified.
 
-This evidence does not exercise a public keyless service, trusted-root rotation, or a separately linked verifier
-binary. The stock signing subprocess is an operational producer tool, not consumer trust authority; its output
-remains untrusted until this independently pinned verification path authenticates it.
+OCI discovery contracts in `pkg/nvkr/sign/oci_registry_bundle_test.go` and
+`pkg/nvkr/sign/oci_bundle_runtime_test.go` count registry reads across mixed publication history, require
+exact provenance despite stale candidates or misleading annotations, and exercise response integrity,
+credential scope, search limits, cancellation and cleanup-error refusal. A negative overlay restoring eager
+fetching fails the historical-referrer request-count regression. `pkg/nvkr/sign/oci_interop_test.go` compares
+the reader's bytes with independent pinned cosign discovery and verifies those bytes using explicit local-key
+fixture trust. That fixture does not establish hosted keyless acceptance; the bounded real keyless replays
+and their limits are recorded in reconciliation.
+
+The contract and local-key suites do not exercise a public keyless service, trusted-root rotation, or a separately
+linked verifier binary. The stock signing subprocess is an operational producer tool, not consumer trust
+authority; its output remains untrusted until this independently pinned verification path authenticates it.
 
 End-to-end acceptance requires the fake, local-key, and gated keyless tiers named above; an egress-blocked
 offline round trip using a rotated mirrored root; and a dependency/binary inspection proving the high-assurance

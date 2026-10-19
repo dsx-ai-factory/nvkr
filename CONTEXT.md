@@ -181,6 +181,13 @@ Top-level `validate` runs diagnostics, whereas `definition validate` checks stat
 Outputs remain descriptive and cannot authorize qualification or promotion.
 _Avoid_: Recipe, test dispatcher framework, verification policy
 
+**Validator catalog (proposed)**:
+An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
+Proposed [ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
+instances and artifact-role bindings. This catalog and the versioned profiles are not implemented; the
+current published-source Validation profile above retains its existing admission rules.
+_Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
+
 **Release authenticity**:
 Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.
 _Avoid_: Payload verification, deployment readiness, full release acceptance

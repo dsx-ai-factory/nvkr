@@ -82,6 +82,10 @@ pilot, historical graph-capacity measurements, shared catalog ownership and rela
 The [input instructions](../inputs/definitions/nvke/README.md#four-family-pilot) own generation and checking;
 the combined candidate remains available pending consumer and qualification cutover.
 
+Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
+adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
+The catalog and versioned profiles are not implemented.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.

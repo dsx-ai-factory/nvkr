@@ -120,7 +120,11 @@ func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
 					}
 					found++
 					lines := strings.Split(strings.TrimSpace(step.Run), "\n")
-					if lines[len(lines)-1] != "exec ./nvkr-exec run "+command.name+" --policy 'qualification.yaml'" {
+					want := "exec ./nvkr-exec run " + command.name + " --policy 'qualification.yaml'"
+					if !policy.Source.Development && command.name == "qualify" {
+						want += " --issue-manifest"
+					}
+					if lines[len(lines)-1] != want {
 						t.Fatalf("%s does not replace its shell with the final owner command", command.workflow)
 					}
 					if lines[0] != "set -euo pipefail" || !strings.Contains(step.Run, "[ -n \"${NVKR_PIN_SOURCE_TOKEN_0:-}\" ]") || step.Timeout != 20 {
@@ -241,6 +245,18 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 				t.Fatal("publication credentials reached smoke worker")
 			}
 		}
+	}
+	manifestCalls := 0
+	for _, step := range final.Steps {
+		if strings.Contains(step.Run, "./nvkr-exec run qualify ") {
+			manifestCalls++
+			if !strings.Contains(step.Run, "--policy 'qualification.yaml' --issue-manifest") || step.ContinueOnError {
+				t.Fatal("production qualification must require manifest issuance under the same independent policy")
+			}
+		}
+	}
+	if manifestCalls != 1 || bytes.Contains(bundle.files[policy.Smoke.Workflow], []byte("--issue-manifest")) {
+		t.Fatal("manifest issuance escaped the single final signing job")
 	}
 	all := string(bundle.files[policy.QualificationWorkflow]) + string(bundle.files[policy.Smoke.Workflow])
 	for _, forbidden := range []string{"secrets.NVKR_CI_STORAGE_TOKEN", "secrets.NVKR_CI_STORAGE_WRITE_TOKEN", "secrets: inherit", "refs/pull/", "ref: ${{ github.event.workflow_run.head_sha }}", "--run ", "--results ", "@main", "@v4"} {

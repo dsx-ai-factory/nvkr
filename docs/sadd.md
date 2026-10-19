@@ -58,6 +58,11 @@ assertions and teardown; the parent harness owns host admission, outer leases,
 disk service and journaled network-control restoration. These trusted-code CI
 diagnostics do not add runtime authority to the artifact-verification core.
 
+Proposed [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
+test ownership and binds named artifact roles through explicit diagnostic profiles. The catalog, versioned
+profiles and controller/chart adapters are not implemented. Existing CLI and published-source diagnostics
+retain their separate admission and result contracts; catalog registration grants no qualification authority.
+
 ## Assumptions {#assumptions}
 
 These assumptions are subject to the current ADRs and milestone acceptance criteria.
@@ -737,8 +742,11 @@ External suites outside scope are explicitly not evaluated. Future required suit
 subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
 conformance or cluster qualification. M4 issues a canonical release manifest listing every artifact only after
 its exact passing qualification evidence is authenticated on every member, and attests it to the publication root
-under the qualification identity; issuance has contract coverage only. A failing, incomplete or wrong-signer
-verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
+under the qualification identity. The generated production qualifier invokes issuance in the same process
+through `run qualify --issue-manifest`, retaining live receipts and the exact canonical evidence. The same
+independently loaded qualification policy selects the expected signer and policy digest. Development stays
+qualification-only. Issuance has contract coverage only; hosted acceptance remains unproved. A failing,
+incomplete or wrong-signer verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
 deferred beyond the MVP.
 
 #### Qualified reproduction and release
