@@ -50,7 +50,7 @@ The local walkthrough publishes to its loopback registry using dry-run signing. 
 The demo uses the loopback registry on port 5000. It generates its own valid
 immutable attempt names.
 
-The non-FDE OS-image bootstrap uses one shared catalog. Its maintained routes
+The non-FDE OS-image bootstrap selects explicit catalog inputs. Its maintained routes
 are native ARM64 and AMD64 Linux Docker/KVM. The older Podman/TCG route and its
 stale toolchain pin are removed; generic NVKR Podman execution support is unchanged.
 
@@ -63,6 +63,10 @@ instead; its validation does not change the older wrapper's pin contract.
 CONTAINER_RUNTIME=docker NVKE_OS_ARCH=arm64 scripts/nvke-os-local.sh local-arm64-docker-001 1
 CONTAINER_RUNTIME=docker NVKE_OS_ARCH=amd64 scripts/nvke-os-local.sh local-amd64-docker-001 1
 ```
+
+The default guest is Ubuntu 26.04. Set `NVKE_OS_UBUNTU_VERSION=24.04` to select the
+[Ubuntu 24.04.5 inputs](../definitions/nvke-os-ubuntu24/README.md), including their
+separate compatible agent compiler. The architecture and native KVM requirements stay the same.
 
 Use a different immutable attempt name for each run. The historical Podman
 [full build and boot smoke](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md)

@@ -17,6 +17,7 @@ with Docker and KVM. This is a development bootstrap route.
 
 CONTAINER_RUNTIME defaults to docker; this launcher requires Docker.
 Set NVKE_OS_ARCH=amd64 or NVKE_OS_ARCH=arm64. ARM64 is the compatibility default.
+Set NVKE_OS_UBUNTU_VERSION=24.04 to select Ubuntu 24.04.5; 26.04 is the default.
 Set NVKE_LOCAL_CLONE to a local NVKE Git checkout when replacing the pinned
 repository fetch.
 EOF
@@ -39,6 +40,7 @@ fi
 input_root=".nvkr/inputs/${attempt}"
 runtime="${CONTAINER_RUNTIME:-docker}"
 arch="${NVKE_OS_ARCH:-arm64}"
+ubuntu_version="${NVKE_OS_UBUNTU_VERSION:-26.04}"
 case "${runtime}" in
   docker) ;;
   *) echo "CONTAINER_RUNTIME must be docker" >&2; exit 2 ;;
@@ -46,6 +48,10 @@ esac
 case "${arch}" in
   amd64|arm64) ;;
   *) echo "NVKE_OS_ARCH must be amd64 or arm64" >&2; exit 2 ;;
+esac
+case "${ubuntu_version}" in
+  24.04|26.04) ;;
+  *) echo "NVKE_OS_UBUNTU_VERSION must be 24.04 or 26.04" >&2; exit 2 ;;
 esac
 command -v "${runtime}" >/dev/null 2>&1 || {
   echo "container runtime not found: ${runtime}" >&2
@@ -83,15 +89,27 @@ command -v jq >/dev/null 2>&1 || {
 }
 definition_source="definitions/nvke-os/definition-${arch}-kvm.yaml"
 environment_source="definitions/nvke-os/environment-local-linux-${arch}-docker.yaml"
+catalog_source="definitions/nvke-os/catalog"
 overlay_source=""
+ubuntu_overlay_source=""
 # Only maintained Definitions that declare an architecture overlay need one.
 # A missing declared overlay still fails when NVKR loads the frozen Definition.
 if [[ -f "definitions/nvke-os/${arch}-kvm.yaml" ]]; then
   overlay_source="definitions/nvke-os/${arch}-kvm.yaml"
 fi
-required_inputs=("${definition_source}" "${environment_source}")
+if [[ "${ubuntu_version}" == 24.04 ]]; then
+  definition_source="definitions/nvke-os-ubuntu24/definition-${arch}.yaml"
+  catalog_source="definitions/nvke-m2/os-catalog"
+  overlay_source="definitions/nvke-m2/native-toolchains.yaml"
+  ubuntu_overlay_source="definitions/nvke-os-ubuntu24/ubuntu24.json"
+fi
+required_inputs=("${definition_source}" "${environment_source}"
+  "${catalog_source}/registry.yaml" "${catalog_source}/pins.lock.yaml")
 if [[ -n "${overlay_source}" ]]; then
   required_inputs+=("${overlay_source}")
+fi
+if [[ -n "${ubuntu_overlay_source}" ]]; then
+  required_inputs+=("${ubuntu_overlay_source}")
 fi
 for required_input in "${required_inputs[@]}"; do
   if [[ ! -f "${required_input}" ]]; then
@@ -123,10 +141,13 @@ fi
 mkdir -p "${input_root}/catalog"
 cp "${definition_source}" "${input_root}/definition.yaml"
 cp "${environment_source}" "${input_root}/environment-local.yaml"
-cp definitions/nvke-os/catalog/pins.lock.yaml "${input_root}/catalog/pins.lock.yaml"
-cp definitions/nvke-os/catalog/registry.yaml "${input_root}/catalog/registry.yaml"
+cp "${catalog_source}/pins.lock.yaml" "${input_root}/catalog/pins.lock.yaml"
+cp "${catalog_source}/registry.yaml" "${input_root}/catalog/registry.yaml"
 if [[ -n "${overlay_source}" ]]; then
-  cp "${overlay_source}" "${input_root}/${arch}-kvm.yaml"
+  cp "${overlay_source}" "${input_root}/$(basename "${overlay_source}")"
+fi
+if [[ -n "${ubuntu_overlay_source}" ]]; then
+  cp "${ubuntu_overlay_source}" "${input_root}/ubuntu24.json"
 fi
 
 # Build the bootstrap runner from this checkout in the exact pinned native
@@ -152,6 +173,14 @@ if [[ ! -x "${runner}" ]]; then
 fi
 
 frozen_definition="${input_root}/definition.yaml"
+if [[ "${ubuntu_version}" == 24.04 ]]; then
+  # Retain the selected M2 catalog stack beside the frozen Definition. The
+  # source paths point outside this attempt root and cannot be used here.
+  "${runner}" definition inspect --definition "${frozen_definition}" |
+    jq '.catalog.base = "catalog" | .catalog.overlays = ["native-toolchains.yaml", "ubuntu24.json"]' \
+    >"${input_root}/definition-ubuntu24.json"
+  frozen_definition="${input_root}/definition-ubuntu24.json"
+fi
 # The native Docker build is an attempt input, not a maintained release pin.
 # Freeze its observed exact ID through the existing catalog overlay contract
 # before compiling the executable Plan. The Packer runtime rechecks the ID.

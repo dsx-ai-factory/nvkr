@@ -29,6 +29,8 @@ each concept to a worked example.
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](../definitions/nvke-v1/README.md),
 [nine-output deploy example](../definitions/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../definitions/nvke-m2/README.md),
 and [OS-image routes](../definitions/nvke-os/README.md). The separate
+[Ubuntu 24 inputs](../definitions/nvke-os-ubuntu24/README.md) select native plain and
+public-bootstrap FDE disk builds alongside the existing Ubuntu 26 default. The
 [FDE-only diagnostic workflow](../definitions/nvke-fde/README.md) selects one native disk for branch iteration.
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 

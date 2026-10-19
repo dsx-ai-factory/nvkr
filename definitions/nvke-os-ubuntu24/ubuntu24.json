@@ -1,0 +1,69 @@
+{
+  "apiVersion": "nvkr.dev/catalog-overlay/v3",
+  "kind": "CatalogOverlay",
+  "name": "nvke-os-ubuntu24",
+  "requiresCatalogDigest": "sha256:81f80bd7d59ac90686c34bf55f72a916cdb696bc81ea04a7ca11a96d8e6f7b23",
+  "components": {
+    "nvke-agent": {
+      "component": {
+        "platforms": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "fromSource": true,
+        "builderType": "oci-hermetic",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "tag": "ff21ba8c07cafff74b68e238a8876af11e5beded",
+        "commit": "ff21ba8c07cafff74b68e238a8876af11e5beded",
+        "treeHash": "b915345debd33ccd63dfbf8146415bf20e94c4ea",
+        "toolchainImages": {
+          "amd64": "docker.io/library/golang@sha256:55395706e9703db746cc507abfc4eb2aea75918f8a8024e4848e2cb81004f5ad",
+          "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+        },
+        "cgo": true,
+        "outputType": "host-package",
+        "buildCommand": [
+          "bash",
+          "-ec",
+          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\nGOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \\\n  VERSION=v0.2.1-81-gff21ba8 \\\n  NFPM_BIN=/src/agent/nvkr-tools/nfpm \\\n  DEB_OUTPUT=/src/agent/bin/nvke-agent.deb\n# Match the pinned source's build-guest.sh: the agent is dynamic, but\n# its updater must remain static. A failed check denies the package output.\nbash /src/os-image/nix/check-ubuntu-elf.sh --arch {{.Arch}} \\\n  /src/agent/bin/linux_{{.Arch}}/nke-agent\nreadonly updater=/src/agent/bin/linux_{{.Arch}}/nke-agent-updater\ntest -f \"$updater\" || { echo 'expected updater binary' >&2; exit 1; }\nheaders=$(readelf -lW \"$updater\")\n[[ \"$headers\" != *INTERP* ]] || {\n  echo 'expected a static updater, found a program interpreter' >&2; exit 1;\n}\n"
+        ],
+        "artifactPath": "agent/bin/nvke-agent.deb",
+        "writeDir": "agent/bin",
+        "vendorCommand": [
+          "bash",
+          "-ec",
+          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\ncd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n# Capture the exact packaging executable alongside the vendored source.\n# The build phase remains offline and cannot bootstrap another nfpm.\nreadonly package_arch='{{.Arch}}'\ncase \"$package_arch\" in\n  amd64) release_arch=x86_64; archive_sha=0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783; binary_sha=17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936 ;;\n  arm64) release_arch=arm64; archive_sha=1c0f5f2999b9a974bfb04fdb0cc3306096de530ac5dbb25d739cc5f5219c919c; binary_sha=4d7ddf169945f7f557ac5373035d373429050d00476925953560e1ac65e16c74 ;;\n  *) echo 'unsupported nfpm architecture' >&2; exit 1 ;;\nesac\nmkdir nvkr-tools\ncurl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 30 --max-time 300 --max-filesize 67108864 \\\n  --output nvkr-tools/nfpm.tar.gz \\\n  \"https://github.com/goreleaser/nfpm/releases/download/v2.47.0/nfpm_2.47.0_Linux_${release_arch}.tar.gz\"\nprintf '%s  %s\\n' \"$archive_sha\" nvkr-tools/nfpm.tar.gz | sha256sum --strict -c -\ntar -xzf nvkr-tools/nfpm.tar.gz -C nvkr-tools nfpm LICENSE.md\nprintf '%s  %s\\n' \"$binary_sha\" nvkr-tools/nfpm | sha256sum --strict -c -\nchmod 0755 nvkr-tools/nfpm\n"
+        ],
+        "sourceDateEpoch": 1791257393
+      }
+    },
+    "ubuntu-installer-iso-amd64": {
+      "version": "24.04.5",
+      "sourceDateEpoch": 1791257393,
+      "outputType": "raw",
+      "prebuilt": {
+        "url": "https://releases.ubuntu.com/24.04.5/ubuntu-24.04.5-live-server-amd64.iso",
+        "digests": {
+          "amd64": "sha256:97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8"
+        },
+        "evidence": {
+          "none": true
+        }
+      }
+    },
+    "ubuntu-installer-iso": {
+      "version": "24.04.5",
+      "sourceDateEpoch": 1791257393,
+      "outputType": "raw",
+      "prebuilt": {
+        "url": "https://cdimage.ubuntu.com/ubuntu/releases/24.04.5/release/ubuntu-24.04.5-live-server-arm64.iso",
+        "digests": {
+          "arm64": "sha256:f12484464c7d4d73e2167e0a7dbda1e669f8fae9bcf778dc0944937034b320cb"
+        },
+        "evidence": {
+          "none": true
+        }
+      }
+    }
+  }
+}

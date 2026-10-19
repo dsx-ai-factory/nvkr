@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-os-ubuntu24-image-amd64
+  description: Build one Ubuntu 24.04.5 native plain disk; build-only candidate.
+catalog:
+  base: ../nvke-v1/catalog
+outputs:
+  - name: nvke-node-image-ubuntu24-amd64
+    platform: linux/amd64
+    format: disk-image
+    catalog:
+      base: ../nvke-m2/os-catalog
+      overlays: [../nvke-m2/native-toolchains.yaml, ubuntu24.json]
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-image-amd64
+      - nvke-patched-installer-iso-amd64
+      - nvke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso-amd64

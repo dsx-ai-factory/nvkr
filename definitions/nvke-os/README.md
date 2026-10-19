@@ -16,6 +16,12 @@ Their Definitions select explicit execution behavior:
 - `definition-arm64-kvm.yaml` requires native Linux ARM64 KVM and uses source-owned Packer defaults for the host CPU.
 - `definition-amd64-kvm.yaml` selects the native Linux AMD64 KVM route and its separate, digest-pinned Ubuntu installer ISO.
 
+These inputs retain Ubuntu 26.04. For opt-in Ubuntu 24.04.5 builds, use the
+[Ubuntu 24 inputs](../nvke-os-ubuntu24/README.md). The same native local wrapper selects
+them with `NVKE_OS_UBUNTU_VERSION=24.04`; they include a separately pinned agent builder
+compatible with the older guest libc. Separate hosted Definitions cover plain and public-bootstrap
+FDE disks on both architectures.
+
 For a first-time seven-lane Apple Silicon demo with Docker/Colima TCG, use the
 [laptop build guide](../../docs/local-development.md#build-the-complete-selection-including-the-os)
 and its `nvke-full-arm64-local.sh ... os` launcher instead. The older wrapper in
