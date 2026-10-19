@@ -103,6 +103,7 @@ func TestGitHubLocatorTransientServerRetries(t *testing.T) {
 				}
 			})
 		}
+	}
 }
 
 func TestGitHubLocatorAPIRetryIsBoundedAndCancellationAware(t *testing.T) {
