@@ -244,7 +244,7 @@ incomplete; a build failure cannot create an implicit deferral.
 2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance binds its selected source and material inputs; every required inside-image component is accounted for in those production inputs. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
 3. CWE controller and NVKE container images are either built (`wrapped-build`, provenance naming the NVKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NVKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
 4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
-5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
+5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL. Partial retries may retain authenticated successful outputs from earlier attempts of that run, with unchanged inputs and original evidence. Artifacts from different runs cannot be combined to satisfy this criterion.
 
 **Definition of done**
 - Tests cover tag-move refusal for image, blob, and package pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege, network or credentials before any output is written; the credential-free build phase; release membership rejecting a member digest that differs from the published digest; optional embedded metadata that is omitted, agrees with its pinned upstream reference, or fails because referenced upstream metadata is missing, malformed or inconsistent.
@@ -289,10 +289,13 @@ merge and repository tests do not satisfy those criteria.
 - **Trusted source and invocation.** Qualification admits only successful approved builds from the intended
   repository and default branch, authenticating the source Run separately from the qualification invocation.
   It reuses the same published bytes and never rebuilds or substitutes them. Missing required outputs cannot
-  be dropped or treated as passing.
+  be dropped or treated as passing. A retry may retain authenticated successful outputs from earlier attempts
+  of the same producing workflow run. Successful tool checks may likewise be retained within the same
+  qualification workflow run when their inputs, policy and complete membership are unchanged. Original
+  attempt identities remain visible; later failures cannot be hidden by an earlier passing result.
 
 **Deferred scope.** Full disk-content inspection and material reconciliation, including embedded disk-content
-verification; waived verdicts; offline pull-request qualification; a dedicated verify-only dispatch; incremental
+verification; waived verdicts; offline pull-request qualification; a dedicated verify-only dispatch; cross-run
 qualification reuse. Disk evidence explicitly remains producer-only. Cluster end-to-end tests, boot validation,
 vulnerability scanning and byte-identical reproduction are outside this MVP. External suites outside scope
 are explicitly reported as not evaluated, never passed. Any later required suite must supply authenticated
@@ -300,8 +303,8 @@ results bound to exact artifact subjects; missing or failing required results bl
 
 **Acceptance criteria**
 1. **Complete, exact candidate.** Qualification accounts for every selected output and authenticates its
-   relationship to the originating Run, attempt, commit, Definition and relevant input identities. Missing,
-   extra, duplicate, substituted or mismatched members fail with a specific error. Unrelated Run evidence
+   relationship to the originating Run, original attempt identities, commit, Definition and relevant input
+   identities. Missing, extra, duplicate, substituted or mismatched members fail with a specific error. Unrelated Run evidence
    cannot satisfy the candidate.
 2. **Authenticated checks.** Every output passes schema validation, applicable pin/digest consistency and
    verification of build signatures and provenance against the expected signer and issuer. Exact source, patch,
@@ -318,8 +321,8 @@ results bound to exact artifact subjects; missing or failing required results bl
    failed verdict blocks all qualification attestations for that invocation and preserves failure diagnostics.
 5. **Independent signed evidence.** After all verdicts pass, evidence is signed for every selected artifact
    under a qualification identity distinct from the builder. Evidence binds exact subjects, originating Run
-   and attempt, Definition and relevant input identities, check results, gate version and qualification
-   invocation. Disk evidence explicitly states that content inspection was not performed.
+   and original attempt identities, Definition and relevant input identities, check results, gate version and
+   qualification invocation. Disk evidence explicitly states that content inspection was not performed.
 6. **Trusted invocation.** Only successful approved builds from the intended repository and default branch
    enter qualification. Records belong to the exact originating build. Smoke execution has no qualification
    signing authority. A green build alone does not establish qualification.

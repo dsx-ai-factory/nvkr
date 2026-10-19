@@ -373,8 +373,10 @@ Partial retries may reuse an authenticated output-local root from an earlier att
 run. The server, repository, run ID and workflow builder must match exactly; canonical positive attempt
 numbers must satisfy preparation ≤ signing ≤ the consuming attempt. Different runs, future attempts,
 changed Plans or missing evidence fail closed. Signing may retry against an earlier prepared root without
-rewriting its metadata or original predicate. This exception is limited to pipeline-attested metadata
-assembly/finalization; it does not relax qualified execution or live disk ownership.
+rewriting its metadata or original predicate. This exception applies to pipeline-attested metadata
+assembly/finalization and ADR-16's independent artifact checks; it does not relax qualified execution or live
+disk ownership. Qualification authenticates the successful completion attempt separately and preserves each
+output's original preparation and signing identities rather than requiring every output to be rebuilt.
 Output-local chart reproduction transports its bound image packages and their producer/evidence
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.

@@ -7,7 +7,7 @@ unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#four-f
 current selections; [reconciliation](adr/reconciliation.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
-The pilot incorporates upstream `afdca952` (2026-10-19). Current local measurements and historical research are reported
+The pilot incorporates upstream `22831fb1` (2026-10-19). Current local measurements and historical research are reported
 separately. Historical tables retain baseline `258ab29bdfa0a6f65de9b761272f186293c6aa0e`; they do not
 describe the current generated bundles.
 This document changes no ADR contract or organizational acceptance decision.
@@ -45,8 +45,9 @@ and drift contracts, not artifact production.
 
 ### Current local validation
 
-The extended split contract passed on 2026-10-19 after the upstream merge: all 73 complete native build records and 69 named
-output-binding records matched the combined Plan byte-for-byte, including catalogs, producer graphs,
+After incorporating upstream `22831fb1` and the bootstrap dispatch fix, the extended split contracts passed
+on 2026-10-19 in 6.055 seconds: all 73 complete native build records and 69 named output-binding records
+matched the combined Plan byte-for-byte, including catalogs, producer graphs,
 material selections, evidence and aggregate child bindings. Each generated family bundle matched exact
 regeneration and retained independent file ownership. This comparison uses the validated combined Plan's
 catalog snapshots; it does not independently fetch upstream sources or prove reproduced artifact bytes.
@@ -56,38 +57,41 @@ catalog snapshots; it does not independently fetch upstream sources or prove rep
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Core | 20 | 24 | 210 | 198 | 130,455 | 651,282 | 15,247 |
 | Services | 28 | 28 | 258 | 233 | 151,551 | 548,972 | 18,272 |
-| Telemetry | 17 | 17 | 160 | 153 | 102,093 | 486,661 | 11,709 |
-| Disks | 4 | 4 | 106 | 55 | 61,523 | 501,720 | 5,293 |
-| Total | 69 | 73 | 734 | 639 | 445,622 | 2,188,635 | 50,521 |
+| Telemetry | 17 | 17 | 160 | 153 | 102,369 | 486,661 | 11,713 |
+| Disks | 4 | 4 | 106 | 55 | 62,075 | 501,720 | 5,301 |
+| Total | 69 | 73 | 734 | 639 | 446,450 | 2,188,635 | 50,533 |
 
 Measured on 2026-10-19 with the same current generator, the retained combined Plan has 716 nodes and its
 workflow has 580 jobs, 394,695 bytes and 47,055 expanded YAML events; the Plan is 2,153,454 bytes. The split
 reduces the largest workflow to 233 jobs, 151,551 bytes and 18,272 events, while total jobs rise by 59
-(10.17%) and total workflow bytes rise to 445,622. These measurements show reduced per-workflow breadth and parser demand,
+(10.17%) and total workflow bytes rise to 446,450. These measurements show reduced per-workflow breadth and parser demand,
 with higher aggregate job and byte counts.
 
-Each workflow's limits apply separately; the total event count is not one parsed workflow. All four
-family workflows and catalog refresh passed actionlint; relaxed yamllint passed these workflows, the
-family actions and authored inputs with line-length warnings.
+Each workflow's limits apply separately; the total event count is not one parsed workflow. Every helper
+bootstrap now enforces the authored dispatch policy before checkout, helper compilation or private CI
+storage upload, including helpers without catalog credentials. The validator rejects missing or relaxed
+guards. Negative contracts cover unadmitted feature branches, tags and push events for build-only,
+publication and named-runtime helpers. These generation contracts establish no hosted execution.
+[Bootstrap dispatch contracts](../pkg/nvkr/factory/github_bootstrap_dispatch_test.go)
 
-`make workflows-check` also passed on 2026-10-19 for all four families, combined production and its
+Current actionlint and relaxed yamllint checks passed; yamllint reported line-length warnings.
+
+`make workflows-check` passed after this integration for all four families, combined production and its
 qualification bundle, development and its qualification bundle, both nightly bundles and catalog
 refresh. These CLI checks reauthenticated source pins and confirmed exact generated-bundle drift.
-This local source validation establishes no hosted execution, publication, qualification or downstream
-acceptance.
+The prior head `7a3a9f39` passed the
+[hosted Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/39217995501). That hosted evidence
+predates the current upstream integration and bootstrap fix. Neither result establishes hosted family
+execution, publication, qualification or downstream acceptance.
 
-The initial uncached `make check GO_TEST_FLAGS=-count=1` at `c19fdead` did not pass on macOS: delivery, factory and lifecycle
-exceeded the 20-minute package timeout. Formatting, license headers, vet, lint, shell checks and Python
-tests passed; a separate `make vulncheck` completed with no vulnerabilities found. The three subtests
-active at timeout (`readback_corrupt`, `missing_output_predicate`, and `version_mismatch`) each passed
-in a bounded focused rerun. Other Go packages completed successfully. The full-suite timeouts remain
-unresolved in that local run; these focused passes do not establish a clean repository gate.
-The initial [PR CI run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39191781677)
-passed its Go check but failed workflow drift on the synthetic merge with newer upstream generator code.
-The current regeneration and drift checks incorporate those generator changes; no passing aggregate
-hosted gate is inferred from the earlier Go check.
+The uncached macOS `make check GO_TEST_FLAGS=-count=1` passed after this integration, including all Go
+packages, formatting, license headers, vet, lint, shell/Python checks and the vulnerability scan; no
+vulnerabilities were found. Delivery, factory and lifecycle completed in approximately 713, 824 and
+1,007 seconds respectively, within the unchanged 20-minute package timeout. Earlier local runs at
+`c19fdead` and `7a3a9f39` timed out in those packages; this successful run does not establish the cause
+of that earlier slowness. No test assertions or timeouts were weakened.
 
-Focused source-access contracts also passed: acquired-only root/output pin-set sources are admitted,
+At `7a3a9f39`, focused source-access contracts also passed: acquired-only root/output pin-set sources are admitted,
 ordinary unselected and unknown sources are rejected, local execution remains unsupported, snapshot
 substitution returns no bundle, and rendered credentials remain confined to catalog revalidation steps.
 Existing fetch-only and repository-scoped credential tests passed. These fixture contracts establish no

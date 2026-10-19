@@ -329,10 +329,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				}
 			}
 		}
-		wantCondition := ""
-		if plan.Environment.GitHubDevelopment || len(catalogEnv) > 0 {
-			wantCondition = "${{ " + githubDispatchCondition(plan) + " }}"
-		}
+		wantCondition := "${{ " + githubDispatchCondition(plan) + " }}"
 		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != wantSteps || job.Steps[0].Uses != actions.Checkout {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}

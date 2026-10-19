@@ -896,7 +896,9 @@ Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selec
 Generated Run workflows are manual-only. Production execution admits the default branch plus exact branch
 names explicitly listed in `Environment.githubDispatchBranches`. The optional list is sorted and unique;
 wildcards, tag/PR refs and expression syntax are rejected. It is bound into Environment and Plan identity,
-cloned with its owner, and enforced in source access, execution and finalization guards. Local execution
+cloned with its owner, and enforced in every helper bootstrap, source access, execution and finalization guard.
+Bootstrap admission applies before checkout, helper compilation and CI-storage writes, including when no
+catalog credential is required. The bundle validator rejects missing or broadened bootstrap guards. Local execution
 rejects this GitHub-only option. Omitting it preserves default-branch-only execution.
 Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
 or outputs change. Default-branch push
@@ -961,9 +963,12 @@ with vendored inputs. The renderer must reject guards it cannot express, includi
 family or credentials in build phases. These are testable contracts; current rendering is not proof that a
 provider or protected environment has exercised them.
 
-The production M3 qualification contract admits only the exact successful originating build from the intended repository
-and default branch. Source Run, attempt, commit, workflow identity, Definition, Environment and Plan bindings
-are authenticated separately from the qualification invocation. A manually dispatched qualification workflow
+The production M3 qualification contract authenticates the successful completion attempt of the originating build from
+the intended repository and default branch. Source Run, original output attempts, commit, workflow identity,
+Definition, Environment and Plan bindings are authenticated separately from the qualification invocation.
+Earlier successful output publications may be retained within the same producer run under ADR-20; earlier
+successful native workers may be retained within the same qualifier run under ADR-16. Each keeps its original
+authenticated invocation and unchanged inputs. A manually dispatched qualification workflow
 does not itself prove that its source build succeeded or came from the approved branch. The M2 validation-branch
 exception cannot authorize qualification. Any later workflow adapter must reject unrelated or unsuccessful
 Runs before downloading executable subjects or requesting qualification signing credentials.
@@ -981,7 +986,10 @@ Both development qualification jobs use `nvkr-dev-release`. Workers receive the 
 reader and OIDC for their own reports; only the final qualifier receives the development writer and OIDC
 for qualification attachments. Repository-token package permissions remain read-only. All worker certificate,
 caller commit/attempt, exact artifact, source and complete-set checks remain mandatory. The development
-workflow must be registered on the default branch before a feature-branch dispatch; registration grants no
+qualifier may retain earlier successful workers from the same qualification run under ADR-16; their original
+branch, report/certificate invocation and private-carrier attempt remain bound. This does not relax the
+development producer's exact source-attempt namespace. The development workflow must be registered on the
+default branch before a feature-branch dispatch; registration grants no
 production identity and the workflow refuses execution on the default branch.
 
 Delivered-tool smoke execution receives the exact authenticated payloads, has networking disabled and has no

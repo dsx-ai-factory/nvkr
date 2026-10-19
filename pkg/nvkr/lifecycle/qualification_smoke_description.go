@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 )
 
 // Validate checks the complete inspectable shape. Only hosted authentication can
@@ -40,7 +41,10 @@ func (description ToolSmokeDescription) Validate() error {
 		if err := worker.Validate(); err != nil {
 			return err
 		}
-		if worker.Platform <= previous || worker.Image != policy.Smoke.Images[worker.Platform] || worker.PolicyDigest != digest || worker.Invocation != description.Invocation || !sameSmokeChecks(worker.ArtifactChecks, description.ArtifactChecks) {
+		if err := matchSmokeWorkerInvocation(worker.Invocation, description.Invocation); err != nil {
+			return err
+		}
+		if worker.Platform <= previous || worker.Image != policy.Smoke.Images[worker.Platform] || worker.PolicyDigest != digest || !sameSmokeChecks(worker.ArtifactChecks, description.ArtifactChecks) {
 			return e.New(e.CodeGateUnmet, "native worker does not bind the exact smoke scope")
 		}
 		previous = worker.Platform
@@ -127,6 +131,26 @@ func (description ToolSmokeDescription) Validate() error {
 	}
 	if len(members) != 0 || len(exemptions) != 0 || len(memberExemptions) != 0 {
 		return e.New(e.CodeReleaseIncomplete, "smoke evidence contains extra output scope")
+	}
+	return nil
+}
+
+// A retried qualifier may retain a worker's original attempt identity, but every
+// other workflow identity field must match. This checks descriptions only; the
+// hosted owner separately authenticates the latest provider job and exact leaf.
+func matchSmokeWorkerInvocation(worker, current qualificationorigin.Description) error {
+	if err := worker.Validate(); err != nil {
+		return err
+	}
+	if err := current.Validate(); err != nil {
+		return err
+	}
+	if len(worker.Attempt) > len(current.Attempt) || len(worker.Attempt) == len(current.Attempt) && worker.Attempt > current.Attempt {
+		return e.New(e.CodeGateUnmet, "native worker invocation is newer than the current qualifier attempt")
+	}
+	worker.Attempt, worker.InvocationID = current.Attempt, current.InvocationID
+	if worker != current {
+		return e.New(e.CodeGateUnmet, "native worker invocation differs from the qualifier Run, workflow or commit")
 	}
 	return nil
 }

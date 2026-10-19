@@ -8,6 +8,7 @@ import (
 	"context"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/testutil"
@@ -193,6 +194,12 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)
+			}
+			workflowDocument := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			for id, job := range workflowDocument.Jobs {
+				if strings.HasPrefix(id, "build-runner-") && job.If != "${{ "+githubExecutionCondition+" }}" {
+					t.Fatalf("family helper %s permits nondefault-ref execution: %q", id, job.If)
+				}
 			}
 			if bundle.WorkflowPath != ".github/workflows/nvkr-run-nvke-"+family.name+".yml" ||
 				bundle.PlanPath != ".github/nvkr-run-nvke-"+family.name+"/plan.json" ||
