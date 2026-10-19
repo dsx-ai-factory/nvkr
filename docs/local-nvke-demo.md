@@ -227,6 +227,16 @@ kernel override, while Linux retains its ARM64 `linux-nvidia-64k` default.
 The Plan records that platform-specific selection; shared source pins are
 unchanged. Do not replace a pin with `main` or `latest` to force compatibility.
 
+The site uses the source-selected ARM64 MachineImage boot script with the
+current local disk URL. NICoSim owns its parsing, image boot and DHCP identity
+registration; the URL itself is not content authentication.
+
+Before site or tenant agents start, the adapter imports the selected named OVN
+image by native manifest digest and projects the matching chart's digest settings.
+The image bundled in the OS package is not used as proof of that separate output.
+Conformance still requires exact runtime manifest observations before and after
+the suite. A runtime exposing only a config ID fails that check.
+
 The shared workflow:
 
 1. NVKR builds/acquires the Definition's named outputs, including Debian package

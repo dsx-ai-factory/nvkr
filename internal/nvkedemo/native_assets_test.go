@@ -62,7 +62,7 @@ func TestNativeAssetsLocalRuntimeClosure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(assets.RuntimeOutputs) != len(runtimeImages) || len(assets.Images) != len(runtimeImages)+5+len(nativeCAPIAuthImages) {
+	if len(assets.RuntimeOutputs) != len(runtimeImages) || len(assets.Images) != len(runtimeImages)+6+len(nativeCAPIAuthImages) {
 		t.Fatal("incomplete local runtime image closure")
 	}
 	for _, role := range runtimeImages {

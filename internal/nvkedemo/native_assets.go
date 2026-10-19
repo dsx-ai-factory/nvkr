@@ -94,6 +94,10 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	if err != nil {
 		return assets, err
 	}
+	_, ovnOutput, _, err := selectedOVNOutputs(cfg.Network)
+	if err != nil {
+		return assets, err
+	}
 	profilesOutput, err := selectedProfilesOutput(cfg.Network)
 	if err != nil {
 		return assets, err
@@ -106,6 +110,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		providersRun = cfg.ProvidersRun
 	}
 	selections := []nativeImageSelection{
+		{"ovn", cfg.DeploymentRun, ovnOutput, "", lifecycle.Artifact{}},
 		{"capnico", providersRun, "capnico-controller-arm64", "ghcr.io/dsx-ai-factory/cluster-api-provider-nico/controller:v0.0.45", lifecycle.Artifact{}},
 		{"controller", controllerRun, "cwe", "docker.io/library/nke-controller:latest", lifecycle.Artifact{}},
 		{"profiles", cfg.DeploymentRun, profilesOutput, "docker.io/library/cwe-profiles:local", lifecycle.Artifact{}},
@@ -157,6 +162,9 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		selection.observed, err = CompleteOutput(ctx, selection.root, selection.output, "oci")
 		if err != nil {
 			return assets, err
+		}
+		if selection.role == "ovn" {
+			selection.reference = "localhost/nvke/ovn-kubernetes@" + selection.observed.Digest
 		}
 		if strings.HasPrefix(selection.role, "runtime-") {
 			selection.reference = "docker.io/nvkr-local/" + strings.TrimPrefix(selection.role, "runtime-") + "@" + selection.observed.Digest

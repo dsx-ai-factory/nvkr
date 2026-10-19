@@ -55,7 +55,7 @@ func TestNativeGuestsUseTenantIPAMPool(t *testing.T) {
 				_, _ = w.Write([]byte(`{"id":"created-instance"}`))
 			}))
 			defer server.Close()
-			raw, err := createNativeGuest(t.Context(), server.URL, name, TenantInstanceType, []byte(startup))
+			raw, err := createNativeGuest(t.Context(), server.URL, name, TenantInstanceType, []byte(startup), nil)
 			if err != nil || string(raw) != `{"id":"created-instance"}` || calls != 1 {
 				t.Fatalf("create calls=%d error=%v", calls, err)
 			}
@@ -74,7 +74,7 @@ func TestNativeGuestCreateRejectsHTTPFailuresAndRedirects(t *testing.T) {
 				_, _ = w.Write([]byte("test-only-private-error"))
 			}))
 			defer server.Close()
-			raw, err := createNativeGuest(t.Context(), server.URL, "site", TenantInstanceType, []byte("#cloud-config\n"))
+			raw, err := createNativeGuest(t.Context(), server.URL, "site", TenantInstanceType, []byte("#cloud-config\n"), nil)
 			if err == nil || len(raw) != 0 || calls != 1 || strings.Contains(err.Error(), "test-only-private-error") {
 				t.Fatalf("failure calls=%d error=%v", calls, err)
 			}
@@ -95,7 +95,7 @@ func TestNativeGuestCreateAdmissionBeforeNetwork(t *testing.T) {
 				cancel()
 				startup = []byte("#cloud-config\n")
 			}
-			_, err := createNativeGuest(ctx, server.URL, "site", TenantInstanceType, startup)
+			_, err := createNativeGuest(ctx, server.URL, "site", TenantInstanceType, startup, nil)
 			if err == nil || calls != 0 || canceled && !errors.Is(err, context.Canceled) {
 				t.Fatalf("admission calls=%d error=%v", calls, err)
 			}

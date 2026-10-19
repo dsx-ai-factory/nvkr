@@ -330,7 +330,14 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	if err := os.WriteFile(userdata, userBytes, 0600); err != nil {
 		return err
 	}
-	created, err := createNativeGuest(ctx, api, instanceName, instanceType, userBytes)
+	var boot *nativeSiteBoot
+	if cfg.site != nil {
+		boot = cfg.site.boot
+		if boot == nil || boot.diskURL != disk.url {
+			return errors.New("native site create lacks its current projected MachineImage boot selection")
+		}
+	}
+	created, err := createNativeGuest(ctx, api, instanceName, instanceType, userBytes, boot)
 	if err != nil {
 		return err
 	}
@@ -386,23 +393,30 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 // createNativeGuest uses the pinned NICo API's existing startup-data field.
 // The source CLI only accepts inline startup data, which would expose the
 // site's private handoff credentials in process arguments.
-func createNativeGuest(ctx context.Context, api, name, instanceType string, userData []byte) ([]byte, error) {
+func createNativeGuest(ctx context.Context, api, name, instanceType string, userData []byte, boot *nativeSiteBoot) ([]byte, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
 	if len(userData) == 0 || len(userData) > 1<<20 {
 		return nil, errors.New("native guest startup data must be nonempty and at most 1 MiB")
 	}
+	if instanceType == "a1b2c3d4-0005-4000-8000-000000000004" && (boot == nil || boot.script == "" || boot.diskURL == "") {
+		return nil, errors.New("full native site requires its source-selected MachineImage boot script")
+	}
 	// Site and tenant guests share NICo's VPC-prefix allocator. Using its
 	// independent subnet allocator here could issue overlapping addresses.
-	payload, err := json.Marshal(map[string]any{
+	body := map[string]any{
 		"name": name, "tenantId": "d282929f-49d5-4dec-8d27-21ceb30ade19",
 		"instanceTypeId": instanceType, "vpcId": VPCID,
 		"labels":           map[string]string{"nke.nvidia.com/node-id": name},
 		"sshKeyGroupIds":   []string{},
 		"interfaces":       []map[string]string{{"vpcPrefixId": TenantPrefixID}},
 		"phoneHomeEnabled": true, "userData": string(userData),
-	})
+	}
+	if boot != nil {
+		body["ipxeScript"] = boot.script
+	}
+	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}

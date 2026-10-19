@@ -127,7 +127,7 @@ func nativeWorkloadRenderedCommands(t *testing.T, raw string, ovn bool) []any {
 }
 
 func TestNativeWorkloadImportGatesRestartsDespiteCloudInitContinuation(t *testing.T) {
-	for _, fail := range []string{"", "package", "package-partial", "package-partial-stale-ready", "sysctl", "reload", "download", "digest", "containerd", "import", "cri", "spire"} {
+	for _, fail := range []string{"", "package", "package-partial", "package-partial-stale-ready", "cni-package", "values", "sysctl", "reload", "download", "digest", "containerd", "import", "cri", "spire"} {
 		name := fail
 		if name == "" {
 			name = "success"
@@ -158,7 +158,7 @@ case "$*" in
   : > "$RUNTIME_READY"
   case "$FAIL_STAGE" in package-partial|package-partial-stale-ready) exit 42 ;; esac
   ;;
- *) printf 'apt-cni\n' >> "$CALLS" ;;
+ *) printf 'apt-cni\n' >> "$CALLS"; test "$FAIL_STAGE" != cni-package ;;
 esac
 `,
 				"systemctl": `
@@ -192,7 +192,10 @@ test "$FAIL_STAGE" != import
 `,
 				"crictl": `
 printf 'crictl %s\n' "$*" >> "$CALLS"
-test "$*" = "--runtime-endpoint unix:///run/containerd/containerd.sock --image-endpoint unix:///run/containerd/containerd.sock --timeout 10s inspecti --quiet $WORKLOAD_IMAGE"
+case "$*" in
+ *"inspecti --quiet $WORKLOAD_IMAGE"|*"inspecti --quiet $OVN_IMAGE") ;;
+ *) exit 98;;
+esac
 test -f "$IMPORTED"
 test "$FAIL_STAGE" != cri
 `,
@@ -204,8 +207,30 @@ test "$FAIL_STAGE" != cri
 				}
 			}
 			init := map[string]any{"userDataTemplate": nativeWorkloadTestTemplate()}
-			if err := nativeDemoWorkloadPolicy(map[string]any{"machineInit": init}, "http://172.30.0.1:18080/files/workload.tar", digest); err != nil {
+			ovnImage := "localhost/nvke/ovn-kubernetes@sha256:" + strings.Repeat("b", 64)
+			values, err := nativeOVNValuesScript(siteOVNVersion, ovnImage)
+			if err != nil {
 				t.Fatal(err)
+			}
+			preloads := []nativeImagePreload{
+				{"http://172.30.0.1:18080/files/ovn.tar", digest, "/var/lib/nvke-demo-ovn.tar", ovnImage},
+				{"http://172.30.0.1:18080/files/workload.tar", digest, "/var/lib/nvke-demo-workload.tar", WorkloadImage},
+			}
+			spec := map[string]any{"machineInit": init}
+			if err := nativeDemoImagePolicy(spec, preloads, values); err != nil {
+				t.Fatal(err)
+			}
+			if err := nativeDemoOVNPackagePolicyWithGuard(spec, "ovn", true); err != nil {
+				t.Fatal(err)
+			}
+			chartRoot := filepath.Join(root, "chart")
+			if fail != "values" {
+				if err := os.Mkdir(chartRoot, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(chartRoot, "Chart.yaml"), []byte("version: 2.4.2\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
 			}
 			commands := nativeWorkloadRenderedCommands(t, init["userDataTemplate"].(string), true)
 			state := filepath.Join(root, "packages.state")
@@ -215,7 +240,7 @@ test "$FAIL_STAGE" != cri
 				}
 			}
 			calls := filepath.Join(root, "calls")
-			env := SetEnv(os.Environ(), map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "CALLS": calls, "PAYLOAD": payloadFile, "RUNTIME_READY": filepath.Join(root, "runtime-ready"), "IMPORTED": filepath.Join(root, "imported"), "WORKLOAD_IMAGE": WorkloadImage, "FAIL_STAGE": fail})
+			env := SetEnv(os.Environ(), map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "CALLS": calls, "PAYLOAD": payloadFile, "RUNTIME_READY": filepath.Join(root, "runtime-ready"), "IMPORTED": filepath.Join(root, "imported"), "WORKLOAD_IMAGE": WorkloadImage, "OVN_IMAGE": ovnImage, "FAIL_STAGE": fail})
 			// Like cloud-init, continue to later items after a failed runcmd command.
 			// Guest-only absolute paths are redirected into the isolated fixture.
 			var failures int
@@ -230,7 +255,8 @@ test "$FAIL_STAGE" != cri
 						if !ok {
 							t.Fatal("non-string command argument")
 						}
-						argv = append(argv, strings.ReplaceAll(strings.ReplaceAll(value, "/var/lib/nvke-demo-workload.tar", filepath.Join(root, "workload.tar")), "/run/nvke-demo-workload-packages.state", state))
+						value = strings.NewReplacer("/var/lib/nvke-demo-workload.tar", filepath.Join(root, "workload.tar"), "/var/lib/nvke-demo-ovn.tar", filepath.Join(root, "ovn.tar"), "/run/nvke-demo-workload-packages.state", state, "/etc/dgx/ovn-kubernetes", chartRoot).Replace(value)
+						argv = append(argv, value)
 					}
 				default:
 					t.Fatalf("unexpected source runcmd %T", row)
@@ -256,7 +282,7 @@ test "$FAIL_STAGE" != cri
 				t.Fatal("did not simulate continuation after the guarded item", log)
 			}
 			if fail != "" {
-				if strings.HasPrefix(fail, "package") {
+				if strings.HasPrefix(fail, "package") || fail == "cni-package" {
 					stateBytes, stateErr := os.ReadFile(state)
 					if stateErr != nil || string(stateBytes) != "pending\n" {
 						t.Fatalf("failed install retained readiness: %q %v", stateBytes, stateErr)
@@ -270,7 +296,7 @@ test "$FAIL_STAGE" != cri
 				}
 				return
 			}
-			sequence := []string{"apt-base skip=1 frontend=noninteractive\n", "apt-cni\n", "sysctl\n", "systemctl daemon-reload\n", "curl-workload\n", "systemctl start containerd.service\n", "ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 120s images import --platform linux/arm64 --label io.cri-containerd.image=managed ", "crictl --runtime-endpoint ", "systemctl restart spire-agent.service\n", "systemctl restart nvke-agent.service\n"}
+			sequence := []string{"apt-base skip=1 frontend=noninteractive\n", "apt-cni\n", "sysctl\n", "systemctl daemon-reload\n", "systemctl start containerd.service\n", "curl-workload\n", "ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 120s images import --digests --base-name localhost/nvke/ovn-kubernetes --platform linux/arm64 --label io.cri-containerd.image=managed ", "crictl --runtime-endpoint ", "systemctl restart spire-agent.service\n", "systemctl restart nvke-agent.service\n"}
 			previous := -1
 			for _, expected := range sequence {
 				at := strings.Index(log, expected)
@@ -279,8 +305,13 @@ test "$FAIL_STAGE" != cri
 				}
 				previous = at
 			}
-			if strings.Count(log, "systemctl restart nvke-agent.service\n") != 1 || strings.Count(log, "crictl ") != 1 {
-				t.Fatal("duplicated restart or CRI verification", log)
+			configured, err := os.ReadFile(filepath.Join(chartRoot, "values-nke.yaml"))
+			expectedValues, valuesErr := nativeOVNValues(siteOVNVersion, ovnImage)
+			if err != nil || valuesErr != nil || string(configured) != expectedValues+"\n" {
+				t.Fatal("agent restart did not follow exact selected OVN values")
+			}
+			if strings.Count(log, "systemctl restart nvke-agent.service\n") != 1 || strings.Count(log, "crictl ") != 2 {
+				t.Fatal("lost one-time restart or per-image CRI verification", log)
 			}
 		})
 	}

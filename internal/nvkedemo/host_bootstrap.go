@@ -49,10 +49,11 @@ install -m 0644 downloads/spire-ca.crt /etc/nke/trust-bundle.pem
 printf 'SPIRE_SERVER_ADDRESS=%s\nSPIRE_SERVER_PORT=30081\nSPIRE_TRUST_DOMAIN=%s\n' \
   {{quote .Gateway}} {{quote (printf "%s.nke.local" .Name)}} > /etc/nke/spire.env
 {{configureSpire}}
-systemctl start --no-block spire-agent.service nvke-agent.service
 for image in controller profiles capnico{{if .RuntimeImages}} workload{{range runtimeImages}} runtime-{{.}}{{end}}{{range authImages}} {{.}}{{end}}{{end}}; do
   nerdctl --namespace k8s.io load --input "downloads/$image.tar"
 done
+{{prepareOVN}}
+systemctl start --no-block spire-agent.service nvke-agent.service
 python3 - "$(get_tpm_pubhash)" <<'IDENTITY' > site-prepared.json
 import json,sys
 json.dump({'tpmEkThumbprint':sys.argv[1]},sys.stdout)

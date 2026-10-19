@@ -4,16 +4,19 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"text/template"
 	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -50,6 +53,7 @@ type nativeSiteAttempt struct {
 	diskDigest, simulatorWork string
 	nodes                     []tenantNode
 	workload                  json.RawMessage
+	boot                      *nativeSiteBoot
 }
 
 // RunNative runs source-owned site bootstrap, deployment and tenant commands
@@ -199,7 +203,7 @@ func (s *nativeSiteAttempt) startup(ctx context.Context, api, diskURL, out strin
 	if err != nil {
 		return nil, err
 	}
-	cfg := NativeSiteStartup{OVNVersion: version, Name: "nvke-native-site", Gateway: s.bridge.gateway.String(),
+	cfg := NativeSiteStartup{OVNVersion: version, OVNImage: s.assets.Images["ovn"].Reference, Name: "nvke-native-site", Gateway: s.bridge.gateway.String(),
 		ControllerImage: s.assets.Images["controller"].Reference, ProviderImage: s.assets.Images["provisioned-provider"].Reference,
 		HandoffURL: handoff.URL, HandoffToken: handoff.Token, HandoffCertificate: handoff.Certificate,
 		Deployment:    &NativeSiteDeployment{NicoURL: api, ImageURL: diskURL, ProfilesImage: s.assets.Images["profiles"].Reference},
@@ -410,6 +414,8 @@ func waitNativeSiteHandoff(ctx context.Context, handoff *nativeHandoff, server *
 }
 
 func (s *nativeSiteAttempt) releases(ctx context.Context, imageURL, api, out string) error {
+	s.boot = nil
+	var boot *nativeSiteBoot
 	for _, kind := range []string{"machineimage", "clusterrelease", "nodepoolrelease"} {
 		if err := requireContext(ctx); err != nil {
 			return err
@@ -441,6 +447,11 @@ func (s *nativeSiteAttempt) releases(ctx context.Context, imageURL, api, out str
 			if !ok || strings.Count(script, "http://127.0.0.1/nvke-node.qcow2") != 1 {
 				return errors.New("source image URL slot changed")
 			}
+			selected, err := projectNativeSiteBoot(ctx, script, imageURL)
+			if err != nil {
+				return err
+			}
+			boot = selected
 			nico["ipxeScript"] = strings.Replace(script, "http://127.0.0.1/nvke-node.qcow2", imageURL, 1)
 			ospec, ok := spec["operatingSystem"].(map[string]any)
 			if !ok {
@@ -458,16 +469,39 @@ func (s *nativeSiteAttempt) releases(ctx context.Context, imageURL, api, out str
 			if err := nativeDemoPackagePolicy(spec); err != nil {
 				return fmt.Errorf("native %s startup policy: %w", kind, err)
 			}
+			var preloads []nativeImagePreload
+			var ovnValues string
+			if image, selected := s.assets.Images["ovn"]; selected {
+				digest, err := DigestFile(ctx, image.File)
+				if err != nil {
+					return err
+				}
+				if image.Reference != "localhost/nvke/ovn-kubernetes@"+image.ManifestDigest {
+					return errors.New("OVN import alias differs from selected manifest")
+				}
+				version, _, _, err := selectedOVNOutputs(s.network)
+				if err != nil {
+					return err
+				}
+				ovnValues, err = nativeOVNValuesScript(version, image.Reference)
+				if err != nil {
+					return err
+				}
+				preloads = append(preloads, nativeImagePreload{api + "/files/ovn.tar", digest, "/var/lib/nvke-demo-ovn.tar", image.Reference})
+			}
 			if workload, selected := s.assets.Images["workload"]; selected {
 				digest, err := DigestFile(ctx, workload.File)
 				if err != nil {
 					return err
 				}
-				if err := nativeDemoWorkloadPolicy(spec, api+"/files/workload.tar", digest); err != nil {
+				preloads = append(preloads, nativeImagePreload{api + "/files/workload.tar", digest, "/var/lib/nvke-demo-workload.tar", WorkloadImage})
+			}
+			if len(preloads) != 0 {
+				if err := nativeDemoImagePolicy(spec, preloads, ovnValues); err != nil {
 					return err
 				}
 			}
-			if err := nativeDemoOVNPackagePolicy(spec, s.network); err != nil {
+			if err := nativeDemoOVNPackagePolicyWithGuard(spec, s.network, len(preloads) != 0); err != nil {
 				return fmt.Errorf("native %s network package policy: %w", kind, err)
 			}
 		}
@@ -479,6 +513,10 @@ func (s *nativeSiteAttempt) releases(ctx context.Context, imageURL, api, out str
 			return err
 		}
 	}
+	if boot == nil {
+		return errors.New("native site requires its projected MachineImage boot script")
+	}
+	s.boot = boot
 	return nil
 }
 
@@ -486,6 +524,20 @@ func (s *nativeSiteAttempt) releases(ctx context.Context, imageURL, api, out str
 // workload handoff. NVKE remains the template owner; this compares exact source
 // bytes and does not implement its template or cloud-config grammar.
 func nativeDemoWorkloadPolicy(spec map[string]any, location, digest string) error {
+	return nativeDemoImagePolicy(spec, []nativeImagePreload{{location, digest, "/var/lib/nvke-demo-workload.tar", WorkloadImage}}, "")
+}
+
+func nativeDemoImagePolicy(spec map[string]any, preloads []nativeImagePreload, ovnValues string) error {
+	if len(preloads) == 0 || len(preloads) > 2 {
+		return errors.New("native startup requires its bounded selected image preloads")
+	}
+	seen := map[string]bool{}
+	for _, image := range preloads {
+		if image.file == "" || seen[image.file] {
+			return errors.New("native image preloads must be distinct")
+		}
+		seen[image.file] = true
+	}
 	init, ok := spec["machineInit"].(map[string]any)
 	if !ok {
 		return errors.New("source release omits machine initialization")
@@ -509,16 +561,19 @@ func nativeDemoWorkloadPolicy(spec map[string]any, location, digest string) erro
 	}
 	const install = "  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 nvke-agent nvke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent\n"
 	const restart = "  - sysctl --system\n  - systemctl daemon-reload\n  - systemctl restart spire-agent.service\n  - systemctl restart nvke-agent.service\n"
-	const file = "/var/lib/nvke-demo-workload.tar"
 	const state = "/run/nvke-demo-workload-packages.state"
-	// The package's supported flag defers its postinst agent restart. Once
-	// kubeadm-distro has installed containerd/ctr/crictl, one shell owns import,
-	// local CRI admission and the original ordered service restarts.
-	script := "set -euo pipefail; test \"$(cat " + state + ")\" = ready; sysctl --system; systemctl daemon-reload; curl --fail --silent --show-error --connect-timeout 10 --max-time 120 " + operatorQuote(location) + " -o " + file +
-		"; printf '%s  %s\\n' " + operatorQuote(strings.TrimPrefix(digest, "sha256:")) + " " + file + " | sha256sum -c -; systemctl start containerd.service; " +
-		"ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 120s images import --platform linux/arm64 --label io.cri-containerd.image=managed " + file +
-		"; crictl --runtime-endpoint unix:///run/containerd/containerd.sock --image-endpoint unix:///run/containerd/containerd.sock --timeout 10s inspecti --quiet " + operatorQuote(WorkloadImage) + " >/dev/null; " +
-		"systemctl restart spire-agent.service; systemctl restart nvke-agent.service"
+	script := "set -euo pipefail; test \"$(cat " + state + ")\" = ready; sysctl --system; systemctl daemon-reload; systemctl start containerd.service"
+	for _, image := range preloads {
+		preload, err := nativeImagePreloadScript(image)
+		if err != nil {
+			return err
+		}
+		script += "; " + preload
+	}
+	if ovnValues != "" {
+		script += "; " + ovnValues
+	}
+	script += "; systemctl restart spire-agent.service; systemctl restart nvke-agent.service"
 	command, err := json.Marshal([]string{"/bin/bash", "-ec", script})
 	if err != nil {
 		return err
@@ -752,4 +807,37 @@ func (s *nativeSiteAttempt) admitAPIClient(ctx context.Context, runner Runner, t
 	}
 	_, err = s.capture(ctx, runner, "api-client-admission", filepath.Join(tools, "kubectl"), "--kubeconfig", kubeconfig, "apply", "--server-side", "-f", path)
 	return err
+}
+
+// This selection is issued only after the actual pinned MachineImage fixture is
+// admitted. NVKE's source-owned template engine renders the disk policy; NICoSim
+// still owns iPXE parsing and booting the selected local QCOW.
+type nativeSiteBoot struct{ script, diskURL string }
+
+func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*nativeSiteBoot, error) {
+	if err := requireContext(ctx); err != nil {
+		return nil, err
+	}
+	// Exact ARM64 fixture retained with the source-selected installer bundle.
+	if plainSHA([]byte(source)) != "b0857676cd4f373310e8979d8fcdbebfa821f9da32d1f6de13ba38ae92e1edf1" {
+		return nil, errors.New("native site MachineImage boot fixture differs from the supported source")
+	}
+	location, err := url.Parse(diskURL)
+	if err != nil || location.Scheme != "http" || location.Hostname() == "" || location.Port() == "" || location.User != nil || location.RawQuery != "" || location.Fragment != "" {
+		return nil, errors.New("native site boot requires the selected local disk URL")
+	}
+	address, err := netip.ParseAddr(location.Hostname())
+	if err != nil || !address.Is4() || !address.IsPrivate() {
+		return nil, errors.New("native site boot requires the owned private disk endpoint")
+	}
+	projected := strings.Replace(source, "http://127.0.0.1/nvke-node.qcow2", diskURL, 1)
+	parsed, err := template.New("source-machine-image").Option("missingkey=error").Parse(projected)
+	if err != nil {
+		return nil, err
+	}
+	var rendered bytes.Buffer
+	if err := parsed.Execute(&rendered, struct{ DiskSelectionStrategy string }{"smallest"}); err != nil {
+		return nil, err
+	}
+	return &nativeSiteBoot{rendered.String(), diskURL}, nil
 }

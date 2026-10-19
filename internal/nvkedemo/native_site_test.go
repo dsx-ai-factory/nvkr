@@ -326,7 +326,7 @@ func testNativeReleasePolicies(t *testing.T, network string, preload bool, sourc
 	for _, kind := range []string{"machineimage", "clusterrelease", "nodepoolrelease"} {
 		spec := map[string]any{"machineImageRef": map[string]any{"name": "original"}, "machineInit": map[string]any{"userDataTemplate": template}}
 		if kind == "machineimage" {
-			spec = map[string]any{"operatingSystem": map[string]any{"version": "24.04"}, "nico": map[string]any{"ipxeScript": "#!ipxe\nset image-url http://127.0.0.1/nvke-node.qcow2\n"}}
+			spec = map[string]any{"operatingSystem": map[string]any{"version": "24.04"}, "nico": map[string]any{"ipxeScript": nativeMachineImageBootTemplate}}
 		}
 		raw, err := yaml.Marshal(map[string]any{"metadata": map[string]any{"name": "original"}, "spec": spec})
 		if err != nil {
@@ -369,8 +369,15 @@ func testNativeReleasePolicies(t *testing.T, network string, preload bool, sourc
 		wantCommand := "DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 nvke-cni-ovn-images-" + request.CNIVersion + " nvke-cni-ovn-charts-" + request.CNIVersion
 		var matches int
 		for _, command := range nativeWorkloadRenderedCommands(t, got, true) {
-			if text, ok := command.(string); ok && text == wantCommand {
-				matches++
+			switch value := command.(type) {
+			case string:
+				if value == wantCommand {
+					matches++
+				}
+			case []any:
+				if len(value) == 3 && strings.Contains(value[2].(string), wantCommand+"\n") {
+					matches++
+				}
 			}
 		}
 		if matches != 1 {

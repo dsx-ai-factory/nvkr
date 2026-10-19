@@ -20,6 +20,7 @@ func startupDescription() NativeSiteStartup {
 		Name: "nvke-native-site", Gateway: "172.30.0.1",
 		ControllerImage: "docker.io/library/nke-controller:latest",
 		ProviderImage:   "docker.io/library/cluster-api-provider-provisioned:latest",
+		OVNImage:        "localhost/nvke/ovn-kubernetes@sha256:" + strings.Repeat("a", 64),
 	}
 	for _, item := range siteStartupAssetNames {
 		cfg.Assets = append(cfg.Assets, StartupAsset{item, "http://172.30.0.1:18080/files/owned/" + item, "sha256:" + strings.Repeat("a", 64)})
@@ -82,6 +83,8 @@ func TestSiteStartupRejectsInvalidHandoffsBeforeReturningUserData(t *testing.T) 
 		{"public gateway", func(c *NativeSiteStartup) { c.Gateway = "8.8.8.8" }},
 		{"ipv6 gateway", func(c *NativeSiteStartup) { c.Gateway = "fd00::1" }},
 		{"invalid image", func(c *NativeSiteStartup) { c.ControllerImage = "image; command" }},
+		{"tag-only OVN", func(c *NativeSiteStartup) { c.OVNImage = "localhost/nvke/ovn-kubernetes:latest" }},
+		{"sibling OVN", func(c *NativeSiteStartup) { c.OVNImage = "localhost/nvke/sibling@sha256:" + strings.Repeat("a", 64) }},
 		{"missing asset", func(c *NativeSiteStartup) { c.Assets = c.Assets[1:] }},
 		{"duplicate asset", func(c *NativeSiteStartup) { c.Assets[0] = c.Assets[1] }},
 		{"unverified bytes", func(c *NativeSiteStartup) { c.Assets[0].Digest = "tag" }},
@@ -161,6 +164,11 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	started := strings.Index(prepare.Content, "\nsystemctl start --no-block spire-agent.service nvke-agent.service\n")
 	if installed < 0 || reloaded <= installed || stopped <= reloaded || started <= stopped || strings.Count(prepare.Content, "systemctl daemon-reload") != 1 {
 		t.Fatal("preparation must reload service drop-ins after APT and before starting the agents")
+	}
+	imported := strings.Index(prepare.Content, "images import --digests --base-name "+operatorQuote("localhost/nvke/ovn-kubernetes"))
+	configured := strings.Index(prepare.Content, "> /etc/dgx/ovn-kubernetes/values-nke.yaml")
+	if imported <= stopped || configured <= imported || started <= configured {
+		t.Fatal("site agents must start after selected OVN import and values projection")
 	}
 
 	command := exec.CommandContext(t.Context(), "bash", "-n")

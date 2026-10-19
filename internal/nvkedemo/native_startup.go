@@ -34,7 +34,7 @@ type StartupAsset struct {
 // This adapter adds no alternative Kubernetes installer or remote shell.
 type NativeSiteStartup struct {
 	Name, Gateway, ControllerImage, ProviderImage string
-	OVNVersion                                    string
+	OVNVersion, OVNImage                          string
 	Assets                                        []StartupAsset
 	HandoffURL, HandoffToken, HandoffCertificate  string
 	Deployment                                    *NativeSiteDeployment
@@ -62,7 +62,7 @@ type startupCloudConfig struct {
 }
 
 var siteStartupAssetNames = []string{
-	"nerdctl", "controller.tar", "profiles.tar", "capnico.tar", "spire-ca.crt",
+	"nerdctl", "controller.tar", "profiles.tar", "capnico.tar", "spire-ca.crt", "ovn.tar",
 }
 
 // SiteStartupUserData returns startup configuration without filesystem,
@@ -78,6 +78,14 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	if err := validateSiteStartup(cfg); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site startup configuration")
 	}
+	importOVN, err := nativeImageImportScript("downloads/ovn.tar", cfg.OVNImage)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site OVN import")
+	}
+	valuesOVN, err := nativeOVNValuesScript(cfg.OVNVersion, cfg.OVNImage)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site OVN values")
+	}
 	assets := slices.Clone(cfg.Assets)
 	slices.SortFunc(assets, func(a, b StartupAsset) int { return strings.Compare(a.Name, b.Name) })
 	cfg.Assets = assets
@@ -85,6 +93,7 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	if err := template.Must(template.New("site-startup").Funcs(template.FuncMap{
 		"quote":          operatorQuote,
 		"configureSpire": func() string { return siteSpireConfigurationScript },
+		"prepareOVN":     func() string { return importOVN + "; " + valuesOVN },
 		"sha":            func(value string) string { return strings.TrimPrefix(value, "sha256:") },
 		"runtimeImages":  func() []string { return slices.Clone(runtimeImages) },
 		"authImages": func() []string {

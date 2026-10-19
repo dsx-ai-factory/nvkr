@@ -192,7 +192,15 @@ local reports omit hosted qualification inputs. Delivery retains distinct named 
 evidence bindings when their exact manifest bytes are shared. Conflicting aliases, repeated logical names
 and duplicate direct descriptors remain rejected; physical closure accounting uses distinct digests.
 Round-trip and rejection contracts cover this case; they do not prove a full native conformance run. The shared native demo has an opt-in Mac/Linux ARM64 conformance hook using
-matching suite/tool outputs from the same fresh artifact Run. Linux retains
+matching suite/tool outputs from the same fresh artifact Run. The shared native
+startup imports the ordinary named OVN image under its exact native digest and
+projects matching chart values after package installation and before agent startup;
+the OS package's independently built image is not treated as the named output.
+The site-create request carries the source-selected MachineImage boot script,
+rendered with the existing NVKE disk-policy template and current local disk URL.
+These source and shell contracts do not prove fresh runtime import, DHCP callback
+identity or conformance acceptance. Strict manifest observations remain required.
+Linux retains
 sealed executable descriptors. Mac local diagnostics hold authenticated Darwin
 bytes and execute private Mach-O snapshots, checked before/after each command
 and removed after joined process cleanup. This detects replacement between

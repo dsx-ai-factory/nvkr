@@ -6,12 +6,18 @@ package nvkedemo
 import (
 	"errors"
 	"strings"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // nativeDemoOVNPackagePolicy projects the reviewed source fixture's package command
 // onto the same OVN selection as the disk, site and tenant request. NVKE still
 // owns template rendering; this exact source edit does not parse that grammar.
 func nativeDemoOVNPackagePolicy(spec map[string]any, network string) error {
+	return nativeDemoOVNPackagePolicyWithGuard(spec, network, false)
+}
+
+func nativeDemoOVNPackagePolicyWithGuard(spec map[string]any, network string, guard bool) error {
 	version, _, _, err := selectedOVNOutputs(network)
 	if err != nil {
 		return err
@@ -33,6 +39,16 @@ func nativeDemoOVNPackagePolicy(spec map[string]any, network string) error {
 		strings.Count(data, "nvke-cni-ovn-images-") != 1 || strings.Count(data, "nvke-cni-ovn-charts-") != 1 {
 		return errors.New("source release OVN package command differs from the supported demo fixture")
 	}
-	init["userDataTemplate"] = strings.Replace(data, command, strings.ReplaceAll(command, sourceVersion, version), 1)
+	replacement := strings.ReplaceAll(command, sourceVersion, version)
+	if guard {
+		const state = "/run/nvke-demo-workload-packages.state"
+		script := "set -euo pipefail\ntest \"$(cat " + state + ")\" = ready\nprintf '%s\\n' pending > " + state + "\n" + strings.TrimPrefix(strings.TrimSpace(replacement), "- ") + "\nprintf '%s\\n' ready > " + state + "\n"
+		item, err := yaml.Marshal([][]string{{"/bin/bash", "-ec", script}})
+		if err != nil {
+			return err
+		}
+		replacement = "\n  " + strings.ReplaceAll(strings.TrimSuffix(string(item), "\n"), "\n", "\n  ") + "\n"
+	}
+	init["userDataTemplate"] = strings.Replace(data, command, replacement, 1)
 	return nil
 }
