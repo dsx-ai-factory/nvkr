@@ -595,6 +595,10 @@ retain their JSON locators plus separately admitted metadata records. The factor
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
 digests and downstream artifact authentication remain required. Metadata-only transfers use workflow
 identity without package API calls. Dedicated read/write credentials do not elevate repository-token permissions.
+Interrupted private reads have at most three extraction attempts under one deadline. Typed HTTP/2 peer
+resets admitted by ADR-18 restart from byte zero after response closure and checked staging cleanup;
+every attempt repeats complete chunk and archive verification. Independent failures cannot authorize a
+retry, and publication and signing remain outside this recovery boundary.
 Production partial retries admit earlier source attempts only within the same Run and preserve original
 transport bindings through restoration. Bounded same-name candidates all authenticate before selection
 of the newest source attempt; ties within an attempt fail closed. Development and explicit cross-Run transfers remain exact-attempt;

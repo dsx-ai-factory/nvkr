@@ -7,16 +7,19 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"syscall"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"golang.org/x/net/http2"
 )
 
 const maxChunkDiagnosticNodes = 32
@@ -112,6 +115,8 @@ func classifyChunkCause(cause error, remaining *int) chunkDiagnostic {
 		return chunkDiagnostic{category: "tls-verification", code: e.CodeFetchFailed}
 	case tls.RecordHeaderError:
 		return chunkDiagnostic{category: "http-protocol", code: e.CodeFetchFailed}
+	case *os.PathError, *os.LinkError:
+		return chunkDiagnostic{category: "filesystem-failure", code: e.CodeFetchFailed}
 	case *transport.Error:
 		return chunkHTTPDiagnostic(typed.StatusCode)
 	case *url.Error:
@@ -150,10 +155,20 @@ func classifyChunkCause(cause error, remaining *int) chunkDiagnostic {
 				result = diagnostic
 			}
 		}
+		// Independent failures cannot jointly authorize replay, even when
+		// each individual cause would admit a fresh body read.
+		result.transient = false
 		return result
 	}
 	if wrapped, ok := cause.(interface{ Unwrap() error }); ok {
 		return classifyChunkCause(wrapped.Unwrap(), remaining)
+	}
+	var stream http2.StreamError
+	// Go 1.27's net/http stream errors convert to this public type. Only
+	// inspect the leaf after the bounded wrapper/independent-failure checks;
+	// errors.As on the original chain could bypass a rejecting boundary.
+	if errors.As(cause, &stream) {
+		return chunkHTTP2Diagnostic(stream)
 	}
 	if network, ok := cause.(net.Error); ok {
 		if network.Timeout() {
@@ -175,6 +190,28 @@ func classifyChunkCause(cause error, remaining *int) chunkDiagnostic {
 		return chunkDiagnostic{category: "http2-protocol", code: e.CodeFetchFailed}
 	}
 	return unknown
+}
+
+func chunkHTTP2Diagnostic(stream http2.StreamError) chunkDiagnostic {
+	diagnostic := chunkDiagnostic{category: "http2-stream", code: e.CodeFetchFailed}
+	// The typed error's fixed cause identifies a received RST_STREAM. Local
+	// header/trailer violations and arbitrary lookalike error strings must
+	// never grant recovery. Retain only an allowlisted diagnostic category.
+	if stream.StreamID == 0 || stream.Cause == nil || stream.Cause.Error() != "received from peer" {
+		return diagnostic
+	}
+	switch stream.Code {
+	case http2.ErrCodeProtocol:
+		diagnostic.category = "http2-peer-protocol-reset"
+	case http2.ErrCodeInternal:
+		diagnostic.category = "http2-peer-internal-reset"
+	case http2.ErrCodeRefusedStream:
+		diagnostic.category = "http2-peer-refused-stream"
+	default:
+		return diagnostic
+	}
+	diagnostic.code, diagnostic.transient = e.CodeUnavailable, true
+	return diagnostic
 }
 
 // These anchored forms belong to the exact pinned go-containerregistry verifier.
