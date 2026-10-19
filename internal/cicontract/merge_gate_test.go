@@ -6,8 +6,10 @@ package cicontract
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -16,21 +18,39 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
+type mergeGateStep struct {
+	storageWorkflowStep
+	ID    string `json:"id"`
+	Shell string `json:"shell"`
+}
+
+type mergeGateJob struct {
+	Needs    []string          `json:"needs"`
+	Outputs  map[string]string `json:"outputs"`
+	Steps    []mergeGateStep   `json:"steps"`
+	Strategy struct {
+		FailFast *bool  `json:"fail-fast"`
+		Matrix   string `json:"matrix"`
+	} `json:"strategy"`
+}
+
+func readMergeGateJobs(t *testing.T) map[string]mergeGateJob {
+	t.Helper()
 	raw, err := os.ReadFile("../../.github/workflows/merge-gate.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var workflow struct {
-		Jobs map[string]struct {
-			Needs []string              `json:"needs"`
-			Steps []storageWorkflowStep `json:"steps"`
-		} `json:"jobs"`
+		Jobs map[string]mergeGateJob `json:"jobs"`
 	}
 	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
-	gate := workflow.Jobs["gate"]
+	return workflow.Jobs
+}
+
+func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
+	gate := readMergeGateJobs(t)["gate"]
 	codeJobs := []string{"check", "lint", "vulnerabilities", "tests"}
 	for _, name := range append(slices.Clone(codeJobs), "check-skip", "check-paths") {
 		if !slices.Contains(gate.Needs, name) {
@@ -101,4 +121,157 @@ func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMergeGateTestMatrix(t *testing.T) {
+	jobs := readMergeGateJobs(t)
+	producer, tests := jobs["check-paths"], jobs["tests"]
+	if producer.Outputs["test-matrix"] != "${{ steps.test-matrix.outputs.matrix }}" {
+		t.Fatal("check-paths must expose the matrix producer's output")
+	}
+	if !slices.Contains(tests.Needs, "check-paths") ||
+		tests.Strategy.Matrix != "${{ fromJSON(needs.check-paths.outputs.test-matrix) }}" {
+		t.Fatal("test strategy must consume the complete producer matrix")
+	}
+	if tests.Strategy.FailFast == nil || *tests.Strategy.FailFast {
+		t.Fatal("test matrix must explicitly disable fail-fast to retain every shard's diagnostics")
+	}
+	step := mergeGateStepByID(t, producer, "test-matrix")
+	const matrix = `{"include":[{"group":"factory","index":2}]}`
+	for _, tc := range []struct {
+		name string
+		exit string
+		code int
+	}{
+		{"success", "0", 0},
+		{"producer failure", "23", 23},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			fake := `#!/bin/sh
+[ "$*" = '-B scripts/ci-test-shard.py --matrix' ] || exit 99
+printf '%s\n' "$FAKE_MATRIX"
+exit "$FAKE_EXIT"
+`
+			if err := os.WriteFile(filepath.Join(root, "python3"), []byte(fake), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			outputPath := filepath.Join(root, "outputs")
+			output, code := runMergeGateStep(t, step, root, []string{
+				"GITHUB_OUTPUT=" + outputPath, "FAKE_MATRIX=" + matrix, "FAKE_EXIT=" + tc.exit,
+			})
+			if code != tc.code {
+				t.Fatalf("matrix step exited %d, want %d: %s", code, tc.code, output)
+			}
+			raw, err := os.ReadFile(outputPath)
+			if tc.code != 0 {
+				if !os.IsNotExist(err) {
+					t.Fatalf("failed producer published a matrix: %s (read error: %v)", raw, err)
+				}
+				return
+			}
+			if err != nil || string(raw) != "matrix="+matrix+"\n" {
+				t.Fatalf("matrix output changed: %s (read error: %v)", raw, err)
+			}
+		})
+	}
+}
+
+func TestMergeGateShardPipeline(t *testing.T) {
+	step := mergeGateStepByID(t, readMergeGateJobs(t)["tests"], "tests")
+	if step.Shell != "bash" {
+		t.Fatal("shard pipeline requires explicit bash to enable GitHub's pipefail behavior")
+	}
+	for name, want := range map[string]string{
+		"TEST_SHARD_GROUP": "${{ matrix.group }}",
+		"TEST_SHARD_INDEX": "${{ matrix.index }}",
+	} {
+		if step.Env[name] != want {
+			t.Fatalf("%s must bind to %s, got %q", name, want, step.Env[name])
+		}
+	}
+	const diagnostic = `{"Action":"output","Package":"fixture","Output":"partial diagnostic\n"}` + "\n"
+	for _, tc := range []struct {
+		name string
+		exit string
+		code int
+	}{
+		{"success", "0", 0},
+		{"shard failure", "23", 23},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			fake := `#!/bin/sh
+[ "$#" -eq 1 ] && [ "$1" = test-shard ] || exit 99
+[ "$TEST_SHARD_GROUP" = factory ] && [ "$TEST_SHARD_INDEX" = 2 ] || exit 99
+printf '%s' "$FAKE_DIAGNOSTIC"
+exit "$FAKE_EXIT"
+`
+			if err := os.WriteFile(filepath.Join(root, "make"), []byte(fake), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			env := []string{"FAKE_DIAGNOSTIC=" + diagnostic, "FAKE_EXIT=" + tc.exit}
+			for name, value := range step.Env {
+				value = strings.NewReplacer("${{ matrix.group }}", "factory", "${{ matrix.index }}", "2").Replace(value)
+				env = append(env, name+"="+value)
+			}
+			output, code := runMergeGateStep(t, step, root, env)
+			if code != tc.code {
+				t.Fatalf("shard pipeline exited %d, want %d: %s", code, tc.code, output)
+			}
+			raw, err := os.ReadFile(filepath.Join(root, "go-test.jsonl"))
+			if err != nil || string(raw) != diagnostic || output != diagnostic {
+				t.Fatalf("shard diagnostics lost: file=%q, output=%q, read error=%v", raw, output, err)
+			}
+		})
+	}
+}
+
+func mergeGateStepByID(t *testing.T, job mergeGateJob, id string) mergeGateStep {
+	t.Helper()
+	for _, step := range job.Steps {
+		if step.ID == id {
+			if step.Run == "" || step.If != "" || step.ContinueOnError != nil && step.ContinueOnError != false {
+				t.Fatalf("step %s must run unconditionally and propagate failures", id)
+			}
+			return step
+		}
+	}
+	t.Fatalf("missing step %s", id)
+	return mergeGateStep{}
+}
+
+func runMergeGateStep(t *testing.T, step mergeGateStep, root string, env []string) (string, int) {
+	t.Helper()
+	script := filepath.Join(root, "step.sh")
+	if err := os.WriteFile(script, []byte(step.Run), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// GitHub's default Linux shell uses -e; explicit bash additionally enables
+	// pipefail. Execute the declared script with the matching runner semantics.
+	args := []string{"-e", script}
+	switch step.Shell {
+	case "":
+	case "bash":
+		args = []string{"--noprofile", "--norc", "-e", "-o", "pipefail", script}
+	default:
+		t.Fatalf("unsupported workflow shell %q", step.Shell)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, "bash", args...)
+	command.Dir = root
+	command.Env = append([]string{"PATH=" + root + string(os.PathListSeparator) + os.Getenv("PATH"), "RUNNER_TEMP=" + root}, env...)
+	output, err := command.CombinedOutput()
+	if ctx.Err() != nil {
+		t.Fatalf("workflow step exceeded deadline: %v", ctx.Err())
+	}
+	if err != nil {
+		var exitError *exec.ExitError
+		if !errors.As(err, &exitError) {
+			t.Fatal(err)
+		}
+		return string(output), exitError.ExitCode()
+	}
+	return string(output), 0
 }

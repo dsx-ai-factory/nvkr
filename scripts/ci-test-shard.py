@@ -21,6 +21,9 @@ import time
 GROUPS = {"factory": ("pkg/nvkr/factory", 4), "lifecycle": ("pkg/nvkr/lifecycle", 2),
           "packages": (None, 5)}
 TEST_NAME = re.compile(r"(?:Test|Example|Fuzz)\w*\Z")
+# Retain at most 32 MiB of stdout per child, including discovery commands.
+# Overflow fails the shard after emitting the diagnostics already read.
+MAX_OUTPUT_BYTES = 32 * 1024 * 1024
 
 
 def partition(names, index, count):
@@ -91,12 +94,14 @@ def validate_results(log, packages, selected=None):
         raise ValueError("test results do not match the discovered shard selection")
 
 
-def captured(argv, timeout=300, emit=False):
+def captured(argv, timeout=300, emit=False, *, max_output_bytes=MAX_OUTPUT_BYTES):
     """Stream diagnostics and stop/join the entire owned process group on exit."""
     if os.name != "posix":
         raise ValueError("CI sharding requires a POSIX process-group owner")
+    if max_output_bytes < 1:
+        raise ValueError("stdout capture limit must be positive")
     print("+ " + " ".join(argv), file=sys.stderr, flush=True)
-    chunks, deadline = [], time.monotonic() + timeout
+    output, deadline = bytearray(), time.monotonic() + timeout
     decoder = codecs.getincrementaldecoder("utf-8")()
     with subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                           start_new_session=True) as process:
@@ -112,12 +117,20 @@ def captured(argv, timeout=300, emit=False):
                     data = os.read(process.stdout.fileno(), 65536)
                     if not data:
                         break
-                    chunks.append(data)
                     if emit:
                         sys.stdout.write(decoder.decode(data))
                         sys.stdout.flush()
+                    if len(output) + len(data) > max_output_bytes:
+                        if not emit:
+                            # Discovery is normally quiet, but retain all
+                            # diagnostics read before its output limit failed.
+                            sys.stdout.write(decoder.decode(output))
+                            sys.stdout.write(decoder.decode(data))
+                            sys.stdout.flush()
+                        raise ValueError(f"stdout exceeded {max_output_bytes}-byte capture limit")
+                    output.extend(data)
             process.wait(timeout=max(0, deadline - time.monotonic()))
-            log = b"".join(chunks).decode("utf-8")
+            log = output.decode("utf-8")
             if emit:
                 sys.stdout.write(decoder.decode(b"", final=True))
             elif process.returncode:

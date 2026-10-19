@@ -8,11 +8,13 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import select
+import signal
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 
 
@@ -26,6 +28,30 @@ def events(*rows):
 
 
 class ShardTest(unittest.TestCase):
+    @contextlib.contextmanager
+    def descendant_probe(self):
+        """A ready descendant holds a FIFO writer until process-group cleanup."""
+        with tempfile.TemporaryDirectory() as directory:
+            fifo, ready = Path(directory) / "pipe", Path(directory) / "ready"
+            os.mkfifo(fifo)
+            reader = os.open(fifo, os.O_RDONLY | os.O_NONBLOCK)
+            child = ("import os,pathlib,sys,time; pipe=os.open(sys.argv[1],os.O_WRONLY); "
+                     "pathlib.Path(sys.argv[2]).write_text(str(os.getpid())); time.sleep(30)")
+            try:
+                yield child, str(fifo), str(ready)
+            finally:
+                try:
+                    self.assertTrue(ready.exists(), "descendant did not start before capture failed")
+                    readable, _, _ = select.select([reader], [], [], 1)
+                    if not readable:
+                        # A broken owner must not leave this test's child alive.
+                        with contextlib.suppress(ProcessLookupError):
+                            os.kill(int(ready.read_text()), signal.SIGKILL)
+                    self.assertTrue(readable, "descendant retained its FIFO after process-group cleanup")
+                    self.assertEqual(os.read(reader, 1), b"", "descendant FIFO did not reach EOF")
+                finally:
+                    os.close(reader)
+
     def test_workflow_matrix_covers_every_declared_shard(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
@@ -44,21 +70,47 @@ class ShardTest(unittest.TestCase):
         self.assertEqual(failure.exception.returncode, 3)
         self.assertIn("failure output", output.getvalue())
 
-        with tempfile.TemporaryDirectory() as directory:
-            marker = Path(directory) / "escaped-child"
-            # The descendant would write after its parent times out if only the
-            # direct process were killed. It holds stdout open independently.
-            child = "import time,pathlib,sys; time.sleep(.4); pathlib.Path(sys.argv[1]).touch()"
-            parent = ("import subprocess,sys,time; "
-                      "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]); "
+        with self.descendant_probe() as child_args:
+            parent = ("import pathlib,subprocess,sys,time; "
+                      "subprocess.Popen([sys.executable,'-c',*sys.argv[1:]])\n"
+                      "while not pathlib.Path(sys.argv[3]).exists(): time.sleep(.001)\n"
                       "print('running',flush=True); time.sleep(30)")
             output = io.StringIO()
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
                 with self.assertRaises(subprocess.TimeoutExpired):
-                    shard.captured([sys.executable, "-c", parent, child, str(marker)], timeout=.2, emit=True)
+                    shard.captured([sys.executable, "-c", parent, *child_args], timeout=1, emit=True)
             self.assertIn("running", output.getvalue())
-            time.sleep(.45)
-            self.assertFalse(marker.exists(), "timed-out descendant escaped its owner's cleanup")
+
+    def test_stdout_capture_limit_counts_bytes_and_accepts_exact_boundary(self):
+        for diagnostic, overflow in [("é" * 16, False), ("é" * 17, True)]:
+            for emit in (False, True):
+                with self.subTest(overflow=overflow, emit=emit):
+                    output = io.StringIO()
+                    argv = [sys.executable, "-c", "import sys; sys.stdout.write(sys.argv[1])", diagnostic]
+                    with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                        if overflow:
+                            with self.assertRaisesRegex(ValueError, "stdout exceeded 32-byte capture limit"):
+                                shard.captured(argv, emit=emit, max_output_bytes=32)
+                        else:
+                            self.assertEqual(shard.captured(argv, emit=emit, max_output_bytes=32), diagnostic)
+                    self.assertEqual(output.getvalue(), diagnostic if emit or overflow else "")
+
+    def test_stdout_overflow_preserves_diagnostics_and_stops_descendants(self):
+        for emit in (False, True):
+            with self.subTest(emit=emit), self.descendant_probe() as child_args:
+                # More than one read is required, exercising the cumulative
+                # limit and diagnostics retained before the overflow chunk.
+                parent = ("import os,pathlib,subprocess,sys,time; "
+                          "subprocess.Popen([sys.executable,'-c',*sys.argv[1:]])\n"
+                          "while not pathlib.Path(sys.argv[3]).exists(): time.sleep(.001)\n"
+                          "os.write(1,b'first diagnostic\\n' + b'x' * 65536); time.sleep(30)")
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaisesRegex(ValueError, "stdout exceeded 65536-byte capture limit"):
+                        shard.captured([sys.executable, "-c", parent, *child_args],
+                                       timeout=3, emit=emit, max_output_bytes=65536)
+                self.assertTrue(output.getvalue().startswith("first diagnostic\n"))
+                self.assertGreater(len(output.getvalue().encode()), 65536)
 
     def test_complete_partition_including_future_tests(self):
         names = [f"TestCase{i}" for i in range(1000)] + ["Example_contract", "FuzzDecoder", "TestCase"]

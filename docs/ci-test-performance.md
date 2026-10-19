@@ -61,7 +61,8 @@ deliberately consumes 45 seconds.
 It protects a distinct deadlock regression when a diagnostic writer holds the capture mutex after cleanup
 times out. Deleting it would lose useful coverage. Its assertion should move to a focused result-collection
 boundary or use a per-owner injectable cleanup budget; the production ownership allowance should remain
-unchanged. That test is absent from this checkout and is not modified by this follow-up.
+unchanged. That test was absent from the audit's starting checkout; integrating PR #179 later brought it
+into this branch unchanged.
 
 The five-minute CI target also requires shortening the critical path: the linked job spent 70 seconds
 in vet and 160 seconds in lint before starting tests. Its other jobs already finished within three minutes
@@ -80,8 +81,15 @@ estimated 311 seconds before compilation or job setup. Five package shards reduc
 estimate to 151 seconds at the slowest shard. This is a distribution check against historical durations,
 not a hosted benchmark; it omits compilation, runner queues and timing changes from these fixture cuts.
 
-The NVKR product code is unchanged. Hosted completion below five minutes requires a recorded run of the
-changed workflow; local tests and estimates cannot establish that result.
+The NVKR product code is unchanged. The first hosted
+[`workflow_dispatch` run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39323382691), at commit
+`d1b957a379fa2ea95bd93277f1bdd00db693e045`, completed in **273 seconds (4m33s)**. After integrating
+current `main`, the [PR run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39325384719) at
+`23fa7cc6e0aae1fb7cc7c9daff0229c4bb392c11` completed in **266 seconds (4m26s)**. Both measurements run
+from workflow creation through aggregate-gate completion; all eleven test shards and all 21 required
+jobs passed. These are individual observations against a 22m55s baseline from a different commit,
+not a controlled benchmark or a guarantee about runner queues. They establish repository CI timing,
+not external release qualification.
 
 Local validation on macOS ARM64 with Go 1.27.2 completed all 62 packages and 3,505 unique top-level
 test/example/fuzz results, including existing skips, without failures. The full run used the initial
