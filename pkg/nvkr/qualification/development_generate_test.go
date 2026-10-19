@@ -56,6 +56,9 @@ func TestDevelopmentQualificationGenerationAndIndependentOwnership(t *testing.T)
 			t.Fatal("development workflow crossed production trust boundary")
 		}
 	}
+	if bytes.Contains(bundle.files[development.QualificationWorkflow], []byte("--issue-manifest")) || bytes.Contains(bundle.files[development.SmokeWorkflow], []byte("--issue-manifest")) {
+		t.Fatal("development qualification acquired production manifest issuance")
+	}
 	root := t.TempDir()
 	production, _ := generationBundle(t)
 	if err := WriteWorkflows(t.Context(), root, production); err != nil {

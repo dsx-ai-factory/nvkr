@@ -538,6 +538,27 @@ from the authenticated `workflow_run` event, verifies the source's exact success
 its original handoff. There are no source-commit, candidate-file, verdict-file or skip-smoke flags.
 A manually dispatched qualifier or the source build's own identity is rejected.
 
+The generated production qualifier adds `--issue-manifest`:
+
+```sh
+nvkr run qualify --policy qualification.yaml --issue-manifest
+```
+
+This keeps the live artifact-check receipt through complete qualification publication and manifest
+issuance. The same independently loaded policy selects the exact default-branch qualification identity
+and policy digest; evidence cannot select its own trusted signer. The issuer verifies the exact canonical
+qualification evidence on every artifact, attests the manifest to the publication root, then verifies its
+attached bytes. Development policies refuse this option before provider or publication work; their
+generated qualifier publishes development qualification only.
+
+With this option, canonical diagnostics contain the qualification result and, after successful issuance,
+the manifest, its digest and subject. A manifest failure returns a nonzero exit status and preserves the
+qualification diagnostics, including a successful qualification whose later manifest step failed. Earlier
+attachments may remain; failure does not imply rollback. Without the option, the command retains its
+qualification-only output shape. Neither mode creates a release tag, moves a channel, issues qualified-lane
+clearance or establishes full-release consumer acceptance. Hosted OIDC and registry acceptance remain
+subject to the evidence recorded in reconciliation.
+
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
