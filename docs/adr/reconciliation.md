@@ -339,6 +339,28 @@ Binding mismatch, closed-owner and canceled-operation contracts prevent output b
 on Linux with Go 1.27.2, as do targeted delivery/lifecycle race checks and full Fern validation. These local
 fixtures do not establish successful hosted qualification.
 
+[Qualification Run 39279436309, attempt 2](https://github.com/dsx-ai-factory/nvkr/actions/runs/39279436309/attempts/2)
+uses the merged storage correction at `bb0fc777751455df34b61043b7fcf1c27d8e6c96` and the original
+producer's successful attempt-4 handoff. Its [AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39279436309/job/118189301921)
+and [ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39279436309/job/118189302977)
+both reached the twenty-minute authentication/smoke step limit without returning CLI diagnostics or
+uploading signed smoke evidence. The [final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39279436309/job/118199918963)
+also reached its twenty-minute step limit at 17:43 UTC. The logs do not identify the active verification
+phase or prove a storage failure. A separate regression reproduced an unbounded standalone SBOM verifier invocation;
+that call now applies the existing three-minute cosign budget and refuses late success. The hosted
+worker and qualifier additionally own nineteen-minute deadlines, leaving the existing twenty-minute
+step limit for cleanup and diagnostics, and generated terminal commands use `exec` for signal delivery.
+These changes bound failure and improve diagnostic availability; they do not establish the cause of the
+hosted timeout or successful completion of the complete candidate. The Linux Go 1.27.2 full gate and build,
+targeted signing/qualification race checks, and full Fern validation pass. The regressions cover earlier
+caller deadlines, cancellation, joined verifier cleanup, late-success refusal and both generated lanes.
+
+A read-only metadata inspection of that candidate counted 69 outputs and 120 distinct SBOM bundles.
+The first bundle (`sha256:d1b935653e29be84a619074c319848e168c6bbc5394401c723c3404f7691eb21`,
+for `nvke-cni-calico` in `nvke-node-fde-arm64`) passed standard pinned cosign 3.1.3 verification on
+Linux ARM64 in 0.974 seconds. This isolated bundle check did not reproduce the timeout; it neither checked
+the complete payload closure nor exercised native smoke or qualification publication.
+
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
 retains positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy
