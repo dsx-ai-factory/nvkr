@@ -86,7 +86,7 @@ type artifactCheckLifetime struct {
 	closeSource      func() error
 	closeErr         error
 	closeDone        chan struct{}
-	verified         *VerifiedRelease
+	verified         *verifiedQualificationPublication
 	plan             *factory.Plan
 	members          []QualificationReleaseMember
 	operationContext context.Context
@@ -209,7 +209,7 @@ func (consumer *Consumer) CheckQualification(ctx context.Context, request Qualif
 	return consumer.checkQualification(ctx, request, request.Origin)
 }
 
-func (consumer *Consumer) checkQualification(ctx context.Context, request QualificationRequest, source qualificationSource) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
+func (consumer *Consumer) checkQualification(ctx context.Context, request QualificationRequest, source qualificationSource) (_ *ArtifactCheckReceipt, _ *ArtifactCheckDescription, resultErr error) {
 	// Invalid source and Plan inputs take diagnostic precedence over missing
 	// consumer adapters. Every admission check still precedes external work.
 	if source == nil {
@@ -267,7 +267,7 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
 		IdentityRegexp: "^" + regexp.QuoteMeta(origin.BuilderID) + "$", Issuer: signing.Issuer,
 		MinimumDiskEvidence: DiskEvidenceBuildProvenance}
-	if consumer == nil || (consumer.verifier == nil && consumer.verifierFor == nil) || consumer.materialize == nil {
+	if consumer == nil || (consumer.verifier == nil && consumer.verifierFor == nil) || consumer.qualificationMaterializer() == nil {
 		return nil, nil, e.New(e.CodeEngineCapability, "artifact qualification requires signature and registry adapters")
 	}
 	verifier := consumer.verifier
@@ -288,20 +288,18 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if _, found := predicates[request.Reference]; !found {
 		return nil, nil, e.New(e.CodeProvenanceMissing, "qualification omits the exact release production predicate")
 	}
-	verified, inputs, err := consumer.VerifyExactInputs(ctx, request.Reference, policy, expectation)
+	verified, inputDescription, err := consumer.verifyQualificationInputs(ctx, request.Reference, policy, expectation)
 	if err != nil {
 		return nil, nil, err
 	}
 	transferred := false
 	defer func() {
 		if !transferred {
-			_ = verified.Close()
+			if closeErr := verified.Close(); closeErr != nil {
+				resultErr = errors.Join(resultErr, closeErr)
+			}
 		}
 	}()
-	inputDescription, err := inputs.Description()
-	if err != nil {
-		return nil, nil, err
-	}
 	publication, err := verified.publication.Description(request.Reference)
 	if err != nil {
 		return nil, nil, err

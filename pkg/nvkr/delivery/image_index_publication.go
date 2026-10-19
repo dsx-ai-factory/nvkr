@@ -5,13 +5,14 @@ package delivery
 
 import (
 	"context"
+	"errors"
 	"sort"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
-func (writer layoutWriter) importImageIndexLayout(ctx context.Context, input ObjectInput) (Descriptor, string, error) {
+func (writer layoutWriter) importImageIndexLayout(ctx context.Context, input ObjectInput) (result Descriptor, digest string, err error) {
 	if err := admitImageIndexInput(input); err != nil {
 		return Descriptor{}, "", err
 	}
@@ -19,7 +20,12 @@ func (writer layoutWriter) importImageIndexLayout(ctx context.Context, input Obj
 	if err != nil {
 		return Descriptor{}, "", err
 	}
-	defer func() { _ = index.Close() }()
+	defer func() {
+		if closeErr := index.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+			result, digest = Descriptor{}, ""
+		}
+	}()
 	description, err := index.Description()
 	if err != nil {
 		return Descriptor{}, "", err

@@ -204,7 +204,7 @@ func registryIndexLayout(ctx context.Context, index *ImageIndex) (v1.ImageIndex,
 // materializeRegistryImageIndex imports only this checked output's exact closure
 // into Pull's private publication stage; the publication's top-level index stays
 // unchanged. The same flat import owner used by release construction rechecks it.
-func materializeRegistryImageIndex(ctx context.Context, stage string, object PublishedObject, index *ImageIndex) error {
+func materializeRegistryImageIndex(ctx context.Context, stage string, object PublishedObject, index *ImageIndex) (err error) {
 	description, err := index.Description()
 	if err != nil {
 		return err
@@ -216,7 +216,11 @@ func materializeRegistryImageIndex(ctx context.Context, stage string, object Pub
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating index import workspace")
 	}
-	defer func() { _ = os.RemoveAll(workspace) }()
+	defer func() {
+		if cleanupErr := os.RemoveAll(workspace); cleanupErr != nil {
+			err = errors.Join(err, e.Wrap(e.CodeImmutableViolation, cleanupErr, "removing index import workspace"))
+		}
+	}()
 	root := filepath.Join(workspace, "image")
 	if err := index.WriteLayout(ctx, root); err != nil {
 		return err

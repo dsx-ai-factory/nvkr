@@ -684,7 +684,10 @@ anchors completion; authenticated production output publications and aggregate r
 attempts of the same producer run under ADR-20's ordering and exact-input checks. Original evidence is retained, and an
 earlier attempt's unrelated job failure does not invalidate its successfully authenticated outputs.
 
-The lifecycle owner issues an opaque check receipt retaining the verified publication and frozen Plan.
+Hosted artifact checking verifies every output's complete payload sequentially and releases non-executable
+scratch after each output. The lifecycle owner issues an opaque check receipt retaining verified control
+documents, evidence, exact executable bundle bytes and the frozen Plan. The narrower owner cannot export discarded
+payloads; ordinary full-publication verification retains its complete export capability.
 Closing it revokes copies, cancels and joins registered operations, then releases held bytes and any owned
 source receipt. The receipt grants neither smoke-execution nor signing authority. Fixed native smoke workers
 consume its held executable members in nonroot network-disabled containers and compare versions with the

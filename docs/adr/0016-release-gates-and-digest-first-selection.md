@@ -217,8 +217,14 @@ metadata and the per-output route records required by qualification. It emits no
 admission returns a capability error before publication work; it cannot claim complete M3 transport.
 
 The owning lifecycle module issues an opaque, subject-bound check receipt after authenticating its exact
-inputs and build evidence. It retains the held verified publication and frozen Plan. Closing it revokes all
-copies, cancels and joins registered operations, then releases the held publication and any owned source
+inputs and build evidence. Hosted checks independently verify every output's complete payload in sequence;
+non-executable payload scratch is released before the next output. The delivery owner retains the checked
+control documents, evidence and exact executable bundle bytes, and issues no complete-set capability until every
+output and the aggregate content identity pass. This bounds transient payload storage by the current output
+instead of the sum of all outputs; one output must still fit the available scratch capacity. Discarded bytes
+cannot be exported through this owner. Ordinary full-publication verification retains its separate export
+capability. The check receipt retains this verified owner and frozen Plan. Closing it revokes all
+copies, cancels and joins registered operations, then releases the retained bytes and any owned source
 receipt. A decoded report, caller-supplied digest or passed boolean cannot restore the
 receipt, and the receipt itself grants no qualification signing authority. M3-B supplies applicable
 delivered CLI/operator version smoke results from those exact payload bytes with networking disabled.
