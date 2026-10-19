@@ -84,25 +84,22 @@ inputs; artifact digests identify produced bytes. A missing record is not succes
 originals and keep private diagnostics off the shared screen. For the smaller general-purpose tutorial,
 use [the M1 walkthrough](../demos/m1-local.md); it is a different selection.
 
-## Run the full Linux ARM64 NVKE demo with its Go CLI
+## Run the full native ARM64 NVKE demo with its Go CLI
 
 The full path is **NVKR builds → NVKE consumes those exact outputs → real tenant → workload/DNS →
 natural tenant deletion → joined cleanup**. It is a separate, explicitly requested host-mutating operation.
-Follow the existing [Ubuntu ARM64 preparation guide](local-nvke-demo.md): native storage, Docker/Buildx,
-libvirt/QEMU, kernel modules, source access, runtime images and administrator capability checks.
-Use a prepared dedicated Linux ARM64 host. Both native hosts execute the Go demo and `nvkectl` locally;
-their virtualization and temporary container-backend prerequisites are platform-specific.
+Follow the [native Mac and Ubuntu ARM64 preparation guide](local-nvke-demo.md#native-linux-and-mac-path).
+Both hosts execute the Go demo and `nvkectl` locally; their virtualization and temporary
+container-backend prerequisites are platform-specific.
 The native Linux bootstrap integration is still under validation; successful artifact builds alone do not
 establish a working deployment.
 
-Set the existing local source clone path, then choose a fresh attempt and output directory:
+Choose a fresh attempt and output directory. The default fetches pinned dependency sources from
+their catalog URLs; pre-existing dependency repositories are not required:
 
 ```sh
-: "${NVKE_LOCAL_CLONE:?Set the absolute path of the local NVKE source clone}"
 bin/nvke-demo e2e \
-  --config demos/local-nvke.yaml \
   --repo "$PWD" \
-  --nvke-clone "$NVKE_LOCAL_CLONE" \
   --attempt presentation-arm-01 \
   --out "$PWD/.nvkr/presentation-arm-01-demo" \
   --jobs 2 \
@@ -133,7 +130,7 @@ The inner NVKR command uses `--ui=plain` so its progress can feed the outer demo
 That child setting does not disable the outer TUI. Explicit build inputs also capture compiler inputs
 through NVKR's existing input owner, including the closure needed by local conformance reporting.
 
-For Linux conformance, add `--conformance`. NVKR builds the version-matched tools in the same fresh
+For conformance on either native host, add `--conformance`. NVKR builds the version-matched tools in the same fresh
 artifact Run, then runs them against that invocation's tenant before cleanup. Retain the original JUnit
 and inspect its failure/error counts. This local report does not upload results to TestGrid automatically.
 
