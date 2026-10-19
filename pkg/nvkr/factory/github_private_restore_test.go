@@ -20,6 +20,7 @@ func TestPrivateStageRestoreAdmitsDevelopmentRetryButRejectsUnknownStage(t *test
 		{"unsigned", githubDevelopmentTestPlan}, {"signed", githubDevelopmentPublicationTestPlan},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
+			setDevelopmentRun(t)
 			err := RestoreGitHubPrivateInputs(t.Context(), fixture.plan(t), "unused", cistore.Request{}, "/missing", cistore.Options{AllowEarlierAttempts: true}, GitHubStepOptions{})
 			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
 		})
