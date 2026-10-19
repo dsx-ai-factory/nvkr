@@ -9,6 +9,10 @@ schema results do not transfer to a changed candidate.
 test interfaces outside that consolidated set until acceptance. Implementation and local CLI proof
 are tracked below; governance, CI and broader acceptance remain pending.
 
+[ADR-24](0024-imported-validator-catalog.md) proposes an imported-validator catalog, explicit artifact-role
+bindings and versioned diagnostic profiles. It is design only and outside the consolidated set; no catalog
+loader, discovery interface, profile migration or controller/chart adapter is implemented by that proposal.
+
 ## Current boundary
 
 The maintained public workflow is **Definition → Run → Release**, with Environment, Artifact and
@@ -448,9 +452,9 @@ both reached the twenty-minute authentication/smoke step limit without returning
 uploading signed smoke evidence. The [final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39279436309/job/118199918963)
 also reached its twenty-minute step limit at 17:43 UTC. The logs do not identify the active verification
 phase or prove a storage failure. A separate regression reproduced an unbounded standalone SBOM verifier invocation;
-that call now applies the existing three-minute cosign budget and refuses late success. The hosted
-worker and qualifier additionally own nineteen-minute deadlines, leaving the existing twenty-minute
-step limit for cleanup and diagnostics, and generated terminal commands use `exec` for signal delivery.
+that call now applies the existing three-minute cosign budget and refuses late success. That follow-up
+introduced nineteen-minute hosted deadlines inside twenty-minute steps for cleanup and diagnostics;
+the current complete-operation budget is described below. Generated terminal commands use `exec` for signal delivery.
 These changes bound failure and improve diagnostic availability; they do not establish the cause of the
 hosted timeout or successful completion of the complete candidate. The Linux Go 1.27.2 full gate and build,
 targeted signing/qualification race checks, and full Fern validation pass. The regressions cover earlier
@@ -488,6 +492,58 @@ The two recorded cryptographic invocations verified signature and provenance sep
 replay of `csi-node-driver-registrar-image`, the first output to time out in the ARM64 worker, passed both
 checks and its exact expected predicate in 15.004 seconds. These bounded read-only replays did not exercise
 the complete publication, native smoke or qualification signing.
+
+[Qualification Run 39327048621](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621)
+used `7f67ce63c19b2aab56e119f0bd27376a385c6e69`, including lazy OCI evidence acquisition and production
+release-manifest issuance, with the original producer's successful attempt-6 handoff. Its
+[AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621/job/118315486080)
+completed all 69 payload, membership, input and SBOM checks, then 40 output signature/provenance checks
+before the nineteen-minute deadline. The other 29 rows reflect the expired context. Its
+[ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621/job/118315486516)
+and [final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621/job/118324467119)
+instead expired while materializing an ordinary output, before artifact-check reporting. Their completed
+output counts are unavailable; the error did not identify the output. All three returned exit 31 before
+the Actions hard limit. Neither worker reached native smoke or uploaded evidence, and the final job
+reached neither qualification publication nor manifest issuance. The Run failed at 22:03 UTC. Complete
+logs confirm the exact trusted checkout and terminal `exec`; no complete qualification follows.
+
+A bounded read-only metadata replay against the same immutable candidate hit its 270-second caller
+deadline after 419 logical manifest/blob acquisitions. Its 1,515 HTTP requests included 419 registry pings
+and 419 token exchanges; their response-header waits consumed 101.024 seconds, while body reads totaled
+about 6.27 MB. A single-variable replay using one operation-scoped registry puller completed all 513
+logical acquisitions in 218.294 seconds, including 69 outputs and 120 evidence records, with 70 pings and
+70 token exchanges. The resulting root index and canonical root config matched the saved exact candidate.
+The baseline was incomplete, so these observations establish reduced negotiation and completion under
+the same bound, not a complete-read speedup ratio. The retained metadata declares 23,822,474,523 bytes
+of output layers, including 20,136,460,288 bytes across four disks; this inspection did not download them.
+Metadata acquisition now reuses that private per-operation puller without removing descriptor, identity,
+size, namespace, cancellation or complete-set inspection checks. Checked-output failures also identify
+the exact output while retaining their coded cause and releasing prior retained files.
+
+A separate bounded Linux ARM64 stock-adapter replay authenticated the same candidate root and all 69
+output subjects against their retained exact production predicates. All 140 signature/provenance
+cryptographic invocations passed using pinned cosign 3.1.3, held-descriptor execution and normal keyless
+trust checks. The sequential verification phase took 732.998 seconds, with a median of 9.25 seconds per
+subject and a maximum of 26.06 seconds. This is 12 minutes 13 seconds for signature/provenance alone;
+it excludes payload acquisition, the 120 SBOM verifications, native smoke, qualification publication and
+release-manifest issuance. These measurements motivate additional aggregate headroom without establishing
+complete qualification or identifying the hosted ARM64/final job's particular slow output.
+
+The current hosted budget is fifty-nine minutes inside a sixty-minute step and ninety-minute job.
+This provides operational headroom for the mandatory workload, including the final job's 69 qualification
+attestations with independent readback, 69 further member verifications, and release-manifest attestation
+with two readbacks. It is not proof of fit or successful issuance. Nested owners retain the original
+deadline, earlier caller cancellation wins, and individual signing, metadata and native execution limits
+remain. Payload materialization inherits this longer parent deadline. The minute before the Actions limit
+permits cooperative cleanup, not a guaranteed return or attachment rollback.
+
+The Linux Go 1.27.2 full uncached repository gate and build pass for this follow-up, including vet,
+lint and vulnerability scanning. Targeted delivery, qualification and release-manifest race checks,
+canonical workflow regeneration, actionlint, YAML lint and Fern validation also pass. Regressions failed
+against the prior source and passed with the correction for repository negotiation reuse, exact-output
+failure diagnostics and the enclosing budget; they also cover independent credential admission and
+retention of the original deadline through manifest issuance. Independent final review found no
+actionable issues. These checks establish the implementation contract, not hosted recovery.
 
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
@@ -1036,6 +1092,7 @@ interruption demonstrations remain M4-D.
 | 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, output-local ordinary job membership with addition/removal and failure-accounting contracts, stable result-collector membership and exact retirement of legacy producer children, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement; opted-in named runtime Plans compile current source pins within the complete reviewed workflow/action and Environment contract and distribute frozen data through same-Run helpers; provider artifacts contain JSON locators while private CI carriers use a digest-bound GHCR transport with package visibility and linked-repository admission | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. The inline layout has guarded dispatch admission and isolated exact-result/failure diagnostics; complete production execution, automatic PR publication and scheduled/private-source service acceptance remain unexercised. The runtime Plan handoff and private CI carrier transport have local contracts; a hosted private-carrier producer-to-E2E cycle remains unexercised. Public-repository execution requires an independently admitted storage credential/access policy; public-linked storage fails closed. Historical Actions payloads and caches are not migrated by this implementation. The workflow `catalog update-ci` renders (installed as `catalog-refresh.yaml`) opens PRs with a GitHub App installation token minted in its `pull-request` job by the SHA-pinned `actions/create-github-app-token` action for this repository only, with contents, pull requests and workflows write, and revoked by the action when the job ends; the workflow token stays read-only (shape, action inputs, bot sign-off identity and step behavior contract-tested with a stubbed `gh`; a manual dispatch on 2026-10-16 failed at the earlier hand-rolled token step with an unattributed 404). No scheduled run, token exchange, push, PR, automatically started PR check, close or branch deletion has been exercised, so M4 acceptance item 1 is implemented but not demonstrated and M4 is not claimed. The review commit is created through the GitHub API with a DCO trailer for the App's bot user (contract-tested; GitHub signing and attribution not verified). Pin-only fixtures assert the production, development and qualification workflows stay identical; a topology, label, interface or action-pin change that regenerates a closure workflow is published in the same PR. One enrolled policy is supported until generated bundle roots are per-Definition. A branch that already holds the candidate is left alone, a closed unmerged PR whose head commit carries the same candidate stays closed even after its branch is deleted, fork PRs from a branch with the same name are ignored, a lookup page that could be truncated fails the step, and an unchanged Definition closes its stale PR and deletes its branch (contract-tested with a stubbed `gh` that applies each call's real filter). The ruleset, last-push approval and code-owner settings that protect the bot branch are repository settings that this workflow does not enforce; the release owner or an administrator must validate them before scheduled writes are relied on. The policy names the dependent development Run, qualification pair and additional named Runs (the two nightly bundles, checked and regenerated through the runtime-Plan owner because they compile current pins at dispatch); refresh admits each additional Run's catalogs before compiling it, and checks, regenerates and transports every member through its owner on an exact allowlist, refuses an unnamed committed bundle and a generator stamp that differs from the committed Plans (contract-tested with real local Git for the production and development bundles, and through the real qualification owner on a fixture with synthetic trust pins that contacts no GHCR or cosign; deployment-image selection is outside the closure and must be coordinated by hand before a moving release), and `make workflows-check` compares the installed workflow with `catalog update-ci` output (not exercised in the hosted gate). Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets including NVKE beta local-chart version omission and descriptive artifact mappings, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 | 23 Artifact test interfaces | Proposed ADR merged in PR #139; Go Plan helper merged in #156; #138 replaces its Python diagnostic with Go factory/source/execution owners | [Implementation guide](../artifact-testing.md) separates the Go macOS ARM64/Docker fresh-build proof from historical Python native results. Upstream adoption, authenticated output membership, exhaustive suite acceptance, maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
+| 24 Validator catalog | Proposed design in [ADR-24](0024-imported-validator-catalog.md); no implementation or acceptance evidence | Strict catalog/profile loading, discovery, adapter registration, CLI migration, multiple-artifact binding, controller/chart and second-repository adoption remain unimplemented. Existing CLI/published-source diagnostics do not prove catalog execution; suite completeness, authenticated membership and qualification remain separate boundaries |
 
 ## Feature-branch pipeline development
 
@@ -2447,8 +2504,9 @@ The named ARM64 nightly and upstream-OVN entries are respectively 182,314/183,23
 All four producer bundles keep their jobs inline. The earlier output-local grouping migration removed
 accidental unrelated-output failure barriers; dependency reduction preserves the resulting ancestor closure.
 The addition/removal regression compiles binary, native binary, collected native binary, source and signed
-per-output publication fixtures with new output names sorting before, between and after existing outputs.
-All 15 cases preserve existing job IDs, relative emission order, expanded operations, invocation values
+per-output publication fixtures. The binary fixture covers names sorting before, between and after existing
+outputs; the other policies cover an earlier insertion, including possible YAML anchor relocation.
+All seven cases preserve existing job IDs, relative emission order, expanded operations, invocation values
 and shared actions outside required aggregate accounting. Collected fixtures also
 preserve existing bucket membership; removing the output restores the complete original bundle byte-for-byte.
 Separate contracts retain package success gating, pinned scanner dependencies and finalizer rejection of

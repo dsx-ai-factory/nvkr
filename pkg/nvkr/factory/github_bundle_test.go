@@ -27,24 +27,6 @@ func namedGitHubTestPlan(t *testing.T, name string) *Plan {
 	return plan
 }
 
-func TestDefaultGitHubBundleRetainsCommittedBytes(t *testing.T) {
-	root := "../../.."
-	plan, err := LoadPlanContext(t.Context(), filepath.Join(root, FactoryPlanPath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if plan.Environment.GitHubBundle != "" {
-		t.Fatal("maintained default fixture unexpectedly selects a named namespace")
-	}
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
-		t.Fatalf("default namespace changed committed Plan/workflow/manifest bytes: %v", err)
-	}
-}
-
 func TestNamedGitHubWorkflowNamesDoNotCollideWithDefault(t *testing.T) {
 	defaultPlan := githubTestPlan(t)
 	defaultBundle, err := RenderGitHub(t.Context(), defaultPlan)

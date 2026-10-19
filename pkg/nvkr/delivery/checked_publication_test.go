@@ -260,6 +260,9 @@ func TestCheckedPublicationLateFailureReleasesRetainedFiles(t *testing.T) {
 				code = e.CodeTimeout
 			}
 			assertRegistryCode(t, err, code)
+			if !strings.Contains(err.Error(), `checking publication output "z-node-image"`) {
+				t.Fatalf("late failure omits the exact output: %v", err)
+			}
 			if checked != nil || !reached.Load() {
 				t.Fatalf("late failure not reached or issued owner: %v %v", checked, err)
 			}

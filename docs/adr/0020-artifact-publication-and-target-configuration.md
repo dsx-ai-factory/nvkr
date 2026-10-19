@@ -216,6 +216,13 @@ Readers reject earlier metadata and removed fields. ValidationVector v3 and Rele
 remain implemented. The retired clearance and publication-manifest families remain reserved and nonminting;
 retained transport media identifiers do not imply a current clearance issuer or verifier.
 
+One metadata acquisition reuses its registry puller across the root and admitted sibling repositories.
+Authentication negotiation is reused within each repository for that operation; the puller and its
+authentication state are not retained for another acquisition. Every requested manifest, config and evidence blob retains
+its exact descriptor, size, digest and complete metadata inspection checks. Session reuse neither caches
+verified authority nor substitutes a previous logical member's checks. The caller's deadline and the
+metadata acquisition bound still cover the complete operation.
+
 Loose executables use `application/vnd.nvkr.binary-bundle.v1`. The Binary Bundle's canonical config binds OS,
 architecture, purpose, optional ReleaseSet and Inventory identities, and every file's name, absolute install
 suggestion, mode, ordinary SHA-256, and size. Its one deterministic

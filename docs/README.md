@@ -77,6 +77,10 @@ The [ADRs](adr) own engineering contracts, and [reconciliation](adr/reconciliati
 implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to the detailed
 [acceptance specification](epics-v1-spec.md).
 
+Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
+adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
+The catalog and versioned profiles are not implemented.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.

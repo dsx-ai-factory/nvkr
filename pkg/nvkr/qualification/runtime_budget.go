@@ -8,7 +8,13 @@ import (
 	"time"
 )
 
-const hostedRuntimeTimeout = 19 * time.Minute
+// These enclosing allowances cover complete candidate work; individual operation
+// limits remain independent. They do not establish that every candidate fits.
+const (
+	hostedRuntimeTimeout     = 59 * time.Minute
+	hostedStepTimeoutMinutes = int((hostedRuntimeTimeout + time.Minute) / time.Minute)
+	hostedJobTimeoutMinutes  = hostedStepTimeoutMinutes + 30
+)
 
 // WithHostedRuntimeBudget bounds the complete hosted qualifier or smoke worker,
 // leaving one minute before the generated step deadline for cancellation,

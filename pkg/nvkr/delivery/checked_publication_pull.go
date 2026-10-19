@@ -6,6 +6,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -102,7 +103,7 @@ func (pull *checkedPublicationPull) run(ctx context.Context, reference, workspac
 			return nil, e.New(e.CodeVerifyFailed, "checked output has no exact repository binding")
 		}
 		if err := checkPublicationOutput(ctx, layout, stage, object, child, controls, state, options); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("checking publication output %q: %w", object.Name, err)
 		}
 	}
 	sort.Slice(state.outputs, func(i, j int) bool { return state.outputs[i].Name < state.outputs[j].Name })

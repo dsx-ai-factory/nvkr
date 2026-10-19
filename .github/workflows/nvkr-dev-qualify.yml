@@ -32,7 +32,7 @@ jobs:
     needs: [native-smoke]
     if: ${{ !cancelled() && (needs.native-smoke.result == 'success' || needs.native-smoke.result == 'failure') && github.event_name == 'workflow_dispatch' && github.repository == 'dsx-ai-factory/nvkr' && startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 90
     permissions:
       contents: read
       actions: read
@@ -91,7 +91,7 @@ jobs:
           path: .nvkr/development-source
           persist-credentials: false
       - name: Authenticate all evidence and publish development qualification
-        timeout-minutes: 20
+        timeout-minutes: 60
         env:
           NVKR_GITHUB_TOKEN: ${{ github.token }}
           NVKR_REGISTRY: ghcr.io

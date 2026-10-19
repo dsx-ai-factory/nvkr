@@ -113,6 +113,9 @@ func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
 				{policy.Smoke.Workflow, "native", "smoke-worker"},
 			} {
 				workflow := decodeQualificationWorkflow(t, bundle.files[command.workflow])
+				if workflow.Jobs[command.job].Timeout != 90 {
+					t.Fatalf("%s does not reserve the complete hosted job budget", command.workflow)
+				}
 				found := 0
 				for _, step := range workflow.Jobs[command.job].Steps {
 					if !strings.Contains(step.Run, "./nvkr-exec run "+command.name+" --policy ") {
@@ -127,11 +130,11 @@ func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
 					if lines[len(lines)-1] != want {
 						t.Fatalf("%s does not replace its shell with the final owner command", command.workflow)
 					}
-					if lines[0] != "set -euo pipefail" || !strings.Contains(step.Run, "[ -n \"${NVKR_PIN_SOURCE_TOKEN_0:-}\" ]") || step.Timeout != 20 {
+					if lines[0] != "set -euo pipefail" || !strings.Contains(step.Run, "[ -n \"${NVKR_PIN_SOURCE_TOKEN_0:-}\" ]") || step.Timeout != 60 {
 						t.Fatalf("%s changed source admission or its bounded step", command.workflow)
 					}
-					if time.Duration(step.Timeout)*time.Minute-hostedRuntimeTimeout < time.Minute {
-						t.Fatalf("%s leaves less than one minute for owner cleanup before the step deadline", command.workflow)
+					if time.Duration(step.Timeout)*time.Minute-hostedRuntimeTimeout != time.Minute {
+						t.Fatalf("%s does not preserve the one-minute owner cleanup margin before the step deadline", command.workflow)
 					}
 				}
 				if found != 1 {
@@ -206,7 +209,7 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 		}
 	}
 	for _, job := range []qualificationWorkflowJob{native, final} {
-		if len(job.Env) != 0 || job.Timeout != 30 {
+		if len(job.Env) != 0 || job.Timeout != 90 {
 			t.Fatal("ambient job environment or missing timeout")
 		}
 		scoped := 0

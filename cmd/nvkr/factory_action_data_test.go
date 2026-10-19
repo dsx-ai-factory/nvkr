@@ -13,21 +13,37 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
-// Reuse the saved, complete producer Plan. The descriptor remains a rendering
-// operation: these command fixtures neither compile authored inputs nor execute
-// the selected producer, restore carriers, or contact a provider.
+// Compile one executable producer: these CLI contracts need real shared action
+// data, not the maintained product's complete graph and publication pipeline.
+// The fixture does not execute producers, restore carriers, or contact providers.
 func githubActionDataCommandFixture(t *testing.T) (planBytes []byte, selector, output string) {
 	t.Helper()
-	path := filepath.Join("..", "..", factory.FactoryPlanPath)
-	plan, err := factory.LoadPlanContext(t.Context(), path)
+	definition := authored.Definition{
+		APIVersion: authored.DefinitionAPIVersion, Kind: authored.DefinitionKind,
+		Metadata: authored.Metadata{Name: "action-data"},
+		Catalog:  authored.Catalog{Base: filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered")},
+		Outputs: []authored.DefinitionOutput{{
+			Name: "containerd", Platform: "linux/amd64", Format: authored.OutputExecutable,
+			Components: []string{"containerd"},
+		}},
+	}
+	environment := authored.Environment{
+		APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind,
+		Metadata: authored.Metadata{Name: "action-data"}, RunsOn: "ubuntu-24.04",
+		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
+		UtilityPlatform:  "linux/amd64",
+	}
+	plan, err := factory.CompileDocuments(t.Context(), "definition.yaml", definition,
+		"environment.yaml", environment, "v0.0.0 (test)")
 	if err != nil {
 		t.Fatal(err)
 	}
-	planBytes, err = os.ReadFile(path)
+	planBytes, err = canonical.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +67,7 @@ func githubActionDataCommandFixture(t *testing.T) (planBytes []byte, selector, o
 		}
 	}
 	if len(selectors) == 0 {
-		t.Fatal("saved Plan has no shared action descriptor")
+		t.Fatal("fixture Plan has no shared action descriptor")
 	}
 	sort.Strings(selectors)
 	selector = selectors[0]

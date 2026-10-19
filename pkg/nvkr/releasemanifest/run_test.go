@@ -179,7 +179,7 @@ func TestTriggeredManifestSharesHostedBudgetThroughIssuance(t *testing.T) {
 		qualificationTime time.Duration
 		wantTimeout       time.Duration
 	}{
-		{"complete hosted budget", 0, 18 * time.Minute, 19 * time.Minute},
+		{"complete hosted budget", 0, 58 * time.Minute, 59 * time.Minute},
 		{"shorter caller", 5 * time.Minute, 4 * time.Minute, 5 * time.Minute},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
