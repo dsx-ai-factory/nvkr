@@ -417,6 +417,24 @@ delivery format, declared-format propagation through path and held APIs, and pay
 owner remain deferred. This diagnostic does not validate target architecture, preserve a source package,
 enable direct APT publication, or prove installation.
 
+ADR-20's specified, disabled native `file` format must preserve source-created Debian packages unchanged.
+Its `deb` kind requires the pinned authoritative Debian tooling to validate package name, version,
+architecture and declared dependencies against the actual held package, then inspect bounded payload
+contents for the required subject-bound evidence. Archive acquisition, member hashes, control metadata
+and actual payload dependencies are distinct claims. No source pathname, filename suffix, caller hint,
+`archive-content/v1` inventory or `deb-archive-metadata/v1` diagnostic may satisfy the payload-evidence gate.
+Every selected package/member and architecture needs its own exact subject and output membership; variants
+that intentionally conflict use separate installation cases. Merely exposing current disk materials as
+files does not complete this evidence path. It remains disabled until its native package and independent
+consumer contracts and operational acceptance are recorded.
+
+For `efi`, `ipxe`, `kernel`, `initrd` and `iso` files, preserve the actual source/material and exact-byte
+subjects. An inventory of archive members establishes those bytes, not boot compatibility, installed
+contents or dependency completeness. The EFI build's pinned upstream, patches, submodules and acquired
+materials must be represented at the producer boundary, not hidden inside an uploader or ambient Make
+invocation. Rendered boot scripts have new exact-byte subjects; their source-template evidence cannot be
+presented as a signature over the rendered bytes. Transport signing is not UEFI Secure Boot acceptance.
+
 For Helm source archives and exact acquired archives selected as Helm outputs, a generic manifest reader inventories bundled `Chart.yaml` declarations and chart
 dependency declarations/locks. It never executes
 installation scripts or fetches external charts. Bundled charts and locked references are

@@ -48,6 +48,7 @@ records source availability and remaining gaps.
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
+| Review the specified, disabled S3 boot and package delivery contract | [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation.md#s3-boot-and-package-delivery-contract) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |

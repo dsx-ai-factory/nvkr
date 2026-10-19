@@ -70,6 +70,22 @@ Environment separately supplies runtime, runner, publication namespace, credenti
 (ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
 
+ADR-20 reserves, without implementing them, Definition v6 native `file` outputs, Environment v2 typed
+`publication.fileTargets`, and Run Plan v6 delivery edges. Current schema constants and input behavior stay
+unchanged. Source-created DEBs, EFI and iPXE files are not executable-tool bundles or reconstructed APT
+packages. The six public lifecycle objects remain unchanged; native manifests, selection receipts, delivery
+roots and locators are generated/authenticated internals rather than independently authored lifecycle inputs.
+
+The disabled delivery use case belongs to `lifecycle`. It authenticates aggregate membership under source
+policy and retains each selected complete output-local publication plus its actual verified proof bytes.
+Its separate opaque receipt binds named selection, source roots/Plan/invocations, delivery target and effective
+consumer policies. The complete-set `ExactInputReceipt` and `ExportForInvocation` are not relaxed for this
+subset operation. A descriptive pull result, copied path or decoded delivery document cannot reconstruct
+the receipt. `delivery` owns byte-preserving member projection and authenticated storage/read-back receipts;
+`sign` owns retained proofs and detached signing/verification. The lifecycle owner joins their exact subjects
+and owns cancellation/Close through stop and join. CLI and SDK adapt the same use case without implementing
+another scheduler or upload mechanism. Legacy monolithic-root subset consumption remains unsupported.
+
 `pkg/nvkr/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
 accepts those exact inputs and owns the complete Plan, output joins and evidence requirements. It returns no
 partially completed plan and exposes no independently authored CompileSpec or ExecutionSettings handoff.

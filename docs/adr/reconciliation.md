@@ -977,6 +977,35 @@ attestation, registry read-back or independent consumer verification is recorded
 creation, publisher exclusion, consumer verification instructions and interruption demonstrations remain
 M4-D.
 
+## S3 boot and package delivery contract
+
+ADR-20's [specified S3 file-delivery contract](0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract)
+freezes the proposed native-file/member, typed destination, source selection, portable proof, detached
+delivery-root/locator and commit/interruption boundaries. ADR-01 reserves distinct new identity families;
+ADR-04/13/14/17/18 own the corresponding trust, evidence, boot, lifecycle and generated execution rules.
+This is a contract-only scope extension for review, not named-decider ratification or feature enablement.
+No code schema constant, decoder, credential, dependency, catalog pin or generated workflow is changed.
+
+Current object routes still fail `CodeEngineCapability`, and Definition accepts no native `file` output.
+The current whole-Plan exact-input receipt cannot authorize selected-output projection. Signature/provenance
+verification records do not retain portable source bundles; proof capture and supplied-bundle verification
+remain implementation work. The new Definition/Environment/Plan versions and identity families are documentary
+reservations, not runtime registrations or accepted wire schemas. Existing native package metadata diagnostics
+and archive inventories cannot satisfy package payload dependency evidence.
+
+The required supported set includes selected AMD64/ARM64 QCOW2, compatible EFI/iPXE assets and original
+Debian packages. The pinned NVKE source [documents](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36)
+the public/fleet imager parameter mismatch; compatibility must be resolved and exercised rather than inferred
+from a build. Its [simulator fixture](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/controller/nico-sim/test/integration/testutil/flows.go#L24)
+explicitly skips fetching the EFI, so that test cannot establish actual EFI-chainload/install acceptance.
+Native package installation must account for conflicting version alternatives.
+
+No S3 service/version, storage credential, boot-network access, independent S3 consumer or full boot/package
+acceptance is recorded for this extension. Enablement requires the exact provider and generated execution,
+independent proof/payload consumption, real EFI imaging/reboot, direct VM boot and native package checks,
+including failure and indeterminate-commit cases. Existing OCI evidence, dry-runs and unit tests do not
+establish these outcomes. The owning ADR states the prerequisite acceptance.
+
 ## Support by owner
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |

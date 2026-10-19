@@ -215,6 +215,22 @@ identities and inexact bindings fail closed. The canonical document is bounded b
 transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
 implementation and external acceptance independently of schema registration.
 
+The disabled S3/native-file contract in ADR-20 reserves the following new families. These are design
+allocations only; no executable codec registration or decoder is added by the contract freeze.
+
+| Object | Canonical schema | Frozen family kind |
+| --- | --- | --- |
+| Native file/member manifest | `nvkr.dev/native-file/v1` | `nvkr.native-file` |
+| Derived signed file-delivery root | `nvkr.dev/file-delivery/v1` | `nvkr.file-delivery` |
+
+The native manifest binds unchanged producer bytes and complete admitted regular members. The delivery
+root binds authenticated source publications to exact stored bytes and destinations. Neither reuses retired
+`nvkr.publication`/`nvkr.publication-manifest` families or changes Build identity. Implementations must register
+the distinct tags and add strict canonical/unknown-schema/family-separation contracts before minting them.
+The `nvkr.dev/file-delivery-locator/v1` locator pins raw document/bundle hashes and sizes; it is transport
+selection, not another semantic identity or trust object. Root JSON SHA-256, detached bundle SHA-256,
+native-file SHA-256 and their typed structured identities remain distinct.
+
 ## Consequences
 
 **Positive**
