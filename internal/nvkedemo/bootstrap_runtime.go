@@ -150,6 +150,12 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 	if err := os.Symlink(wrapper, filepath.Join(backend.view, "nerdctl")); err != nil {
 		return backend, err
 	}
+	// Upstream nerdctl.lima resolves limactl through PATH. Keep transport logs
+	// out of machine-readable nerdctl output without filtering guest stderr.
+	// Lifecycle commands still use the admitted absolute binary directly.
+	if err := os.WriteFile(filepath.Join(backend.view, "limactl"), []byte("#!/bin/sh\nset -eu\nexec \"$NVKR_BOOTSTRAP_LIMACTL\" --log-level=error \"$@\"\n"), 0700); err != nil {
+		return backend, err
+	}
 	backend.runner = backend.bind(runner)
 	// Lima's verified public download cache remains reusable. Instance state
 	// and SSH identities are still isolated by the explicit private LIMA_HOME.
@@ -257,6 +263,7 @@ func (backend *hostBootstrap) bind(runner Runner) Runner {
 	if backend.root != "" {
 		values["LIMA_HOME"] = filepath.Join(backend.root, "state")
 		values["LIMA_INSTANCE"] = "bootstrap"
+		values["NVKR_BOOTSTRAP_LIMACTL"] = backend.limactl
 		values["PATH"] = backend.view + string(os.PathListSeparator) + environmentValue(runner.Env, "PATH")
 		values["TMPDIR"] = backend.temporary
 		runner.directory = filepath.Dir(backend.temporary)

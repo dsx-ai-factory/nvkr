@@ -198,6 +198,9 @@ projects matching chart values after package installation and before agent start
 the OS package's independently built image is not treated as the named output.
 The site-create request carries the source-selected MachineImage boot script,
 rendered with the existing NVKE disk-policy template and current local disk URL.
+Its admitted iPXE selection also supplies DHCP address mode to both site readiness
+and bootstrap address checks; standalone guests retain the static two-address contract.
+Owned-subnet, reserved-address and duplicate-address rejection remain shared.
 These source and shell contracts do not prove fresh runtime import, DHCP callback
 identity or conformance acceptance. Strict manifest observations remain required.
 Linux retains
@@ -1689,6 +1692,14 @@ A full tenant crash/restart and recovery matrix remains unverified.
 The native Linux bootstrap adapter now reuses the private temporary Lima owner,
 with explicit QEMU/9p, reviewed source version and singleton image/archive pins;
 Mac retains its separate platform prerequisite. Version admission precedes BUILD.
+The private upstream `nerdctl.lima` transport uses Lima's supported
+`--log-level=error` option through an invocation-owned PATH adapter. This keeps
+Lima informational/version warnings out of NVKE's combined image-inspection
+output; guest command stderr and exit status remain unchanged. Direct Lima
+version, startup and cleanup diagnostics remain intact. Real subprocess
+contracts cover exact digest output and guest failure propagation for both
+platform bindings. This does not change NVKE sources or establish fresh E2E
+acceptance; NVKE's combined-output parsing remains an upstream limitation.
 The owner retains each concrete readiness process until joined, stops polling on
 an unjoined group and preserves dependent controls when cleanup cannot join it.
 Contract tests cover both platform bindings, version refusal and retained-probe

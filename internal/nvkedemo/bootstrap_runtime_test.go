@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -115,10 +116,22 @@ case "$1" in
  --version) printf 'limactl version %s\n' "$VERSION";;
  start) trap 'exit 0' TERM INT; : > "$LIMA_HOME.fixture-ready"; while :; do sleep 1; done;;
  stop) exit 0;;
+ --log-level=error)
+  shift
+  test "$1" = shell && test "$2" = --preserve-env && test "$3" = bootstrap && test "$4" = nerdctl
+  test -f "$LIMA_HOME.fixture-ready"
+  case "$5" in
+   info) exit 0;;
+   image) printf '%s %s\n' "$DIGEST" "$DIGEST";;
+   fail) printf 'guest containerd failed\n' >&2; exit 23;;
+   *) exit 44;;
+  esac;;
+ shell) printf 'Lima version warning\n' >&2; exit 45;;
  *) exit 42;;
 esac
 `), 0700)
-	writeTenantFixture(t, filepath.Join(bin, "nerdctl.lima"), []byte("#!/bin/sh\nset -eu\ntest -f \"$LIMA_HOME.fixture-ready\"\n"), 0700)
+	// Match the upstream wrapper, including its PATH lookup of limactl.
+	writeTenantFixture(t, filepath.Join(bin, "nerdctl.lima"), []byte("#!/bin/sh\nset -eu\nexec limactl shell --preserve-env \"$LIMA_INSTANCE\" nerdctl \"$@\"\n"), 0700)
 	version, _, err := bootstrapLimaPlatform(platform)
 	if err != nil {
 		t.Fatal(err)
@@ -140,6 +153,32 @@ esac
 	})
 	if exited, err := backend.process.Exited(); exited {
 		t.Fatalf("backend exited before cleanup: %v", err)
+	}
+	// NVKE consumes combined output here. Exercise the upstream wrapper and
+	// private transport as real subprocesses, preserving guest errors/status.
+	digest := "sha256:" + strings.Repeat("a", 64)
+	for _, test := range []struct {
+		command, want string
+		exit          int
+	}{
+		{"image", digest + " " + digest + "\n", 0},
+		{"fail", "guest containerd failed\n", 23},
+	} {
+		command := exec.CommandContext(ctx, filepath.Join(backend.view, "nerdctl"), test.command)
+		command.Env = SetEnv(backend.runner.Env, map[string]string{"DIGEST": digest})
+		command.WaitDelay = time.Second
+		output, err := command.CombinedOutput()
+		exit := 0
+		if err != nil {
+			var failed *exec.ExitError
+			if !errors.As(err, &failed) {
+				t.Fatal(err)
+			}
+			exit = failed.ExitCode()
+		}
+		if string(output) != test.want || exit != test.exit {
+			t.Fatalf("%s: combined output=%q exit=%d; want %q exit=%d", test.command, output, exit, test.want, test.exit)
+		}
 	}
 	if err := backend.close(ctx); err != nil {
 		t.Fatal(err)
