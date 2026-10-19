@@ -21,21 +21,10 @@ func TestCosignVerifyBindsExpectedPredicateOnlyToProvenance(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			signature := qualificationBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer, []byte(`{}`))
 			provenance := qualificationBundle(t, ociTestDigest, ProvenancePredicateType, ociObservedIdentity, ociTestIssuer, []byte(tc.predicate))
-			stub := &cosignStub{stdout: map[string]string{"version": cosignVersionJSON}}
+			stub := &cosignStub{stdout: map[string]string{"version": cosignVersionJSON, "download": signature + "\n" + provenance}}
 			var phases []string
 			stub.onCall = func(call recordedCall) error {
 				switch call.args[0] {
-				case "download":
-					predicateType := call.args[3]
-					phases = append(phases, "download "+predicateType)
-					switch predicateType {
-					case CosignSignaturePredicateType:
-						stub.stdout["download"] = signature
-					case ProvenancePredicateType:
-						stub.stdout["download"] = provenance
-					default:
-						t.Fatalf("unexpected evidence type: %s", predicateType)
-					}
 				case "verify-blob-attestation":
 					phases = append(phases, "verify "+call.args[4])
 				}
@@ -56,9 +45,7 @@ func TestCosignVerifyBindsExpectedPredicateOnlyToProvenance(t *testing.T) {
 				t.Fatalf("missing verified evidence: %+v", record)
 			}
 			wantPhases := []string{
-				"download " + CosignSignaturePredicateType,
 				"verify " + CosignSignaturePredicateType,
-				"download " + ProvenancePredicateType,
 			}
 			if tc.want == "" {
 				wantPhases = append(wantPhases, "verify "+ProvenancePredicateType)

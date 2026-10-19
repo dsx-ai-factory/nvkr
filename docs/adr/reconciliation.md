@@ -462,6 +462,33 @@ for `nvke-cni-calico` in `nvke-node-fde-arm64`) passed standard pinned cosign 3.
 Linux ARM64 in 0.974 seconds. This isolated bundle check did not reproduce the timeout; it neither checked
 the complete payload closure nor exercised native smoke or qualification publication.
 
+[Qualification Run 39309062376](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376)
+uses merged commit `c014f854fccf22ecead82daa7da084cd5d7b30aa` and the original producer's successful
+attempt-5 handoff. Its [ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376/job/118253636589)
+and [AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376/job/118253637003)
+both completed payload integrity checks for all 69 complete outputs, including four disks and the native
+children of four image indexes, then verified the required SBOM bundles. Disk filesystem/content inspection
+remains unperformed. Their nineteen-minute operation deadline expired during the subsequent output
+signature/provenance checks, after 15 and 16 outputs respectively. Both returned coded timeout diagnostics
+and exit 31 before native smoke or signed worker evidence. The remaining timeout rows reflect the expired
+shared context, not independent evidence that each remaining artifact is defective. The dependent
+[final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376/job/118263498701)
+also completed all 69 payload and SBOM checks, then returned exit 31 at its nineteen-minute deadline after
+five output signature/provenance checks. It published no qualification subjects. The Run completed with
+failure at 19:53:33 UTC. These runs exercise the storage correction and diagnostic deadline; they do not
+establish complete qualification.
+
+A bounded read-only Linux ARM64 replay of the first real output's stock signing adapter took 33.018 seconds:
+30.699 seconds were spent in two cosign bundle downloads, with normal signature and exact production-predicate
+verification succeeding. That subject had five signature, five provenance and five SBOM bundles from
+historical publication attempts. Pinned cosign 3.1.3 fetched all 15 before predicate filtering on each download.
+The lazy acquisition implementation checked the same subject and exact predicate through the stock adapter
+in 6.865 seconds, using the same pinned binary, held-descriptor execution and normal transparency checks.
+The two recorded cryptographic invocations verified signature and provenance separately. A second stock
+replay of `csi-node-driver-registrar-image`, the first output to time out in the ARM64 worker, passed both
+checks and its exact expected predicate in 15.004 seconds. These bounded read-only replays did not exercise
+the complete publication, native smoke or qualification signing.
+
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
 retains positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy
