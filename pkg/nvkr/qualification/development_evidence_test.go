@@ -71,3 +71,33 @@ func TestDevelopmentEvidenceIsNotProductionEvidence(t *testing.T) {
 		})
 	}
 }
+
+func TestDevelopmentEvidenceRetainsMixedPublicationAttempts(t *testing.T) {
+	for _, tc := range []struct {
+		name, attempt string
+		code          e.Code
+	}{
+		{"retained output", "1", ""},
+		{"current output", "2", ""},
+		{"future output", "3", e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := developmentEvidenceFixture()
+			v.ArtifactChecks.Origin.Attempt = "2"
+			v.ArtifactChecks.Origin.InvocationID = strings.Replace(v.ArtifactChecks.Origin.InvocationID, "/attempts/1", "/attempts/2", 1)
+			v.ArtifactChecks.Outputs[0].Reference = strings.Replace(v.ArtifactChecks.Outputs[0].Reference, "/attempts/1/", "/attempts/"+tc.attempt+"/", 1)
+			v.ToolSmoke.ArtifactChecks = v.ArtifactChecks
+			for i := range v.ToolSmoke.Workers {
+				v.ToolSmoke.Workers[i].ArtifactChecks = v.ArtifactChecks
+			}
+			raw, err := v.Canonical()
+			if tc.code != "" {
+				requireCode(t, err, tc.code)
+				return
+			}
+			if err != nil || !strings.Contains(string(raw), "/attempts/1/") {
+				t.Fatalf("lost retained publication: %v", err)
+			}
+		})
+	}
+}
