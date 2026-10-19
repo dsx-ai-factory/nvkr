@@ -499,10 +499,13 @@ An incomplete evidence traversal is labeled as a failure of the complete publica
 signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;
 no output receives a passing evidence verdict merely because its own signature check did not fail.
 
-Qualification requires the root and every output predicate to name that exact source attempt. When output
-metadata records publication origin, both preparation and signing invocations must also match. Earlier-attempt
-publication reuse remains available to the existing publication retry protocol, but cannot satisfy this MVP
-qualification gate. Earlier bytes are never relabeled as produced by the current attempt. The CLI writes
+Production qualification accepts authenticated publications from earlier attempts of the same producer workflow run.
+The selected successful attempt anchors completion; each output retains its original preparation and signing
+identities and exact predicate bytes. Preparation must precede or equal signing, output signing must precede
+or equal aggregate assembly, and aggregate assembly/signing must precede or equal source completion.
+All subjects must match the same exact Plan, inputs and workflow builder. Missing origins, other runs,
+future attempts, changed inputs and invalid or incomplete evidence still fail. An earlier attempt may have
+failed unrelated jobs; its successfully authenticated outputs need not be rebuilt. The CLI writes
 check diagnostics and returns the stable failure code; its serialized output cannot restore a live receipt
 or grant qualification signing authority.
 
@@ -618,12 +621,15 @@ check results remain intact; this does not claim the payload itself was executed
 
 After workers complete with success or failure, the final job repeats artifact checks and attempts to
 authenticate the complete smoke set. This produces refusal diagnostics when a worker failed. Canceled,
-skipped or untrusted source invocations do not enter this final job. Publication still requires successful worker
-jobs from the exact current attempt and verifies each report's signature, worker certificate SAN and GitHub
-issuer. The same verified leaf must bind the top-level workflow, workflow commit and exact Run attempt.
-It then recomputes the complete expected member set and compares the full independent policy, payload
-identities, native images, expected versions and observed results. A missing architecture, missing member,
-wrong identity, reused attempt or failed check prevents signing.
+skipped or untrusted source invocations do not enter this final job. For each platform, publication selects
+the latest worker job in the same qualifier run, up to the current attempt, and requires it to succeed.
+Successful workers from earlier attempts can be reused; a later failed or unfinished job blocks fallback.
+The original attempt's artifact, report signature, worker certificate SAN and GitHub issuer are verified.
+The same verified leaf must bind the worker's original top-level workflow, workflow commit and Run attempt.
+The final owner requires unchanged source artifact checks, commit, full independent policy, native images
+and complete expected member identities/results. A missing architecture or member, another run or workflow,
+future attempt, changed policy or failed check prevents signing. The final qualification evidence binds the
+current invocation and preserves every worker's original invocation.
 
 `qualification.PublishTriggeredRun` owns this orchestration. The lower-level publisher consumes live A,
 B and invocation receipts; serialized reports cannot restore them. The old `qualification.PublishFiles`
@@ -645,7 +651,8 @@ the command returns a failure code and retains those subjects in its diagnostics
 not establish successful qualification or release authorization.
 
 The maintained candidate's reviewed policy and generated workflows may merge before real acceptance runs.
-After merge, a fresh complete producer attempt must provide its original exact-attempt handoff; the hosted
+After merge, a complete producer run must provide its original evidence and a handoff for its successful
+completion attempt; authenticated partial retries are permitted. The hosted
 worker/qualifier and independent consumer then exercise positive and negative cases. These observations
 remain unproved and are required before production-readiness claims. Local native-container, race and protocol
 tests do not establish GitHub's actual reusable-job names, OIDC claims, production attachment/read-back or

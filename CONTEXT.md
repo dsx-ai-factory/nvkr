@@ -223,17 +223,22 @@ Historical signed `deferred-m3` documents retain their original bytes and uninsp
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
 
 **Build/evidence qualification**:
-Checks for the complete selected artifact set against its exact producing Run, attempt, commit and inputs,
+Checks for the complete selected artifact set against its producing Run, original attempt identities, commit and inputs,
 including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
 has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
-the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact Run
-attempt and an independent consumer policy. The generated handoff carries original inputs and evidence for
+the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact
+successful completion attempt of a Run and an independent consumer policy. Production outputs may retain authenticated earlier
+attempts of that same workflow run when their exact inputs and original evidence remain bound; retrying does
+not relabel production. Development publications remain bound to one exact source attempt and its namespace.
+The generated handoff carries original inputs and evidence for
 recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
 The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
 joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
 Native workers exercise every selected delivered tool with fixed version checks in isolated containers and
 sign exact member observations. The final qualifier authenticates complete native coverage under the same
-independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
+independent policy before signing. A successful worker from an earlier attempt of that same qualification
+run may be reused with its original authenticated invocation, unchanged inputs and policy; a later failed
+worker prevents fallback to its earlier success. Worker reports remain generated transport;
 they are not caller-authored pass records or release authorization.
 An exact runtime-assets archive member may be outside version smoke only when the Plan declares a
 source-built tarball and the delivered member is non-executable. Its artifact checks remain required;

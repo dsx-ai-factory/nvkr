@@ -102,7 +102,14 @@ func (receipt *ArtifactCheckReceipt) WriteExecutableMember(ctx context.Context, 
 			publicationMatches++
 		}
 	}
-	if publicationMatches != 1 || publicationDescription.Metadata.InvocationID != description.Origin.InvocationID {
+	origin, err := receipt.origin.Description()
+	if err != nil {
+		return ExecutableMemberDescription{}, err
+	}
+	// The issuing gate authenticated the retained root and its original assembly
+	// attempt. A later successful attempt may reuse that root, so preserve the
+	// separate completion binding through the provider-issued source receipt.
+	if publicationMatches != 1 || origin != description.Origin {
 		return ExecutableMemberDescription{}, e.New(e.CodeVerifyFailed, "executable publication does not match its authenticated source binding")
 	}
 	member, err := streamExecutableMember(operation, publication, selected, memberName, platform, maxBytes, destination)
