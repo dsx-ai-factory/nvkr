@@ -203,28 +203,9 @@ func registryIndexLayout(ctx context.Context, index *ImageIndex) (v1.ImageIndex,
 
 // materializeRegistryImageIndex imports only this checked output's exact closure
 // into Pull's private publication stage; the publication's top-level index stays
-// unchanged. The same flat import owner used by release construction rechecks it.
+// unchanged. Release construction shares this direct, guarded held-byte import.
 func materializeRegistryImageIndex(ctx context.Context, stage string, object PublishedObject, index *ImageIndex) error {
-	description, err := index.Description()
-	if err != nil {
-		return err
-	}
-	if err := validatePublishedImageIndex(object, description); err != nil {
-		return err
-	}
-	workspace, err := os.MkdirTemp("", "nvkr-index-pull-*")
-	if err != nil {
-		return e.Wrap(e.CodeInternal, err, "creating index import workspace")
-	}
-	defer func() { _ = os.RemoveAll(workspace) }()
-	root := filepath.Join(workspace, "image")
-	if err := index.WriteLayout(ctx, root); err != nil {
-		return err
-	}
-	descriptor, _, err := (layoutWriter{root: stage}).importFlatLayout(ctx, ObjectInput{
-		Name: object.Name, Kind: object.Kind, ArtifactType: object.ArtifactType, SemanticDigest: object.SemanticDigest,
-		Path: root, BlobDigest: object.DescriptorDigest, Output: object.Output, Layout: true,
-	})
+	descriptor, _, err := (layoutWriter{root: stage}).importHeldImageIndex(ctx, object, index)
 	if err != nil {
 		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "importing registry image index"))
 	}

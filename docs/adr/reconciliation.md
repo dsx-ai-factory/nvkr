@@ -173,7 +173,10 @@ export or consumption from implying otherwise. The file diagnostic adapter now s
 independent credential-host admission before transport; missing/mismatched hosts refuse explicit pull
 credentials, while anonymous and host-scoped keychain operation remain available.
 
-The check receipt retains the verified publication and a frozen Plan; closing it revokes copies, cancels and
+Hosted artifact checks verify every output's complete payload sequentially, then release non-executable
+payload scratch before the next output. Their narrower delivery owner retains checked controls, evidence and
+exact executable bundle bytes; it cannot export discarded payloads. Ordinary full-publication export retains its
+complete payload owner. The check receipt retains this verified owner and a frozen Plan; closing it revokes copies, cancels and
 joins registered operations and then releases held bytes and any owned source receipt. It grants no execution
 or signing authority. The command writes diagnostic JSON, not a serialized capability. Contract fixtures in
 `pkg/nvkr/factory/compile_snapshot_test.go`, `pkg/nvkr/factory/github_handoff_test.go`,
@@ -310,6 +313,31 @@ of changed inputs/policies/subjects, other runs/workflows/commits, missing origi
 The targeted qualification/native-smoke suite also passes with race detection on Linux using Go 1.27.2
 across `factory`, `lifecycle`, `qualificationorigin` and `qualification`; Linux lint and full Fern validation pass.
 These provider/signature fixtures establish contract behavior; successful hosted retry qualification remains unproved.
+
+The [attempt-3 finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/39191524720/job/117957092152)
+completed successfully on October 19 at 08:42 UTC, reusing the original producer publications and emitting a
+fresh handoff. It triggered [qualification Run 39224632381](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381)
+at `22831fb16867b7ce28a99ca846279b2cb622ee71`, which includes the retry correction.
+Its [AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381/job/117967824568)
+failed while materializing `nvke-node-fde-arm64` with `no space left on device`, before native smoke or
+qualification signing. Its [ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381/job/117967824107)
+finished downloading the release but rejected the additional disk snapshots: 20,136,460,288 bytes required
+with 12,484,796,416 bytes available. The [final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381/job/117975647169)
+also exhausted storage while downloading `nvke-node-fde-arm64`. The former delivery path downloaded the complete
+release into one scratch layout before constructing another retained snapshot. This records successful finalizer reuse and a hosted storage
+failure, not complete artifact verification or successful retry qualification. Sequential verification and
+reduced payload retention require a fresh hosted run after their local contract checks.
+
+Registry-backed delivery and lifecycle contracts cover sequential complete payload verification, retained
+executable bundle reads, full-format parity, exact evidence bindings, missing sibling rejection, cancellation
+and cleanup. The storage fixture first failed against the cumulative pull path and passes with sequential
+checking. Interrupted disk reads are retried without retaining failed payloads or repeating prior output
+observations; integrity, close and filesystem failures remain terminal. Image-index import reuses the verified
+held closure directly; a regression rejects the former intermediate-layout path when system temporary storage
+is unavailable and verifies exact child bytes, shared-blob membership and unchanged publication index bytes.
+Binding mismatch, closed-owner and canceled-operation contracts prevent output before admission. The uncached full gate and build pass
+on Linux with Go 1.27.2, as do targeted delivery/lifecycle race checks and full Fern validation. These local
+fixtures do not establish successful hosted qualification.
 
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
@@ -2298,7 +2326,7 @@ The external policy read-back retained `codex/m2-arc-validation` and `main` for 
 `codex/m2-arc-validation`, `feat/nke-deploy-pipeline` and `main` for `nkd-release`; it did not admit the exact
 PR #97 branch. Removing an authored exception neither changes those provider policies nor bypasses them.
 The existing provider secret is `NKE_SOURCE_TOKEN`; the rename retains that exact
-credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Package Actions read access, native pool capacity and successful exact-head
+credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Dedicated reader-account package access, native pool capacity and successful exact-head
 execution remain external acceptance requirements.
 
 ## Maintained input and schema boundaries
@@ -2318,14 +2346,14 @@ references and own any required association or compatibility decision. See the
 [pilot inputs](../../inputs/definitions/nvke/README.md#four-family-pilot) and
 [partitioning strategy](../definition-partitioning-strategy.md) for scope and historical measurements.
 
-Local validation on 2026-10-19 after incorporating upstream `22831fb1` and the bootstrap dispatch fix
-passed the extended split contracts in 6.055 seconds: all 73 complete native build records and
+Local validation on 2026-10-19 after incorporating upstream `bb0fc777` and review hardening
+passed the extended split contracts in 4.15 seconds: all 73 complete native build records and
 69 output-binding records matched the combined Plan byte-for-byte, and all four generated bundles matched
 exact regeneration. The comparison uses that validated Plan's resolved catalog snapshots, not fresh upstream
 authentication or reproduced artifact bytes. Family workflows contain 198, 233, 153 and 55 jobs; the largest
 is 151,551 bytes with 18,272 expanded YAML events. The combined workflow with the same current generator
 has 580 jobs, 394,695 bytes and 47,055 events; the families total 639 jobs, 446,450 workflow bytes and
-50,533 expanded events across their separate workflows. These results do not establish a complete
+50,533 expanded events across their separate workflows. These split comparisons alone do not establish a complete
 repository gate, hosted execution or product acceptance. The
 [split contract](../../pkg/nvkr/factory/nvke_definition_split_test.go) and
 [current measurement table](../definition-partitioning-strategy.md#current-local-validation) own the exact scope.
@@ -2337,21 +2365,19 @@ and push events across build-only, publication and named-runtime helpers. No hos
 fix is recorded. [ADR-18](0018-pipeline-ir-and-ci-adapter-emission.md) owns the boundary;
 [bootstrap dispatch contracts](../../pkg/nvkr/factory/github_bootstrap_dispatch_test.go) cover refusal.
 
-Current actionlint and relaxed yamllint checks passed; yamllint reported line-length warnings.
-
-`make workflows-check` passed after this integration for all four families, combined production and its
-qualification bundle, development and its qualification bundle, both nightly bundles and catalog
-refresh. The CLI reauthenticated source pins and confirmed exact generated-bundle drift. Prior head
-`7a3a9f39` passed the [hosted Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/39217995501);
-that hosted evidence predates the current upstream integration and bootstrap fix. Neither result establishes
-hosted family execution, publication, qualification or consumer acceptance.
-
-The uncached macOS `make check GO_TEST_FLAGS=-count=1` passed after this integration, including all Go
-packages, formatting, license headers, vet, lint, shell/Python checks and the vulnerability scan; no
-vulnerabilities were found. Delivery, factory and lifecycle completed in approximately 713, 824 and
-1,007 seconds respectively, within the unchanged 20-minute package timeout. Earlier local runs at
-`c19fdead` and `7a3a9f39` timed out in those packages; this successful run does not establish the cause
-of that earlier slowness. No test assertions or timeouts were weakened.
+Actionlint and relaxed yamllint passed for the unchanged generated workflows at `98a2031b`; yamllint
+reported line-length warnings. `make workflows-check` passed for all family, combined, development,
+qualification, nightly and catalog refresh owners after this integration, reauthenticating source pins
+and confirming exact generated bytes. The full uncached
+`make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and diff checks passed on 2026-10-19:
+all 58 Go package suites, formatting, license, vet, lint, shell and Python checks passed, and the
+vulnerability scan found no vulnerabilities. Packages ran sequentially; delivery, factory and lifecycle
+completed in 473.259, 506.003 and 716.076 seconds. The preceding concurrent gate exhausted lifecycle's
+cumulative 20-minute budget during fixture setup; its complete standalone rerun passed in 871.952 seconds
+before the successful full gate. No assertions or timeouts were weakened, and the runtime difference does
+not establish the timeout's cause. Prior head `98a2031b` passed the
+[hosted Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/39271266995); that hosted evidence
+predates the current PinSet validation hardening and upstream qualification storage changes.
 
 All four family Environments retain the maintained production `NVKR_REGISTRY_WRITE` publication policy.
 The exact `m2-candidate/disks` prefix also admits the existing pinned M2 toolchains for separate preparation
@@ -2368,11 +2394,29 @@ and publication do not. This closes a local admission gap for acquired-only sele
 trust or credential scope. No hosted private-source read or services publication is established by this
 change; [ADR-20](0020-artifact-publication-and-target-configuration.md#2-target-configuration-surface) owns
 the contract.
-Focused local contracts at `7a3a9f39` passed for pin-set-only sources in root and output catalogs, ordinary-source and
-unknown-repository refusal, unchanged local-engine admission, rendered credential scope and snapshot
-substitution without a partial bundle. Existing fetch-only and repository-scoped credential tests also
-passed. These use fixtures and local Git credential checks, not a hosted source read.
-[Source-access contracts](../../pkg/nvkr/factory/source_access_test.go)
+Focused local contracts pass for root/output pin-set-only sources, mixed admitted/unrelated access,
+ordinary-source and unknown-repository refusal, local-engine admission and snapshot substitution without
+partial output. A local Git fixture composes real acquired-only loading with rendering: the locked commit
+survives a moved upstream tag; malformed metadata, stale versions and stale provenance return no Plan or
+bundle. Exact catalog credential helper/mirror configuration is confined to revalidation steps.
+[Source-access contracts](../../pkg/nvkr/factory/source_access_test.go),
+[real loader composition](../../pkg/nvkr/factory/source_access_loader_test.go).
+
+Resolved snapshots reuse the catalog owner's intrinsic PinSet declaration checks. Malformed file paths and
+unsupported formats first reproduced acceptance in low-level compilation and rehashed root/output Plan
+validation, then were rejected with no Plan or credential-bearing bundle. Valid base catalogs and explicit
+producer overlays remain supported. These semantic checks and snapshot identity do not authenticate
+upstream contents; authored loading retains reciprocal membership, lock and exact pinned-tree checks.
+[ADR-22](0022-catalog-pinning-and-the-lock-contract.md#7-derived-pin-sets-one-source-may-curate-other-sources-pins)
+owns the boundary; [compiler contracts](../../pkg/nvkr/factory/pin_set_semantics_test.go) cover it.
+
+The maintained family matrix asserts combined/core/services catalog credential confinement and
+telemetry/disks absence, including raw-secret aliases and exact repository/helper/mirror bindings while
+preserving legitimate source-fetch credentials. All nondisk families explicitly reject the private-toolchain
+exception and emit no reader preparation. Default tests compare all authored family Definitions and
+Environments to committed Plans in 0.23 seconds; full compilation/rendering remains extended. The focused
+family matrix passed in 23.951 seconds, including the 73/69 identity comparison above. These are local
+contracts, not evidence of private registry access, hosted family execution or consumer acceptance.
 
 The [M2 Definition instructions](../../inputs/definitions/nvke/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built

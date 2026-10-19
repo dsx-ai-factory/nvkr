@@ -329,6 +329,14 @@ are readable; symlinks, submodules and path escapes are rejected. Reads are cont
 4 MiB per file, 32 MiB and 1,024 reads per tree. No checkout, source program, hook, template or dependency
 resolver runs. Extraction itself has no network access; obtaining pinned Git objects requires source access.
 
+Resolved catalog snapshots reuse the catalog owner's intrinsic pin-set declaration checks: supported
+format, canonical relative file path, bounded and unambiguous member declarations, and adapter-specific
+selectors. Compilation and Plan validation reject malformed descriptions before emitting credentialed
+catalog-revalidation steps. These checks and a matching snapshot digest establish semantic validity and
+byte identity, not upstream authentication. Reciprocal registry membership, lock completeness and exact
+pinned-tree re-derivation remain owned by catalog loading; resolved overlays do not recreate those
+authored registry records.
+
 **Atomic updates and provenance.** The catalog extracts a complete member-version map before resolving that
 umbrella's members. Acquired producers whose version comes from a derived source move in the same transaction.
 It validates and serializes the complete candidate lock within the byte limit before `--check` or commit; any

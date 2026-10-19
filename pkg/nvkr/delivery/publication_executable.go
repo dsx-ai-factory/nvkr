@@ -57,7 +57,11 @@ func retainPublicationExecutables(ctx context.Context, layout string, inspection
 // output. It establishes checked payload membership, not execution, signature
 // or qualification authority. InstallPath remains a deployment suggestion.
 func (publication *Publication) ExecutableBundle(outputName string) (BinaryBundle, error) {
-	if publication == nil || publication.publicationState == nil {
+	return publication.retainedState().executableBundle(outputName)
+}
+
+func (publication *publicationState) executableBundle(outputName string) (BinaryBundle, error) {
+	if publication == nil {
 		return BinaryBundle{}, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()
@@ -81,10 +85,14 @@ func (publication *Publication) ExecutableBundle(outputName string) (BinaryBundl
 // goroutine is detached to interrupt it. Errors can leave partial bytes, which
 // must be discarded rather than executed or treated as successful evidence.
 func (publication *Publication) WriteExecutableMember(ctx context.Context, outputName, memberName string, destination io.Writer) (int64, error) {
+	return publication.retainedState().writeExecutableMember(ctx, outputName, memberName, destination)
+}
+
+func (publication *publicationState) writeExecutableMember(ctx context.Context, outputName, memberName string, destination io.Writer) (int64, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return 0, err
 	}
-	if publication == nil || publication.publicationState == nil {
+	if publication == nil {
 		return 0, e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	if destination == nil {

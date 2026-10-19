@@ -127,6 +127,31 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 	}
 }
 
+// Keep stale authored selections visible in the default suite without catalog
+// loading, full compilation or rendering. The extended contract below separately
+// compares complete producer records and every generated bundle member.
+func TestNVKEDefinitionSplitCommittedPlanBindings(t *testing.T) {
+	nvkeSplitRepository(t)
+	for _, family := range nvkeSplitFamilies {
+		t.Run(family.name, func(t *testing.T) {
+			definitionPath, environmentPath := nvkeSplitPaths(family.name)
+			plan, err := LoadPlanContext(t.Context(), ".github/nvkr-run-nvke-"+family.name+"/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plan.DefinitionPath != definitionPath || plan.EnvironmentPath != environmentPath {
+				t.Fatal("committed family Plan binds different authored input paths")
+			}
+			if !bytes.Equal(nvkeSplitCanonical(t, plan.Definition), nvkeSplitCanonical(t, nvkeSplitDefinition(t, definitionPath))) {
+				t.Fatal("committed family Plan has a stale authored Definition")
+			}
+			if !bytes.Equal(nvkeSplitCanonical(t, plan.Environment), nvkeSplitCanonical(t, nvkeSplitEnvironment(t, environmentPath))) {
+				t.Fatal("committed family Plan has a stale authored Environment")
+			}
+		})
+	}
+}
+
 func TestNVKEDefinitionSplitRejectsCrossFamilyChartBinding(t *testing.T) {
 	nvkeSplitRepository(t)
 	for _, image := range []string{"missing-controller", "spire-agent-image"} {
@@ -200,6 +225,9 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				if strings.HasPrefix(id, "build-runner-") && job.If != "${{ "+githubExecutionCondition+" }}" {
 					t.Fatalf("family helper %s permits nondefault-ref execution: %q", id, job.If)
 				}
+			}
+			if family.name != "disks" {
+				assertNoPrivateToolchainPreparation(t, bundle)
 			}
 			if bundle.WorkflowPath != ".github/workflows/nvkr-run-nvke-"+family.name+".yml" ||
 				bundle.PlanPath != ".github/nvkr-run-nvke-"+family.name+"/plan.json" ||

@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"testing"
 
@@ -62,14 +63,16 @@ func TestRunPlanSourceAccessBindingAndEngineAdmission(t *testing.T) {
 func TestRunPlanPinSetOnlySourceAccess(t *testing.T) {
 	const repository = "https://github.com/example/private-pins"
 	for _, tc := range []struct {
-		name, sourceCatalog string
-		pinSet, allowed     bool
+		name, sourceCatalog        string
+		pinSet, allowed, unrelated bool
 	}{
-		{"root pin set", "root", true, true},
-		{"output pin set", "output", true, true},
-		{"ordinary root source", "root", false, false},
-		{"ordinary output source", "output", false, false},
-		{"unknown repository", "", false, false},
+		{"root pin set", "root", true, true, false},
+		{"output pin set", "output", true, true, false},
+		{"ordinary root source", "root", false, false, false},
+		{"ordinary output source", "output", false, false, false},
+		{"unknown repository", "", false, false, false},
+		{"root pin set with unrelated access", "root", true, false, true},
+		{"output pin set with unrelated access", "output", true, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			definition, environment := fixtureInputs("pin-set-source-access", "acquired", "ubuntu-24.04")
@@ -80,6 +83,12 @@ func TestRunPlanPinSetOnlySourceAccess(t *testing.T) {
 			environment.SourceAccess = map[string]authored.SourceAccess{repository: {
 				Mirror: repository, CredentialRef: "github:PIN_SOURCE_TOKEN",
 			}}
+			const unrelated = "https://github.com/example/unrelated"
+			if tc.unrelated {
+				environment.SourceAccess[unrelated] = authored.SourceAccess{
+					Mirror: unrelated, CredentialRef: "github:UNRELATED_SOURCE_TOKEN",
+				}
+			}
 			// Resolved fixture snapshots model the loader boundary without contacting
 			// a private Git server. Catalog pin derivation has its own loader tests.
 			plan, err := compileDocumentsWithLoader(t.Context(), "examples/pin-set.yaml", definition,
@@ -114,6 +123,14 @@ func TestRunPlanPinSetOnlySourceAccess(t *testing.T) {
 				}
 				if plan != nil {
 					t.Fatal("source-access rejection returned a partial Plan")
+				}
+				if tc.unrelated && !strings.Contains(err.Error(), unrelated) {
+					t.Fatalf("mixed map did not reject the unrelated entry: %v", err)
+				}
+				bundle, renderErr := RenderGitHub(t.Context(), plan)
+				assertSourceAccessCode(t, renderErr, nvkrerr.CodeInvalidCatalog)
+				if bundle != nil {
+					t.Fatal("rejected source-access map returned a credential-bearing bundle")
 				}
 				return
 			}
@@ -153,10 +170,24 @@ func assertPinSetOnlyCredentialScope(t *testing.T, plan *Plan) {
 		t.Fatal(err)
 	}
 	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+	if len(plan.Environment.SourceAccess) != 1 {
+		t.Fatal("pin-set-only fixture must select exactly one source credential")
+	}
+	want := map[string]string{
+		"GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_COUNT": "4",
+		"GIT_CONFIG_KEY_0": "credential.helper", "GIT_CONFIG_VALUE_0": "",
+		"GIT_CONFIG_KEY_1": "credential.useHttpPath", "GIT_CONFIG_VALUE_1": "true",
+		"NVKR_PIN_SOURCE_TOKEN_0": "${{ secrets.PIN_SOURCE_TOKEN }}",
+	}
+	for repository, access := range plan.Environment.SourceAccess {
+		want["GIT_CONFIG_KEY_2"], want["GIT_CONFIG_VALUE_2"] = "url."+access.Mirror+".insteadOf", repository
+		want["GIT_CONFIG_KEY_3"] = "credential." + access.Mirror + ".helper"
+		want["GIT_CONFIG_VALUE_3"] = strings.ReplaceAll(sourceCredentialHelper, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0")
+	}
 	assertNoCredential := func(env map[string]string) {
 		t.Helper()
 		for key, value := range env {
-			if strings.Contains(key, "SOURCE_TOKEN") || strings.Contains(value, "secrets.PIN_SOURCE_TOKEN") {
+			if strings.HasPrefix(key, "GIT_CONFIG_") || strings.Contains(key, "SOURCE_TOKEN") || strings.Contains(value, "secrets.PIN_SOURCE_TOKEN") {
 				t.Fatal("pin credential escaped catalog revalidation steps")
 			}
 		}
@@ -173,7 +204,7 @@ func assertPinSetOnlyCredentialScope(t *testing.T, plan *Plan) {
 				assertNoCredential(step.Env)
 				continue
 			}
-			if step.Env["NVKR_PIN_SOURCE_TOKEN_0"] != "${{ secrets.PIN_SOURCE_TOKEN }}" ||
+			if !maps.Equal(step.Env, want) ||
 				!strings.Contains(step.Run, "NVKR_PIN_SOURCE_TOKEN_0") ||
 				!strings.Contains(job.If, githubDispatchCondition(plan)) {
 				t.Fatal("catalog revalidation lacks the admitted credential or dispatch guard")

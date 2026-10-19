@@ -254,8 +254,10 @@ producer completion with mixed original attempts. Successful independent retry q
 Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE;
 native build jobs receive source bytes without that
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
-before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
-package. Restrict `nvkr-arc`, `nvkr-release` and the signing identity to the selected refs. Maintained inputs
+before producer execution. Grant the dedicated reader account only its required package roles and retire
+source-repository Actions access after migrating and validating the new workflow, as described in the
+[production credential setup](../../../docs/generate-pipeline.md). Restrict `nvkr-arc`, `nvkr-release`
+and the signing identity to the selected refs. Maintained inputs
 admit `main` only and contain no validation-branch dispatch exception. Ephemeral runner isolation and
 provider access restrictions remain operator obligations.
 
