@@ -416,7 +416,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: dsx-ai-factory/nvke
-          ref: 33fb71b2f4224b470ebc628a9165fc4b92870406 # v0.21.0
+          ref: 6991e36bef8f15b42b6f6519ccff089c587a6e49 # v0.22.0-beta.1
           fetch-depth: 0
           path: .nvkr-inputs/nvke
           token: ${{ secrets.NKE_SOURCE_TOKEN }}

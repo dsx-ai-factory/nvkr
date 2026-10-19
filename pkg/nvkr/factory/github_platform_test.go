@@ -257,7 +257,7 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 			if !strings.Contains(strings.Join(node.Command, " "), "-mod=vendor") {
 				t.Fatal("CLI stopped building offline")
 			}
-			if !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NKECTL_TREE=clean") {
+			if !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NVKECTL_TREE=clean") {
 				t.Fatal("CLI must use source-owned linker symbols and version assertion")
 			}
 			env := map[string]string{}

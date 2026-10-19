@@ -48,8 +48,8 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 			continue
 		}
 		roots++
-		if node.Component != "nvke-node-fde-amd64" || node.Disk.Encryption != "luks2" || node.ArtifactPath != "fde/nke-node.qcow2" ||
-			node.Packer.BuildName != "nke-node-fde.qemu.nke-fde" || node.SourceCommit != "ff21ba8c07cafff74b68e238a8876af11e5beded" {
+		if node.Component != "nvke-node-fde-amd64" || node.Disk.Encryption != "luks2" || node.ArtifactPath != "fde/nvke-node.qcow2" ||
+			node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" || node.SourceCommit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" {
 			t.Fatal("FDE producer no longer selects the audited source contract")
 		}
 		if err := pipeline.ValidateVMImagePackerDiskExecution(node); err != nil {
@@ -166,9 +166,9 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 				if node.Component != name || node.Disk == nil || node.Packer == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 					t.Fatal("incomplete native FDE producer")
 				}
-				if node.SourceCommit != "ff21ba8c07cafff74b68e238a8876af11e5beded" || node.Toolchain != tc.toolchain ||
+				if node.SourceCommit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" || node.Toolchain != tc.toolchain ||
 					node.ToolchainPlatform != build.Platform || node.Disk.Format != "qcow2" || node.Disk.Encryption != "luks2" ||
-					node.ArtifactPath != "fde/nke-node.qcow2" || node.Packer.BuildName != "nke-node-fde.qemu.nke-fde" ||
+					node.ArtifactPath != "fde/nvke-node.qcow2" || node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" ||
 					node.Packer.AcquisitionArchive != "fde/apt-acquisitions.tar" {
 					t.Fatal("FDE producer differs from the audited native source contract")
 				}
@@ -254,14 +254,14 @@ func nvkeM2ControllerCatalogFixture(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const sourceCommit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
+	const sourceCommit = "6991e36bef8f15b42b6f6519ccff089c587a6e49"
 	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
 		if lock.Pins[name].Commit != sourceCommit {
 			t.Fatalf("authored %s source=%s, want %s", name, lock.Pins[name].Commit, sourceCommit)
 		}
 	}
 	repo := t.TempDir()
-	if err := os.CopyFS(repo, os.DirFS("pkg/nvkr/catalog/testdata/nvke-pin-set")); err != nil {
+	if err := os.CopyFS(repo, os.DirFS("pkg/nvkr/catalog/testdata/nvke-beta-pin-set")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)

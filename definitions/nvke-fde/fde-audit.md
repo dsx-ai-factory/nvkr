@@ -1,7 +1,8 @@
 # FDE bootstrap and key-material audit
 
-This source audit covers NVKE OS commit `ff21ba8c07cafff74b68e238a8876af11e5beded`,
-the OS pin inherited from the M2 candidate. The separate SPIRE material retains its older pin.
+This historical source audit covers NVKE OS commit `ff21ba8c07cafff74b68e238a8876af11e5beded`,
+selected by M2 before its `v0.22.0-beta.1` update. The separate SPIRE material retained its older pin.
+The findings below describe that inspected tree and do not establish an audit of the current OS pin.
 It supports using the documented public `changeit` bootstrap value for a diagnostic build.
 That value has no confidentiality requirement, but it remains an effective disk-unlock credential.
 The diagnostic output must not imply production confidentiality or successful TPM enrollment.

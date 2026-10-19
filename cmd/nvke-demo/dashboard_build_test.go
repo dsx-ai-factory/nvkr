@@ -494,7 +494,7 @@ func TestDashboardLastGuestReport(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
 			w := &checkedWriter{out: d, observer: d, started: time.Now()}
-			_, _ = fmt.Fprintf(w, "==> nke-node-non-fde.qemu.nke-non-fde: %s\n", tc.message)
+			_, _ = fmt.Fprintf(w, "==> nvke-node-non-fde.qemu.nvke-non-fde: %s\n", tc.message)
 			s := d.snapshot()
 			if s.buildGuestStage != tc.want || (tc.want == "") != s.buildGuestAt.IsZero() ||
 				s.phases[1].state != "running" || len(s.buildSteps) != 0 {
@@ -513,9 +513,9 @@ func TestDashboardLastGuestReport(t *testing.T) {
 func TestDashboardGuestReportRejectsUnknownAndControls(t *testing.T) {
 	for _, line := range []string{
 		"==> other-builder: Connected to SSH!",
-		"==> nke-node-non-fde.qemu.nke-non-fde: Provisioning with shell script: /private/\nsecret",
-		"==> nke-node-non-fde.qemu.nke-non-fde: Uploading /private/\x7f => /tmp/input",
-		"==> nke-node-non-fde.qemu.nke-non-fde: Uploading " + strings.Repeat("x", dashboardRunes),
+		"==> nvke-node-non-fde.qemu.nvke-non-fde: Provisioning with shell script: /private/\nsecret",
+		"==> nvke-node-non-fde.qemu.nvke-non-fde: Uploading /private/\x7f => /tmp/input",
+		"==> nvke-node-non-fde.qemu.nvke-non-fde: Uploading " + strings.Repeat("x", dashboardRunes),
 		dashboardGuestReportPrefix + "Guest is healthy; artifacts complete",
 		dashboardGuestReportPrefix + "Running guest shell provisioning\r",
 	} {
@@ -537,7 +537,7 @@ func TestDashboardGuestReportKeepsVariableSuffixPrivate(t *testing.T) {
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
 			var public, private bytes.Buffer
 			w := &checkedWriter{out: io.MultiWriter(&public, d), raw: &private, remaining: 8192, observer: d, started: time.Now()}
-			line := "==> nke-node-non-fde.qemu.nke-non-fde: " + message + "\n"
+			line := "==> nvke-node-non-fde.qemu.nvke-non-fde: " + message + "\n"
 			if _, err := io.WriteString(w, line); err != nil {
 				t.Fatal(err)
 			}

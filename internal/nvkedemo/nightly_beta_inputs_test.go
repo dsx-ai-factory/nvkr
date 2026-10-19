@@ -1,0 +1,153 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package nvkedemo
+
+import (
+	"context"
+	"net/netip"
+	"os"
+	"path/filepath"
+	"strings"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/google/go-containerregistry/pkg/name"
+)
+
+type nightlyReleaseResource struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string `json:"kind"`
+	tenantReleaseDocument
+}
+
+func startNightlyDiskService(ctx context.Context, path, address string, profile NightlyProfile) (*diskService, error) {
+	selected, err := selectedDiskOutput(profile.Network)
+	if err != nil || (profile.Network != "ovn" && profile.Network != "upstream-ovn") || selected != profile.DiskOutput || filepath.Base(path) != DiskOutputName+".qcow2" {
+		return nil, e.New(e.CodeEngineCapability, "nightly disk service requires the exact profile output and candidate filename")
+	}
+	alias := ""
+	if selected != DiskOutputName {
+		alias = selected + ".qcow2"
+	}
+	return startDiskServiceWithNightlyAlias(ctx, path, address, alias)
+}
+
+// The publication owner already authenticated and extracted these files. The
+// shared diagnostic projection validates the selected disk and profile bytes;
+// this adapter adds only the current Kubernetes envelope for the suite's fresh
+// management cluster. No converter executable is built from another revision.
+func nightlyProfileResources(ctx context.Context, profile NightlyProfile, release lifecycle.Release, directory, destination string) error {
+	if err := requireContext(ctx); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "nightly release resources context")
+	}
+	if profile.OSProfile != TenantProfile {
+		return e.New(e.CodeEngineCapability, "nightly suite requires its explicit local plain OS profile")
+	}
+	var image lifecycle.Artifact
+	count := 0
+	for _, artifact := range release.Artifacts {
+		if artifact.Name == profile.DiskOutput {
+			image, count = artifact, count+1
+		}
+	}
+	if count != 1 {
+		return e.New(e.CodeVerifyFailed, "nightly profile requires one exact selected disk output")
+	}
+	var files [][]byte
+	for i, path := range []string{"metadata.yaml", profile.OSProfile + "/ipxeScript", profile.OSProfile + "/userData.tmpl"} {
+		raw, err := boundedRegularRead(filepath.Join(directory, "profiles/osProfiles", path), []int64{tenantMetadataLimit, tenantIPXELimit, tenantUserDataLimit}[i])
+		if err != nil {
+			return e.Wrap(e.CodeVerifyFailed, err, "reading authenticated nightly profile %s", path)
+		}
+		files = append(files, raw)
+	}
+	_, documents, err := tenantReleaseDocuments(profile.Network, image, files[0], files[1], files[2])
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "projecting authenticated nightly profile")
+	}
+	// The upstream candidate suite admits this fixed profile name. Its fresh
+	// cluster cannot contain an older resource with that name. Keep the full
+	// verified disk digest annotations and exact boot/template bytes unchanged.
+	for i := range documents {
+		documents[i].Metadata.Name = profile.OSProfile
+		if i != 0 {
+			documents[i].Spec.(map[string]any)["machineImageRef"] = map[string]string{"name": profile.OSProfile}
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "nightly release resources canceled")
+	}
+	if err := os.Mkdir(destination, 0o700); err != nil {
+		return e.Wrap(e.CodeImmutableViolation, err, "creating nightly release resources")
+	}
+	for i, kind := range []string{"MachineImage", "ClusterRelease", "NodePoolRelease"} {
+		resource := nightlyReleaseResource{APIVersion: "internal.nvke.nvidia.com/v1", Kind: kind, tenantReleaseDocument: documents[i]}
+		// JSON is YAML; the suite's metadata reader admits .yaml documents.
+		if err := privateJSON(filepath.Join(destination, profile.OSProfile+"-"+strings.ToLower(kind)+".yaml"), resource); err != nil {
+			return e.Wrap(e.CodeImmutableViolation, err, "writing nightly %s", kind)
+		}
+	}
+	return nil
+}
+
+// Only stack rendering consumes this spec. The suite's pinned Kind config owns
+// management Kubernetes and networking; the loader-required bootstrap fields
+// never trigger a bootstrap command or select an additional product artifact.
+func nightlySiteSpec(ctx context.Context, runner Runner, source, gateway, controller, profiles string) (string, error) {
+	if err := requireContext(ctx); err != nil {
+		return "", e.Wrap(e.CodeTimeout, err, "nightly site spec context")
+	}
+	cluster := environmentValue(runner.Env, "KIND_CLUSTER_NAME")
+	address, err := netip.ParseAddr(gateway)
+	if err != nil || !address.Is4() || !nightlyOutputNamePattern.MatchString(cluster) || strings.ContainsAny(cluster, "._") || len(cluster+"-control-plane") > 63 {
+		return "", e.New(e.CodeVerifyFailed, "nightly site requires its exact IPv4 simulator gateway and Kind name")
+	}
+	for _, reference := range []string{controller, profiles} {
+		digest, err := name.NewDigest(reference, name.StrictValidation)
+		if err != nil || digest.Name() != reference {
+			return "", e.New(e.CodeVerifyFailed, "nightly site requires exact native controller and profiles references")
+		}
+	}
+	telemetry, err := boundedRegularRead(filepath.Join(source, "nktp/hack/e2e-values.yaml"), diagnosticLimit)
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "reading pinned nightly Kind telemetry values")
+	}
+	password, err := randomScalar()
+	if err != nil {
+		return "", e.Wrap(e.CodePreflightFailed, err, "creating nightly tenant password")
+	}
+	for _, file := range []struct {
+		name string
+		raw  []byte
+	}{{"nightly-nico-token", []byte("nico-vmsctl-token")}, {"nightly-tenant-password", []byte(password)}, {"nightly-nktp-values.yaml", telemetry}} {
+		if err := privateWrite(filepath.Join(runner.Work, file.name), file.raw); err != nil {
+			return "", e.Wrap(e.CodeImmutableViolation, err, "writing private nightly site input")
+		}
+	}
+	spec := map[string]any{
+		"clusterName": cluster,
+		"cluster": map[string]any{
+			"nodes":      []any{map[string]string{"name": cluster + "-control-plane", "ip": GuestGateway}},
+			"k8sVersion": "1.37.0", "cniName": "ovn-kubernetes", "controlPlaneVIP": GuestGateway,
+			"podCidr": managementPodCIDR, "serviceCidr": managementServiceCIDR,
+		},
+		"registry": map[string]string{"bootstrapRepo": strings.Split(controller, "@")[0], "bootstrapChart": "nke-controller"},
+		"spire": map[string]string{
+			"trustDomain": cluster + ".nke.local", "caCertFile": filepath.Join(runner.Work, "ca.crt"), "caKeyFile": filepath.Join(runner.Work, "ca.key"),
+		},
+		"controllerStack": map[string]any{
+			"arch":           "arm64",
+			"nico":           map[string]string{"endpoint": "http://" + gateway + ":18089", "orgID": "novxwn552ssc", "apiName": "forge", "tokenFile": filepath.Join(runner.Work, "nightly-nico-token")},
+			"tenant":         map[string]string{"user": "nvkr-nightly", "passwordFile": filepath.Join(runner.Work, "nightly-tenant-password")},
+			"database":       map[string]string{"passwordFile": filepath.Join(runner.Work, "nightly-database-password")},
+			"images":         map[string]string{"controller": controller, "profiles": profiles},
+			"nktpValuesFile": filepath.Join(runner.Work, "nightly-nktp-values.yaml"),
+		},
+	}
+	path := filepath.Join(runner.Work, "sitespec.json")
+	if err := privateJSON(path, spec); err != nil {
+		return "", e.Wrap(e.CodeImmutableViolation, err, "writing private nightly site spec")
+	}
+	return path, nil
+}

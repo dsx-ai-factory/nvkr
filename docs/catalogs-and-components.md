@@ -140,16 +140,17 @@ checking the expected old digest. It keeps the existing source and command decla
 `components` fields. This differs from replacing the complete producer.
 
 **Version stamps** render source-pin values into build environment variables. This excerpt from the
-[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/catalog/registry.yaml) embeds its commit and module tag:
+[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/catalog/registry.yaml) embeds its exact commit, release tag and source date:
 
 ```yaml
 versionStamp:
-  NKECTL_COMMIT: '{{slice .Commit 0 8}}'
-  NKECTL_VERSION: '{{.ModuleTag}}'
+  NVKECTL_VERSION: '{{.ModuleTag}}'
+  NVKECTL_COMMIT: '{{.Commit}}'
+  NVKECTL_DATE: '{{.Date}}'
 ```
 
-These are build inputs, not labels added after the build. For the pinned tag `cli/v0.1.0-rc.2`,
-`.ModuleTag` is `v0.1.0-rc.2`; `.Version` is `0.1.0-rc.2`.
+These are build inputs, not labels added after the build. For the pinned tag `v0.22.0-beta.1`,
+`.ModuleTag` is `v0.22.0-beta.1`; `.Version` is `0.22.0-beta.1`.
 
 ## Run the local lab
 

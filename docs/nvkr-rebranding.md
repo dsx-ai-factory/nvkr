@@ -37,21 +37,22 @@ current authored examples and exported Plans use the new names.
 ## Exact upstream contracts
 
 A Git repository rename does not rewrite a pinned source tree or rename its
-operational interfaces. The maintained catalog preserves the following exact
-source-owned contracts. Retaining these names is not unfinished rebranding:
+operational interfaces. The maintained catalog now selects NVKE `v0.22.0-beta.1`
+and preserves that release's exact source-owned contracts:
 
-- CLI source directory `cli/cmd/nkectl`, linker module
-  `github.com/NVIDIA/nke/cli`, Make inputs `NKECTL_*`, and Make output
-  `cli/bin/nkectl`.
-- Packer selector `nke-node-non-fde.qemu.nke-non-fde`, producer manifest
-  `nke.dev/os-image-materials/v1`, and output `non-fde/nke-node.qcow2`.
-- The deploy pin-set's `controller/deploy/nke-sbom/nke-deploy.yaml`, its
-  `nke-base-config` item, and the upstream controller chart filename.
+- CLI source directory `cli/cmd/nvkectl`, module
+  `github.com/dsx-ai-factory/nvke/cli`, Make inputs `NVKECTL_*`, and Make output
+  `cli/bin/nvkectl`. The source Makefile owns its linker symbols in `main`.
+- Packer selector `nvke-node-non-fde.qemu.nvke-non-fde`, producer manifest
+  `nvke.nvidia.com/os-image-materials/v1`, and output `non-fde/nvke-node.qcow2`.
+- The deploy pin-set's `deploy/nico/nvke-deploy.yaml`, its
+  `nvke-base-config` item, and the upstream `nke-controller` chart name.
 - Installed packages, services, deployment selectors and helper files supplied
   by the pinned upstream tree. These describe producer bytes, not NVKR aliases.
 - Guest acquisition envelope `nkd.dev/package-acquisitions/v1`, OVN's
-  `NKE_CTR_BIN`, `/usr/lib/nke/cni-ovn/` and post-install log, and the producer's
-  existing maintainer name and email. None is rewritten by the consuming repository.
+  `NKE_CTR_BIN` and post-install log, and the producer's existing maintainer
+  name and email. NVKE's source packages use `/usr/lib/nvke/cni-ovn/`;
+  the separate fork producer retains its declared `/usr/lib/nke/cni-ovn/` path.
 - Pinned runtime ABI `/nkd/toolchain/packer/plugins` and
   `/usr/local/bin/nkd-disk-inspect`, including its `NKD_INSPECTION ` diagnostic
   wire prefix. Its report properties `nkd:diskContentClass`, `nkd:packageFormat`,
@@ -65,11 +66,11 @@ source-owned contracts. Retaining these names is not unfinished rebranding:
 
 Public component names, caller-owned output paths and documentation use NVKE.
 Captured upstream test fixtures retain the actual upstream bytes.
-Node packages, services, Kubernetes identifiers and Packer contracts keep their
-existing names. A future independent interface change requires an explicit
-producer change and matching consumer validation; it is not a naming-cutover
-prerequisite. Repinning to NVKE's renamed CLI is likewise a separate source
-update, not permission to rewrite the CLI paths in an older pinned checkout.
+Node packages, services, Kubernetes identifiers and Packer contracts follow
+their exact selected source. The beta update changes CLI, package and Packer
+interfaces together with the matching consumers; it does not rewrite captured
+fixtures or older pinned checkouts. Further interface changes require an
+explicit producer change and matching consumer validation.
 
 ## Deployment cutover
 

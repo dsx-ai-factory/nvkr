@@ -9,7 +9,7 @@ full product acceptance are separate facts.
 
 | Output group | Owning inputs | Selection |
 |---|---|---|
-| CLI | `../nvke-v1/catalog` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared independent CLI module pin |
+| CLI | `../nvke-v1/catalog` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from the shared NVKE `v0.22.0-beta.1` release pin |
 | Controller and charts | `../nvke-controller/catalog` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `catalog` | AMD64 Helm and kubectl executables, selected from the NVKE distribution lock |
 | Node images | `os-catalog`, `native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers |
@@ -29,11 +29,11 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 
 | Member | Selection mirrored from pinned upstream inputs | Boundary |
 |---|---|---|
-| CAPNICo | NVKE's selected `controller/deploy/nke-sbom/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
-| NKTP chart and dependencies | The same NVKE `v0.21.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select chart `0.1.0-rc.2` and three exact dependencies | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
-| NKTP images | Selected source values and authenticated dependency charts: collector/operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
+| CAPNICo | NVKE's selected `deploy/nico/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
+| NKTP chart and dependencies | The same NVKE `v0.22.0-beta.1` source as the maintained controller; the placeholder chart is packaged as `0.22.0-beta.1`, and `Chart.lock` selects three exact dependencies | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
+| NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0` and operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
 | Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
-| CAPI and cert-manager images | Selected NVKE `make/tool-versions.mk` chooses CAPI `v1.12.3`; its published provider manifests name the three controllers, and its clusterctl config selects cert-manager `v1.19.3` | Acquired runtime images only. Provider manifests/metadata and installation remain a separate consumer contract |
+| CAPI and cert-manager images | Selected NVKE `make/tool-versions.mk` chooses CAPI `v1.13.6`; its published provider manifests name the three controllers, and NVKE selects cert-manager `v1.21.1` | Acquired runtime images only. Provider manifests/metadata and installation remain a separate consumer contract |
 
 These version selections are explicit mirrors of the pinned upstream files, not live imports. A future
 upstream version bump requires a reviewed catalog/lock update; automatic source-to-catalog version drift
@@ -46,18 +46,17 @@ published digest and testing rendered manifests for both architectures without m
 Until then, consumers must explicitly relocate/bind those references; chart and image delivery alone
 does not prove offline installation or that a deployed workload uses the signed image outputs.
 
-This does not silently update the retained controller/CLI to current NVKE main. That newer code reads
-`MachineImage`, `ClusterRelease` and `NodePoolRelease` resources; the retained controller still reads legacy
-OS profile files. The config-only reference image is not a complete provisioning configuration for that
-older controller. Fleet payload selection, migration to the newer controller and delivery of the Kubernetes
-release resources remain explicit follow-ups, not acceptance established by adding these artifacts.
+The controller and CLI now select NVKE `v0.22.0-beta.1`, which reads `MachineImage`, `ClusterRelease`
+and `NodePoolRelease` resources. The config-only reference image is not a complete provisioning
+configuration. Fleet payload selection and installation of those release resources remain consumer
+responsibilities; a successful artifact build does not establish tenant provisioning.
 
 The catalogs and their machine-managed locks own exact commits, versions, archive/member hashes and
 native image digests. Do not maintain a second digest table in documentation. PostgreSQL and SPIRE Bash
 retain their source-owned index digests as well as the selected native child pins; acquisition checks
 actual parent-to-child membership before using the native image.
 
-OS assembly, agent, Calico and kubeadm retain the capture-capable NVKE commit. SPIRE packaging alone
+OS assembly, agent, Calico and kubeadm select NVKE `v0.22.0-beta.1`. SPIRE packaging alone
 temporarily selects the prior NVKE commit `726f76944404e1106626b8333d3576bdf67b575b`, with its matching
 source-owned acquisition and Debian packaging commands. It stages SPIRE `1.14.1` and TPM plugin `1.9.0`,
 then packages them offline before image-input composition and Packer. This is a packaging-source rollback,
@@ -69,17 +68,14 @@ in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641): agree on su
 triage the selected DSX dependency findings and confirm the source/binary and distribution contracts.
 The blocked DSX source-build producer, its material-only components and its unused source credentials
 are not selected or retained in this catalog. Source and security admission are not weakened.
-The [merged-source handoff](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-05-m2-input-acquisition.md#merged-capture-source-handoff)
-records NVKE #1211 as approved and merged, and the exact selected commit as protected `main`
-at the recorded read-back. The agent version is `v0.2.1-81-gff21ba8`, derived through the source's
-`agent/v*` tag pattern. Exact commit acquisition itself is not protected-ref or source-review
-proof; that acceptance is separately recorded. The hosted candidate publication result is recorded below;
-independent consumer acceptance remains unresolved.
+The selected beta resolves to `6991e36bef8f15b42b6f6519ccff089c587a6e49`. The agent receives
+`v0.22.0-beta.1` as its version stamp. The prior hosted candidate publication below remains historical
+evidence for its recorded inputs; it does not establish beta execution or independent consumer acceptance.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde/apt-acquisitions.tar` or `fde/apt-acquisitions.tar`, which each producer declares through `packer.acquisitionArchive`.
 The source's composition command receives the required explicit native `--architecture` argument.
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
-under `nke.dev/os-image-materials/v1`; every selected material and disk target retains its own architecture.
+under `nvke.nvidia.com/os-image-materials/v1`; every selected material and disk target retains its own architecture.
 
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
@@ -168,12 +164,13 @@ cannot substitute for those gates or establish qualified reproduction.
 ## Native execution and publication
 
 `nvke-node-fde-amd64` and `nvke-node-fde-arm64` select the pinned source's
-`nke-node-fde.qemu.nke-fde` target and `fde/nke-node.qcow2` output. They reuse each architecture's existing
+`nvke-node-fde.qemu.nvke-fde` target and `fde/nvke-node.qcow2` output. They reuse each architecture's existing
 material producers and native toolchain. Each explicitly declares the public bootstrap `luks_passphrase: changeit`;
 no private passphrase or new secret channel is admitted. Build-provenance publication binds `luks2` through
 the wrapper and signed release metadata. Strict FDE inspection/publication and qualified reproduction remain
-unsupported. The [source audit](../nvke-fde/fde-audit.md) explains why these shared-key candidate images make
-no deployed confidentiality claim, even after TPM enrollment. `swtpm` is not required for the bake.
+unsupported. The [historical source audit](../nvke-fde/fde-audit.md) records the prior pin's shared-key
+limitations; it is not an audit of the beta update. These diagnostic images make no deployed confidentiality
+claim, even after TPM enrollment. `swtpm` is not required for the bake.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64

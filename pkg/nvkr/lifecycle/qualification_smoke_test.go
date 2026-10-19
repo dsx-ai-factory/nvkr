@@ -224,6 +224,19 @@ func TestNativeSmokeExpectedStampBindings(t *testing.T) {
 		code e.Code
 	}{
 		{"exact prefix", func(*ir.Node) {}, ""},
+		{"current stamp family", func(n *ir.Node) { n.Env[0].Name, n.Env[1].Name = "NVKECTL_VERSION", "NVKECTL_COMMIT" }, ""},
+		{"mixed stamp families", func(n *ir.Node) { n.Env[0].Name = "NVKECTL_VERSION" }, e.CodeVerifyFailed},
+		{"both stamp families", func(n *ir.Node) {
+			n.Env = append(n.Env, ir.EnvVar{Name: "NVKECTL_VERSION", Value: "v1.2.3"}, ir.EnvVar{Name: "NVKECTL_COMMIT", Value: n.SourceCommit})
+		}, e.CodeVerifyFailed},
+		{"current wrong version", func(n *ir.Node) {
+			n.Env[0].Name, n.Env[1].Name = "NVKECTL_VERSION", "NVKECTL_COMMIT"
+			n.Env[0].Value = "v1.2.4"
+		}, e.CodeVerifyFailed},
+		{"current wrong commit", func(n *ir.Node) {
+			n.Env[0].Name, n.Env[1].Name = "NVKECTL_VERSION", "NVKECTL_COMMIT"
+			n.Env[1].Value = "bbbbbbbb"
+		}, e.CodeVerifyFailed},
 		{"exact full commit", func(n *ir.Node) { n.Env[1].Value = n.SourceCommit }, ""},
 		{"wrong version", func(n *ir.Node) { n.Env[0].Value = "v1.2.4" }, e.CodeVerifyFailed},
 		{"wrong commit", func(n *ir.Node) { n.Env[1].Value = "bbbbbbbb" }, e.CodeVerifyFailed},

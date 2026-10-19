@@ -1,7 +1,7 @@
 # Combined CLI, image and chart example
 
 This retained example builds `nvkectl`, the upstream CWE runtime image, and the source controller Helm chart
-from independently pinned NVKE module tags. The chart depends on the exact built CWE image. Producer
+from NVKE `v0.22.0-beta.1`. The chart depends on the exact built CWE image. Producer
 instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
 runtime, destination and signing.
 
@@ -118,14 +118,14 @@ nvkr run generate \
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
-The CLI source `nvke` is pinned to `cli/v0.1.0-rc.2`. CWE and the chart share `nvke-controller`, pinned to
-`controller/v0.1.1-rc.9` (`340009f1e15d8e26940f1e03c9696f1ad251c0ae`). The controller pin supplies the
-source chart's existing digest support. CLI and controller can be repinned independently; CWE and its chart
-move together:
+The CLI source `nvke` and the shared CWE/chart source `nvke-controller` are pinned to
+`v0.22.0-beta.1` (`6991e36bef8f15b42b6f6519ccff089c587a6e49`). The controller pin supplies the
+source chart's existing digest support. Each source role has its own lock entry;
+update both for a shared NVKE release:
 
 ```sh
-nvkr catalog pin --dir definitions/nvke-v1/catalog --tag v0.1.0-rc.2 nvke
-nvkr catalog pin --dir definitions/nvke-v1/catalog --tag v0.1.1-rc.9 nvke-controller
+nvkr catalog pin --dir definitions/nvke-v1/catalog --tag v0.22.0-beta.1 nvke
+nvkr catalog pin --dir definitions/nvke-v1/catalog --tag v0.22.0-beta.1 nvke-controller
 ```
 
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.

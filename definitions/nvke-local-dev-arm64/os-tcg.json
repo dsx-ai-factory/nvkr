@@ -2,11 +2,11 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:7b2edee8f03952f7efd8af71fd4a1beb43d4d883d7502d59398c6e50761db73c",
+  "requiresCatalogDigest": "sha256:1447b5c407e54ba45dd6b1ee2cbd7ed73309e676b0944b41131b11d7dc429568",
   "components": {
     "nvke-node-image": {
       "component": {
-        "artifactPath": "non-fde/nke-node.qcow2",
+        "artifactPath": "non-fde/nvke-node.qcow2",
         "buildNetwork": "default",
         "buildRequirements": {
           "allowedHostPlatforms": [
@@ -26,7 +26,7 @@
           "timeoutSeconds": 21600
         },
         "builderType": "vm-image",
-        "commit": "ff21ba8c07cafff74b68e238a8876af11e5beded",
+        "commit": "6991e36bef8f15b42b6f6519ccff089c587a6e49",
         "disk": {
           "encryption": "none",
           "format": "qcow2"
@@ -42,13 +42,13 @@
           "acquisitionArchive": "non-fde/apt-acquisitions.tar",
           "architectureVariable": "architecture",
           "buildLogDirectoryVariable": "build_log_directory",
-          "buildName": "nke-node-non-fde.qemu.nke-non-fde",
+          "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
           "materialManifest": {
             "kinds": {
               "image-inputs": "archive",
               "installer-iso": "disk-image"
             },
-            "schemaVersion": "nke.dev/os-image-materials/v1"
+            "schemaVersion": "nvke.nvidia.com/os-image-materials/v1"
           },
           "materialManifestVariable": "material_manifest",
           "outputDirectoryVariable": "output_directory",
@@ -70,13 +70,13 @@
           "linux/arm64"
         ],
         "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "sourceDateEpoch": 1791257393,
-        "tag": "ff21ba8c07cafff74b68e238a8876af11e5beded",
+        "sourceDateEpoch": 1792081788,
+        "tag": "v0.22.0-beta.1",
         "toolchainImages": {
           "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
           "arm64": "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db"
         },
-        "treeHash": "b915345debd33ccd63dfbf8146415bf20e94c4ea",
+        "treeHash": "64d3259508bb91745a0fbaa71b5d72a61b787142",
         "vendorCommand": [
           "bash",
           "-ec",

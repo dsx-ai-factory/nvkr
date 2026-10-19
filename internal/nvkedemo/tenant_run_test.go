@@ -5,6 +5,7 @@ package nvkedemo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -29,6 +30,12 @@ func tenantRunFixture(t *testing.T, network, fail, block string) (tenant, string
 		}
 	}
 	domains, _, image, _, _ := tenantVMFixtureAt(t, simulatorWork)
+	image.Name, image.Kind, image.OS, image.Arch = DiskOutputName, "disk-image", "linux", "arm64"
+	image.Disk.Format, image.Disk.Encryption, image.Disk.PayloadDigest = "qcow2", "none", image.Digest
+	if network == "upstream-ovn" {
+		image.Name = "nvke-node-image-upstream-ovn-arm64"
+	}
+	profileBinding := tenantProfilesFixture(t, root, network)
 	for name, value := range map[string]any{
 		"rows.json":   []tenantRow{{Name: "owned", ID: "owned-id", NICo: TenantProvider{OrgID, SiteID, VPCID}}},
 		"config.json": map[string]any{"clusters": []any{map[string]any{"cluster": map[string]string{"server": "https://" + TenantVIP + ":6443"}}}},
@@ -46,6 +53,10 @@ func tenantRunFixture(t *testing.T, network, fail, block string) (tenant, string
 set -eu
 case "$1 $2" in
   'get clusters') if test -f "$FIXTURE/created"; then cat "$FIXTURE/rows.json"; else printf '[]\n'; fi ;;
+  'create machineimage'|'create clusterrelease'|'create nodepoolrelease')
+    printf '%s\n' "$2" >> "$FIXTURE/events"
+    if test "$FAIL" = "$2"; then exit 7; fi
+    ;;
   'create cluster') : > "$FIXTURE/created" ;;
   'get kubeconfig') printf 'fixture only\n' > "$5" ;;
   *) exit 22 ;;
@@ -63,6 +74,25 @@ shift 2
 if test "$1" = --request-timeout=10s; then shift; fi
 if test "$1" = -n; then shift 2; fi
 case "$1 $2" in
+  'get pods')
+    if test "${3:-}" = -l && test "$4" = app.kubernetes.io/name=nke-controller; then
+      if test -f "$FIXTURE/profile-read" && test "$FAIL" = profile-replaced; then
+        cat "$FIXTURE/profile-replaced.json"
+      else
+        cat "$FIXTURE/profile-pod.json"
+      fi
+    else step workload-pod; cat "$FIXTURE/pods.json"; fi ;;
+  'exec profiles-pod')
+    previous=
+    last=
+    for argument do previous="$last"; last="$argument"; done
+    : > "$FIXTURE/profile-read"
+    case "$previous" in
+      */metadata.yaml) cat "$FIXTURE/profile-metadata.yaml" ;;
+      */ipxeScript) cat "$FIXTURE/profile-ipxe" ;;
+      */userData.tmpl) cat "$FIXTURE/profile-userdata" ;;
+      *) exit 22 ;;
+    esac ;;
   'get secret') step kubeconfig; printf '{}\n' ;;
   'config view') cat "$FIXTURE/config.json" ;;
   'get nodes') step nodes; cat "$FIXTURE/nodes.json" ;;
@@ -71,7 +101,6 @@ case "$1 $2" in
   'apply -f') step workload-apply ;;
   'wait job/nvkr-smoke') step workload-complete ;;
   'logs job/nvkr-smoke') step workload-log; printf 'NVKE_LOCAL_WORKLOAD_PASS\n' ;;
-  'get pods') step workload-pod; cat "$FIXTURE/pods.json" ;;
   *) exit 22 ;;
 esac
 `), 0o700)
@@ -87,7 +116,7 @@ esac
 			t.Errorf("join fixture simulator: %v", err)
 		}
 	})
-	return tenant{name: "owned", network: network, session: ManagementSession{Work: work, Tools: work, Runner: runner}, simulator: simulator, domains: domains, image: image}, root
+	return tenant{name: "owned", network: network, session: ManagementSession{Work: work, Tools: work, Runner: runner, tenantProfiles: profileBinding}, simulator: simulator, domains: domains, image: image}, root
 }
 
 func TestTenantRunAdmitsCNIAndDNSBeforeSmoke(t *testing.T) {
@@ -100,7 +129,7 @@ func TestTenantRunAdmitsCNIAndDNSBeforeSmoke(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			selected, root := tenantRunFixture(t, test.network, test.fail, "")
 			err := selected.run(t.Context(), 10*time.Second)
-			want := []string{"kubeconfig", "nodes"}
+			want := []string{"machineimage", "clusterrelease", "nodepoolrelease", "kubeconfig", "nodes"}
 			if test.network == "kind-calico" {
 				want = append(want, "daemonset/calico-node")
 			}
@@ -128,6 +157,18 @@ func TestTenantRunAdmitsCNIAndDNSBeforeSmoke(t *testing.T) {
 				want = append(want, "workload-apply", "workload-complete", "workload-log", "workload-pod")
 				if _, err := os.Stat(filepath.Join(selected.session.Work, "tenant-result.json")); err != nil {
 					t.Fatal(err)
+				}
+				raw, err := os.ReadFile(filepath.Join(selected.session.Work, "tenant-request.json"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var request TenantRequest
+				if err := json.Unmarshal(raw, &request); err != nil {
+					t.Fatal(err)
+				}
+				releaseName := "nvkr-local-" + strings.TrimPrefix(selected.image.Digest, "sha256:")[:40]
+				if request.ControlPlane.NICo.OS != releaseName || len(request.NodePools) != 1 || request.NodePools[0].NICo.OS != releaseName {
+					t.Fatal("tenant request did not select the exact disk-bound releases")
 				}
 			}
 			raw, err := os.ReadFile(filepath.Join(root, "events"))

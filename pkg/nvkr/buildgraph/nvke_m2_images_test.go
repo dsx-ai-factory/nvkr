@@ -167,7 +167,7 @@ func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
 
 func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	const root = "../../../definitions/nvke-m2"
-	const commit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
+	const commit = "6991e36bef8f15b42b6f6519ccff089c587a6e49"
 	expected := map[string]string{
 		"csi-node-driver-registrar-image": "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0",
 		"postgresql-image":                "registry-1.docker.io/bitnami/postgresql@sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71",

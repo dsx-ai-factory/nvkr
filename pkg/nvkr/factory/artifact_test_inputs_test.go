@@ -45,13 +45,16 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 		}
 	}
 	switch mode {
-	case "alias", "equal-alias", "conflicting-alias":
+	case "alias", "equal-alias", "conflicting-alias", "empty-alias":
 		component.VersionStamp["NVKECTL_VERSION"] = "v1"
 		if mode == "alias" {
 			delete(component.VersionStamp, "NKECTL_VERSION")
 		}
 		if mode == "conflicting-alias" {
 			component.VersionStamp["NVKECTL_VERSION"] = "v2"
+		}
+		if mode == "empty-alias" {
+			component.VersionStamp["NVKECTL_VERSION"] = ""
 		}
 	case "nix":
 		component.BuilderType = ir.BuilderNix
@@ -84,11 +87,6 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 		t.Fatal(err)
 	}
 	plan, err := Compile(t.Context(), definition, environment, stack, "test")
-	if strings.Contains(mode, "alias") {
-		// Renamed stamps are refused by canonical IR environment admission.
-		assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
-		return nil
-	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,8 +185,30 @@ func TestCLIArtifactTestUnsupportedProducers(t *testing.T) {
 }
 
 func TestCLIArtifactTestVersionAliasAdmission(t *testing.T) {
-	for _, mode := range []string{"alias", "equal-alias", "conflicting-alias"} {
-		t.Run(mode, func(t *testing.T) { cliTestPlan(t, "amd64", mode, 1) })
+	for _, tc := range []struct {
+		name, mode string
+		code       e.Code
+	}{
+		{"legacy version", "scalar", ""},
+		{"current version", "alias", ""},
+		{"equal versions", "equal-alias", ""},
+		{"conflicting versions", "conflicting-alias", e.CodeInvalidCatalog},
+		{"empty current version", "empty-alias", e.CodeInvalidCatalog},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := cliTestPlan(t, "amd64", tc.mode, 1)
+			inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "")
+			if tc.code != "" {
+				assertFactoryErrorCode(t, err, tc.code)
+				if inputs != nil {
+					t.Fatal("invalid version stamps emitted diagnostic inputs")
+				}
+				return
+			}
+			if err != nil || inputs.ExpectedVersion != "v1" {
+				t.Fatalf("admitted version stamps: %+v, %v", inputs, err)
+			}
+		})
 	}
 }
 

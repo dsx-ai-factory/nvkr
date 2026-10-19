@@ -72,13 +72,34 @@ def local_toolchain_scopes($lane):
 # transport URL served by the private-source handoff. This lexical diagnostic
 # also rejects that project path on other hosts; it does not parse or authenticate
 # Git URLs. Catalog and Git still own source admission and byte verification.
+def nvke_spire_source_exception:
+  {commit:"726f76944404e1106626b8333d3576bdf67b575b",
+   treeHash:"3d6ea77f85d5da2648038425f805a598e23464ba"};
+
 def nvke_source_closure($pin):
   def nvke_alias:
     ascii_downcase | split("?")[0] | split("#")[0] |
     split(":") | join("/") | split("/") | map(select(length > 0)) |
     .[-2:] | . == ["dsx-ai-factory", "nvke"] or . == ["dsx-ai-factory", "nvke.git"];
-  [.builds[].executionGraph.nodes[] |
-    select(.kind == "fetch" and (.repo | nvke_alias))] as $sources |
+  nvke_spire_source_exception as $spire |
+  # The temporary source exception is limited to the named SPIRE producer.
+  # Both its snapshot and its executable source edge must agree; another
+  # component cannot reuse the older checkout merely because its bytes match.
+  def spire_only($build; $source):
+    $build.catalogSnapshot.Components["nvke-spire-agent"] as $component |
+    [$build.executionGraph.nodes[] |
+      select(.sourceDest == $source.dest or ((.needs // []) | index($source.id)))] as $consumers |
+    $source.commit == $spire.commit and $source.treeHash == $spire.treeHash and
+    $component.fromSource == true and $component.repo == $source.repo and
+    $component.commit == $spire.commit and $component.treeHash == $spire.treeHash and
+    ($consumers | length) == 1 and
+    all($consumers[]; .kind == "build" and .component == "nvke-spire-agent" and
+      .sourceDest == $source.dest and ((.needs // []) | index($source.id)) != null and
+      .sourceCommit == $spire.commit and .sourceTreeHash == $spire.treeHash);
+  [.builds[] as $build | $build.executionGraph.nodes[] |
+    select(.kind == "fetch" and (.repo | nvke_alias)) |
+    {build:$build, source:.}] as $sources |
   ($sources | length) > 0 and
-  all($sources[]; .repo == "https://github.com/dsx-ai-factory/nvke.git" and
-    .commit == $pin.commit and .treeHash == $pin.treeHash);
+  all($sources[]; . as $entry | .source |
+    .repo == "https://github.com/dsx-ai-factory/nvke.git" and
+    ((.commit == $pin.commit and .treeHash == $pin.treeHash) or spire_only($entry.build; .)));

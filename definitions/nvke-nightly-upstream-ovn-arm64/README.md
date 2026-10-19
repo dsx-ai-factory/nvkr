@@ -12,7 +12,8 @@ The CLI, controller image, controller chart and NKTP chart share the profile-own
 [nightly site catalog](../nvke-nightly-arm64/site-catalog/README.md). `installer-tools-arm64` shares the
 separate [nightly installer-tools catalog](../nvke-nightly-arm64/installer-tools-catalog/README.md);
 other output catalog selections remain explicit. Four tools
-remain source-built at their original pins and commands, with executable `host-package` output types.
+remain source-built with executable `host-package` output types; clusterctl selects 1.13.6 to
+match the beta installer, while kind, kubectl and ORAS retain their existing pins.
 Helm 4.2.4 is acquired by exact archive/executable digest because its diagnostic source preparation
 is unsupported by hosted fetching. Its recorded binary security scan has findings; this is an
 exception disclosure, not a security-pass or complete-source-build claim.
@@ -43,9 +44,18 @@ workflow does not execute that suite or establish operational acceptance.
 `../nightly-profiles.json` selects this project's generated producer and exact NVKE suite revision.
 The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
 publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
-vulnerability-clearance claim. The suite and all four site-product sources select
-`a8391755d12d99f859783c6cf390338debd1e085`, including its `^TestE2E$` runtime entrypoint
-selection and candidate-input fixes. This candidate comes from open NVKE PR #1580;
-it is not a merged-main or human-approval claim. The shared revision follows ADR-23's
-proposed matching-revision rule without establishing overall interface adoption.
+vulnerability-clearance claim. All four site-product sources select
+NVKE `v0.22.0-beta.1` at `6991e36bef8f15b42b6f6519ccff089c587a6e49`. The OS closure
+retains the explicit pre-DSX SPIRE exception at `726f76944404e1106626b8333d3576bdf67b575b`.
+The test-only suite selects `a32067108ab89d1e2b2b6720766ffe97270a166a`, an explicit
+user-approved exception to ADR-23's proposed matching-revision rule. Product sources remain beta.
+
+The adapter now projects authenticated profile bytes into beta `MachineImage`, `ClusterRelease`
+and `NodePoolRelease` resources, preserving the exact disk binding and the candidate suite's
+fixed profile name. It renders the current site-specification shape with private tenant credentials.
+These paths are contract-tested, without a recorded runtime cycle.
+
+The selected test source retains the candidate entrypoint omitted from beta. It accepts the
+verified publication without rebuilding products. This separate test pin does not establish
+runtime compatibility or operational acceptance.
 The first combined nightly cycle remains unrecorded.

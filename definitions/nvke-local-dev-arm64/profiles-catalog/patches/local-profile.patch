@@ -125,7 +125,7 @@ new file mode 100644
 +{{- end }}
 +
 +runcmd:
-+  - systemctl stop nke-agent.service
++  - systemctl stop nvke-agent.service
 +  - systemctl stop spire-agent.service
 +{{- if .TeleportEnabled }}
 +  - echo 'Starting Teleport installation at '$(date) >> /var/log/cloud-init-teleport.log
@@ -135,9 +135,9 @@ new file mode 100644
 +  - systemctl is-active --quiet teleport && echo 'Teleport service started successfully' >> /var/log/cloud-init-teleport.log || { echo 'Teleport service failed to start' >> /var/log/cloud-init-teleport.log; systemctl status teleport --no-pager >> /var/log/cloud-init-teleport.log; exit 1; }
 +  - echo 'Teleport installation completed at '$(date) >> /var/log/cloud-init-teleport.log
 +{{- end }}
-+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 nke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion "v" }} spire-agent || exit 1
++  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 nvke-agent nvke-kubeadm-distro-{{ trimPrefix .KubernetesVersion "v" }} spire-agent || exit 1
 +{{- if .CalicoEnabled }}
-+  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 nke-cni-calico-images-3.30.1 nke-cni-calico-manifests-3.30.1 || exit 1
++  - DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/nke-local.list -o Dir::Etc::sourceparts=- -o DPkg::Lock::Timeout=600 nvke-cni-calico-images-3.30.1 nvke-cni-calico-manifests-3.30.1 || exit 1
 +{{- end }}
 +{{- if .OvnEnabled }}
 +  # The charts package is what the post-init CNI install reads.
@@ -146,7 +146,7 @@ new file mode 100644
 +  - sysctl --system
 +  - systemctl daemon-reload
 +  - systemctl restart spire-agent.service
-+  - systemctl restart nke-agent.service
++  - systemctl restart nvke-agent.service
 +  - 'systemctl restart procps || echo "Warning: procps restart failed but continuing" >> /var/log/cloud-init-teleport.log'
 +  - touch /run/cloud-init.done
 +

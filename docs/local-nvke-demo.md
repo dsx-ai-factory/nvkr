@@ -590,8 +590,8 @@ row distinguishes an owned VM's state, infrastructure readiness and console-file
 activity from Kubernetes readiness. Narrow terminals stack the panes.
 The phase map keeps the Site and Tenant checklists visible together when the
 terminal has room; compact terminals prioritize the live wait and timeout.
-The Site checklist retains individual Cluster API and NVKE installation stages;
-an NVKE stage is checked off only after both its run and verification succeed.
+The Site checklist retains readiness, Cluster API and NVKE installation steps;
+each step advances only from its command's observed completion.
 The Tenant checklist shows kubeconfig, API, two-node readiness and workload/DNS
 observations. Active steps show their own elapsed time. Pending steps have not
 been observed; the display does not estimate an overall completion percentage.
@@ -682,7 +682,7 @@ of canceled work: up to six minutes for diagnostics, two minutes for the delete
 request, 45 minutes for the owned tenant to disappear, and two minutes for guest
 route withdrawal, with additional joining/headroom inside that hour. The following
 host-runtime cleanup has its own eight-minute bound. These are separate ceilings,
-not completion estimates. The [selected NVKE teardown workflow](https://github.com/dsx-ai-factory/nvke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/controller/internal/temporal/workflows/teardown_cluster.go)
+not completion estimates. The [selected NVKE teardown workflow](https://github.com/dsx-ai-factory/nvke/blob/6991e36bef8f15b42b6f6519ccff089c587a6e49/controller/internal/temporal/workflows/teardown_cluster.go)
 tears down worker pools before control-plane nodes and permits 20-minute waits
 for each; retries and other steps
 can extend teardown. The 45-minute wait is a finite local policy, not an upstream
@@ -1022,19 +1022,21 @@ after the eight-hour work context expires.
 
 These are exact source selections recorded by this example, not a command to
 build whichever NVKE release is newest. A Git SHA identifies a commit; NVKR also
-checks its pinned tree. The guide does not establish that these candidates are
-one tagged NVKE release.
+checks its pinned tree. NVKE sources select `v0.22.0-beta.1`, with the explicit
+older SPIRE packaging exception below. This selection does not establish complete
+beta content parity or a successful deployment.
 
 | Part | Selected NVKE commit | Owning input |
 | --- | --- | --- |
-| Installer, site CLI/controller/charts and diagnostic profiles | [`8fb2d533`](https://github.com/dsx-ai-factory/nvke/commit/8fb2d53368823bd386b4fbd55b4ab6d3c0931345) | [Site lock](../definitions/nvke-local-dev-arm64/site-catalog/pins.lock.yaml), [profiles lock](../definitions/nvke-local-dev-arm64/profiles-catalog/pins.lock.yaml) and the demo's [installer pin](../internal/nvkedemo/model.go) |
-| OS assembly, agent and most NVKE-owned OS material producers | [`ff21ba8c`](https://github.com/dsx-ai-factory/nvke/commit/ff21ba8c07cafff74b68e238a8876af11e5beded) | [OS lock](../definitions/nvke-m2/os-catalog/pins.lock.yaml) and [local OS overlay](../definitions/nvke-local-dev-arm64/os-tcg.json) |
+| Installer, site CLI/controller/charts and diagnostic profiles | [`6991e36b`](https://github.com/dsx-ai-factory/nvke/commit/6991e36bef8f15b42b6f6519ccff089c587a6e49) | [Site lock](../definitions/nvke-local-dev-arm64/site-catalog/pins.lock.yaml), [profiles lock](../definitions/nvke-local-dev-arm64/profiles-catalog/pins.lock.yaml) and the demo's [installer pin](../internal/nvkedemo/model.go) |
+| OS assembly, agent and most NVKE-owned OS material producers | [`6991e36b`](https://github.com/dsx-ai-factory/nvke/commit/6991e36bef8f15b42b6f6519ccff089c587a6e49) | [OS lock](../definitions/nvke-m2/os-catalog/pins.lock.yaml) and [local OS overlay](../definitions/nvke-local-dev-arm64/os-tcg.json) |
 | Temporary SPIRE package selection | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Same OS lock; the prior plugin-free producer is retained temporarily. DSX remains a required missing product input, tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641), not full source/content parity. |
-| NICoSim | [`6ffc2e5c`](https://github.com/dsx-ai-factory/nvke/commit/6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4) | [Simulator lock](../definitions/nvke-local-dev-arm64/simulator-catalog/pins.lock.yaml) |
-| Provisioned provider (built, not used by this NICoSim tenant) | [`33fb71b2`](https://github.com/dsx-ai-factory/nvke/commit/33fb71b2f4224b470ebc628a9165fc4b92870406) | [Provider lock](../definitions/nvke-controller/catalog/pins.lock.yaml), selecting `v0.21.0` |
+| NICoSim | [`6991e36b`](https://github.com/dsx-ai-factory/nvke/commit/6991e36bef8f15b42b6f6519ccff089c587a6e49) | [Simulator lock](../definitions/nvke-local-dev-arm64/simulator-catalog/pins.lock.yaml) |
+| Provisioned provider (built, not used by this NICoSim tenant) | [`6991e36b`](https://github.com/dsx-ai-factory/nvke/commit/6991e36bef8f15b42b6f6519ccff089c587a6e49) | [Provider lock](../definitions/nvke-controller/catalog/pins.lock.yaml) |
 
-The OS commit added APT archive capture; the installer commit includes the staged
-deployment interface this adapter checks. The NVIDIA OVN fork, CAPNICo, NICoSim
+The adapter uses the beta's site-spec renderer and deployment entrypoint. Tenant
+setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
+the live observed profiles image and selected disk. The NVIDIA OVN fork, CAPNICo
 and upstream tools have their own source pins in the selected catalogs. A new
 NVKE release does **not** automatically move any of these selections.
 

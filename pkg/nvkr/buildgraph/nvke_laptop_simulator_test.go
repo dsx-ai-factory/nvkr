@@ -57,7 +57,7 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 					}
 				case ir.KindBuild:
 					builds++
-					if node.SourceCommit != "6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4" || node.Network != ir.NetworkNone || node.BuilderType != ir.BuilderOCIHermetic || !node.SourceReadOnly {
+					if node.SourceCommit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" || node.Network != ir.NetworkNone || node.BuilderType != ir.BuilderOCIHermetic || !node.SourceReadOnly {
 						t.Fatalf("pinned offline source producer changed: %+v", node)
 					}
 					cgo := false

@@ -37,9 +37,9 @@ KEEP_REGISTRY=1
 # The same pinned toolchain image the catalog builds nvkectl with, reused here as the
 # amd64 execution environment for the recovered binary. Reusing it keeps this script from
 # introducing another execution image. The loopback registry service uses registry:3.
-RUN_IMAGE=golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
-# The version string upstream's own cli/Makefile stamps for tag cli/v0.1.0-rc.2.
-EXPECT_VERSION=${EXPECT_VERSION:-v0.1.0-rc.2}
+RUN_IMAGE=golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+# The version string the catalog passes to upstream's cli/Makefile for the shared release.
+EXPECT_VERSION=${EXPECT_VERSION:-v0.22.0-beta.1}
 
 usage() {
   cat <<'EOF'

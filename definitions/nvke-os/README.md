@@ -6,9 +6,10 @@ source-owned Packer project. Architecture-dependent build and vendor argv use th
 substitution. The AMD64 disk root and ARM64 execution overlay are explicit producer declarations, not one
 architecture-neutral root.
 
-The bootstrap lock retains Git describe-derived source selections such as
-`os-image/v0.1.0-rc.4-51-g726f7694`; these describe an exact commit, not a published
-release tag. Do not infer coordinated release acceptance from those names.
+The catalog pins NVKE source to `v0.22.0-beta.1` at commit
+`6991e36bef8f15b42b6f6519ccff089c587a6e49`. The SPIRE package is an explicit
+exception, retained at the pre-DSX commit `726f76944404e1106626b8333d3576bdf67b575b`.
+The selected pins describe build inputs; they do not establish coordinated release acceptance.
 
 Local development and CI are parallel supported paths sharing material producers, not substitutes for one another.
 Their Definitions select explicit execution behavior:
@@ -84,12 +85,15 @@ Manual dispatch supports these modes:
 For a full dispatch, supply an exact main-reachable NVKR commit or the copy-pr-bot mirror of a current,
 open, non-draft same-repository PR. Maintainers must vet the exact head first. The workflow does not
 authenticate an `/ok to test` comment or independently enforce human approval. `approved_nvke_commit`
-must match the selected catalog lock and every source node in the trusted compiler's complete Plans.
+must match the selected NVKE catalog lock and source nodes in the trusted compiler's complete Plans.
+Only the named SPIRE producer may use the exact pre-DSX commit/tree retained above; its catalog
+snapshot and executable source edge must both match that exception.
 This is a consistency check; the input is not itself source-owner approval.
 
 The selector and source fetch use trusted main code. The fetch job alone receives the read-only
-`NKE_SOURCE_TOKEN`; it verifies the exact source commit/tree, removes persistent credentials, and
-transports bytes to the candidate job. Candidate execution receives private source content and declared
+`NKE_SOURCE_TOKEN`; it verifies both exact source commit/tree pairs, removes persistent credentials, and
+transports one Git checkout containing both commits to the candidate job. The consumer verifies the
+archive digest and both pins before using that checkout. Candidate execution receives private source content and declared
 build network, but no source token. The process-local Git transport override keeps canonical source pins.
 
 The runner identity must already have read/write KVM access; the workflow prints device ownership/mode

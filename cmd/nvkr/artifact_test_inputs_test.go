@@ -47,7 +47,7 @@ func TestArtifactTestInputCommand(t *testing.T) {
 					continue
 				}
 				component := build.CatalogSnapshot.Components["nvkectl"]
-				want = factory.CLIArtifactTestInputs{Output: output, BuildDigest: build.BuildDigest, Platform: build.Platform, Repo: component.Repo, Commit: component.Commit, TreeHash: component.TreeHash, ExpectedVersion: component.VersionStamp["NKECTL_VERSION"]}
+				want = factory.CLIArtifactTestInputs{Output: output, BuildDigest: build.BuildDigest, Platform: build.Platform, Repo: component.Repo, Commit: component.Commit, TreeHash: component.TreeHash, ExpectedVersion: component.VersionStamp["NVKECTL_VERSION"]}
 				for _, node := range build.Graph.Nodes {
 					if node.Kind == ir.KindBuild && node.Component == "nvkectl" {
 						want.ToolchainImage = node.Toolchain

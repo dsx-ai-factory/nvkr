@@ -184,6 +184,78 @@ func TestOSPlanSourceClosureRejectsAliasAndPinDrift(t *testing.T) {
 	}
 }
 
+func TestOSPlanSPIREExceptionCannotAuthorizeOtherConsumers(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("OS validation requires jq")
+	}
+	raw, _ := nvkeOSScriptPlan(t, "amd64")
+	for _, scenario := range []string{"retained SPIRE", "changed commit", "changed tree", "another consumer", "another name", "missing source edge", "snapshot drift"} {
+		t.Run(scenario, func(t *testing.T) {
+			var plan factory.Plan
+			if err := json.Unmarshal(raw, &plan); err != nil {
+				t.Fatal(err)
+			}
+			graph := plan.Builds[0].Graph
+			var source *ir.Node
+			var consumer *ir.Node
+			var primary ir.Node
+			for i := range graph.Nodes {
+				node := &graph.Nodes[i]
+				if node.Kind == ir.KindFetch && node.Repo == "https://github.com/dsx-ai-factory/nvke.git" {
+					if node.Commit == "726f76944404e1106626b8333d3576bdf67b575b" {
+						source = node
+					} else {
+						primary = *node
+					}
+				}
+				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
+					consumer = node
+				}
+			}
+			if source == nil || consumer == nil || primary.Commit == "" {
+				t.Fatal("fixture omits the mixed-source producer closure")
+			}
+			switch scenario {
+			case "changed commit":
+				source.Commit = strings.Repeat("a", 40)
+			case "changed tree":
+				source.TreeHash = strings.Repeat("a", 40)
+			case "another consumer":
+				other := *consumer
+				other.ID, other.Component = "build-other", "other"
+				graph.Nodes = append(graph.Nodes, other)
+			case "another name":
+				consumer.Component = "other"
+			case "missing source edge":
+				consumer.Needs = nil
+			case "snapshot drift":
+				component := plan.Builds[0].CatalogSnapshot.Components["nvke-spire-agent"]
+				component.Commit = primary.Commit
+				plan.Builds[0].CatalogSnapshot.Components["nvke-spire-agent"] = component
+			}
+			changed, err := json.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pin, err := json.Marshal(map[string]string{"commit": primary.Commit, "treeHash": primary.TreeHash})
+			if err != nil {
+				t.Fatal(err)
+			}
+			output, err := runOSPlanQuery(t, changed, "nvke_source_closure($pin)", "--argjson", "pin", string(pin))
+			if scenario == "retained SPIRE" {
+				if err != nil || strings.TrimSpace(string(output)) != "true" {
+					t.Fatalf("retained source exception rejected: %v: %s", err, output)
+				}
+				return
+			}
+			var exit *exec.ExitError
+			if !errors.As(err, &exit) || exit.ExitCode() != 1 || strings.TrimSpace(string(output)) != "false" {
+				t.Fatalf("changed source exception not rejected: %v: %s", err, output)
+			}
+		})
+	}
+}
+
 func nvkeOSScriptPlan(t *testing.T, arch string) ([]byte, *factory.Plan) {
 	t.Helper()
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))

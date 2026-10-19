@@ -12,5 +12,5 @@ validation: static
 # Scheduling is deliberately absent. To opt in after review: schedule: '0 6 * * 1'
 sourceCheckout:
   repository: dsx-ai-factory/nvke
-  ref: 33fb71b2f4224b470ebc628a9165fc4b92870406
+  ref: 6991e36bef8f15b42b6f6519ccff089c587a6e49
   secret: NKE_SOURCE_TOKEN

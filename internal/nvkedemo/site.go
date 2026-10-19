@@ -26,7 +26,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
-	"go.yaml.in/yaml/v3"
 )
 
 const registryImage = "docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
@@ -705,7 +704,7 @@ func appendChartValues(ctx context.Context, capture chartCapture, reader, deploy
 
 func prepareRuntimeValues(ctx context.Context, checkout, deploy, host string, outputs map[string]SelectedOutput, capture chartCapture) error {
 	values := runtimeValues(host, outputs)
-	reader := filepath.Join(checkout, "deploy/lib/nke-deploy-items.py")
+	reader := filepath.Join(checkout, "deploy/lib/nvke-deploy-items.py")
 	for _, item := range []string{"postgresql", "spire", "temporal"} {
 		if err := appendChartValues(ctx, capture, reader, deploy, item, "nvkr-image-inputs.json", values[item]); err != nil {
 			return err
@@ -912,8 +911,10 @@ func validateRuntimePods(rows podList, refs map[string]string) (map[string]obser
 	return result, nil
 }
 
-func deployedSiteImages(ctx context.Context, session ManagementSession, refs map[string]string) (map[string]any, error) {
-	observed := make(map[string]any)
+func deployedSiteImages(ctx context.Context, session ManagementSession, refs map[string]string) (observed map[string]any, result error) {
+	boundary := beginProgress(session.Runner.Progress, "site-images-admission", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { boundary.finish(result) }()
+	observed = make(map[string]any)
 	kubectl := filepath.Join(session.Tools, "kubectl")
 	kube := environmentValue(session.Runner.Env, "SITE_KUBECONFIG")
 	for _, item := range []struct {
@@ -1056,38 +1057,6 @@ func randomScalar() (string, error) {
 	return hex.EncodeToString(raw[:]), nil
 }
 
-type siteConfiguration struct {
-	Site struct {
-		Name        string `yaml:"name"`
-		TrustDomain string `yaml:"trustDomain"`
-		VIP         string `yaml:"vip"`
-		Arch        string `yaml:"arch"`
-	} `yaml:"site"`
-	Spire struct {
-		CACertFile string `yaml:"caCertFile"`
-		CAKeyFile  string `yaml:"caKeyFile"`
-	} `yaml:"spire"`
-	Images struct {
-		Controller string `yaml:"controller"`
-		Profiles   string `yaml:"profiles"`
-	} `yaml:"images"`
-	Nico struct {
-		Endpoint string `yaml:"endpoint"`
-		OrgID    string `yaml:"orgId"`
-		Token    string `yaml:"token"`
-		APIName  string `yaml:"apiName"`
-	} `yaml:"nico"`
-	Registry struct {
-		Server   string `yaml:"server"`
-		Username string `yaml:"username"`
-		Token    string `yaml:"token"`
-	} `yaml:"registry"`
-	Tenant struct {
-		User     string `yaml:"user"`
-		Password string `yaml:"password"`
-	} `yaml:"tenant"`
-}
-
 // checkoutSiteInstaller materializes the full pinned tree in this private copy.
 // Sparse checkout writes extensions.worktreeConfig, which the shared source Git
 // owner deliberately rejects. Keep that policy and the original source intact.
@@ -1166,7 +1135,6 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	if err = probeNodeSimulator(ctx, session.Runner, node, endpoint); err != nil {
 		return err
 	}
-	session.Runner.Env = SetEnv(session.Runner.Env, map[string]string{"STAGE_NEEDS_RELEASE": "1", "NODE_EXEC": "docker exec {node}", "PREPULL_EXTERNAL": "0"})
 	selected := make(map[string]lifecycle.Artifact)
 	for key, value := range materials.Outputs {
 		selected[key] = value.Observation
@@ -1192,13 +1160,14 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	if err = checkoutSiteInstaller(ctx, session.Runner, sourceCheckout, checkout, InstallerCommit); err != nil {
 		return err
 	}
-	charts, pins := make(map[string]string), make(map[string]string)
+	charts, pins, versions := make(map[string]string), make(map[string]string), make(map[string]string)
 	for item := range chartOutputs {
 		charts[item] = materials.Outputs[item].Layout
 		pins[item] = materials.Outputs[item].Observation.Digest
+		versions[item] = materials.Outputs[item].Observation.ChartVersion
 	}
 	capture := sequencedChartCapture(session.Runner)
-	deploy, err := prepareChartInputs(ctx, ChartInputsConfig{NVKECheckout: checkout, NVKR: tool, Out: filepath.Join(session.Work, "chart-inputs"), Charts: charts, Manifests: pins}, capture)
+	deploy, err := prepareChartInputs(ctx, ChartInputsConfig{NVKECheckout: checkout, NVKR: tool, Out: filepath.Join(session.Work, "chart-inputs"), Charts: charts, Manifests: pins, Versions: versions}, capture)
 	if err != nil {
 		return err
 	}
@@ -1245,71 +1214,14 @@ func ConsumeSite(ctx context.Context, cfg Config, materials *SiteMaterials, conn
 	if err = bootstrapCA(ctx, session); err != nil {
 		return err
 	}
-	var config siteConfiguration
-	config.Site.Name = session.Name
-	config.Site.TrustDomain = "nvkr.local"
-	config.Site.VIP = vip
-	config.Site.Arch = "arm64"
-	config.Spire.CACertFile = filepath.Join(session.Work, "ca.crt")
-	config.Spire.CAKeyFile = filepath.Join(session.Work, "ca.key")
-	config.Images.Controller = refs["cwe"]
-	// The source-owned chart consumes this exact native image through its init container.
-	config.Images.Profiles = refs["profiles"]
-	config.Nico.Endpoint = endpoint
-	config.Nico.OrgID = connection.Org
-	config.Nico.Token = connection.Token
-	config.Nico.APIName = "forge"
-	config.Registry.Server = host
-	config.Registry.Username = "local-diagnostic"
-	config.Registry.Token, err = randomScalar()
-	if err != nil {
+	if err = installSelectedStack(ctx, session, checkout, deploy, vip, materials.Gateway, refs, SiteConnection{Token: connection.Token, Endpoint: endpoint, Org: connection.Org}, capture); err != nil {
 		return err
-	}
-	config.Tenant.User = "nvkr-demo"
-	config.Tenant.Password, err = randomScalar()
-	if err != nil {
-		return err
-	}
-	telemetry, err := sourceBytes(ctx, session.Runner, checkout, "nktp/hack/e2e-values.yaml", "kind-nktp-values")
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(string(telemetry), "  args: [\"--kubelet-insecure-tls\"]") {
-		return errors.New("selected NVKE Kind telemetry fixture differs")
-	}
-	encoded, err := yaml.Marshal(config)
-	if err != nil {
-		return err
-	}
-	encoded = append(encoded, []byte("nktp:\n")...)
-	for _, line := range strings.Split(strings.TrimSuffix(string(telemetry), "\n"), "\n") {
-		encoded = append(encoded, []byte("  "+line+"\n")...)
-	}
-	siteConfig := filepath.Join(session.Work, "site-config.yaml")
-	if err = privateWrite(siteConfig, encoded); err != nil {
-		return err
-	}
-	manifest := filepath.Join(session.Work, "local-assembly.yaml")
-	manifestBytes := "apiVersion: nke.nvidia.com/release/v1\nrelease: local-assembly\nlane: local-assembly\nscope: none\nsource:\n  repo: https://github.com/dsx-ai-factory/nvke\n  tag: local-assembly\n  commit: " + InstallerCommit + "\nitems:\n  - {name: controller, type: image, ref: " + refs["cwe"] + "}\n"
-	if err = privateWrite(manifest, []byte(manifestBytes)); err != nil {
-		return err
-	}
-	session.Runner.Env = SetEnv(session.Runner.Env, map[string]string{"SITE_CONFIG": siteConfig, "RELEASE_FILE": manifest, "CAPNICO_IMAGE": strings.Split(refs["provider"], "@")[0] + ":" + session.Name, "API_CLIENT_CIDRS": materials.Gateway + "/32"})
-	for _, phase := range []string{"00-check-readiness", "01-prepare-cluster", "02-stage-images", "03-describe-site", "05-install-site-controller", "06-secure-and-register"} {
-		stage := filepath.Join(checkout, "deploy/stages", phase+".sh")
-		if err = session.Runner.Run(ctx, []string{"bash", stage, "run"}, "site-"+phase, 1800*time.Second); err != nil {
-			return err
-		}
-		if err = session.Runner.Run(ctx, []string{"bash", stage, "check"}, "check-"+phase, 180*time.Second); err != nil {
-			return err
-		}
-		if phase == "03-describe-site" {
-			if err = appendChartValues(ctx, capture, filepath.Join(checkout, "deploy/lib/nke-deploy-items.py"), deploy, "controller", "nvkr-profiles-image.json", profilesImageValues(refs["profiles"])); err != nil {
-				return err
-			}
-		}
 	}
 	images, err := deployedSiteImages(ctx, session, refs)
+	if err != nil {
+		return err
+	}
+	session.tenantProfiles, err = bindTenantProfiles(refs, images)
 	if err != nil {
 		return err
 	}

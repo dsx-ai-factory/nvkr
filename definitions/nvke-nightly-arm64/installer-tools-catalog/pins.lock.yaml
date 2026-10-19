@@ -3,10 +3,10 @@ apiVersion: nvkr.dev/lock/v1
 kind: PinLock
 pins:
   clusterctl:
-    commit: 1a1852c74072febc3fbf9823c9dd32f4cd6cc747
-    sourceDateEpoch: 1771324984
-    tag: v1.12.3
-    treeHash: adfe92aa22b7d1bae7cd787cdd0fc722ec5afbc8
+    commit: bd8162edfe045c1bb490d431b3acddd568bdb887
+    sourceDateEpoch: 1788866431
+    tag: v1.13.6
+    treeHash: 8c584c260a47253fb8ebc5681a7eb894798ace7a
   helm:
     commit: 3900f434fd3ef2b84065dc04508df48f288dba00
     sourceDateEpoch: 1786632363

@@ -6,23 +6,23 @@ metadata:
 sources:
   nvke-controller:
     repo: https://github.com/dsx-ai-factory/nvke
-    tagPrefix: controller/
-    constraint: 0.1.x
+    constraint: v0.22.0-beta.1
     pinSet:
       format: nvke-deploy-v1
-      file: controller/deploy/nke-sbom/nke-deploy.yaml
+      file: deploy/nico/nvke-deploy.yaml
       members:
         postgresql: {artifact: postgresql-chart}
         spire: {artifact: spire-chart}
         spire-crds: {artifact: spire-crds-chart}
         temporal: {artifact: temporal-chart}
       accounted:
-        nke-base-config: {type: template}
+        nvke-base-config: {type: template}
         spire-tpm-pubhashes: {type: manifest}
         spire-server-nodeport: {type: manifest}
         spire-oidc-provider-nodeport: {type: manifest}
         capnico: {type: manifest}
-        controller: {type: helm, path: ../charts/controller}
+        controller: {type: helm, path: ../../controller/deploy/charts/controller}
+        nktp: {type: helm, path: ../../nktp/deploy/charts/nktp}
 components:
   postgresql-chart:
     platforms: [linux/amd64, linux/arm64]

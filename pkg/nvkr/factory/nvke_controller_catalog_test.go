@@ -31,7 +31,7 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 	if err != nil {
 		t.Fatal(err)
 	}
-	const sourceCommit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
+	const sourceCommit = "6991e36bef8f15b42b6f6519ccff089c587a6e49"
 	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
 		if lock.Pins[name].Commit != sourceCommit {
 			t.Fatalf("authored %s source=%s, want %s", name, lock.Pins[name].Commit, sourceCommit)
@@ -43,7 +43,7 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 		t.Fatal("locate controller pin-set fixture")
 	}
 	repo := t.TempDir()
-	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-pin-set"))); err != nil {
+	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-beta-pin-set"))); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)

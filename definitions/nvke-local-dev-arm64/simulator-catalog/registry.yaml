@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-nicosim:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.1
     # Historical M2 Docker candidate Go/GCC toolchain. Local launchers substitute
     # freshly validated bytes; this pin does not prove current-source reproduction
     # or completed organizational review.

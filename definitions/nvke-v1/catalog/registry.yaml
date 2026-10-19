@@ -43,31 +43,26 @@ components:
     source: nvke-controller
     writeDir: bin
   nvkectl:
-    artifactPath: bin/nvkectl
-    buildCommand:
-    - sh
-    - -c
-    - go build -mod=vendor -trimpath -ldflags "-s -w -buildid= -X main.version=$NKECTL_VERSION
-      -X main.gitCommit=$NKECTL_COMMIT -X main.gitTreeState=clean -X main.buildDate=$NKECTL_DATE
-      -X github.com/NVIDIA/nke/cli/internal/cwedeploy.capiVersion=$NKECTL_CAPI_VERSION"
-      -o /src/bin/nvkectl ./cli/cmd/nkectl
-    cgo: false
     fromSource: true
-    outputType: host-package
-    platforms:
-    - linux/amd64
-    - linux/arm64
     source: nvke
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: cli/bin/nvkectl
+    writeDir: cli/bin
     versionStamp:
-      NKECTL_CAPI_VERSION: v1.12.3
-      NKECTL_COMMIT: '{{slice .Commit 0 8}}'
-      NKECTL_DATE: '{{.Date}}'
-      NKECTL_VERSION: '{{.ModuleTag}}'
-    writeDir: bin
+      NVKECTL_VERSION: '{{.ModuleTag}}'
+      NVKECTL_COMMIT: '{{.Commit}}'
+      NVKECTL_DATE: '{{.Date}}'
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        make -C cli build NVKECTL_TREE=clean
 kind: SourceBuildRegistry
 metadata:
-  description: NVKE components from independently pinned CLI and controller module
-    tags. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+  description: NVKE components from the shared v0.22.0-beta.1 release. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
     rootless BuildKit.
   name: nvke-v1
 sources:
@@ -88,15 +83,27 @@ sources:
     kind: github-action
     repo: https://github.com/actions/download-artifact
   nvke:
-    constraint: 0.1.x
     repo: https://github.com/dsx-ai-factory/nvke
-    tagPrefix: cli/
-    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+    constraint: v0.22.0-beta.1
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        test ! -e controller/deploy/charts/go.sum
+        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
+        cd cli
+        timeout --kill-after=10s 540s go mod download
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        cd ..
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        test ! -e controller/deploy/charts/go.sum
   nvke-controller:
-    constraint: 0.1.x
+    constraint: v0.22.0-beta.1
     repo: https://github.com/dsx-ai-factory/nvke
-    tagPrefix: controller/
-    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
   setup-go:
     constraint: 7.x
     kind: github-action

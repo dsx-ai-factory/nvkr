@@ -223,7 +223,10 @@ qualifier's exact commit. The existing `run generate --qualification-policy` ope
 and the qualifier alongside the producer workflow; the worker is generated infrastructure, not a separately
 authored operator workflow. The independent policy selects native Linux AMD64/ARM64 image pins and fixed
 nvkectl, Helm or kubectl version profiles by exact component name. Every delivered executable member must be exercised;
-expected versions and nvkectl source stamps come from A's frozen Plan. OCI/APT non-tool scope requires an
+expected versions and nvkectl source stamps come from A's frozen Plan. They require an
+exactly selected legacy `NKECTL_VERSION`/`NKECTL_COMMIT` or current
+`NVKECTL_VERSION`/`NVKECTL_COMMIT` stamp pair; mixed families fail closed. Both bind the
+normalized source version and a checked prefix of the exact source commit. OCI/APT non-tool scope requires an
 exact named output, kind, component set and deployment-image/package-repository role. It does not assert
 that those artifacts contain no tools. Disk and Helm use the explicit non-tool format rule. One pure
 lifecycle admission operation joins the frozen Plan and smoke policy before generation and runtime bundle

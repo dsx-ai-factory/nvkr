@@ -57,7 +57,7 @@ type BuildConfig struct {
 }
 
 const (
-	InstallerCommit    = "8fb2d53368823bd386b4fbd55b4ab6d3c0931345"
+	InstallerCommit    = "6991e36bef8f15b42b6f6519ccff089c587a6e49"
 	SimulatorBundle    = "nicosim-tools-arm64"
 	DiskOutputName     = "nvke-node-image-arm64"
 	OrgID              = "novxwn552ssc"
@@ -74,9 +74,8 @@ const (
 // These identifiers belong to InstallerCommit's source contract, not NVKR
 // aliases. Change them only together with the pinned installer source.
 const (
-	installerDeployReader      = "deploy/lib/nke-deploy-items.py"
-	installerReleaseAPIVersion = "nke.nvidia.com/release/v1"
-	installerControllerName    = "nke-controller"
-	installerSystemNamespace   = "nke-system"
-	installerCLIName           = "nkectl"
+	installerDeployReader    = "deploy/lib/nvke-deploy-items.py"
+	installerControllerName  = "nke-controller"
+	installerSystemNamespace = "nke-system"
+	installerCLIName         = "nvkectl"
 )

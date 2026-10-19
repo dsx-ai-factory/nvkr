@@ -190,7 +190,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						t.Fatal("site applications/charts must not fall back to acquired releases")
 					case ir.KindFetch:
 						fetches++
-						if node.Commit != "8fb2d53368823bd386b4fbd55b4ab6d3c0931345" || node.TreeHash != "36569cf4ec0e2360ee023cd7e53da65b96ce770d" {
+						if node.Commit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" || node.TreeHash != "64d3259508bb91745a0fbaa71b5d72a61b787142" {
 							t.Fatal("CLI, controller and charts must share the selected installer source")
 						}
 						if build.Name == "nktp" {
@@ -233,7 +233,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						if build.Name == "nvkectl" && node.Toolchain != compiler {
 							t.Fatal("site CLI must select the exact reviewed compiler, not the retained producer pin")
 						}
-						if build.Name == "nvkectl" && !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NKECTL_TREE=clean") {
+						if build.Name == "nvkectl" && !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NVKECTL_TREE=clean") {
 							t.Fatal("source-owned Make must own the changed CLI linker symbols and stamp assertion")
 						}
 					}

@@ -4,8 +4,8 @@
 package catalog
 
 import (
-	"context"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -15,15 +15,15 @@ import (
 const nvkeV1CatalogDir = "../../../definitions/nvke-v1/catalog"
 
 // The nvkectl binary this catalog builds must report the SAME version string as a binary
-// built by NVKE's own cli/Makefile, which strips the `cli/` module prefix from the tag and
-// stamps the remainder verbatim — leading v included.
+// built by NVKE's own cli/Makefile, including the leading v. The retained v1
+// selection now follows the same repository release as the maintained M2 selection.
 //
 // This is a regression guard with a real failure behind it: the catalog originally
 // rendered {{.Version}}, which also strips the v, so the published CLI reported
 // version "0.1.0-rc.2" while the release it claimed to be reports "v0.1.0-rc.2". A digest
 // chain cannot catch that; only comparing against upstream's own stamping rule can.
 func TestNVKEV1CatalogStampsUpstreamModuleTag(t *testing.T) {
-	cat, err := LoadContext(context.Background(), Dir(filepath.FromSlash(nvkeV1CatalogDir)))
+	cat, err := LoadContext(t.Context(), Dir(filepath.FromSlash(nvkeV1CatalogDir)))
 	if err != nil {
 		t.Fatalf("loading the shipped nvke-v1 catalog: %v", err)
 	}
@@ -32,18 +32,15 @@ func TestNVKEV1CatalogStampsUpstreamModuleTag(t *testing.T) {
 		t.Fatalf("nvke-v1 catalog has no nvkectl component; components: %v", componentNames(cat))
 	}
 
-	// Derived from the lock (cli/v0.1.0-rc.2 @ ed9fb09b…, committer epoch 1787066575),
+	// Derived from the lock (v0.22.0-beta.1 @ 6991e36b…, committer epoch 1792081788),
 	// never from wall-clock time or the local checkout.
 	want := map[string]string{
-		"NKECTL_VERSION":      "v0.1.0-rc.2",
-		"NKECTL_COMMIT":       "ed9fb09b",
-		"NKECTL_DATE":         "2026-08-18T15:22:55Z",
-		"NKECTL_CAPI_VERSION": "v1.12.3",
+		"NVKECTL_VERSION": "v0.22.0-beta.1",
+		"NVKECTL_COMMIT":  "6991e36bef8f15b42b6f6519ccff089c587a6e49",
+		"NVKECTL_DATE":    "2026-10-15T16:29:48Z",
 	}
-	for key, value := range want {
-		if got := component.VersionStamp[key]; got != value {
-			t.Errorf("nvkectl versionStamp[%s] = %q, want %q", key, got, value)
-		}
+	if !reflect.DeepEqual(component.VersionStamp, want) {
+		t.Errorf("nvkectl version stamps = %v, want %v", component.VersionStamp, want)
 	}
 }
 

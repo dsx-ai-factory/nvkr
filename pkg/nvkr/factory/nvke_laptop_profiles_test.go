@@ -202,8 +202,8 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 	}
 	packages := []string{
 		"teleport-ent=18.6.4",
-		"nke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
-		"nke-cni-calico-images-3.30.1 nke-cni-calico-manifests-3.30.1",
+		"nvke-agent nvke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
+		"nvke-cni-calico-images-3.30.1 nvke-cni-calico-manifests-3.30.1",
 		"nke-cni-ovn-images-2.4.0 nke-cni-ovn-charts-2.4.0",
 	}
 	if len(commands) != len(packages) {
@@ -273,7 +273,7 @@ func TestLaptopProfilesImageContext(t *testing.T) {
 	}
 }
 
-// Exact bytes from NVKE 8fb2d53368823bd386b4fbd55b4ab6d3c0931345, not a
+// Exact bytes from NVKE 6991e36bef8f15b42b6f6519ccff089c587a6e49, not a
 // Dockerfile grammar or semantic validator. BuildKit owns that interpretation.
 const laptopProfilesDockerfile = `# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -520,7 +520,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					t.Fatal("profiles must not fall back to an acquired fleet image")
 				case ir.KindFetch:
 					fetches++
-					if node.Commit != "8fb2d53368823bd386b4fbd55b4ab6d3c0931345" || node.TreeHash != "36569cf4ec0e2360ee023cd7e53da65b96ce770d" {
+					if node.Commit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" || node.TreeHash != "64d3259508bb91745a0fbaa71b5d72a61b787142" {
 						t.Fatal("profiles must use the staged-installer source")
 					}
 				case ir.KindBuild:
@@ -547,7 +547,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 						}
 					}
 					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
-						node.Patches[0].SHA256 != "sha256:6cbf4dd9524fed1533c25d470e44504532e709fa24f4536e6538a1644777c0fd" {
+						node.Patches[0].SHA256 != "sha256:9ad21f6fc5cab7729cd56f8c88249099fdde143e1726ebe29fa863f2d84a730b" {
 						t.Fatal("Plan must retain the exact authenticated source patch")
 					}
 					command := node.Patches[0].Content

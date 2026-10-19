@@ -9,8 +9,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.1
     toolchainImagesByArch:
       # AMD64 is a substitution-only local baseline. ARM64 retains the historical
       # M2 Docker candidate publication, not reproduction of the current Dockerfile.
@@ -47,8 +46,7 @@ sources:
         }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.1
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
@@ -66,8 +64,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.1
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db
@@ -102,11 +99,13 @@ components:
       - -ec
       - |
         GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
-          VERSION=v0.2.1-81-gff21ba8 \
+          VERSION="$BUILD_VERSION" \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
     writeDir: agent/bin
     artifactPath: agent/bin/nvke-agent.deb
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
   nvke-cni-calico:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
@@ -296,12 +295,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-fde.qemu.nke-fde
+      buildName: nvke-node-fde.qemu.nvke-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -321,7 +320,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso-amd64
-    artifactPath: fde/nke-node.qcow2
+    artifactPath: fde/nvke-node.qcow2
   nvke-node-fde-arm64:
     platforms: [linux/arm64]
     fromSource: true
@@ -345,12 +344,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-fde.qemu.nke-fde
+      buildName: nvke-node-fde.qemu.nvke-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -371,7 +370,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso
-    artifactPath: fde/nke-node.qcow2
+    artifactPath: fde/nvke-node.qcow2
   nvke-node-image:
     platforms: [linux/arm64]
     fromSource: true
@@ -395,12 +394,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -418,7 +417,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-node-image-amd64:
     platforms: [linux/amd64]
     fromSource: true
@@ -442,12 +441,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -464,7 +463,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso-amd64
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-patched-installer-iso:
     platforms: [linux/arm64]
     fromSource: true

@@ -29,7 +29,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/releaseview"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 	"github.com/google/go-containerregistry/pkg/name"
-	"go.yaml.in/yaml/v3"
 	"golang.org/x/sys/unix"
 )
 
@@ -247,7 +246,7 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, publication.Close()) }()
-	bindings, err := nightlyMaterials(ctx, runner, profile, plan, description, publication, publicationRoot, source)
+	bindings, err := nightlyMaterials(ctx, runner, profile, plan, description, publication, publicationRoot)
 	if err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "staging the authenticated nightly candidate")
 	}
@@ -321,7 +320,7 @@ func nightlyBundleEntries(bundle delivery.BinaryBundle, directory string) (map[s
 	return entries, nil
 }
 
-func nightlyMaterials(ctx context.Context, runner Runner, profile NightlyProfile, plan *factory.Plan, release lifecycle.Release, publication *delivery.Publication, publicationRoot, source string) (map[string]string, error) {
+func nightlyMaterials(ctx context.Context, runner Runner, profile NightlyProfile, plan *factory.Plan, release lifecycle.Release, publication *delivery.Publication, publicationRoot string) (map[string]string, error) {
 	for _, output := range []string{nightlyControllerOutput(profile), profile.ProfilesOutput} {
 		if _, err := nightlyNamedImage(release, output); err != nil {
 			return nil, err
@@ -392,10 +391,7 @@ func nightlyMaterials(ctx context.Context, runner Runner, profile NightlyProfile
 		return nil, err
 	}
 	releases := filepath.Join(work, "releases")
-	crRunner := runner
-	crRunner.directory = filepath.Join(source, "controller")
-	if err = crRunner.Run(ctx, []string{"go", "run", "./hack/osprofiles-to-crs", "--profiles", filepath.Join(profileDirectory, "profiles"), "--output", releases,
-		"--crds", "../management-engine/config/crd/bases", "--gitops=false", "--license", "Apache-2.0"}, "candidate-profile-resources", 5*time.Minute); err != nil {
+	if err = nightlyProfileResources(ctx, profile, release, profileDirectory, releases); err != nil {
 		return nil, err
 	}
 	values, err := nightlyRuntimeValues(release)
@@ -603,7 +599,7 @@ func nightlyRuntime(ctx context.Context, timing nightlyTiming, runner Runner, so
 		"KIND_CLUSTER_NAME": "nvkr-nightly-" + profile.Bundle,
 	})
 	disk := environmentValue(runner.Env, "NKE_E2E_CANDIDATE_QCOW2")
-	service, err := startDiskService(context.WithoutCancel(ctx), disk, GuestGateway+":18080")
+	service, err := startNightlyDiskService(context.WithoutCancel(ctx), disk, GuestGateway+":18080", profile)
 	if err != nil {
 		return err
 	}
@@ -621,40 +617,17 @@ func nightlyRuntime(ctx context.Context, timing nightlyTiming, runner Runner, so
 	if err = verifyHTTPDisk(ctx, service.url, image); err != nil {
 		return err
 	}
+	if profile.DiskOutput != DiskOutputName {
+		profileURL := strings.TrimSuffix(service.url, "/"+filepath.Base(disk)) + "/" + profile.DiskOutput + ".qcow2"
+		if err = verifyHTTPDisk(ctx, profileURL, image); err != nil {
+			return err
+		}
+	}
 	if err = bootstrapCA(ctx, ManagementSession{Work: runner.Work, Runner: runner}); err != nil {
 		return err
 	}
-	var site siteConfiguration
-	site.Site.Name = environmentValue(runner.Env, "KIND_CLUSTER_NAME")
-	site.Site.Arch = "arm64"
-	// NVKE's management kube context derives this same domain for its OIDC
-	// assertions. Keep the rendered site identity bound to that context.
-	site.Site.TrustDomain = site.Site.Name + ".nke.local"
-	site.Site.VIP = GuestGateway
-	site.Spire.CACertFile = filepath.Join(runner.Work, "ca.crt")
-	site.Spire.CAKeyFile = filepath.Join(runner.Work, "ca.key")
-	site.Nico.Endpoint = "http://" + network.Gateway + ":18089"
-	site.Nico.OrgID = "novxwn552ssc"
-	site.Nico.Token = "nico-vmsctl-token"
-	site.Nico.APIName = "forge"
-	site.Images.Controller, site.Images.Profiles = controller.Reference, profiles.Reference
-	site.Registry.Server = "ghcr.io"
-	site.Registry.Username = "local-nightly"
-	site.Registry.Token, err = randomScalar()
+	siteFile, err := nightlySiteSpec(ctx, runner, source, network.Gateway, controller.Reference, profiles.Reference)
 	if err != nil {
-		return err
-	}
-	site.Tenant.User = "nvkr-nightly"
-	site.Tenant.Password, err = randomScalar()
-	if err != nil {
-		return err
-	}
-	siteRaw, err := yaml.Marshal(site)
-	if err != nil {
-		return err
-	}
-	siteFile := filepath.Join(runner.Work, "sitespec.yaml")
-	if err = privateWrite(siteFile, siteRaw); err != nil {
 		return err
 	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"NKE_E2E_CANDIDATE_SITESPEC": siteFile})

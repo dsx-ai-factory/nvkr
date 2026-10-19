@@ -264,7 +264,7 @@ func TestNVKEPinSetExampleRegistryValidates(t *testing.T) {
 		t.Fatalf("documented NVKE catalog must pass full declaration admission: %v", err)
 	}
 	set := reg.Sources["nvke-controller"].PinSet
-	if set == nil || set.Format != "nvke-deploy-v1" || set.File != nvkeFixtureDeploy {
+	if set == nil || set.Format != "nvke-deploy-v1" || set.File != nvkeBetaFixtureDeploy {
 		t.Fatal("documented example does not select the NVKE deploy adapter")
 	}
 }

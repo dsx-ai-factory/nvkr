@@ -517,7 +517,7 @@ func TestTenantCleanupReportsBalancedPrivateOperations(t *testing.T) {
 			}
 			state := filepath.Join(work, "state")
 			script := "#!/bin/sh\nset -eu\ncase \"$1:$2\" in\n get:clusters)\n  [ \"$SCENARIO\" != inventory-failed ] || exit 7\n  if [ -f \"$STATE\" ]; then\n   [ \"$SCENARIO\" != wait-failed ] || exit 7\n   printf '[]'\n  elif [ \"$SCENARIO\" = absent ]; then printf '[]'; else printf '%s' \"$ROW\"; fi;;\n delete:cluster) [ \"$SCENARIO\" != delete-failed ] || exit 7; touch \"$STATE\";;\n *) exit 42;;\nesac\n"
-			if err = os.WriteFile(filepath.Join(cliDir, "nkectl"), []byte(script), 0o700); err != nil {
+			if err = os.WriteFile(filepath.Join(cliDir, "nvkectl"), []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			if err = os.WriteFile(filepath.Join(work, "virsh"), []byte("#!/bin/sh\n[ \"$SCENARIO\" != diagnostics-failed ]\n"), 0o700); err != nil {
