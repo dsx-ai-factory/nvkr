@@ -343,7 +343,11 @@ func testNativeReleasePolicies(t *testing.T, network string, preload bool, sourc
 		if err := os.WriteFile(workload, []byte("local transport fixture\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		attempt.assets.Images = map[string]NativeImageAsset{"workload": {File: workload}}
+		ovnDigest := "sha256:" + strings.Repeat("b", 64)
+		attempt.assets.Images = map[string]NativeImageAsset{
+			"workload": {File: workload},
+			"ovn":      {File: workload, ManifestDigest: ovnDigest, Reference: "localhost/nvke/ovn-kubernetes@" + ovnDigest},
+		}
 	}
 	if err := attempt.releases(t.Context(), "http://172.30.0.1:8080/local.qcow2", "http://172.30.0.1:18080", out); err != nil {
 		t.Fatal(err)
@@ -363,6 +367,11 @@ func testNativeReleasePolicies(t *testing.T, network string, preload bool, sourc
 		}
 		spec := doc["spec"].(map[string]any)
 		got := spec["machineInit"].(map[string]any)["userDataTemplate"].(string)
+		// NVKE 69ef9924's release CRDs admit equal counts of {{ and }}.
+		// Check the complete projected template, including the OVN chart values.
+		if strings.Count(got, "{{") != strings.Count(got, "}}") {
+			t.Fatalf("%s violates the pinned NVKE template-delimiter admission rule", kind)
+		}
 		if spec["machineImageRef"].(map[string]any)["name"] != TenantProfile || !strings.Contains(got, "\npackage_update: false\n") {
 			t.Fatalf("%s lost the selected image or package header", kind)
 		}

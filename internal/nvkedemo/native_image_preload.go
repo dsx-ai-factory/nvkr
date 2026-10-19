@@ -62,7 +62,9 @@ func nativeOVNValues(version, reference string) (string, error) {
 	default:
 		return "", errors.New("native OVN image projection requires a supported selected chart")
 	}
-	raw, err := json.Marshal(values)
+	// Release CRDs count raw Go-template delimiters before rendering. Keep JSON
+	// closing braces separated so chart values cannot add a literal }} token.
+	raw, err := json.MarshalIndent(values, "", "  ")
 	return string(raw), err
 }
 

@@ -196,6 +196,9 @@ matching suite/tool outputs from the same fresh artifact Run. The shared native
 startup imports the ordinary named OVN image under its exact native digest and
 projects matching chart values after package installation and before agent startup;
 the OS package's independently built image is not treated as the named output.
+Embedded JSON chart values separate closing braces to preserve the pinned NVKE
+release CRDs' template-delimiter admission rule; projected control-plane and worker
+templates exercise that rule and the standard Go renderer in contract tests.
 The site-create request carries the source-selected MachineImage boot script,
 rendered with the existing NVKE disk-policy template and current local disk URL.
 Its admitted iPXE selection also supplies DHCP address mode to both site readiness
