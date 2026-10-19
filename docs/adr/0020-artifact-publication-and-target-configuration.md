@@ -249,6 +249,9 @@ checked control documents, evidence and exact executable bundle bytes for subseq
 it exposes no layout or disk export for discarded payloads. Late failure or cancellation prevents issuance
 and closes retained bytes. This is a retention distinction, not metadata-only verification or a new evidence
 lane. The ordinary held `Publication` and verified Release export paths keep their complete payload owners.
+Registry image-index import copies the already verified held closure directly into the caller's private stage,
+without an intermediate layout or second complete snapshot. The import borrows the owner through completion,
+preserves exact index and child bytes, and retains complete publication binding and payload checks.
 
 The public CLI constructor emits only a visibly `diagnostic` root and requires `--allow-diagnostic` before push.
 It cannot set publication identity, publication-manifest digest, or clearance digest. Qualified publishing is

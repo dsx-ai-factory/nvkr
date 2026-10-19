@@ -332,7 +332,10 @@ Registry-backed delivery and lifecycle contracts cover sequential complete paylo
 executable bundle reads, full-format parity, exact evidence bindings, missing sibling rejection, cancellation
 and cleanup. The storage fixture first failed against the cumulative pull path and passes with sequential
 checking. Interrupted disk reads are retried without retaining failed payloads or repeating prior output
-observations; integrity, close and filesystem failures remain terminal. The uncached full gate and build pass
+observations; integrity, close and filesystem failures remain terminal. Image-index import reuses the verified
+held closure directly; a regression rejects the former intermediate-layout path when system temporary storage
+is unavailable and verifies exact child bytes, shared-blob membership and unchanged publication index bytes.
+Binding mismatch, closed-owner and canceled-operation contracts prevent output before admission. The uncached full gate and build pass
 on Linux with Go 1.27.2, as do targeted delivery/lifecycle race checks and full Fern validation. These local
 fixtures do not establish successful hosted qualification.
 
