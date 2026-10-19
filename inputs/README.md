@@ -51,6 +51,11 @@ QCOW builds use NVKR's existing disk-image Definitions listed above.
 The recorded Mac runtime uses an existing QCOW, upstream OVN and TCG. These inputs
 do not imply fresh-machine or full native Linux runtime acceptance.
 
+The opt-in [Ubuntu 24 node-image inputs](definitions/diagnostics/ubuntu24/README.md) select
+native AMD64 and ARM64 plain local builds, plus plain or public-bootstrap FDE GitHub builds.
+The hosted variants use the matching `environments/github-ubuntu24-<arch>.yaml` Environment
+and remain build-only; they do not change maintained release membership or Ubuntu 26 defaults.
+
 ## Focused inputs and examples
 
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,

@@ -10,6 +10,8 @@ name: 'nvkr-smoke-nvke-m2'
         required: true
       NVKR_DEV_REGISTRY_READ:
         required: true
+      NVKR_REGISTRY_READ:
+        required: true
 permissions:
   contents: read
 concurrency:
@@ -35,7 +37,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: read
       id-token: write
     environment: nvkr-dev-release
     steps:
@@ -95,8 +96,8 @@ jobs:
         env:
           SMOKE_IMAGE: ${{ matrix.image }}
           SMOKE_ARCH: ${{ matrix.arch }}
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          GHCR_TOKEN: ${{ secrets.NVKR_REGISTRY_READ }}
         run: |
           set -euo pipefail
           export DOCKER_CONFIG="$RUNNER_TEMP/nvkr-smoke-pull"

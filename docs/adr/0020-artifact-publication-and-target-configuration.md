@@ -248,6 +248,17 @@ Linux and checks byte integrity only: signatures and consumer policy remain unve
 is issued, and no accepted Release or stronger evidence lane is implied. Explicit `artifact-publication`
 verification retains its complete payload and policy checks; `authenticity` retains its signature/evidence-only scope.
 
+ADR-16's hosted artifact-check path uses a narrower delivery owner: it verifies the complete publication one
+output at a time and releases non-executable payload scratch after each output's format, descriptor and
+content checks. All named outputs and every declared native image child remain mandatory. The owner retains
+checked control documents, evidence and exact executable bundle bytes for subsequent qualification and smoke work;
+it exposes no layout or disk export for discarded payloads. Late failure or cancellation prevents issuance
+and closes retained bytes. This is a retention distinction, not metadata-only verification or a new evidence
+lane. The ordinary held `Publication` and verified Release export paths keep their complete payload owners.
+Registry image-index import copies the already verified held closure directly into the caller's private stage,
+without an intermediate layout or second complete snapshot. The import borrows the owner through completion,
+preserves exact index and child bytes, and retains complete publication binding and payload checks.
+
 The public CLI constructor emits only a visibly `diagnostic` root and requires `--allow-diagnostic` before push.
 It cannot set publication identity, publication-manifest digest, or clearance digest. Qualified publishing is
 not implemented. The unused qualified constructor, legacy filesystem publication adapters, clearance authentication and
@@ -325,9 +336,9 @@ one release index from named outputs; normal authors do not wire payload → roo
 
 GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
 package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
-null or nonpublic repository linkage, using the publication credential independently of CI carrier storage.
+no repository linkage, using the publication credential independently of CI carrier storage.
 The source repository metadata lookup uses the job's automatic repository token, passed separately only to
-GHCR publication jobs. Package-scoped development credentials therefore need no source-repository scope
+GHCR publication jobs. Package-scoped publication credentials therefore need no source-repository scope
 for this admission check. The repository token does not replace the publication credential for package
 metadata or registry operations and is not added to producer execution.
 Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
@@ -375,8 +386,10 @@ Partial retries may reuse an authenticated output-local root from an earlier att
 run. The server, repository, run ID and workflow builder must match exactly; canonical positive attempt
 numbers must satisfy preparation ≤ signing ≤ the consuming attempt. Different runs, future attempts,
 changed Plans or missing evidence fail closed. Signing may retry against an earlier prepared root without
-rewriting its metadata or original predicate. This exception is limited to pipeline-attested metadata
-assembly/finalization; it does not relax qualified execution or live disk ownership.
+rewriting its metadata or original predicate. This exception applies to pipeline-attested metadata
+assembly/finalization and ADR-16's independent artifact checks; it does not relax qualified execution or live
+disk ownership. Qualification authenticates the successful completion attempt separately and preserves each
+output's original preparation and signing identities rather than requiring every output to be rebuilt.
 Output-local chart reproduction transports its bound image packages and their producer/evidence
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.
@@ -423,9 +436,15 @@ exact Plan/invocation-bound production predicate, output signatures/provenance a
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
 read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
-Production GitHub per-output publication admits only anonymous access or the job-scoped
-`github:GITHUB_TOKEN`; arbitrary static credentials are rejected because job permissions cannot narrow their
-authority. The explicit signed-development contract below instead requires separately scoped read/write
+Production GitHub per-output publication additionally admits the fixed `github:NVKR_REGISTRY_WRITE`
+policy. Publishers and signers receive that secret and its explicit account; verification, assembly and
+finalization receive `NVKR_REGISTRY_READ` and its explicit account. These jobs request no workflow-token
+package permissions. Maintained production and nightly inputs use this policy. Legacy anonymous and
+job-scoped `github:GITHUB_TOKEN` configurations remain supported but are unsuitable for private binaries
+in a future-public source repository; arbitrary static credentials remain rejected. Generated production
+qualification requires the fixed production writer policy on both the publication and every target, matching
+its emitted credentials and permissions; legacy workflow-token producer profiles cannot generate that pair.
+The explicit signed-development contract below instead requires separately scoped read/write
 credentials. Legacy publication without this mode retains its full-closure assembly/finalization path. Local
 execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
 published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository
@@ -453,8 +472,8 @@ platform-scoped evidence. It retrieves no artifact payload layers and issues onl
 authentication capability, which cannot authorize export or exact-input matching. A signed disk inventory
 authenticates the producer's inspection claim; this scope performs no consumer-side disk inspection.
 
-Consumer integrity checking opens an opaque delivery publication with an explicit lifetime. It snapshots the
-index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
+Ordinary full-publication consumer integrity checking opens an opaque delivery publication with an explicit
+lifetime. It snapshots the index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
 and checks format-specific payload membership against that exact closure. Private extraction workspaces are
 removed before the capability is returned. Later source-path replacement cannot change the checked output
 projection, and defensive copies cannot mutate the held view; closing releases the file capabilities and rejects
@@ -462,7 +481,8 @@ further projections. Signature and policy verification remain in the lifecycle c
 integrity and membership only, never signer authority by itself. Path-based diagnostic operations retain their
 independent revalidation at each call.
 
-Large QCOW2 payloads use streamed anonymous filesystem snapshots rather than payload-sized RAM files.
+This full-publication owner's large QCOW2 payloads use streamed anonymous filesystem snapshots rather than
+payload-sized RAM files.
 The consumer snapshot root uses the process `TMPDIR` (the platform temporary directory when unset),
 including when registry acquisition has a separate workspace. Before payload copies, the consumer admits
 aggregate unique QCOW2 bytes against writable free space and rejects detected tmpfs/ramfs storage with

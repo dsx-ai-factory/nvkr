@@ -121,6 +121,10 @@ removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
+Production partial retries may transport retained same-Run artifacts from earlier attempts while preserving
+their original source bindings. Same-name candidates are bounded and authenticated before selecting the
+newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;
+development and explicitly selected qualification sources remain exact-attempt.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
@@ -219,17 +223,24 @@ Historical signed `deferred-m3` documents retain their original bytes and uninsp
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
 
 **Build/evidence qualification**:
-Checks for the complete selected artifact set against its exact producing Run, attempt, commit and inputs,
+Checks for the complete selected artifact set against its producing Run, original attempt identities, commit and inputs,
 including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
 has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
-the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact Run
-attempt and an independent consumer policy. The generated handoff carries original inputs and evidence for
+the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact
+successful completion attempt of a Run and an independent consumer policy. Production outputs may retain authenticated earlier
+attempts of that same workflow run when their exact inputs and original evidence remain bound; retrying does
+not relabel production. Development publications remain bound to one exact source attempt and its namespace.
+The generated handoff carries original inputs and evidence for
 recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
-The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
-joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+Hosted checks verify all payloads sequentially and release non-executable scratch after each output. The check
+receipt retains verified controls, evidence, exact executable bundle bytes and the frozen Plan until closure revokes
+copies, cancels and joins registered operations, then releases held bytes. It cannot export discarded payloads.
+This lifetime grants no smoke-execution authority.
 Native workers exercise every selected delivered tool with fixed version checks in isolated containers and
 sign exact member observations. The final qualifier authenticates complete native coverage under the same
-independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
+independent policy before signing. A successful worker from an earlier attempt of that same qualification
+run may be reused with its original authenticated invocation, unchanged inputs and policy; a later failed
+worker prevents fallback to its earlier success. Worker reports remain generated transport;
 they are not caller-authored pass records or release authorization.
 An exact runtime-assets archive member may be outside version smoke only when the Plan declares a
 source-built tarball and the delivered member is non-executable. Its artifact checks remain required;

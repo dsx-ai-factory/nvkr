@@ -6,6 +6,7 @@ package nvkedemo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -104,5 +105,86 @@ func TestNativeSiteCreateCarriesTheSourceSelectedBootScript(t *testing.T) {
 	}
 	if _, err := createNativeGuest(t.Context(), server.URL, "site", "a1b2c3d4-0005-4000-8000-000000000004", []byte("#cloud-config\n"), boot); err != nil || calls != 1 {
 		t.Fatalf("create: calls=%d err=%v", calls, err)
+	}
+}
+
+func TestNativeSiteBootCarriesDHCPAddressModeThroughReadinessAndSetup(t *testing.T) {
+	const disk = "http://172.30.0.1:18082/disk.qcow2"
+	boot, err := projectNativeSiteBoot(t.Context(), nativeMachineImageBootTemplate, disk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, reply string
+		valid       bool
+	}{
+		{"confirmed lease", `{"status":"Ready","interfaces":[{"ipAddresses":["172.30.0.2"]}]}`, true},
+		{"upper lease", `{"status":"Ready","interfaces":[{"ipAddresses":["172.30.0.254"]}]}`, true},
+		{"missing lease", `{"status":"Ready","interfaces":[{"ipAddresses":[]}]}`, false},
+		{"gateway", `{"status":"Ready","interfaces":[{"ipAddresses":["172.30.0.1"]}]}`, false},
+		{"broadcast", `{"status":"Ready","interfaces":[{"ipAddresses":["172.30.0.255"]}]}`, false},
+		{"foreign", `{"status":"Ready","interfaces":[{"ipAddresses":["192.168.64.2"]}]}`, false},
+		{"malformed", `{"status":"Ready","interfaces":[{"ipAddresses":["not-an-ip"]}]}`, false},
+		{"duplicate", `{"status":"Ready","interfaces":[{"ipAddresses":["172.30.0.2","172.30.0.2"]}]}`, false},
+		{"extra interface", `{"status":"Ready","interfaces":[{"ipAddresses":["172.30.0.2"]},{"ipAddresses":["172.30.0.3"]}]}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			original := linuxNativeBridge()
+			attempt := nativeSiteAttempt{boot: boot}
+			network, err := attempt.selectBootNetwork(original, disk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if original.dhcp || !network.dhcp || network != attempt.bridge || network.prefix != original.prefix || network.gateway != original.gateway || network.last != original.last {
+				t.Fatal("site boot changed bridge bounds or failed to share its address mode")
+			}
+			var row nativeInstance
+			if err := json.Unmarshal([]byte(tc.reply), &row); err != nil {
+				t.Fatal(err)
+			}
+			_, err = nativePrimaryAddress(row, network)
+			if (err == nil) != tc.valid {
+				t.Fatalf("Ready response admission: %v", err)
+			}
+			// Cancellation stops before bootstrap work, after setup's real address
+			// check. A valid lease must reach that next owner unchanged.
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			_, err = attempt.setup(ctx, Runner{}, row, "", "", nil)
+			if tc.valid != errors.Is(err, context.Canceled) {
+				t.Fatalf("setup address admission: %v", err)
+			}
+			if tc.valid {
+				if _, err := nativePrimaryAddress(row, original); err == nil {
+					t.Fatal("standalone Linux static guest accepted a singleton lease")
+				}
+			}
+		})
+	}
+}
+
+func TestNativeSiteBootNetworkRejectsMissingOrStaleSelection(t *testing.T) {
+	const disk = "http://172.30.0.1:18082/disk.qcow2"
+	boot, err := projectNativeSiteBoot(t.Context(), nativeMachineImageBootTemplate, disk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		boot *nativeSiteBoot
+		url  string
+	}{
+		{"missing", nil, disk},
+		{"empty", &nativeSiteBoot{}, disk},
+		{"stale", boot, disk + ".other"},
+		{"missing disk", boot, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			original := linuxNativeBridge()
+			attempt := nativeSiteAttempt{bridge: original, boot: tc.boot}
+			if _, err := attempt.selectBootNetwork(original, tc.url); err == nil || attempt.bridge != original {
+				t.Fatal("invalid boot selection changed site address mode")
+			}
+		})
 	}
 }

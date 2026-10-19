@@ -222,8 +222,8 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 	consumer, err := lifecycle.NewConsumer(lifecycle.ConsumerOptions{
 		CosignBinary: os.Getenv("NVKR_NIGHTLY_COSIGN"), CosignDigest: os.Getenv("NVKR_NIGHTLY_COSIGN_DIGEST"),
 		WorkspaceRoot: filepath.Join(workspace, "verified"),
-		Registry:      delivery.RegistryOptions{Username: os.Getenv("GITHUB_ACTOR"), Password: os.Getenv("GH_TOKEN")},
-		Credential:    sign.Credential{Registry: "ghcr.io", Username: os.Getenv("GITHUB_ACTOR"), Password: os.Getenv("GH_TOKEN")},
+		Registry:      delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_READ_USER"), Password: os.Getenv("NVKR_REGISTRY_READ")},
+		Credential:    sign.Credential{Registry: "ghcr.io", Username: os.Getenv("NVKR_REGISTRY_READ_USER"), Password: os.Getenv("NVKR_REGISTRY_READ")},
 	})
 	if err != nil {
 		return err

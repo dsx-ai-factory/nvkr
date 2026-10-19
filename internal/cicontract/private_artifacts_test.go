@@ -106,12 +106,15 @@ func TestAuthoredPrivateConsumersUseReadCredential(t *testing.T) {
 				for _, step := range job.Steps {
 					if token, ok := step.Env["NVKR_CI_STORAGE_TOKEN"]; ok {
 						consumers++
+						if step.Env["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || step.Env["NVKR_REGISTRY_READ_USER"] != "${{ vars.NVKR_REGISTRY_READ_USER }}" {
+							t.Fatal("nightly publication consumer lost independent registry reader")
+						}
 						if token != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || step.Env["NVKR_CI_STORAGE_USER"] != "${{ vars.NVKR_CI_STORAGE_READ_USER }}" {
 							t.Fatal("nightly consumer has no dedicated read credential")
 						}
 					}
 				}
-				if consumers != 1 || job.Permissions["packages"] != "read" {
+				if consumers != 1 || job.Permissions["packages"] != "" {
 					t.Fatal("nightly publication authentication lost its separate read authority")
 				}
 				publicReports := 0

@@ -29,7 +29,7 @@
   ],
   "publication": {
     "mode": "per-output-v1",
-    "credentialRef": "github:GITHUB_TOKEN",
+    "credentialRef": "github:NVKR_REGISTRY_WRITE",
     "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64"
   },
   "runtime": {

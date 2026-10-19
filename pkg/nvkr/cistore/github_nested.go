@@ -44,14 +44,13 @@ func (b *backend) downloadGitHubNested(ctx context.Context, request Request, ind
 	if err != nil {
 		return err
 	}
-	locators, err := readNestedIndex(ctx, request, index, clean)
+	locators, err := readNestedIndex(ctx, request, index, clean, options.AllowEarlierAttempts)
 	if err != nil {
 		return err
 	}
 	for _, name := range names {
 		if locators[name].Metadata == nil {
-			selected := request
-			selected.Name = name
+			selected := locators[name].Request
 			if err := ValidateGitHubTransfer(ctx, selected, options); err != nil {
 				return err
 			}
@@ -61,8 +60,7 @@ func (b *backend) downloadGitHubNested(ctx context.Context, request Request, ind
 		return err
 	}
 	for _, name := range names {
-		selected := request
-		selected.Name = name
+		selected := locators[name].Request
 		if err := b.downloadNested(ctx, selected, locators[name], destination, clean[name], options); err != nil {
 			return err
 		}
@@ -107,7 +105,7 @@ func admitNestedSelections(request Request, selections map[string]NestedArchive)
 	return clean, names, all.Allowed, nil
 }
 
-func readNestedIndex(ctx context.Context, request Request, index string, selections map[string]NestedArchive) (map[string]Locator, error) {
+func readNestedIndex(ctx context.Context, request Request, index string, selections map[string]NestedArchive, allowEarlier bool) (map[string]Locator, error) {
 	directory, before, err := securepath.OpenDirectory(index)
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "holding nested CI locator index")
@@ -141,9 +139,9 @@ func readNestedIndex(ctx context.Context, request Request, index string, selecti
 		selected.Name = name
 		var locator Locator
 		if entry.IsDir() {
-			locator, err = readNestedArtifactDirectory(ctx, directory, name, selected)
+			locator, err = readNestedArtifactDirectory(ctx, directory, name, selected, allowEarlier)
 		} else {
-			locator, err = readNestedLocator(ctx, directory, entry.Name(), selected)
+			locator, err = readNestedLocator(ctx, directory, entry.Name(), selected, allowEarlier)
 		}
 		if err != nil {
 			return nil, err
@@ -174,7 +172,7 @@ func readNestedIndex(ctx context.Context, request Request, index string, selecti
 	return locators, nil
 }
 
-func readNestedArtifactDirectory(ctx context.Context, parent *os.File, name string, request Request) (Locator, error) {
+func readNestedArtifactDirectory(ctx context.Context, parent *os.File, name string, request Request, allowEarlier bool) (Locator, error) {
 	directory, before, err := securepath.OpenChild(parent, name, true)
 	if err != nil {
 		return Locator{}, e.Wrap(e.CodeVerifyFailed, err, "holding nested CI artifact directory")
@@ -187,7 +185,7 @@ func readNestedArtifactDirectory(ctx context.Context, parent *os.File, name stri
 	if len(entries) != 1 || entries[0].Type() != 0 || entries[0].Name() != name+locatorSuffix {
 		return Locator{}, e.New(e.CodeVerifyFailed, "nested CI artifact directory is not one exact locator")
 	}
-	locator, err := readNestedLocator(ctx, directory, entries[0].Name(), request)
+	locator, err := readNestedLocator(ctx, directory, entries[0].Name(), request, allowEarlier)
 	if err != nil {
 		return Locator{}, err
 	}
@@ -201,7 +199,7 @@ func readNestedArtifactDirectory(ctx context.Context, parent *os.File, name stri
 	return locator, nil
 }
 
-func readNestedLocator(ctx context.Context, directory *os.File, name string, request Request) (Locator, error) {
+func readNestedLocator(ctx context.Context, directory *os.File, name string, request Request, allowEarlier bool) (Locator, error) {
 	file, before, err := securepath.OpenChild(directory, name, false)
 	if err != nil {
 		return Locator{}, e.Wrap(e.CodeVerifyFailed, err, "holding nested CI locator")
@@ -225,7 +223,7 @@ func readNestedLocator(ctx context.Context, directory *os.File, name string, req
 	if err != nil {
 		return Locator{}, err
 	}
-	if err := locator.Validate(request); err != nil {
+	if _, err := githubSourceRequest(request, locator, allowEarlier); err != nil {
 		return Locator{}, err
 	}
 	return locator, nil

@@ -77,8 +77,8 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 				if target.CredentialRef != development.WriteCredentialRef {
 					return e.New(e.CodeEngineCapability, "%s development target %q requires its fixed scoped writer credential", adapter, name)
 				}
-			} else if target.CredentialRef != "" && target.CredentialRef != "github:GITHUB_TOKEN" {
-				return e.New(e.CodeEngineCapability, "%s per-output target %q requires the job-scoped GITHUB_TOKEN; custom publication credentials cannot be narrowed for read-only jobs", adapter, name)
+			} else if target.CredentialRef != "" && target.CredentialRef != "github:GITHUB_TOKEN" && target.CredentialRef != ProductionRegistryWriteCredential {
+				return e.New(e.CodeEngineCapability, "%s per-output target %q requires the job-scoped GITHUB_TOKEN or fixed production read/write credentials", adapter, name)
 			}
 		}
 	}

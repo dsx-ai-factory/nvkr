@@ -711,3 +711,58 @@ func TestGitHubCompositesManifestOwnershipAndRetirement(t *testing.T) {
 		})
 	}
 }
+
+func TestGitHubCompositeLiftsNonImageVariableOnExactStep(t *testing.T) {
+	const expression = "${{ vars.CATALOG_PROFILE }}"
+	original := []*yamlv3.Node{
+		githubYAMLMap("name", githubYAMLString("Consume profile"), "run", githubYAMLString("echo profile"), "env", githubYAMLMap("PROFILE", githubYAMLString(expression))),
+		githubYAMLMap("name", githubYAMLString("Reuse profile"), "run", githubYAMLString("echo same profile"), "env", githubYAMLMap("PROFILE", githubYAMLString(expression))),
+		githubYAMLMap("name", githubYAMLString("Unrelated operation"), "run", githubYAMLString("echo unrelated")),
+	}
+	steps := make([]*yamlv3.Node, len(original))
+	for i, step := range original {
+		steps[i] = githubInterfaceClone(step)
+	}
+	files := map[string][]byte{}
+	path := githubActionsDirectory + "jobs/non-image/part-1"
+	call, err := githubComposite(files, path, "Non-image variable", steps, "bash -e {0}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments := githubYAMLField(call, "with")
+	if githubYAMLLength(arguments) != 2 || githubYAMLValue(arguments, "profile") != expression || githubYAMLField(call, "env") != nil {
+		t.Fatal("caller variable gained unrelated inputs or ambient scope")
+	}
+	var action yamlv3.Node
+	if err := yamlv3.Unmarshal(files[path+"/action.yml"], &action); err != nil {
+		t.Fatal(err)
+	}
+	body := action.Content[0]
+	if githubYAMLLength(githubYAMLField(body, "inputs")) != 2 {
+		t.Fatal("unexpected composite input set")
+	}
+	inner := githubYAMLField(githubYAMLField(body, "runs"), "steps")
+	if githubYAMLValue(githubYAMLField(inner.Content[0], "env"), "PROFILE") != "${{ inputs.profile }}" || githubYAMLValue(githubYAMLField(inner.Content[1], "env"), "PROFILE") != "${{ inputs.profile }}" || githubYAMLField(inner.Content[2], "env") != nil {
+		t.Fatal("variable escaped its original step")
+	}
+	expanded, err := expandGitHubSteps(&Plan{}, []*yamlv3.Node{call}, files, "bash -e {0}", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expanded) != len(original) {
+		t.Fatal("expansion changed step count")
+	}
+	for i := range original {
+		want, err := encodeGitHubYAML(original[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := encodeGitHubYAML(expanded[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("step %d variable roundtrip changed: %s", i, got)
+		}
+	}
+}

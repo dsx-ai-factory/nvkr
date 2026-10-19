@@ -7,9 +7,24 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
+
+func TestPrivateStageRestoreRejectsDevelopmentRetryBeforeIO(t *testing.T) {
+	for _, fixture := range []struct {
+		name string
+		plan func(*testing.T) *Plan
+	}{
+		{"unsigned", githubDevelopmentTestPlan}, {"signed", githubDevelopmentPublicationTestPlan},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			err := RestoreGitHubPrivateInputs(t.Context(), fixture.plan(t), "unused", cistore.Request{}, "/missing", cistore.Options{AllowEarlierAttempts: true}, GitHubStepOptions{})
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+		})
+	}
+}
 
 func TestPrivateStageRestoreProjectionPreservesItsExactOperation(t *testing.T) {
 	for _, family := range []string{"execute-node", "execute-source", "prepare-inputs", "execute-node-container", "prepare-inputs-container"} {

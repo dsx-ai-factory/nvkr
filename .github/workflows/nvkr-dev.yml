@@ -967,12 +967,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-fde-amd64:
     name: 'Build and package producer evidence for nvke-node-fde-amd64'
     runs-on: 'arc-amd64-kvm'
@@ -983,7 +990,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - name: Prepare KVM access before transfer
@@ -1026,6 +1032,8 @@ jobs:
         name: prepare images part-2
         uses: ./.github/nvkr-dev/actions/shared/prepare-images
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
       - name: 'Build and package producer evidence for nvke-node-fde-amd64'
         id: run-disk
@@ -1131,12 +1139,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1146,12 +1161,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1161,12 +1183,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1186,8 +1215,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc:
     name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-fde-arm64, nvke-patched-installer-iso (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1197,12 +1236,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-fde-arm64:
     name: 'Build and package producer evidence for nvke-node-fde-arm64'
     runs-on: 'arc-arm64-kvm'
@@ -1213,7 +1259,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - name: Prepare KVM access before transfer
@@ -1282,12 +1327,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1297,12 +1349,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1312,12 +1371,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1337,8 +1403,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4:
     name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-image-amd64, nvke-patched-installer-iso-amd64 (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1348,12 +1424,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-image-amd64:
     name: 'Build and package producer evidence for nvke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
@@ -1364,7 +1447,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - name: Prepare KVM access before transfer
@@ -1427,12 +1509,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1442,12 +1531,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1457,12 +1553,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1482,8 +1585,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2:
     name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1493,12 +1606,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-image-arm64:
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
@@ -1509,7 +1629,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - name: Prepare KVM access before transfer
@@ -1572,12 +1691,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1587,12 +1713,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1602,12 +1735,19 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+      - name: execute source part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-source
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1627,8 +1767,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvkectl-linux-arm64-fetch-nvkectl:
     name: 'Fetch pinned source for nvkectl (nvkectl-linux-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -7686,7 +7836,7 @@ jobs:
   nvkr-lifecycle-run:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 15
+    timeout-minutes: 120
     needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0c, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-release'

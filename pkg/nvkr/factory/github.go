@@ -470,12 +470,20 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 
 func githubSigningPermissionsFor(plan *Plan, kind string) map[string]string {
 	permissions := githubSigningPermissions(kind, plan.Environment.Signing.Mode)
-	if plan.Environment.GitHubDevelopment {
-		// Development publication uses separately scoped principals. The workflow
+	if githubScopedPublication(plan) {
+		// Scoped publication uses separately scoped principals. The workflow
 		// token cannot acquire production-package write access as a side effect.
 		delete(permissions, "packages")
 	}
 	return permissions
+}
+
+// ProductionRegistryWriteCredential selects independently scoped production accounts.
+const ProductionRegistryWriteCredential = "github:NVKR_REGISTRY_WRITE"
+
+func githubScopedPublication(plan *Plan) bool {
+	return plan.Environment.GitHubDevelopment ||
+		(plan.Environment.Publication != nil && plan.Environment.Publication.CredentialRef == ProductionRegistryWriteCredential)
 }
 
 // githubRegistryEnvironment selects the fixed credential for one graph operation.
@@ -502,6 +510,16 @@ func githubRegistryEnvironment(plan *Plan, kind, targetName string) (map[string]
 			secret, user = development.ReadSecret, "${{ vars."+development.ReadUserVariable+" }}"
 		default:
 			return nil, e.New(e.CodeEngineCapability, "development operation %q has no registry credential scope", kind)
+		}
+	}
+	if !plan.Environment.GitHubDevelopment && target.CredentialRef == ProductionRegistryWriteCredential {
+		switch kind {
+		case NodePublish, NodeSign:
+			secret, user = "NVKR_REGISTRY_WRITE", "${{ vars.NVKR_REGISTRY_WRITE_USER }}"
+		case NodeVerifyPublication, NodeAssembleRelease:
+			secret, user = "NVKR_REGISTRY_READ", "${{ vars.NVKR_REGISTRY_READ_USER }}"
+		default:
+			return nil, e.New(e.CodeEngineCapability, "production operation %q has no registry credential scope", kind)
 		}
 	}
 	return map[string]string{"NVKR_CREDENTIAL": "${{ secrets." + secret + " }}", "NVKR_REGISTRY_USER": user}, nil

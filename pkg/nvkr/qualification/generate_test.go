@@ -115,11 +115,12 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	if call.Name != "native-smoke" || call.Uses != "./"+policy.Smoke.Workflow || native.Name != "native-${{ matrix.arch }}" || native.RunsOn != "${{ matrix.runner }}" {
 		t.Fatal("exact authenticated job or same-commit reusable identity changed")
 	}
-	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "write" || call.Permissions["packages"] != "read" || native.Permissions["packages"] != "read" {
+	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "" || call.Permissions["packages"] != "" || native.Permissions["packages"] != "" {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
 	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
-		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || len(call.Secrets) != 2 {
+		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
+		call.Secrets["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || len(call.Secrets) != 3 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
 	}
 	contract, ok := worker.On["workflow_call"].(map[string]any)
@@ -133,6 +134,27 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	readSecret, ok := secrets["NVKR_CI_STORAGE_READ_TOKEN"].(map[string]any)
 	if !ok || readSecret["required"] != true {
 		t.Fatal("private carrier read credential must be required")
+	}
+	registryRead, ok := secrets["NVKR_REGISTRY_READ"].(map[string]any)
+	if !ok || registryRead["required"] != true {
+		t.Fatal("registry reader must be required by the reusable worker")
+	}
+	for _, tc := range []struct{ name, user, token string }{
+		{"Acquire pinned native smoke image", "GHCR_USER", "GHCR_TOKEN"},
+		{"Authenticate and smoke exact delivered tool bytes", "NVKR_PULL_REGISTRY_USER", "NVKR_PULL_REGISTRY_PASSWORD"},
+	} {
+		found := 0
+		for _, step := range native.Steps {
+			if step.Name == tc.name {
+				found++
+				if step.Env[tc.user] != "${{ vars.NVKR_REGISTRY_READ_USER }}" || step.Env[tc.token] != "${{ secrets.NVKR_REGISTRY_READ }}" {
+					t.Fatalf("%s lost its exact registry reader binding", tc.name)
+				}
+			}
+		}
+		if found != 1 {
+			t.Fatalf("missing or repeated registry consumer %s", tc.name)
+		}
 	}
 	for _, job := range []qualificationWorkflowJob{native, final} {
 		if len(job.Env) != 0 || job.Timeout != 30 {
@@ -259,6 +281,41 @@ func TestQualificationGenerationFinalReportsWorkerFailure(t *testing.T) {
 		if step.If != "" || step.ContinueOnError {
 			t.Fatalf("worker step %q no longer stops on failure", step.Name)
 		}
+	}
+}
+
+func TestQualificationProductionRegistryCredentialAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		publication bool
+		target      bool
+	}{
+		{"dedicated writer", false, false},
+		{"legacy publication", true, false},
+		{"legacy target", false, true},
+		{"legacy publication and target", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, policy := generationFixture(t)
+			if tc.publication {
+				plan.Environment.Publication.CredentialRef = "github:GITHUB_TOKEN"
+			}
+			if tc.target {
+				if len(plan.Targets) == 0 {
+					t.Fatal("fixture has no publication targets")
+				}
+				for name, target := range plan.Targets {
+					target.CredentialRef = "github:GITHUB_TOKEN"
+					plan.Targets[name] = target
+				}
+			}
+			err := admitQualificationRegistry(plan, policy)
+			if tc.publication || tc.target {
+				requireCode(t, err, e.CodeEngineCapability)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

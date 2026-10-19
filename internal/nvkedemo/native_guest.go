@@ -332,10 +332,11 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	}
 	var boot *nativeSiteBoot
 	if cfg.site != nil {
-		boot = cfg.site.boot
-		if boot == nil || boot.diskURL != disk.url {
-			return errors.New("native site create lacks its current projected MachineImage boot selection")
+		network, err = cfg.site.selectBootNetwork(network, disk.url)
+		if err != nil {
+			return err
 		}
+		boot = cfg.site.boot
 	}
 	created, err := createNativeGuest(ctx, api, instanceName, instanceType, userBytes, boot)
 	if err != nil {

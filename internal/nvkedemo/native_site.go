@@ -814,6 +814,18 @@ func (s *nativeSiteAttempt) admitAPIClient(ctx context.Context, runner Runner, t
 // still owns iPXE parsing and booting the selected local QCOW.
 type nativeSiteBoot struct{ script, diskURL string }
 
+// The admitted iPXE selection makes NICo record a confirmed DHCP lease instead
+// of the standalone guest's static address pair. Both readiness consumers must
+// use that instance address mode without changing the owned bridge's bounds.
+func (s *nativeSiteAttempt) selectBootNetwork(network nativeBridgeConfig, diskURL string) (nativeBridgeConfig, error) {
+	if s.boot == nil || s.boot.script == "" || diskURL == "" || s.boot.diskURL != diskURL {
+		return nativeBridgeConfig{}, errors.New("native site create lacks its current projected MachineImage boot selection")
+	}
+	network.dhcp = true
+	s.bridge = network
+	return network, nil
+}
+
 func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*nativeSiteBoot, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err

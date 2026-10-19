@@ -57,12 +57,13 @@ func TestGitHubLocatorSelectionAdmission(t *testing.T) {
 }
 
 func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
-	for _, scenario := range []string{"success flat", "success subdirectories", "singleton subdirectory", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
+	for _, scenario := range []string{"success flat", "success subdirectories", "singleton subdirectory", "earlier attempt", "retry newest first", "retry oldest first", "retry tied", "retry future", "retry corrupt", "retry truncated", "retry repeated id", "retry exact", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
 		t.Run(scenario, func(t *testing.T) {
 			index := t.TempDir()
 			request := testRequest
 			request.Name = ""
 			selection := GitHubLocatorSelection{Pattern: "{nvkr-a,nvkr-b}", MergeMultiple: scenario != "success subdirectories" && scenario != "singleton subdirectory" && scenario != "partial nonmerged" && scenario != "empty nonmerged"}
+			selection.AllowEarlierAttempts = scenario == "earlier attempt" || scenario == "wrong attempt" || (strings.HasPrefix(scenario, "retry ") && scenario != "retry exact")
 			if scenario == "singleton subdirectory" {
 				selection.Pattern = "nvkr-a"
 			}
@@ -79,6 +80,9 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			for i, name := range []string{"nvkr-a", "nvkr-b"} {
 				selected := request
 				selected.Name = name
+				if scenario == "earlier attempt" && i == 1 {
+					selected.Attempt = "1"
+				}
 				if scenario == "wrong attempt" && i == 1 {
 					selected.Attempt = "999"
 				}
@@ -112,6 +116,35 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 					}
 				}
 				bodies[id], artifacts[name] = body, artifact
+			}
+			// A distinct provider ID for the same name can come from a rerun.
+			extra := artifacts["nvkr-b"]
+			extra.ID = "3"
+			if scenario == "retry repeated id" {
+				extra.ID = artifacts["nvkr-b"].ID
+			}
+			if strings.HasPrefix(scenario, "retry ") {
+				source := request
+				source.Name = "nvkr-b"
+				source.Attempt = "1"
+				if scenario == "retry tied" {
+					source.Attempt = request.Attempt
+				}
+				if scenario == "retry future" {
+					source.Attempt = "3"
+				}
+				raw, marshalErr := canonical.Marshal(githubAdapterLocator(source))
+				if marshalErr != nil {
+					t.Fatal(marshalErr)
+				}
+				body := githubLocatorZIPFixture(t, source.Name+locatorSuffix, raw, false)
+				hash := sha256.Sum256(body)
+				extra.Size = json.Number(strconv.Itoa(len(body)))
+				extra.Digest = "sha256:" + hex.EncodeToString(hash[:])
+				if scenario == "retry corrupt" {
+					body[len(body)-1] ^= 1
+				}
+				bodies["3"] = body
 			}
 			calls, archives := 0, 0
 			g := newGitHubLocatorClient("test-repository-token")
@@ -153,7 +186,18 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 					if scenario == "duplicate" {
 						items = append(items, artifacts[name])
 					}
-					raw, _ := json.Marshal(map[string]any{"total_count": len(items), "artifacts": items})
+					if strings.HasPrefix(scenario, "retry ") && name == "nvkr-b" {
+						if scenario == "retry oldest first" {
+							items = append([]githubLocatorArtifact{extra}, items...)
+						} else {
+							items = append(items, extra)
+						}
+					}
+					count := len(items)
+					if scenario == "retry truncated" {
+						count = 101
+					}
+					raw, _ := json.Marshal(map[string]any{"total_count": count, "artifacts": items})
 					return githubLocatorHTTPFixture(200, raw, nil), nil
 				}
 				if strings.HasSuffix(r.URL.Path, "/zip") {
@@ -204,7 +248,7 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				return
 			}
 			switch scenario {
-			case "success flat", "success subdirectories", "singleton subdirectory", "missing pattern":
+			case "success flat", "success subdirectories", "singleton subdirectory", "missing pattern", "earlier attempt", "retry newest first", "retry oldest first":
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -218,6 +262,29 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 					}
 					if _, err := os.ReadFile(path); err != nil {
 						t.Fatal(err)
+					}
+					if strings.HasPrefix(scenario, "retry ") {
+						raw, readErr := os.ReadFile(path)
+						locator, decodeErr := DecodeLocator(raw)
+						if readErr != nil || decodeErr != nil || locator.Request.Attempt != request.Attempt {
+							t.Fatal("retry did not select the newest authenticated source", readErr, decodeErr)
+						}
+						expected := request
+						expected.Name = name
+						want, marshalErr := canonical.Marshal(githubAdapterLocator(expected))
+						if marshalErr != nil || !bytes.Equal(raw, want) {
+							t.Fatal("retry changed the selected locator bytes", marshalErr)
+						}
+					}
+					if scenario == "earlier attempt" && name == "nvkr-b" {
+						raw, err := os.ReadFile(path)
+						if err != nil {
+							t.Fatal(err)
+						}
+						locator, err := DecodeLocator(raw)
+						if err != nil || locator.Request.Attempt != "1" {
+							t.Fatalf("source attempt rewritten: %v", err)
+						}
 					}
 				}
 				return
@@ -244,7 +311,7 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			if entries, err := os.ReadDir(index); err != nil || len(entries) != 0 {
 				t.Fatal("failed acquisition left locator outputs")
 			}
-			if (scenario == "wrong head" || scenario == "duplicate" || scenario == "expired" || scenario == "missing digest") && archives != 0 {
+			if (scenario == "wrong head" || scenario == "duplicate" || scenario == "retry truncated" || scenario == "retry repeated id" || scenario == "retry exact" || scenario == "expired" || scenario == "missing digest") && archives != 0 {
 				t.Fatal("unadmitted selection fetched ZIP bytes")
 			}
 		})
@@ -296,7 +363,7 @@ func TestGitHubLocatorZIPRejectsUnexpectedMembersAndBounds(t *testing.T) {
 		{"noncanonical", githubLocatorZIPFixture(t, testRequest.Name+locatorSuffix, append(raw, '\n'), false)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := unpackGitHubLocator(t.Context(), tc.archive, testRequest)
+			_, err := unpackGitHubLocator(t.Context(), tc.archive, testRequest, false)
 			assertCode(t, err, e.CodeVerifyFailed)
 		})
 	}

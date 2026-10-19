@@ -186,7 +186,9 @@ Independent acceptance must also:
    and independently selected policy. Require all selected output verdicts and complete applicable smoke
    evidence to pass. An external suite marked `not-evaluated` supplies no passing result.
 4. Require the same complete successful evidence across the entire selected set. Reject missing outputs,
-   different subjects, different attempts or differing complete records, even if individual signatures pass.
+   different subjects, different final qualification invocations or differing complete records, even if
+   individual signatures pass. One complete record may retain authenticated original producer or worker
+   attempts from permitted same-run retries.
    Earlier attachments left by a failed publication do not prove completion.
 
 Retain the exact Run/artifact references and positive and controlled-failure verification transcript for

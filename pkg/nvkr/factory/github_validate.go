@@ -395,8 +395,8 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if err := validateGitHubStageExecution(plan, stage, job.Steps); err != nil {
 			return err
 		}
-		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read", "packages": "read"}) {
-			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read and packages:read")
+		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read"}) {
+			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read")
 		}
 		wantCondition := stage.condition(plan)
 		if job.If != wantCondition {
@@ -406,14 +406,14 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if want := githubPublicationRepositoryToken(plan, node); repositoryToken != want || repositoryTokenPresent != (want != "") {
 			return e.New(e.CodeEngineCapability, "GitHub job %q repository metadata credential differs from its publication scope", jobID)
 		}
-		if plan.Environment.GitHubDevelopment {
+		if githubScopedPublication(plan) {
 			if err := validateGitHubRegistryEnvironment(plan, node.Kind, node.Target, jobID, job); err != nil {
 				return err
 			}
 		}
 		if node.Kind == NodePublish {
 			target := plan.Targets[node.Target]
-			if !plan.Environment.GitHubDevelopment && strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
+			if !githubScopedPublication(plan) && strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
 				return e.New(e.CodeEngineCapability, "GitHub publish job %q lacks explicit packages:write", jobID)
 			}
 			if !strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "" {
@@ -468,7 +468,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		job := document.Jobs["nvkr-lifecycle-run"]
 		if PerOutputPublication(plan) {
 			permissions := map[string]string{"contents": "read"}
-			if !plan.Environment.GitHubDevelopment {
+			if !githubScopedPublication(plan) {
 				permissions["packages"] = "read"
 			}
 			if job.Environment != githubReleaseEnvironmentFor(plan) || !reflect.DeepEqual(job.Permissions, permissions) {

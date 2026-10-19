@@ -7,7 +7,9 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -236,6 +238,82 @@ func TestChunkReadRetryStopsAtNonretryableFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestChunkReadRetryRequiresExactSingleStreamCause(t *testing.T) {
+	verify := func(cause error) error { return e.Wrap(e.CodeVerifyFailed, cause, "reading transport archive") }
+	for _, test := range []struct {
+		name  string
+		wrap  func(error) error
+		retry bool
+		code  e.Code
+	}{
+		{"direct stream failure", func(cause error) error { return cause }, true, e.CodeUnavailable},
+		{"extraction context", verify, true, e.CodeUnavailable},
+		{"nested extraction context", func(cause error) error { return verify(fmt.Errorf("inner archive: %w", verify(cause))) }, true, e.CodeUnavailable},
+		{"joined independent failure", func(cause error) error {
+			return verify(errors.Join(cause, e.New(e.CodeImmutableViolation, "failed rollback")))
+		}, false, e.CodeVerifyFailed},
+		{"joined stream failures", func(cause error) error { return verify(errors.Join(cause, cause)) }, false, e.CodeVerifyFailed},
+		{"filesystem wrapper", func(cause error) error {
+			return verify(&os.PathError{Op: "write", Path: "payload", Err: cause})
+		}, false, e.CodeVerifyFailed},
+		{"link wrapper", func(cause error) error {
+			return verify(&os.LinkError{Op: "rename", Old: "stage", New: "payload", Err: cause})
+		}, false, e.CodeVerifyFailed},
+		{"TLS wrapper", func(cause error) error { return verify(&tls.CertificateVerificationError{Err: cause}) }, false, e.CodeVerifyFailed},
+		{"immutable boundary", func(cause error) error { return e.Wrap(e.CodeImmutableViolation, cause, "failed commit") }, false, e.CodeImmutableViolation},
+		{"unavailable boundary", func(cause error) error { return e.Wrap(e.CodeUnavailable, cause, "another boundary") }, false, e.CodeUnavailable},
+		{"unknown boundary", func(cause error) error { return e.Wrap(e.Code("NVKR-E-UNKNOWN"), cause, "unknown boundary") }, false, e.Code("NVKR-E-UNKNOWN")},
+		{"custom equality", func(cause error) error { return verify(chunkRetryEqualityImitation{target: cause}) }, false, e.CodeVerifyFailed},
+		{"excessive wrappers", func(cause error) error {
+			for range maxChunkDiagnosticNodes {
+				cause = fmt.Errorf("archive context: %w", cause)
+			}
+			return verify(cause)
+		}, false, e.CodeVerifyFailed},
+		{"cyclic wrapper", func(error) error { return verify(&cyclicChunkCause{}) }, false, e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, layers, _, manifest := chunkFixture(t)
+			attempts, closes, waits, cleanups := 0, 0, 0, 0
+			layers[0] = editedChunk{Layer: layers[0], open: func() (io.ReadCloser, error) {
+				return &chunkRetryCloser{Reader: failingChunkBody{}, close: func() error { closes++; return nil }}, nil
+			}}
+			var extractionErr error
+			err := unpackChunkAttempts(t.Context(), layers, manifest, filepath.Join(t.TempDir(), "restored"),
+				func(stream *chunkReader) error {
+					attempts++
+					_, cause := io.Copy(io.Discard, stream)
+					if !isRetryableChunkRead(cause) {
+						t.Fatal("fixture did not produce a retryable stream failure")
+					}
+					extractionErr = test.wrap(cause)
+					return extractionErr
+				}, func(context.Context, time.Duration) error {
+					waits++
+					return nil
+				}, func(string) error {
+					cleanups++
+					return nil
+				})
+			assertCode(t, err, test.code)
+			wantAttempts := 1
+			if test.retry {
+				wantAttempts = maxChunkReadAttempts
+			} else if err != extractionErr {
+				t.Fatal("independent extraction error was replaced by its stream cause")
+			}
+			if attempts != wantAttempts || closes != wantAttempts || cleanups != wantAttempts || waits != wantAttempts-1 {
+				t.Fatalf("unexpected attempt/close/cleanup/wait counts: %d/%d/%d/%d", attempts, closes, cleanups, waits)
+			}
+		})
+	}
+}
+
+type chunkRetryEqualityImitation struct{ target error }
+
+func (chunkRetryEqualityImitation) Error() string            { return "independent extraction failure" }
+func (err chunkRetryEqualityImitation) Is(target error) bool { return err.target == target }
 
 type chunkRetryReadFailure struct{ err error }
 
