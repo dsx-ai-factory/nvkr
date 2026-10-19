@@ -11,10 +11,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -50,6 +52,8 @@ func checkLocalQualificationEntrypoint(t *testing.T, workspace string, policy Lo
 			policyPath := filepath.Join(scratch, "policy.json")
 			writeCanonicalTestFile(t, policyPath, policy)
 			options := LocalQualificationOptions{Workspace: retained, PolicyPath: policyPath, BuilderKeyPath: os.Getenv("NVKR_TEST_LOCAL_BUILDER_KEY"), SmokeKeyPath: os.Getenv("NVKR_TEST_LOCAL_SMOKE_KEY"), QualifierKeyPath: os.Getenv("NVKR_TEST_LOCAL_QUALIFIER_KEY"), CosignExecutable: binary, Repository: strings.TrimPrefix(server.URL, "http://") + "/entrypoint", Scratch: scratch, EvidenceOut: filepath.Join(scratch, "evidence.json"), Registry: delivery.RegistryOptions{PlainHTTP: true, Anonymous: true}}
+			var events []qualificationprogress.Event
+			options.Progress = func(event qualificationprogress.Event) { events = append(events, event) }
 			if mode == "wrong-qualifier-key" {
 				options.QualifierKeyPath = options.BuilderKeyPath
 			}
@@ -83,6 +87,20 @@ func checkLocalQualificationEntrypoint(t *testing.T, workspace string, policy Lo
 				return runLocalToolSmokeWith(ctx, build, opts, policy.Platform, func(context.Context, pipeline.ToolSmokeSelection) (nativeSmokeRuntime, error) { return runtime, nil })
 			}
 			result, err := qualifyLocalRunWith(t.Context(), options, policy.Platform, smoke)
+			var started, completed []string
+			for _, event := range events {
+				if err := event.Validate(); err != nil {
+					t.Fatal(err)
+				}
+				if event.Kind == qualificationprogress.KindStage {
+					switch event.State {
+					case qualificationprogress.StateRunning:
+						started = append(started, event.Stage)
+					case qualificationprogress.StateCompleted:
+						completed = append(completed, event.Stage)
+					}
+				}
+			}
 			if mode != "exact" {
 				code := e.CodeBuildFailed
 				if mode == "wrong-qualifier-key" {
@@ -98,6 +116,13 @@ func checkLocalQualificationEntrypoint(t *testing.T, workspace string, policy Lo
 				if mode == "wrong-qualifier-key" && calls != 0 {
 					t.Fatal("invalid signing key reached smoke")
 				}
+				failedStage := qualificationprogress.StageSmoke
+				if mode == "wrong-qualifier-key" {
+					failedStage = qualificationprogress.StageInputs
+				}
+				if len(events) == 0 || events[len(events)-1].Stage != failedStage || events[len(events)-1].State != qualificationprogress.StateFailed || slices.Contains(completed, failedStage) {
+					t.Fatalf("failure lost active stage or reported completion: %+v", events)
+				}
 				return
 			}
 			if err != nil {
@@ -105,6 +130,10 @@ func checkLocalQualificationEntrypoint(t *testing.T, workspace string, policy Lo
 			}
 			if result.Status != "passed" || result.Attempt != attempt || result.Publication.Evidence == "" || result.Lane != "unqualified-local-execution" || calls != 1 {
 				t.Fatal("complete local entrypoint lost result", result)
+			}
+			wantStages := []string{"inputs", "builder", "smoke", "qualifier", "publish", "readback"}
+			if !slices.Equal(started, wantStages) || !slices.Equal(completed, wantStages) {
+				t.Fatalf("incorrect stage sequence: started=%v completed=%v", started, completed)
 			}
 			if _, err := readLocalEvidenceBundle(t.Context(), options.EvidenceOut); err != nil {
 				t.Fatal(err)

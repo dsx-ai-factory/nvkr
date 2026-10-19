@@ -53,6 +53,8 @@ func checkLocalQualificationPayloadsWith(ctx context.Context, workspace string, 
 		if want.Name != slot.Name {
 			return e.New(e.CodeVerifyFailed, "local output observations are not in canonical slot order")
 		}
+		activity := localProgress(ctx)
+		activity.startItem(slot.Name, index, len(inputs.run.Expected))
 		if slot.Kind == OutputDiskImage {
 			path, err := LocalDiskOutputPath(workspace, slot.Name)
 			if err != nil {
@@ -77,6 +79,7 @@ func checkLocalQualificationPayloadsWith(ctx context.Context, workspace string, 
 				got.Format != want.Disk.Format || got.Encryption != want.Disk.Encryption || !equalStrings(got.Components, want.Components) {
 				return e.New(e.CodeVerifyFailed, "retained local disk %q differs from its complete Run", slot.Name)
 			}
+			activity.finishItem()
 			continue
 		}
 		got, err := observeOutput(ctx, slot, artifacts, inputs.plan, nil, workspace)
@@ -94,6 +97,7 @@ func checkLocalQualificationPayloadsWith(ctx context.Context, workspace string, 
 		if !bytes.Equal(wantBytes, gotBytes) {
 			return e.New(e.CodeVerifyFailed, "local output %q differs from its complete Run", slot.Name)
 		}
+		activity.finishItem()
 	}
 	return nil
 }

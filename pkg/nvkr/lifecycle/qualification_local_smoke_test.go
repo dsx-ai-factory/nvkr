@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
@@ -32,6 +33,9 @@ func checkLocalSmokeFixture(t *testing.T, workspace string, inputs *localQualifi
 		t.Run("local smoke/"+mode, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
+			var events []qualificationprogress.Event
+			ctx, activity := withLocalQualificationProgress(ctx, func(event qualificationprogress.Event) { events = append(events, event) })
+			activity.start(qualificationprogress.StageSmoke)
 			runtime := &nativeSmokeTestRuntime{expected: append([]ToolSmokeMember(nil), members...)}
 			platform := policy.Platform
 			code := e.CodeEngineCapability
@@ -72,6 +76,9 @@ func checkLocalSmokeFixture(t *testing.T, workspace string, inputs *localQualifi
 				if !runtime.closed || runtime.count != len(members) {
 					t.Fatal("receipt preceded complete execution and cleanup")
 				}
+				if len(events) != 3 || events[2].Kind != qualificationprogress.KindItem || events[2].State != qualificationprogress.StateCompleted || events[2].Item != "cli/kubectl" || events[2].Completed != 1 || events[2].Total != 1 {
+					t.Fatalf("smoke omitted evaluated tool progress: %+v", events)
+				}
 				successful = receipt
 				return
 			}
@@ -83,8 +90,16 @@ func checkLocalSmokeFixture(t *testing.T, workspace string, inputs *localQualifi
 				if opened != 0 {
 					t.Fatal("unsupported platform opened runtime")
 				}
+				if len(events) != 1 {
+					t.Fatal("unsupported platform emitted tool progress")
+				}
 			} else if !runtime.closed {
 				t.Fatal("failed smoke leaked runtime")
+			}
+			if mode == "runtime-failure" || mode == "wrong-version" {
+				if len(events) != 2 || events[1].State != qualificationprogress.StateRunning || events[1].Completed != 0 {
+					t.Fatalf("failed tool emitted completion: %+v", events)
+				}
 			}
 		})
 	}
