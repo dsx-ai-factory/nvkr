@@ -12,23 +12,17 @@ import (
 )
 
 func TestGitHubDependencyProjectionAdmission(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
+	plan, projection, _ := collectedRecoveryPlan(t)
+	baseline := githubWorkflowDocument{Jobs: map[string]githubJob{}}
+	for id, needs := range projection.Reduced {
+		baseline.Jobs[id] = githubJob{Needs: slices.Clone(needs)}
 	}
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
+	for id, members := range projection.Collectors {
+		baseline.Jobs[id] = githubResultCollector(plan, id, members)
 	}
-	expanded, err := expandGitHubActions(plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
-	if err != nil {
-		t.Fatal(err)
-	}
-	baseline := decodeGitHubWorkflow(t, expanded)
-	projection, err := githubNeedsForPlan(t.Context(), plan)
-	if err != nil || len(projection.Collectors) != githubResultBucketCount {
-		t.Fatalf("maintained fixture requires all result buckets: %v", err)
-	}
+	finalizer := baseline.Jobs[githubFinalizerJobID]
+	finalizer.Steps = []githubStep{githubCollectedRunEndSummary(len(projection.Full[githubFinalizerJobID]))}
+	baseline.Jobs[githubFinalizerJobID] = finalizer
 	collectorID := sortedKeys(projection.Collectors)[0]
 	stageID := ""
 	for _, id := range sortedKeys(projection.Full) {

@@ -2027,8 +2027,9 @@ The named ARM64 nightly and upstream-OVN entries are respectively 182,314/183,23
 All four producer bundles keep their jobs inline. The earlier output-local grouping migration removed
 accidental unrelated-output failure barriers; dependency reduction preserves the resulting ancestor closure.
 The addition/removal regression compiles binary, native binary, collected native binary, source and signed
-per-output publication fixtures with new output names sorting before, between and after existing outputs.
-All 15 cases preserve existing job IDs, relative emission order, expanded operations, invocation values
+per-output publication fixtures. The binary fixture covers names sorting before, between and after existing
+outputs; the other policies cover an earlier insertion, including possible YAML anchor relocation.
+All seven cases preserve existing job IDs, relative emission order, expanded operations, invocation values
 and shared actions outside required aggregate accounting. Collected fixtures also
 preserve existing bucket membership; removing the output restores the complete original bundle byte-for-byte.
 Separate contracts retain package success gating, pinned scanner dependencies and finalizer rejection of

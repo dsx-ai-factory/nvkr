@@ -148,12 +148,12 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (
 	if err != nil {
 		t.Fatal(err)
 	}
-	base := newExactInputFixture(t)
-	definition, environment := base.definition, base.environment
+	base := newExactInputPlan(t)
+	definition, environment := base.Definition, base.Environment
 	definition.CosignTool = "cosign"
 	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: identity, Issuer: "https://token.actions.githubusercontent.com"}
 	environment.Publication.Mode = "per-output-v1"
-	snapshot := base.plan.CatalogSnapshot
+	snapshot := base.CatalogSnapshot
 	snapshot.Tools = map[string]catalog.ToolPin{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.invalid/cosign.tar.gz", Platform: "linux/amd64", ArchiveDigest: "sha256:" + strings.Repeat("1", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + strings.Repeat("2", 64)}}
 	stack, err := catalog.ApplyStack(snapshot)
 	if err != nil {
@@ -163,8 +163,7 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture := exactInputFixtureForPlan(t, definition, environment, plan)
-	fixture = fixture.withReleaseMetadata(t, func(metadata *delivery.ReleaseMetadata) { metadata.InvocationID = description.InvocationID })
+	fixture := exactInputFixtureForPlanAndInvocation(t, definition, environment, plan, description.InvocationID)
 	run, err := provenance.NewGitHubRunContext(func(key string) string {
 		return map[string]string{
 			"GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": description.Repository,

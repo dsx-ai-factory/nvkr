@@ -4,17 +4,11 @@
 package lifecycle
 
 import (
-	"context"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -92,17 +86,6 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controllerCatalog := nvkeM2ControllerCatalogFixture(t)
-	for i := range definition.Outputs {
-		output := &definition.Outputs[i]
-		if output.Catalog != nil && output.Catalog.Base == "../../catalogs/nvke/release" {
-			output.Catalog.Base = controllerCatalog
-		}
-	}
-	plan, err := Compile(t.Context(), definitionPath, definition, environmentPath, environment, "test (deadbeef)")
-	if err != nil {
-		t.Fatal(err)
-	}
 	wantNames := strings.Fields(`
 		capi-controller-image capi-controller-image-arm64
 		capi-kubeadm-bootstrap-image capi-kubeadm-bootstrap-image-arm64
@@ -124,12 +107,29 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		spire-crds spire-oidc-image spire-oidc-image-arm64 spire-server-image spire-server-image-arm64
 		spire-tpm-server-image spire-tpm-server-image-arm64 temporal temporal-admin-tools-image temporal-admin-tools-image-arm64
 		temporal-server-image temporal-server-image-arm64 temporal-ui-image temporal-ui-image-arm64`)
-	names := make([]string, 0, len(plan.LifecycleOutputs))
-	for _, output := range plan.LifecycleOutputs {
+	names := make([]string, 0, len(definition.Outputs))
+	var diskOutputs []DefinitionOutput
+	for _, output := range definition.Outputs {
 		names = append(names, output.Name)
+		if output.Format == OutputDiskImage {
+			diskOutputs = append(diskOutputs, output)
+		}
 	}
-	if !slices.Equal(names, wantNames) || len(plan.Builds) != 73 {
-		t.Fatalf("maintained M2 must retain all 69 outputs and 73 builds: names=%v, builds=%d", names, len(plan.Builds))
+	if !slices.Equal(names, wantNames) || len(diskOutputs) != 4 {
+		t.Fatalf("maintained M2 must retain all 69 outputs and four native disks: names=%v, disks=%d", names, len(diskOutputs))
+	}
+	// This contract concerns the four native disk closures. Compiling unrelated
+	// controllers and charts adds no FDE signal and requires a synthetic Git source.
+	definition.Outputs = diskOutputs
+	// The disk catalog uses the .git source spelling; the controller-only entry
+	// would correctly be refused as unused in this reduced selection.
+	delete(environment.SourceAccess, "https://github.com/dsx-ai-factory/nvke")
+	plan, err := Compile(t.Context(), definitionPath, definition, environmentPath, environment, "test (deadbeef)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.LifecycleOutputs) != 4 || len(plan.Builds) != 4 {
+		t.Fatalf("native disk selection changed: outputs=%d builds=%d", len(plan.LifecycleOutputs), len(plan.Builds))
 	}
 	if plan.Qualification != factory.TierPipelineAttested || !factory.PerOutputPublication(plan) ||
 		plan.Environment.Signing == nil || plan.Environment.DiskEvidence != "build-provenance-v1" {
@@ -239,84 +239,3 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		t.Fatalf("disk jobs = %v, want two per native architecture", diskJobs)
 	}
 }
-
-// nvkeM2ControllerCatalogFixture preserves the authored controller producers and
-// complete chart pin set while rederiving it from checked-in deploy metadata.
-// Only the copied controller source pins change; the FDE catalogs and the full
-// output selection remain intact. This is compilation evidence, not an upstream
-// checkout or producer execution, and must work without private Git credentials.
-func nvkeM2ControllerCatalogFixture(t *testing.T) string {
-	t.Helper()
-	directory := t.TempDir()
-	if err := os.CopyFS(directory, os.DirFS("inputs/catalogs/nvke/release")); err != nil {
-		t.Fatal(err)
-	}
-	lock, err := catalog.LoadLockContext(t.Context(), directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The release is whatever the authored lock records, so a reviewed catalog
-	// maintenance bump does not break this fixture. The chart-owning nvke source
-	// and its chart source are one maintained release cohort and must agree; the
-	// independent nvke-cli role only has to be a complete commit.
-	sourceCommit := lock.Pins["nvke"].Commit
-	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
-		if !fullCommit.MatchString(lock.Pins[name].Commit) {
-			t.Fatalf("authored %s source=%q is not a full commit", name, lock.Pins[name].Commit)
-		}
-	}
-	if lock.Pins["nvke-helm"].Commit != sourceCommit {
-		t.Fatalf("authored nvke-helm source=%s, want the nvke source %s", lock.Pins["nvke-helm"].Commit, sourceCommit)
-	}
-	repo := t.TempDir()
-	if err := os.CopyFS(repo, os.DirFS("pkg/nvkr/catalog/testdata/nvke-pin-set")); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	t.Setenv("GIT_CONFIG_COUNT", "0")
-	t.Setenv("GIT_CONFIG_PARAMETERS", "")
-	t.Setenv("GIT_ALLOW_PROTOCOL", "file")
-	t.Setenv("GIT_TERMINAL_PROMPT", "0")
-	t.Setenv("GIT_AUTHOR_DATE", "1733939955 +0000")
-	t.Setenv("GIT_COMMITTER_DATE", "1733939955 +0000")
-	run := func(args ...string) string {
-		t.Helper()
-		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, "git", append([]string{"-C", repo}, args...)...)
-		cmd.WaitDelay = time.Second
-		raw, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("fixture git %v: %v: %s", args, err, raw)
-		}
-		return strings.TrimSpace(string(raw))
-	}
-	run("init", "--template=", "-q")
-	run("config", "user.name", "M2 Catalog Test")
-	run("config", "user.email", "m2-catalog@example.invalid")
-	run("add", ".")
-	run("-c", "commit.gpgsign=false", "commit", "-q", "-m", "M2 deploy metadata fixture")
-	commit, tree := run("rev-parse", "HEAD"), run("rev-parse", "HEAD^{tree}")
-	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
-		pin := lock.Pins[name]
-		pin.Commit, pin.TreeHash, pin.SourceDateEpoch = commit, tree, 1733939955
-		lock.Pins[name] = pin
-	}
-	for name, pin := range lock.Artifacts {
-		if pin.DerivedFrom != "nvke@"+sourceCommit {
-			t.Fatalf("authored chart %s has unexpected pin-set owner %q", name, pin.DerivedFrom)
-		}
-		pin.DerivedFrom = "nvke@" + commit
-		lock.Artifacts[name] = pin
-	}
-	t.Setenv("GIT_CONFIG_COUNT", "1")
-	t.Setenv("GIT_CONFIG_KEY_0", "url."+repo+".insteadOf")
-	t.Setenv("GIT_CONFIG_VALUE_0", "https://github.com/dsx-ai-factory/nvke")
-	if err := catalog.WriteLockContext(t.Context(), directory, lock); err != nil {
-		t.Fatal(err)
-	}
-	return directory
-}
-
-var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)

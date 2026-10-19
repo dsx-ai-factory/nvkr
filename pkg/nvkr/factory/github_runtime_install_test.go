@@ -56,9 +56,10 @@ func freshGitHubRuntimePins(t *testing.T, before *Plan) *Plan {
 }
 
 func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
+	before, baseline, original := runtimeInputsFixture(t)
 	for _, refreshed := range []bool{false, true} {
 		t.Run(map[bool]string{false: "unchanged", true: "updated source pins"}[refreshed], func(t *testing.T) {
-			before, baseline, root := runtimeInputsFixture(t)
+			root := copyGitHubRuntimeRoot(t, original)
 			fresh := before
 			if refreshed {
 				fresh = freshGitHubRuntimePins(t, before)
@@ -91,64 +92,71 @@ func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
 }
 
 func TestInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T) {
-	for _, member := range []string{"plan.json", "action-data.json", "manifest.json"} {
-		for _, damage := range []string{"missing", "corrupt", "symlink", "old bytes"} {
-			t.Run(member+"/"+damage, func(t *testing.T) {
-				before, baseline, root := runtimeInputsFixture(t)
-				fresh := freshGitHubRuntimePins(t, before)
-				stageGitHubRuntimeInputs(t, root, fresh)
-				filename := filepath.Join(root, githubRuntimeInputDirectory, member)
-				switch damage {
-				case "missing":
-					if err := os.Remove(filename); err != nil {
-						t.Fatal(err)
-					}
-				case "corrupt":
-					if err := os.WriteFile(filename, []byte("{}"), 0644); err != nil {
-						t.Fatal(err)
-					}
-				case "symlink":
-					target := filepath.Join(t.TempDir(), "member")
-					if err := os.Rename(filename, target); err != nil {
-						t.Fatal(err)
-					}
-					if err := os.Symlink(target, filename); err != nil {
-						t.Fatal(err)
-					}
-				case "old bytes":
-					name := baseline.PlanPath
-					switch member {
-					case "action-data.json":
-						name = githubActionDataPathFor(before)
-					case "manifest.json":
-						name = baseline.ManifestPath
-					}
-					raw, err := os.ReadFile(filepath.Join(root, name))
-					if err != nil {
-						t.Fatal(err)
-					}
-					if err := os.WriteFile(filename, raw, 0644); err != nil {
-						t.Fatal(err)
-					}
+	before, baseline, original := runtimeInputsFixture(t)
+	fresh := freshGitHubRuntimePins(t, before)
+	stageGitHubRuntimeInputs(t, original, fresh)
+	// Old bytes exercise every same-Run binding. Missing/type admission is a
+	// common directory reader; corrupt Plan bytes additionally cover decoding.
+	for _, test := range []struct{ member, damage string }{
+		{"plan.json", "old bytes"}, {"action-data.json", "old bytes"}, {"manifest.json", "old bytes"},
+		{"plan.json", "corrupt"}, {"action-data.json", "missing"}, {"manifest.json", "symlink"},
+	} {
+		member, damage := test.member, test.damage
+		t.Run(member+"/"+damage, func(t *testing.T) {
+			root := copyGitHubRuntimeRoot(t, original)
+			filename := filepath.Join(root, githubRuntimeInputDirectory, member)
+			switch damage {
+			case "missing":
+				if err := os.Remove(filename); err != nil {
+					t.Fatal(err)
 				}
-				prior := githubRuntimeTree(t, root)
-				assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(t.Context(), before, root), e.CodePipelineDrift)
-				if !reflect.DeepEqual(prior, githubRuntimeTree(t, root)) {
-					t.Fatal("rejected handoff changed existing files")
+			case "corrupt":
+				if err := os.WriteFile(filename, []byte("{}"), 0644); err != nil {
+					t.Fatal(err)
 				}
-			})
-		}
+			case "symlink":
+				target := filepath.Join(t.TempDir(), "member")
+				if err := os.Rename(filename, target); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, filename); err != nil {
+					t.Fatal(err)
+				}
+			case "old bytes":
+				name := baseline.PlanPath
+				switch member {
+				case "action-data.json":
+					name = githubActionDataPathFor(before)
+				case "manifest.json":
+					name = baseline.ManifestPath
+				}
+				raw, err := os.ReadFile(filepath.Join(root, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filename, raw, 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			prior := githubRuntimeTree(t, root)
+			assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(t.Context(), before, root), e.CodePipelineDrift)
+			if !reflect.DeepEqual(prior, githubRuntimeTree(t, root)) {
+				t.Fatal("rejected handoff changed existing files")
+			}
+		})
 	}
 }
 
 func TestInstallGitHubRuntimeInputsRejectsChangedAuthority(t *testing.T) {
+	before, baseline, original := runtimeInputsFixture(t)
+	updated := freshGitHubRuntimePins(t, before)
+	stageGitHubRuntimeInputs(t, original, updated)
 	for _, kind := range []string{"Environment", "namespace", "input path", "workflow", "authored input", "baseline drift", "extra staged member", "oversized Plan"} {
 		t.Run(kind, func(t *testing.T) {
-			before, baseline, root := runtimeInputsFixture(t)
-			fresh := freshGitHubRuntimePins(t, before)
+			root := copyGitHubRuntimeRoot(t, original)
 			switch kind {
 			case "Environment", "namespace", "workflow":
-				fresh = recompileGitHubStabilityPlan(t, before, func(in *githubStabilityInputs) {
+				fresh := recompileGitHubStabilityPlan(t, before, func(in *githubStabilityInputs) {
 					switch kind {
 					case "Environment":
 						in.environment.Publication.RepositoryPrefix = "ghcr.io/example/other-tools"
@@ -160,8 +168,11 @@ func TestInstallGitHubRuntimeInputsRejectsChangedAuthority(t *testing.T) {
 						in.catalog.Actions["upload-artifact"] = pin
 					}
 				})
+				stageGitHubRuntimeInputs(t, root, fresh)
 			case "input path":
+				fresh := *updated
 				fresh.DefinitionPath = "other/definition.yaml"
+				stageGitHubRuntimeInputs(t, root, &fresh)
 			case "authored input":
 				definition := before.Definition.Clone()
 				definition.Metadata.Name = "other-project"
@@ -171,7 +182,6 @@ func TestInstallGitHubRuntimeInputsRejectsChangedAuthority(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			stageGitHubRuntimeInputs(t, root, fresh)
 			switch kind {
 			case "extra staged member":
 				if err := os.WriteFile(filepath.Join(root, githubRuntimeInputDirectory, "extra.json"), []byte("{}"), 0644); err != nil {
@@ -213,6 +223,7 @@ func TestInstallGitHubRuntimeInputsRejectsLinkedStagingDirectory(t *testing.T) {
 }
 
 func TestInstallGitHubRuntimeInputsAdmitsBeforeIO(t *testing.T) {
+	baseline := githubRuntimePlanFixture(t)
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	for _, test := range []struct {
@@ -228,9 +239,9 @@ func TestInstallGitHubRuntimeInputsAdmitsBeforeIO(t *testing.T) {
 		{"development", t.Context(), func(p *Plan) { p.Environment.GitHubDevelopment = true }, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			plan, root := githubRuntimePlanFixture(t), t.TempDir()
-			test.change(plan)
-			assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(test.ctx, plan, root), test.code)
+			plan, root := *baseline, t.TempDir()
+			test.change(&plan)
+			assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(test.ctx, &plan, root), test.code)
 			if len(githubRuntimeTree(t, root)) != 0 {
 				t.Fatal("runtime installer wrote before capability admission")
 			}

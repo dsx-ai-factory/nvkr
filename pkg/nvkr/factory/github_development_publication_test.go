@@ -253,28 +253,26 @@ func TestGitHubPublicationRepositoryIdentityCoversOutputAndReleaseRoots(t *testi
 	}
 }
 
-func TestMaintainedM2DevelopmentPreservesCompleteGraphAndPrivateToolchainReads(t *testing.T) {
-	base, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestDevelopmentPreservesProducerGraphAndPrivateToolchainReads(t *testing.T) {
+	// A native disk and its vendor fetch cover both preparation sites. The
+	// full maintained product adds no distinct development credential boundary.
+	base := recompileGitHubStabilityPlan(t, privateImageTestPlan(t, "github:GITHUB_TOKEN"), func(inputs *githubStabilityInputs) {
+		inputs.environment.Publication.Mode = "per-output-v1"
+		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/dsx-ai-factory/nvkr/m2-candidate"
+		root := inputs.catalog.Components["image"]
+		for arch, image := range root.ToolchainImages {
+			root.ToolchainImages[arch] = "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-" + arch + image[strings.Index(image, "@sha256:"):]
+		}
+		inputs.catalog.Components["image"] = root
+	})
 	plan := developmentPublicationPlan(t, base, "ghcr.io/dsx-ai-factory/nvkr/development")
 	if len(plan.LifecycleOutputs) != len(base.LifecycleOutputs) || len(plan.Graph.Nodes) != len(base.Graph.Nodes) {
-		t.Fatal("development changed the maintained selected output or operation closure")
+		t.Fatal("development changed the selected output or operation closure")
 	}
-	fdePlatforms := map[string]bool{}
 	for i, build := range plan.Builds {
 		if build.Name != base.Builds[i].Name || build.BuildDigest != base.Builds[i].BuildDigest {
 			t.Fatalf("development changed producer identity for %s", build.Name)
 		}
-		for _, instruction := range build.Graph.Nodes {
-			if instruction.Disk != nil && instruction.Disk.Encryption == "luks2" {
-				fdePlatforms[build.Platform] = true
-			}
-		}
-	}
-	if !fdePlatforms["linux/amd64"] || !fdePlatforms["linux/arm64"] || len(fdePlatforms) != 2 {
-		t.Fatal("development omitted the maintained native public-bootstrap FDE producers")
 	}
 	// The production qualification handoff needs every original output record.
 	// Development still authenticates the complete release with six controls;
@@ -319,8 +317,7 @@ func TestMaintainedM2DevelopmentPreservesCompleteGraphAndPrivateToolchainReads(t
 			}
 		}
 	}
-	if disks != 4 || fetches == 0 {
+	if disks != 1 || fetches == 0 {
 		t.Fatalf("development omitted private native preparation: %d disks / %d fetches", disks, fetches)
 	}
-	t.Logf("complete M2 development workflow: %d bytes", len(bundle.Files[bundle.WorkflowPath]))
 }

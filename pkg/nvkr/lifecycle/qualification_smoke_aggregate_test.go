@@ -147,9 +147,10 @@ func TestHostedSmokeAuthenticatesBeforeMintAndFreezesDescriptions(t *testing.T) 
 	assertCode(t, err, e.CodeGateUnmet)
 }
 func TestHostedSmokeVerifierFailureAndFinalRevocation(t *testing.T) {
+	checks, baseInvocation, policy, report := smokeAggregateFixture(t)
 	for _, mode := range []string{"signature", "wrong signer", "missing invocation claims", "wrong invocation claims", "cancel", "qualifier revoked"} {
 		t.Run(mode, func(t *testing.T) {
-			checks, invocation, policy, report := smokeAggregateFixture(t)
+			invocation := &nativeSmokeTestInvocation{source: baseInvocation.source, description: baseInvocation.description}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			receipt, err := authenticateHostedToolSmoke(ctx, checks, invocation, policy, hostedSmokeVerifier(func(_ context.Context, req trust.DocumentVerificationRequest) (trust.VerificationEvidence, error) {

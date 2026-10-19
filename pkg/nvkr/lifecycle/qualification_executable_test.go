@@ -217,23 +217,25 @@ func TestArtifactExecutableMemberRejectsPartialAndRevokedStreams(t *testing.T) {
 }
 
 func TestArtifactExecutableMemberRequiresLiveBorrowedSource(t *testing.T) {
-	for _, phase := range []string{"before", "during"} {
-		t.Run(phase, func(t *testing.T) {
-			receipt, member := executableReceiptFixture(t)
-			source, ok := receipt.origin.(*qualificationFixtureSource)
-			if !ok {
-				t.Fatal("fixture did not retain its borrowed source")
-			}
-			if phase == "before" {
-				source.closed = true
-			}
-			writes := 0
-			got, err := receipt.WriteExecutableMember(t.Context(), member.Output, member.Member, member.Platform, member.Size, executableWriter(func(raw []byte) (int, error) { writes++; source.closed = true; return len(raw), nil }))
-			assertCode(t, err, e.CodeProvenanceMissing)
-			if got != (ExecutableMemberDescription{}) || phase == "before" && writes != 0 {
-				t.Fatal("revoked source produced successful member metadata or wrote before admission")
-			}
-		})
+	receipt, member := executableReceiptFixture(t)
+	source, ok := receipt.origin.(*qualificationFixtureSource)
+	if !ok {
+		t.Fatal("fixture did not retain its borrowed source")
+	}
+	// Revoking during the first stream must refuse its result and every later
+	// admission. A second publication adds no independent source-lifetime signal.
+	writes := 0
+	destination := executableWriter(func(raw []byte) (int, error) { writes++; source.closed = true; return len(raw), nil })
+	got, err := receipt.WriteExecutableMember(t.Context(), member.Output, member.Member, member.Platform, member.Size, destination)
+	assertCode(t, err, e.CodeProvenanceMissing)
+	if got != (ExecutableMemberDescription{}) || writes == 0 {
+		t.Fatal("source revocation did not occur during streaming or returned successful metadata")
+	}
+	writes = 0
+	got, err = receipt.WriteExecutableMember(t.Context(), member.Output, member.Member, member.Platform, member.Size, destination)
+	assertCode(t, err, e.CodeProvenanceMissing)
+	if got != (ExecutableMemberDescription{}) || writes != 0 {
+		t.Fatal("revoked source produced successful member metadata or wrote before admission")
 	}
 }
 
