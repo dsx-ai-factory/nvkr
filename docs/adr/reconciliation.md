@@ -452,9 +452,9 @@ both reached the twenty-minute authentication/smoke step limit without returning
 uploading signed smoke evidence. The [final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39279436309/job/118199918963)
 also reached its twenty-minute step limit at 17:43 UTC. The logs do not identify the active verification
 phase or prove a storage failure. A separate regression reproduced an unbounded standalone SBOM verifier invocation;
-that call now applies the existing three-minute cosign budget and refuses late success. The hosted
-worker and qualifier additionally own nineteen-minute deadlines, leaving the existing twenty-minute
-step limit for cleanup and diagnostics, and generated terminal commands use `exec` for signal delivery.
+that call now applies the existing three-minute cosign budget and refuses late success. That follow-up
+introduced nineteen-minute hosted deadlines inside twenty-minute steps for cleanup and diagnostics;
+the current complete-operation budget is described below. Generated terminal commands use `exec` for signal delivery.
 These changes bound failure and improve diagnostic availability; they do not establish the cause of the
 hosted timeout or successful completion of the complete candidate. The Linux Go 1.27.2 full gate and build,
 targeted signing/qualification race checks, and full Fern validation pass. The regressions cover earlier
@@ -492,6 +492,58 @@ The two recorded cryptographic invocations verified signature and provenance sep
 replay of `csi-node-driver-registrar-image`, the first output to time out in the ARM64 worker, passed both
 checks and its exact expected predicate in 15.004 seconds. These bounded read-only replays did not exercise
 the complete publication, native smoke or qualification signing.
+
+[Qualification Run 39327048621](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621)
+used `7f67ce63c19b2aab56e119f0bd27376a385c6e69`, including lazy OCI evidence acquisition and production
+release-manifest issuance, with the original producer's successful attempt-6 handoff. Its
+[AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621/job/118315486080)
+completed all 69 payload, membership, input and SBOM checks, then 40 output signature/provenance checks
+before the nineteen-minute deadline. The other 29 rows reflect the expired context. Its
+[ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621/job/118315486516)
+and [final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327048621/job/118324467119)
+instead expired while materializing an ordinary output, before artifact-check reporting. Their completed
+output counts are unavailable; the error did not identify the output. All three returned exit 31 before
+the Actions hard limit. Neither worker reached native smoke or uploaded evidence, and the final job
+reached neither qualification publication nor manifest issuance. The Run failed at 22:03 UTC. Complete
+logs confirm the exact trusted checkout and terminal `exec`; no complete qualification follows.
+
+A bounded read-only metadata replay against the same immutable candidate hit its 270-second caller
+deadline after 419 logical manifest/blob acquisitions. Its 1,515 HTTP requests included 419 registry pings
+and 419 token exchanges; their response-header waits consumed 101.024 seconds, while body reads totaled
+about 6.27 MB. A single-variable replay using one operation-scoped registry puller completed all 513
+logical acquisitions in 218.294 seconds, including 69 outputs and 120 evidence records, with 70 pings and
+70 token exchanges. The resulting root index and canonical root config matched the saved exact candidate.
+The baseline was incomplete, so these observations establish reduced negotiation and completion under
+the same bound, not a complete-read speedup ratio. The retained metadata declares 23,822,474,523 bytes
+of output layers, including 20,136,460,288 bytes across four disks; this inspection did not download them.
+Metadata acquisition now reuses that private per-operation puller without removing descriptor, identity,
+size, namespace, cancellation or complete-set inspection checks. Checked-output failures also identify
+the exact output while retaining their coded cause and releasing prior retained files.
+
+A separate bounded Linux ARM64 stock-adapter replay authenticated the same candidate root and all 69
+output subjects against their retained exact production predicates. All 140 signature/provenance
+cryptographic invocations passed using pinned cosign 3.1.3, held-descriptor execution and normal keyless
+trust checks. The sequential verification phase took 732.998 seconds, with a median of 9.25 seconds per
+subject and a maximum of 26.06 seconds. This is 12 minutes 13 seconds for signature/provenance alone;
+it excludes payload acquisition, the 120 SBOM verifications, native smoke, qualification publication and
+release-manifest issuance. These measurements motivate additional aggregate headroom without establishing
+complete qualification or identifying the hosted ARM64/final job's particular slow output.
+
+The current hosted budget is fifty-nine minutes inside a sixty-minute step and ninety-minute job.
+This provides operational headroom for the mandatory workload, including the final job's 69 qualification
+attestations with independent readback, 69 further member verifications, and release-manifest attestation
+with two readbacks. It is not proof of fit or successful issuance. Nested owners retain the original
+deadline, earlier caller cancellation wins, and individual signing, metadata and native execution limits
+remain. Payload materialization inherits this longer parent deadline. The minute before the Actions limit
+permits cooperative cleanup, not a guaranteed return or attachment rollback.
+
+The Linux Go 1.27.2 full uncached repository gate and build pass for this follow-up, including vet,
+lint and vulnerability scanning. Targeted delivery, qualification and release-manifest race checks,
+canonical workflow regeneration, actionlint, YAML lint and Fern validation also pass. Regressions failed
+against the prior source and passed with the correction for repository negotiation reuse, exact-output
+failure diagnostics and the enclosing budget; they also cover independent credential admission and
+retention of the original deadline through manifest issuance. Independent final review found no
+actionable issues. These checks establish the implementation contract, not hosted recovery.
 
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D

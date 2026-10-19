@@ -254,15 +254,20 @@ reads. It rejects missing or extra tool profiles, non-tool membership and native
 validates expected versions/source stamps. Generated workers cover exactly the selected executable
 platforms; the final AMD64 signer additionally requires its independently pinned cosign executable.
 
-The hosted worker and final qualifier each own a nineteen-minute operation deadline inside their
-twenty-minute Actions step. Manifest issuance shares the final qualifier's original deadline; it does not
-start a fresh budget after qualification publication. A shorter caller deadline still wins. The remaining minute allows cooperative
+The hosted worker and final qualifier each own a fifty-nine-minute operation deadline inside their
+sixty-minute Actions step and ninety-minute job. The complete-operation budget covers source admission,
+metadata and payload acquisition, evidence authentication, native smoke or qualification publication, and
+production release-manifest issuance. Manifest issuance shares the final qualifier's original deadline;
+it does not start a fresh budget after qualification publication. A shorter caller deadline still wins.
+The remaining minute allows cooperative
 joined cleanup and failure diagnostics; it is not a guaranteed return bound. Expiration cannot establish
 successful completion; attachments already published are not rolled back.
 Generated terminal commands replace the shell so cancellation reaches the CLI's signal handler.
 Each standalone SBOM verification also owns a three-minute deadline, including its cosign subprocess,
-and rejects success after cancellation. These bounds contain failed work; they do not establish that a
-complete candidate fits the hosted budget. Explicit local artifact checks retain their caller's overall
+and rejects success after cancellation. Metadata acquisition retains its twenty-minute bound. Payload
+acquisition inherits the complete-operation deadline; the delivery adapter's thirty-minute default applies
+only when its caller supplies no deadline, not as an additional per-output limit. These bounds contain
+failed work; they do not establish that a complete candidate fits the hosted budget. Explicit local artifact checks retain their caller's overall
 deadline and the individual operation bounds.
 
 Pipeline owns native ELF and image admission, bounded execution in a nonroot network-disabled container,
