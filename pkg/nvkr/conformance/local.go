@@ -42,6 +42,7 @@ func NewLocal(product, tools *lifecycle.LocalDiagnosticArtifacts, options Option
 	if options.Artifacts != nil || options.ToolArtifacts != nil {
 		return nil, e.New(e.CodeUsage, "local conformance cannot mix published and local artifact owners")
 	}
+	options.localDiagnostic = true
 	validated, err := validateOptions(options)
 	if err != nil {
 		return nil, err

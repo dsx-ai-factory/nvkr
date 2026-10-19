@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -134,6 +135,38 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	}
 	if !strings.Contains(prepare.Content, "systemctl start --no-block spire-agent.service nvke-agent.service") {
 		t.Fatal("agents must start without blocking the host bootstrap")
+	}
+	// Only stdout/stderr routing may override either source-owned service unit.
+	const consoleDropIn = "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"
+	for _, unit := range []string{"nvke-agent.service", "spire-agent.service"} {
+		path := "/etc/systemd/system/" + unit + ".d/10-nvkr-console.conf"
+		file, exists := files[path]
+		if !exists || file.Permissions != "0600" || file.Content != consoleDropIn {
+			t.Fatalf("service diagnostics must use a private logging-only drop-in: %s", unit)
+		}
+	}
+	dropIns := 0
+	for _, file := range decoded.WriteFiles {
+		if strings.HasPrefix(file.Path, "/etc/systemd/system/") {
+			dropIns++
+		}
+	}
+	if dropIns != 2 {
+		t.Fatal("startup diagnostics must not add other service overrides")
+	}
+	// An unconditional reload is needed even if APT performs no installation.
+	installed := strings.Index(prepare.Content, "nvke-cni-ovn-charts-")
+	reloaded := strings.Index(prepare.Content, "\nsystemctl daemon-reload\n")
+	stopped := strings.Index(prepare.Content, "\nsystemctl stop nvke-agent.service spire-agent.service\n")
+	started := strings.Index(prepare.Content, "\nsystemctl start --no-block spire-agent.service nvke-agent.service\n")
+	if installed < 0 || reloaded <= installed || stopped <= reloaded || started <= stopped || strings.Count(prepare.Content, "systemctl daemon-reload") != 1 {
+		t.Fatal("preparation must reload service drop-ins after APT and before starting the agents")
+	}
+
+	command := exec.CommandContext(t.Context(), "bash", "-n")
+	command.Stdin = strings.NewReader(prepare.Content)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("rendered guest preparation shell syntax: %v: %s", err, output)
 	}
 	if decoded.PhoneHome.URL != "http://172.30.0.1:7777/latest/meta-data/phone_home" || decoded.PhoneHome.Post != "all" {
 		t.Fatal("completion must reach the source-owned native metadata gateway")

@@ -4,6 +4,7 @@
 package conformance
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -11,6 +12,14 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
+
+func localOptionsFixture() Options {
+	o := optionsFixture()
+	if runtime.GOOS == "darwin" {
+		o.Hydrophone.Platform, o.Kubectl.Platform = "darwin/arm64", "darwin/arm64"
+	}
+	return o
+}
 
 func localDescriptionFixture() lifecycle.LocalDiagnosticDescription {
 	d := artifactDescriptionFixture().Outputs[0]
@@ -56,14 +65,14 @@ func TestLocalConformanceImageBindings(t *testing.T) {
 
 func TestLocalConformanceRefusesCallerOwners(t *testing.T) {
 	for _, owner := range []*lifecycle.LocalDiagnosticArtifacts{nil, {}} {
-		producer, err := NewLocal(owner, owner, optionsFixture(), LocalBindings{})
+		producer, err := NewLocal(owner, owner, localOptionsFixture(), LocalBindings{})
 		requireCode(t, err, e.CodeGateUnmet)
 		if producer != nil {
 			t.Fatal("caller-created local owner admitted")
 		}
 	}
 	for _, product := range []bool{false, true} {
-		options := optionsFixture()
+		options := localOptionsFixture()
 		if product {
 			options.Artifacts = &lifecycle.ArtifactCheckReceipt{}
 		} else {
@@ -75,7 +84,7 @@ func TestLocalConformanceRefusesCallerOwners(t *testing.T) {
 }
 
 func TestLocalConformanceAliasStillChecksRuntimeBytes(t *testing.T) {
-	options := optionsFixture()
+	options := localOptionsFixture()
 	view, aliases, err := localView(localDescriptionFixture(), []LocalImageBinding{{"image", "registry.example.test/nvke:local"}}, true)
 	if err != nil {
 		t.Fatal(err)

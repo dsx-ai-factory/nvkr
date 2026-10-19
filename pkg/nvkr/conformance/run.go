@@ -41,6 +41,7 @@ var _ testresults.Producer = (*Producer)(nil)
 // New validates configuration and the borrowed artifact receipt. Produce authenticates executable bytes and
 // the kubeconfig before cluster I/O. Caller environment is never inherited.
 func New(options Options) (*Producer, error) {
+	options.localDiagnostic = false
 	options, err := validateOptions(options)
 	if err != nil {
 		return nil, err
@@ -120,7 +121,7 @@ func (p *Producer) produce(ctx context.Context, description, tools lifecycle.Art
 	if err != nil {
 		return testresults.Output{}, err
 	}
-	defer a.close()
+	defer func() { a.close(); resultErr = errors.Join(resultErr, a.closeNative()) }()
 	capture := p.captureTool
 	if capture == nil {
 		capture = func(ctx context.Context, selector ExecutableSelector) (*heldfile.File, error) {

@@ -41,7 +41,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 			}
 			expected := 32
 			if conformance {
-				expected = 36
+				expected = 38
 			}
 			if len(plan.LifecycleOutputs) != expected {
 				t.Fatalf("outputs=%d, want%d", len(plan.LifecycleOutputs), expected)
@@ -134,19 +134,31 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		}
 		want := 32
 		if conformance {
-			want = 36
+			want = 38
 		}
 		if len(doc.Outputs) != want {
 			t.Fatalf("outputs%d want%d", len(doc.Outputs), want)
 		}
-		expected := map[string]string{"nvke-node-image-arm64": "node-images/native-arm64", "cwe": "nvke/native-site-arm64", "nvkectl": "nvke/native-site-arm64", "controller-chart": "nvke/native-site-arm64", "controller-profiles": "controller-profiles/native-nvidia-arm64"}
+		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images/native-arm64", "cwe": "inputs/catalogs/nvke/native-site-arm64", "nvkectl": "inputs/catalogs/nvke/native-site-arm64", "controller-chart": "inputs/catalogs/nvke/native-site-arm64", "controller-profiles": "inputs/catalogs/controller-profiles/native-nvidia-arm64"}
+		hostPlatforms := map[string]string{}
+		if conformance {
+			for _, host := range []struct{ suffix, platform string }{{"arm64", "linux/arm64"}, {"darwin-arm64", "darwin/arm64"}} {
+				expected["hydrophone-"+host.suffix] = "definitions/kubernetes-conformance-arm64/hydrophone-catalog"
+				expected["kubectl-"+host.suffix] = "definitions/kubernetes-conformance-arm64/demo-1.34/kubectl-catalog"
+				hostPlatforms["hydrophone-"+host.suffix] = host.platform
+				hostPlatforms["kubectl-"+host.suffix] = host.platform
+			}
+		}
 		for _, output := range doc.Outputs {
 			dir, selected := expected[output.Name]
 			if !selected {
 				continue
 			}
-			if output.Catalog == nil || filepath.Clean(filepath.Join(filepath.Dir(file), output.Catalog.Base)) != filepath.Join(repo, "inputs/catalogs", dir) {
+			if output.Catalog == nil || filepath.Clean(filepath.Join(filepath.Dir(file), output.Catalog.Base)) != filepath.Join(repo, dir) {
 				t.Fatalf("%s lost its native catalog selection", output.Name)
+			}
+			if platform, host := hostPlatforms[output.Name]; host && output.Platform != platform {
+				t.Fatalf("%s platform=%s, want %s", output.Name, output.Platform, platform)
 			}
 			delete(expected, output.Name)
 		}

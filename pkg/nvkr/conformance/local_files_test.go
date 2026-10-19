@@ -19,7 +19,7 @@ import (
 
 func localConfigurationFixture(t *testing.T) LocalConfiguration {
 	t.Helper()
-	options := optionsFixture()
+	options := localOptionsFixture()
 	options.Kubeconfig.Path = "private/tenant.kubeconfig"
 	return LocalConfiguration{ToolsWorkspace: ".nvkr/runs/fresh-demo", Runner: options,
 		Bindings: LocalBindings{ProductImages: []LocalImageBinding{{"image", "registry.example.test/nvke:local"}},

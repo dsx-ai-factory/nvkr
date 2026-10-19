@@ -37,20 +37,14 @@ func TestEndToEnd(t *testing.T) {
 	if binary == "" {
 		binary = filepath.Join(repo, "bin", "nvke-demo")
 	}
-	// The CLI owns its 8/12-hour workflow deadline. Leave two more hours for
+	// The conformance CLI owns its 12-hour workflow deadline. Leave two more hours for
 	// independent guest cleanup (65m), restoration (8m), bridge stop (1m)
 	// and bounded diagnostics instead of killing it before those owners join.
-	budget := 10 * time.Hour
-	if runtime.GOOS == "linux" {
-		budget += 4 * time.Hour
-	}
+	budget := 14 * time.Hour
 	args := []string{binary, "e2e", "--repo", repo, "--attempt", attempt,
-		"--out", out, "--jobs", "1", "--network", "ovn", "--cleanup", "--plain"}
+		"--out", out, "--jobs", "1", "--network", "ovn", "--conformance", "--cleanup", "--plain"}
 	if clone := os.Getenv("NVKE_LOCAL_CLONE"); clone != "" {
 		args = append(args, "--nvke-clone", clone)
-	}
-	if runtime.GOOS == "linux" {
-		args = append(args, "--conformance")
 	}
 	if err := (Runner{Env: os.Environ(), Progress: os.Stdout}).Run(t.Context(), args, "full-native-e2e", budget); err != nil {
 		t.Fatal(err)

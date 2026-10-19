@@ -169,7 +169,7 @@ func (owner *LocalDiagnosticArtifacts) WithDiagnosticOperation(ctx context.Conte
 	return err
 }
 
-// WriteExecutableMember streams an exact native Linux executable from held local
+// WriteExecutableMember streams an exact native executable from held local
 // bytes through delivery's existing complete archive/member checks. It grants
 // payload access only. The caller bounds destination writes and discards partial
 // bytes on error; complete executable use belongs inside WithDiagnosticOperation.
@@ -182,8 +182,8 @@ func (owner *LocalDiagnosticArtifacts) WriteExecutableMember(ctx context.Context
 			return ExecutableMemberDescription{}, e.New(e.CodeUsage, "local executable output and member require explicit safe text")
 		}
 	}
-	if platform != "linux/arm64" && platform != "linux/amd64" {
-		return ExecutableMemberDescription{}, e.New(e.CodeEngineCapability, "local executable requires native Linux platform")
+	if platform != "linux/arm64" && platform != "linux/amd64" && platform != "darwin/arm64" {
+		return ExecutableMemberDescription{}, e.New(e.CodeEngineCapability, "local executable requires a supported native platform")
 	}
 	operation, done, err := owner.beginOperation(ctx)
 	if err != nil {

@@ -307,7 +307,7 @@ func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {
 	flags := command.Flags()
 	flags.StringVar(&cfg.Accelerator, "accelerator", "", "native guest accelerator: defaults to Mac hvf or Linux kvm for every VM")
-	flags.BoolVar(&cfg.Conformance, "conformance", false, "run Kubernetes conformance against this disposable tenant before cleanup (Linux ARM64)")
+	flags.BoolVar(&cfg.Conformance, "conformance", false, "run Kubernetes conformance against this disposable tenant before cleanup (native Mac or Linux ARM64)")
 	flags.BoolVar(&cfg.Walkthrough, "walkthrough", false, "show bounded read-only site, tenant and existing workload observations before cleanup")
 	flags.BoolVar(&cfg.Cleanup, "cleanup", false, "delete owned VMs after acceptance; otherwise keep the foreground demo until Ctrl-C")
 	checkoutHelp := "legacy source locator; deployment uses the NVKR installer archive"

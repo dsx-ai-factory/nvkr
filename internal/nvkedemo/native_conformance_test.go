@@ -142,7 +142,7 @@ func TestConformanceDefinitionsPreserveOrdinaryDeploymentOutputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(a.Outputs) != 32 || len(b.Outputs) != 36 || !reflect.DeepEqual(a.Catalog, b.Catalog) {
+		if len(a.Outputs) != 32 || len(b.Outputs) != 38 || !reflect.DeepEqual(a.Catalog, b.Catalog) {
 			t.Fatal("combined Definition changed ordinary selection")
 		}
 		for _, output := range a.Outputs {

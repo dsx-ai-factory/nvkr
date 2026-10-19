@@ -19,7 +19,7 @@ usage() {
     'Explicit upstream alternative: add --network upstream-ovn before ATTEMPT (all selection only).' \
     'Linux image builds require KVM by default. Explicit slow diagnostic: --build-accelerator tcg.' \
     'NVIDIA OVN remains the default. This alternative does not validate the NVIDIA fork.' \
-    'Add --conformance for 36 outputs in one Run, including matching Kubernetes conformance tools (native Linux KVM all only).' \
+    'Add --conformance for 38 outputs in one Run, including matching Kubernetes conformance tools (native Linux KVM all only).' \
     'all: one Run with 32 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
     'simulator bootstraps the same pinned Go/GCC Docker toolchain.' \

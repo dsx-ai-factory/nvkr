@@ -136,6 +136,17 @@
       "format": "executable"
     },
     {
+      "name": "hydrophone-darwin-arm64",
+      "platform": "darwin/arm64",
+      "catalog": {
+        "base": "../../../definitions/kubernetes-conformance-arm64/hydrophone-catalog"
+      },
+      "components": [
+        "hydrophone"
+      ],
+      "format": "executable"
+    },
+    {
       "name": "installer-tools-arm64",
       "platform": "linux/arm64",
       "catalog": {
@@ -153,6 +164,17 @@
     {
       "name": "kubectl-arm64",
       "platform": "linux/arm64",
+      "catalog": {
+        "base": "../../../definitions/kubernetes-conformance-arm64/demo-1.34/kubectl-catalog"
+      },
+      "components": [
+        "kubectl"
+      ],
+      "format": "executable"
+    },
+    {
+      "name": "kubectl-darwin-arm64",
+      "platform": "darwin/arm64",
       "catalog": {
         "base": "../../../definitions/kubernetes-conformance-arm64/demo-1.34/kubectl-catalog"
       },

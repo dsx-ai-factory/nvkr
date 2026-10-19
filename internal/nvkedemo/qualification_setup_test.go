@@ -111,7 +111,7 @@ func TestQualificationSetupScopeRejectsConformanceDefinitions(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(d.Outputs) != 36 {
+			if len(d.Outputs) != 38 {
 				t.Fatal("explicit conformance selection changed; qualification scope must be reviewed")
 			}
 			plan := &factory.Plan{}

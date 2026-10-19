@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -94,7 +95,12 @@ func (a *admitted) commandLimit(ctx context.Context, tool *heldfile.File, args [
 			target.b.sink = f
 		}
 	}
-	err = heldfile.RunContext(ctx, tool, args, heldfile.RunOptions{Stdin: stdin, Stdout: stdout, Stderr: stderr, Dir: workspace, Env: []string{"HOME=" + workspace, "TMPDIR=" + workspace, "PATH=", "KUBECONFIG=" + path, "KUBECACHEDIR=" + filepath.Join(workspace, "kube-cache")}, TerminationGrace: 250 * time.Millisecond}, kube)
+	options := heldfile.RunOptions{Stdin: stdin, Stdout: stdout, Stderr: stderr, Dir: workspace, Env: []string{"HOME=" + workspace, "TMPDIR=" + workspace, "PATH=", "KUBECONFIG=" + path, "KUBECACHEDIR=" + filepath.Join(workspace, "kube-cache")}, TerminationGrace: 250 * time.Millisecond}
+	if a.options.localDiagnostic && runtime.GOOS == "darwin" {
+		err = a.runLocalNativeCommand(ctx, tool, args, options, kube)
+	} else {
+		err = heldfile.RunContext(ctx, tool, args, options, kube)
+	}
 	sinkErr := errors.Join(stdout.err, stderr.err)
 	for _, file := range diagnostics {
 		sinkErr = errors.Join(sinkErr, file.Close())
@@ -117,7 +123,9 @@ func (a *admitted) commandLimit(ctx context.Context, tool *heldfile.File, args [
 		}
 		// Normal Hydrophone exits, including nonzero statuses, do not decide
 		// capture completeness. Retention, cleanup and observations do that.
-		if tool == a.hydrophone && exit != nil && exit.ProcessState != nil && exit.Exited() && code > 0 {
+		// Only a standalone normal exit is recoverable. Joined integrity or
+		// cleanup errors remain fatal even when they also contain an exit code.
+		if tool == a.hydrophone && err == exit && exit != nil && exit.ProcessState != nil && exit.Exited() && code > 0 {
 			return bytes.Clone(stdout.Bytes()), code, nil
 		}
 		diagnostics := "private diagnostic text excluded from public errors"

@@ -13,9 +13,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	nvkrerrors "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
@@ -170,6 +173,189 @@ func privateTestDir(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return dir
+}
+
+type delayedDiagnosticSink struct {
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (sink *delayedDiagnosticSink) Write(raw []byte) (int, error) {
+	sink.once.Do(func() { close(sink.entered) })
+	<-sink.release
+	return len(raw), nil
+}
+
+func TestOwnedProcessSuccessfulExitWaitsForDiagnosticDrain(t *testing.T) {
+	for _, channel := range []string{"stdout", "stderr"} {
+		t.Run(channel, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			sink := &delayedDiagnosticSink{entered: make(chan struct{}), release: make(chan struct{})}
+			var release sync.Once
+			unblock := func() { release.Do(func() { close(sink.release) }) }
+			defer unblock()
+			runner := Runner{Work: privateTestDir(t), Env: []string{"PATH=/usr/bin:/bin"}, output: sink}
+			command := "printf original-diagnostic"
+			if channel == "stderr" {
+				command += " >&2"
+			}
+			process, err := runner.start(ctx, []string{"/bin/sh", "-c", command}, "delayed-drain", true, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				unblock()
+				cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+				defer stop()
+				if err := process.Stop(cleanup); err != nil {
+					t.Error(err)
+				}
+			})
+			select {
+			case <-sink.entered:
+			case <-ctx.Done():
+				t.Fatal("diagnostic sink was not reached")
+			}
+			// The child has exited and its group is gone. Keep the diagnostic
+			// writer blocked beyond the independent termination grace.
+			if err := process.awaitGroup(ctx); err != nil {
+				t.Fatal(err)
+			}
+			timer := time.NewTimer(2 * ownedcmd.DefaultTerminationGrace)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				t.Fatal("diagnostic drain exceeded the command deadline")
+			}
+			unblock()
+			if err := process.waitOwned(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if exited, err := process.Exited(); !exited || err != nil {
+				t.Fatalf("successful child lost during diagnostic drain: exited=%t error=%v", exited, err)
+			}
+			raw, err := os.ReadFile(filepath.Join(runner.Work, "delayed-drain.log"))
+			if err != nil || string(raw) != "original-diagnostic" {
+				t.Fatalf("original diagnostic not retained: %q %v", raw, err)
+			}
+		})
+	}
+}
+
+func TestRunnerMergedOutputPreservesChildWriteOrder(t *testing.T) {
+	root := privateTestDir(t)
+	var stream bytes.Buffer
+	runner := Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin"}, output: &stream}
+	if err := runner.Run(t.Context(), []string{"/bin/sh", "-c", "printf first; printf second >&2; printf third"}, "merged", 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "merged.log"))
+	if err != nil || string(raw) != "firstsecondthird" || stream.String() != string(raw) {
+		t.Fatalf("merged output order changed: log=%q stream=%q error=%v", raw, stream.String(), err)
+	}
+}
+
+func TestOwnedProcessStopPreservesOutputDrainFailure(t *testing.T) {
+	failure := errors.New("original output drain failure")
+	p := &OwnedProcess{done: make(chan struct{}), outputErr: failure}
+	close(p.done)
+	if err := p.Stop(t.Context()); !errors.Is(err, failure) {
+		t.Fatalf("Stop discarded the owned drain failure: %v", err)
+	}
+}
+
+func TestOwnedProcessCancellationStillEscalatesToKill(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	sink := &delayedDiagnosticSink{entered: make(chan struct{}), release: make(chan struct{})}
+	close(sink.release)
+	process, err := (Runner{Env: []string{"PATH=/usr/bin:/bin"}, output: sink}).start(ctx,
+		[]string{"/bin/sh", "-c", "trap '' TERM; printf started; exec sleep 60"}, "kill", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		if err := process.Stop(cleanup); err != nil {
+			t.Error(err)
+		}
+	})
+	select {
+	case <-sink.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("child did not install its TERM handler and write")
+	}
+	cancel()
+	if err := process.waitOwned(ctx); !errors.Is(err, context.Canceled) || errors.Is(err, ErrUnjoined) {
+		t.Fatalf("canceled command did not join: %v", err)
+	}
+	exited, err := process.Exited()
+	var exit *exec.ExitError
+	if !exited || !errors.As(err, &exit) {
+		t.Fatalf("lost original child exit: exited=%t error=%v", exited, err)
+	}
+	status, ok := exit.Sys().(syscall.WaitStatus)
+	if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
+		t.Fatalf("TERM-ignoring child was not killed: %v", exit)
+	}
+	if alive, err := groupAlive(process.PID()); err != nil || alive {
+		t.Fatalf("canceled group remains: alive=%t error=%v", alive, err)
+	}
+	if raw, err := process.stdout.result(); err != nil || string(raw) != "started" {
+		t.Fatalf("cancellation lost completed output: %q %v", raw, err)
+	}
+}
+
+func TestRunnerBlockedDiagnosticSinkRetainsUnjoinedOutcome(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	sink := &delayedDiagnosticSink{entered: make(chan struct{}), release: make(chan struct{})}
+	var release sync.Once
+	unblock := func() { release.Do(func() { close(sink.release) }) }
+	defer unblock()
+	type outcome struct {
+		raw []byte
+		err error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		raw, err := (Runner{Env: []string{"PATH=/usr/bin:/bin"}, output: sink}).Capture(ctx,
+			[]string{"/bin/sh", "-c", "printf original-diagnostic"}, "blocked-drain", time.Minute)
+		done <- outcome{raw, err}
+	}()
+	// Release the sink on every failure path and join this test's caller.
+	joined := false
+	t.Cleanup(func() {
+		unblock()
+		if !joined {
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Error("blocked capture caller did not join after releasing its sink")
+			}
+		}
+	})
+	select {
+	case <-sink.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("diagnostic sink was not reached")
+	}
+	cancel()
+	// Exercise the existing 45-second stop/join allowance, without shortening
+	// production ownership or releasing the blocked diagnostic writer early.
+	select {
+	case result := <-done:
+		joined = true
+		if !errors.Is(result.err, ErrUnjoined) || !errors.Is(result.err, context.Canceled) || result.raw != nil {
+			t.Fatalf("unjoined diagnostic returned a capture or lost causes: bytes=%d error=%v", len(result.raw), result.err)
+		}
+	case <-time.After(time.Minute):
+		t.Fatal("unjoined outcome blocked on the incomplete capture mutex")
+	}
 }
 
 func TestRunnerCaptureContracts(t *testing.T) {
@@ -428,8 +614,8 @@ func TestOwnedProcessDescendantAfterLeader(t *testing.T) {
 	if errors.Is(err, ErrUnjoined) {
 		t.Fatal(err)
 	}
-	// Cmd.WaitDelay may report a held pipe after the leader exited; cleanup must
-	// nevertheless join the descendant before returning this ordinary failure.
+	// The leader's exit cannot complete capture until the inherited output pipe
+	// closes and the descendant's process group has independently joined.
 }
 
 func TestAuthenticationCommandOwnership(t *testing.T) {

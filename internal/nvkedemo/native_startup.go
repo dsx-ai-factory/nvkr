@@ -101,6 +101,8 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	config := startupCloudConfig{
 		WriteFiles: []startupFile{
 			{"/var/lib/nvke-native/prepare.sh", "0700", script.String()},
+			{"/etc/systemd/system/nvke-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
+			{"/etc/systemd/system/spire-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
 		},
 		RunCmd: [][]string{{"/bin/bash", "/var/lib/nvke-native/prepare.sh"}},
 	}

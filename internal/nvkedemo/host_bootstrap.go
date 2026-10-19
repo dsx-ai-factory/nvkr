@@ -39,6 +39,9 @@ install -m 0755 downloads/nerdctl bin/nerdctl
 export PATH="$work/bin:$PATH"
 DEBIAN_FRONTEND=noninteractive NVKE_AGENT_SKIP_START=1 apt-get install -y -o DPkg::Lock::Timeout=600 \
   nvke-agent spire-agent nvke-kubeadm-distro-1.34.2 nvke-cni-ovn-images-{{.OVNVersion}} nvke-cni-ovn-charts-{{.OVNVersion}}
+# Cloud-init wrote logging-only drop-ins before package installation. Reload
+# even when APT finds the packages already installed and runs no postinst.
+systemctl daemon-reload
 systemctl stop nvke-agent.service spire-agent.service
 install -d -m 0700 /etc/nke
 install -d -m 1777 /var/lib/nvke-native/postgres /var/lib/nvke-native/spire

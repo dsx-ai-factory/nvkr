@@ -98,7 +98,11 @@ independently explicit; registry/provider secrets are not forwarded in the clust
 Relative policy and check-configuration paths resolve beside the profile. Lifecycle owns publication,
 source-Run lookup and artifact authentication; customers need no GitHub Run URL. An unsigned local
 Run or record cannot restore that hosted receipt. The separate explicit local diagnostic route below
-captures local bytes through its own concrete lifecycle owner.
+captures local bytes through its own concrete lifecycle owner. This route supports native
+Linux tools and Darwin ARM64 tools. Darwin uses owner-private executable snapshots with byte
+checks before/after commands and joined cleanup; it does not provide Linux sealed execution
+against a hostile same-user writer. Published-source validation remains Linux-only.
+Linux OCI suite images and exact Run/output bindings are unchanged.
 Check `name` is a configurable unique instance name; `suite` and `harness` select separate supported
 protocols. The initial suite/harness pair is `kube-conformance` / `hydrophone`. Unsupported pairs,
 including user/AI adapters, return `CodeUnsupported` before provider or harness work. New producers

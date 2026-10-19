@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -131,9 +132,14 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 	if err != nil {
 		return err
 	}
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	hydrophoneOutput, kubectlOutput := "hydrophone-arm64", "kubectl-arm64"
+	if platform == "darwin/arm64" {
+		hydrophoneOutput, kubectlOutput = "hydrophone-darwin-arm64", "kubectl-darwin-arm64"
+	}
 	local := conformance.LocalConfiguration{ToolsWorkspace: cfg.run, Runner: conformance.Options{
-		Hydrophone: conformance.ExecutableSelector{Output: "hydrophone-arm64", Member: "hydrophone", Platform: "linux/arm64"},
-		Kubectl:    conformance.ExecutableSelector{Output: "kubectl-arm64", Member: "kubectl", Platform: "linux/arm64"},
+		Hydrophone: conformance.ExecutableSelector{Output: hydrophoneOutput, Member: "hydrophone", Platform: platform},
+		Kubectl:    conformance.ExecutableSelector{Output: kubectlOutput, Member: "kubectl", Platform: platform},
 		Kubeconfig: conformance.Tool{Path: kubeconfig, Digest: kubeDigest}, Context: kube.Current,
 		CNINamespace: "ovn-kubernetes", CNISelector: "app=ovnkube-node", ImageVersion: "1.34.2", SuiteName: "kubernetes-conformance", Role: "local", DisposableCluster: true,
 		ConformanceImage: conformance.ImageSelector{Output: "conformance-image-arm64", Platform: "linux/arm64"},

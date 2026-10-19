@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"runtime"
 	"strings"
 	"time"
 
@@ -56,12 +57,14 @@ type Options struct {
 	Artifacts         *lifecycle.ArtifactCheckReceipt `json:"-"`
 	Targets           []DeploymentTarget              `json:"targets"`
 	localImageAliases map[string]string
+	localDiagnostic   bool
 }
 
 type admitted struct {
 	options                         Options
 	hydrophone, kubectl, kubeconfig *heldfile.File
 	kubeBytes                       []byte
+	native                          nativeExecution
 }
 
 func failure(reason string) error { return e.New(e.CodeVerifyFailed, "conformance: %s", reason) }
@@ -76,6 +79,16 @@ func captureFailure(ctx context.Context, err error, code e.Code, message string)
 	}
 	return e.Wrap(code, err, "%s", message)
 }
+
+// Darwin snapshots are restricted to captured local diagnostics. Published,
+// signing and qualification execution retain Linux held-descriptor admission.
+func requireExecutionSupport(local bool) error {
+	if local && runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		return nil
+	}
+	return heldfile.RequireExecutableSupport()
+}
+
 func capability(err error) error {
 	return e.Wrap(e.CodeEngineCapability, err, "conformance requires held Linux executable support")
 }
@@ -91,7 +104,7 @@ func admit(ctx context.Context, o Options) (*admitted, error) {
 		return nil, err
 	}
 	o = validated
-	if err = heldfile.RequireExecutableSupport(); err != nil {
+	if err = requireExecutionSupport(o.localDiagnostic); err != nil {
 		return nil, capability(err)
 	}
 	a := &admitted{options: o}
@@ -125,6 +138,8 @@ func (a *admitted) close() {
 		}
 	}
 }
+
+func (a *admitted) closeNative() error { return a.native.close() }
 
 // Kubeconfig syntax is owned by the established sigs.k8s.io/yaml decoder.
 // This deliberately narrow admission profile admits only self-contained static
@@ -239,7 +254,7 @@ func validateOptions(o Options) (Options, error) {
 		return Options{}, e.New(e.CodeUnpinnedInput, "conformance requires an exact kubeconfig access pin")
 	}
 	for _, selector := range []ExecutableSelector{o.Hydrophone, o.Kubectl} {
-		if err := validateExecutableSelector(selector); err != nil {
+		if err := validateExecutableSelectorFor(selector, o.localDiagnostic); err != nil {
 			return Options{}, err
 		}
 	}

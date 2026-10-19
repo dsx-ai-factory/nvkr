@@ -26,10 +26,10 @@ func defaultMacBuild(cfg *BuildConfig, platform, executable string) (bool, error
 	if platform != "darwin/arm64" || cfg.Definition != "" || cfg.Environment != "" || cfg.NVKR != "" {
 		return false, nil
 	}
-	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" || cfg.Conformance {
-		return false, e.New(e.CodeEngineCapability, "default Mac BUILD supports unsigned local execution without conformance")
+	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" {
+		return false, e.New(e.CodeEngineCapability, "default Mac BUILD supports unsigned local execution")
 	}
-	definition, _, err := LocalArtifactInputsFor(cfg.Network, false)
+	definition, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
 	if err != nil {
 		return false, err
 	}

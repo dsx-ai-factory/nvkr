@@ -26,7 +26,7 @@ runtime evidence bound to that revision.
 
 ## Open the complete demo's authored inputs
 
-The maintained local ARM demo selects **32 named outputs**, or **36 with conformance**, in one Definition. Start with its inputs,
+The maintained local ARM demo selects **32 named outputs**, or **38 with conformance**, in one Definition. Start with its inputs,
 not the separate three-output tutorial. Paths below are relative to the checkout selected by `--repo`.
 For NVIDIA OVN, open these in this order:
 

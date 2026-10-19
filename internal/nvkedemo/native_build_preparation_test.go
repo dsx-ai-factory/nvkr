@@ -26,7 +26,7 @@ func TestDefaultMacBuildRetainsTheProductSelectionAndExplicitInputs(t *testing.T
 		{name: "matched upstream", platform: "darwin/arm64", network: "upstream-ovn", wantDefault: true},
 		{name: "Linux retained", platform: "linux/arm64"},
 		{name: "explicit prepared retained", platform: "darwin/arm64", definition: ".nvkr/explicit/definition.json", environment: ".nvkr/explicit/environment.json", nvkr: "/explicit/nvkr"},
-		{name: "conformance stays Linux", platform: "darwin/arm64", conformance: true, reject: true},
+		{name: "Mac conformance", platform: "darwin/arm64", conformance: true, wantDefault: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := BuildConfig{Network: tc.network, Definition: tc.definition, Environment: tc.environment, NVKR: tc.nvkr, Conformance: tc.conformance}
@@ -48,7 +48,7 @@ func TestDefaultMacBuildRetainsTheProductSelectionAndExplicitInputs(t *testing.T
 				}
 				return
 			}
-			definition, _, err := LocalArtifactInputsFor(tc.network, false)
+			definition, _, err := LocalArtifactInputsFor(tc.network, tc.conformance)
 			if err != nil || cfg.Definition != definition || cfg.Environment != "inputs/environments/local-native-mac.json" || cfg.NVKR != "/distribution/bin/nvkr" {
 				t.Fatalf("default substituted product inputs: %+v, %v", cfg, err)
 			}

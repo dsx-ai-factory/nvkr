@@ -603,7 +603,11 @@ its recorded Plan and compiler inputs, and its exact payloads through lifecycle'
 `LocalDiagnosticArtifacts` owner. Product and tools may share that one owner; separate local
 Runs require separate captures. No publication identity, hosted origin, policy receipt or qualification
 input is synthesized. Local image aliases are descriptions only: selected running manifests must match
-the held output before and after the suite. Local executable members use the same held delivery export.
+the held output before and after the suite. Local executable members use the same held delivery export. Native Mac local diagnostics additionally admit exact Darwin ARM64 members through that local owner,
+using private Mach-O snapshots with checks before/after commands and owned process cleanup.
+Linux retains sealed executable descriptors. The Mac diagnostic does not widen published-source
+validation or qualified signing, and its pathname execution cannot prevent a hostile same-user
+writer from racing execution. Both hosts retain the same suite/image bindings and original JUnit.
 This capability is limited to `unqualified-local-execution`; partial, changed and dry-run attempts fail.
 
 The operator must explicitly declare an existing disposable local cluster. That declaration proves

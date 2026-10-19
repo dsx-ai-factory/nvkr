@@ -237,8 +237,11 @@ file artifacts; trusted selection summaries and runner logs remain diagnostic. T
 attaches only its constructed cycle summary, never unvalidated raw suite report files. These limits are not SLSA
 Build L3 or qualified execution claims.
 
-The explicit diagnostic `validate` route is separate from generated producer execution. It is Linux-only
-and executes authenticated, held tool bytes on the host with the selected embedded kubeconfig. Private
+The explicit diagnostic `validate` route is separate from generated producer execution. Published-source
+validation remains Linux-only with sealed executable descriptors. Captured-local-Run validation also
+admits Darwin ARM64 tools using private executable snapshots checked before/after commands; this
+local pathname execution does not provide Linux sealing against a hostile same-user writer. Both
+execute authenticated tool bytes on the host with the selected embedded kubeconfig. Private
 workspaces, pinned descriptors, bounded output, restricted environment and process cancellation/join
 protect capture and lifecycle; they provide no filesystem, network, privilege or container sandbox.
 The cluster endpoint can be remote: local/disposable acknowledgement is an operator declaration, not
@@ -629,6 +632,15 @@ extension does not by itself admit source compilation, hosted execution or signi
 This helper accepts neither an execution request nor a selected binding. It does not authenticate Environment
 membership or deterministic selection, own or enforce an execution deadline, reserve observed resources, prove a
 provider allocation, or authorize execution.
+
+The explicit captured-local-Run conformance diagnostic also admits native Darwin ARM64 tools.
+It retains authenticated executable bytes, copies each selected tool once to a private executable
+snapshot, and checks the snapshot inode, mode, size and digest before and after commands.
+A separate owner-only kubeconfig snapshot belongs to each command. Owned process-group
+cancellation and join precede snapshot cleanup. The same upstream suite and original-report
+capture run on both hosts; conformance images remain Linux OCI subjects. This local diagnostic
+has the pathname-execution limitation described below and issues no qualification receipt.
+Published-source validation and global held-executable/signing admission stay Linux-only.
 
 The existing direct-Packer driver separates host mechanics through one private execution-class interface.
 Validation/build arguments, authenticated material staging, plugin closure, exact output collection and

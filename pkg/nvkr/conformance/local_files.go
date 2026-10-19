@@ -53,7 +53,7 @@ func RunLocalFiles(ctx context.Context, productWorkspace, configPath string, run
 	if !localPathText(productWorkspace) || !localPathText(configPath) || !localPathText(runtimeOptions.WorkspaceRoot) {
 		return output, e.New(e.CodeUsage, "local conformance requires explicit product, configuration and report workspaces")
 	}
-	if err := heldfile.RequireExecutableSupport(); err != nil {
+	if err := requireExecutionSupport(true); err != nil {
 		return output, capability(err)
 	}
 	config, options, err := loadLocalConfiguration(ctx, configPath, runtimeOptions.WorkspaceRoot)
@@ -130,6 +130,7 @@ func loadLocalConfiguration(ctx context.Context, path, workspace string) (LocalC
 		return config, Options{}, e.Wrap(e.CodeUsage, err, "decoding local conformance configuration")
 	}
 	options := config.Runner
+	options.localDiagnostic = true
 	for _, timeout := range []struct {
 		value    string
 		fallback time.Duration

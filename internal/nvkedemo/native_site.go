@@ -66,8 +66,8 @@ func RunNative(ctx context.Context, cfg NativeConfig) (result error) {
 	if err := admitNativeHost(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator); err != nil {
 		return err
 	}
-	if cfg.conformance != nil && runtime.GOOS != "linux" {
-		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local conformance requires Linux")
+	if cfg.conformance != nil && runtime.GOARCH != "arm64" {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local conformance requires native ARM64")
 	}
 	if err := admitBootstrapHost(runtime.GOOS, NativeEnvironment()); err != nil {
 		return err

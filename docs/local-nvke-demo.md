@@ -303,11 +303,13 @@ and DNS rollouts before the same zero-retry workload. **Current native `run` and
 Existing legacy sessions and their original compatible tools retain their status
 and cleanup path below. Neither Calico nor upstream is NVIDIA-fork acceptance.
 
-## Conformance on the fresh Ubuntu tenant
+## Conformance on the fresh tenant
 
-Add `--conformance` to native Ubuntu ARM64 `e2e`. It selects 36 outputs in the
-same fresh artifact Run: the ordinary 32 plus Hydrophone, source-built kubectl,
-the matching Kubernetes v1.34.2 conformance image and BusyBox. The kubectl source
+Add `--conformance` to native Mac or Ubuntu ARM64 `e2e`. Both use the same
+38-output Definition and source pins: the ordinary 32 plus Linux and Darwin
+Hydrophone/kubectl outputs, the matching Linux ARM64 Kubernetes v1.34.2
+conformance image and BusyBox. Each host executes its native tools; the suite
+pods run in the same fresh Linux tenant. The kubectl source
 is v1.34.12 with declared dependency updates, built using Go 1.27.2.
 
 After two Ready tenant nodes and workload/DNS success, the demo calls
@@ -317,8 +319,11 @@ retained under `runtime/conformance`; `runtime/conformance-output.json` describe
 the capture. Harness failure, partial/missing capture or identity change prevents
 success. Owned cleanup still runs after errors.
 
-Conformance currently requires Linux ARM64; an explicit Mac request fails
-before build/guest work. Prepared/local-signing combinations are also refused.
+Mac local diagnostics use private Mach-O snapshots with byte checks before and
+after commands; Linux retains sealed executable descriptors. Mac pathname
+execution does not provide the Linux guarantee against a hostile same-user
+process. Published validation and signing retain Linux admission.
+Prepared/local-signing combinations are refused.
 The suite has a four-hour ceiling and increases the `e2e` work ceiling to 12 hours.
 The complete native demo plus conformance remains externally unverified.
 Original JUnit owns the results; this does not issue a signed qualification
@@ -426,6 +431,11 @@ Capture/diagnostic failure does not turn the original operation into success.
 Native failure collection preserves bounded site/tenant API and guest evidence
 before deletion; it does not retry provisioning or workload checks.
 
+Site preparation forwards `nvke-agent.service` and `spire-agent.service` stdout/stderr
+to the guest journal and console through logging-only unit drop-ins. Their output
+is available to the existing private serial capture, subject to journal filtering.
+This adds failure visibility; it does not establish or repair a failure cause.
+
 For Linux network recovery, `restore --work` accepts only the original private
 journal after its owned producers are idle. It restores recorded host-network
 controls; it does not delete a tenant, VM, container or Packer observer. See
@@ -446,8 +456,9 @@ Cross-process automatic Packer orphan recovery is not implemented.
 ## Repeat through the opt-in native E2E test
 
 `TestEndToEnd` invokes the normal `bin/nvke-demo e2e` CLI with fresh paths,
-NVIDIA OVN and cleanup. It supports native Mac/Ubuntu ARM64 and adds conformance
-on Linux only. Ordinary tests skip this real build/deployment operation.
+NVIDIA OVN, conformance and cleanup on native Mac/Ubuntu ARM64. Both hosts use
+the 14-hour wrapper budget, including two hours beyond the CLI work deadline.
+Ordinary tests skip this real build/deployment operation.
 The binary and checkout must come from the same reviewed source revision.
 
 ```sh
@@ -481,7 +492,7 @@ pinned commit and tree; they are not represented as one tagged NVKE release.
 | Explicit SPIRE packaging exception | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Native OS lock; missing DSX input tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
-Native NVIDIA Definitions select 32 outputs, or 36 with conformance. Package
+Native NVIDIA Definitions select 32 outputs, or 38 with conformance. Package
 producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
 uses NVKE's renamed Packer build/material schema and QCOW2 output. Changed package
 bytes require a fresh disk build. Release, upstream, historical TCG and hosted

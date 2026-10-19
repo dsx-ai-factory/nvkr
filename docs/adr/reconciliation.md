@@ -188,8 +188,13 @@ successful external execution of the corrected published-source route. Report pa
 validity, continuous installed-byte proof, AI/user adapters, Definition applicability detection,
 qualification signing and promotion from these outputs remain unimplemented. Explicit complete local diagnostic Runs are now captured through a lifecycle-owned capability,
 including original Plan/compiler inputs and held payloads. Product and tools may share one capture;
-local reports omit hosted qualification inputs. The shared native demo has an opt-in Linux ARM64
-conformance hook using matching suite/tool outputs from the same fresh artifact Run. Focused owner,
+local reports omit hosted qualification inputs. The shared native demo has an opt-in Mac/Linux ARM64 conformance hook using
+matching suite/tool outputs from the same fresh artifact Run. Linux retains
+sealed executable descriptors. Mac local diagnostics hold authenticated Darwin
+bytes and execute private Mach-O snapshots, checked before/after each command
+and removed after joined process cleanup. This detects replacement between
+commands, without Linux's sealed-descriptor guarantee against hostile same-user
+writers. Published validation, signing and qualification admission remain Linux-only. Focused owner,
 adapter and dispatch tests establish those contracts; the full native demo plus conformance remains
 externally unverified. Existing validation-vector v3 and qualification-evidence v2 are unchanged.
 [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
@@ -1402,7 +1407,7 @@ Diagnostic commit version stamps do not claim a tagged agent release; the select
 controller can still choose its source-owned legacy per-node compatibility form.
 The owning catalogs inspect Debian package names and architectures before accepting
 outputs. The disk uses the renamed Packer build, artifact path and material schema.
-The 32-output demo and 36-output local conformance selections share the same deployment
+The 32-output demo and 38-output local conformance selections share the same deployment
 closure. These are native diagnostic input changes, with no release/nightly pin change
 or new Release authority. A fresh package/QCOW build, site/tenant runtime, conformance
 and joined cleanup still require external evidence; prior failed Runs remain failed.
