@@ -258,7 +258,8 @@ validates expected versions/source stamps. Generated workers cover exactly the s
 platforms; the final AMD64 signer additionally requires its independently pinned cosign executable.
 
 The hosted worker and final qualifier each own a nineteen-minute operation deadline inside their
-twenty-minute Actions step. A shorter caller deadline still wins. The remaining minute allows cooperative
+twenty-minute Actions step. Manifest issuance shares the final qualifier's original deadline; it does not
+start a fresh budget after qualification publication. A shorter caller deadline still wins. The remaining minute allows cooperative
 joined cleanup and failure diagnostics; it is not a guaranteed return bound. Expiration cannot establish
 successful completion; attachments already published are not rolled back.
 Generated terminal commands replace the shell so cancellation reaches the CLI's signal handler.
@@ -363,6 +364,13 @@ output's surviving attachment cannot stand in for a later failed or canceled one
 canonical manifest (ADR-01) to the publication root under the qualification identity and verify the exact
 attached bytes again. The receipt is rechecked and cancellation is observed between every step. Issuance uses
 M2's existing bytes and never rebuilds, repacks or relabels a member.
+
+The production adapter derives that independent manifest policy from the one loaded qualification-policy
+snapshot: its repository, qualification workflow and default branch select the exact expected certificate
+identity, and its typed policy digest selects the evidence contract. The generated production qualifier
+requests issuance explicitly in the same process; development qualification cannot request a production
+manifest. The retained operation owns and closes the source, invocation, artifact and smoke receipts.
+It preserves qualification diagnostics on a later manifest failure and reports the overall operation as failed.
 
 An opaque manifest receipt is returned only after that verification; decoding a manifest cannot restore it.
 Attestation and verification are not atomic: an operational failure may leave a manifest attachment and is

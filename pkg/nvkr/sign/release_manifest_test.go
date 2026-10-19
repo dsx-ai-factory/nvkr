@@ -61,10 +61,6 @@ func TestReleaseManifestAttestationUsesSeparateTypeAndVerifiesExactBytes(t *test
 					if string(raw) != predicate {
 						t.Fatal("changed predicate")
 					}
-				case "download":
-					if call.args[3] != ReleaseManifestPredicateType {
-						t.Fatal("release manifest downloaded another evidence type")
-					}
 				case "verify-blob-attestation":
 					if call.args[4] != ReleaseManifestPredicateType {
 						t.Fatal("release manifest verified another evidence type")
@@ -82,7 +78,7 @@ func TestReleaseManifestAttestationUsesSeparateTypeAndVerifiesExactBytes(t *test
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(stub.calls) != 3 || stub.calls[0].args[0] != "attest" || stub.calls[1].args[0] != "download" || stub.calls[2].args[0] != "verify-blob-attestation" {
+			if len(stub.calls) != 2 || stub.calls[0].args[0] != "attest" || stub.calls[1].args[0] != "verify-blob-attestation" {
 				t.Fatalf("calls=%+v", stub.calls)
 			}
 		})

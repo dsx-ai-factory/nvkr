@@ -462,6 +462,33 @@ for `nvke-cni-calico` in `nvke-node-fde-arm64`) passed standard pinned cosign 3.
 Linux ARM64 in 0.974 seconds. This isolated bundle check did not reproduce the timeout; it neither checked
 the complete payload closure nor exercised native smoke or qualification publication.
 
+[Qualification Run 39309062376](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376)
+uses merged commit `c014f854fccf22ecead82daa7da084cd5d7b30aa` and the original producer's successful
+attempt-5 handoff. Its [ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376/job/118253636589)
+and [AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376/job/118253637003)
+both completed payload integrity checks for all 69 complete outputs, including four disks and the native
+children of four image indexes, then verified the required SBOM bundles. Disk filesystem/content inspection
+remains unperformed. Their nineteen-minute operation deadline expired during the subsequent output
+signature/provenance checks, after 15 and 16 outputs respectively. Both returned coded timeout diagnostics
+and exit 31 before native smoke or signed worker evidence. The remaining timeout rows reflect the expired
+shared context, not independent evidence that each remaining artifact is defective. The dependent
+[final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39309062376/job/118263498701)
+also completed all 69 payload and SBOM checks, then returned exit 31 at its nineteen-minute deadline after
+five output signature/provenance checks. It published no qualification subjects. The Run completed with
+failure at 19:53:33 UTC. These runs exercise the storage correction and diagnostic deadline; they do not
+establish complete qualification.
+
+A bounded read-only Linux ARM64 replay of the first real output's stock signing adapter took 33.018 seconds:
+30.699 seconds were spent in two cosign bundle downloads, with normal signature and exact production-predicate
+verification succeeding. That subject had five signature, five provenance and five SBOM bundles from
+historical publication attempts. Pinned cosign 3.1.3 fetched all 15 before predicate filtering on each download.
+The lazy acquisition implementation checked the same subject and exact predicate through the stock adapter
+in 6.865 seconds, using the same pinned binary, held-descriptor execution and normal transparency checks.
+The two recorded cryptographic invocations verified signature and provenance separately. A second stock
+replay of `csi-node-driver-registrar-image`, the first output to time out in the ARM64 worker, passed both
+checks and its exact expected predicate in 15.004 seconds. These bounded read-only replays did not exercise
+the complete publication, native smoke or qualification signing.
+
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
 retains positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy
@@ -971,11 +998,20 @@ the strict schema and deterministic identity, exact provenance coverage and clos
 refusals, a later member's missing or wrong-signer evidence despite earlier surviving attachments, manifest
 attachment and verification failures, receipt revocation and cancellation between steps, and type, subject,
 identity and issuer substitution in the cosign adapter. These are contract tests with fakes and a stubbed
-cosign runner. No CLI command or generated workflow invokes issuance yet;
-M4-B owns that connection. No hosted Run, OIDC manifest
-attestation, registry read-back or independent consumer verification is recorded. The tag rule, tag
-creation, publisher exclusion, consumer verification instructions and interruption demonstrations remain
-M4-D.
+cosign runner.
+
+M4-B connects issuance through `run qualify --issue-manifest` and the generated production qualifier.
+The qualification owner retains the same live source, invocation, artifact and smoke receipts through
+publication and issuance, and freezes the exact canonical published evidence independently of mutable
+diagnostics. The manifest adapter derives its expected qualification identity and policy digest from the
+single independently loaded policy snapshot. Development policies refuse production issuance before
+provider or publication work. A later manifest failure preserves qualification diagnostics and returns a
+nonzero outcome; no surviving attachment is reported as a completed release. CLI and orchestration
+contracts cover terminal failure reporting, receipt lifetime and lane isolation; generation contracts
+require issuance only in the production final signer. These are local contract tests, not hosted acceptance.
+No hosted Run, OIDC manifest attestation, registry read-back or independent consumer verification is
+recorded. The tag rule, tag creation, publisher exclusion, consumer verification instructions and
+interruption demonstrations remain M4-D.
 
 ## Support by owner
 
@@ -992,7 +1028,7 @@ M4-D.
 | 13 Evidence | Executable-target SBOMs select architecture-specific toolchain pins for Linux and Darwin ARM64 while preserving native Go compiler identities, without widening execution admission; exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; separately scoped archive member/hash inventories for source tarball assets in executable bundles; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Archive inventories describe files, not package dependencies; their hosted producer path remains unexercised. Factory callers retain ordinary hint-free binary inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed plain/public-bootstrap FDE OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; private-passphrase FDE, strict FDE and object-store delivery are unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
-| 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics; M4-C release-manifest schema and receipt-gated issuance | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. M4 manifest issuance is contract-tested only and not yet invoked by a CLI or workflow. Qualified clearance, release-specific trusted time, M4 tags and revocation remain unimplemented |
+| 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics; M4-C release-manifest schema and receipt-gated issuance | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. M4 manifest issuance is invoked by `run qualify --issue-manifest` and the generated production qualifier, with local contract coverage only; hosted OIDC attestation, registry read-back and independent consumer verification remain unexercised. Qualified clearance, release-specific trusted time, M4 tags and revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, diagnostic output pulling, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
 | 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Successful hosted qualification, same-run retry qualification and independent-consumer acceptance remain unproved. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its first scheduled attempt failed before runtime and no successful combined cycle is recorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |

@@ -63,7 +63,7 @@ func TestQualificationCLISelectsOnlyIndependentPolicy(t *testing.T) {
 	}
 	for _, flag := range cmdRunQualify().Flags {
 		for _, name := range flag.Names() {
-			if name != "policy" && name != "workspace" {
+			if name != "policy" && name != "workspace" && name != "issue-manifest" {
 				t.Fatalf("qualify exposes candidate or trust override %s", name)
 			}
 		}

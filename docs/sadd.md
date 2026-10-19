@@ -737,8 +737,11 @@ External suites outside scope are explicitly not evaluated. Future required suit
 subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
 conformance or cluster qualification. M4 issues a canonical release manifest listing every artifact only after
 its exact passing qualification evidence is authenticated on every member, and attests it to the publication root
-under the qualification identity; issuance has contract coverage only. A failing, incomplete or wrong-signer
-verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
+under the qualification identity. The generated production qualifier invokes issuance in the same process
+through `run qualify --issue-manifest`, retaining live receipts and the exact canonical evidence. The same
+independently loaded qualification policy selects the expected signer and policy digest. Development stays
+qualification-only. Issuance has contract coverage only; hosted acceptance remains unproved. A failing,
+incomplete or wrong-signer verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
 deferred beyond the MVP.
 
 #### Qualified reproduction and release
