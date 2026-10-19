@@ -130,12 +130,19 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 			return Inspection{}, err
 		}
 	}
+	objectDescriptors := map[string]bool{}
 	for _, object := range publication.Objects {
+		objectDescriptors[object.DescriptorDigest] = true
 		if object.Output == nil && object.Evidence == nil {
 			continue
 		}
-		if _, exists := descriptors[object.DescriptorDigest]; exists {
+		if direct[object.DescriptorDigest] {
 			return Inspection{}, e.New(e.CodeVerifyFailed, "deliverable is duplicated in release repository")
+		}
+		// Root validation permits only consistent native output aliases. Check
+		// their physical closure once; each named binding is still checked below.
+		if _, exists := descriptors[object.DescriptorDigest]; exists {
+			continue
 		}
 		descriptor := Descriptor{MediaType: publishedManifestMediaType(object), Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
 		if err := verifyDescriptorForInspection(ctx, root, descriptor, visited, disks); err != nil {
@@ -146,7 +153,7 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 	if err := verifyBlobInventory(root, visited); err != nil {
 		return Inspection{}, err
 	}
-	if len(descriptors) != len(publication.Objects) {
+	if len(descriptors) != len(objectDescriptors) {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "publication-root object count does not match OCI descriptors")
 	}
 	for _, object := range publication.Objects {

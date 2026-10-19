@@ -10,6 +10,7 @@ import (
 
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // GitHubExecutionFor projects the effective hosted runner and instruction without
@@ -41,7 +42,23 @@ func (plan *Plan) GitHubExecutionFor(node Node) (Node, error) {
 	return node, nil
 }
 
+func admitGitHubPayloads(plan *Plan) error {
+	// Payload admission precedes execution projection: a Linux cross-toolchain
+	// does not authorize a Darwin payload on any hosted runner selector.
+	for _, output := range plan.Definition.Outputs {
+		if output.Platform != "" {
+			if err := target.ValidatePlatform(output.Platform); err != nil {
+				return e.Wrap(e.CodeEngineCapability, err, "GitHub execution requires Linux payload targets")
+			}
+		}
+	}
+	return nil
+}
+
 func admitGitHubPlatforms(plan *Plan) error {
+	if err := admitGitHubPayloads(plan); err != nil {
+		return err
+	}
 	// Existing ARC plans retain their independently admitted execution projection.
 	if plan.Environment.GitHubARC != "" && len(plan.Environment.GitHubRunners) == 0 {
 		return nil
@@ -67,6 +84,9 @@ func admitGitHubPlatforms(plan *Plan) error {
 }
 
 func admitGitHubNodePlatform(plan *Plan, node Node, observed string) error {
+	if err := admitGitHubPayloads(plan); err != nil {
+		return err
+	}
 	execution, err := plan.GitHubExecutionFor(node)
 	if err != nil {
 		return err

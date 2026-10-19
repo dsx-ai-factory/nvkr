@@ -338,12 +338,15 @@ limits visible through the current cgroup mount, not a reservation, hidden ances
 allocation or a hosted identity boundary. The generic APIs do not by themselves connect a production disk
 compiler, packaging consumer or publisher.
 
-The diagnostic guest package capture schema `nvkr.dev/package-acquisitions/v1` has scope
+The diagnostic guest package capture schemas `nvkr.dev/package-acquisitions/v1` and the original upstream
+NVKE envelope `nkd.dev/package-acquisitions/v1` have scope
 `apt-pre-install-pkgs` and target `amd64` or `arm64`. Its canonical JSON manifest is the first USTAR member,
 followed by nonempty, unique package members in digest order with exact digest-derived paths and sizes.
 Limits are 16,384 packages, 1 GiB per package, 8 MiB manifest, 8 GiB archive, and 1–32 bounded raw repository
 locations per package, each at most 4,096 bytes. The owning held-archive verifier checks member-byte
 correspondence without extraction; package display metadata and locations remain source-reported descriptions.
+The reader preserves the original envelope and digest-bound bytes; accepting either exact schema name does
+not rewrite the producer, permit other versions or change the validation and authority boundaries.
 Header metadata and member padding are opaque digest-bound bytes, not canonical package evidence. Capture
 settings belong to the selected producer configuration. The [capture contract](../nvke-os-acquisition-contract.md)
 describes the unpinned NVKE candidate. The generic collector binds a selected carrier to its original

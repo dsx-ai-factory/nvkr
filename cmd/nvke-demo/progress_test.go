@@ -20,6 +20,36 @@ import (
 
 type failedProgressWriter struct{ short bool }
 
+func TestBuildRunLocatorsSurviveConciseOutputAndReplay(t *testing.T) {
+	const locators = "Artifacts Run: /workspace/.nvkr/runs/artifacts-001\nNative tools Run: /workspace/.nvkr/native-tools/runs/tools-001\n"
+	for _, mode := range []string{"concise", "plain", "dashboard replay", "failed dashboard replay"} {
+		t.Run(mode, func(t *testing.T) {
+			var output bytes.Buffer
+			if strings.Contains(mode, "replay") {
+				writer := &checkedWriter{out: &output, started: time.Now()}
+				if _, err := io.WriteString(writer, locators); err != nil {
+					t.Fatal(err)
+				}
+				output.Reset()
+				writer.replayResults(mode == "dashboard replay")
+			} else {
+				err := runProgress(t.Context(), &output, mode == "plain", func(_ context.Context, writer io.Writer) error {
+					_, err := io.WriteString(writer, locators)
+					return err
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, line := range strings.Split(strings.TrimSpace(locators), "\n") {
+				if strings.Contains(output.String(), line) == (mode == "failed dashboard replay") {
+					t.Fatalf("Run locator visibility differs for %s: %q", mode, output.String())
+				}
+			}
+		})
+	}
+}
+
 func (w failedProgressWriter) Write(data []byte) (int, error) {
 	if w.short {
 		return len(data) / 2, nil

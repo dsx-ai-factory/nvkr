@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Edit the absolute paths for your dedicated Ubuntu ARM64 execution host.
-# On macOS, these paths refer to files INSIDE the Colima Linux VM.
+# Edit the absolute paths for your native Mac or Ubuntu ARM64 execution host.
+# Both hosts select their default native build inputs; explicit selections are
+# optional. See docs/local-nvke-demo.md for prerequisites.
 # This is a local diagnostic description, not an NVKR Definition or Release.
 version: 1
 build:
   repo: /workspace/nvkr
-  # Default: fetch pinned remote Git sources. Authentication must work on Linux.
+  # Default: fetch pinned remote Git sources from their catalog URLs.
   # Optional: uncomment only for an accessible local Git object source.
   # nvkeClone: /workspace/nvke-source
   attempt: demo-e2e-01

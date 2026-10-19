@@ -60,13 +60,6 @@ func TestAutomaticQualificationFlagOverridesConfiguration(t *testing.T) {
 						}
 						return nvkedemo.BuiltInputs{}, stop
 					},
-					prepare: func(_ context.Context, cfg nvkedemo.BuildConfig, _ nvkedemo.Config) (nvkedemo.Config, error) {
-						called = true
-						if cfg.QualifyLocal != value {
-							t.Fatal("flag override lost")
-						}
-						return nvkedemo.Config{}, stop
-					},
 				}
 				flag := "--qualify-local=false"
 				if value {

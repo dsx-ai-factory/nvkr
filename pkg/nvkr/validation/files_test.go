@@ -48,7 +48,7 @@ func TestProfileCapabilityRefusalPrecedesSourceAndHarnessWork(t *testing.T) {
 			p.Checks = append(p.Checks, Check{Name: "user-added", Suite: "ai-tests", Harness: "command", Config: "/must-not-open"})
 		}, e.CodeUnsupported, "suite"},
 		{"other harness", "", func(p *Configuration) { p.Checks[0].Harness = "sonobuoy" }, e.CodeUnsupported, "harness"},
-		{"local source", "", func(p *Configuration) { p.Source.Kind = "local" }, e.CodeEngineCapability, "owning diagnostic capability"},
+		{"mixed local source", "", func(p *Configuration) { p.Source.Kind = "local" }, e.CodeUsage, "explicit workspace"},
 		{"wrong reference", "", func(p *Configuration) { p.Source.Reference = "registry.example.test/release:latest" }, e.CodeUsage, "source reference"},
 		{"GitHub Run URL", "", func(p *Configuration) { p.Source.Reference = "https://github.com/example/nvkr/actions/runs/42" }, e.CodeUsage, "immutable OCI"},
 		{"duplicate check", "", func(p *Configuration) { p.Checks = append(p.Checks, p.Checks[0]) }, e.CodeUsage, "unique"},
@@ -243,5 +243,60 @@ func TestCompleteCaptureContinuesAfterNonzeroHarnessExit(t *testing.T) {
 		if output.CaptureStatus != testresults.CaptureComplete || output.Environment[0].Metadata.Value != "1" {
 			t.Fatal("dispatch changed capture status or harness fact")
 		}
+	}
+}
+
+func TestLocalProfileKeepsRepositoryRunPathSeparateFromConfigurationPaths(t *testing.T) {
+	profile := profileFixture()
+	profile.Source = Source{Kind: "local", Workspace: ".nvkr/runs/fresh-demo"}
+	raw, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := saveProfile(t, raw)
+	loaded, checks, err := loadConfiguration(t.Context(), "kube-conformance", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Source.Workspace != profile.Source.Workspace || loaded.Source.Reference != "" || loaded.Source.Policy != "" {
+		t.Fatalf("local source acquired publication fields or changed repository path: %+v", loaded.Source)
+	}
+	if len(checks) != 1 || checks[0].Config != filepath.Join(filepath.Dir(path), profile.Checks[0].Config) {
+		t.Fatal("check configuration did not resolve beside profile")
+	}
+}
+
+func TestLocalAndPublishedProfileFieldsCannotMix(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*Configuration)
+		text string
+	}{
+		{"local reference", func(p *Configuration) {
+			p.Source.Reference = "registry.example.test/release@sha256:" + strings.Repeat("a", 64)
+		}, "without publication or policy"},
+		{"local policy", func(p *Configuration) { p.Source.Policy = "/must-not-open" }, "without publication or policy"},
+		{"missing Run", func(p *Configuration) { p.Source.Workspace = "" }, "explicit workspace"},
+		{"Run whitespace", func(p *Configuration) { p.Source.Workspace = " .nvkr/runs/fresh-demo" }, "explicit workspace"},
+		{"Run control", func(p *Configuration) { p.Source.Workspace = ".nvkr/runs/\x1b" }, "explicit workspace"},
+		{"published Run", func(p *Configuration) {
+			p.Source = profileFixture().Source
+			p.Source.Workspace = ".nvkr/runs/fresh-demo"
+		}, "cannot include a local workspace"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			profile := profileFixture()
+			profile.Source = Source{Kind: "local", Workspace: ".nvkr/runs/fresh-demo"}
+			tc.edit(&profile)
+			raw, err := json.Marshal(profile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			outputs, err := RunFiles(t.Context(), "", saveProfile(t, raw), lifecycle.QualificationRuntimeOptions{WorkspaceRoot: "/must-not-create"})
+			requireError(t, err, e.CodeUsage, tc.text)
+			if len(outputs) != 0 {
+				t.Fatal("mixed source admission emitted reports")
+			}
+		})
 	}
 }

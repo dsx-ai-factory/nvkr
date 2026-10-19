@@ -1,8 +1,12 @@
 # Use the Go CLI to demonstrate NVKR and NVKE
 
-Run **`nvkr`** for catalog, input, Plan, artifact and release operations. Run **`nvke-demo e2e`** for the
-complete Linux ARM64 build and tenant demonstration. These are the existing Go entry points; no new
-shell wrapper is required.
+Run **`nvkr`** for catalog, input, Plan, artifact and release operations. The Go demo CLI's
+`run` and `e2e` commands use one shared native deployment path: one QEMU site and two tenant guests.
+NVKE's host-native `nvkectl` uses a temporary Kind bootstrap, then deploys the permanent site stack
+and creates the tenant. Kind is removed before tenant startup; it is not the permanent site.
+The [operational guide](local-nvke-demo.md#native-linux-and-mac-path) explains the native topology,
+current validation limits and host prerequisites. `e2e` builds fresh artifact and native-tool Runs;
+`run` consumes explicitly selected completed Runs. Each invocation retains its own evidence.
 
 ## Prepare the Go binaries
 
@@ -17,28 +21,28 @@ bin/nvke-demo e2e --help
 
 `make build` produces `bin/nvkr`; `make demo` produces `bin/nvke-demo`. Record the full source commit
 with `git rev-parse HEAD`. A working CLI does not prove an accepted tenant deployment. These commands
-were checked against source `68b09b8e71048fdbcbd4a11b4b7d1264a1e04c6f` plus the local strict
-18-argument launcher compatibility fix and optional walkthrough in this change; select a reviewed revision and use
-that revision's help. Never silently mix a binary, inputs and runtime evidence from different revisions.
+must use one reviewed source revision and that revision's help. Keep the binary, inputs and
+runtime evidence bound to that revision.
 
 ## Open the complete demo's authored inputs
 
-The full ARM demo selects **29 named outputs** in one Definition. Start with its inputs,
+The maintained local ARM demo selects **32 named outputs**, or **38 with conformance**, in one Definition. Start with its inputs,
 not the separate three-output tutorial. Paths below are relative to the checkout selected by `--repo`.
 For NVIDIA OVN, open these in this order:
 
 | File | What to explain |
 |---|---|
-| `inputs/definitions/demo/arm64-nvidia-tcg.json` | The complete named output selection, including per-output catalog stacks. |
+| `inputs/definitions/demo/arm64-nvidia-local-kvm.json` | The complete local named output selection, including per-output catalog stacks. |
+| `inputs/definitions/demo/arm64-nvidia-local-kvm-conformance.json` | The same selection plus version-matched Kubernetes conformance tools and images. |
 | Each selected stack's `registry.yaml` | Reusable build/acquisition producers, dependencies and instructions. |
 | Each selected stack's `pins.lock.yaml` | CLI-managed exact source, artifact and tool identities. |
-| `inputs/catalogs/node-images/variants/nvidia-tcg.json` | The explicitly selected OS producer overlay; it is an authored file. |
-| `inputs/environments/local-arm64-tcg.json` | Native Linux ARM64 Docker execution; publication and signing are absent. |
+| `inputs/catalogs/node-images/variants/native-nvidia.json` | The native OS producer overlay; it is an authored file. |
+| `inputs/environments/local-arm64-kvm.json` | Native Linux ARM64 Docker/KVM build execution; publication and signing are absent. |
 
 The default catalog is `inputs/catalogs/nvke/module-cli-arm64`; other outputs select their own complete stacks. The Go
 `e2e --walkthrough` introduction enumerates the selected catalog and overlay paths from the actual
 Definition and prints the actual output count. For explicit `upstream-ovn`, it instead reads
-`inputs/definitions/demo/arm64-upstream-tcg.json`. It never changes the NVIDIA default to make a demo pass.
+`inputs/definitions/demo/arm64-upstream-local-kvm.json`. It never changes the NVIDIA default to make a demo pass.
 
 These read-only commands inspect the NVIDIA selection:
 
@@ -46,8 +50,8 @@ These read-only commands inspect the NVIDIA selection:
 bin/nvkr catalog validate --data inputs/catalogs/nvke/module-cli-arm64
 bin/nvkr catalog list --data inputs/catalogs/nvke/module-cli-arm64
 bin/nvkr catalog source-pin --data inputs/catalogs/nvke/module-cli-arm64 nvke
-bin/nvkr definition validate --definition inputs/definitions/demo/arm64-nvidia-tcg.json
-bin/nvkr definition inspect --definition inputs/definitions/demo/arm64-nvidia-tcg.json
+bin/nvkr definition validate --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json
+bin/nvkr definition inspect --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json
 ```
 
 A customer saying “recipe” usually means a reusable catalog producer. The current schema selects
@@ -80,23 +84,22 @@ inputs; artifact digests identify produced bytes. A missing record is not succes
 originals and keep private diagnostics off the shared screen. For the smaller general-purpose tutorial,
 use [the M1 walkthrough](../demos/m1-local.md); it is a different selection.
 
-## Run the full Linux ARM64 NVKE demo with its Go CLI
+## Run the full native ARM64 NVKE demo with its Go CLI
 
 The full path is **NVKR builds → NVKE consumes those exact outputs → real tenant → workload/DNS →
 natural tenant deletion → joined cleanup**. It is a separate, explicitly requested host-mutating operation.
-Follow the existing [Ubuntu ARM64 preparation guide](local-nvke-demo.md): native storage, Docker/Buildx,
-libvirt/QEMU, kernel modules, source access, runtime images and administrator capability checks.
-Use a prepared dedicated Linux ARM64 host. A Darwin CLI build or Linux hosted inside Colima is not proof
-of native Mac NVKE deployment. No VM workaround is selected by these commands.
+Follow the [native Mac and Ubuntu ARM64 preparation guide](local-nvke-demo.md#native-linux-and-mac-path).
+Both hosts execute the Go demo and `nvkectl` locally; their virtualization and temporary
+container-backend prerequisites are platform-specific.
+The native Linux bootstrap integration is still under validation; successful artifact builds alone do not
+establish a working deployment.
 
-Set the existing local source clone path, then choose a fresh attempt and output directory:
+Choose a fresh attempt and output directory. The default fetches pinned dependency sources from
+their catalog URLs; pre-existing dependency repositories are not required:
 
 ```sh
-: "${NVKE_LOCAL_CLONE:?Set the absolute path of the local NVKE source clone}"
 bin/nvke-demo e2e \
-  --config demos/local-nvke.yaml \
   --repo "$PWD" \
-  --nvke-clone "$NVKE_LOCAL_CLONE" \
   --attempt presentation-arm-01 \
   --out "$PWD/.nvkr/presentation-arm-01-demo" \
   --jobs 2 \
@@ -112,17 +115,24 @@ The existing CLI chooses its outer TUI in an interactive terminal; `--plain` sel
 host's actual capacity. `--cleanup` requests natural tenant deletion and joined cleanup before return.
 Omitting it instead retains a Ready environment and is not full cleanup acceptance.
 
-This change adds optional `--walkthrough` (or `run.walkthrough: true` in explicit YAML). For `e2e`,
-it prints the selected inputs, concepts, generated-record locators and source-pinned documentation links
+For `e2e`, optional `--walkthrough` (or `run.walkthrough: true` in explicit YAML)
+prints the selected inputs, concepts, generated-record locators and source-pinned documentation links
 after typed configuration admission, before the dashboard. This introduction is read-only presentation;
 it does not establish platform support, execute producers or grant runtime admission. The unchanged
 runtime checks still decide whether work can proceed. After the original workload/DNS check, bounded
-read-only site/tenant observations show nodes, pods, rollouts and the existing Job's zero-retry result
-before cleanup. The Job is never rerun to create success. No input pauses are added and TUI remains the default.
+read-only native site/tenant observations show API readiness, node roles and anonymous pod status/restarts
+before cleanup. The legacy Kind management walkthrough additionally presents workload inventory,
+selected rollouts and the existing Job's zero-retry result. The native path still enforces the preceding
+zero-retry workload/DNS acceptance. The Job is never rerun to create success. No input pauses are added
+and TUI remains the default.
 
-The existing Go entry point is retained. The private launcher contract requires exactly 18 arguments,
-including its internal `--ui=plain`; missing, replaced, split or extra arguments remain rejected.
-That internal child setting does not disable the outer demo's TUI.
+The inner NVKR command uses `--ui=plain` so its progress can feed the outer demo dashboard.
+That child setting does not disable the outer TUI. Explicit build inputs also capture compiler inputs
+through NVKR's existing input owner, including the closure needed by local conformance reporting.
+
+For conformance on either native host, add `--conformance`. NVKR builds the version-matched tools in the same fresh
+artifact Run, then runs them against that invocation's tenant before cleanup. Retain the original JUnit
+and inspect its failure/error counts. This local report does not upload results to TestGrid automatically.
 
 The current runtime validation has not established a new complete accepted demonstration. Artifact
 completion alone is insufficient. Full acceptance requires the same fresh Run's complete required-output
@@ -130,11 +140,11 @@ set, exact consumed bytes, two distinct real Ready tenant nodes, zero-retry work
 natural tenant deletion, joined owned cleanup and natural exit zero. Preserve failed originals and use
 fresh resource inventory before recovery. Never call an incomplete recording a successful demo.
 
-The full output retains `demo-inputs.json`, `site/site-inputs.json`, `site/tenant-result.json` and private
-logs. The Run remains under `.nvkr/runs/<attempt>/lifecycle.json`. Keep credentials, node addresses,
-private kubeconfigs and provider logs off the shared screen. Native Mac deployment is separate feature
-work; the Darwin operator and Linux tenant runtime have distinct support and acceptance gates.
-Do not merge their evidence.
+The native output retains prepared assets and a private `runtime` directory with site/tenant kubeconfigs,
+observations and the native result when completed. The artifact Run remains under
+`.nvkr/runs/<attempt>/lifecycle.json`; the native-tool Run is under `.nvkr/native-tools/runs/<attempt>`.
+Keep credentials, node addresses, private kubeconfigs and provider logs off the shared screen.
+Mac and Linux share source and orchestration, while each requires its own complete runtime result.
 
 ## Publish and inspect an exact local diagnostic package
 
@@ -157,7 +167,7 @@ bin/nvkr publish inspect --layout "$NVKR_REVIEW_DIR/cli-publication"
 ```
 
 The output directory must be absent. This validates the selected package and creates a local
-**unqualified diagnostic** publication root, not a signed Release or the full 29-output deployment.
+**unqualified diagnostic** publication root, not a signed Release or the full deployment.
 To push that diagnostic to an explicitly selected existing development registry, use:
 
 ```sh
@@ -171,11 +181,10 @@ Add `--plain-http` only for a supported loopback development registry. Registry 
 remain customer-owned; these commands do not start a registry or obtain authorization implicitly.
 The push prints a digest-pinned reference. It does not create a signature or qualification.
 
-During `nvke-demo e2e`, the Go adapter separately starts its owned temporary registry, copies exact
-selected runtime images, reads their descriptors back and installs the selected artifacts into the site.
-This is local artifact distribution for the cluster, not release signing. Its retained `site/site-inputs.json`
-records the selected outputs, references, observed deployment bindings and chart digests. Do not publish
-private registry addresses or raw provider logs in a customer report.
+During the native demo, the adapter distributes the selected verified local image archives to the
+bootstrap backend and site startup. NVKE consumes those images for its controller, providers and runtime
+services. This is local artifact distribution for the cluster, not release signing. Retain the selected Run
+and native input/output records; keep private endpoints and raw provider logs out of customer reports.
 
 ## Verify an existing published Release
 
@@ -201,5 +210,6 @@ The Go introduction links directly to the reviewed source baseline's
 [catalog authoring](https://github.com/dsx-ai-factory/nvkr/blob/68b09b8e71048fdbcbd4a11b4b7d1264a1e04c6f/docs/catalogs-and-components.md),
 [documentation map](https://github.com/dsx-ai-factory/nvkr/blob/68b09b8e71048fdbcbd4a11b4b7d1264a1e04c6f/docs/README.md) and
 [ARM demo prerequisites](https://github.com/dsx-ai-factory/nvkr/blob/68b09b8e71048fdbcbd4a11b4b7d1264a1e04c6f/docs/local-nvke-demo.md).
-These pages explain the baseline contracts; the walkthrough addition itself remains a local change
-until reviewed and committed. Native Mac deployment is separate work and is not claimed by this guide.
+These links identify the historical narration baseline. Use the documentation at the selected source
+revision to assess current implementation and recorded validation; historical explanations do not establish
+a fresh successful Mac or Linux invocation.

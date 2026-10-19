@@ -56,6 +56,12 @@ type OperatorStatusWriter interface {
 // responses, kubeconfigs and command diagnostics stay in private local logs.
 // This observation neither grants retention nor changes acceptance criteria.
 func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner, out io.Writer) error {
+	return access.writeLiveStatus(ctx, runner, out, false)
+}
+
+// The optional walkthrough adds only read-only pods to the same owned cluster
+// observation. It does not change readiness or workload acceptance.
+func (access OperatorAccess) writeLiveStatus(ctx context.Context, runner Runner, out io.Writer, walkthrough bool) error {
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "live cluster status requires a context and output writer")
 	}
@@ -82,13 +88,21 @@ func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner,
 		return nvkrerr.New(nvkrerr.CodePreflightFailed, "could not retain private cluster status diagnostics")
 	}
 	runner.Work, runner.Progress, runner.output = logs, nil, nil
-	bounded, cancel := context.WithTimeout(ctx, 45*time.Second)
+	timeout := 45 * time.Second
+	if walkthrough {
+		timeout = walkthroughTimeout
+	}
+	bounded, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var text strings.Builder
 	fmt.Fprintf(&text, "\nLive Kubernetes checks · %s\nActual bundled kubectl; read-only observations, not a Release or a continuous health guarantee.\n", time.Now().UTC().Format(time.RFC3339))
 	failed, unjoined := false, false
 	var cancellation error
-	for _, cluster := range []struct{ name, config string }{{"Site / Kind management", access.site}, {"Tenant / QCOW2", access.tenant}} {
+	siteName := "Site / Kind management"
+	if access.siteQCOW {
+		siteName = "Site / native QCOW2"
+	}
+	for _, cluster := range []struct{ name, config string }{{siteName, access.site}, {"Tenant / QCOW2", access.tenant}} {
 		fmt.Fprintf(&text, "\n%s\n$ kubectl --kubeconfig <selected private config> get --raw=/readyz\n", cluster.name)
 		raw, probeErr := runner.Capture(bounded, []string{access.kubectl, "--kubeconfig", cluster.config, "--request-timeout=10s", "get", "--raw=/readyz"}, clusterPhase(cluster.config == access.site, "api"), 15*time.Second)
 		if probeErr != nil || strings.TrimSpace(string(raw)) != "ok" {
@@ -120,13 +134,43 @@ func (access OperatorAccess) WriteLiveStatus(ctx context.Context, runner Runner,
 		}
 		_ = columns.Flush() // strings.Builder cannot fail.
 		failed = failed || ready != len(rows)
+		if walkthrough {
+			text.WriteString("$ kubectl --kubeconfig <selected private config> get pods -A -o json\n")
+			raw, podErr := runner.Capture(bounded, []string{access.kubectl, "--kubeconfig", cluster.config, "--request-timeout=10s", "get", "pods", "-A", "-o", "json"}, clusterPhase(cluster.config == access.site, "pods"), 15*time.Second)
+			var podRows string
+			if podErr == nil {
+				podRows, podErr = walkthroughPodRows(raw)
+			}
+			if podErr != nil {
+				cancellation = errors.Join(cancellation, operatorCancellation(podErr), operatorCancellation(bounded.Err()))
+				text.WriteString("Pods: observation not confirmed. Private diagnostics retained.\n")
+				failed, unjoined = true, unjoined || errors.Is(podErr, ErrUnjoined)
+				if errors.Is(podErr, ErrUnjoined) || bounded.Err() != nil {
+					break
+				}
+			} else {
+				text.WriteString(podRows)
+			}
+		}
 	}
 	if text.Len() > 64<<10 {
-		return nvkrerr.New(nvkrerr.CodePreflightFailed, "public cluster observation exceeds its presentation limit; private diagnostics retained")
-	}
-	status := OperatorStatus{text: text.String()}
-	if err := writeOperatorStatus(out, status); err != nil {
+		err := nvkrerr.New(nvkrerr.CodePreflightFailed, "public cluster observation exceeds its presentation limit; private diagnostics retained")
+		if unjoined {
+			return errors.Join(err, ErrUnjoined)
+		}
 		return err
+	}
+	var presentationErr error
+	if walkthrough {
+		presentationErr = writeWalkthroughPages(bounded, out, text.String())
+	} else {
+		presentationErr = writeOperatorStatus(out, OperatorStatus{text: text.String()})
+	}
+	if presentationErr != nil {
+		if unjoined {
+			return errors.Join(presentationErr, ErrUnjoined)
+		}
+		return presentationErr
 	}
 	if failed {
 		var err error = nvkrerr.Wrap(nvkrerr.CodePreflightFailed, errOperatorHealthUnconfirmed, "current cluster health was not confirmed; retained environment was not changed")

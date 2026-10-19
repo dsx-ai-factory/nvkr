@@ -38,10 +38,17 @@ execution, separate development signing/publication credentials, and attempt-sco
 Controlled dispatch-adapter tests run with `make test-ci-tools`; registry cleanup is owned by the Go
 development module and the separate default-branch cleanup workflow.
 
-Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nvke-demo.md) for
-`nvke-demo e2e`: build selected artifacts through `nvkr`, then deploy those
-completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
-host through Colima; this is not a native Darwin build.
+The Go CLI is the entry point for the
+[shared native Linux/Mac path](../docs/local-nvke-demo.md#native-linux-and-mac-path):
+`nvke-demo build`, `run` and `e2e`; `tools` and `native` expose focused operations. The native site runs in QEMU; Kind is
+temporary bootstrap infrastructure. NVKR owns artifact builds, including QCOW2
+outputs; native NVKE commands own bootstrap and deployment. Native runtime
+acceptance against the selected source remains pending.
+
+Follow the [native build-and-deploy guide](../docs/local-nvke-demo.md#native-linux-and-mac-path).
+The standard `e2e` command builds through NVKR, then invokes the same three-VM
+deployment owner as `run`. The default Mac BUILD prepares native inputs from the
+documented installed prerequisites before invoking NVKR. No Colima execution host is substituted.
 
 `nvke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
 [focused selections](../inputs/definitions/demo/README.md);
@@ -78,7 +85,7 @@ The local walkthrough publishes to its loopback registry using dry-run signing. 
 The demo uses the loopback registry on port 5000. It generates its own valid
 immutable attempt names.
 
-The non-FDE OS-image bootstrap uses one shared catalog. Its maintained routes
+The non-FDE OS-image bootstrap selects explicit catalog inputs. Its maintained routes
 are native ARM64 and AMD64 Linux Docker/KVM. The older Podman/TCG route and its
 stale toolchain pin are removed; generic NVKR Podman execution support is unchanged.
 
@@ -91,6 +98,10 @@ instead; its validation does not change the older wrapper's pin contract.
 CONTAINER_RUNTIME=docker NVKE_OS_ARCH=arm64 scripts/nvke-os-local.sh local-arm64-docker-001 1
 CONTAINER_RUNTIME=docker NVKE_OS_ARCH=amd64 scripts/nvke-os-local.sh local-amd64-docker-001 1
 ```
+
+The default guest is Ubuntu 26.04. Set `NVKE_OS_UBUNTU_VERSION=24.04` to select the
+[Ubuntu 24.04.5 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md), including their
+separate compatible agent compiler. The architecture and native KVM requirements stay the same.
 
 Use a different immutable attempt name for each run. The historical Podman
 [full build and boot smoke](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-23-nke-arm64-local-os-build.md)

@@ -16,6 +16,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 const (
@@ -172,22 +173,39 @@ func (root PublicationRoot) Validate() error {
 		return e.New(e.CodeReleaseIncomplete, "publication root contains no delivery objects")
 	}
 	previous := ""
-	seenDescriptors := map[string]bool{}
+	seenDescriptors := map[string]PublishedObject{}
 	for _, object := range root.Objects {
 		key := object.Name + "\x00" + object.Kind
 		if !canonicalToken(object.Name) || !canonicalToken(object.Kind) || key <= previous ||
 			!validMediaType(object.ArtifactType) || !isDigest(object.DescriptorDigest) ||
-			!isDigest(object.SemanticDigest) || !isDigest(object.BlobDigest) || object.Size < 0 || seenDescriptors[object.DescriptorDigest] {
+			!isDigest(object.SemanticDigest) || !isDigest(object.BlobDigest) || object.Size < 0 {
 			return e.New(e.CodeVerifyFailed, "publication objects must be canonical, sorted, unique, and digest-bound")
+		}
+		if first, seen := seenDescriptors[object.DescriptorDigest]; seen &&
+			(root.Release == nil || !sameNativeOutputDescriptor(first, object)) {
+			return e.New(e.CodeVerifyFailed, "publication objects sharing a descriptor must bind the same native image")
 		}
 		if (object.OS == "") != (object.Arch == "") ||
 			(object.OS != "" && (!canonicalToken(object.OS) || !canonicalToken(object.Arch))) {
 			return e.New(e.CodeVerifyFailed, "publication object platform must bind os and arch together")
 		}
-		seenDescriptors[object.DescriptorDigest] = true
+		seenDescriptors[object.DescriptorDigest] = object
 		previous = key
 	}
 	return nil
+}
+
+// Named native image outputs may select identical immutable bytes. Their build,
+// component, repository and evidence memberships remain independent; only the
+// physical image descriptor is shared. Other object kinds cannot alias it.
+func sameNativeOutputDescriptor(a, b PublishedObject) bool {
+	return a.Output != nil && b.Output != nil && a.Evidence == nil && b.Evidence == nil &&
+		a.Output.Format == "oci" && b.Output.Format == "oci" && a.Output.ImageIndex == nil && b.Output.ImageIndex == nil &&
+		a.Kind == "container-image" && b.Kind == a.Kind && a.Name != b.Name &&
+		(a.ArtifactType == MediaOCIManifest || a.ArtifactType == string(types.DockerManifestSchema2)) && b.ArtifactType == a.ArtifactType &&
+		a.DescriptorDigest == b.DescriptorDigest && a.SemanticDigest == a.DescriptorDigest && b.SemanticDigest == a.SemanticDigest &&
+		a.BlobDigest == a.DescriptorDigest && b.BlobDigest == a.BlobDigest && a.Size == b.Size &&
+		a.OS != "" && a.Arch != "" && a.OS == b.OS && a.Arch == b.Arch
 }
 
 func (root PublicationRoot) Digest() (string, error) {

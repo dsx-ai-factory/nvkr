@@ -1,11 +1,11 @@
-# NVIDIA Kubernetes® Recipes (NVKR)
+# NVIDIA Kubernetes Recipes (NVKR)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.27.2-00ADD8.svg)](.go-version)
 
 **Build NVKE artifacts from pinned inputs and trace releases back to their sources.**
 NVKR gives release engineers a CLI, reusable component catalogs and declarative
-Definitions for NVIDIA Kubernetes Engine (NVKE). Select the executables, container
+Definitions for NVIDIA Kubernetes® Engine (NVKE). Select the executables, container
 images, Helm charts or node images to produce; NVKR derives the dependency graph
 and runs local builds or generates GitHub Actions workflows. The hosted workflows
 build, sign and publish releases with evidence consumers can verify against their

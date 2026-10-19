@@ -345,7 +345,7 @@ func exactInputFixtureForPlan(t *testing.T, definition Definition, environment E
 	return exactInputFixtureForPlanAndInvocation(t, definition, environment, plan, "")
 }
 
-func exactInputFixtureForPlanAndInvocation(t *testing.T, definition Definition, environment Environment, plan *factory.Plan, invocation string) exactInputFixture {
+func exactInputFixtureForPlanAndInvocation(t *testing.T, definition Definition, environment Environment, plan *factory.Plan, invocation string, mutations ...func(*delivery.PublicationRequest)) exactInputFixture {
 	t.Helper()
 	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
 	for _, build := range plan.Builds {
@@ -394,6 +394,9 @@ func exactInputFixtureForPlanAndInvocation(t *testing.T, definition Definition, 
 	request.Release.EnvironmentDigest, err = environment.Digest()
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, mutate := range mutations {
+		mutate(&request)
 	}
 	layout := filepath.Join(t.TempDir(), "publication")
 	publication, err := delivery.BuildPublicationRoot(t.Context(), layout, request)

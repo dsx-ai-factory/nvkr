@@ -13,7 +13,8 @@ each concept to a worked example.
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
-| Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
+| Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
+| Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
 | Inspect my first Plan | [Quickstart](quickstart.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
@@ -29,6 +30,8 @@ each concept to a worked example.
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
 [nine-output deploy example](examples/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
 and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
+[Ubuntu 24 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md) select native plain and
+public-bootstrap FDE disk builds alongside the existing Ubuntu 26 default. The
 [FDE-only diagnostic workflow](../inputs/definitions/diagnostics/fde.md) selects one native disk for branch iteration.
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
@@ -60,7 +63,7 @@ records source availability and remaining gaps.
 | Build artifacts, install a local site, and validate a real QCOW2-backed tenant plus workload | [Integrated Ubuntu ARM64 guide](local-nvke-demo.md) |
 | Review exact-revision evidence from the successful fresh upstream OVN diagnostic | [2026-10-11 runtime evidence](evidence/local-upstream-ovn-2026-10-11.md) |
 | Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
-| Understand the NVKR-to-installer artifact handoff | [Staged-installer handoff](nvkr-to-nvke-demo.md) |
+| Inspect older staged-installer sessions and recovery controls | [Legacy handoff and recovery](nvkr-to-nvke-demo.md) |
 | Determine what remains for a full source-built local NVKE distribution | [Full-source gap map](full-nvke-source-build.md) |
 
 ## Engineering and maintenance

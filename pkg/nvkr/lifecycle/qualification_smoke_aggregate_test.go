@@ -48,7 +48,7 @@ func smokeArtifact(t *testing.T, report NativeToolSmokeReport) qualificationorig
 	if err != nil {
 		t.Fatal(err)
 	}
-	return qualificationorigin.NativeSmokeArtifact{Platform: report.Platform, Document: raw, Signature: []byte("signature"), Certificate: []byte("certificate"), Bundle: []byte("bundle")}
+	return qualificationorigin.NativeSmokeArtifact{Platform: report.Platform, Invocation: report.Invocation, Document: raw, Signature: []byte("signature"), Certificate: []byte("certificate"), Bundle: []byte("bundle")}
 }
 func validSmokeVerification(t *testing.T, req trust.DocumentVerificationRequest) trust.VerificationEvidence {
 	t.Helper()
@@ -58,8 +58,79 @@ func validSmokeVerification(t *testing.T, req trust.DocumentVerificationRequest)
 	constraints := *req.GitHubInvocation
 	return trust.VerificationEvidence{CertificateIdentities: append([]string(nil), req.AllowedIdentities...), OIDCIssuer: req.OIDCIssuer, CertificateSHA256: nativeSmokeTestDigest("6"), GitHubInvocation: &constraints}
 }
+
+func TestHostedSmokePartialRetryAuthenticatesOriginalWorkerInvocation(t *testing.T) {
+	checks, invocation, policy, report := smokeAggregateFixture(t)
+	original := report.Invocation
+	invocation.description.Attempt = "12"
+	invocation.description.InvocationID = "https://github.com/" + original.Repository + "/actions/runs/" + original.RunID + "/attempts/12"
+	receipt, err := authenticateHostedToolSmoke(t.Context(), checks, invocation, policy, hostedSmokeVerifier(func(_ context.Context, req trust.DocumentVerificationRequest) (trust.VerificationEvidence, error) {
+		if req.GitHubInvocation == nil || req.GitHubInvocation.RunInvocationURI != original.InvocationID {
+			t.Fatalf("earlier worker signature was rebound to later attempt: %+v", req.GitHubInvocation)
+		}
+		return validSmokeVerification(t, req), nil
+	}), func(context.Context, []string) ([]qualificationorigin.NativeSmokeArtifact, error) {
+		return []qualificationorigin.NativeSmokeArtifact{smokeArtifact(t, report)}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = receipt.Close() }()
+	description, err := receipt.Description()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if description.Invocation != invocation.description || description.Workers[0].Invocation != original {
+		t.Fatal("aggregation did not retain original worker and current qualifier identities")
+	}
+	if err := description.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := receipt.Require(report.ArtifactChecks, invocation.description, report.PolicyDigest); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHostedSmokePartialRetryRejectsWorkerIdentitySubstitution(t *testing.T) {
+	checks, invocation, policy, report := smokeAggregateFixture(t)
+	invocation.description.Attempt = "12"
+	invocation.description.InvocationID = "https://github.com/" + report.Invocation.Repository + "/actions/runs/" + report.Invocation.RunID + "/attempts/12"
+	for _, tc := range []struct {
+		name string
+		edit func(*qualificationorigin.Description)
+	}{
+		{"future attempt", func(d *qualificationorigin.Description) { d.Attempt = "13" }},
+		{"different run", func(d *qualificationorigin.Description) { d.RunID = "51" }},
+		{"different commit", func(d *qualificationorigin.Description) { d.Commit = strings.Repeat("b", 40) }},
+		{"different workflow", func(d *qualificationorigin.Description) { d.Workflow = ".github/workflows/other.yml" }},
+		{"different repository", func(d *qualificationorigin.Description) { d.Repository = "other/nvkr" }},
+		{"different branch", func(d *qualificationorigin.Description) { d.DefaultBranch = "other" }},
+		{"different development branch", func(d *qualificationorigin.Description) { d.Branch = "feature/other" }},
+		{"report differs from selected provider job", func(d *qualificationorigin.Description) { d.Attempt = "11" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			artifact := smokeArtifact(t, report)
+			tc.edit(&artifact.Invocation)
+			d := &artifact.Invocation
+			d.Ref = "refs/heads/" + d.SourceBranch()
+			d.InvocationID = "https://github.com/" + d.Repository + "/actions/runs/" + d.RunID + "/attempts/" + d.Attempt
+			d.BuilderID = "https://github.com/" + d.Repository + "/" + d.Workflow + "@" + d.Ref
+			receipt, err := authenticateHostedToolSmoke(t.Context(), checks, invocation, policy, hostedSmokeVerifier(func(_ context.Context, req trust.DocumentVerificationRequest) (trust.VerificationEvidence, error) {
+				return validSmokeVerification(t, req), nil
+			}), func(context.Context, []string) ([]qualificationorigin.NativeSmokeArtifact, error) {
+				return []qualificationorigin.NativeSmokeArtifact{artifact}, nil
+			})
+			assertCode(t, err, e.CodeGateUnmet)
+			if receipt != nil {
+				t.Fatal("substituted worker minted receipt")
+			}
+		})
+	}
+}
 func TestHostedSmokeRejectsSignedScopeSubstitution(t *testing.T) {
 	checks, invocation, policy, report := smokeAggregateFixture(t)
+	invocation.description.Attempt = "12"
+	invocation.description.InvocationID = "https://github.com/" + report.Invocation.Repository + "/actions/runs/" + report.Invocation.RunID + "/attempts/12"
 	for _, tc := range []struct {
 		name string
 		edit func(*NativeToolSmokeReport)
@@ -75,6 +146,8 @@ func TestHostedSmokeRejectsSignedScopeSubstitution(t *testing.T) {
 		}, e.CodeGateUnmet},
 		{"omitted member", func(r *NativeToolSmokeReport) { r.Members = r.Members[:len(r.Members)-1] }, e.CodeReleaseIncomplete},
 		{"changed exact A", func(r *NativeToolSmokeReport) { r.ArtifactChecks.CatalogDigest = nativeSmokeTestDigest("9") }, e.CodeGateUnmet},
+		{"changed source", func(r *NativeToolSmokeReport) { r.ArtifactChecks.Origin.Commit = strings.Repeat("b", 40) }, e.CodeGateUnmet},
+		{"changed Plan", func(r *NativeToolSmokeReport) { r.ArtifactChecks.Inputs.PlanDigest = nativeSmokeTestDigest("9") }, e.CodeGateUnmet},
 		{"failed report", func(r *NativeToolSmokeReport) { r.Status = "fail"; r.Code = string(e.CodeGateUnmet) }, e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -148,9 +221,11 @@ func TestHostedSmokeAuthenticatesBeforeMintAndFreezesDescriptions(t *testing.T) 
 }
 func TestHostedSmokeVerifierFailureAndFinalRevocation(t *testing.T) {
 	checks, baseInvocation, policy, report := smokeAggregateFixture(t)
-	for _, mode := range []string{"signature", "wrong signer", "missing invocation claims", "wrong invocation claims", "cancel", "qualifier revoked"} {
+	for _, mode := range []string{"signature", "wrong signer", "missing invocation claims", "wrong invocation claims", "relabeled earlier attempt", "cancel", "qualifier revoked"} {
 		t.Run(mode, func(t *testing.T) {
 			invocation := &nativeSmokeTestInvocation{source: baseInvocation.source, description: baseInvocation.description}
+			invocation.description.Attempt = "12"
+			invocation.description.InvocationID = "https://github.com/" + report.Invocation.Repository + "/actions/runs/" + report.Invocation.RunID + "/attempts/12"
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			receipt, err := authenticateHostedToolSmoke(ctx, checks, invocation, policy, hostedSmokeVerifier(func(_ context.Context, req trust.DocumentVerificationRequest) (trust.VerificationEvidence, error) {
@@ -164,6 +239,8 @@ func TestHostedSmokeVerifierFailureAndFinalRevocation(t *testing.T) {
 					ev.GitHubInvocation = nil
 				case "wrong invocation claims":
 					ev.GitHubInvocation.BuildConfigDigest = strings.Repeat("f", 40)
+				case "relabeled earlier attempt":
+					ev.GitHubInvocation.RunInvocationURI = invocation.description.InvocationID
 				case "cancel":
 					cancel()
 				case "qualifier revoked":

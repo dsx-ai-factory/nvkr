@@ -20,7 +20,9 @@ func ConfigureCancellation(cmd *exec.Cmd, grace time.Duration) error {
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
-	cmd.SysProcAttr.Setpgid = true
+	// setsid already creates a private group with PGID equal to the child PID.
+	// Combining it with setpgid makes session creation fail with EPERM.
+	cmd.SysProcAttr.Setpgid = !cmd.SysProcAttr.Setsid
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return os.ErrProcessDone

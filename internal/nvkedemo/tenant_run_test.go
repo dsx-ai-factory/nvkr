@@ -63,7 +63,7 @@ shift 2
 if test "$1" = --request-timeout=10s; then shift; fi
 if test "$1" = -n; then shift 2; fi
 case "$1 $2" in
-  'get secret') step kubeconfig; printf '{}\n' ;;
+  'get secret') step kubeconfig; printf '{"data":{"value":"YQ=="}}\n' ;;
   'config view') cat "$FIXTURE/config.json" ;;
   'get nodes') step nodes; cat "$FIXTURE/nodes.json" ;;
   'get machines.cluster.x-k8s.io,nicomachines.infrastructure.cluster.x-k8s.io') step guest-bindings; printf '{"items":[]}\n' ;;

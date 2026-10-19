@@ -238,3 +238,33 @@ func errorCode(err error) nvkrerr.Code {
 	}
 	return ""
 }
+
+func TestNativeHVFClassMatching(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		platform   HostPlatform
+		capability CapabilityName
+		valid      bool
+	}{
+		{"native Mac", HostPlatformDarwinARM64, CapabilityHVF, true},
+		{"Linux KVM", HostPlatformLinuxARM64, CapabilityKVM, true},
+		{"Mac cannot expose KVM", HostPlatformDarwinARM64, CapabilityKVM, false},
+		{"Linux cannot expose HVF", HostPlatformLinuxARM64, CapabilityHVF, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			class := testClass("native", test.platform, false)
+			class.Capabilities = []CapabilityName{test.capability}
+			requirements := testRequirements(CapabilityRequired)
+			requirements.AllowedHostPlatforms = []HostPlatform{test.platform}
+			requirements.Capabilities = []CapabilityRequirement{{Name: test.capability, Policy: CapabilityRequired}}
+			binding, err := Match(requirements, []Class{class}, MatchOptions{RequiredHostPlatform: test.platform})
+			if test.valid {
+				if err != nil || binding == nil || !binding.Capabilities[0].Enabled {
+					t.Fatalf("native binding=%+v/%v", binding, err)
+				}
+			} else if binding != nil || errorCode(err) != nvkrerr.CodeInvalidCatalog {
+				t.Fatalf("foreign capability accepted=%+v/%v", binding, err)
+			}
+		})
+	}
+}

@@ -21,6 +21,13 @@ The catalog has two files:
 | `registry.yaml` | Sources, allowed versions, supported platforms, toolchains and producer instructions | Edit the declarations. |
 | `pins.lock.yaml` | Exact source commits, trees and timestamps; acquired-artifact and tool digests | Use `catalog pin`/`bump` for source releases and their tool assets; `catalog pin-artifacts` for direct acquired-artifact/image pins. |
 
+A command producer may declare `buildCommandByPlatform` with complete argument arrays for explicitly
+supported platforms. The compiler selects the exact matching array, falling back to `buildCommand` when no
+override exists, before deriving the IR and Build Digest. This keeps host linker differences in one producer:
+the native NICoSim catalog retains Linux's static Make build and selects Go compilation on Darwin. It does
+not duplicate source pins, material declarations or deployment orchestration. Unknown targets and empty
+overrides fail validation; command overrides are unavailable to Packer, Nix and acquired producers.
+
 A source can serve several components. A pin set can derive several source or acquired-artifact versions
 from one upstream release's version file. Update those members through their owning source. Use
 `catalog bump --check` to preview changes without writing the lock; pending changes return `NVKR-E-DIFF`.
@@ -119,6 +126,15 @@ existing component key. Missing selected materials fail validation.
 A disk output currently selects its root and every transitive material producer explicitly, with no
 unrelated extras. Root-only selection does not expand dependencies automatically. See
 [node images](node-images.md) for the complete example.
+
+## Acquired executables
+
+A source `tool` selects an exact upstream executable with `format: raw`, `tar-gzip` or `zip`, an HTTPS
+URL, a concrete platform and an exact `executablePath`. Its `releaseExecutable: true` component uses
+`outputType: host-package`. `catalog pin` records both carrier and executable digests. Acquisition checks
+both identities and scans all archive entries with bounded standard-library readers; it never extracts
+archive paths into the filesystem. Archive format is part of the compiled identity. Existing tar-gzip IR
+records retain their original encoding.
 
 ## Build tools and version stamps
 

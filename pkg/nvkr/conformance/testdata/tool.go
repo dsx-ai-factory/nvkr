@@ -117,9 +117,6 @@ func main() {
 		}
 		return
 	}
-	if mode == "slow-after" && readState()["_finished"] != "" {
-		time.Sleep(40 * time.Millisecond)
-	}
 	var args []string
 	for _, a := range os.Args[1:] {
 		if !strings.HasPrefix(a, "--") {
@@ -128,6 +125,18 @@ func main() {
 	}
 	if len(args) == 0 {
 		os.Exit(5)
+	}
+	if mode == "slow-after" && readState()["_finished"] != "" && args[0] == "get" &&
+		(has("--raw=/version") || len(args) > 1 && (args[1] == "nodes" || args[1] == "pods") ||
+			len(args) > 2 && args[1] == "namespaces" && args[2] == "kube-system") {
+		// Only the six terminal observation calls are delayed. Each remains well
+		// inside its command budget, while their sum exceeds one such budget.
+		// Cleanup GET/DELETE operations keep their ordinary scheduling allowance.
+		budget, err := time.ParseDuration(value("--request-timeout="))
+		if err != nil || budget <= 0 {
+			os.Exit(24)
+		}
+		time.Sleep(budget / 4)
 	}
 	switch args[0] {
 	case "get":

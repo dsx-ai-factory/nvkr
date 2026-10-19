@@ -31,6 +31,23 @@ func Arch(platform string) string {
 	}
 }
 
+// ValidateExecutablePlatform admits acquired native tools independently of the
+// Linux source-build and OCI execution domains. It does not authorize execution.
+func ValidateExecutablePlatform(platform string) error {
+	if platform == "darwin/arm64" {
+		return nil
+	}
+	return ValidatePlatform(platform)
+}
+
+// ExecutableArch returns the architecture of an admitted executable target.
+func ExecutableArch(platform string) string {
+	if platform == "darwin/arm64" {
+		return "arm64"
+	}
+	return Arch(platform)
+}
+
 func ValidArch(arch string) bool { return arch == "amd64" || arch == "arm64" }
 
 // Arches returns the supported architecture domain in canonical order.

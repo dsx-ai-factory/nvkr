@@ -595,6 +595,10 @@ retain their JSON locators plus separately admitted metadata records. The factor
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
 digests and downstream artifact authentication remain required. Metadata-only transfers use workflow
 identity without package API calls. Dedicated read/write credentials do not elevate repository-token permissions.
+Interrupted private reads have at most three extraction attempts under one deadline. Typed HTTP/2 peer
+resets admitted by ADR-18 restart from byte zero after response closure and checked staging cleanup;
+every attempt repeats complete chunk and archive verification. Independent failures cannot authorize a
+retry, and publication and signing remain outside this recovery boundary.
 Production partial retries admit earlier source attempts only within the same Run and preserve original
 transport bindings through restoration. Bounded same-name candidates all authenticate before selection
 of the newest source attempt; ties within an attempt fail closed. Development and explicit cross-Run transfers remain exact-attempt;
@@ -667,7 +671,7 @@ need not traverse job storage repeatedly. Fetching precedes the build; publicati
 after the build exits and the run record is written. The mechanism enforcing this phase separation is part of
 wrapped-job acceptance, not implied by putting steps in sequence.
 
-M3 authenticates the complete selected set against its exact producing Run, attempt, commit and inputs. It
+M3 authenticates the complete selected set against its producing Run, original attempts, commit and inputs. It
 checks schemas, applicable pins and sources, build signatures/provenance and delivered-tool smoke. The
 implemented M3-A diagnostic takes an exact Run attempt URL and independently selected policy through
 `run check-artifacts --run <URL> --policy <path>`. The provider discovers the commit and authenticates the
@@ -675,15 +679,25 @@ successful attempt against the approved repository, workflow and actual default 
 producer generates a bounded handoff containing original Plan bytes, compiler-read authored inputs and
 original publication predicates. Replay preserves logical paths and recompiles from captured files without a
 checkout fallback; catalog-owned pinned Git authentication still runs, so this is not offline replay.
-Downloaded records cannot select consumer policy or replace missing evidence.
+Downloaded records cannot select consumer policy or replace missing evidence. The successful source attempt
+anchors completion; authenticated production output publications and aggregate roots may come from earlier
+attempts of the same producer run under ADR-20's ordering and exact-input checks. Original evidence is retained, and an
+earlier attempt's unrelated job failure does not invalidate its successfully authenticated outputs.
 
-The lifecycle owner issues an opaque check receipt retaining the verified publication and frozen Plan.
+Hosted artifact checking verifies every output's complete payload sequentially and releases non-executable
+scratch after each output. The lifecycle owner issues an opaque check receipt retaining verified control
+documents, evidence, exact executable bundle bytes and the frozen Plan. The narrower owner cannot export discarded
+payloads; ordinary full-publication verification retains its complete export capability.
 Closing it revokes copies, cancels and joins registered operations, then releases held bytes and any owned
 source receipt. The receipt grants neither smoke-execution nor signing authority. Fixed native smoke workers
 consume its held executable members in nonroot network-disabled containers and compare versions with the
-frozen producer inputs. Their distinct signatures bind exact member observations, full policy and the current
-qualifier invocation. The final owner requires successful exact-attempt jobs, authenticates those signatures
-and certificate invocation claims, and recomputes complete native coverage before issuing a B receipt.
+frozen producer inputs. Their distinct signatures bind exact member observations, full policy and each
+worker's original qualifier invocation. The final owner selects the latest job per native platform in the
+same qualification run, requires success, authenticates its signature and original certificate invocation,
+and recomputes complete native coverage before issuing a B receipt for the current invocation. Earlier
+successful workers require unchanged source checks, commit and policy; a later failed worker blocks reuse.
+Development qualifier retries preserve the original worker branch and private-carrier attempt as well;
+development publications remain bound to their exact source attempt and namespace.
 For mixed executable bundles, independent policy may name an exact runtime-assets archive member.
 Shared admission requires its source-built tarball producer, a non-executable delivered mode and
 complete sibling tool coverage. The archive stays in A's authenticated artifact set; the rule does
@@ -723,8 +737,11 @@ External suites outside scope are explicitly not evaluated. Future required suit
 subject-bound results; an unsigned report or pass boolean cannot satisfy the gate. This supplies no runtime
 conformance or cluster qualification. M4 issues a canonical release manifest listing every artifact only after
 its exact passing qualification evidence is authenticated on every member, and attests it to the publication root
-under the qualification identity; issuance has contract coverage only. A failing, incomplete or wrong-signer
-verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
+under the qualification identity. The generated production qualifier invokes issuance in the same process
+through `run qualify --issue-manifest`, retaining live receipts and the exact canonical evidence. The same
+independently loaded qualification policy selects the expected signer and policy digest. Development stays
+qualification-only. Issuance has contract coverage only; hosted acceptance remains unproved. A failing,
+incomplete or wrong-signer verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
 deferred beyond the MVP.
 
 #### Qualified reproduction and release

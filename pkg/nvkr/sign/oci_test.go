@@ -111,14 +111,14 @@ func TestDryRunSignerVerifyRecord(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := 2
+			want := 1
 			if required {
-				want = 4
+				want = 2
 			}
 			if len(record.WouldRun) != want || len(record.Ran) != 0 || record.SignatureVerified || record.AttestationVerified {
 				t.Fatalf("record: %+v", record)
 			}
-			if record.WouldRun[0][1] != "download" || record.WouldRun[1][1] != "verify-blob-attestation" {
+			if record.WouldRun[0][1] != "verify-blob-attestation" {
 				t.Fatalf("commands: %v", record.WouldRun)
 			}
 			if err := record.Validate(); err != nil {
@@ -249,6 +249,9 @@ func newStubbedSigner(t *testing.T, stub *cosignStub, credential Credential) *Co
 	if err != nil {
 		t.Fatalf("NewCosignOCISigner: %v", err)
 	}
+	signer.bundleSource = func(_ context.Context, _ Subject, _ Credential) (*ociBundleSource, error) {
+		return fixtureOCIBundleSource([]byte(stub.stdout["download"]))
+	}
 	return signer
 }
 
@@ -325,7 +328,7 @@ func TestCosignOCICredentialsNeverReachArgv(t *testing.T) {
 		"version":  cosignVersionJSON,
 		"download": testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer),
 	}}
-	credential := Credential{Registry: "ghcr.io", Username: "publisher-bot", Password: "s3cr3t-token"}
+	credential := Credential{Registry: "127.0.0.1:5000", Username: "publisher-bot", Password: "s3cr3t-token"}
 	var configPath string
 	var configMode, dirMode os.FileMode
 	var document []byte
@@ -371,7 +374,7 @@ func TestCosignOCICredentialsNeverReachArgv(t *testing.T) {
 	if err := json.Unmarshal(document, &config); err != nil {
 		t.Fatalf("config.json is not JSON: %v (%s)", err, document)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(config.Auths["ghcr.io"].Auth)
+	decoded, err := base64.StdEncoding.DecodeString(config.Auths["127.0.0.1:5000"].Auth)
 	if err != nil {
 		t.Fatalf("auth is not base64: %v", err)
 	}

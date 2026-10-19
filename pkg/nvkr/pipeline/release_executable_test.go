@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"net/http"
@@ -19,6 +20,13 @@ import (
 )
 
 func TestReleaseExecutableAcquisition(t *testing.T) {
+	for _, format := range []string{"", "zip"} {
+		t.Run(format, func(t *testing.T) { testReleaseExecutableAcquisition(t, format) })
+	}
+}
+
+func testReleaseExecutableAcquisition(t *testing.T, format string) {
+	t.Helper()
 	executable := []byte("pinned executable")
 	var carrier bytes.Buffer
 	gz := gzip.NewWriter(&carrier)
@@ -35,6 +43,20 @@ func TestReleaseExecutableAcquisition(t *testing.T) {
 	if err := gz.Close(); err != nil {
 		t.Fatal(err)
 	}
+	if format == "zip" {
+		carrier.Reset()
+		zw := zip.NewWriter(&carrier)
+		f, err := zw.Create("linux-amd64/tool")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Write(executable); err != nil {
+			t.Fatal(err)
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
 	archive := carrier.Bytes()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write(archive)
@@ -46,6 +68,13 @@ func TestReleaseExecutableAcquisition(t *testing.T) {
 		code   e.Code
 	}{
 		{name: "exact"},
+		{name: "wrong archive format", change: func(n *ir.Node) {
+			if n.ExecutableArchive.Format == "zip" {
+				n.ExecutableArchive.Format = ""
+			} else {
+				n.ExecutableArchive.Format = "zip"
+			}
+		}, code: e.CodeVerifyFailed},
 		{name: "changed archive", change: func(n *ir.Node) { n.ExecutableArchive.Digest = sha256Of([]byte("other archive")) }, code: e.CodeVerifyFailed},
 		{name: "changed executable", change: func(n *ir.Node) { n.Digest = sha256Of([]byte("other executable")) }, code: e.CodeVerifyFailed},
 		{name: "missing member", change: func(n *ir.Node) { n.ExecutableArchive.Member = "other" }, code: e.CodeVerifyFailed},
@@ -62,7 +91,7 @@ func TestReleaseExecutableAcquisition(t *testing.T) {
 				Digest: sha256Of(executable), Platform: "linux/amd64", Network: ir.NetworkDefault,
 				OutputType: "host-package", ArtifactPath: "tool", Version: "1.2.3",
 				Env:               []ir.EnvVar{{Name: "SOURCE_DATE_EPOCH", Value: "1"}},
-				ExecutableArchive: &ir.ExecutableArchive{Digest: sha256Of(archive), Member: "linux-amd64/tool"}}
+				ExecutableArchive: &ir.ExecutableArchive{Format: format, Digest: sha256Of(archive), Member: "linux-amd64/tool"}}
 			if test.change != nil {
 				test.change(&node)
 			}

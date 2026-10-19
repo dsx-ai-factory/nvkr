@@ -5,13 +5,14 @@ package delivery
 
 import (
 	"context"
+	"errors"
 	"sort"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
-func (writer layoutWriter) importImageIndexLayout(ctx context.Context, input ObjectInput) (Descriptor, string, error) {
+func (writer layoutWriter) importImageIndexLayout(ctx context.Context, input ObjectInput) (result Descriptor, digest string, err error) {
 	if err := admitImageIndexInput(input); err != nil {
 		return Descriptor{}, "", err
 	}
@@ -19,7 +20,12 @@ func (writer layoutWriter) importImageIndexLayout(ctx context.Context, input Obj
 	if err != nil {
 		return Descriptor{}, "", err
 	}
-	defer func() { _ = index.Close() }()
+	defer func() {
+		if closeErr := index.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+			result, digest = Descriptor{}, ""
+		}
+	}()
 	description, err := index.Description()
 	if err != nil {
 		return Descriptor{}, "", err
@@ -27,23 +33,59 @@ func (writer layoutWriter) importImageIndexLayout(ctx context.Context, input Obj
 	object := PublishedObject{Output: input.Output, Name: input.Name, Kind: input.Kind, ArtifactType: input.ArtifactType,
 		DescriptorDigest: description.Digest, Size: description.Size, SemanticDigest: input.SemanticDigest,
 		BlobDigest: input.BlobDigest, OS: input.OS, Arch: input.Arch}
+	return writer.importHeldImageIndex(ctx, object, index)
+}
+
+// importHeldImageIndex borrows an already verified closure without another layout
+// or snapshot. The operation gate joins concurrent Close across shallow handles;
+// the caller retains ownership and closes the index after the import finishes.
+func (writer layoutWriter) importHeldImageIndex(ctx context.Context, object PublishedObject, index *ImageIndex) (Descriptor, string, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return Descriptor{}, "", err
+	}
+	if index == nil {
+		return Descriptor{}, "", e.New(e.CodeUsage, "image index import requires a capability")
+	}
+	if index.imageIndexState == nil || index.operation == nil {
+		return Descriptor{}, "", e.New(e.CodeVerifyFailed, "image index capability was not issued by delivery")
+	}
+	select {
+	case <-ctx.Done():
+		return Descriptor{}, "", e.Wrap(e.CodeTimeout, ctx.Err(), "image index import canceled while waiting for an active operation")
+	case index.operation <- struct{}{}:
+	}
+	defer func() { <-index.operation }()
+	if err := deliveryContext(ctx); err != nil {
+		return Descriptor{}, "", err
+	}
+	index.mu.Lock()
+	err := index.usable()
+	closure, description := index.closure, index.description
+	index.mu.Unlock()
+	if err != nil {
+		return Descriptor{}, "", err
+	}
 	if err := validatePublishedImageIndex(object, description); err != nil {
 		return Descriptor{}, "", err
 	}
-	// This fresh capability remains private to this invocation; no other caller
-	// can write or close it while its immutable held blobs are copied.
-	digests := make([]string, 0, len(index.closure.blobs))
-	for digest := range index.closure.blobs {
+	digests := make([]string, 0, len(closure.blobs))
+	for digest := range closure.blobs {
 		digests = append(digests, digest)
 	}
 	sort.Strings(digests)
 	for _, digest := range digests {
-		if _, err := writer.addBlobHeld(ctx, index.closure.blobs[digest], MediaOctetStream); err != nil {
+		if err := deliveryContext(ctx); err != nil {
+			return Descriptor{}, "", err
+		}
+		if _, err := writer.addBlobHeld(ctx, closure.blobs[digest], MediaOctetStream); err != nil {
 			return Descriptor{}, "", err
 		}
 	}
-	descriptor, err := writer.addBlobHeld(ctx, index.closure.index, MediaOCIIndex)
+	descriptor, err := writer.addBlobHeld(ctx, closure.index, MediaOCIIndex)
 	if err != nil {
+		return Descriptor{}, "", err
+	}
+	if err := deliveryContext(ctx); err != nil {
 		return Descriptor{}, "", err
 	}
 	return descriptor, description.Digest, nil

@@ -92,9 +92,6 @@ func TestQualificationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testin
 						return os.WriteFile(call.args[6], []byte("changed"), 0600)
 					}
 				}
-				if call.args[0] == "download" && call.args[3] != QualificationPredicateType {
-					t.Fatal("qualification downloaded another evidence type")
-				}
 				if call.args[0] == "verify-blob-attestation" && call.args[4] != QualificationPredicateType {
 					t.Fatal("qualification verified another evidence type")
 				}
@@ -106,7 +103,7 @@ func TestQualificationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testin
 			} else if err != nil {
 				t.Fatal(err)
 			}
-			if tc.code == "" && (len(stub.calls) != 3 || stub.calls[0].args[0] != "attest" || stub.calls[1].args[0] != "download" || stub.calls[2].args[0] != "verify-blob-attestation") {
+			if tc.code == "" && (len(stub.calls) != 2 || stub.calls[0].args[0] != "attest" || stub.calls[1].args[0] != "verify-blob-attestation") {
 				t.Fatalf("calls=%+v", stub.calls)
 			}
 			for _, call := range stub.calls {
@@ -175,10 +172,6 @@ func TestDevelopmentQualificationUsesDistinctPredicate(t *testing.T) {
 				case "attest", "verify-blob-attestation":
 					if call.args[4] != expected {
 						t.Fatalf("wrong predicate: %v", call.args)
-					}
-				case "download":
-					if call.args[3] != expected {
-						t.Fatalf("wrong read-back: %v", call.args)
 					}
 				}
 			}

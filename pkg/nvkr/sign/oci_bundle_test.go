@@ -100,21 +100,9 @@ func TestCosignOCIBundleVerification(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			signature := testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer)
 			provenance := testOCIBundle(t, ociTestDigest, ProvenancePredicateType, ociObservedIdentity, ociTestIssuer)
-			stub := &cosignStub{stdout: map[string]string{"version": cosignVersionJSON, "verify-blob-attestation": `{"Subject":"untrusted presentation text"}`}}
+			stub := &cosignStub{stdout: map[string]string{"version": cosignVersionJSON, "verify-blob-attestation": `{"Subject":"untrusted presentation text"}`, "download": signature + "\n" + provenance}}
 			var paths []string
 			stub.onCall = func(call recordedCall) error {
-				if call.args[0] == "download" {
-					if tc.failure == "download" {
-						return fmt.Errorf("download failed")
-					}
-					if call.args[1] != "attestation" || call.args[2] != "--predicate-type" || call.args[4] != ociTestRef {
-						t.Fatalf("download argv: %v", call.args)
-					}
-					stub.stdout["download"] = signature
-					if call.args[3] == ProvenancePredicateType {
-						stub.stdout["download"] = provenance
-					}
-				}
 				if call.args[0] == "verify-blob-attestation" {
 					path := call.args[2]
 					paths = append(paths, path)
@@ -148,7 +136,13 @@ func TestCosignOCIBundleVerification(t *testing.T) {
 				}
 				return nil
 			}
-			record, err := newStubbedSigner(t, stub, Credential{}).Verify(t.Context(), ociSubject(), VerifyPolicy{RequireAttestation: tc.required})
+			signer := newStubbedSigner(t, stub, Credential{})
+			if tc.failure == "download" {
+				signer.bundleSource = func(context.Context, Subject, Credential) (*ociBundleSource, error) {
+					return nil, e.New(e.CodeSignatureInvalid, "download failed")
+				}
+			}
+			record, err := signer.Verify(t.Context(), ociSubject(), VerifyPolicy{RequireAttestation: tc.required})
 			if tc.want != "" {
 				requireSignCode(t, err, tc.want)
 				if record.SignatureVerified || record.AttestationVerified || len(record.Ran) > 0 {
@@ -158,9 +152,9 @@ func TestCosignOCIBundleVerification(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				want := 2
+				want := 1
 				if tc.required {
-					want = 4
+					want = 2
 				}
 				if len(record.Ran) != want || !record.SignatureVerified || record.AttestationVerified != tc.required || record.ObservedIdentity != ociObservedIdentity || record.ObservedIssuer != ociTestIssuer {
 					t.Fatalf("record: %+v", record)
@@ -190,7 +184,7 @@ func TestOCIBundleRefusesSubstitutedClaims(t *testing.T) {
 			stub := &cosignStub{stdout: map[string]string{"download": testOCIBundle(t, tc.digest, tc.predicate, tc.identity, tc.issuer)}}
 			_, err := newStubbedSigner(t, stub, Credential{}).Verify(t.Context(), ociSubject(), VerifyPolicy{})
 			requireSignCode(t, err, tc.want)
-			if len(stub.calls) != 1 {
+			if len(stub.calls) != 0 {
 				t.Fatal("invalid bundle reached verification")
 			}
 		})
@@ -240,8 +234,10 @@ func TestOCIBundleFailureSummary(t *testing.T) {
 	}
 }
 
-func TestOCIBundleDownloadRejectsLegacyAndMalformedReports(t *testing.T) {
-	for _, raw := range []string{"", "not json", "[]", cosignAttestationJSON(ociTestDigest, CosignSignaturePredicateType), strings.Repeat("{}\n", maxVerificationBundles+1), `{"mediaType":"a","mediaType":"b"}`} {
+func TestOCIBundleVerificationRejectsUnsupportedEvidence(t *testing.T) {
+	// These well-formed fixtures reach production classification/claims checks.
+	// Invalid and ambiguous JSON is exercised through real registry transport.
+	for _, raw := range []string{"", "[]", "{}", cosignAttestationJSON(ociTestDigest, CosignSignaturePredicateType)} {
 		t.Run(fmt.Sprintf("%.30s", raw), func(t *testing.T) {
 			_, err := newStubbedSigner(t, &cosignStub{stdout: map[string]string{"download": raw}}, Credential{}).Verify(t.Context(), ociSubject(), VerifyPolicy{})
 			requireSignCode(t, err, e.CodeSignatureInvalid)

@@ -140,6 +140,8 @@ func (s *CosignOCISigner) VerifySBOM(ctx context.Context, digest string, bundle 
 	if _, err := sbom.AttestedDocument(bundle, digest); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
 	workspace, cleanup, err := newPrivateWorkspace("nvkr-sbom-verify-*")
 	if err != nil {
 		return err
@@ -153,7 +155,13 @@ func (s *CosignOCISigner) VerifySBOM(ctx context.Context, digest string, bundle 
 	if _, err := s.capture(ctx, args, ociCosignEnvironment(os.Environ(), "")); err != nil {
 		return err
 	}
-	return assertPrivateFileUnchanged(path, bundle)
+	if err := contextError(ctx); err != nil {
+		return err
+	}
+	if err := assertPrivateFileUnchanged(path, bundle); err != nil {
+		return err
+	}
+	return contextError(ctx)
 }
 
 func (s *CosignOCISigner) admitSBOM(ctx context.Context, digest string) error {

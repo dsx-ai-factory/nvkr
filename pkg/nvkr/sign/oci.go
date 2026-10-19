@@ -18,9 +18,9 @@ package sign
 //     through Linux anonymous-descriptor execution and fails closed elsewhere,
 //     exactly like the qualified sign-blob/verify-blob adapters in this package.
 //
-// Registry credentials NEVER appear in argv or in a record: they are written to
-// a private 0600 config.json inside a private 0700 DOCKER_CONFIG directory whose
-// lifetime is the operation.
+// Registry credentials NEVER appear in argv or in a record. The bundle reader
+// uses explicitly scoped in-memory credentials; subprocesses receive a private
+// 0600 config.json in a 0700 DOCKER_CONFIG directory owned by the operation.
 
 import (
 	"bytes"
@@ -361,8 +361,9 @@ func (s *DryRunSigner) SignAndAttest(ctx context.Context, subject Subject, predi
 	return record, nil
 }
 
-// Verify records the exact verification invocations without running them. The
-// returned record never claims a verified signature or attestation.
+// Verify records the exact verification invocations without running them.
+// Registry discovery uses HTTP and has no subprocess argv. The returned record
+// never claims a verified signature or attestation.
 func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy VerifyPolicy) (VerificationRecord, error) {
 	if s == nil {
 		return VerificationRecord{}, e.New(e.CodeInternal, "dry-run OCI signer is not initialized")
@@ -386,12 +387,11 @@ func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy Verif
 		Issuer:        resolved.Issuer,
 		PredicateType: ProvenancePredicateType,
 		WouldRun: [][]string{
-			argv(DefaultBinary, ociDownloadBundleArgs(subject.Ref, CosignSignaturePredicateType)),
 			argv(DefaultBinary, ociVerifyBundleArgs(SignatureBundlePlaceholder, subject.Digest, CosignSignaturePredicateType, resolved)),
 		},
 	}
 	if resolved.RequireAttestation {
-		record.WouldRun = append(record.WouldRun, argv(DefaultBinary, ociDownloadBundleArgs(subject.Ref, ProvenancePredicateType)),
+		record.WouldRun = append(record.WouldRun,
 			argv(DefaultBinary, ociVerifyBundleArgs(ProvenanceBundlePlaceholder, subject.Digest, ProvenancePredicateType, resolved)))
 	}
 	if err := record.Validate(); err != nil {
@@ -404,9 +404,9 @@ func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy Verif
 // CosignOCISigner
 // ---------------------------------------------------------------------------
 
-// Credential is one registry credential. It is written to a private Docker
-// config file for the duration of an operation and never reaches argv, a
-// record, or the child's inherited ambient environment.
+// Credential is one registry credential. Direct reads scope it to the subject
+// registry; subprocesses receive it through a private Docker config file. It
+// never reaches argv, a record, or the child's inherited ambient environment.
 type Credential struct {
 	Registry string
 	Username string
@@ -476,6 +476,9 @@ type CosignOCISigner struct {
 	identity     string
 	issuer       string
 	credential   Credential
+	// Tests may replace descriptive transport independently of crypto. Production
+	// always constructs one private, lazy source for the complete Verify call.
+	bundleSource func(context.Context, Subject, Credential) (*ociBundleSource, error)
 
 	versionOnce  sync.Mutex
 	version      string
@@ -612,6 +615,9 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	if err != nil {
 		return VerificationRecord{}, err
 	}
+	if _, err := admitOCIRegistry(subject, s.credential); err != nil {
+		return VerificationRecord{}, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	workspace, cleanup, err := newPrivateWorkspace("nvkr-cosign-oci-verify-*")
@@ -624,6 +630,11 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 		return VerificationRecord{}, err
 	}
 	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
+	source, err := s.newOCIBundleSource(ctx, subject)
+	if err != nil {
+		return VerificationRecord{}, err
+	}
+	defer source.close()
 
 	record := VerificationRecord{
 		SchemaVersion: VerificationRecordSchemaVersion,
@@ -638,7 +649,7 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	// the artifact signature has its own distinct predicate and evidence type.
 	signaturePolicy := resolved
 	signaturePolicy.ExpectedPredicate = nil
-	identity, issuer, ran, err := s.verifyOCIBundles(ctx, subject, CosignSignaturePredicateType, signaturePolicy, workspace, environment)
+	identity, issuer, ran, err := s.verifyOCIType(ctx, source, subject, CosignSignaturePredicateType, signaturePolicy, workspace, environment)
 	if err != nil {
 		return VerificationRecord{}, err
 	}
@@ -647,7 +658,7 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	record.ObservedIdentity = identity
 	record.ObservedIssuer = issuer
 	if resolved.RequireAttestation {
-		_, _, ran, err := s.verifyOCIBundles(ctx, subject, ProvenancePredicateType, resolved, workspace, environment)
+		_, _, ran, err := s.verifyOCIType(ctx, source, subject, ProvenancePredicateType, resolved, workspace, environment)
 		if err != nil {
 			return VerificationRecord{}, err
 		}
@@ -655,6 +666,9 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 		record.AttestationVerified = true
 	}
 	record.CosignVersion = s.detectVersion(ctx, environment)
+	if err := contextError(ctx); err != nil {
+		return VerificationRecord{}, err
+	}
 	if err := record.Validate(); err != nil {
 		return VerificationRecord{}, err
 	}
